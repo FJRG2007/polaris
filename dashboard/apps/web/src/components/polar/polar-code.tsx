@@ -1691,6 +1691,7 @@ function CodeThread({
                         )}
                         {/* A thread cached before subagents were read has none. */}
                         <CodeSubagents
+                            sessionId={sessionId}
                             subagents={thread.subagents ?? []}
                             onStop={live && thread.canManage && canPrompt ? stopTurn : null}
                             stopping={busy}

@@ -8,12 +8,19 @@
  *
  * Only a container session has these. One on somebody's own server is that
  * server's files, and its shell is the way to them.
+ *
+ * The one file outside the checkout read here is a subagent's own transcript,
+ * at the exact place Claude Code writes it (`subagentTranscriptPath`), and from
+ * wherever the session lives.
  */
 
 import * as core from "@polaris/core";
 import { DEFAULT_WORKDIR } from "./session-work";
 import { withContainerPorts } from "./session-ports";
 import { sessionPlacement } from "./session-service";
+import { runInSession } from "./session-runtime";
+import { readTranscript } from "./session-transcript";
+import { decodeClaudeSubagentLine, type HistoryRow } from "./transcript-decoders";
 
 /** The most files a list holds. Past this the list says it was cut. */
 export const MAX_FILES = 20_000;
@@ -144,6 +151,74 @@ export async function readSessionFile(sessionId: string, rawPath: string): Promi
         });
     } catch (error) {
         console.error(`[agent-session] ${sessionId}: could not read ${path}:`, error);
+        return { kind: "unavailable" };
+    }
+}
+
+/** The most rows a subagent's transcript is shown with; past it, it says so. */
+export const MAX_SUBAGENT_ROWS = 500;
+/** Chunks of a subagent's transcript read at most (`TRANSCRIPT_CHUNK_BYTES` each). */
+const SUBAGENT_CHUNKS = 48;
+
+/** `~/.claude/projects/<project>/.../subagents/<agent>.jsonl`, from the home
+ *  or absolute. A config home moved by `CLAUDE_CONFIG_DIR` is still a
+ *  `.claude*` directory. No step up, nothing a shell would read. */
+const SUBAGENT_TRANSCRIPT =
+    /^(?:~|(?:\/[A-Za-z0-9._-]+)+)\/\.claude[A-Za-z0-9_-]*\/projects\/(?:[A-Za-z0-9._-]+\/)+subagents\/[A-Za-z0-9._-]+\.jsonl$/;
+
+/**
+ * A subagent transcript's path, or null for anything else. The path came from
+ * a hook payload, which the agent's machine wrote; it is only ever read when
+ * it is exactly where Claude Code keeps a subagent's transcript.
+ */
+export function subagentTranscriptPath(path: string | null | undefined): string | null {
+    if (typeof path !== "string" || path.length > 1024) return null;
+    if (core.hasControlCharacter(path)) return null;
+    if (path.split("/").some((part) => part === ".." || part === ".")) return null;
+    return SUBAGENT_TRANSCRIPT.test(path) ? path : null;
+}
+
+export type SubagentTranscriptAnswer =
+    | { kind: "rows"; rows: HistoryRow[]; truncated: boolean }
+    | { kind: "missing" }
+    | { kind: "unavailable" };
+
+type Run = (sessionId: string, script: string) => Promise<{ code: number; output: string }>;
+
+/** A finished session's machine may still be there; the read says when not. */
+const runEvenIfFinished: Run = (sessionId, script) =>
+    runInSession(sessionId, script, { evenIfFinished: true });
+
+/** A subagent's own conversation, read from its transcript on the session's machine. */
+export async function readSubagentTranscript(
+    sessionId: string,
+    rawPath: string | null,
+    run: Run = runEvenIfFinished
+): Promise<SubagentTranscriptAnswer> {
+    const path = subagentTranscriptPath(rawPath);
+    if (!path) return { kind: "missing" };
+    try {
+        const read = await readTranscript(
+            path,
+            0,
+            async (script) => (await run(sessionId, script)).output,
+            { maxChunks: SUBAGENT_CHUNKS }
+        );
+        if (read.kind === "missing") return { kind: "missing" };
+        if (read.kind === "failed") return { kind: "unavailable" };
+        const rows: HistoryRow[] = [];
+        let truncated = read.more;
+        for (const line of read.lines) {
+            const decoded = decodeClaudeSubagentLine(line.text);
+            if (rows.length + decoded.length > MAX_SUBAGENT_ROWS) {
+                truncated = true;
+                break;
+            }
+            rows.push(...decoded);
+        }
+        return { kind: "rows", rows, truncated };
+    } catch (error) {
+        console.error(`[agent-session] ${sessionId}: could not read a subagent transcript:`, error);
         return { kind: "unavailable" };
     }
 }

@@ -1473,7 +1473,11 @@
             "hide": "Hide subagents",
             "untitled": "No description",
             "noSteps": "No steps yet",
-            "stopNote": "Stops the agent's whole turn"
+            "stopNote": "Stops the agent's whole turn",
+            "transcriptMissing": "No transcript was kept for it.",
+            "transcriptGone": "Its session machine is gone, so the transcript cannot be read.",
+            "transcriptCut": "Only the start of a long transcript is shown.",
+            "transcriptEmpty": "Nothing in its transcript yet."
         },
         "todos": {
             "title": "Plan",

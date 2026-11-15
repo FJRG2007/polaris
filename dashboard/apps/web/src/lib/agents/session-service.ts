@@ -816,6 +816,18 @@ async function tellOwner(
  *  covers the turns a reader is looking at without reading a long session whole. */
 const SUBAGENT_EVENTS_MOST = 2000;
 
+/** Where a session's subagent wrote its own transcript, as its SubagentStop
+ *  said; null before it stopped or when it named none. Unchecked: the reader
+ *  (`session-files.ts`) decides whether it is a path it may open. */
+export async function subagentTranscriptRef(sessionId: string, agentId: string): Promise<string | null> {
+    const record = await prisma.agentSessionEvent.findFirst({
+        where: { sessionId, agentId, kind: "subagent.end", ref: { not: null } },
+        orderBy: { createdAt: "desc" },
+        select: { ref: true }
+    });
+    return record?.ref ?? null;
+}
+
 /** The events a session's subagent tree is drawn from, oldest first. */
 export async function sessionSubagentEvents(sessionId: string): Promise<subagents.StoredSubagentEvent[]> {
     const tools = [...subagents.SUBAGENT_TOOL_KINDS];

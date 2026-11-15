@@ -47,12 +47,12 @@ afterEach(cleanup);
 
 describe("CodeSubagents", () => {
     it("draws nothing without subagents", () => {
-        const { container } = render(<CodeSubagents subagents={[]} onStop={null} />, { wrapper: MessagesWrapper });
+        const { container } = render(<CodeSubagents sessionId="s1" subagents={[]} onStop={null} />, { wrapper: MessagesWrapper });
         expect(container.textContent).toBe("");
     });
 
     it("lists each subagent and opens one to its steps", async () => {
-        render(<CodeSubagents subagents={nodes} onStop={null} />, { wrapper: MessagesWrapper });
+        render(<CodeSubagents sessionId="s1" subagents={nodes} onStop={null} />, { wrapper: MessagesWrapper });
         expect(screen.getByText("1 running")).toBeTruthy();
         expect(screen.getByText("Find the API routes")).toBeTruthy();
         expect(screen.getByText("Explore")).toBeTruthy();
@@ -75,7 +75,7 @@ describe("CodeSubagents", () => {
 
     it("offers Stop on a running subagent, saying it stops the whole turn", async () => {
         const onStop = vi.fn();
-        render(<CodeSubagents subagents={nodes} onStop={onStop} />, { wrapper: MessagesWrapper });
+        render(<CodeSubagents sessionId="s1" subagents={nodes} onStop={onStop} />, { wrapper: MessagesWrapper });
         const stop = screen.getAllByRole("button", { name: /Stop/ });
         expect(stop).toHaveLength(1);
         expect(stop[0]!.getAttribute("title")).toBe("Stops the agent's whole turn");
@@ -83,8 +83,55 @@ describe("CodeSubagents", () => {
         expect(onStop).toHaveBeenCalledTimes(1);
     });
 
+    it("opens a finished subagent's transcript, asked by session and agent id", async () => {
+        const fetchMock = vi.fn(async (_url: string) => ({
+            ok: true,
+            json: async () => ({
+                value: {
+                    kind: "rows",
+                    truncated: true,
+                    rows: [
+                        { vendorId: "u:0", role: "user", kind: "text", subject: "", ref: "", body: "Find the API routes", at: null },
+                        { vendorId: "a:0", role: "agent", kind: "tool", subject: "Grep", ref: "t1", body: "route", at: null },
+                        { vendorId: "a:1", role: "agent", kind: "text", subject: "", ref: "", body: "There are two.", at: null }
+                    ]
+                }
+            })
+        }));
+        vi.stubGlobal("fetch", fetchMock);
+        try {
+            render(<CodeSubagents sessionId="s1" subagents={nodes} onStop={null} />, { wrapper: MessagesWrapper });
+            // Only the finished one: a running subagent has no transcript to open yet.
+            const open = screen.getAllByRole("button", { name: /Open transcript/ });
+            expect(open).toHaveLength(1);
+            await userEvent.click(open[0]!);
+            expect(await screen.findByText("There are two.")).toBeTruthy();
+            expect(screen.getByText("Task")).toBeTruthy();
+            expect(screen.getByText("Used Grep")).toBeTruthy();
+            expect(screen.getByText("Only the start of a long transcript is shown.")).toBeTruthy();
+            const url = String(fetchMock.mock.calls[0]?.[0]);
+            expect(url).toBe("/api/polar/code/subagent?sessionId=s1&agentId=a1");
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it("says when no transcript was kept", async () => {
+        vi.stubGlobal(
+            "fetch",
+            vi.fn(async () => ({ ok: true, json: async () => ({ value: { kind: "missing" } }) }))
+        );
+        try {
+            render(<CodeSubagents sessionId="s1" subagents={nodes} onStop={null} />, { wrapper: MessagesWrapper });
+            await userEvent.click(screen.getByRole("button", { name: /Open transcript/ }));
+            expect(await screen.findByText("No transcript was kept for it.")).toBeTruthy();
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
     it("folds the list away", async () => {
-        render(<CodeSubagents subagents={nodes} onStop={null} />, { wrapper: MessagesWrapper });
+        render(<CodeSubagents sessionId="s1" subagents={nodes} onStop={null} />, { wrapper: MessagesWrapper });
         await userEvent.click(screen.getByRole("button", { name: "Hide subagents" }));
         expect(screen.queryByText("Find the API routes")).toBeNull();
     });

@@ -1473,7 +1473,11 @@
             "hide": "Plegar subagentes",
             "untitled": "Sin descripción",
             "noSteps": "Aún sin pasos",
-            "stopNote": "Detiene todo el turno del agente"
+            "stopNote": "Detiene todo el turno del agente",
+            "transcriptMissing": "No se guardó su transcripción.",
+            "transcriptGone": "Su máquina ya no existe y no se puede leer.",
+            "transcriptCut": "Solo se ve el inicio de una transcripción larga.",
+            "transcriptEmpty": "Su transcripción aún está vacía."
         },
         "todos": {
             "title": "Plan",

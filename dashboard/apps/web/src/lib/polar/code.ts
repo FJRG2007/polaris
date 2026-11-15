@@ -45,6 +45,7 @@ import {
     polarCodeEditSchema,
     polarCodeInterruptSchema,
     polarCodeQueueSchema,
+    polarCodeSubagentSchema,
     threadEvents
 } from "@/lib/polar/code-history";
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
@@ -55,9 +56,11 @@ import {
     hideSessionFromPolar,
     renameSession,
     sessionSubagentEvents,
+    subagentTranscriptRef,
     type SessionView
 } from "@/lib/agents/session-service";
 import { subagentTreeFromEvents, type SubagentNode } from "@/lib/agents/session-subagents";
+import { readSubagentTranscript, type SubagentTranscriptAnswer } from "@/lib/agents/session-files";
 import { keepSpare } from "@/lib/agents/session-spares";
 import { queuePosition } from "@/lib/agents/session-queue";
 import { capacityRefusal, sessionCapacity } from "@/lib/agents/session-capacity";
@@ -621,6 +624,23 @@ export async function polarCodeInterrupt(
     const parsed = polarCodeInterruptSchema.safeParse(input);
     // An id that is not one reads as a session that is not there.
     return interruptSessionAction(parsed.success ? parsed.data.sessionId : "");
+}
+
+/**
+ * A finished subagent's own conversation, for whoever may read the session.
+ * Asked by session and agent id: the transcript's path is looked up here and
+ * never travels to the browser.
+ */
+export async function polarCodeSubagentTranscript(
+    user: SessionUser,
+    input: unknown
+): Promise<SubagentTranscriptAnswer | null> {
+    if ((await accessOf(user)) === "none") return null;
+    const parsed = polarCodeSubagentSchema.safeParse(input);
+    if (!parsed.success) return null;
+    const { sessionId, agentId } = parsed.data;
+    if (!(await getSession(sessionId, user.id))) return null;
+    return readSubagentTranscript(sessionId, await subagentTranscriptRef(sessionId, agentId));
 }
 
 /** Change a running Claude session's model from its thread. */

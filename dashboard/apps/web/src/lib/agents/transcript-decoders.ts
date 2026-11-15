@@ -176,6 +176,19 @@ function resultText(content: unknown): string {
 
 /** One line of a Claude Code transcript, as rows. Unknown lines give none. */
 export function decodeClaudeLine(line: string): HistoryRow[] {
+    return decodeClaude(line, false);
+}
+
+/**
+ * One line of a subagent's own transcript (`.../subagents/agent-*.jsonl`), as
+ * rows. Every line there is marked `isSidechain`, which the main transcript's
+ * decoder skips; here those lines are the whole conversation.
+ */
+export function decodeClaudeSubagentLine(line: string): HistoryRow[] {
+    return decodeClaude(line, true);
+}
+
+function decodeClaude(line: string, sidechain: boolean): HistoryRow[] {
     let raw: unknown;
     try {
         raw = JSON.parse(line);
@@ -187,7 +200,7 @@ export function decodeClaudeLine(line: string): HistoryRow[] {
     const record = parsed.data;
     const id = record.uuid;
     // No id is no way to store it once; a subagent's turns are its own.
-    if (!id || record.isSidechain) return [];
+    if (!id || (record.isSidechain && !sidechain)) return [];
     const stamped = record.timestamp ? Date.parse(record.timestamp) : Number.NaN;
     const at = Number.isFinite(stamped) ? stamped : null;
 

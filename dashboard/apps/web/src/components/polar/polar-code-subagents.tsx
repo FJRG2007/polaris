@@ -5,23 +5,28 @@
  * one row per launch with its description, type, status, duration and step
  * count, opened to the tool calls it made. Laid out after Claude Code's own
  * subagent view. Read from the session's hooks (`session-subagents.ts`), so it
- * follows the thread's own polling.
+ * follows the thread's own polling. A finished one opens to its own
+ * transcript, asked from the server by agent id (`/api/polar/code/subagent`).
  */
 
-import { useState } from "react";
-import { Button, cn } from "@polaris/ui";
-import { Bot, ChevronRight, Square } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Button, cn, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
+import { Bot, ChevronRight, FileText, Square } from "lucide-react";
 import type { PolarCodeSubagent } from "@/lib/polar/code";
+import type { SubagentTranscriptAnswer } from "@/lib/agents/session-files";
+import { readPoll } from "@/lib/poll-fetch";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { durationOf, StatusMark, useNow } from "@/components/polar/polar-subagents";
 
 const CARD = "flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card p-3";
 
 export function CodeSubagents({
+    sessionId,
     subagents,
     onStop,
     stopping = false
 }: {
+    sessionId: string;
     subagents: readonly PolarCodeSubagent[];
     /** Stops the agent's turn, which is the only stop Claude Code offers for a
      *  subagent; null where this reader may not steer the session. */
@@ -30,6 +35,7 @@ export function CodeSubagents({
 }) {
     const t = useTranslations("polar");
     const [open, setOpen] = useState(true);
+    const [reading, setReading] = useState<PolarCodeSubagent | null>(null);
     const running = subagents.filter((node) => node.status === "running").length;
     const now = useNow(running > 0);
     if (subagents.length === 0) return null;
@@ -53,9 +59,19 @@ export function CodeSubagents({
             {open ? (
                 <ul className="flex max-h-72 min-w-0 flex-col gap-1 overflow-y-auto overscroll-contain text-sm">
                     {subagents.map((node) => (
-                        <SubagentRow key={node.id} node={node} now={now} onStop={onStop} stopping={stopping} />
+                        <SubagentRow
+                            key={node.id}
+                            node={node}
+                            now={now}
+                            onStop={onStop}
+                            stopping={stopping}
+                            onOpen={() => setReading(node)}
+                        />
                     ))}
                 </ul>
+            ) : null}
+            {reading ? (
+                <SubagentTranscript sessionId={sessionId} node={reading} onClose={() => setReading(null)} />
             ) : null}
         </section>
     );
@@ -65,12 +81,14 @@ function SubagentRow({
     node,
     now,
     onStop,
-    stopping
+    stopping,
+    onOpen
 }: {
     node: PolarCodeSubagent;
     now: number;
     onStop: (() => void) | null;
     stopping: boolean;
+    onOpen: () => void;
 }) {
     const t = useTranslations("polar");
     const [open, setOpen] = useState(false);
@@ -115,6 +133,20 @@ function SubagentRow({
                         {stopping ? t("subagents.stopping") : t("subagents.stop")}
                     </Button>
                 ) : null}
+                {node.status !== "running" && node.agentId ? (
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={onOpen}
+                        title={t("subagents.open")}
+                        aria-label={`${t("subagents.open")}: ${description}`}
+                        className="shrink-0 gap-1"
+                    >
+                        <FileText className="size-3" aria-hidden />
+                        <span className="hidden sm:inline">{t("subagents.open")}</span>
+                    </Button>
+                ) : null}
             </div>
             {open ? (
                 node.steps.length === 0 ? (
@@ -139,5 +171,117 @@ function SubagentRow({
                 )
             ) : null}
         </li>
+    );
+}
+
+/** A finished subagent's own conversation: what it was asked, what it said and
+ *  the tools it used, in order. */
+function SubagentTranscript({
+    sessionId,
+    node,
+    onClose
+}: {
+    sessionId: string;
+    node: PolarCodeSubagent;
+    onClose: () => void;
+}) {
+    const t = useTranslations("polar");
+    const [answer, setAnswer] = useState<SubagentTranscriptAnswer | null>(null);
+    const [failed, setFailed] = useState(false);
+    const load = useCallback(async () => {
+        setFailed(false);
+        setAnswer(null);
+        try {
+            const read = await readPoll<SubagentTranscriptAnswer | null>("/api/polar/code/subagent", {
+                sessionId,
+                agentId: node.agentId ?? ""
+            });
+            setAnswer(read ?? { kind: "missing" });
+        } catch {
+            setFailed(true);
+        }
+    }, [sessionId, node.agentId]);
+    useEffect(() => {
+        void load();
+    }, [load]);
+    const description = node.description || t("code.subagents.untitled");
+    const rows =
+        answer?.kind === "rows" ? answer.rows.filter((row) => row.kind === "text" || row.kind === "tool") : [];
+    // The first thing the user side says is the task it was given.
+    const taskId = rows.find((row) => row.kind === "text" && row.role === "user")?.vendorId ?? null;
+    return (
+        <Dialog open onOpenChange={(value) => (value ? undefined : onClose())}>
+            <DialogContent
+                aria-describedby={undefined}
+                className="flex max-h-[85vh] w-[calc(100vw-2rem)] max-w-2xl flex-col gap-3"
+            >
+                <DialogHeader>
+                    <DialogTitle className="min-w-0 truncate pr-6" title={description}>
+                        {t("subagents.transcriptTitle", { name: node.type, description })}
+                    </DialogTitle>
+                </DialogHeader>
+                <div className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-md border border-border p-3 text-sm">
+                    {failed ? (
+                        <div className="flex flex-col items-start gap-2">
+                            <p className="text-foreground-muted">{t("subagents.loadFailed")}</p>
+                            <Button size="sm" variant="outline" onClick={() => void load()}>
+                                {t("subagents.retry")}
+                            </Button>
+                        </div>
+                    ) : !answer ? (
+                        <div className="flex flex-col gap-2" aria-busy>
+                            <div className="h-4 w-2/3 animate-pulse rounded bg-muted" />
+                            <div className="h-4 w-1/2 animate-pulse rounded bg-muted" />
+                            <div className="h-4 w-3/4 animate-pulse rounded bg-muted" />
+                        </div>
+                    ) : answer.kind !== "rows" ? (
+                        <div className="flex flex-col items-start gap-2">
+                            <p className="text-foreground-muted">
+                                {answer.kind === "missing"
+                                    ? t("code.subagents.transcriptMissing")
+                                    : t("code.subagents.transcriptGone")}
+                            </p>
+                            {answer.kind === "unavailable" ? (
+                                <Button size="sm" variant="outline" onClick={() => void load()}>
+                                    {t("subagents.retry")}
+                                </Button>
+                            ) : null}
+                        </div>
+                    ) : rows.length === 0 ? (
+                        <p className="text-foreground-muted">{t("code.subagents.transcriptEmpty")}</p>
+                    ) : (
+                        <div className="flex flex-col gap-3">
+                            {rows.map((row) =>
+                                row.kind === "tool" ? (
+                                    <p
+                                        key={row.vendorId}
+                                        className="min-w-0 truncate font-mono text-xs text-foreground-muted"
+                                        title={row.body || row.subject}
+                                    >
+                                        {t("subagents.usedTool", { tool: row.subject || "?" })}
+                                    </p>
+                                ) : (
+                                    <div key={row.vendorId} className="flex min-w-0 flex-col gap-1">
+                                        <span className="text-xs font-medium text-foreground-muted">
+                                            {row.vendorId === taskId
+                                                ? t("subagents.task")
+                                                : row.role === "user"
+                                                  ? t("subagents.you")
+                                                  : node.type}
+                                        </span>
+                                        <p className="whitespace-pre-wrap break-words">{row.body}</p>
+                                    </div>
+                                )
+                            )}
+                            {answer.truncated ? (
+                                <p className="border-t border-border pt-3 text-xs text-foreground-muted">
+                                    {t("code.subagents.transcriptCut")}
+                                </p>
+                            ) : null}
+                        </div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
