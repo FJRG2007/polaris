@@ -7,6 +7,10 @@
  * the headline already is must not be printed twice.
  */
 
+/** Which secondary reading a stat is. An identifier, not text: the chart says it
+ *  in the reader's words. */
+export type SeriesStatLabel = "avg" | "peak";
+
 /** How the headline number summarizes the window. */
 export type SeriesSummary = "last" | "sum" | "avg" | "max";
 
@@ -14,7 +18,7 @@ export interface SeriesStats {
     /** The headline, per the chosen summary. Null when the window has no data. */
     headline: number | null;
     /** The secondary readings, in render order. Empty when there is no data. */
-    stats: Array<{ label: string; value: number }>;
+    stats: Array<{ label: SeriesStatLabel; value: number }>;
 }
 
 /**
@@ -37,7 +41,7 @@ export function summarizeSeries(values: readonly number[], summary: SeriesSummar
                 ? peak
                 : values[values.length - 1]!;
 
-    const stats: Array<{ label: string; value: number }> = [];
+    const stats: Array<{ label: SeriesStatLabel; value: number }> = [];
     if (summary !== "avg") stats.push({ label: "avg", value: average });
     if (summary !== "max") stats.push({ label: "peak", value: peak });
     return { headline, stats };

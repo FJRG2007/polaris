@@ -35,6 +35,9 @@ export interface UiStrings {
      *  nothing in it at all. */
     readonly noData: string;
     readonly noDataInRange: string;
+    /** Beside a chart's headline: the window's mean and its highest reading. */
+    readonly seriesAverage: string;
+    readonly seriesPeak: string;
     /** The hex field of a colour picker, alone and beside the caller's label. */
     readonly hexColour: string;
     readonly hexOf: (label: string) => string;
@@ -85,6 +88,8 @@ export const ENGLISH_UI_STRINGS: UiStrings = {
     hidePassword: "Hide password",
     noData: "No data",
     noDataInRange: "No data in this range",
+    seriesAverage: "avg",
+    seriesPeak: "peak",
     hexColour: "Hex color",
     hexOf: (label) => `${label}: hex`,
     unit: "Unit",

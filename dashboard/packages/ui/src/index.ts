@@ -165,7 +165,12 @@ export {
     type GaugeTone,
     type TimePoint
 } from "./components/charts";
-export { summarizeSeries, type SeriesStats, type SeriesSummary } from "./lib/series-summary";
+export {
+    summarizeSeries,
+    type SeriesStatLabel,
+    type SeriesStats,
+    type SeriesSummary
+} from "./lib/series-summary";
 export * from "./components/dropdown-menu";
 export * from "./components/context-menu";
 export * from "./components/dialog";

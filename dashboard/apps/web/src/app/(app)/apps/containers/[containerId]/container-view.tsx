@@ -26,6 +26,7 @@ import { formatAge, STALE_AFTER_MS } from "../freshness";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
 import { useLiveResource } from "@/components/use-live-resource";
+import { CONSUMPTION_METRICS, MetricsHistory } from "@/components/metrics-history";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { containerAction, removeContainerAction } from "../actions";
 import { containerStateLabel } from "../container-words";
@@ -85,6 +86,10 @@ const TABS: Array<{ id: ContainerTab; icon: ReactNode }> = [
     { id: "files", icon: <Folder className="size-4" /> },
     { id: "console", icon: <TerminalSquare className="size-4" /> }
 ];
+
+/** What a container's stored history charts. Storage is left out: what a
+ *  container writes lands on its volumes, which are measured on their own. */
+const HISTORY_METRICS = CONSUMPTION_METRICS.filter((metric) => metric.key !== "disk");
 
 const REFRESH_MS = 5000;
 /** How much history the charts hold: ten minutes at one sample every five
@@ -424,7 +429,23 @@ export function ContainerView({
                 />
             </div>
 
-            {running ? <Usage samples={samples} /> : null}
+            {/* The machines the collector measures keep a minute-by-minute history
+                of every container on them, so the chart covers the range picked
+                rather than the seconds this page has been open - and still has
+                something to say about a container that has stopped. A connection
+                it does not measure only has what this page watches. */}
+            {connection.local || connection.host ? (
+                <Card>
+                    <CardBody>
+                        <MetricsHistory
+                            endpoint={`/api/containers/history?${query}`}
+                            metrics={HISTORY_METRICS}
+                        />
+                    </CardBody>
+                </Card>
+            ) : running ? (
+                <Usage samples={samples} />
+            ) : null}
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <RunsOn connection={connection} host={host} networks={detail?.networks ?? null} />

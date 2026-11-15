@@ -6,7 +6,7 @@
 
 import { LOCAL_SERVER_ID } from "@polaris/core";
 
-export type MetricSubjectType = "app" | "storage" | "volume" | "host";
+export type MetricSubjectType = "app" | "storage" | "volume" | "host" | "container";
 
 /**
  * Subject id for the machine Polaris itself runs on. It has no Host row until it

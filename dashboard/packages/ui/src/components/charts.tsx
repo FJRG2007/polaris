@@ -234,7 +234,8 @@ export function TimeSeriesChart({
                 <span className="flex items-baseline gap-2">
                     {stats.map((stat) => (
                         <span key={stat.label} className="text-xs text-muted-foreground/70">
-                            {stat.label} {format(stat.value)}
+                            {stat.label === "avg" ? words.seriesAverage : words.seriesPeak}{" "}
+                            {format(stat.value)}
                         </span>
                     ))}
                     <span className="text-sm text-muted-foreground">

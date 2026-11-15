@@ -58,6 +58,10 @@ export async function subjectBelongsToOwner(
         });
         return host != null;
     }
+    // A container's subject is derived from the host it runs on, so it is never
+    // answered on an owner alone: its route authorizes that host first and reads
+    // through `getContainerMetricSeries`.
+    if (subjectType === "container") return false;
     if (subjectType === "volume") {
         // Ownership rides on the deploy target, which is where every other volume
         // query checks it too.
@@ -156,6 +160,22 @@ export async function getMetricSeries(input: {
     return input.subjectType === "app"
         ? withVolumeDisk(input.subjectId, points, input.from, input.to)
         : points;
+}
+
+/**
+ * One container's series over [from, to]. The caller has already authorized the
+ * host it runs on (`authorizeConnection`), which is the only ownership a
+ * container has - so there is no owner check here, and nothing else may call it.
+ */
+export async function getContainerMetricSeries(input: {
+    subjectId: string;
+    from: Date;
+    to: Date;
+}): Promise<MetricPoint[]> {
+    const read = { ...input, subjectType: "container" as const };
+    return input.to.getTime() - input.from.getTime() <= RAW_MAX_SPAN_MS
+        ? rawSeries(read)
+        : rollupSeries(read);
 }
 
 /** Full-resolution samples, with the counters differenced into rates. */

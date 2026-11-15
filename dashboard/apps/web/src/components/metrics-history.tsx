@@ -21,7 +21,7 @@ import { ChevronRight, Loader2 } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Button, TimeSeriesChart, cn, type TimePoint, DateInput } from "@polaris/ui";
+import { Button, TimeSeriesChart, cn, type TimePoint, DateInput, Skeleton } from "@polaris/ui";
 import { formatBytes } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -75,6 +75,20 @@ function keptWindowLimit(window: Window): number {
 }
 
 /** "YYYY-MM-DDTHH:mm" in local time, for a datetime-local input default. */
+/**
+ * Why a window has too little to draw, or null when it has enough. One reading is
+ * a dot nobody can see, so it says when collection started instead; none says
+ * that nothing has been recorded rather than leaving blank frames to be guessed
+ * at. Null while the first read is still out - that is a skeleton, not a reason.
+ */
+export function sparseWindowNote(
+    points: readonly { t: number }[] | null,
+    say: { collectingSince: (at: number) => string; nothingYet: string }
+): string | null {
+    if (points === null || points.length >= 2) return null;
+    return points.length === 1 ? say.collectingSince(points[0]!.t) : say.nothingYet;
+}
+
 function toLocalInput(ms: number): string {
     const date = new Date(ms);
     const pad = (value: number): string => String(value).padStart(2, "0");
@@ -262,6 +276,11 @@ export function MetricsHistory<T extends { t: number } = Point>({
         [display, from, to]
     );
 
+    const sparse = sparseWindowNote(points, {
+        collectingSince: (at) => t("metrics.collectingSince", { time: stampOf(at) }),
+        nothingYet: t("metrics.nothingYet")
+    });
+
     return (
         <div className="flex flex-col gap-3 py-2">
             <div className="flex flex-wrap items-center gap-1">
@@ -341,8 +360,26 @@ export function MetricsHistory<T extends { t: number } = Point>({
                 </div>
             )}
 
+            {sparse && <p className="text-xs text-muted-foreground">{sparse}</p>}
+
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {metrics.map((metric) => {
+                    // Nothing kept for this window and the first read still out:
+                    // the frame of a chart, not one saying there is no data.
+                    if (points === null)
+                        return (
+                            <div
+                                key={metric.key}
+                                aria-hidden
+                                className="flex flex-col gap-2 rounded-lg border border-border/60 p-3"
+                            >
+                                <div className="flex items-center justify-between gap-2">
+                                    <Skeleton className="h-4 w-20" />
+                                    <Skeleton className="h-4 w-28" />
+                                </div>
+                                <Skeleton className="h-[132px] w-full" />
+                            </div>
+                        );
                     const breakdown = metric.breakdown;
                     const chart = (
                         <TimeSeriesChart

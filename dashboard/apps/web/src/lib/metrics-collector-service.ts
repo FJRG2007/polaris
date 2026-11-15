@@ -18,6 +18,7 @@ import type { DockerDriver } from "@polaris/docker";
 import { recordMachineCores } from "./machine-cores";
 import { readBackupTasks, watchUnasAlerts } from "./unas-alerts";
 import { rememberSample } from "./container-stats-cache";
+import { containerMetricSubject } from "./container-metric-subject";
 import { getPorts, type TargetRow } from "./deploy/runtime";
 import { getServerMetrics } from "./server-metrics-service";
 import { summarizeGpus, type GpuReport } from "./gpu/nvidia";
@@ -42,6 +43,16 @@ import {
 } from "./metrics-shared";
 
 type SampleRow = Prisma.MetricSampleCreateManyInput;
+
+/** One container's reading in a tick, filed under its own subject. */
+interface ContainerReading {
+    subjectId: string;
+    cpuPercent: number;
+    memUsedBytes: number;
+    memTotalBytes: number | null;
+    netRxBytes: number;
+    netTxBytes: number;
+}
 
 function round2(value: number): number {
     return Math.round(value * 100) / 100;
@@ -347,7 +358,7 @@ async function collectHosts(ts: Date): Promise<SampleRow[]> {
 
     const local = await sampleHost(LOCAL_HOST_SUBJECT, null, ts);
     if (local) {
-        rows.push(local.row);
+        rows.push(local.row, ...local.containers);
         if (local.dockerId) await recordLocalDockerId(local.dockerId);
     }
 
@@ -360,7 +371,7 @@ async function collectHosts(ts: Date): Promise<SampleRow[]> {
         // second server that disagrees with the first about the same CPU.
         const daemon = sample.dockerId ?? host.dockerId;
         if (local?.dockerId && daemon && daemon === local.dockerId) continue;
-        rows.push(sample.row);
+        rows.push(sample.row, ...sample.containers);
     }
     return rows;
 }
@@ -380,6 +391,8 @@ async function containersOn(
     memUsedBytes: number;
     net: Map<string, { rx: number; tx: number }>;
     running: { id: string; name: string }[];
+    /** Each running container's own reading, for its page's history. */
+    parts: ContainerReading[];
 } | null> {
     let driver: DockerDriver | null = null;
     try {
@@ -405,6 +418,7 @@ async function containersOn(
         let cpu = 0;
         let memory = 0;
         const net = new Map<string, { rx: number; tx: number }>();
+        const parts: ContainerReading[] = [];
         for (const container of running) {
             const stats = samples.get(container.id);
             // A container that stopped between the list and the read.
@@ -413,6 +427,18 @@ async function containersOn(
             cpu += stats.cpuPercent;
             memory += stats.memUsage;
             net.set(container.id, { rx: stats.netRx, tx: stats.netTx });
+            if (container.name) {
+                parts.push({
+                    subjectId: containerMetricSubject(connectionId, container.name),
+                    cpuPercent: round2(stats.cpuPercent),
+                    memUsedBytes: stats.memUsage,
+                    // Its own limit where it has one, the machine otherwise: either
+                    // way what the memory chart is a share of.
+                    memTotalBytes: stats.memLimit > 0 ? stats.memLimit : info.memTotal,
+                    netRxBytes: stats.netRx,
+                    netTxBytes: stats.netTx
+                });
+            }
         }
         return {
             dockerId: info.id,
@@ -425,7 +451,8 @@ async function containersOn(
             cpuPercent: round2(Math.min(100, cpu)),
             memUsedBytes: memory,
             net,
-            running: running.map((container) => ({ id: container.id, name: container.name }))
+            running: running.map((container) => ({ id: container.id, name: container.name })),
+            parts
         };
     } catch {
         // Daemon absent or host unreachable this tick.
@@ -450,7 +477,7 @@ async function sampleHost(
     subjectId: string,
     ownerId: string | null,
     ts: Date
-): Promise<{ row: SampleRow; dockerId: string | null } | null> {
+): Promise<{ row: SampleRow; containers: SampleRow[]; dockerId: string | null } | null> {
     const [machine, containers, localGpu] = await Promise.all([
         ownerId === null ? localMachine() : probedMachine(subjectId, ownerId),
         containersOn(subjectId, ownerId),
@@ -485,6 +512,19 @@ async function sampleHost(
     );
     return {
         dockerId: containers?.dockerId ?? null,
+        // One row per running container, so the page of any one of them - Polaris's
+        // own included, which no deployed service stands for - has a history to
+        // draw rather than only the seconds it has been open.
+        containers: (containers?.parts ?? []).map((part) => ({
+            subjectType: "container",
+            subjectId: part.subjectId,
+            ts,
+            cpuPercent: part.cpuPercent,
+            memUsedBytes: bigBytes(part.memUsedBytes),
+            memTotalBytes: bigBytes(part.memTotalBytes),
+            netRxBytes: bigBytes(part.netRxBytes),
+            netTxBytes: bigBytes(part.netTxBytes)
+        })),
         row: {
             subjectType: "host",
             subjectId,

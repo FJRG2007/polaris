@@ -80,6 +80,8 @@ function UiWords({ children }: { children: ReactNode }) {
             hidePassword: t("ui.hidePassword"),
             noData: t("ui.noData"),
             noDataInRange: t("ui.noDataInRange"),
+            seriesAverage: t("ui.seriesAverage"),
+            seriesPeak: t("ui.seriesPeak"),
             hexColour: t("ui.hexColour"),
             hexOf: (label) => t("ui.hexOf", { label }),
             unit: t("ui.unit"),

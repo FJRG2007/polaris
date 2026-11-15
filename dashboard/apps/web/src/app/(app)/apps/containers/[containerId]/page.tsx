@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/session";
-import { containerHosts, selectConnection } from "../connections";
+import { connectionContext, resolveConnection } from "../connections";
 import { ContainerView, type ContainerTab } from "./container-view";
 
 export const dynamic = "force-dynamic";
@@ -41,16 +41,20 @@ export default async function ContainerPage({
     const user = await requirePermission("deploy.read");
     const [{ containerId }, query] = await Promise.all([params, searchParams]);
     const requested = pick(query.c);
-    const hosts = await containerHosts(user, requested);
-    const connection = selectConnection(hosts, requested);
-    if (!connection || connection.id !== requested) notFound();
+    if (!requested) notFound();
+    // Only the host named, never the switcher's page of every host: nothing here
+    // lists them, and reading them all was what the page waited on before it
+    // could paint anything.
+    const ctx = await connectionContext(user);
+    const connection = await resolveConnection(user, ctx, requested);
+    if (!connection) notFound();
 
     return (
         <ContainerView
             connection={connection}
             containerRef={decodeURIComponent(containerId)}
             initialTab={pickTab(query.tab)}
-            canManage={hosts.canManage}
+            canManage={ctx.canManage}
         />
     );
 }

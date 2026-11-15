@@ -128,6 +128,8 @@
         "hidePassword": "Hide password",
         "noData": "No data",
         "noDataInRange": "No data in this range",
+        "seriesAverage": "avg",
+        "seriesPeak": "peak",
         "hexColour": "Hex color",
         "hexOf": "{label}: hex",
         "unit": "Unit",
@@ -1551,6 +1553,8 @@
         "custom": "Custom",
         "points": "{count} points",
         "pointsLive": "{count} points - live",
+        "collectingSince": "Collecting since {time}. The chart draws from the next reading, a minute apart.",
+        "nothingYet": "Nothing recorded in this range yet. A reading is taken every minute.",
         "apply": "Apply",
         "shareOf": "{share} of {total}",
         "players": "{count, plural, one {# player} other {# players}}"

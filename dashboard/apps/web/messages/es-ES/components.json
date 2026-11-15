@@ -128,6 +128,8 @@
         "hidePassword": "Ocultar clave",
         "noData": "Sin datos",
         "noDataInRange": "Sin datos en este intervalo",
+        "seriesAverage": "media",
+        "seriesPeak": "máx.",
         "hexColour": "Color hex",
         "hexOf": "{label}: hex",
         "unit": "Unidad",
@@ -916,15 +918,15 @@
                 "summary": "Conecta las redes privadas de este servidor a la VPN."
             },
             "relayPorts": {
-                "label": "Puertos del relé",
+                "label": "Puertos relé",
                 "summary": "Lleva por el relé los puertos de juegos, llamadas y demás."
             },
             "relayLink": {
-                "label": "Enlace del relé",
+                "label": "Enlace relé",
                 "summary": "Mantiene Polaris accesible a través de tu servidor relé."
             },
             "backupTunnel": {
-                "label": "Acceso de respaldo",
+                "label": "Acceso de reserva",
                 "summary": "Otra forma de entrar mientras la dirección principal cae."
             }
         }
@@ -1551,6 +1553,8 @@
         "custom": "A medida",
         "points": "{count} puntos",
         "pointsLive": "{count} puntos - en directo",
+        "collectingSince": "Recogiendo desde {time}. El gráfico se dibuja con la siguiente lectura, al minuto.",
+        "nothingYet": "Aún no hay nada registrado en este intervalo. Se toma una lectura por minuto.",
         "apply": "Aplicar",
         "shareOf": "{share} de {total}",
         "players": "{count, plural, one {# jugador} other {# jugadores}}"
