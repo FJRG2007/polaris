@@ -69,6 +69,7 @@ import { resumeLimitedSessions } from "@/lib/agents/account-rotation";
 import { advanceActiveRuns } from "@/lib/agents/orchestration-service";
 import { reapLeftoverContainers, reapPoolLeftovers } from "@/lib/agents/leftover-containers";
 import { sweepSpares } from "@/lib/agents/session-spares";
+import { pollPullFacts } from "@/lib/agents/session-pr-facts";
 import { readPool } from "@/lib/agents/session-placement";
 import { recheckReach } from "@/lib/agents/pool-reach";
 import { removeLeftoverVolumes } from "@/lib/deploy/leftover-volumes";
@@ -748,6 +749,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // the other already took.
         leaseMs: 10 * MINUTE,
         run: sweepAgentLeftovers
+    },
+    {
+        key: "agent-pull-facts",
+        // The fallback for pull requests no webhook refreshed: an instance with
+        // no public address gets none, and a missed delivery is never resent.
+        // Five minutes, the age past which a fact is read again; each pass asks
+        // GitHub about at most 25 pull requests, stalest first.
+        everyMs: Number(process.env.POLARIS_PULL_FACTS_SWEEP_MS) || 5 * MINUTE,
+        // Leased: two runners would ask GitHub about the same pull requests
+        // twice, out of the same installation's quota.
+        leaseMs: 10 * MINUTE,
+        run: () => pollPullFacts()
     },
     {
         key: "task-reminders",

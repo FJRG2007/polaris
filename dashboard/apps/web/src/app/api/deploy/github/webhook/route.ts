@@ -7,6 +7,8 @@
  *   - `check_suite`, `check_run` and `workflow_run` finishing settle the pushes a
  *     service is holding until CI passes ("Wait for CI"), beside the Agents app
  *     that also reads the first and last of them.
+ *   - pull request, review and check events refresh the pull request facts of
+ *     the Code sessions they concern (`session-pr-facts.ts`).
  *   - `workflow_job` tells the runner pools which repository has work waiting, so
  *     a pool serving many repositories puts its next runner where it is needed.
  *
@@ -20,6 +22,7 @@
 import { z } from "zod";
 import { recordWorkflowJob } from "@/lib/runners/runner-demand";
 import { handleAgentWebhook } from "@/lib/agents/agent-webhook";
+import { isPullFactEvent, onPullFactWebhook } from "@/lib/agents/session-pr-facts";
 import { finishedCheckOf, onChecksFinished } from "@/lib/deploy/ci-wait";
 import { branchFromRef, triggerAutoDeploysForPush } from "@/lib/deploy/push-deploys";
 import { closePullRequestPreview, ensurePullRequestPreview } from "@/lib/deploy/environments";
@@ -148,6 +151,18 @@ async function handlePreviewEvent(payload: unknown): Promise<number> {
     });
 }
 
+/** Refreshes the pull request facts of the Code sessions an event concerns. Not
+ *  awaited: each refresh reads GitHub again, and GitHub waits ten seconds for
+ *  an answer to the delivery. */
+function refreshPullFacts(event: string, payload: unknown): void {
+    if (!isPullFactEvent(event)) return;
+    void onPullFactWebhook(event, payload)
+        .then((refreshes) => Promise.all(refreshes))
+        .catch((error: unknown) => {
+            console.error("polaris: pull request facts could not be refreshed:", error);
+        });
+}
+
 export async function POST(request: Request): Promise<Response> {
     const event = request.headers.get("x-github-event");
     const signature = request.headers.get("x-hub-signature-256") ?? "";
@@ -170,6 +185,7 @@ export async function POST(request: Request): Promise<Response> {
             return new Response("bad payload", { status: 400 });
         }
         settleHeldPushes(event, payload);
+        refreshPullFacts(event, payload);
         return Response.json({ ok: true });
     }
 
@@ -210,6 +226,7 @@ export async function POST(request: Request): Promise<Response> {
         // ten seconds GitHub waits for an answer, and a delivery it gave up on is
         // one it retries.
         if (event === "check_suite" || event === "workflow_run") settleHeldPushes(event, payload);
+        refreshPullFacts(event, payload);
         if (event === "pull_request") {
             void handlePreviewEvent(payload).catch((error: unknown) => {
                 console.error("polaris: a preview environment could not be updated:", error);
@@ -224,6 +241,18 @@ export async function POST(request: Request): Promise<Response> {
             delivery: request.headers.get("x-github-delivery")
         });
         return Response.json({ runs: runs.length });
+    }
+
+    // A pull request event the Agents app does not start anything on.
+    if (event && isPullFactEvent(event)) {
+        let payload: unknown;
+        try {
+            payload = JSON.parse(raw);
+        } catch {
+            return new Response("bad payload", { status: 400 });
+        }
+        refreshPullFacts(event, payload);
+        return Response.json({ ok: true });
     }
 
     if (event !== "push") return Response.json({ ignored: event });
