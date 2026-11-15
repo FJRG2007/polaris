@@ -90,7 +90,8 @@ describe("chat display settings", () => {
             helperModel: null,
             improveModel: null,
             writingContext: "",
-            writingSkills: []
+            writingSkills: [],
+            sessionEngine: null
         });
     });
 
@@ -107,7 +108,8 @@ describe("chat display settings", () => {
             helperModel: { provider: "openai", model: "gpt-mini", payer: "own" },
             improveModel: { provider: "groq", model: "llama-small", payer: null },
             writingContext: "I sign as Ana.",
-            writingSkills: ["Tone"]
+            writingSkills: ["Tone"],
+            sessionEngine: "opencode"
         };
         expect(await (await preferences.GET()).json()).toEqual(state.preference);
     });
@@ -152,6 +154,15 @@ describe("chat display settings", () => {
         ]);
         expect((await patch({ transcriptionModel: "not a model" })).status).toBe(400);
         expect((await patch({ transcriptionModel: 3 })).status).toBe(400);
+        expect(state.upserts).toHaveLength(2);
+    });
+
+    it("store the session engine, put it back to Automatic, and refuse one that is not an engine id", async () => {
+        expect((await patch({ sessionEngine: "opencode" })).status).toBe(200);
+        expect((await patch({ sessionEngine: null })).status).toBe(200);
+        expect(state.upserts.map((entry) => entry.update)).toEqual([{ sessionEngine: "opencode" }, { sessionEngine: null }]);
+        expect((await patch({ sessionEngine: "Not An Engine" })).status).toBe(400);
+        expect((await patch({ sessionEngine: 3 })).status).toBe(400);
         expect(state.upserts).toHaveLength(2);
     });
 

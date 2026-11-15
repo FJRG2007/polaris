@@ -932,6 +932,23 @@
                     "hint": "Stops a finish while work is still unfinished."
                 }
             }
+        },
+        "engine": {
+            "title": "Session engine",
+            "intro": "What runs your coding tasks.",
+            "label": "Engine",
+            "hint": "Automatic picks the best tool for each model.",
+            "auto": "Automatic",
+            "autoHint": "Default",
+            "native": "Polaris native",
+            "notReady": "Not available yet",
+            "cannotServe": "Can't run this model",
+            "notInstalled": "Not installed",
+            "yourSetting": "Your setting",
+            "yourSettingHint": "The engine chosen in Polar settings.",
+            "search": "Search engines",
+            "noMatch": "No engine matches.",
+            "failed": "Couldn't save that setting. Try again."
         }
     },
     "temporary": {

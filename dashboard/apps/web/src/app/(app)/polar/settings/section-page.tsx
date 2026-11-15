@@ -7,6 +7,7 @@
  */
 
 import { Suspense } from "react";
+import * as core from "@polaris/core";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { homePathForUser, requireUser } from "@/lib/session";
@@ -38,6 +39,8 @@ import { polarModelOptions } from "@/lib/polar/models";
 import { connectorPolicy, listConnectorViews } from "@/lib/polar/connectors/store";
 import { DisplaySettings } from "@/components/polar/polar-display";
 import { PolarHelperSettings } from "@/components/polar/polar-helper-settings";
+import { SessionEngineSettings } from "@/components/polar/session-engine";
+import { polarPreferences } from "@/lib/polar/preferences";
 import { PolarWritingSettings } from "@/components/polar/polar-writing-settings";
 import { DataSettings, MemorySettings, PolarToolSettings } from "@/components/polar/polar-settings";
 import {
@@ -176,6 +179,18 @@ async function AgentsSection({
     );
 }
 
+/** The session engine setting, with the coding tools this person can run. */
+async function SessionEngineSection({ userId, readOnly }: { userId: string; readOnly: boolean }) {
+    const [options, stored] = await Promise.all([
+        agentOptionsFor(userId),
+        polarPreferences(userId)
+            .then((preferences) => preferences.sessionEngine)
+            .catch(() => null)
+    ]);
+    const tools = [...new Set(options.map((option) => option.cli))].filter((id) => core.agentCliById(id) !== null);
+    return <SessionEngineSettings tools={tools} initial={stored} readOnly={readOnly} />;
+}
+
 export function ListSkeleton() {
     return (
         <Card>
@@ -289,6 +304,9 @@ export async function SettingsSectionPage({
         case "coding-tools":
             return (
                 <div className="flex flex-col gap-8">
+                    <Suspense fallback={<ListSkeleton />}>
+                        <SessionEngineSection userId={user.id} readOnly={Boolean(user.viewingAs)} />
+                    </Suspense>
                     <Suspense fallback={<ListSkeleton />}>
                         <AgentsSection userId={user.id} readOnly={Boolean(user.viewingAs)} part="tools" />
                     </Suspense>

@@ -932,6 +932,23 @@
                     "hint": "Impide terminar con trabajo sin acabar."
                 }
             }
+        },
+        "engine": {
+            "title": "Motor de sesiones",
+            "intro": "Qué ejecuta tus tareas de código.",
+            "label": "Motor",
+            "hint": "Automático elige la mejor herramienta por modelo.",
+            "auto": "Automático",
+            "autoHint": "Estándar",
+            "native": "Polaris nativo",
+            "notReady": "Aún no disponible",
+            "cannotServe": "No ejecuta este modelo",
+            "notInstalled": "No instalado",
+            "yourSetting": "Tu ajuste",
+            "yourSettingHint": "El motor elegido en los ajustes de Polar.",
+            "search": "Buscar motores",
+            "noMatch": "Ningún motor coincide.",
+            "failed": "No se pudo guardar. Inténtalo de nuevo."
         }
     },
     "temporary": {

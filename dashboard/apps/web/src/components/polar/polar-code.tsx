@@ -44,6 +44,8 @@ import {
 } from "@/lib/polar/agents/code-sources";
 import { CodeModelPicker } from "@/components/polar/code-model-picker";
 import { CodeAccountSwitch } from "@/components/polar/code-account-switch";
+import { CodeEnginePill, KNOWN_ENGINES } from "@/components/polar/session-engine";
+import { engineOptions, NATIVE_ENGINE } from "@/lib/polar/native/engine-choice";
 import { CodeView } from "@/components/json-view";
 import { Work } from "@/components/polar/elements/work";
 import { Shimmer } from "@/components/polar/elements/shimmer";
@@ -834,6 +836,8 @@ function CodeStart({
     const inputId = useId();
     const [prompt, setPrompt] = useState("");
     const [modelOpen, setModelOpen] = useState(false);
+    // The engine for this task only; null follows the person's setting.
+    const [engine, setEngine] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [gap, setGap] = useState<GithubAppGap | null>(null);
     const [busy, startTransition] = useTransition();
@@ -937,7 +941,20 @@ function CodeStart({
           ? { cli: POLAR_RUNTIME, accountId: null, useMachineLogin: false, modelChoice: null }
           : null;
     const polar = resolved?.cli === POLAR_RUNTIME;
-    const tool = resolved && !polar ? resolved.cli : null;
+    // This task's engine override, when one is picked and can run the model;
+    // the server resolves it again with the person's own setting.
+    const engineOverride =
+        runOn && !polar && engine
+            ? (engineOptions(runOn, KNOWN_ENGINES, null).find(
+                  (option) => option.id === engine && option.disabled === null
+              )?.id ?? null)
+            : null;
+    const tool =
+        resolved && !polar
+            ? engineOverride && engineOverride !== NATIVE_ENGINE
+                ? engineOverride
+                : resolved.cli
+            : null;
     // Only a tool whose questions are answered from here is given a mode.
     const asksMode = tool !== null && core.takesPermissionMode(tool);
     const model: ModelChoice | null = polar
@@ -1030,6 +1047,8 @@ function CodeStart({
                                 provider: runModel?.provider ?? "",
                                 model: runModel?.model ?? null
                             },
+                            // This task's engine, honoured only where it can run the pick.
+                            engine: engineOverride,
                             // One of the person's own agents: its instructions
                             // lead the task (`polarCodeStart`).
                             agentId: persona?.id ?? null,
@@ -1114,6 +1133,14 @@ function CodeStart({
                                 open={modelOpen}
                                 onOpenChange={setModelOpen}
                             />
+                            {tool && runOn ? (
+                                <CodeEnginePill
+                                    source={runOn}
+                                    value={engineOverride}
+                                    onChange={setEngine}
+                                    disabled={busy || pending}
+                                />
+                            ) : null}
                             {tool ? (
                                 <CodeEffortPill
                                     cli={tool}
