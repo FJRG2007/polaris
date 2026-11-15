@@ -569,6 +569,25 @@ export async function writePullFacts(
     });
 }
 
+/**
+ * Records that a session has this pull request before anything was read about
+ * it, as the source's discovery does: the row reads as an open pull request
+ * with nothing known, and as the stalest there is, so the next poll asks about
+ * it first. An existing row is left as it is.
+ */
+export async function seedPullFacts(
+    sessionId: string,
+    repoFullName: string,
+    number: number,
+    url: string
+): Promise<void> {
+    await prisma.sessionPullFacts.upsert({
+        where: { sessionId_number: { sessionId, number } },
+        create: { sessionId, repoFullName, number, url, fetchedAt: new Date(0) },
+        update: {}
+    });
+}
+
 export interface RefreshTarget {
     sessionId: string;
     repoFullName: string;

@@ -12,6 +12,7 @@ const db = vi.hoisted(() => ({
     updates: [] as unknown[],
     stale: [] as Array<{ sessionId: string; repoFullName: string; number: number }>,
     unseen: [] as Array<{ id: string; prNumber: number | null; repo: { repoFullName: string } | null }>,
+    upserts: [] as unknown[],
     staleArgs: [] as unknown[],
     unseenArgs: [] as unknown[]
 }));
@@ -36,6 +37,10 @@ vi.mock("@polaris/db", () => ({
             findMany: async (args: unknown) => {
                 db.staleArgs.push(args);
                 return db.stale;
+            },
+            upsert: async (args: unknown) => {
+                db.upserts.push(args);
+                return {};
             }
         }
     }
@@ -597,5 +602,25 @@ describe("pollPullFacts", () => {
         const result = await facts.pollPullFacts(now, d);
         expect(result.asked).toBe(facts.POLL_BATCH);
         expect(db.unseenArgs).toHaveLength(0);
+    });
+});
+
+describe("seedPullFacts", () => {
+    it("records a baseline the poll reads first, and leaves an existing row alone", async () => {
+        db.upserts = [];
+        await facts.seedPullFacts("s1", "acme/app", 7, "https://github.com/acme/app/pull/7");
+        expect(db.upserts).toEqual([
+            {
+                where: { sessionId_number: { sessionId: "s1", number: 7 } },
+                create: {
+                    sessionId: "s1",
+                    repoFullName: "acme/app",
+                    number: 7,
+                    url: "https://github.com/acme/app/pull/7",
+                    fetchedAt: new Date(0)
+                },
+                update: {}
+            }
+        ]);
     });
 });

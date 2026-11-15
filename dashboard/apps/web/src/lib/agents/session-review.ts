@@ -15,6 +15,7 @@ import * as changes from "./session-changes";
 import * as github from "@/lib/github-service";
 import { runInSession } from "./session-runtime";
 import { saveSessionWork, type SaveOutcome } from "./session-work";
+import { seedPullFacts } from "./session-pr-facts";
 import type { SessionView, SessionWorkReason } from "./session-service";
 
 /** Why a session's checkout cannot be read right now. */
@@ -194,10 +195,14 @@ const defaultDeps: ShipDeps = {
     defaultBranch: (...args) => github.repoDefaultBranch(...args),
     create: (...args) => github.createPullRequest(...args),
     record: async (sessionId, pull) => {
-        await prisma.agentSession.update({
+        const session = await prisma.agentSession.update({
             where: { id: sessionId },
-            data: { prNumber: pull.number, prUrl: pull.url }
+            data: { prNumber: pull.number, prUrl: pull.url },
+            select: { repo: { select: { repoFullName: true } } }
         });
+        // A baseline the poll reads first, so its facts arrive even where no
+        // webhook does.
+        if (session.repo) await seedPullFacts(sessionId, session.repo.repoFullName, pull.number, pull.url);
     }
 };
 
