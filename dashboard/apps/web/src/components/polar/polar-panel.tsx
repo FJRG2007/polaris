@@ -2514,7 +2514,12 @@ export function PolarChat({
                         {codeTask ? (
                             <Chip
                                 label={t("code.taskOn", {
-                                    repo: codeTask.branch ? `${codeTask.repo}@${codeTask.branch}` : codeTask.repo
+                                    repo:
+                                        codeTask.repo === null
+                                            ? t("code.workspace")
+                                            : codeTask.branch
+                                              ? `${codeTask.repo}@${codeTask.branch}`
+                                              : codeTask.repo
                                 })}
                                 removeLabel={t("code.taskClear")}
                                 onRemove={() => setCodeTask(null)}

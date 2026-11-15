@@ -465,7 +465,7 @@ export async function POST(request: Request): Promise<Response> {
     // Reading a repository is reading the web, under the same switch. Always
     // registered; sent while the page shared or the conversation names one.
     const repoOffered =
-        web && (body.data.code !== null || aboutRepository(body.data.context?.site?.url, messages));
+        web && (Boolean(body.data.code?.repo) || aboutRepository(body.data.context?.site?.url, messages));
     // The person's own browser, under the same switch: one tool, in every
     // turn, so Polar never answers that it has no way to scroll a page. With
     // no extension connected it answers with the step that connects one.

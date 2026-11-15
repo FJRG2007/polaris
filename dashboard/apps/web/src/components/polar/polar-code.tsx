@@ -988,7 +988,13 @@ function CodeStart({
             onPolarTask({
                 text,
                 choice: model,
-                code: workspace || !repoName ? null : { repo: repoName, branch: baseRef.trim() }
+                // "No repository" is a Code task too, said as one: as no task at
+                // all it read as a plain chat, and the model chose a repository.
+                code: workspace
+                    ? { repo: null, branch: "" }
+                    : repoName
+                      ? { repo: repoName, branch: baseRef.trim() }
+                      : null
             });
             return;
         }

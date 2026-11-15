@@ -17,8 +17,14 @@ const branchSchema = z
     .max(200)
     .regex(/^[A-Za-z0-9._/-]*$/);
 
+/**
+ * `repo` is null for a task the person asked for with "No repository" picked:
+ * still a Code task, and one that must not land on a repository of the model's
+ * choosing. Without a value of its own it read as a plain chat, which says
+ * nothing about where to work.
+ */
 export const polarCodeTaskSchema = z.object({
-    repo: core.repoFullNameSchema,
+    repo: core.repoFullNameSchema.nullable(),
     branch: branchSchema.default("")
 });
 export type PolarCodeTask = z.infer<typeof polarCodeTaskSchema>;
@@ -26,6 +32,11 @@ export type PolarCodeTask = z.infer<typeof polarCodeTaskSchema>;
 /** The system line for a Code task, empty for a plain chat. */
 export function codeTaskPrompt(task: PolarCodeTask | null): string {
     if (!task) return "";
+    if (task.repo === null)
+        return [
+            "This is a Code task with no repository: the person chose to work without one.",
+            "Do not pick, guess or assume a repository they did not name in this conversation. If you start an agent session for it, leave its repository empty so it runs in an empty workspace."
+        ].join(" ");
     const where = task.branch
         ? `https://github.com/${task.repo}/tree/${task.branch}`
         : `https://github.com/${task.repo}`;

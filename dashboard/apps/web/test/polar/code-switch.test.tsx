@@ -255,6 +255,46 @@ describe("the Chat / Code switch", () => {
         expect(screen.queryByRole("button", { name: /^Where the agent works: acme.web/ })).toBeNull();
     });
 
+    it("starts a session with no repository once No repository is picked", async () => {
+        access = "manage";
+        window.localStorage.setItem("polar.mode", "code");
+        render(<Harness />, { wrapper: MessagesWrapper });
+        const trigger = await screen.findByRole("button", { name: /^Where the agent works: acme.web/ });
+        fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
+        fireEvent.click(await screen.findByRole("menuitem", { name: /No repository/ }));
+        await screen.findByRole("button", { name: /^Where the agent works: No repository/ });
+        const box = await screen.findByRole("textbox", { name: "Task for the agent" });
+        fireEvent.change(box, { target: { value: "Write a scratch script" } });
+        const send = screen.getByRole("button", { name: "Start session" }) as HTMLButtonElement;
+        await waitFor(() => expect(send.disabled).toBe(false));
+        fireEvent.click(send);
+        await waitFor(() => expect(started).toHaveLength(1));
+        expect(started[0]).toMatchObject({ repoId: null, baseRef: "", issueNumber: null });
+    });
+
+    it("tells Polar a task has no repository when No repository is picked", async () => {
+        access = "manage";
+        polarTasks.length = 0;
+        window.localStorage.removeItem("polar.code.agent");
+        window.localStorage.setItem("polar.mode", "code");
+        render(<Harness />, { wrapper: MessagesWrapper });
+        await screen.findByRole("button", { name: /^Model: Automatic/ });
+        const trigger = await screen.findByRole("button", { name: /^Where the agent works: acme.web/ });
+        fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
+        fireEvent.click(await screen.findByRole("menuitem", { name: /No repository/ }));
+        await screen.findByRole("button", { name: /^Where the agent works: No repository/ });
+        const box = await screen.findByRole("textbox", { name: "Task for the agent" });
+        fireEvent.change(box, { target: { value: "Write a scratch script" } });
+        const send = screen.getByRole("button", { name: "Send (Enter)" }) as HTMLButtonElement;
+        await waitFor(() => expect(send.disabled).toBe(false));
+        fireEvent.click(send);
+        // Not null: that is a plain chat, and the model picked a repository itself.
+        expect(polarTasks).toEqual([
+            expect.objectContaining({ text: "Write a scratch script", code: { repo: null, branch: "" } })
+        ]);
+        expect(started).toHaveLength(0);
+    });
+
     it("starts on the first repository when the one picked last is gone", async () => {
         access = "manage";
         window.localStorage.setItem("polar.mode", "code");

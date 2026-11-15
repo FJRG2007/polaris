@@ -25,4 +25,12 @@ describe("a Code task on the chat's models", () => {
         expect(line).toContain("repo_ tools");
         expect(codeTaskPrompt(null)).toBe("");
     });
+
+    it("keeps No repository a Code task, and tells the model not to pick one", () => {
+        expect(polarCodeTaskSchema.parse({ repo: null })).toEqual({ repo: null, branch: "" });
+        const line = codeTaskPrompt({ repo: null, branch: "" });
+        expect(line).toContain("no repository");
+        expect(line).toContain("leave its repository empty");
+        expect(line).not.toContain("github.com");
+    });
 });
