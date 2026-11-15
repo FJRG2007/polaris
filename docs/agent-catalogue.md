@@ -55,7 +55,7 @@ took fields from AO; **not catalogued** is explained in the notes.
 | Grok Build | `agent/grok` | `grok` | `curl https://x.ai/cli/install.sh` | TUI, ACP `agent stdio` | `XAI_API_KEY` | no | catalogued |
 | Kimi Code | `agent/kimi` | `kimi` | `curl https://code.kimi.com/kimi-code/install.sh` | TUI, ACP `acp` | `KIMI_API_KEY` | yes | catalogued |
 | Pi | `agent/pi` | `pi` | npm `@earendil-works/pi-coding-agent` | TUI | provider keys | yes | catalogued |
-| Auggie | `agent/auggie` | `auggie` | npm `@augmentcode/auggie` | TUI | own login (not sourced) | yes | catalogued |
+| Auggie | `agent/auggie` | `auggie` | npm `@augmentcode/auggie` | TUI | Augment account (`~/.augment/session.json`) | yes | catalogued |
 | Continue | `agent/continueagent` | `cn` | npm `@continuedev/cli` | TUI | not sourced | no | catalogued |
 | Devin | `agent/devin` | `devin` | `curl https://cli.devin.ai/install.sh` | TUI | `DEVIN_API_KEY` | yes | catalogued |
 | Kiro | `agent/kiro` | `kiro-cli` | `curl https://cli.kiro.dev/install` | TUI (`chat`) | `KIRO_API_KEY` | yes | catalogued |
@@ -85,6 +85,50 @@ AO helper packages that are not agents and were left out: `activitydispatch`,
 `activitystate`, `agentbase`, `authprobe`, `binaryutil`, `cursorstore`, `fake`,
 `hooksjson`, `hookutil`, `importcopy`, `modelcatalog`, `nativeconfig`,
 `registry`, `terminalui`.
+
+## Sign-in commands
+
+Polaris runs a tool's own login in a throwaway container on the person's home
+(`LOGIN_COMMANDS` in `apps/web/src/lib/agents/signin-runtime.ts`) and keeps the
+credential it produces, encrypted, for the next container. A login is listed
+only when its vendor's documentation names the command, the flow can finish
+from a browser on another machine, and the credential it leaves is either
+printed or kept in a known file. A logout is listed only when the vendor
+documents one; it is never inferred from the login.
+
+| Tool | Login | Logout | Source |
+| --- | --- | --- | --- |
+| Claude Code | `claude setup-token` | - (the token is not a home login) | existing entry |
+| Codex | `codex login --device-auth` (file store) | `codex logout` (file store) | learn.chatgpt.com/docs/auth |
+| Gemini CLI | `gemini` with Google sign-in selected | - | existing entry |
+| GitHub Copilot | `copilot login --device-code` | - | existing entry |
+| Auggie | `auggie auth login --headless` | `auggie auth logout` | docs.augmentcode.com/cli/setup-auggie/authentication |
+
+Not listed, and why (checked 2026-11-15):
+
+- **Cursor**: `agent login` / `agent logout` with `NO_OPEN_BROWSER=1` are
+  documented (cursor.com/docs/cli/reference/authentication), but the docs do not
+  say where the login is kept, and AO only reads display fields from
+  `~/.cursor/cli-config.json`. Waits on a sign-in kind that needs no captured
+  file (see `U6-PLAN.md`).
+- **Kiro**: `kiro-cli login` with device flow is documented for containers
+  (kiro.dev/docs/getting-started/authentication), no logout is, and the docs do
+  not say where the login is kept. Same wait as Cursor.
+- **Continue**: `cn login` is documented as a browser flow; nothing says it can
+  finish from another machine, and no credential location or logout is named.
+- **Amp, Devin, Grok, OpenCode, Kilo Code**: AO lists `amp login`/`logout`,
+  `devin auth login`/`logout`, `grok login`, `opencode auth login`/`logout` and
+  `kilo auth login`, but the vendor pages fetched did not document them
+  (ampcode.com/manual, docs.devin.ai/cli, docs.x.ai/build/overview,
+  opencode.ai/docs/cli and /providers, kilo.ai CLI page).
+- **MiMo Code, Crush, Cline, Muse, Autohand, fx, Command Code, Stakpak,
+  Codewhale**: AO's login subcommands were not checked against vendor docs in
+  this pass.
+- **TUI logins** (MiniMax Code, Droid, Prime Agent, Kimi, Pi, Kimchi, Qwen,
+  OMP, Agy) and **setup wizards** (Goose, Vibe, Hermes, OpenHands, DeepSeek
+  Harness): AO types `/login` or drives a first-run wizard rather than running a
+  login subcommand; Polaris's sign-in starts one command and does not yet send
+  input once a TUI has drawn its ready marker.
 
 ## Left out, and why
 
