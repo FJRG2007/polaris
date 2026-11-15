@@ -39,7 +39,30 @@ import type { DeviceAccountView } from "../../lib/device-accounts";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as registry from "../../lib/device-connections";
 import { BatteryMeter } from "./battery-meter";
-import { BatteryLow, DoorOpen, Plus, Radio, RefreshCw, Settings2, Unplug } from "lucide-react";
+import {
+    BatteryCharging,
+    BatteryLow,
+    Check,
+    DoorOpen,
+    Eye,
+    HardDrive,
+    MoreHorizontal,
+    Plus,
+    Radio,
+    RefreshCw,
+    Search,
+    Settings2,
+    Unplug,
+    Video,
+    Workflow
+} from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { ComponentType, ReactNode } from "react";
+import * as list from "../../lib/device-list";
+import type { HardwareView, ListEntry } from "../../lib/device-list";
+import type { RoomView } from "../../lib/room-kinds";
+import { usePlaceRooms } from "../use-place-rooms";
 import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
 import { useDeviceAct } from "./use-device-act";
 import { DeviceControls, DeviceIcon, DevicePanel, stateClass } from "./device-panel";
@@ -48,14 +71,29 @@ import {
     Badge,
     Button,
     ConfirmDeleteDialog,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuItem,
+    ContextMenuSeparator,
+    ContextMenuSub,
+    ContextMenuSubContent,
+    ContextMenuSubTrigger,
+    ContextMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuTrigger,
     EmptyState,
-    LanDetails,
+    Input,
     Skeleton,
     cn
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
-import type { PlacesTranslator } from "../../lib/i18n";
 import { placesRefusalText } from "../../lib/refusal-text";
 import { readCachedDevices, writeCachedDevices } from "./device-cache";
 import {
@@ -77,27 +115,18 @@ function markRead(devices: readonly DeviceView[]): void {
 }
 
 /**
- * The devices of one sort, together.
- *
- * A place with six doors reads as a list; the same place with six doors and
- * thirty sockets reads as neither unless they are apart. The order is the order
- * of the kinds themselves rather than of whatever synced first, so the doors are
- * always at the top - which is what somebody opening this screen in a hurry came
- * for.
+ * How many rows are drawn before "Show more". A house of thirty devices never
+ * sees it; one with hundreds of sockets and sensors does not draw them all on
+ * every push.
  */
-function groupDevices(
-    devices: readonly DeviceView[],
-    t: PlacesTranslator
-): { label: string; devices: DeviceView[] }[] {
-    const groups = new Map<string, { label: string; devices: DeviceView[] }>();
-    for (const kind of kinds.DEVICE_KINDS) {
-        const label = kinds.groupText(kind, t);
-        if (!groups.has(label)) groups.set(label, { label, devices: [] });
-    }
-    for (const device of devices) {
-        groups.get(kinds.groupText(device.kind, t))?.devices.push(device);
-    }
-    return [...groups.values()].filter((group) => group.devices.length > 0);
+const PAGE = 100;
+
+/** Where a camera, UPS or NAS opens: a camera on its own screen, the rest on
+ *  theirs. */
+function hardwareHref(hardware: HardwareView): string | null {
+    return hardware.kind === "camera"
+        ? `/places/cameras?open=${encodeURIComponent(hardware.id)}`
+        : hardware.href;
 }
 
 export function DevicesView({
@@ -139,7 +168,30 @@ export function DevicesView({
     // A device that left the house is listed apart, off limits, not among these.
     const here = useMemo(() => (devices ?? []).filter((device) => !device.gone), [devices]);
     const gone = useMemo(() => (devices ?? []).filter((device) => device.gone), [devices]);
-    const groups = useMemo(() => groupDevices(here, t), [here, t]);
+    const [hardware, setHardware] = useState<HardwareView[] | null>(null);
+    const [rooms, setRooms] = usePlaceRooms(placeId);
+    const [query, setQuery] = useState("");
+    const [kindsShown, setKindsShown] = useState<ReadonlySet<string>>(() => new Set());
+    const [limit, setLimit] = useState(PAGE);
+    const entries = useMemo(() => list.listEntries(here, hardware ?? []), [here, hardware]);
+    const present = useMemo(() => list.presentGroups(entries, t), [entries, t]);
+    const roomNames = useMemo(
+        () => new Map((rooms ?? []).map((room) => [room.id, room.name] as const)),
+        [rooms]
+    );
+    const filtered = useMemo(
+        () =>
+            list.filterEntries(entries, { groups: kindsShown, query }, t, (id) =>
+                roomNames.get(id)
+            ),
+        [entries, kindsShown, query, t, roomNames]
+    );
+    const groups = useMemo(
+        () => list.groupEntries(filtered.slice(0, limit), t),
+        [filtered, limit, t]
+    );
+    // A new search starts from the top of the list rather than deep in it.
+    useEffect(() => setLimit(PAGE), [query, kindsShown]);
 
     /** When each device was last pushed, so a full read that began before a
      *  push cannot put the older state back. */
@@ -206,6 +258,19 @@ export function DevicesView({
             cancelled = true;
         };
     }, [cacheKey, take]);
+
+    const loadHardware = useCallback(async () => {
+        const result = await actions
+            .listPlaceHardwareAction()
+            .catch(() => ({ hardware: undefined, error: undefined }));
+        setHardware(result.hardware ?? []);
+        if (result.error) setError(result.error);
+    }, []);
+
+    useEffect(() => {
+        setHardware(null);
+        void loadHardware();
+    }, [cacheKey, loadHardware]);
 
     useEffect(() => {
         if (devices && listedFor.current === cacheKey) {
@@ -334,6 +399,44 @@ export function DevicesView({
     );
     const openDevice = useCallback((device: DeviceView) => setOpened(device), []);
 
+    /**
+     * Put a device, camera, UPS or NAS in a room. Moved on screen at once, and
+     * put back with the reason if the server refuses.
+     */
+    const assign = useCallback(
+        async (entry: ListEntry, roomId: string | null) => {
+            const before = list.entryRoom(entry);
+            if (before === roomId) return;
+            const move = (to: string | null) =>
+                entry.type === "device"
+                    ? update((item) =>
+                          item.id === entry.device.id ? { ...item, roomId: to } : item
+                      )
+                    : setHardware((current) =>
+                          (current ?? []).map((item) =>
+                              item.kind === entry.hardware.kind && item.id === entry.hardware.id
+                                  ? { ...item, roomId: to }
+                                  : item
+                          )
+                      );
+            move(roomId);
+            const result = await runAction(
+                () =>
+                    actions.assignRoomAction({
+                        kind: entry.type === "device" ? "device" : entry.hardware.kind,
+                        id: entry.type === "device" ? entry.device.id : entry.hardware.id,
+                        roomId
+                    }),
+                setError
+            );
+            if (!result || result.error) {
+                move(before);
+                if (result?.error) setError(result.error);
+            }
+        },
+        [update]
+    );
+
     const disconnect = async () => {
         if (!disconnecting) return;
         const result = await runAction(
@@ -393,7 +496,7 @@ export function DevicesView({
     // something already live. Only the accounts and the devices wait, since they
     // are what the read decides. t("devicesView.checkAgain") waits too - there is nothing yet
     // to check again.
-    if (devices === null) {
+    if (devices === null || (!connected && hardware === null)) {
         return (
             <>
                 <div className="flex flex-col gap-4">
@@ -415,7 +518,7 @@ export function DevicesView({
         );
     }
 
-    if (!connected) {
+    if (!connected && hardware !== null && hardware.length === 0) {
         return (
             <>
                 <EmptyState
@@ -536,31 +639,6 @@ export function DevicesView({
                 </Button>
             </div>
 
-            {canManage && connected && networks.length > 0 ? (
-                <section className="flex flex-col gap-2">
-                    <h2 className="text-sm font-medium">{t("network.title")}</h2>
-                    <ul className="flex flex-col gap-3">
-                        {networks.map((network) => (
-                            <li key={network.id} className="flex min-w-0 flex-col gap-1">
-                                <span
-                                    className="truncate text-xs font-medium"
-                                    title={network.label}
-                                >
-                                    {network.label}
-                                </span>
-                                <LanDetails
-                                    details={network.details}
-                                    labels={{
-                                        address: t("network.address"),
-                                        mac: t("network.mac")
-                                    }}
-                                />
-                            </li>
-                        ))}
-                    </ul>
-                </section>
-            ) : null}
-
             <HandoverNotes
                 accounts={accounts}
                 canManage={canManage}
@@ -645,10 +723,68 @@ export function DevicesView({
                 }}
             />
 
-            {here.length === 0 && gone.length > 0 ? null : here.length === 0 ? (
+            {entries.length > 0 && (present.length > 1 || entries.length > 8) && (
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="relative min-w-0 flex-1 sm:max-w-xs">
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 shrink-0 text-foreground-subtle" />
+                        <Input
+                            type="search"
+                            value={query}
+                            onChange={(event) => setQuery(event.target.value)}
+                            placeholder={t("devicesView.search")}
+                            aria-label={t("devicesView.search")}
+                            className="pl-8"
+                        />
+                    </div>
+                    {present.length > 1 && (
+                        <div
+                            role="group"
+                            aria-label={t("devicesView.typeFilter")}
+                            className="flex min-w-0 flex-wrap items-center gap-1.5"
+                        >
+                            <Button
+                                size="sm"
+                                variant={kindsShown.size === 0 ? "secondary" : "ghost"}
+                                aria-pressed={kindsShown.size === 0}
+                                onClick={() => setKindsShown(new Set())}
+                            >
+                                {t("devicesView.allTypes")}
+                            </Button>
+                            {present.map((label) => {
+                                const on = kindsShown.has(label);
+                                return (
+                                    <Button
+                                        key={label}
+                                        size="sm"
+                                        variant={on ? "secondary" : "ghost"}
+                                        aria-pressed={on}
+                                        onClick={() =>
+                                            setKindsShown((current) => {
+                                                const next = new Set(current);
+                                                if (on) next.delete(label);
+                                                else next.add(label);
+                                                return next;
+                                            })
+                                        }
+                                    >
+                                        {label}
+                                    </Button>
+                                );
+                            })}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {entries.length === 0 && gone.length > 0 ? null : entries.length === 0 ? (
                 <EmptyState
                     title={t("devicesView.nothingTitle")}
                     description={t("devicesView.nothingBody")}
+                />
+            ) : filtered.length === 0 ? (
+                <EmptyState
+                    title={t("devicesView.noMatchTitle")}
+                    description={t("devicesView.noMatchBody")}
                 />
             ) : (
                 <div className="flex flex-col gap-6">
@@ -660,26 +796,62 @@ export function DevicesView({
                                 </h2>
                             )}
                             <ul className="flex flex-col gap-2">
-                                {group.devices.map((device) => (
-                                    <DeviceRow
-                                        key={device.id}
-                                        device={device}
-                                        canControl={canControl}
-                                        busy={busy?.id === device.id ? busy.action : null}
-                                        onOpen={openDevice}
-                                        onAct={actOnRow}
-                                    />
-                                ))}
+                                {group.entries.map((entry) =>
+                                    entry.type === "device" ? (
+                                        <DeviceRow
+                                            key={entry.key}
+                                            device={entry.device}
+                                            canControl={canControl}
+                                            canManage={canManage}
+                                            placeId={placeId}
+                                            rooms={rooms}
+                                            busy={
+                                                busy?.id === entry.device.id ? busy.action : null
+                                            }
+                                            onOpen={openDevice}
+                                            onAct={actOnRow}
+                                            onAssign={assign}
+                                        />
+                                    ) : (
+                                        <HardwareRow
+                                            key={entry.key}
+                                            entry={entry}
+                                            canManage={canManage}
+                                            placeId={placeId}
+                                            rooms={rooms}
+                                            roomName={
+                                                entry.hardware.roomId
+                                                    ? roomNames.get(entry.hardware.roomId)
+                                                    : undefined
+                                            }
+                                            onAssign={assign}
+                                        />
+                                    )
+                                )}
                             </ul>
                         </section>
                     ))}
+                    {filtered.length > limit && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="self-center"
+                            onClick={() => setLimit((current) => current + PAGE)}
+                        >
+                            {t("devicesView.showMore", {
+                                count: Math.min(PAGE, filtered.length - limit)
+                            })}
+                        </Button>
+                    )}
                 </div>
             )}
-
             <DevicePanel
                 device={opened}
                 canControl={canControl}
                 canManage={canManage}
+                placeId={placeId}
+                networks={networks}
+                devices={here}
                 onClose={() => setOpened(null)}
                 onAct={act}
                 onEdit={(device) => {
@@ -704,7 +876,14 @@ export function DevicesView({
                 open={arranging}
                 placeId={placeId}
                 onClose={() => setArranging(false)}
-                onChanged={() => void sync()}
+                onChanged={() => {
+                    void sync();
+                    void loadHardware();
+                    void actions.listRoomsAction(placeId).then(
+                        (result) => setRooms(result.rooms ?? []),
+                        () => undefined
+                    );
+                }}
             />
             <AccountOptionsDialog
                 account={accounts.find((account) => account.id === adjusting) ?? null}
@@ -771,17 +950,34 @@ export function DevicesView({
 const DeviceRow = memo(function DeviceRow({
     device,
     canControl,
+    canManage,
+    placeId,
+    rooms,
     busy,
     onOpen,
-    onAct
+    onAct,
+    onAssign
 }: {
     device: DeviceView;
     canControl: boolean;
+    canManage: boolean;
+    placeId: string;
+    rooms: readonly RoomView[] | null;
     busy: DeviceAction | null;
     onOpen: (device: DeviceView) => void;
     onAct: (device: DeviceView, action: DeviceAction, command?: DeviceCommand) => void;
+    onAssign: (entry: ListEntry, roomId: string | null) => void;
 }) {
     const t = usePlacesT();
+    const entry: ListEntry = { type: "device", key: `device:${device.id}`, device };
+    const actions: RowActions = {
+        name: device.name,
+        open: () => onOpen(device),
+        rooms: canManage ? (rooms ?? []) : null,
+        roomId: device.roomId ?? null,
+        assign: (roomId) => onAssign(entry, roomId),
+        automation: canManage ? list.automationHref(entry, placeId) : null
+    };
     const details = [
         device.zone,
         device.model,
@@ -790,7 +986,7 @@ const DeviceRow = memo(function DeviceRow({
         .filter(Boolean)
         .join(" - ");
     return (
-        <li className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-card px-4 py-3">
+        <RowShell actions={actions}>
             <button
                 type="button"
                 onClick={() => onOpen(device)}
@@ -841,7 +1037,7 @@ const DeviceRow = memo(function DeviceRow({
                 busy={busy}
                 onAct={(action, command) => onAct(device, action, command)}
             />
-        </li>
+        </RowShell>
     );
 });
 
@@ -869,5 +1065,214 @@ function DeviceFreshness({
             {separated ? " - " : ""}
             {t("devicesView.updated")} <RelativeTime iso={at} formatStyle="narrow" />
         </span>
+    );
+}
+
+/** What a row's menu offers, the same behind the three dots and a right-click. */
+interface RowActions {
+    readonly name: string;
+    readonly open: () => void;
+    /** The rooms it can be moved to; null where this reader may not move it. */
+    readonly rooms: readonly RoomView[] | null;
+    readonly roomId: string | null;
+    readonly assign: (roomId: string | null) => void;
+    readonly automation: string | null;
+}
+
+/** The pieces of one menu kind, so the dots and the right-click draw the same
+ *  items from one list. */
+interface MenuParts {
+    Item: ComponentType<{
+        onSelect?: (event: Event) => void;
+        disabled?: boolean;
+        role?: string;
+        "aria-checked"?: boolean;
+        children?: ReactNode;
+    }>;
+    Sub: ComponentType<{ children?: ReactNode }>;
+    SubTrigger: ComponentType<{ children?: ReactNode }>;
+    SubContent: ComponentType<{ children?: ReactNode }>;
+    Separator: ComponentType;
+}
+
+const DROPDOWN_PARTS: MenuParts = {
+    Item: DropdownMenuItem,
+    Sub: DropdownMenuSub,
+    SubTrigger: DropdownMenuSubTrigger,
+    SubContent: DropdownMenuSubContent,
+    Separator: DropdownMenuSeparator
+};
+
+const CONTEXT_PARTS: MenuParts = {
+    Item: ContextMenuItem,
+    Sub: ContextMenuSub,
+    SubTrigger: ContextMenuSubTrigger,
+    SubContent: ContextMenuSubContent,
+    Separator: ContextMenuSeparator
+};
+
+/** Whether a row has anything to offer beyond opening it, which a click does. */
+function hasMenu(actions: RowActions): boolean {
+    return actions.rooms !== null || actions.automation !== null;
+}
+
+function RowMenuItems({ actions, parts }: { actions: RowActions; parts: MenuParts }) {
+    const t = usePlacesT();
+    const router = useRouter();
+    const { Item, Sub, SubTrigger, SubContent, Separator } = parts;
+    const room = (id: string | null, label: string) => (
+        <Item
+            key={id ?? ""}
+            role="menuitemradio"
+            aria-checked={actions.roomId === id}
+            onSelect={() => actions.assign(id)}
+        >
+            <Check
+                className={cn("size-4 shrink-0", actions.roomId === id ? "" : "opacity-0")}
+            />
+            <span className="min-w-0 truncate" title={label}>
+                {label}
+            </span>
+        </Item>
+    );
+    return (
+        <>
+            <Item onSelect={actions.open}>
+                <Eye className="size-4 shrink-0" />
+                {t("devicesView.open")}
+            </Item>
+            {actions.rooms !== null || actions.automation !== null ? <Separator /> : null}
+            {actions.rooms !== null && (
+                <Sub>
+                    <SubTrigger>
+                        <DoorOpen className="size-4 shrink-0" />
+                        {t("devicesView.moveToRoom")}
+                    </SubTrigger>
+                    <SubContent>
+                        {room(null, t("devicesView.noRoom"))}
+                        {actions.rooms.length > 0 ? <Separator /> : null}
+                        {actions.rooms.map((entry) => room(entry.id, entry.name))}
+                    </SubContent>
+                </Sub>
+            )}
+            {actions.automation !== null && (
+                <Item onSelect={() => router.push(actions.automation as string)}>
+                    <Workflow className="size-4 shrink-0" />
+                    {t("devicesView.createAutomation")}
+                </Item>
+            )}
+        </>
+    );
+}
+
+/** The three dots at the end of a row. */
+function RowMenu({ actions }: { actions: RowActions }) {
+    const t = usePlacesT();
+    const label = t("devicesView.moreFor", { name: actions.name });
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0"
+                    aria-label={label}
+                    title={label}
+                >
+                    <MoreHorizontal className="size-4 shrink-0" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <RowMenuItems actions={actions} parts={DROPDOWN_PARTS} />
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+/** A row that also answers a right-click with the same menu as its dots. */
+function RowShell({ actions, children }: { actions: RowActions; children: ReactNode }) {
+    const row = (
+        <li className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-card px-4 py-3">
+            {children}
+            {hasMenu(actions) && <RowMenu actions={actions} />}
+        </li>
+    );
+    if (!hasMenu(actions)) return row;
+    return (
+        <ContextMenu>
+            <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+            <ContextMenuContent>
+                <RowMenuItems actions={actions} parts={CONTEXT_PARTS} />
+            </ContextMenuContent>
+        </ContextMenu>
+    );
+}
+
+const HARDWARE_ICONS = { camera: Video, ups: BatteryCharging, nas: HardDrive } as const;
+
+/** A camera, UPS or NAS on the list. Each opens its own screen. */
+function HardwareRow({
+    entry,
+    canManage,
+    placeId,
+    rooms,
+    roomName,
+    onAssign
+}: {
+    entry: Extract<ListEntry, { type: "hardware" }>;
+    canManage: boolean;
+    placeId: string;
+    rooms: readonly RoomView[] | null;
+    roomName: string | undefined;
+    onAssign: (entry: ListEntry, roomId: string | null) => void;
+}) {
+    const t = usePlacesT();
+    const router = useRouter();
+    const { hardware } = entry;
+    const href = hardwareHref(hardware);
+    const Icon = HARDWARE_ICONS[hardware.kind];
+    const details = [hardware.model, roomName].filter(Boolean).join(" - ");
+    const actions: RowActions = {
+        name: hardware.name,
+        open: () => {
+            if (href) router.push(href);
+        },
+        rooms: hardware.canArrange ? (rooms ?? []) : null,
+        roomId: hardware.roomId,
+        assign: (roomId) => onAssign(entry, roomId),
+        automation: canManage ? list.automationHref(entry, placeId) : null
+    };
+    const body = (
+        <>
+            <span className="flex min-w-0 max-w-full items-center gap-2">
+                <Icon className="size-4 shrink-0 text-muted-foreground" />
+                <span className="truncate text-sm font-medium" title={hardware.name}>
+                    {hardware.name}
+                </span>
+                <Badge className="shrink-0 border-border bg-muted text-muted-foreground">
+                    {t(`devicesView.kinds.${hardware.kind}`)}
+                </Badge>
+            </span>
+            {details && (
+                <span
+                    className="max-w-full truncate text-[0.6875rem] text-foreground-subtle"
+                    title={details}
+                >
+                    {details}
+                </span>
+            )}
+        </>
+    );
+    const className = "flex min-w-[10rem] flex-1 flex-col items-start gap-0.5 text-left";
+    return (
+        <RowShell actions={actions}>
+            {href ? (
+                <Link href={href} className={className}>
+                    {body}
+                </Link>
+            ) : (
+                <div className={className}>{body}</div>
+            )}
+        </RowShell>
     );
 }

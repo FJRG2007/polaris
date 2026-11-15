@@ -57,6 +57,11 @@ let gate: Promise<void> = Promise.resolve();
 let answer: (value: { device?: DeviceView; error?: string }) => void = () => undefined;
 
 vi.mock("@polaris-app/places/src/screens/actions", () => ({
+    listRoomsAction: async () => ({ rooms: [] }),
+    listPlaceHardwareAction: async () => ({ hardware: [] }),
+    readingHistoryAction: async (input: { measure: string; range: string }) => ({
+        history: { ...input, from: 0, to: 0, points: [], stats: null }
+    }),
     listDevicesAction: async () => {
         listCalls += 1;
         await gate;

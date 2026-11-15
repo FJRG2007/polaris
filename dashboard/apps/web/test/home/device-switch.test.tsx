@@ -61,6 +61,11 @@ let answer: (value: { device?: DeviceView; error?: string }) => void = () => und
 const pressed: [string, string][] = [];
 
 vi.mock("@polaris-app/places/src/screens/actions", () => ({
+    listRoomsAction: async () => ({ rooms: [] }),
+    listPlaceHardwareAction: async () => ({ hardware: [] }),
+    readingHistoryAction: async (input: { measure: string; range: string }) => ({
+        history: { ...input, from: 0, to: 0, points: [], stats: null }
+    }),
     listDevicesAction: async () => ({ devices: listed, accounts: [ACCOUNT] }),
     syncDevicesAction: async () => ({}),
     deviceHistoryAction: async () => ({ events: [] }),
