@@ -868,7 +868,7 @@
         "tuya-app": {
             "label": "Smart Life / Tuya Smart app",
             "summary": "Sign in by scanning a code with the app your devices are already in. No developer account.",
-            "note": "It reaches every home on the app account through Tuya's servers. The sign-in renews itself, and removing this connection signs Polaris out at Tuya as well.",
+            "note": "It reaches every home on the app account through Tuya's servers. The sign-in renews itself, and removing this connection signs Polaris out at Tuya as well. It is the same sign-in as Home Assistant's Tuya integration, so the app may list Polaris as Home Assistant.",
             "steps": {
                 "s0": "In the Smart Life or Tuya Smart app, open Me, tap the gear, then Account and Security.",
                 "s1": "Copy the User Code shown at the bottom and paste it below.",
