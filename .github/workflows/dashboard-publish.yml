@@ -2,9 +2,10 @@ name: Publish dashboard image
 run-name: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && format('Dry run on {0}', github.ref_name) || '' }}
 
 # Build and push the dashboard images to GHCR on every change to main, keeping
-# only the `latest` tag (no versioned tags). Installs then pull instead of
-# building from source. The packages must be made public once in GitHub
-# (Settings -> Packages -> change visibility) so unauthenticated pulls work.
+# only the `latest` tag (no versioned tags; the one exception is the tunnel
+# daemon, see its job). Installs then pull instead of building from source. The
+# packages must be made public once in GitHub (Settings -> Packages -> change
+# visibility) so unauthenticated pulls work.
 #
 # Each image is its own job, gated on whether its sources actually changed, so a
 # web-only push does not rebuild the multi-arch Rust host daemon (the slowest
@@ -51,6 +52,7 @@ on:
       - "dashboard/package.json"
       - "dashboard/package-lock.json"
       - "crates/polaris-hostd/**"
+      - "crates/polaris-tunnel/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/dashboard-publish.yml"
@@ -124,6 +126,9 @@ jobs:
       extension: ${{ steps.filter.outputs.extension }}
       mdns: ${{ steps.filter.outputs.mdns }}
       hostd: ${{ steps.filter.outputs.hostd }}
+      tunnel: ${{ steps.filter.outputs.tunnel }}
+      tunnel_version: ${{ steps.filter.outputs.tunnel_version }}
+      tunnel_inputs: ${{ steps.filter.outputs.tunnel_inputs }}
       updater: ${{ steps.filter.outputs.updater }}
       guard: ${{ steps.filter.outputs.guard }}
       hytale: ${{ steps.filter.outputs.hytale }}
@@ -148,7 +153,12 @@ jobs:
         run: |
           set -euo pipefail
           out() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
-          all() { out web true; out extension true; out mdns true; out hostd true; out updater true; out guard true; out hytale true; out relay true; out matter true; out broker true; out dnsblock true; out vpn true; out vision true; out face true; }
+          # The tunnel image's version tag, which the dashboard names it by.
+          echo "tunnel_version=$(sed -n 's/^version = "\(.*\)"$/\1/p' crates/polaris-tunnel/Cargo.toml | head -n 1)" >> "$GITHUB_OUTPUT"
+          # What that version's image is built from, recorded on the image so the
+          # tag is never moved to a build of other sources.
+          echo "tunnel_inputs=$(python3 .github/scripts/tunnel-inputs.py HEAD)" >> "$GITHUB_OUTPUT"
+          all() { out web true; out extension true; out mdns true; out hostd true; out tunnel true; out updater true; out guard true; out hytale true; out relay true; out matter true; out broker true; out dnsblock true; out vpn true; out vision true; out face true; }
           # Measured from the last run that published, not from the push before
           # this one. A run that failed its suites or was cancelled built nothing
           # that got tagged, so its changes are still unpublished - and measured
@@ -226,6 +236,7 @@ jobs:
           out web "$web"
           has '^dashboard/mdns/' && out mdns true || out mdns false
           has '^crates/polaris-hostd/|^Cargo\.(toml|lock)$' && out hostd true || out hostd false
+          has '^crates/polaris-tunnel/|^Cargo\.(toml|lock)$' && out tunnel true || out tunnel false
           has '^dashboard/docker/updater/' && out updater true || out updater false
           # The guard bundles @polaris/core, so a change there is a change to the guard.
           has '^dashboard/services/edge-guard/|^dashboard/packages/core/|^dashboard/package(-lock)?\.json$' && out guard true || out guard false
@@ -270,7 +281,7 @@ jobs:
 
   rust-ci:
     needs: changes
-    if: ${{ needs.changes.outputs.hostd == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+    if: ${{ needs.changes.outputs.hostd == 'true' || needs.changes.outputs.tunnel == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     uses: ./.github/workflows/ci.yml
 
   # Next.js dashboard. amd64 only (the runtime servers are x86). Layer caching in
@@ -548,6 +559,135 @@ jobs:
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-hostd:latest \
             $(printf 'ghcr.io/fjrg2007/polaris-hostd@sha256:%s ' *)
+
+  # The tunnel daemon both ends of every WireGuard tunnel and of the relay run.
+  # Into the dashboard's package as `latest-service-tunnel-<crate version>`, for
+  # the reason given on the dnsblock job. The dashboard names it by that version
+  # and hosts pull it only when missing, so a version tag is never moved (see
+  # tunnel-manifest). The dashboard's own tag waits for it.
+  tunnel:
+    needs: changes
+    if: ${{ needs.changes.outputs.tunnel == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux/amd64
+            arch: amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            arch: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
+          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          pull: true
+          no-cache: ${{ github.event_name == 'schedule' }}
+          context: .
+          file: crates/polaris-tunnel/Dockerfile
+          platforms: ${{ matrix.platform }}
+          cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:tunnel-${{ matrix.arch }}
+          cache-to: ${{ env.PUBLISH == 'true' && format('type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:tunnel-{0},mode=max', matrix.arch) || '' }}
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-dashboard,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
+          # No attestation manifests. buildx attaches one to the index by
+          # default, and it is an extra untagged child that every puller then has
+          # to resolve: a daemon on the containerd image store fetches the whole
+          # index, and a deployment was left unable to upgrade with "content
+          # digest ... not found" pointing at exactly that child while the two
+          # real platform manifests were fine. Nothing here reads the provenance,
+          # so the index carries the two images and nothing else.
+          provenance: false
+          sbom: false
+      - name: Export digest
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tunnel-digest-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/digests/*
+          retention-days: 1
+          if-no-files-found: error
+
+  # Stitch the per-arch digests into the multi-arch version tag, once the Rust
+  # suites have passed. A failed `rust-ci` skips this job, which leaves both arch
+  # digests in the registry with no tag pointing at them: ghcr-prune.yml deletes
+  # them an hour later, since no tag it keeps references them.
+  #
+  # A version tag is immutable. Hosts pull it only when missing, so moving it would
+  # leave different hosts running different builds under one name. The index
+  # records the fingerprint of its sources (.github/scripts/tunnel-inputs.py): a
+  # rebuild of the same sources (the weekly run, a test-only change) leaves the
+  # published tag exactly as it is, and changed sources under a version already
+  # published fail here and ask for a new version. ci.yml refuses the same on the
+  # pull request.
+  tunnel-manifest:
+    needs: [changes, rust-ci, tunnel]
+    if: ${{ needs.changes.outputs.tunnel == 'true' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: tunnel-digest-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v4
+        with:
+          buildkitd-config-inline: ${{ env.BUILDKITD_CONFIG }}
+          driver-opts: image=${{ env.BUILDKIT_IMAGE }}
+          cleanup: false
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create manifest list
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          TAG: ghcr.io/fjrg2007/polaris-dashboard:latest-service-tunnel-${{ needs.changes.outputs.tunnel_version }}
+          INPUTS: ${{ needs.changes.outputs.tunnel_inputs }}
+        run: |
+          set -euo pipefail
+          [ -n "$INPUTS" ] || { echo "::error::no fingerprint of the tunnel daemon's sources"; exit 1; }
+          if published=$(docker buildx imagetools inspect "$TAG" --raw 2>"$RUNNER_TEMP/inspect.err"); then
+            recorded=$(echo "$published" | jq -r '.annotations["dev.polaris.tunnel.inputs"] // empty')
+            if [ "$recorded" = "$INPUTS" ]; then
+              echo "$TAG already holds a build of these sources - left exactly as it is"
+              exit 0
+            fi
+            echo "::error title=Tunnel daemon changed without a new version::$TAG is already published from other sources, and hosts that pulled it keep it. Raise the version in crates/polaris-tunnel/Cargo.toml."
+            exit 1
+          fi
+          # Only a tag that does not exist may be created: any other failure to read
+          # it is no proof that it is free.
+          if ! grep -qiE 'not found|manifest unknown' "$RUNNER_TEMP/inspect.err"; then
+            echo "::error::could not read $TAG: $(cat "$RUNNER_TEMP/inspect.err")"
+            exit 1
+          fi
+          if [ "$PUBLISH" != true ]; then
+            echo "dry run - $TAG not created"
+            exit 0
+          fi
+          docker buildx imagetools create \
+            --annotation "index:dev.polaris.tunnel.inputs=$INPUTS" \
+            -t "$TAG" \
+            $(printf 'ghcr.io/fjrg2007/polaris-dashboard@sha256:%s ' *)
 
   # One-shot self-update runner spawned by hostd's /v1/update.
   updater:
@@ -957,7 +1097,7 @@ jobs:
   # the extension does run dashboard-ci, so this runs and tags nothing - every
   # step below is guarded on its own image's result, and all of them were skipped.
   tag:
-    needs: [dashboard-ci, web, guard, hytale, relay, matter, broker, dnsblock, vpn, vision, face]
+    needs: [changes, dashboard-ci, web, guard, hytale, relay, matter, broker, dnsblock, vpn, vision, face, tunnel-manifest]
     if: ${{ !cancelled() && (needs.dashboard-ci.result == 'success' || needs.dashboard-ci.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -977,17 +1117,39 @@ jobs:
         with:
           sparse-checkout: dashboard/docker/app-bundles.sh
           sparse-checkout-cone-mode: false
+      # The dashboard names its tunnel daemon as `latest-service-tunnel-<version>`,
+      # so it is tagged only when that tag is in the registry: published by this
+      # run, or by an earlier one when this push did not touch the daemon. Skipped
+      # is not success - tunnel-manifest is skipped too when the build or the Rust
+      # suites failed. Held back, the job still tags the other images, then fails.
+      - name: Check the tunnel daemon the dashboard names
+        id: tunnel
+        if: ${{ env.PUBLISH == 'true' && needs.web.result == 'success' }}
+        env:
+          MANIFEST: ${{ needs.tunnel-manifest.result }}
+          CHANGED: ${{ needs.changes.outputs.tunnel }}
+          TUNNEL: ghcr.io/fjrg2007/polaris-dashboard:latest-service-tunnel-${{ needs.changes.outputs.tunnel_version }}
+        run: |
+          ready=true
+          if [ "$MANIFEST" != success ] && { [ "$MANIFEST" != skipped ] || [ "$CHANGED" = true ]; }; then
+            echo "::error::the tunnel daemon was not published ($MANIFEST) - the dashboard is not tagged"
+            ready=false
+          elif ! docker buildx imagetools inspect "$TUNNEL" >/dev/null; then
+            echo "::error::$TUNNEL is not in the registry - the dashboard is not tagged"
+            ready=false
+          fi
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
       # Before the dashboard: a `latest` that names bundles nobody tagged would
       # lose them to the next prune.
       - name: Tag the app bundles
-        if: ${{ env.PUBLISH == 'true' && needs.web.result == 'success' && needs.web.outputs.bundles != '' }}
+        if: ${{ env.PUBLISH == 'true' && needs.web.result == 'success' && steps.tunnel.outputs.ready == 'true' && needs.web.outputs.bundles != '' }}
         env:
           REGISTRY_USER: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLES: ${{ needs.web.outputs.bundles }}
         run: bash dashboard/docker/app-bundles.sh tag "$BUNDLES"
       - name: Tag the dashboard
-        if: ${{ env.PUBLISH == 'true' && needs.web.result == 'success' }}
+        if: ${{ env.PUBLISH == 'true' && needs.web.result == 'success' && steps.tunnel.outputs.ready == 'true' }}
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-dashboard:latest \
             ghcr.io/fjrg2007/polaris-dashboard@${{ needs.web.outputs.digest }}
@@ -1035,3 +1197,6 @@ jobs:
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-face:latest \
             ghcr.io/fjrg2007/polaris-face@${{ needs.face.outputs.digest }}
+      - name: Report a dashboard held back for its tunnel daemon
+        if: ${{ steps.tunnel.outputs.ready == 'false' }}
+        run: exit 1

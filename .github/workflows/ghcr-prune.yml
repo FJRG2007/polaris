@@ -14,7 +14,10 @@ name: Prune published images
 # What is never deleted: the version carrying the `latest` tag, and every digest
 # that version references. In the dashboard's package, also the installable apps'
 # bundles the latest dashboard names, which carry a `latest-app-<id>` tag moved in
-# the same job as `latest`; every older bundle goes like an older image. A multi-arch image is an index whose per-architecture
+# the same job as `latest`; every older bundle goes like an older image. The
+# service images there (SERVICE_TAGS) keep their tags and what those tags
+# reference - for the tunnel daemon, every version ever published, since an older
+# dashboard still names its own. A multi-arch image is an index whose per-architecture
 # manifests are themselves untagged, and a build attestation is another untagged
 # child - deleting those would leave `latest` pointing at manifests the registry
 # no longer holds, which breaks the pull for everyone. When the tag cannot be
@@ -90,7 +93,10 @@ jobs:
           # else was ever going to collect it.
           CACHE_PACKAGES: polaris-buildcache
           # Service images living in the dashboard's package under their own tag.
-          SERVICE_TAGS: latest-service-dns-blocker latest-service-vpn
+          # An entry ending in `*` is every tag with that prefix: the tunnel
+          # daemon is tagged per version, and a dashboard an install still runs,
+          # or rolls back to, names its version, so no published one is dropped.
+          SERVICE_TAGS: latest-service-dns-blocker latest-service-vpn latest-service-tunnel-*
         run: |
           set -uo pipefail
           repo=$(echo "$OWNER" | tr "[:upper:]" "[:lower:]")
@@ -133,17 +139,6 @@ jobs:
               fi
               keep=$(echo "$index" | jq -r '.manifests[]?.digest')
               echo "latest references $(echo "$keep" | grep -c . || true) manifest(s)"
-              # Service images published into the dashboard's package so they
-              # are public without anybody changing a visibility by hand (see the
-              # dnsblock job). Each is a multi-arch index: the tag keeps the index,
-              # and its per-architecture children are kept here. A tag not
-              # published yet has nothing to keep.
-              if [ "$package" = polaris-dashboard ]; then
-                for tag in $SERVICE_TAGS; do
-                  side=$(docker buildx imagetools inspect "ghcr.io/$repo/$package:$tag" --raw 2>/dev/null) || continue
-                  keep=$(printf '%s\n%s' "$keep" "$(echo "$side" | jq -r '.manifests[]?.digest')")
-                done
-              fi
             fi
             refused=0
 
@@ -160,6 +155,45 @@ jobs:
               esac
               echo "::endgroup::"
               continue
+            fi
+
+            # Service images published into the dashboard's package so they are
+            # public without anybody changing a visibility by hand (see the
+            # dnsblock job). Each is a multi-arch index: the tag keeps the index,
+            # and its per-architecture children are kept here. A fixed tag not
+            # published yet has nothing to keep; a tag the listing shows but that
+            # cannot be read skips the package, since its children would go.
+            if [ "$package" = polaris-dashboard ]; then
+              listed=$(printf '%s\n' "$versions" | cut -f4 | tr ',' '\n' | sort -u)
+              unreadable=false
+              # No filename expansion: `*` in SERVICE_TAGS is a tag prefix.
+              set -f
+              for entry in $SERVICE_TAGS; do
+                tags_for=$entry
+                required=false
+                case "$entry" in
+                  *"*")
+                    tags_for=""
+                    required=true
+                    for tag in $listed; do
+                      case "$tag" in "${entry%"*"}"*) tags_for="$tags_for $tag";; esac
+                    done;;
+                esac
+                for tag in $tags_for; do
+                  if ! side=$(docker buildx imagetools inspect "ghcr.io/$repo/$package:$tag" --raw 2>/dev/null); then
+                    [ "$required" = true ] && { echo "$tag is listed but could not be read"; unreadable=true; }
+                    continue
+                  fi
+                  keep=$(printf '%s\n%s' "$keep" "$(echo "$side" | jq -r '.manifests[]?.digest')")
+                done
+              done
+              set +f
+              if [ "$unreadable" = true ]; then
+                echo "skipped rather than guessed at"
+                failed=1
+                echo "::endgroup::"
+                continue
+              fi
             fi
 
             while IFS=$'\t' read -r id digest created tags; do

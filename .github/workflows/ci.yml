@@ -24,6 +24,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
+      - ".github/scripts/tunnel-inputs.py"
       - ".github/workflows/ci.yml"
   pull_request:
     paths:
@@ -31,6 +32,7 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
+      - ".github/scripts/tunnel-inputs.py"
       - ".github/workflows/ci.yml"
   workflow_call:
 
@@ -66,3 +68,38 @@ jobs:
       # about how long the gates take, not about which code they accept.
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test --all
+
+  # A dashboard names the tunnel daemon's image by the crate's version and hosts
+  # pull it only when it is missing, so a published version never changes. A pull
+  # request that changes what the image is built from has to raise the version;
+  # the publish refuses to move the tag either way, this only says so before the
+  # merge. Test-only changes need no new version (see the script).
+  tunnel-version:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: A changed tunnel daemon carries a new version
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          manifest=crates/polaris-tunnel/Cargo.toml
+          version() { git show "$1:$manifest" | sed -n 's/^version = "\(.*\)"$/\1/p' | head -n 1; }
+          if ! git cat-file -e "$BASE:$manifest" 2>/dev/null; then
+            echo "the base has no tunnel daemon - nothing published to compare with"
+            exit 0
+          fi
+          before=$(python3 .github/scripts/tunnel-inputs.py "$BASE")
+          after=$(python3 .github/scripts/tunnel-inputs.py HEAD)
+          if [ "$before" = "$after" ]; then
+            echo "the image's sources are unchanged"
+          elif [ "$(version "$BASE")" = "$(version HEAD)" ]; then
+            echo "::error file=$manifest,title=Tunnel daemon changed without a new version::What version $(version HEAD) is built from changed, but a published version never changes: hosts that pulled it keep it. Raise the version in $manifest."
+            exit 1
+          else
+            echo "sources changed, version $(version "$BASE") -> $(version HEAD)"
+          fi
