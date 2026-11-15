@@ -24,6 +24,31 @@ export const polarAskInputSchema = z.object({
 });
 export type PolarAskInput = z.infer<typeof polarAskInputSchema>;
 
+/**
+ * The call's questions with any asked twice dropped. A small model (Mistral
+ * Nemo) sends the same question twice in one call; the card pages through
+ * both, and the answers come back keyed by question text, so the model reads
+ * one answer and says it asked the same thing twice. Two questions are the
+ * same when their text, folded for case and spacing, is. Applied as the
+ * input's `settle` (`tool-input.ts`), so the model reads back the call that
+ * was shown. Pure.
+ */
+export function distinctQuestions(value: unknown): unknown {
+    if (typeof value !== "object" || value === null) return value;
+    const questions = (value as { questions?: unknown }).questions;
+    if (!Array.isArray(questions)) return value;
+    const seen = new Set<string>();
+    const kept = questions.filter((entry) => {
+        const text = (entry as { question?: unknown } | null)?.question;
+        if (typeof text !== "string") return true;
+        const key = text.normalize("NFC").trim().replace(/\s+/g, " ").toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+    return kept.length === questions.length ? value : { ...value, questions: kept };
+}
+
 export const polarAskOutputSchema = z.discriminatedUnion("status", [
     z.object({
         status: z.literal("answered"),

@@ -12,7 +12,7 @@
 import { tool, type ToolSet } from "ai";
 import { polarInputSchema } from "@/lib/polar/tool-input";
 import { POLAR_FORM_TOOL, polarFormSchema } from "@/lib/polar/forms";
-import { POLAR_ASK_TOOL, polarAskInputSchema, polarAskOutputSchema } from "@/lib/polar/ask";
+import { POLAR_ASK_TOOL, distinctQuestions, polarAskInputSchema, polarAskOutputSchema } from "@/lib/polar/ask";
 
 const ASK_DESCRIPTION = [
     "Ask the person one to four questions with options and wait for the answer before going on.",
@@ -33,7 +33,7 @@ export function polarAskTools(): ToolSet {
     return {
         [POLAR_ASK_TOOL]: tool({
             description: ASK_DESCRIPTION,
-            inputSchema: polarInputSchema(polarAskInputSchema),
+            inputSchema: polarInputSchema(polarAskInputSchema, distinctQuestions),
             outputSchema: polarInputSchema(polarAskOutputSchema)
         }),
         [POLAR_FORM_TOOL]: tool({
