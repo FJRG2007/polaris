@@ -115,7 +115,7 @@ describe("the refusals a stand-in may answer", () => {
         ).toBe("rate");
     });
 
-    it("hands over on a 402, a paid-model refusal or a 429, and nothing else", () => {
+    it("hands over on a refusal another key or model answers, or a failure nothing explains, never on a bad request", () => {
         expect(standInRetry(upstreamBusy())).toBe(true);
         expect(standInRetry(paymentRequired())).toBe(true);
         expect(standInRetry(new PaidModelError(paymentRequired()))).toBe(true);
@@ -124,7 +124,9 @@ describe("the refusals a stand-in may answer", () => {
         expect(standInRetry(Object.assign(new Error("x"), { statusCode: 401 }))).toBe(true);
         expect(standInRetry(Object.assign(new Error("x"), { statusCode: 500 }))).toBe(true);
         expect(standInRetry(Object.assign(new Error("x"), { statusCode: 400 }))).toBe(false);
-        expect(standInRetry(new Error("socket hang up"))).toBe(false);
+        // A failure nothing explains (no status, no reason) is the model's: the
+        // router asks once more, then hands over (`routes` in `router/chain.ts`).
+        expect(standInRetry(new Error("socket hang up"))).toBe(true);
     });
 
     it("counts a :free model or a zero price as free, an unknown price as not", () => {

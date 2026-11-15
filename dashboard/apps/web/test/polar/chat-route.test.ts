@@ -71,6 +71,11 @@ vi.mock("@/lib/polar/skills/enigma-catalogue", () => ({
 vi.mock("@/lib/polar/agents/store", () => ({ polarThreadAgent: async () => null, listAgents: async () => [] }));
 vi.mock("@/lib/polar/subagents/store", () => ({ takeFinishedBackground: async () => [] }));
 vi.mock("@/lib/polar/agents/defaults", () => ({ polarAgentDefault: async () => null }));
+// A model picked by hand reads the person's routing (`pinnedFallsBack`); the
+// real store would wait on a database this suite does not have.
+vi.mock("@/lib/polar/router/store", async () => ({
+    polarRouting: async () => (await import("@/lib/polar/routing")).POLAR_ROUTING_DEFAULTS
+}));
 vi.mock("@/lib/polar/access", async () => ({
     ...(await (await import("./fixtures/open-polar-access")).openPolarAccess()),
     polarAccessFor: async () => ({ use: true, spend: true, web: state.web })
