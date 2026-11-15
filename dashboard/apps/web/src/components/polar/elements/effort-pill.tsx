@@ -50,7 +50,9 @@ export function EffortPill<T extends string>({
             <button
                 type="button"
                 aria-pressed={pressed}
-                title={t("effort.thinkHint")}
+                // The name is cut short in a narrow composer in any language: the
+                // tooltip carries it whole, with what it does.
+                title={`${t("effort.think")} - ${t("effort.thinkHint")}`}
                 disabled={disabled}
                 onClick={() => onChange(pressed ? off : on)}
                 className={`${PILL} ${pressed ? "border-primary/40 bg-primary/10 text-primary hover:text-primary" : ""}`}
@@ -75,7 +77,7 @@ export function EffortPill<T extends string>({
                     <span className="min-w-0 truncate">{current}</span>
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48">
+            <DropdownMenuContent align="start" className="min-w-48 max-w-[min(20rem,calc(100vw-2rem))]">
                 <DropdownMenuLabel>{t("effort.title")}</DropdownMenuLabel>
                 {levels.map((level) => (
                     <DropdownMenuItem
