@@ -785,7 +785,10 @@
         "labelTaken": "Ya hay una etiqueta con ese nombre",
         "labelsFull": "Este lugar ya tiene todas las etiquetas posibles",
         "labelElsewhere": "Esa etiqueta es de otro lugar",
-        "tuyaLapsed": "Tuya ha detenido la suscripción IoT Core del proyecto en la nube, así que rechaza cada orden. Amplíala en la plataforma de desarrolladores de Tuya en Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period (la prueba dura unos seis meses, así que volverá a pasar), o conecta la app Smart Life, que no necesita suscripción."
+        "tuyaLapsed": "Tuya ha detenido la suscripción IoT Core del proyecto en la nube, así que rechaza cada orden. Amplíala en la plataforma de desarrolladores de Tuya en Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period (la prueba dura unos seis meses, así que volverá a pasar), o conecta la app Smart Life, que no necesita suscripción.",
+        "upsGone": "SAI inexistente",
+        "nasGone": "NAS inexistente",
+        "deviceDisconnected": "Ese dispositivo ya no está conectado"
     },
     "connections": {
         "nuki-web": {
@@ -1912,7 +1915,24 @@
         "goneRemove": "Quitar",
         "goneRemoveTitle": "Quitar aparato",
         "goneRemoveQuestion": "¿Quitar <em>{name}</em> para siempre?",
-        "goneRemoveBody": "Su historial y lo que se haya compartido de él se van con él. Si vuelve, llega como uno nuevo."
+        "goneRemoveBody": "Su historial y lo que se haya compartido de él se van con él. Si vuelve, llega como uno nuevo.",
+        "kinds": {
+            "camera": "Cámaras",
+            "ups": "SAI",
+            "nas": "Discos NAS"
+        },
+        "search": "Buscar equipos",
+        "typeFilter": "Tipo",
+        "allTypes": "Todos",
+        "noMatchTitle": "Nada coincide",
+        "noMatchBody": "Prueba otra búsqueda u otro tipo.",
+        "showMore": "Mostrar {count} más",
+        "moreFor": "Más de {name}",
+        "open": "Abrir",
+        "moveToRoom": "Mover a sala",
+        "noRoom": "Sin sala",
+        "createAutomation": "Crear automatización",
+        "sharedAddress": "Se llega por {account}, compartida con otros dispositivos."
     },
     "devicePanel": {
         "watchOnly": "Configurado para vigilarse, no para manejarse.",
@@ -3219,7 +3239,7 @@
             "pm25": "PM2,5",
             "allergen": "Alérgenos",
             "gas": "Gases (COV)",
-            "filter": "Vida del filtro",
+            "filter": "Filtro",
             "power": "Potencia",
             "energy": "Energía",
             "co2": "CO2",
@@ -3232,7 +3252,7 @@
         },
         "empty": "Aún no hay nada registrado en este periodo.",
         "failed": "No se pudieron cargar las lecturas.",
-        "tracking": "Historial de lecturas",
+        "tracking": "Lecturas pasadas",
         "trackingHint": "Qué medidas se guardan con el tiempo.",
         "trackName": "Guardar el historial de {measure}",
         "offTitle": "¿Dejar de guardar {measure}?",

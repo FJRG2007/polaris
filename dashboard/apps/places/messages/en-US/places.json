@@ -785,7 +785,10 @@
         "labelTaken": "A label with that name is already here",
         "labelsFull": "This place has all the labels it can",
         "labelElsewhere": "That label is at another place",
-        "tuyaLapsed": "Tuya stopped the cloud project's IoT Core subscription, so it refuses every command. Extend it in the Tuya developer platform under Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period (the trial lasts about six months, so this comes back) - or connect the Smart Life app instead, which needs no subscription."
+        "tuyaLapsed": "Tuya stopped the cloud project's IoT Core subscription, so it refuses every command. Extend it in the Tuya developer platform under Cloud, Cloud Services, IoT Core, My Subscriptions, Extend Trial Period (the trial lasts about six months, so this comes back) - or connect the Smart Life app instead, which needs no subscription.",
+        "upsGone": "UPS not found",
+        "nasGone": "NAS not found",
+        "deviceDisconnected": "That device is no longer connected"
     },
     "connections": {
         "nuki-web": {
@@ -1912,7 +1915,24 @@
         "goneRemove": "Remove",
         "goneRemoveTitle": "Remove the device",
         "goneRemoveQuestion": "Remove <em>{name}</em> for good?",
-        "goneRemoveBody": "Its history and anything shared of it go with it. If it comes back, it arrives as a new device."
+        "goneRemoveBody": "Its history and anything shared of it go with it. If it comes back, it arrives as a new device.",
+        "kinds": {
+            "camera": "Cameras",
+            "ups": "UPS units",
+            "nas": "NAS drives"
+        },
+        "search": "Search devices",
+        "typeFilter": "Device type",
+        "allTypes": "All",
+        "noMatchTitle": "Nothing matches",
+        "noMatchBody": "Try another search or type.",
+        "showMore": "Show {count} more",
+        "moreFor": "More for {name}",
+        "open": "Open",
+        "moveToRoom": "Move to room",
+        "noRoom": "No room",
+        "createAutomation": "Create automation",
+        "sharedAddress": "Reached through {account}, shared with other devices."
     },
     "devicePanel": {
         "watchOnly": "Set to be watched rather than operated.",
