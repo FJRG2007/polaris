@@ -1,0 +1,154 @@
+// @vitest-environment jsdom
+/**
+ * The tracker's opt-in automatic events: file downloads, form submissions,
+ * mailto/tel links, 404 pages and hash routing. Run against the real file in a
+ * DOM, because what matters is which beats a click or a submit produces.
+ */
+
+import { join } from "node:path";
+import { readFile } from "node:fs/promises";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const SOURCE = await readFile(join(process.cwd(), "public", "analytics.js"), "utf8");
+
+interface Beat {
+    type: string;
+    url: string;
+    name?: string;
+    props?: Record<string, unknown>;
+}
+
+let beats: Beat[] = [];
+const listeners: [string, EventListenerOrEventListenerObject, boolean | AddEventListenerOptions | undefined][] = [];
+
+function load(attributes: Record<string, string>): void {
+    const tag = document.createElement("script");
+    tag.src = "https://polaris.example/analytics.js";
+    tag.setAttribute("data-key", "abcdefgh12");
+    for (const [name, value] of Object.entries(attributes)) tag.setAttribute(name, value);
+    Object.defineProperty(document, "currentScript", { value: tag, configurable: true });
+    new Function(SOURCE)();
+}
+
+beforeEach(() => {
+    beats = [];
+    vi.stubGlobal("requestIdleCallback", (run: () => void) => run());
+    vi.stubGlobal(
+        "fetch",
+        vi.fn(async (_url: string, init: { body: string }) => {
+            beats.push(JSON.parse(init.body) as Beat);
+            return new Response(null, { status: 204 });
+        })
+    );
+    // Keep each test's listeners from leaking into the next one.
+    const original = window.addEventListener.bind(window);
+    vi.spyOn(window, "addEventListener").mockImplementation((type, listener, options) => {
+        listeners.push([type, listener, options]);
+        original(type, listener, options);
+    });
+    window.history.replaceState(null, "", "/start");
+    document.body.innerHTML = "";
+});
+
+afterEach(() => {
+    for (const [type, listener, options] of listeners.splice(0)) window.removeEventListener(type, listener, options);
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+});
+
+const events = () => beats.filter((beat) => beat.type === "event");
+
+function click(html: string): void {
+    document.body.innerHTML = html;
+    const link = document.body.querySelector("a") as HTMLAnchorElement;
+    link.addEventListener("click", (clicked) => clicked.preventDefault());
+    link.click();
+}
+
+describe("file downloads", () => {
+    it("records a link to a known file type", () => {
+        load({ "data-downloads": "true", "data-auto": "false" });
+        click('<a href="https://polaris.example/files/report.PDF">get</a>');
+        expect(events()).toEqual([
+            expect.objectContaining({ name: "file-download", props: { url: "https://polaris.example/files/report.PDF" } })
+        ]);
+    });
+
+    it("records a link with a download attribute whatever its extension", () => {
+        load({ "data-downloads": "true", "data-auto": "false" });
+        click('<a href="/export" download>get</a>');
+        expect(events()[0]?.name).toBe("file-download");
+    });
+
+    it("takes the site's own extension list", () => {
+        load({ "data-downloads": "epub, .mobi", "data-auto": "false" });
+        click('<a href="/book.mobi">get</a>');
+        click('<a href="/book.pdf">get</a>');
+        expect(events().map((beat) => beat.props?.url)).toEqual([`${window.location.origin}/book.mobi`]);
+    });
+
+    it("is off unless asked for", () => {
+        load({ "data-auto": "false" });
+        click('<a href="/report.pdf">get</a>');
+        expect(events()).toEqual([]);
+    });
+});
+
+describe("contact links", () => {
+    it("records mailto and tel under data-outbound, without the prefilled text", () => {
+        load({ "data-outbound": "true", "data-auto": "false" });
+        click('<a href="mailto:sales@example.com?subject=Hello">mail</a>');
+        click('<a href="tel:+34900000000">call</a>');
+        expect(events().map((beat) => [beat.name, beat.props?.url])).toEqual([
+            ["contact-link-click", "mailto:sales@example.com"],
+            ["contact-link-click", "tel:+34900000000"]
+        ]);
+    });
+
+    it("keeps reporting real outbound links", () => {
+        load({ "data-outbound": "true", "data-auto": "false" });
+        click('<a href="https://elsewhere.example/page">out</a>');
+        expect(events()[0]).toMatchObject({ name: "outbound-link-click" });
+    });
+});
+
+describe("form submissions", () => {
+    it("records the form's target path and id", () => {
+        load({ "data-forms": "true", "data-auto": "false" });
+        document.body.innerHTML = '<form id="signup" action="/subscribe?x=1"></form>';
+        const form = document.body.querySelector("form") as HTMLFormElement;
+        form.addEventListener("submit", (submitted) => submitted.preventDefault());
+        form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        expect(events()).toEqual([expect.objectContaining({ name: "form-submit", props: { path: "/subscribe", id: "signup" } })]);
+    });
+
+    it("is off unless asked for", () => {
+        load({ "data-auto": "false" });
+        document.body.innerHTML = "<form></form>";
+        document.body.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+        expect(events()).toEqual([]);
+    });
+});
+
+describe("error pages and hash routing", () => {
+    it("records a 404 for the address asked for", () => {
+        window.history.replaceState(null, "", "/missing?q=1");
+        load({ "data-404": "true", "data-auto": "false" });
+        expect(events()).toEqual([expect.objectContaining({ name: "404", props: { path: "/missing?q=1" } })]);
+    });
+
+    it("counts the hash as part of the page when asked", async () => {
+        window.history.replaceState(null, "", "/app#/inbox");
+        load({ "data-hash": "true" });
+        expect(beats.find((beat) => beat.type === "view")?.url).toBe("/app#/inbox");
+        window.location.hash = "#/sent";
+        window.dispatchEvent(new HashChangeEvent("hashchange"));
+        expect(beats.filter((beat) => beat.type === "view").map((beat) => beat.url)).toEqual(["/app#/inbox", "/app#/sent"]);
+    });
+
+    it("ignores the hash by default", () => {
+        window.history.replaceState(null, "", "/app#/inbox");
+        load({});
+        expect(beats.find((beat) => beat.type === "view")?.url).toBe("/app");
+    });
+});

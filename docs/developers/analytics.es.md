@@ -69,7 +69,11 @@ Todas son atributos de la etiqueta `<script>`.
 | `data-domains="example.com,www.example.com"` | Solo cuenta visitas cuyo hostname sea exactamente uno de estos (sin distinguir mayúsculas, sin comodines). |
 | `data-do-not-track="true"` | Ignora los navegadores que envían Do Not Track. |
 | `data-exclude-search="true"` | Quita la query string de cada página. Los parámetros UTM tampoco se leen. |
-| `data-outbound="true"` | Registra los clics en enlaces a otros hosts como `outbound-link-click`, con el enlace en `url`. |
+| `data-outbound="true"` | Registra los clics en enlaces a otros hosts como `outbound-link-click`, con el enlace en `url`, y los clics en enlaces `mailto:` y `tel:` como `contact-link-click` (solo la dirección, sin asunto ni cuerpo). |
+| `data-downloads="true"` | Registra los clics en enlaces a archivos como `file-download`, con el enlace en `url`. Cuenta un enlace con atributo `download` o que termina en una extensión de archivo habitual (pdf, xlsx, docx, txt, rtf, csv, exe, key, pps, ppt, pptx, 7z, pkg, rar, gz, zip, avi, mov, mp4, mpeg, wmv, midi, mp3, wav, wma, dmg). Puedes dar tu propia lista: `data-downloads="epub,mobi"`. |
+| `data-forms="true"` | Registra los envíos de formularios como `form-submit`, con la ruta de destino en `path` y su `id` si lo tiene. Los formularios con `data-polaris-event` solo envían ese evento. |
+| `data-hash="true"` | Cuenta el `#hash` como parte de la página, para routers basados en hash (`/app#/inbox`). Los cambios de hash cuentan como cambios de ruta. |
+| `data-404="true"` | Ponlo en la etiqueta de tu página de error: cada visita a ella registra también un evento `404` con la ruta pedida en `path`, y los enlaces rotos aparecen en **Eventos**. |
 | `data-before-send="beforeSend"` | Nombre de una función global que ve cada latido antes de enviarse. |
 
 ### `data-before-send`

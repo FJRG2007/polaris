@@ -68,7 +68,11 @@ All options are attributes on the `<script>` tag.
 | `data-domains="example.com,www.example.com"` | Only count visits whose hostname is exactly one of these (case-insensitive, no wildcards). |
 | `data-do-not-track="true"` | Skip browsers that send Do Not Track. |
 | `data-exclude-search="true"` | Drop the query string from every page. UTM parameters are then not read either. |
-| `data-outbound="true"` | Record clicks on links to other hosts as `outbound-link-click`, with the link in `url`. |
+| `data-outbound="true"` | Record clicks on links to other hosts as `outbound-link-click`, with the link in `url`, and clicks on `mailto:` and `tel:` links as `contact-link-click` (address only, no prefilled subject or body). |
+| `data-downloads="true"` | Record clicks on links to files as `file-download`, with the link in `url`. A link counts when it has a `download` attribute or ends in a common file extension (pdf, xlsx, docx, txt, rtf, csv, exe, key, pps, ppt, pptx, 7z, pkg, rar, gz, zip, avi, mov, mp4, mpeg, wmv, midi, mp3, wav, wma, dmg). Give your own list instead: `data-downloads="epub,mobi"`. |
+| `data-forms="true"` | Record form submissions as `form-submit`, with the form's target `path` and its `id` when it has one. Forms that carry `data-polaris-event` report only that event. |
+| `data-hash="true"` | Count the `#hash` as part of the page, for hash-based routers (`/app#/inbox`). Hash changes are counted as route changes. |
+| `data-404="true"` | Put this on the tag of your error page: every view of it also records a `404` event with the requested `path`, so broken links show up under **Events**. |
 | `data-before-send="beforeSend"` | Name of a global function that sees each beat first. |
 
 ### `data-before-send`

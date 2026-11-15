@@ -29,7 +29,11 @@
  *   data-domains="a.com,b.com" - only count visits on these hostnames
  *   data-do-not-track="true"   - count nobody whose browser sends Do Not Track
  *   data-exclude-search="true" - drop the query string from every page
- *   data-outbound="true"       - record clicks on links to other sites
+ *   data-outbound="true"       - record clicks on links to other sites, and on mailto:/tel: links
+ *   data-downloads="true"      - record clicks on file links (or a comma list of extensions)
+ *   data-forms="true"          - record form submissions
+ *   data-hash="true"           - count the #hash as part of the page, for hash routers
+ *   data-404="true"            - this is an error page: record a 404 event for it
  *   data-before-send="fnName"  - a global function that sees every beat first and
  *                                returns it (changed or not), or a falsy value to drop it
  *
@@ -62,6 +66,19 @@
         .map((entry) => entry.trim().toLowerCase())
         .filter(Boolean);
     const excludeSearch = flag("data-exclude-search");
+    const hashRouting = flag("data-hash");
+    const downloadsAttr = script.getAttribute("data-downloads");
+    // The extensions a link to a file usually ends in; a site can name its own.
+    const downloads =
+        downloadsAttr && downloadsAttr !== "false"
+            ? (downloadsAttr === "true"
+                  ? "pdf,xlsx,docx,txt,rtf,csv,exe,key,pps,ppt,pptx,7z,pkg,rar,gz,zip,avi,mov,mp4,mpeg,wmv,midi,mp3,wav,wma,dmg"
+                  : downloadsAttr
+              )
+                  .split(",")
+                  .map((entry) => entry.trim().toLowerCase().replace(/^\./, ""))
+                  .filter(Boolean)
+            : [];
     const beforeSendName = script.getAttribute("data-before-send");
 
     /** Whether this visit is one the site asked not to count. Read each time: a
@@ -85,7 +102,8 @@
     let lastUrl = null;
     let enteredAt = 0;
 
-    const currentUrl = () => location.pathname + (excludeSearch ? "" : location.search);
+    const currentUrl = () =>
+        location.pathname + (excludeSearch ? "" : location.search) + (hashRouting ? location.hash : "");
 
     /**
      * Do this when the browser has nothing better to do.
@@ -223,10 +241,25 @@
                     event(tagged.getAttribute("data-polaris-event"), Object.keys(props).length ? props : undefined);
                     return;
                 }
-                if (!flag("data-outbound")) return;
                 const link = target.closest("a[href]");
-                if (!link || !/^https?:$/.test(link.protocol) || link.host === location.host) return;
-                event("outbound-link-click", { url: link.href.slice(0, 240) });
+                if (!link) return;
+                const url = link.href.slice(0, 240);
+                if (downloads.length && /^https?:$/.test(link.protocol)) {
+                    const extension = /\.([a-z0-9]+)$/i.exec(link.pathname);
+                    if (link.hasAttribute("download") || (extension && downloads.includes(extension[1].toLowerCase()))) {
+                        event("file-download", { url });
+                        return;
+                    }
+                }
+                if (!flag("data-outbound")) return;
+                // The scheme and address only: a prefilled subject or body is the
+                // page's text, not where the click went.
+                if (/^(mailto|tel):$/.test(link.protocol)) {
+                    event("contact-link-click", { url: url.split("?")[0] });
+                    return;
+                }
+                if (!/^https?:$/.test(link.protocol) || link.host === location.host) return;
+                event("outbound-link-click", { url });
             } catch {
                 /* ignore */
             }
@@ -234,7 +267,32 @@
         true
     );
 
+    // A form sent, whatever framework handles it. Capture phase, like the clicks,
+    // and before the page's own handler can navigate away.
+    if (flag("data-forms"))
+        addEventListener(
+            "submit",
+            (submitted) => {
+                try {
+                    const form = submitted.target instanceof HTMLFormElement ? submitted.target : null;
+                    if (!form || form.hasAttribute("data-polaris-event")) return;
+                    const props = { path: new URL(form.action || location.href, location.href).pathname.slice(0, 240) };
+                    if (form.id) props.id = form.id.slice(0, 240);
+                    event("form-submit", props);
+                } catch {
+                    /* ignore */
+                }
+            },
+            true
+        );
+
+    // An error page says so on its own tag, and every view of it is a 404 for the
+    // address that was asked for.
+    if (flag("data-404")) whenIdle(() => event("404", { path: currentUrl().slice(0, 240) }));
+
     if (!auto) return;
+
+    if (hashRouting) addEventListener("hashchange", () => view());
 
     // Single-page navigation. history.pushState fires no event of its own, so the two
     // methods are wrapped - the one reliable way to see a route change without polling
