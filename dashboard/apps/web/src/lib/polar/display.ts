@@ -9,6 +9,7 @@
  */
 
 import { z } from "zod";
+import { sessionEngineSchema } from "@/lib/polar/native/engine-choice";
 import { PAYERS } from "@/lib/polar/shared";
 import { transcriptionChoiceSchema } from "@/lib/polar/transcription";
 
@@ -91,7 +92,9 @@ export const polarPreferencesPatchSchema = z
         autoCompact: z.boolean().optional(),
         reopenLastChat: z.boolean().optional(),
         /** The mic menu's model, `provider/model`; null goes back to the default. */
-        transcriptionModel: transcriptionChoiceSchema.nullable().optional()
+        transcriptionModel: transcriptionChoiceSchema.nullable().optional(),
+        /** The engine Code sessions run on; null is Automatic. */
+        sessionEngine: sessionEngineSchema.nullable().optional()
     })
     .strict()
     .refine((patch) => Object.values(patch).some((value) => value !== undefined), {

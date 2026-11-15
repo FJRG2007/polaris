@@ -276,7 +276,9 @@ an install that never ran the migration's reader still behaves as before.
 ## 5. Checklist
 
 - [x] Design and parity inventory (this page)
-- [ ] Engine choice: setting, composer override, disabled reasons, switch off
+- [x] Engine choice module and switch, off (`lib/polar/native/engine-choice.ts`)
+- [x] Per-person `sessionEngine` setting stored (migration 20271120000180)
+- [ ] Engine choice wired into resolve-start, settings UI, composer override, i18n, tests
 - [x] Native engine: loop, tools, prompt, hooks, transcript, compaction,
       interrupt, model change, plan mode, subagents (`lib/polar/native/`)
 - [x] Tests per tool and end to end with a scripted model (`test/polar/native/`)

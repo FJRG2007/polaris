@@ -112,7 +112,12 @@ export class NativeSession {
 
     private toolSet(): ToolSet {
         return Object.fromEntries(
-            this.tools().map((entry) => [entry.name, tool({ description: entry.description, inputSchema: entry.schema })])
+            // Declared without `execute`: every call comes back here to be gated
+            // and run. The schema's type is erased; `runCall` parses the input.
+            this.tools().map((entry) => [
+                entry.name,
+                tool({ description: entry.description, inputSchema: entry.schema as never } as never)
+            ])
         ) as ToolSet;
     }
 

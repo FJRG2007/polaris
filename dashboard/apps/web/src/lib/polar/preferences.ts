@@ -9,6 +9,7 @@
 
 import { Prisma, prisma } from "@polaris/db";
 import { transcriptionChoiceSchema } from "@/lib/polar/transcription";
+import { sessionEngineSchema } from "@/lib/polar/native/engine-choice";
 import {
     displayOf,
     helperModelOf,
@@ -27,6 +28,8 @@ export interface PolarPreferences extends PolarDisplay {
     improveModel: PolarHelperModel | null;
     writingContext: string;
     writingSkills: string[];
+    /** The engine Code sessions run on; null is Automatic. */
+    sessionEngine: string | null;
 }
 
 const SELECTED = {
@@ -41,7 +44,8 @@ const SELECTED = {
     showContextBar: true,
     autoCompact: true,
     reopenLastChat: true,
-    transcriptionModel: true
+    transcriptionModel: true,
+    sessionEngine: true
 } as const;
 
 /** A stored pick that still reads as one, or null. */
@@ -65,6 +69,7 @@ function preferencesOf(
         improveModel?: unknown;
         writingContext?: unknown;
         writingSkills?: unknown;
+        sessionEngine?: unknown;
     } | null
 ): PolarPreferences {
     return {
@@ -76,6 +81,7 @@ function preferencesOf(
         writingSkills: Array.isArray(row?.writingSkills)
             ? row.writingSkills.filter((name): name is string => typeof name === "string")
             : [],
+        sessionEngine: sessionEngineSchema.safeParse(row?.sessionEngine).success ? (row?.sessionEngine as string) : null,
         ...displayOf(row)
     };
 }
@@ -100,7 +106,8 @@ export async function setPolarPreferences(
             ? { improveModel: patch.improveModel ?? Prisma.DbNull }
             : {}),
         ...(patch.writingContext !== undefined ? { writingContext: patch.writingContext } : {}),
-        ...(patch.writingSkills !== undefined ? { writingSkills: patch.writingSkills } : {})
+        ...(patch.writingSkills !== undefined ? { writingSkills: patch.writingSkills } : {}),
+        ...(patch.sessionEngine !== undefined ? { sessionEngine: patch.sessionEngine } : {})
     };
     const row = await prisma.polarPreference.upsert({
         where: { userId },

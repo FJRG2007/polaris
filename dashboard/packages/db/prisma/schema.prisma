@@ -17186,6 +17186,9 @@ model PolarPreference {
     // The order the model picker lists providers and sources in, as their
     // keys (`polar:<provider>`, `account:<id>`, ...). Unlisted ones follow.
     sourceOrder    String[] @default([])
+    // The engine Polar Code sessions run on: a coding CLI's catalogue id, or
+    // "polaris-native". Null is Automatic (lib/polar/native/engine-choice.ts).
+    sessionEngine  String?
     updatedAt      DateTime @updatedAt
 }
 
