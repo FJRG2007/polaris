@@ -1728,7 +1728,7 @@
     "subagents": {
         "title": "Subagentes",
         "label": "Subagente",
-        "background": "En segundo plano",
+        "background": "De fondo",
         "status": {
             "running": "Trabajando",
             "done": "Hecho",
