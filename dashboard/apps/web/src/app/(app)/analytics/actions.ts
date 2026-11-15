@@ -34,6 +34,7 @@ import * as reports from "@/lib/analytics-reports";
 import * as lists from "@/lib/analytics-lists";
 import * as alerts from "@/lib/analytics-alerts";
 import * as shareLinks from "@/lib/analytics-share";
+import * as lab from "@/lib/analytics-lab";
 import { externalSiteSchema } from "./site-input";
 import {
     createExternalSite,
@@ -739,6 +740,43 @@ export async function setAlertSettingsAction(input: {
     const parsed = alertSettingsSchema.safeParse(input.settings);
     if (!parsed.success) return { error: await say("alerts.invalid") };
     await alerts.writeAlertSettings(reached.access.site.id, reached.userId, parsed.data);
+    return {};
+}
+
+// --- lab performance ---------------------------------------------------------------
+
+/** The site's Lighthouse audits and schedule. */
+export async function getLabAction(input: {
+    scopeType: string;
+    scopeId: string;
+}): Promise<{ error?: string; lab?: lab.LabOverview }> {
+    const reached = await reach(input, "view");
+    if ("error" in reached) return reached;
+    return { lab: await lab.readLab(reached.access.site.id, reached.access.site.hostnames) };
+}
+
+/** Queue an audit of the site's home page now. Answers at once; the panel polls. */
+export async function runLabCheckAction(input: { scopeType: string; scopeId: string }): Promise<{ error?: string }> {
+    const reached = await reach(input, "edit");
+    if ("error" in reached) return reached;
+    const queued = await lab.queueLabCheck(reached.access.site.id, reached.access.site.hostnames, "manual");
+    if ("refused" in queued) return { error: await say(`lab.${queued.refused}`) };
+    return {};
+}
+
+const labFrequencySchema = z.enum(lab.LAB_FREQUENCIES);
+
+export async function setLabFrequencyAction(input: {
+    scopeType: string;
+    scopeId: string;
+    frequency: unknown;
+}): Promise<{ error?: string }> {
+    const reached = await reach(input, "edit");
+    if ("error" in reached) return reached;
+    const parsed = labFrequencySchema.safeParse(input.frequency);
+    if (!parsed.success) return { error: await say("lab.invalid") };
+    if (parsed.data !== "off" && !lab.labAvailable()) return { error: await say("lab.limited") };
+    await lab.setLabFrequency(reached.access.site.id, parsed.data);
     return {};
 }
 

@@ -97,6 +97,8 @@ describe("the work Polaris runs on a schedule", () => {
             "alarms",
             // Two passes would both find the same spike due and tell it twice.
             "analytics-alerts",
+            // Two passes would both claim the same queued audit and run it twice.
+            "analytics-lab",
             // An announcement fans out to every reader, so two clocks in the same
             // minute would both send it and everybody would be told twice.
             "announcements",

@@ -1102,6 +1102,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: async () => (await import("@/lib/analytics-alerts")).runAnalyticsAlerts()
     },
     {
+        key: "analytics-lab",
+        // Every minute: a check somebody asked for should start within a minute.
+        // Free when nothing is queued or due.
+        everyMs: MINUTE,
+        // Leased: two runners would both claim the queue's head and start two
+        // Chromes for one audit. A pass runs at most one check (two audits of up
+        // to twelve minutes each), so the lease outlasts it.
+        leaseMs: 30 * MINUTE,
+        run: async () => (await import("@/lib/analytics-lab")).runAnalyticsLab()
+    },
+    {
         key: "outbound-webhooks",
         // Every minute: the first retry of a signed webhook is due a minute after
         // the try that failed. Also drops log rows past their thirty days, and

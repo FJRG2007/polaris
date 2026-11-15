@@ -584,5 +584,58 @@
         "tooMany": "This site has too many links. Remove one first.",
         "gone": "That link no longer exists.",
         "rangeLabel": "Period"
+    },
+    "lab": {
+        "title": "Lab performance",
+        "intro": "Lighthouse audits of {url}, three runs each, median shown.",
+        "run": "Run audit",
+        "running": "Auditing...",
+        "queued": "Waiting to start",
+        "schedule": "Schedule",
+        "frequency": {
+            "off": "Off",
+            "daily": "Every day",
+            "weekly": "Every week",
+            "monthly": "Every month"
+        },
+        "next": "Next audit {when}",
+        "none": "No audits yet. Run one to see how the home page scores.",
+        "limited": "Audits need the full edition of Polaris, which can start containers on this machine.",
+        "noUrl": "Add a public hostname to this site to audit it.",
+        "busy": "An audit of this site is already running.",
+        "strategy": {
+            "mobile": "Mobile",
+            "desktop": "Desktop"
+        },
+        "score": {
+            "performance": "Performance",
+            "accessibility": "Accessibility",
+            "bestPractices": "Best practices",
+            "seo": "SEO"
+        },
+        "metric": {
+            "lcpMs": "Largest paint",
+            "cls": "Layout shift",
+            "tbtMs": "Blocking time",
+            "fcpMs": "First paint",
+            "siMs": "Speed index",
+            "ttiMs": "Interactive"
+        },
+        "history": "History",
+        "when": "When",
+        "trigger": {
+            "scheduled": "Scheduled",
+            "manual": "By hand"
+        },
+        "error": {
+            "unreachable": "The page did not load.",
+            "private": "The hostname points to a private network.",
+            "failed": "The audit did not finish.",
+            "limited": "Needs the full edition.",
+            "timeout": "The audit took too long."
+        },
+        "version": "Lighthouse {version}",
+        "invalid": "Pick one of the listed schedules.",
+        "device": "Device"
     }
 }

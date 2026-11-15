@@ -584,5 +584,58 @@
         "tooMany": "Este sitio tiene demasiados enlaces. Quita uno antes.",
         "gone": "Ese enlace ya no existe.",
         "rangeLabel": "Periodo"
+    },
+    "lab": {
+        "title": "Laboratorio",
+        "intro": "Auditorías Lighthouse de {url}, tres pasadas, se muestra la mediana.",
+        "run": "Auditar",
+        "running": "Auditando...",
+        "queued": "Esperando turno",
+        "schedule": "Programar",
+        "frequency": {
+            "off": "No",
+            "daily": "Cada día",
+            "weekly": "Cada semana",
+            "monthly": "Cada mes"
+        },
+        "next": "Próxima {when}",
+        "none": "Aún no hay auditorías. Lanza una para ver la nota de la portada.",
+        "limited": "Las auditorías necesitan la edición completa, que arranca contenedores aquí.",
+        "noUrl": "Añade un nombre de host público al sitio para auditarlo.",
+        "busy": "Ya hay una auditoría de este sitio en marcha.",
+        "strategy": {
+            "mobile": "Móvil",
+            "desktop": "Escritorio"
+        },
+        "score": {
+            "performance": "Rendimiento",
+            "accessibility": "Accesibilidad",
+            "bestPractices": "Buenas prácticas",
+            "seo": "SEO"
+        },
+        "metric": {
+            "lcpMs": "Mayor pintado",
+            "cls": "Saltos",
+            "tbtMs": "Bloqueo",
+            "fcpMs": "Primer pintado",
+            "siMs": "Velocidad",
+            "ttiMs": "Interactiva"
+        },
+        "history": "Historial",
+        "when": "Cuándo",
+        "trigger": {
+            "scheduled": "Programada",
+            "manual": "A mano"
+        },
+        "error": {
+            "unreachable": "La página no cargó.",
+            "private": "El host apunta a una red privada.",
+            "failed": "La auditoría no terminó.",
+            "limited": "Necesita la edición completa.",
+            "timeout": "La auditoría tardó demasiado."
+        },
+        "version": "Lighthouse {version}",
+        "invalid": "Elige una de las opciones de la lista.",
+        "device": "Equipo"
     }
 }

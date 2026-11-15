@@ -41,6 +41,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { BREAKDOWN_FILTER, Empty, Failure, Rows, useFilterPick, type PanelProps } from "./analytics-reports";
 import { grouped } from "./analytics-format";
 import { VitalsCard } from "./vitals-card";
+import { LabCard } from "./lab-card";
 
 type Breakdown = Extract<AnalyticsReportAnswer, { kind: "breakdown" }>;
 type Realtime = Extract<AnalyticsReportAnswer, { kind: "realtime" }>;
@@ -348,6 +349,9 @@ export function PagesSection(props: PanelProps) {
             />
             <div className="min-w-0 xl:col-span-2">
                 <VitalsCard {...props} />
+            </div>
+            <div className="min-w-0 xl:col-span-2">
+                <LabCard scope={props.scope} siteId={props.siteId} canEdit={props.data.level !== "view"} />
             </div>
             <div className="min-w-0 xl:col-span-2">
                 <EngagementCard {...props} />
