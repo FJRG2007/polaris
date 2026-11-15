@@ -17,7 +17,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { emitAutomationEvent, kickIntake } from "./outbox";
 import { armVersion, disarm, hookPath, manualSubject } from "./triggers";
 import { callCycle } from "./calls";
-import { graphProblems } from "./node-registry";
+import { automationIssues } from "./node-registry";
 import { mayAllowLocalNetwork, mayEditShelf, mayReadShelf, type Shelf } from "./runner";
 import { AutomationAccessError } from "./access-error";
 import { checkChatWebhooks } from "./chat-webhooks";
@@ -399,10 +399,13 @@ export async function saveDraft(
     actor: RunActor,
     id: string,
     graph: core.AutomationGraph
-): Promise<core.GraphProblem[]> {
+): Promise<core.AutomationIssue[]> {
     const row = await load(actor, id, true);
-    const problems = await graphProblems(graph);
+    // A step still being filled in may be saved; everything else wrong is refused.
+    const problems = core.blockingIssues(await automationIssues(graph, { automationId: id }));
     if (problems.some((problem) => problem.code !== "badConfig")) return problems;
+    const cycle = await callCycle(id, graph, publishedGraphOf);
+    if (cycle) return [{ severity: "error", code: "callCycle", node: cycle.node }];
     await checkSecrets(row, graph);
     await checkChatWebhooks(actor, graph, row.draft);
     await checkNoticeTargets(actor, graph, row.draft);
@@ -414,20 +417,28 @@ export async function saveDraft(
 }
 
 /** Make the draft live: a new immutable version, armed, running as whoever published it. */
-export async function publishAutomation(actor: RunActor, id: string): Promise<core.GraphProblem[]> {
+/** The live graph of another automation, for following a chain of calls. */
+async function publishedGraphOf(target: string): Promise<core.AutomationGraph | null> {
+    const other = await prisma.automation.findUnique({
+        where: { id: target },
+        select: { publishedVersionId: true }
+    });
+    return other?.publishedVersionId ? loadGraph(other.publishedVersionId) : null;
+}
+
+export async function publishAutomation(
+    actor: RunActor,
+    id: string
+): Promise<core.AutomationIssue[]> {
     const row = await load(actor, id, true);
     const parsed = core.automationGraphSchema.safeParse(row.draft);
     if (!parsed.success) throw new AutomationAccessError("invalid");
-    const problems = await graphProblems(parsed.data, { forPublish: true });
+    const problems = core.blockingIssues(
+        await automationIssues(parsed.data, { automationId: id, forPublish: true })
+    );
     if (problems.length > 0) return problems;
-    const cycle = await callCycle(id, parsed.data, async (target) => {
-        const other = await prisma.automation.findUnique({
-            where: { id: target },
-            select: { publishedVersionId: true }
-        });
-        return other?.publishedVersionId ? loadGraph(other.publishedVersionId) : null;
-    });
-    if (cycle) return [{ code: "callCycle", node: cycle.node }];
+    const cycle = await callCycle(id, parsed.data, publishedGraphOf);
+    if (cycle) return [{ severity: "error", code: "callCycle", node: cycle.node }];
     await checkSecrets(row, parsed.data);
     await checkChatWebhooks(actor, parsed.data);
     await checkNoticeTargets(actor, parsed.data);

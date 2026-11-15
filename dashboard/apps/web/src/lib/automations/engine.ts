@@ -27,6 +27,7 @@ import { randomBytes } from "node:crypto";
 import { automationRunner, mayAllowLocalNetwork } from "./runner";
 import { serverNode } from "./node-registry";
 import { readSecretForRun } from "./secrets";
+import { callsBackIntoChain } from "./calls";
 import {
     StepError,
     StepRefusal,
@@ -1561,6 +1562,7 @@ async function callAutomation(
             ? target.orgId === run.automation.orgId
             : !target.orgId && target.userId === run.automation.userId);
     if (!target || !sameShelf) throw new StepRefusal("callForbidden");
+    if (await callsBackIntoChain(run, target.id)) throw new StepRefusal("callLoop");
     if (run.depth + 1 > L.depth) throw new StepRefusal("loop");
     if (!target.enabled || !target.publishedVersionId) throw new StepError("callOff");
     const graph = await loadGraph(target.publishedVersionId);

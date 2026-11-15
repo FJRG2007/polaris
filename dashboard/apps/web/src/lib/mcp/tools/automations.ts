@@ -56,6 +56,15 @@ async function attempt<T>(run: () => Promise<T>): Promise<T> {
     }
 }
 
+/** A draft save that answered with problems saved nothing: say so instead of "Saved". */
+function savedOrRefused(problems: readonly core.AutomationIssue[]): void {
+    const blocking = problems.filter((problem) => problem.code !== "badConfig");
+    if (blocking.length > 0)
+        throw new McpRefusal(
+            `Nothing was saved. Fix these and call again:\n${blocking.map(problemLine).join("\n")}`
+        );
+}
+
 /** The address an automation opens on, for the model to hand on. */
 export function automationHref(id: string): string {
     return `/automations/${id}`;
@@ -137,7 +146,7 @@ function graphNodeOf(node: NodeInput, kept?: core.GraphNode): core.GraphNode {
 }
 
 /** A problem as the model reads it: what is wrong and on which node. */
-export function problemLine(problem: core.GraphProblem): string {
+export function problemLine(problem: core.GraphProblem | core.AutomationIssue): string {
     if (!("node" in problem)) return "The automation has no trigger. Add one, such as core.manual.";
     const where = `node ${problem.node}`;
     switch (problem.code) {
@@ -153,6 +162,16 @@ export function problemLine(problem: core.GraphProblem): string {
             return `${where}: two nodes share this id.`;
         case "cycle":
             return `${where}: is part of a loop of connections. Use core.forEach or core.repeat to repeat steps.`;
+        case "missingReference":
+            return `${where}: reads ${problem.reference}, and no step has that id.`;
+        case "laterReference":
+            return `${where}: reads ${problem.reference}, from a step that does not run before it.`;
+        case "selfTrigger":
+            return `${where}: would fire this automation's own trigger ${problem.trigger} again. Put a core.if before it.`;
+        case "selfCall":
+            return `${where}: runs the automation it is in.`;
+        case "callCycle":
+            return `${where}: starts a chain of automations that leads back to this one.`;
         default:
             return `${where}: ${problem.code}.`;
     }
@@ -503,7 +522,7 @@ const createTool: McpTool<z.infer<typeof createInput>> = {
             )
         );
         try {
-            await attempt(() => service.saveDraft(actor, id, graph));
+            await savedOrRefused(await attempt(() => service.saveDraft(actor, id, graph)));
         } catch (caught) {
             // An automation left behind with only the starter trigger is not what was asked for.
             await service.deleteAutomation(actor, id).catch(() => undefined);
@@ -595,7 +614,9 @@ const updateTool: McpTool<z.infer<typeof updateInput>> = {
             throw new McpRefusal("You can look at this automation but not change it.");
         const { graph, wrote } = editedGraph(found.draft, input);
         const checked = await checkedGraph(graph, { forPublish: false, wrote });
-        await attempt(() => service.saveDraft(actor, input.automation, checked));
+        await savedOrRefused(
+            await attempt(() => service.saveDraft(actor, input.automation, checked))
+        );
         return {
             text: `Saved the draft of "${found.name}": ${checked.nodes.length} nodes, ${checked.edges.length} connections. ${found.published ? "Publish it for the change to run." : "It is still a draft."}`,
             structured: { automationId: found.id, href: automationHref(found.id) }

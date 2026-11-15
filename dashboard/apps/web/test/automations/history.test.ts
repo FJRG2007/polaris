@@ -65,6 +65,9 @@ const http = (id: string, extra: Partial<core.GraphNode> = {}) =>
     );
 const say = (id: string) => node(id, "core.notify", { title: "Hi {{steps.h.body.id}}", body: "" });
 
+/** A step that reads nothing: a version must not read from a step that is not there. */
+const hello = (id: string) => node(id, "core.notify", { title: "Hi", body: "" });
+
 function graphOf(nodes: core.GraphNode[], edges: [string, string][]): core.AutomationGraph {
     return {
         ...core.emptyGraph("UTC"),
@@ -452,9 +455,9 @@ describe("open in editor with this data", () => {
 
 describe("naming and comparing versions", () => {
     it("names a version, takes the name away, and compares it with the draft and another version", async () => {
-        const id = await seed(graphOf([node("t1", "core.manual"), say("n")], [["t1", "n"]]));
+        const id = await seed(graphOf([node("t1", "core.manual"), hello("n")], [["t1", "n"]]));
         await service.publishAutomation(actor, id);
-        const draft = graphOf([node("t1", "core.manual"), say("m")], [["t1", "m"]]);
+        const draft = graphOf([node("t1", "core.manual"), hello("m")], [["t1", "m"]]);
         await service.saveDraft(actor, id, draft);
         await service.publishAutomation(actor, id);
         const [second, first] = await history.listVersions(actor, id);
@@ -472,8 +475,8 @@ describe("naming and comparing versions", () => {
     });
 
     it("refuses a reader renaming, and a version of another automation", async () => {
-        const id = await seed(graphOf([node("t1", "core.manual"), say("n")], [["t1", "n"]]));
-        const other = await seed(graphOf([node("t1", "core.manual"), say("n")], [["t1", "n"]]));
+        const id = await seed(graphOf([node("t1", "core.manual"), hello("n")], [["t1", "n"]]));
+        const other = await seed(graphOf([node("t1", "core.manual"), hello("n")], [["t1", "n"]]));
         await service.publishAutomation(actor, other);
         const [version] = await history.listVersions(actor, other);
         await expect(history.renameVersion(actor, id, version!.id, "x")).rejects.toMatchObject({

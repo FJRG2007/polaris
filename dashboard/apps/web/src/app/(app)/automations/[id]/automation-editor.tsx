@@ -76,6 +76,7 @@ import type {
     VersionRow
 } from "@/lib/automations/history";
 import { CanvasEditor, Palette, nodeLabel } from "./canvas-editor";
+import { IssuesPanel, nodeIssues } from "./issues-panel";
 import { EditorGraphProvider, ReferenceScope } from "./references";
 import {
     LoadFailed,
@@ -298,6 +299,24 @@ function Loaded({
         return () => window.removeEventListener("beforeunload", warn);
     }, [dirty]);
 
+    // Checked as you edit, as the server checks it on save and publish.
+    const issues = useMemo(
+        () => core.automationIssues(graph, { automationId: detail.id }),
+        [graph, detail.id]
+    );
+    const publishBlocked = useMemo(
+        () =>
+            core.blockingIssues(
+                core.automationIssues(graph, { automationId: detail.id, forPublish: true })
+            ).length > 0,
+        [graph, detail.id]
+    );
+    const titleOf = useCallback(
+        (id: string) => nodeLabel(t, graph.nodes.find((node) => node.id === id)),
+        [t, graph]
+    );
+    const issuesByNode = useMemo(() => nodeIssues(t, issues, titleOf), [t, issues, titleOf]);
+
     const save = useCallback(async (): Promise<boolean> => {
         const answer = await saveDraftAction(detail.id, graph);
         if (!answer.ok) {
@@ -461,7 +480,8 @@ function Loaded({
                                     {testing ? t("canvas.testing") : t("canvas.test")}
                                 </Button>
                                 <Button
-                                    disabled={pending}
+                                    disabled={pending || publishBlocked}
+                                    title={publishBlocked ? t("issues.publishBlocked") : undefined}
                                     onClick={() =>
                                         act(async () => {
                                             if (dirty && !(await save())) return;
@@ -564,6 +584,7 @@ function Loaded({
                 {!flow ? (
                     <p className="text-xs text-muted-foreground">{t("canvas.listUnavailable")}</p>
                 ) : null}
+                {!readOnly ? <IssuesPanel issues={issues} title={titleOf} /> : null}
                 {view === "canvas" && !wide && !readOnly ? (
                     <p className="text-xs text-muted-foreground">{t("canvas.phoneReadOnly")}</p>
                 ) : null}
@@ -579,6 +600,7 @@ function Loaded({
                         secrets={secrets}
                         samples={samples}
                         states={states}
+                        issues={issuesByNode}
                         onChanged={onChanged}
                         onAdded={onAdded}
                         onRunFrom={
