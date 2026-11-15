@@ -191,7 +191,11 @@ describe("context size", () => {
         expect(compaction.needsAutoCompact(at - 11, 10, window, true)).toBe(false);
         expect(compaction.needsAutoCompact(at - 10, 10, window, true)).toBe(true);
         expect(compaction.needsAutoCompact(at, 0, window, false)).toBe(false);
-        expect(compaction.needsAutoCompact(at, 0, null, true)).toBe(false);
+        // No window known: a conservative one, never "no compaction at all".
+        const fallback = compaction.AUTO_COMPACT_FALLBACK_WINDOW * compaction.AUTO_COMPACT_AT;
+        expect(compaction.needsAutoCompact(fallback - 1, 0, null, true)).toBe(false);
+        expect(compaction.needsAutoCompact(fallback, 0, null, true)).toBe(true);
+        expect(compaction.needsAutoCompact(fallback, 0, null, false)).toBe(false);
         expect(compaction.estimateTokens("abcd")).toBe(1);
     });
 });

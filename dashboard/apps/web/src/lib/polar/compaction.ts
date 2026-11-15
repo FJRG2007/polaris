@@ -344,6 +344,15 @@ export function contextFill(
     return { share, level: share >= 1 ? "over" : share >= CONTEXT_WARN ? "warn" : "ok" };
 }
 
+/**
+ * The window assumed for auto-compact when neither the provider nor the
+ * catalogue gives one (Automatic, a model the catalogue does not list): small
+ * enough to fit every model Polar offers tools to, so a long chat is
+ * compacted before a provider refuses it rather than after. The context bar
+ * still shows nothing for such a model; this is never shown as its size.
+ */
+export const AUTO_COMPACT_FALLBACK_WINDOW = 32_000;
+
 /** Whether a turn of this size is compacted before it is sent. */
 export function needsAutoCompact(
     used: number,
@@ -351,8 +360,8 @@ export function needsAutoCompact(
     window: number | null,
     enabled: boolean
 ): boolean {
-    if (!enabled || !window) return false;
-    return used + draft >= window * AUTO_COMPACT_AT;
+    if (!enabled) return false;
+    return used + draft >= (window ?? AUTO_COMPACT_FALLBACK_WINDOW) * AUTO_COMPACT_AT;
 }
 
 /**
