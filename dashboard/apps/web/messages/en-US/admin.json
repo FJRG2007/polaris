@@ -1545,7 +1545,28 @@
             },
             "ses": {
                 "summary": "AWS Simple Email Service. Cheapest at volume."
+            },
+            "polarisMail": {
+                "label": "Polaris mail server",
+                "summary": "Mail from your own domain, on a server Polaris runs for you. It sets up its own sender."
             }
+        },
+        "polarisMail": {
+            "forbidden": "Setting up a mail server needs permission to manage mail servers. Ask an administrator for it.",
+            "notInstalled": "The Mail server app is off. Turn it on, then set up a server at one of your domains.",
+            "notInstalledAsk": "The Mail server app is off. Ask an administrator to turn it on.",
+            "enable": "Turn on Mail server",
+            "noServer": "No mail server is set up yet. Set one up at one of your domains and it adds its sender here when it is done.",
+            "setUp": "Set up a mail server",
+            "settingUp": "{host} is still being set up. It adds its sender here when it is done.",
+            "failed": "Setup of {host} stopped before it finished. Open it to repair it.",
+            "ready": "{host} is ready. Polaris can create a mailbox on it and send through it.",
+            "use": "Send through {host}",
+            "starting": "Creating the sender on {host}. It appears in your senders in a moment.",
+            "sending": "{host} already sends through {name}.",
+            "open": "Open mail server",
+            "loadFailed": "Could not check the mail server.",
+            "retry": "Try again"
         }
     },
     "evidence": {

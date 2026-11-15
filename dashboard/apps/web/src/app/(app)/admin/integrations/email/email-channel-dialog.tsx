@@ -33,7 +33,8 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { EmailChannelView } from "@/lib/mail-service";
 import { ProviderSelect } from "@/components/model-keys/provider-select";
-import { providerOptions, providerSummary } from "./email-providers";
+import { PolarisMailPanel } from "./polaris-mail-panel";
+import { POLARIS_MAIL, providerOptions, providerSummary } from "./email-providers";
 import {
     createEmailChannelAction,
     deleteEmailChannelAction,
@@ -61,7 +62,8 @@ export function EmailChannelDialog({
     initialProvider,
     onClose,
     onSaved,
-    onRemoved
+    onRemoved,
+    onPolarisMailSending
 }: {
     /** The channel being edited, or null when adding one. */
     channel: EmailChannelView | null;
@@ -70,6 +72,8 @@ export function EmailChannelDialog({
     onClose: () => void;
     onSaved: (channel: EmailChannelView) => void;
     onRemoved: (id: string) => void;
+    /** Polaris's own mail server finished creating its sender while this was open. */
+    onPolarisMailSending?: () => void;
 }) {
     const t = useTranslations("admin");
     const tc = useTranslations("common");
@@ -77,6 +81,8 @@ export function EmailChannelDialog({
     const starting = channel?.provider ?? initialProvider ?? "brevo";
     const [confirm, confirmElement] = useConfirm();
     const [provider, setProvider] = useState<MailProvider>(starting);
+    // The "Polaris mail server" row, which has no form of its own.
+    const [own, setOwn] = useState(false);
     const [name, setName] = useState(channel?.name ?? "");
     const [secret, setSecret] = useState("");
     const [settings, setSettings] = useState<Record<string, string>>(() =>
@@ -90,16 +96,21 @@ export function EmailChannelDialog({
     const [removing, startRemove] = useTransition();
 
     const info = MAIL_PROVIDER_INFO[provider];
-    const options = useMemo(() => providerOptions(t), [t]);
+    const options = useMemo(() => providerOptions(t, { withPolarisMail: !editing }), [editing, t]);
     const busy = saving || testing || removing;
 
     /** Switching provider keeps the values the two providers share (the From
      *  address, mostly) and drops the ones that do not apply. */
-    function changeProvider(next: MailProvider) {
-        setProvider(next);
-        setSettings((prev) => initialSettings(next, prev));
+    function changeProvider(next: string) {
         setError(null);
         setNotice(null);
+        if (next === POLARIS_MAIL) {
+            setOwn(true);
+            return;
+        }
+        setOwn(false);
+        setProvider(next as MailProvider);
+        setSettings((prev) => initialSettings(next as MailProvider, prev));
     }
 
     const missing = useMemo(() => {
@@ -180,7 +191,9 @@ export function EmailChannelDialog({
                             ? t("inboxChannels.manage.title", { name: channel.name })
                             : t("inboxChannels.email.addTitle")}
                     </DialogTitle>
-                    <DialogDescription>{providerSummary(t, provider)}</DialogDescription>
+                    <DialogDescription>
+                        {own ? t("email.providers.polarisMail.summary") : providerSummary(t, provider)}
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="flex max-h-[65vh] flex-col gap-4 overflow-y-auto overscroll-contain">
@@ -188,91 +201,99 @@ export function EmailChannelDialog({
                         <span className="font-medium">{t("inboxChannels.email.provider")}</span>
                         <ProviderSelect
                             options={options}
-                            value={provider}
-                            onChange={(value) => changeProvider(value as MailProvider)}
+                            value={own ? POLARIS_MAIL : provider}
+                            onChange={changeProvider}
                             disabled={busy}
                         />
-                        <span className="text-xs text-muted-foreground">
-                            {t.rich("inboxChannels.email.sendingAddress", {
-                                requirement: info.senderRequirement,
-                                docs: (chunks) => (
-                                    <a
-                                        key="docs"
-                                        href={info.docsUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="text-primary underline-offset-2 hover:underline"
-                                    >
-                                        {chunks}
-                                    </a>
-                                )
-                            })}
-                        </span>
+                        {own ? null : (
+                            <span className="text-xs text-muted-foreground">
+                                {t.rich("inboxChannels.email.sendingAddress", {
+                                    requirement: info.senderRequirement,
+                                    docs: (chunks) => (
+                                        <a
+                                            key="docs"
+                                            href={info.docsUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-primary underline-offset-2 hover:underline"
+                                        >
+                                            {chunks}
+                                        </a>
+                                    )
+                                })}
+                            </span>
+                        )}
                     </div>
 
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{t("inbox.connect.name")}</span>
-                        <Input
-                            value={name}
-                            onChange={(event) => setName(event.target.value)}
-                            placeholder={t("inboxChannels.email.namePlaceholder")}
-                        />
-                    </label>
-
-                    {info.fields.map((field) => (
-                        <SettingField
-                            key={field.name}
-                            field={field}
-                            value={settings[field.name] ?? ""}
-                            onChange={(value) =>
-                                setSettings((prev) => ({ ...prev, [field.name]: value }))
-                            }
-                        />
-                    ))}
-
-                    <label className="flex flex-col gap-1 text-sm">
-                        <span className="font-medium">{info.secretLabel}</span>
-                        <Input
-                            type="password"
-                            autoComplete="off"
-                            value={secret}
-                            onChange={(event) => setSecret(event.target.value)}
-                            placeholder={editing ? t("inboxChannels.email.secretPlaceholder") : ""}
-                        />
-                        <span className="text-xs text-muted-foreground">{info.secretHint}</span>
-                    </label>
-
-                    {editing && (
-                        <div className="flex flex-col gap-1 rounded-md border border-border p-3">
-                            <span className="text-sm font-medium">
-                                {t("inboxChannels.email.testTitle")}
-                            </span>
-                            <div className="flex items-start gap-2">
+                    {own ? (
+                        <PolarisMailPanel onSending={() => onPolarisMailSending?.()} />
+                    ) : (
+                        <>
+                            <label className="flex flex-col gap-1 text-sm">
+                                <span className="font-medium">{t("inbox.connect.name")}</span>
                                 <Input
-                                    type="email"
-                                    value={testTo}
-                                    autoComplete="email"
-                                    placeholder="you@example.com"
-                                    onChange={(event) => setTestTo(event.target.value)}
+                                    value={name}
+                                    onChange={(event) => setName(event.target.value)}
+                                    placeholder={t("inboxChannels.email.namePlaceholder")}
                                 />
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    onClick={sendTest}
-                                    disabled={busy || !testTo.trim()}
-                                >
-                                    {testing ? (
-                                        <Loader2 className="size-4 animate-spin" />
-                                    ) : (
-                                        <Send className="size-4" />
-                                    )}
-                                    {t("inboxChannels.email.send")}
-                                </Button>
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                                {t("inboxChannels.email.testHint")}
-                            </span>
-                        </div>
+                            </label>
+
+                            {info.fields.map((field) => (
+                                <SettingField
+                                    key={field.name}
+                                    field={field}
+                                    value={settings[field.name] ?? ""}
+                                    onChange={(value) =>
+                                        setSettings((prev) => ({ ...prev, [field.name]: value }))
+                                    }
+                                />
+                            ))}
+
+                            <label className="flex flex-col gap-1 text-sm">
+                                <span className="font-medium">{info.secretLabel}</span>
+                                <Input
+                                    type="password"
+                                    autoComplete="off"
+                                    value={secret}
+                                    onChange={(event) => setSecret(event.target.value)}
+                                    placeholder={editing ? t("inboxChannels.email.secretPlaceholder") : ""}
+                                />
+                                <span className="text-xs text-muted-foreground">{info.secretHint}</span>
+                            </label>
+
+                            {editing && (
+                                <div className="flex flex-col gap-1 rounded-md border border-border p-3">
+                                    <span className="text-sm font-medium">
+                                        {t("inboxChannels.email.testTitle")}
+                                    </span>
+                                    <div className="flex items-start gap-2">
+                                        <Input
+                                            type="email"
+                                            value={testTo}
+                                            autoComplete="email"
+                                            placeholder="you@example.com"
+                                            onChange={(event) => setTestTo(event.target.value)}
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            onClick={sendTest}
+                                            disabled={busy || !testTo.trim()}
+                                        >
+                                            {testing ? (
+                                                <Loader2 className="size-4 animate-spin" />
+                                            ) : (
+                                                <Send className="size-4" />
+                                            )}
+                                            {t("inboxChannels.email.send")}
+                                        </Button>
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">
+                                        {t("inboxChannels.email.testHint")}
+                                    </span>
+                                </div>
+                            )}
+                        </>
                     )}
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -301,14 +322,16 @@ export function EmailChannelDialog({
                         <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
                             {editing ? t("inbox.connect.close") : tc("actions.cancel")}
                         </Button>
-                        <Button
-                            type="button"
-                            onClick={save}
-                            disabled={busy || missing || unchanged}
-                        >
-                            {saving && <Loader2 className="size-4 animate-spin" />}
-                            {editing ? tc("actions.save") : t("inboxChannels.email.add")}
-                        </Button>
+                        {own ? null : (
+                            <Button
+                                type="button"
+                                onClick={save}
+                                disabled={busy || missing || unchanged}
+                            >
+                                {saving && <Loader2 className="size-4 animate-spin" />}
+                                {editing ? tc("actions.save") : t("inboxChannels.email.add")}
+                            </Button>
+                        )}
                     </div>
                 </div>
                 {confirmElement}

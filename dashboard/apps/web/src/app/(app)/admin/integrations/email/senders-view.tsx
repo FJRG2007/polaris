@@ -12,6 +12,7 @@ import { Button, Card, CardBody } from "@polaris/ui";
 import { ChannelCard } from "./channel-card";
 import { EMAIL_CHANNEL_MARK } from "./email-mark";
 import { EmailChannelDialog } from "./email-channel-dialog";
+import { loadEmailAdminAction } from "./data";
 import type { EmailChannelView } from "@/lib/mail-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { providerLabel } from "./email-providers";
@@ -92,6 +93,13 @@ export function EmailSendersView({
                     onRemoved={(id) => {
                         setSenders((prev) => prev.filter((item) => item.id !== id));
                         setEditing(null);
+                    }}
+                    // The mail server made its sender on its own: show it in the list.
+                    onPolarisMailSending={() => {
+                        setEditing(null);
+                        void loadEmailAdminAction()
+                            .then((data) => setSenders(data.senders))
+                            .catch(() => undefined);
                     }}
                 />
             )}

@@ -1545,7 +1545,28 @@
             },
             "ses": {
                 "summary": "Amazon Simple Email Service. El más barato a gran volumen."
+            },
+            "polarisMail": {
+                "label": "Correo propio de Polaris",
+                "summary": "Correo desde tu propio dominio, en un servidor que Polaris gestiona por ti. Crea su propio remitente."
             }
+        },
+        "polarisMail": {
+            "forbidden": "Configurar un servidor de correo requiere permiso para gestionar servidores de correo. Pídeselo a un administrador.",
+            "notInstalled": "La app Servidor de correo está desactivada. Actívala y configura un servidor en uno de tus dominios.",
+            "notInstalledAsk": "La app Servidor de correo está desactivada. Pide a un administrador que la active.",
+            "enable": "Activar el servidor",
+            "noServer": "Aún no hay ningún servidor de correo. Configura uno en uno de tus dominios y añadirá aquí su remitente al terminar.",
+            "setUp": "Configurar un servidor",
+            "settingUp": "{host} aún se está configurando. Añadirá aquí su remitente al terminar.",
+            "failed": "La configuración de {host} se detuvo antes de terminar. Ábrelo para repararlo.",
+            "ready": "{host} está listo. Polaris puede crear un buzón en él y enviar a través de él.",
+            "use": "Enviar a través de {host}",
+            "starting": "Creando el remitente en {host}. Aparecerá en tus remitentes en un momento.",
+            "sending": "{host} ya envía a través de {name}.",
+            "open": "Abrir el servidor",
+            "loadFailed": "No se pudo comprobar el servidor de correo.",
+            "retry": "Reintentar"
         }
     },
     "evidence": {
