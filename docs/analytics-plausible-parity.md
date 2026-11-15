@@ -112,3 +112,62 @@ Size: S under a day, M one to three days, L more.
 | White-label | [white-label](https://plausible.io/docs/white-label) | - | - | n/a: Polaris is self-hosted | - |
 | Looker Studio connector | [looker-studio](https://plausible.io/docs/looker-studio) | - | - | n/a: Google-hosted connector | - |
 | Billing, trial | [trial](https://plausible.io/docs/trial) | - | - | n/a: self-hosted | - |
+
+## Pulse
+
+[Pulse](https://github.com/ciphera-net/pulse) (Ciphera, AGPL-3.0 like Polaris)
+is reviewed from its public frontend repository; its backend (`pulse-backend`)
+is not public, so behaviour is read from the frontend's API clients
+(`lib/api/*.ts`) and screens. Paths in the Pulse column are relative to that
+repository. Rows already covered by the Plausible tables above are not repeated
+unless Pulse goes further.
+
+| Feature | Pulse | Polaris today | Gap | Decision | Size |
+| --- | --- | --- | --- | --- | --- |
+| Tracker opt-out link | `?pulse-ignore=on` / `=off` stored in `localStorage` (`tracker/script.js`, `script.note.js`) | `localStorage polaris.disabled`, set by hand | no link | build: `?polaris-ignore=on/off` in `analytics.js` | S |
+| Interaction labels script | `tracker/script.interactions.js` labels clicks from page text | Tagged events (`data-polaris-event`) | reads page text | n/a: tagged events cover it without reading visitors' content | - |
+| One-tag settings | Tracker options set per site on the server (`TrackingScriptSection.tsx`) | Options as tag attributes | gap | plan: serve per-site tracker options from the collect endpoint | M |
+| Page rules (leave out, group, keep separate) | `components/settings/pages/privacy/rules.ts`, learned `/:id` parents | Ignored pages with `*`; no grouping | grouping | plan: group rules applied at read time | M |
+| Geo detail level | `GeoDataLevel` full / country / none (`lib/api/sites.ts`) | Country only, from header / DB-IP / time zone | city | n/a for city (see Regions, cities); country is the finest level | - |
+| Install status and ingest health | `getInstallStatus`, `getIngestHealth` with rejection causes | Site list shows the last beat | causes | have (last beat); rejection causes: plan | S |
+| Framework detection | `detectFramework(domain)` for setup snippets | Framework snippets chosen by hand (`add-site-flow.tsx`) | auto-detect | n/a: fetching the operator's site from setup adds an outbound call for a hint | - |
+| Realtime | `getRealtime`, `RealtimeOrb.tsx` | `/analytics/realtime` | none | have | - |
+| Sources, channels, campaigns | `Sources.tsx`, `CampaignStat` | Same, plus term / content | none | have | - |
+| Outbound links tab | `Outbound.tsx`, `OutboundLinksTab.tsx` | `outbound-link-click` events with `url` | none | have | - |
+| Countries, regions, cities, map | `Locations.tsx`, `MapView.tsx`, `CityStat`, `RegionStat` | Countries and map | cities | n/a (see Regions, cities) | - |
+| Languages, language groups, time zones | `LanguageStat`, `LanguageGroupStat`, `TimezoneStat` | `language`, `timezone` dimensions | groups | have | - |
+| Screen resolution | `ScreenResolutionStat` | `screen` dimension | none | have | - |
+| Browser and OS versions | `TechSpecs.tsx`, `BrowserStat`, `OSStat` | Browser, OS, device names | versions | build: browser and OS version, raw-only breakdowns | M |
+| Peak hours | `components/dashboard/PeakHours.tsx` (day x hour grid) | none | gap | build: 7 x 24 grid from raw sessions | S |
+| Scroll depth | `ScrollDepthBars.tsx`, `ScrollDepthDistribution` | none | gap | build: per-pageview scroll depth from the leave beat | M |
+| Time on page | `PageTableRow` time columns (`getPagesTable`) | Visit duration per session | per page | build: per-pageview engaged time from the leave beat | M |
+| Content signals | `ContentSignals.tsx`, `ContentStats.tsx` | Top pages with entries / exits | partial | have (pages, entries, exits; scroll and time with the rows above) | - |
+| Goals | `GoalStats.tsx`, settings `goals` | Goal reports | none | have | - |
+| Event property breakdowns | `getEventPropertyKeys`, `getEventPropertyValues` | `eventProperties` report | none | have | - |
+| Funnels with daily instrument | `components/funnels/*` | Funnel reports | daily chart | have | - |
+| Journeys (Sankey) | `components/journeys/SankeyJourney.tsx` | Journey reports | none | have | - |
+| Visitor profiles and visits | `app/sites/[id]/visitors/[key]`, `lib/api/visitors.ts` | Sessions panel with the journey of each session | none | have | - |
+| Comparison: previous and year | `ReportCompare` `previous` / `year` / `none` (`lib/api/reports.ts`) | Previous period | year | build: year-over-year mode | S |
+| Public dashboard with password | `PublicDashboardSection.tsx`, `app/share/[id]`, `authenticatePublicDashboard` | Grants to people only | gap | build: public / password link on the shared link primitives | L |
+| Growth reports (link, slides, print) | `app/r/[token]`, `components/reports/PublicReport.tsx`, `ReportSlides.tsx`, expiry 7 / 30 / 90 days | Printable report (`(print)/analytics/report`) | public link | build together with the public dashboard | M |
+| Scheduled email reports | `ScheduledEmailsSection.tsx`, `ReportEvery` month / quarter | none | - | n/a for email (no outbound channel); periodic digest as a Polaris notification: build | M |
+| Weekly / monthly summary notifications | `lib/notifications/categories.ts` `summary`, `summary_monthly` | none | gap | build: digest notification per site | M |
+| Traffic alerts | `site` notification category | none | gap | build: spike / drop notification | M |
+| Export xlsx / csv / json with grain | `lib/api/export.ts` | CSV of raw pages and events | xlsx, grain | have (CSV); xlsx: n/a, CSV opens in every spreadsheet | - |
+| Import from Plausible, Fathom, Umami, Simple Analytics | `lib/import/sources/*`, run in a worker | none | gap | plan: daily totals into `AnalyticsDay` | L |
+| Data window / retention | `getDataWindow` | Raw retention setting, daily rollup kept | none | have | - |
+| Reset data per module | `resetSiteData(modules)` | **Delete data** for the whole site | per module | have | - |
+| Soft delete and restore sites | `restoreSite`, `listDeletedSites` | Delete is final after a confirm | restore | n/a: the confirm dialog is the safeguard | - |
+| API keys | `lib/api/api-keys.ts`, Developers settings | Polaris API keys | analytics read | build: Stats API on Polaris API keys | M |
+| MCP for assistants | `lib/mcp/clients.ts`, `AssistantsSections.tsx` | Polaris MCP server | analytics tools | plan: analytics tools on the existing MCP server | M |
+| AI analyst | `app/sites/[id]/analyst`, `lib/api/analyst.ts` | Polar assistant | analytics context | plan: through Polar | L |
+| Uptime monitors and incidents | `components/uptime/*`, `lib/api/uptime.ts` | Health probe per deployed service | site view | plan: show the service's uptime history on the site | M |
+| Lab performance (Lighthouse) | `app/sites/[id]/performance`, `lib/api/performance.ts` (`source` psi / lighthouse, scores, audits, filmstrip, history, on-demand trigger) | Field vitals from visitors | lab runs | build: scheduled / on-demand Lighthouse in a throwaway container | L |
+| Search Console / Bing keywords | `lib/api/gsc.ts`, `lib/api/bing.ts` | none | - | n/a: an OAuth app registered with Google / Microsoft per install | - |
+| Bunny CDN statistics | `lib/api/bunny.ts`, `app/sites/[id]/cdn` | none | - | n/a: one vendor's CDN | - |
+| Quarantine (suspicious traffic held) | `lib/api/quarantine.ts` | Bot filtering, firewall | none | have (bots dropped, firewall blocks) | - |
+| Command deck, keyboard shortcuts | `CommandDeck.tsx`, `components/keyboard` | Polaris command palette | analytics keys | plan | S |
+| Never store IPs | Pulse drops IPs | Polaris keeps IPs for the firewall on purpose | - | n/a: deliberate | - |
+| Teams, roles, activity log, billing | `components/settings/pages/team`, `billing` | Polaris orgs and site grants | none | have / n/a (billing) | - |
+
+No Pulse source code was copied into Polaris.
