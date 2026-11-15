@@ -10,6 +10,10 @@
  * tool parses the input itself when it runs (`tools.ts`), the way an MCP
  * client's call does.
  *
+ * `settle` is the one rewrite allowed, and it is applied before the check and
+ * kept: a value the model may not choose (`codeTaskInput`), which the model
+ * and the approval card are meant to read back as the call that will run.
+ *
  * Server-only.
  */
 
@@ -17,10 +21,14 @@ import type { z } from "zod";
 import type { McpTool } from "@/lib/mcp/protocol";
 import { jsonSchema, zodSchema, type Schema } from "ai";
 
-export function polarInputSchema(input: McpTool<never>["input"] | z.ZodType): Schema<unknown> {
+export function polarInputSchema(
+    input: McpTool<never>["input"] | z.ZodType,
+    settle: (value: unknown) => unknown = (value) => value
+): Schema<unknown> {
     const described = zodSchema(input as any);
     return jsonSchema(() => described.jsonSchema, {
-        validate: async (value) => {
+        validate: async (written) => {
+            const value = settle(written);
             const checked = await input.safeParseAsync(value);
             return checked.success
                 ? { success: true, value }

@@ -262,7 +262,7 @@ export async function POST(request: Request): Promise<Response> {
     // read again on every turn so an edit to the agent reaches it at once.
     const agent = await polarThreadAgent(user.id, body.data.threadId, body.data.agentId);
     const [toolset, connectorSet] = await Promise.all([
-        polarTools(user),
+        polarTools(user, body.data.code),
         polarConnectorTools(
             user,
             access,

@@ -45,3 +45,34 @@ export function codeTaskPrompt(task: PolarCodeTask | null): string {
         "Questions are about this repository's code unless the person says otherwise: read it with the repo_ tools before answering, cite the files you used, and write code that fits what is already there."
     ].join(" ");
 }
+
+/**
+ * Tools that put work on a repository the model names, and how a Code task
+ * settles that name. Reading a repository (the repo_ tools) is not here: a read
+ * changes nothing, and comparing with another project the person points at is
+ * a fair question inside a Code task.
+ */
+type Pin = (input: Record<string, unknown>, task: PolarCodeTask) => Record<string, unknown>;
+const PINNED_REPO_TOOLS: Record<string, Pin> = {
+    // The session lands where the person chose: their repository, or with "No
+    // repository" an empty workspace - never one the model picked. A base
+    // branch the model left empty takes the one the person picked.
+    agent_session_start: (input, task) => ({
+        ...input,
+        repo: task.repo ?? "",
+        baseRef: task.repo === null ? "" : input.baseRef || task.branch
+    })
+};
+
+/**
+ * A call's input with the Code task's repository in place of whatever the
+ * model wrote, so the approval card and the run both see the effective one.
+ * Unchanged outside a Code task, for a tool not listed above, or for input
+ * that is not an object (the tool's own check refuses that).
+ */
+export function codeTaskInput(name: string, input: unknown, task: PolarCodeTask | null): unknown {
+    const pin = task ? PINNED_REPO_TOOLS[name] : undefined;
+    if (!pin || !task) return input;
+    if (typeof input !== "object" || input === null || Array.isArray(input)) return input;
+    return pin(input as Record<string, unknown>, task);
+}

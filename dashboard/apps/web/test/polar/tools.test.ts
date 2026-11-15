@@ -11,6 +11,8 @@ const held = new Set<string>();
 const ran: string[] = [];
 /** The person's stored "Always allow" rows, as the database holds them. */
 const grants: { tool: string; target: string }[] = [];
+/** The input each agent_session_start actually ran with. */
+const started: unknown[] = [];
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -63,6 +65,23 @@ vi.mock("@/lib/mcp/catalog", () => ({
             run: async () => ({ text: "renamed" })
         },
         {
+            name: "agent_session_start",
+            title: "Start an agent session",
+            description: "Starts a session",
+            input: z.object({
+                repo: z.string().default(""),
+                prompt: z.string().min(1),
+                baseRef: z.string().default("")
+            }),
+            scope: "agents.manage",
+            readOnly: false,
+            destructive: false,
+            run: async (input: unknown) => {
+                started.push(input);
+                return { text: "started" };
+            }
+        },
+        {
             name: "admin_users",
             description: "Lists users",
             input: z.object({}),
@@ -81,6 +100,7 @@ beforeEach(() => {
     held.clear();
     ran.length = 0;
     grants.length = 0;
+    started.length = 0;
 });
 
 type Approve = (input: unknown) => Promise<string>;
@@ -171,5 +191,56 @@ describe("polarTools", () => {
         const toolset = await polarTools(USER);
         held.delete("tasks.manage");
         expect(await run("tasks_rename", toolset, { id: "ENG-1" })).toMatchObject({ ok: false });
+    });
+});
+
+/** What the chat's check turns a written call into: the input the card shows. */
+async function checked(
+    toolset: Awaited<ReturnType<typeof polarTools>>,
+    name: string,
+    input: unknown
+) {
+    const schema = (
+        toolset.tools[name] as { inputSchema: { validate: (value: unknown) => unknown } }
+    ).inputSchema;
+    return (await schema.validate(input)) as { success: boolean; value?: unknown };
+}
+
+describe("polarTools on a Code task", () => {
+    const picked = { repo: "FJRG2007/experiments", prompt: "Fix the build", baseRef: "" };
+
+    it("starts a No repository task's session in an empty workspace, whatever the model named", async () => {
+        held.add("agents.manage");
+        const toolset = await polarTools(USER, { repo: null, branch: "" });
+        expect(await checked(toolset, "agent_session_start", picked)).toEqual({
+            success: true,
+            value: { repo: "", prompt: "Fix the build", baseRef: "" }
+        });
+        await run("agent_session_start", toolset, picked);
+        expect(started).toEqual([{ repo: "", prompt: "Fix the build", baseRef: "" }]);
+    });
+
+    it("keeps a session on the task's repository, never one the model swapped in", async () => {
+        held.add("agents.manage");
+        const toolset = await polarTools(USER, { repo: "octo/app", branch: "dev" });
+        expect(await checked(toolset, "agent_session_start", picked)).toEqual({
+            success: true,
+            value: { repo: "octo/app", prompt: "Fix the build", baseRef: "dev" }
+        });
+        // An approved call comes back from the browser: the run settles it again.
+        await run("agent_session_start", toolset, { ...picked, baseRef: "feature" });
+        expect(started).toEqual([
+            { repo: "octo/app", prompt: "Fix the build", baseRef: "feature" }
+        ]);
+    });
+
+    it("leaves the model's repository alone outside a Code task", async () => {
+        held.add("agents.manage");
+        const toolset = await polarTools(USER);
+        expect(await checked(toolset, "agent_session_start", picked)).toMatchObject({
+            value: picked
+        });
+        await run("agent_session_start", toolset, picked);
+        expect(started).toEqual([picked]);
     });
 });

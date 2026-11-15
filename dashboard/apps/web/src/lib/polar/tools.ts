@@ -29,6 +29,7 @@ import {
 import type { CatalogEntry } from "@/lib/polar/tool-relevance";
 import { callTarget, grantCovers, grantKeys } from "@/lib/polar/tool-grants";
 import { polarInputSchema } from "@/lib/polar/tool-input";
+import { codeTaskInput, type PolarCodeTask } from "@/lib/polar/code-task";
 
 /** The scopes this person holds, worked out once per request. */
 export async function sessionScopes(user: SessionUser): Promise<McpScope[]> {
@@ -86,11 +87,21 @@ function failure(entry: McpTool<never>, error: unknown): string {
 /**
  * The tools this person may use, as AI SDK tools. One they hold no scope for is
  * not offered at all, the way `tools/list` leaves it out for a key.
+ *
+ * `codeTask` is the Code task the chat is on: a tool that would put work on a
+ * repository takes that one, or none for "No repository", whatever the model
+ * wrote (`codeTaskInput`). Settled where the call is checked, so the approval
+ * card shows it, and again where it runs, since an approved call comes back
+ * from the browser.
  */
-export async function polarTools(user: SessionUser): Promise<PolarToolSet> {
+export async function polarTools(
+    user: SessionUser,
+    codeTask: PolarCodeTask | null = null
+): Promise<PolarToolSet> {
     const caller = await polarCaller(user);
     const readers = new Map<string, McpTool<never>>();
-    const runAs = async (entry: McpTool<never>, input: unknown): Promise<RunOutcome> => {
+    const runAs = async (entry: McpTool<never>, written: unknown): Promise<RunOutcome> => {
+        const input = codeTaskInput(entry.name, written, codeTask);
         // Checked again at the moment it runs: an approval can sit for a
         // while, and a permission removed in between must hold.
         const fresh = { ...caller, scopes: await sessionScopes(user) };
@@ -132,7 +143,9 @@ export async function polarTools(user: SessionUser): Promise<PolarToolSet> {
         });
         result.tools[entry.name] = tool({
             description: entry.description,
-            inputSchema: polarInputSchema(entry.input),
+            inputSchema: polarInputSchema(entry.input, (value) =>
+                codeTaskInput(entry.name, value, codeTask)
+            ),
             async execute(written: unknown) {
                 const outcome = await runAs(entry, written);
                 if (outcome.kind === "denied") {
@@ -150,7 +163,8 @@ export async function polarTools(user: SessionUser): Promise<PolarToolSet> {
         if (writes) {
             result.approval[entry.name] = async (input) => {
                 if (grants.size === 0) return "user-approval";
-                const target = await callTarget(entry, input, caller);
+                const settled = codeTaskInput(entry.name, input, codeTask);
+                const target = await callTarget(entry, settled, caller);
                 return grantCovers(grants, entry, target) ? "approved" : "user-approval";
             };
         }
