@@ -8,6 +8,7 @@
 
 import { capabilitiesFor } from "@polaris/messaging";
 import type { AdapterContext, ChannelAdapter, InteractivePrompt, OutboundMessage, SendResult } from "@polaris/messaging";
+import { authenticationTemplatePayload, cloudTextPayload, whatsappDigits, type CodeTemplate } from "../whatsapp-template";
 
 const GRAPH_BASE = "https://graph.facebook.com/v21.0";
 
@@ -17,10 +18,13 @@ export class WhatsAppCloudAdapter implements ChannelAdapter {
     private readonly phoneNumberId: string;
     private readonly ctx: AdapterContext;
 
-    constructor(token: string, phoneNumberId: string, ctx: AdapterContext) {
+    private readonly template: CodeTemplate | null;
+
+    constructor(token: string, phoneNumberId: string, ctx: AdapterContext, template: CodeTemplate | null = null) {
         this.token = token;
         this.phoneNumberId = phoneNumberId;
         this.ctx = ctx;
+        this.template = template;
     }
 
     private async graph<T>(path: string, body?: unknown): Promise<T> {
@@ -92,10 +96,19 @@ export class WhatsAppCloudAdapter implements ChannelAdapter {
     }
 
     async send(message: OutboundMessage): Promise<SendResult> {
-        const to = message.peerId;
+        // A peer stored as a WhatsApp Web JID (<digits>@c.us) is still a number here.
+        const to = whatsappDigits(message.peerId);
         const payload = message.interactive
             ? this.interactivePayload(to, message.interactive)
-            : { messaging_product: "whatsapp", to, type: "text", text: { body: message.text ?? "" } };
+            : cloudTextPayload(to, message.text ?? "");
+        const result = await this.graph<{ messages?: { id?: string }[] }>(`${this.phoneNumberId}/messages`, payload);
+        return { externalId: result.messages?.[0]?.id };
+    }
+
+    /** A code opens a conversation, which only an approved template may do. */
+    async sendCode(message: { peerId: string; code: string; text: string }): Promise<SendResult> {
+        if (!this.template) return this.send({ peerId: message.peerId, text: message.text });
+        const payload = authenticationTemplatePayload({ to: message.peerId, template: this.template, code: message.code });
         const result = await this.graph<{ messages?: { id?: string }[] }>(`${this.phoneNumberId}/messages`, payload);
         return { externalId: result.messages?.[0]?.id };
     }

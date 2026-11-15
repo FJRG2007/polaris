@@ -25,6 +25,7 @@ const SECOND_FACTORS: Readonly<Record<SecondFactor, NamespaceKey<"components">>>
     totp: "signIn.secondFactors.totp",
     "email-code": "signIn.secondFactors.emailCode",
     "whatsapp-code": "signIn.secondFactors.whatsappCode",
+    "telegram-code": "signIn.secondFactors.telegramCode",
     code: "signIn.secondFactors.code",
     "backup-code": "signIn.secondFactors.backupCode",
     "trusted-device": "signIn.secondFactors.trustedDevice"

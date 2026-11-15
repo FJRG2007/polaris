@@ -12,7 +12,6 @@
 
 import { z } from "zod";
 import { auth } from "@/lib/auth";
-import { prisma } from "@polaris/db";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
@@ -23,7 +22,9 @@ import { getTranslations } from "@/lib/i18n/request";
 import { methodLabel } from "./known-sentences";
 import { firstIssue, localized } from "./action-messages";
 import { normalizePeerId } from "@/lib/messaging-service";
-import { sendThroughChannel } from "@/lib/messaging/channel-runtime";
+import { sendCodeThroughChannel } from "@/lib/messaging/channel-runtime";
+import { codeRouteFor } from "@/lib/messaging/code-senders";
+import { checkTelegramLink, startTelegramLink, unlinkTelegram } from "@/lib/messaging/telegram-link";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
 import {
     otpCodeField,
@@ -84,10 +85,9 @@ export async function removePhoneAction(password: unknown): Promise<ActionResult
 /**
  * Send a confirmation code to the number on the account.
  *
- * It goes through one of the user's own connected WhatsApp channels, which is
- * also the only way a second-factor code would ever reach that number - so
- * confirming the number and confirming the route are the same act, and a number
- * that confirms cannot later turn out to be unreachable.
+ * It goes the way a second-factor code would - the deployment's WhatsApp code
+ * sender, or the user's own connected channel on an older setup - so confirming
+ * the number and confirming the route are the same act.
  */
 export async function sendPhoneCodeAction(): Promise<ActionResult> {
     const user = await requireUser();
@@ -99,13 +99,9 @@ export async function sendPhoneCodeAction(): Promise<ActionResult> {
         return { error: t("errors.tooManyCodes", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
     }
 
-    const channel = await prisma.channel.findFirst({
-        where: { ownerId: user.id, platform: "whatsapp", status: "connected" },
-        orderBy: { createdAt: "asc" },
-        select: { id: true }
-    });
+    const route = await codeRouteFor("whatsapp", user.id);
     const t = await getTranslations("accountSecurity");
-    if (!channel) return { error: t("errors.connectWhatsAppFirst") };
+    if (!route.channelId) return { error: t("errors.connectWhatsAppFirst") };
 
     const issued = await issuePhoneCode(auth, user.id);
     if (issued.error || !issued.code || !issued.phone) {
@@ -113,8 +109,9 @@ export async function sendPhoneCodeAction(): Promise<ActionResult> {
     }
 
     try {
-        await sendThroughChannel(channel.id, {
+        await sendCodeThroughChannel(route.channelId, {
             peerId: normalizePeerId("whatsapp", issued.phone),
+            code: issued.code,
             // Sent to this same person, so in the language they are reading in.
             text: t("phone.confirmationMessage", { code: issued.code, minutes: TWO_FACTOR_CODE_TTL_MINUTES })
         });
@@ -122,6 +119,45 @@ export async function sendPhoneCodeAction(): Promise<ActionResult> {
         return { error: caught instanceof Error ? caught.message : t("errors.messageNotSent") };
     }
     await recordAudit({ actorId: user.id, action: "account.phone.code-sent" });
+    return {};
+}
+
+/**
+ * Start linking Telegram: a one-time deep link to the deployment's bot. Pressing
+ * Start there is what lets the bot write to this person at all.
+ */
+export async function startTelegramLinkAction(): Promise<{ url?: string; error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    const throttle = await rateLimit(`telegram-link:${user.id}`, CODE_SEND_LIMIT, CODE_SEND_WINDOW_MS);
+    if (!throttle.ok) {
+        const t = await getTranslations("accountSecurity");
+        return { error: t("errors.tooManyCodes", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
+    }
+    return localized(await startTelegramLink(user.id));
+}
+
+/** Whether the Start press arrived; binds the chat when it did. */
+export async function checkTelegramLinkAction(): Promise<{ linked: boolean; error?: string }> {
+    const user = await requireUser();
+    const throttle = await rateLimit(`telegram-check:${user.id}`, 60, CODE_CHECK_WINDOW_MS);
+    if (!throttle.ok) return { linked: false };
+    const result = await checkTelegramLink(user.id);
+    if (result.linked) {
+        await recordAudit({ actorId: user.id, action: "account.telegram.linked" });
+        revalidatePath("/account/security");
+    }
+    return result.error ? { linked: false, ...(await localized({ error: result.error })) } : result;
+}
+
+export async function unlinkTelegramAction(): Promise<ActionResult> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    await unlinkTelegram(user.id);
+    await recordAudit({ actorId: user.id, action: "account.telegram.unlinked" });
+    revalidatePath("/account/security");
     return {};
 }
 

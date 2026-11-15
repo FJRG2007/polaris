@@ -63,6 +63,10 @@ const EXACT: ReadonlyMap<string, SecurityKey> = new Map<string, SecurityKey>([
     ["Polaris has no email channel to send from.", "known.noEmailChannel"],
     ["Confirm a phone number on your profile first.", "known.confirmPhoneFirst"],
     ["None of your WhatsApp channels is connected.", "known.noWhatsAppChannel"],
+    ["WhatsApp codes are not set up. An administrator turns them on in Integrations > Messaging.", "known.noWhatsAppSender"],
+    ["Telegram codes are not set up. An administrator turns them on in Integrations > Messaging.", "known.noTelegramSender"],
+    ["Link your Telegram account first.", "known.linkTelegramFirst"],
+    ["That link has expired. Start again.", "known.telegramLinkExpired"],
     ["No authenticator is set up on this account.", "known.noAuthenticator"],
     ["Two-step verification is off.", "known.twoStepOff"],
     // The shared schemas behind these forms (@polaris/core).
@@ -129,7 +133,8 @@ export function questionLabel(t: NamespaceTranslator<"accountSecurity">, questio
 const METHOD_LABELS: Readonly<Record<core.TwoFactorMethod, SecurityKey>> = {
     totp: "methods.totp.label",
     email: "methods.email.label",
-    whatsapp: "methods.whatsapp.label"
+    whatsapp: "methods.whatsapp.label",
+    telegram: "methods.telegram.label"
 };
 
 /** A two-factor method's name, in the reader's language. */

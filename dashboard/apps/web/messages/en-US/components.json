@@ -954,6 +954,7 @@
             "totp": "Authenticator app",
             "emailCode": "Emailed code",
             "whatsappCode": "WhatsApp code",
+            "telegramCode": "Telegram code",
             "code": "Sent code",
             "backupCode": "Backup code",
             "trustedDevice": "Remembered device"
@@ -1224,6 +1225,7 @@
             "totp": "Authenticator code",
             "email": "Emailed code",
             "whatsapp": "WhatsApp code",
+            "telegram": "Telegram code",
             "password": "Your password"
         },
         "optionsFailed": "Could not work out how to confirm this.",

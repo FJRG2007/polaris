@@ -82,7 +82,7 @@
         "approvalNeedsPin": "Primero desactiva la aprobación de inicios de sesión desde una sesión abierta: pide este PIN.",
         "authenticatorFirst": "Primero desactiva la app de autenticación: un inicio de sesión pide uno de los dos, no ambos.",
         "pinFirst": "Primero configura un PIN de desbloqueo rápido: aprobar un inicio de sesión lo pide.",
-        "connectWhatsAppFirst": "Primero conecta uno de tus canales de WhatsApp: el código se envía por él.",
+        "connectWhatsAppFirst": "Los códigos por WhatsApp no están activos. Un administrador los activa en Integraciones > Mensajería.",
         "messageNotSent": "No se ha podido enviar el mensaje.",
         "methodCannotSend": "{method} todavía no puede enviar nada.",
         "unknownPasskey": "Llave de acceso desconocida.",
@@ -348,6 +348,10 @@
             "label": "Código WhatsApp",
             "description": "Un código enviado a tu número confirmado como mensaje de WhatsApp."
         },
+        "telegram": {
+            "label": "Código de Telegram",
+            "description": "Un código que el bot de Polaris envía a tu Telegram vinculado."
+        },
         "title": "Cómo terminas de iniciar sesión",
         "description": "Después de tu contraseña, elige qué más pide la cuenta.",
         "alwaysOn": "Siempre",
@@ -457,7 +461,11 @@
         "phoneFormat": "Usa el formato internacional, por ejemplo +34600111222",
         "enterPassword": "Introduce tu contraseña",
         "passwordMinLength": "La contraseña nueva debe tener al menos {count} caracteres.",
-        "setQuestions": "Configura {count} preguntas"
+        "setQuestions": "Configura {count} preguntas",
+        "noWhatsAppSender": "Los códigos por WhatsApp no están activos. Un administrador los activa en Integraciones > Mensajería.",
+        "noTelegramSender": "Los códigos por Telegram no están activos. Un administrador los activa en Integraciones > Mensajería.",
+        "linkTelegramFirst": "Vincula primero tu cuenta de Telegram.",
+        "telegramLinkExpired": "Ese enlace ha caducado. Empieza de nuevo."
     },
     "binding": {
         "title": "Dónde se pueden usar tus sesiones",

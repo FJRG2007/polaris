@@ -82,7 +82,7 @@
         "approvalNeedsPin": "Turn off approving sign-ins from an open session first - it asks for this PIN.",
         "authenticatorFirst": "Turn the authenticator app off first - a sign-in asks for one of the two, not both.",
         "pinFirst": "Set a quick unlock PIN first - approving a sign-in asks for it.",
-        "connectWhatsAppFirst": "Connect one of your WhatsApp channels first - the code is sent through it.",
+        "connectWhatsAppFirst": "WhatsApp codes are not set up. An administrator turns them on in Integrations > Messaging.",
         "messageNotSent": "The message could not be sent.",
         "methodCannotSend": "{method} cannot send anything yet.",
         "unknownPasskey": "Unknown passkey.",
@@ -348,6 +348,10 @@
             "label": "WhatsApp code",
             "description": "A code sent to your confirmed number as a WhatsApp message."
         },
+        "telegram": {
+            "label": "Telegram code",
+            "description": "A code sent to your linked Telegram account by the Polaris bot."
+        },
         "title": "How you finish signing in",
         "description": "After your password, pick what else the account asks for.",
         "alwaysOn": "Always on",
@@ -457,7 +461,11 @@
         "phoneFormat": "Use the international form, for example +34600111222",
         "enterPassword": "Enter your password",
         "passwordMinLength": "New password must be at least {count} characters.",
-        "setQuestions": "Set {count} questions"
+        "setQuestions": "Set {count} questions",
+        "noWhatsAppSender": "WhatsApp codes are not set up. An administrator turns them on in Integrations > Messaging.",
+        "noTelegramSender": "Telegram codes are not set up. An administrator turns them on in Integrations > Messaging.",
+        "linkTelegramFirst": "Link your Telegram account first.",
+        "telegramLinkExpired": "That link has expired. Start again."
     },
     "binding": {
         "title": "Where your sessions may be used",

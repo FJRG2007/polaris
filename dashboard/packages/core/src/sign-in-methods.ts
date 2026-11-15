@@ -51,6 +51,7 @@ export const SECOND_FACTORS = [
     "totp",
     "email-code",
     "whatsapp-code",
+    "telegram-code",
     "code",
     "backup-code",
     "trusted-device"
@@ -76,6 +77,7 @@ export const SECOND_FACTOR_LABELS: Record<SecondFactor, string> = {
     totp: "Authenticator app",
     "email-code": "Emailed code",
     "whatsapp-code": "WhatsApp code",
+    "telegram-code": "Telegram code",
     code: "Sent code",
     "backup-code": "Backup code",
     "trusted-device": "Remembered device"
@@ -88,7 +90,8 @@ export const SECOND_FACTOR_LABELS: Record<SecondFactor, string> = {
  */
 export const SECOND_FACTOR_BY_DELIVERY: Record<string, SecondFactor> = {
     email: "email-code",
-    whatsapp: "whatsapp-code"
+    whatsapp: "whatsapp-code",
+    telegram: "telegram-code"
 };
 
 /** How one sign-in proved itself, as stored. Either half can be absent: an old

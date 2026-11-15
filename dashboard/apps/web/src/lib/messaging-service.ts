@@ -6,6 +6,7 @@
  */
 
 import { EMAIL_PLATFORM } from "@polaris/core";
+import { isWhatsAppWebProvider } from "@polaris/messaging";
 import { prisma } from "@polaris/db";
 import { hasWhatsAppSession } from "./messaging/whatsapp-session";
 import { connectLive, connectRequestFor, liveState } from "./messaging/channel-runtime";
@@ -75,7 +76,7 @@ export async function reconcileChannels(): Promise<void> {
             continue;
         }
         try {
-            if (channel.platform === "whatsapp" && channel.provider !== "whatsapp-cloud") {
+            if (channel.platform === "whatsapp" && isWhatsAppWebProvider(channel.provider)) {
                 if (!hasWhatsAppSession(channel.id)) {
                     await prisma.channel.update({
                         where: { id: channel.id },

@@ -71,6 +71,10 @@ export interface ChannelAdapter {
     /** Enumerate addressable targets grouped (server -> channels), for platforms
      *  whose recipients are discoverable (Discord). Absent where they are not. */
     listTargets?(): Promise<TargetGroup[]>;
+    /** Deliver a one-time code. Backends that may only start a conversation with
+     *  an approved template (WhatsApp's Business API) send it through one; absent
+     *  means the code goes as the plain `text`. */
+    sendCode?(message: { peerId: string; code: string; text: string }): Promise<SendResult>;
 }
 
 /** Factory a platform module registers under its `Platform` key. */

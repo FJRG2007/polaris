@@ -26,7 +26,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import * as polls from "./shared-polls";
 
-const PROOFS = new Set(["totp", "email", "whatsapp", "password"]);
+const PROOFS = new Set(["totp", "email", "whatsapp", "telegram", "password"]);
 
 /** How a proof is named, from its id; one this build has no words for keeps the
  *  label the service gave it. */

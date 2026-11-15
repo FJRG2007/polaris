@@ -7,7 +7,16 @@
 export type Platform = "telegram" | "whatsapp" | "discord" | "slack";
 
 /** WhatsApp has two selectable backends with very different trade-offs. */
-export type WhatsAppProvider = "whatsapp-web" | "whatsapp-cloud";
+export type WhatsAppProvider = "whatsapp-web" | "whatsapp-cloud" | "whatsapp-twilio" | "whatsapp-360dialog";
+
+/** The WhatsApp backends built on the official Business API. Anything else is a
+ *  WhatsApp Web session, which WhatsApp may ban. */
+export const OFFICIAL_WHATSAPP_PROVIDERS: readonly string[] = ["whatsapp-cloud", "whatsapp-twilio", "whatsapp-360dialog"];
+
+/** True for a WhatsApp channel driven through an unofficial WhatsApp Web session. */
+export function isWhatsAppWebProvider(provider: string | null | undefined): boolean {
+    return !OFFICIAL_WHATSAPP_PROVIDERS.includes(provider ?? "");
+}
 
 /** How a channel is brought online. */
 export type OnboardingMode = "token" | "qr" | "code" | "oauth";

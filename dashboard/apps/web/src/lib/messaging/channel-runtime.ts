@@ -17,7 +17,8 @@ import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { EMAIL_PLATFORM } from "@polaris/core";
 import { decryptSecret } from "@polaris/storage";
-import { capabilitiesFor } from "@polaris/messaging";
+import { capabilitiesFor, isWhatsAppWebProvider } from "@polaris/messaging";
+import { codeTemplateFrom } from "./whatsapp-template";
 import { hasWhatsAppSession } from "./whatsapp-session";
 import type {
     AdapterContext,
@@ -59,12 +60,32 @@ async function buildAdapter(request: ConnectRequest, context: AdapterContext): P
             return new TelegramAdapter(request.token);
         }
         case "whatsapp": {
+            const template = codeTemplateFrom(request.config);
             if (request.provider === "whatsapp-cloud") {
                 if (!request.token) throw new Error("WhatsApp Cloud needs an access token");
                 const phoneNumberId = request.config?.phoneNumberId;
                 if (!phoneNumberId) throw new Error("WhatsApp Cloud needs a phone number ID");
                 const { WhatsAppCloudAdapter } = await import("./adapters/whatsapp-cloud");
-                return new WhatsAppCloudAdapter(request.token, phoneNumberId, context);
+                return new WhatsAppCloudAdapter(request.token, phoneNumberId, context, template);
+            }
+            if (request.provider === "whatsapp-twilio") {
+                const accountSid = request.config?.accountSid;
+                const from = request.config?.from;
+                if (!request.token || !accountSid) throw new Error("Twilio needs an account SID and auth token");
+                if (!from) throw new Error("Twilio needs the WhatsApp sender number");
+                const { WhatsAppTwilioAdapter } = await import("./adapters/whatsapp-twilio");
+                return new WhatsAppTwilioAdapter(
+                    accountSid,
+                    request.token,
+                    from,
+                    request.config?.contentSid?.trim() || undefined,
+                    context
+                );
+            }
+            if (request.provider === "whatsapp-360dialog") {
+                if (!request.token) throw new Error("360dialog needs an API key");
+                const { WhatsApp360DialogAdapter } = await import("./adapters/whatsapp-360dialog");
+                return new WhatsApp360DialogAdapter(request.token, request.config?.from, template, context);
             }
             const { WhatsAppWebAdapter } = await import("./adapters/whatsapp-web");
             return new WhatsAppWebAdapter(request.channelId, context);
@@ -179,13 +200,13 @@ export function connectRequestFor(channel: {
     };
 }
 
-const NOT_LINKED = "This channel is not linked. Scan its QR code again in Admin > Channels.";
+const NOT_LINKED = "This channel is not linked. Scan its QR code again in Integrations > Messaging.";
 
 /** How long a send waits for a WhatsApp Web session to finish restoring. */
 const RESTORE_WAIT_MS = 45_000;
 
 function isWhatsAppWeb(channel: { platform: string; provider: string | null }): boolean {
-    return channel.platform === "whatsapp" && channel.provider !== "whatsapp-cloud";
+    return channel.platform === "whatsapp" && isWhatsAppWebProvider(channel.provider);
 }
 
 /** Start a channel's adapter from its stored row, once per process. */
@@ -214,11 +235,8 @@ async function ensureLive(channelId: string): Promise<ChannelAdapter> {
     }
 }
 
-/** Send through a channel, starting its adapter first when it is not running. */
-export async function sendThroughChannel(
-    channelId: string,
-    message: { peerId: string; text?: string; interactive?: InteractivePrompt }
-): Promise<SendResult> {
+/** A started adapter that is ready to send, waiting out a WhatsApp Web restore. */
+async function readyAdapter(channelId: string): Promise<ChannelAdapter> {
     const adapter = await ensureLive(channelId);
     // A WhatsApp Web session restores in the background after a start; the first
     // send after a restart waits for it rather than failing on a page not ready.
@@ -231,5 +249,26 @@ export async function sendThroughChannel(
     // letting the browser session fail somewhere deeper.
     if (status === "qr" || status === "disconnected" || status === "error") throw new Error(NOT_LINKED);
     if (status === "connecting") throw new Error("This channel is still starting. Try again in a minute.");
-    return adapter.send(message);
+    return adapter;
+}
+
+/** Send through a channel, starting its adapter first when it is not running. */
+export async function sendThroughChannel(
+    channelId: string,
+    message: { peerId: string; text?: string; interactive?: InteractivePrompt }
+): Promise<SendResult> {
+    return (await readyAdapter(channelId)).send(message);
+}
+
+/**
+ * Send a one-time code. A backend that may only open a conversation with an
+ * approved template (WhatsApp's Business API) sends it through that template;
+ * every other one sends `text`, which already carries the code.
+ */
+export async function sendCodeThroughChannel(
+    channelId: string,
+    message: { peerId: string; code: string; text: string }
+): Promise<SendResult> {
+    const adapter = await readyAdapter(channelId);
+    return adapter.sendCode ? adapter.sendCode(message) : adapter.send({ peerId: message.peerId, text: message.text });
 }

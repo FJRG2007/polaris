@@ -4,6 +4,7 @@
  * should render (native buttons vs a poll vs a numbered menu).
  */
 
+import { isWhatsAppWebProvider } from "./types.js";
 import type { ChannelCapabilities, Platform } from "./types.js";
 
 /** Capabilities for a platform and, where it has more than one backend, its
@@ -70,7 +71,7 @@ export function capabilitiesFor(platform: Platform, provider?: string | null): C
             // The official Cloud API has native interactive messages and templates;
             // the free whatsapp-web backend has neither (buttons were deprecated),
             // so a selector degrades to a native poll or a numbered menu.
-            return provider === "whatsapp-cloud"
+            return !isWhatsAppWebProvider(provider)
                 ? {
                       nativeButtons: true,
                       nativeSelects: true,

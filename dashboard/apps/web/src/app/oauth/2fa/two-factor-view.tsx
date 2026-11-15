@@ -16,6 +16,7 @@ import { authClient } from "@/lib/auth-client";
 import { abandonChallengeAction } from "./actions";
 import { KeyRound, Mail, Smartphone } from "lucide-react";
 import { WhatsAppLogo } from "./whatsapp-logo";
+import { TelegramLogo } from "./telegram-logo";
 import type { ChallengeOptions } from "@/lib/two-factor-delivery";
 import { useEffect, useState, type ComponentType, type FormEvent } from "react";
 import {
@@ -41,7 +42,8 @@ function target(): string {
 const METHOD_ICON: Record<TwoFactorMethod, ComponentType<{ className?: string }>> = {
     totp: Smartphone,
     email: Mail,
-    whatsapp: WhatsAppLogo
+    whatsapp: WhatsAppLogo,
+    telegram: TelegramLogo
 };
 
 /** How long the resend button stays quiet, so a code that is simply slow does not

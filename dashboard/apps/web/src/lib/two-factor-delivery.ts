@@ -17,7 +17,9 @@ import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { normalizePeerId } from "@/lib/messaging-service";
-import { sendThroughChannel } from "@/lib/messaging/channel-runtime";
+import { sendCodeThroughChannel } from "@/lib/messaging/channel-runtime";
+import { codeRouteFor } from "@/lib/messaging/code-senders";
+import { telegramChatFor } from "@/lib/messaging/telegram-link";
 import { getAuthMailStatus, sendAuthEmail } from "@/lib/auth-mail";
 import { getUserPhone, getUserSecurity, noteSecondFactor, twoFactorEnabled } from "@polaris/auth";
 import {
@@ -54,7 +56,7 @@ export interface TwoFactorMethodStatus {
 interface Destination {
     /** The address or number, unmasked - only ever used to send. */
     address: string;
-    /** For WhatsApp, the channel that carries it. */
+    /** For WhatsApp and Telegram, the channel that carries it. */
     channelId?: string;
 }
 
@@ -83,30 +85,35 @@ async function emailDestination(userId: string): Promise<Resolution> {
 }
 
 /**
- * Where a WhatsApp code goes. The channel has to be one of the user's own:
- * routing it through somebody else's would drop the conversation, and the code
- * in it, into that person's inbox.
+ * Where a WhatsApp code goes: the person's confirmed number, through the sender
+ * an administrator picked under Integrations > Messaging - or, on an install that
+ * predates it, through a WhatsApp channel the person connected themselves
+ * (lib/messaging/code-route.ts).
  */
 async function whatsappDestination(userId: string): Promise<Resolution> {
-    const [phone, channel] = await Promise.all([
-        getUserPhone(userId),
-        prisma.channel.findFirst({
-            where: { ownerId: userId, platform: "whatsapp", status: "connected" },
-            orderBy: { createdAt: "asc" },
-            select: { id: true }
-        })
-    ]);
+    const [phone, route] = await Promise.all([getUserPhone(userId), codeRouteFor("whatsapp", userId)]);
     if (!phone?.verified) return { destination: null, blocker: "Confirm a phone number on your profile first." };
-    if (!channel) return { destination: null, blocker: "None of your WhatsApp channels is connected." };
-    return { destination: { address: phone.phone, channelId: channel.id }, blocker: null };
+    if (route.channelId === null) return { destination: null, blocker: route.blocker };
+    return { destination: { address: phone.phone, channelId: route.channelId }, blocker: null };
+}
+
+/** Where a Telegram code goes: the chat the person linked by pressing Start. */
+async function telegramDestination(userId: string): Promise<Resolution> {
+    const [chatId, route] = await Promise.all([telegramChatFor(userId), codeRouteFor("telegram", userId)]);
+    if (route.channelId === null) return { destination: null, blocker: route.blocker };
+    if (!chatId) return { destination: null, blocker: "Link your Telegram account first." };
+    return { destination: { address: chatId, channelId: route.channelId }, blocker: null };
 }
 
 function resolveDestination(userId: string, method: TwoFactorDeliveryMethod): Promise<Resolution> {
-    return method === "email" ? emailDestination(userId) : whatsappDestination(userId);
+    if (method === "email") return emailDestination(userId);
+    return method === "telegram" ? telegramDestination(userId) : whatsappDestination(userId);
 }
 
 function maskDestination(method: TwoFactorDeliveryMethod, address: string): string {
-    return method === "email" ? maskEmail(address) : maskPhone(address);
+    if (method === "email") return maskEmail(address);
+    // A chat id is not something the person recognises, and not worth showing.
+    return method === "telegram" ? "Telegram" : maskPhone(address);
 }
 
 /**
@@ -213,13 +220,13 @@ export interface CodeMessage {
 export async function deliverCode(
     userId: string,
     method: TwoFactorDeliveryMethod,
-    message: CodeMessage
+    message: CodeMessage & { code?: string }
 ): Promise<{ error?: string }> {
     const { destination, blocker } = await resolveDestination(userId, method);
     if (!destination) return { error: blocker ?? (await readerWords("api"))("refusals.twoFactor.methodUnusable") };
     return method === "email"
         ? sendAuthEmail({ to: destination.address, subject: message.subject, text: message.text, html: message.html })
-        : sendByWhatsApp(destination, message.text);
+        : sendByChannel(method, destination, message.text, message.code);
 }
 
 function messageBody(code: string): { text: string; html: string } {
@@ -279,7 +286,7 @@ export async function sendTwoFactorCode(input: {
     const result =
         chosen === "email"
             ? await sendAuthEmail({ to: destination.address, subject: "Your Polaris sign-in code", text, html })
-            : await sendByWhatsApp(destination, text);
+            : await sendByChannel(chosen, destination, text, code);
 
     // Which channel carried the code is only known here - the request that checks
     // it carries nothing about where it came from - so a code that actually went
@@ -295,15 +302,22 @@ export async function sendTwoFactorCode(input: {
 }
 
 /**
- * Hand the message straight to the channel rather than through the inbox, so it
- * is never written into the conversation history: a code that outlives the
- * minute it was good for is a code sitting in a database for no reason.
+ * Hand the message straight to the channel, so it is never written into any
+ * history: a code that outlives the minute it was good for is a code sitting in
+ * a database for no reason. With the code known, a WhatsApp Business API sender
+ * uses its approved authentication template, the only way it may open a chat.
  */
-async function sendByWhatsApp(destination: Destination, text: string): Promise<{ error?: string }> {
+async function sendByChannel(
+    platform: "whatsapp" | "telegram",
+    destination: Destination,
+    text: string,
+    code?: string
+): Promise<{ error?: string }> {
     if (!destination.channelId) return { error: (await readerWords("api"))("refusals.twoFactor.noWhatsApp") };
     try {
-        await sendThroughChannel(destination.channelId, {
-            peerId: normalizePeerId("whatsapp", destination.address),
+        await sendCodeThroughChannel(destination.channelId, {
+            peerId: normalizePeerId(platform, destination.address),
+            code: code ?? "",
             text
         });
         return {};

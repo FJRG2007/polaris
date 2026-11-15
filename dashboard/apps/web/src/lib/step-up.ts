@@ -103,6 +103,7 @@ export async function sendStepUpCode(
     const code = await issueStepUpCode(auth, userId, purpose);
     const result = await deliverCode(userId, method, {
         subject: "Your Polaris confirmation code",
+        code,
         text: [
             `Your Polaris confirmation code is ${code}.`,
             "",

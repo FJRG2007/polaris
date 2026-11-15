@@ -40,7 +40,7 @@ import {
 const NOTE_TTL_MS = 15 * 60 * 1000;
 
 /** The factors that mean "a code Polaris sent", whichever channel carried it. */
-const SENT_CODES: ReadonlySet<SecondFactor> = new Set(["email-code", "whatsapp-code", "code"]);
+const SENT_CODES: ReadonlySet<SecondFactor> = new Set(["email-code", "whatsapp-code", "telegram-code", "code"]);
 
 /** The one way in that somebody else has to answer for before the session
  *  exists, and so the only one an authorizer can belong to. */
