@@ -162,7 +162,7 @@ vi.mock("@/lib/github-app-reach", () => ({
     installGapMessage: vi.fn()
 }));
 vi.mock("@/lib/agents/session-work", () => ({ saveSessionWork: vi.fn() }));
-vi.mock("@/lib/agents/session-review", () => ({}));
+vi.mock("@/lib/agents/session-review", () => ({ pullRequestToken: vi.fn() }));
 vi.mock("@/lib/agents/repo-options", () => ({}));
 vi.mock("@/lib/tasks/access", () => ({}));
 vi.mock("@/lib/tasks/task-detail-service", () => ({ addComment: vi.fn() }));

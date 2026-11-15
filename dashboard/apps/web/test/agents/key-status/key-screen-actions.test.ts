@@ -21,6 +21,8 @@ vi.mock("@polaris/core", () => ({
     agentSigninIdSchema: {}
 }));
 vi.mock("@/lib/agents/model-keys", () => ({ INSTANCE: null }));
+vi.mock("@/lib/audit-service", () => ({ recordAudit: vi.fn() }));
+vi.mock("@/lib/integrations/provider-catalog", () => ({}));
 vi.mock("@/lib/agents/model-key-actions", () => {
     const capture =
         (write: string) =>

@@ -56,7 +56,7 @@ const has = (text: string, name: string) =>
 
 /** A strip that can hold more than its width: it scrolls, or it wraps. */
 function stripCopes(node: Opening): boolean {
-    const tag = node.tagName.getText();
+    const tag = node.tagName.getText().split(".").pop();
     if (tag === "ScrollRow" || tag === "SegmentedControl") return true;
     const text = classes(node);
     return (

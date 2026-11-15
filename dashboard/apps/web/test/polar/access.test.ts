@@ -147,7 +147,10 @@ describe("Polar access policy", () => {
         expect(routes.length).toBeGreaterThan(10);
         for (const path of routes) {
             const source = readFileSync(path, "utf8");
-            expect(source, path).toContain("polarCaller()");
+            // A stream a tab holds open reads the caller without counting as
+            // activity (`backgroundUser`), and asks the Polar policy itself.
+            const background = source.includes("backgroundUser()") && source.includes("polarAccessFor(");
+            if (!background) expect(source, path).toContain("polarCaller()");
             expect(source, path).not.toMatch(/\bapiUser\(/);
         }
     });

@@ -90,7 +90,7 @@ export function PeakHoursCard(props: PanelProps) {
                                 <tbody>
                                     {DAYS.map((day) => (
                                         <tr key={day}>
-                                            <th className="truncate pr-1 text-left font-normal text-muted-foreground">
+                                            <th className="truncate pe-1 text-start font-normal text-muted-foreground">
                                                 {dayNames[day - 1]}
                                             </th>
                                             {HOURS.map((hour) => {

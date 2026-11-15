@@ -75,20 +75,20 @@ export function VitalsCard(props: PanelProps) {
                         <div className="min-w-0 overflow-x-auto">
                             <table className="w-full min-w-[36rem] text-sm">
                                 <thead>
-                                    <tr className="text-left text-xs text-muted-foreground">
-                                        <th className="py-1 pr-3 font-medium">{t("vitals.page")}</th>
+                                    <tr className="text-start text-xs text-muted-foreground">
+                                        <th className="py-1 pe-3 font-medium">{t("vitals.page")}</th>
                                         {(["lcp", "inp", "cls"] as const).map((metric) => (
-                                            <th key={metric} className="py-1 pr-3 text-right font-medium">
+                                            <th key={metric} className="py-1 pe-3 text-end font-medium">
                                                 {label(metric)}
                                             </th>
                                         ))}
-                                        <th className="py-1 text-right font-medium">{t("vitals.pageSamples")}</th>
+                                        <th className="py-1 text-end font-medium">{t("vitals.pageSamples")}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {report.pages.map((row) => (
                                         <tr key={row.path} className="border-t border-border">
-                                            <td className="max-w-0 py-1.5 pr-3">
+                                            <td className="max-w-0 py-1.5 pe-3">
                                                 <span className="block truncate" title={row.path}>
                                                     {row.path}
                                                 </span>
@@ -96,13 +96,13 @@ export function VitalsCard(props: PanelProps) {
                                             {(["lcp", "inp", "cls"] as const).map((metric) => (
                                                 <td
                                                     key={metric}
-                                                    className={cn("py-1.5 pr-3 text-right tabular-nums", BAND_INK[core.webVitalBand(metric, row[metric])])}
+                                                    className={cn("py-1.5 pe-3 text-end tabular-nums", BAND_INK[core.webVitalBand(metric, row[metric])])}
                                                     title={band(metric, row[metric])}
                                                 >
                                                     {formatVital(metric, row[metric])}
                                                 </td>
                                             ))}
-                                            <td className="py-1.5 text-right tabular-nums text-muted-foreground">{grouped(row.samples)}</td>
+                                            <td className="py-1.5 text-end tabular-nums text-muted-foreground">{grouped(row.samples)}</td>
                                         </tr>
                                     ))}
                                 </tbody>

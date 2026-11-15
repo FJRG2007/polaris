@@ -152,7 +152,7 @@ export function CodeAccountSwitch({
                                     disabled={saving}
                                     onClick={() => pick(account.id)}
                                     className={cn(
-                                        "flex min-w-0 items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors",
+                                        "flex min-w-0 items-center gap-2 rounded-md border px-3 py-2 text-start text-sm transition-colors",
                                         on ? "border-primary bg-primary/5" : "hover:bg-muted",
                                         saving && "opacity-60"
                                     )}

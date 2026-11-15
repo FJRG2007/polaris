@@ -44,31 +44,31 @@ export function EngagementCard(props: PanelProps) {
                 ) : (
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[32rem] text-sm">
-                            <thead className="text-left text-xs text-muted-foreground">
+                            <thead className="text-start text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="py-1 pr-3 font-medium">{t("engagement.page")}</th>
-                                    <th className="py-1 pr-3 text-right font-medium">{t("engagement.scroll")}</th>
-                                    <th className="py-1 pr-3 text-right font-medium">{t("engagement.deep")}</th>
-                                    <th className="py-1 pr-3 text-right font-medium">{t("engagement.time")}</th>
-                                    <th className="py-1 text-right font-medium">{t("engagement.views")}</th>
+                                    <th className="py-1 pe-3 font-medium">{t("engagement.page")}</th>
+                                    <th className="py-1 pe-3 text-end font-medium">{t("engagement.scroll")}</th>
+                                    <th className="py-1 pe-3 text-end font-medium">{t("engagement.deep")}</th>
+                                    <th className="py-1 pe-3 text-end font-medium">{t("engagement.time")}</th>
+                                    <th className="py-1 text-end font-medium">{t("engagement.views")}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {report.pages.map((row) => (
                                     <tr key={row.path} className="border-t border-border/60">
-                                        <td className="max-w-0 py-1.5 pr-3">
+                                        <td className="max-w-0 py-1.5 pe-3">
                                             <span className="block truncate font-mono text-xs" title={row.path}>
                                                 {row.path}
                                             </span>
                                         </td>
-                                        <td className="py-1.5 pr-3 text-right tabular-nums">
+                                        <td className="py-1.5 pe-3 text-end tabular-nums">
                                             {row.avgScroll === null ? "-" : `${row.avgScroll}%`}
                                         </td>
-                                        <td className="py-1.5 pr-3 text-right tabular-nums">
+                                        <td className="py-1.5 pe-3 text-end tabular-nums">
                                             {row.deepShare === null ? "-" : `${Math.round(row.deepShare * 100)}%`}
                                         </td>
-                                        <td className="py-1.5 pr-3 text-right tabular-nums">{pageTime(row.avgEngagedMs)}</td>
-                                        <td className="py-1.5 text-right tabular-nums">{grouped(row.measured)}</td>
+                                        <td className="py-1.5 pe-3 text-end tabular-nums">{pageTime(row.avgEngagedMs)}</td>
+                                        <td className="py-1.5 text-end tabular-nums">{grouped(row.measured)}</td>
                                     </tr>
                                 ))}
                             </tbody>
