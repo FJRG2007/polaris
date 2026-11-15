@@ -23,6 +23,8 @@ import * as core from "@polaris/core";
 import { execCommand } from "@polaris/ssh";
 import * as commands from "./session-commands";
 import * as accountHomes from "./account-homes";
+import * as acpPipe from "./acp/pipe-commands";
+import * as acpTransport from "./acp/transport";
 import { borrowSsh } from "@/lib/connection-pool";
 import { appBaseUrl } from "@/lib/domain-service";
 import { containerState, withContainerPorts } from "./session-ports";
@@ -1298,6 +1300,30 @@ export async function openAgentInterface(
     if (result.code === commands.NOT_OPENED.interactive) return "interactive";
     if (result.code === commands.NOT_OPENED.turnRunning) return "busy";
     throw new Error("The session's terminal did not open the agent's interface");
+}
+
+/**
+ * Start the session's agent in protocol mode: `argv` (a provider binding's
+ * launch line) in its own window, its input and output on the pipe
+ * `acp/pipe-commands` describes. Starting again replaces the agent that was
+ * there, and a connection still open on the old one ends (`PipeClosedError`).
+ */
+export async function startAcpAgent(sessionId: string, argv: readonly string[]): Promise<void> {
+    const placement = await sessionPlacement(sessionId);
+    if (!placement) throw new Error("That session no longer exists.");
+    await refreshCredentials(sessionId);
+    await steer(
+        sessionId,
+        acpPipe.acpLaunchCommand(stateDirFor(placement), argv),
+        "The session's machine did not start the agent"
+    );
+}
+
+/** The session's protocol pipe, for `acp/transport`'s `pipeStream`. */
+export async function sessionAcpPipe(sessionId: string): Promise<acpTransport.PipeIo> {
+    const placement = await sessionPlacement(sessionId);
+    if (!placement) throw new Error("That session no longer exists.");
+    return acpTransport.shellPipe(stateDirFor(placement), (command) => runInSession(sessionId, command));
 }
 
 /** Bring the agent back on its conversation, typed into the shell it left. */

@@ -874,7 +874,7 @@ export const CREDENTIALS_FILE = "credentials.env";
 
 /** The line the launch script reads that file with. Also what a launch script
  *  written by an older build is taught, so its sessions refresh too. */
-const READ_CREDENTIALS = `if [ -f "$POLARIS_STATE_DIR/${CREDENTIALS_FILE}" ]; then . "$POLARIS_STATE_DIR/${CREDENTIALS_FILE}"; fi`;
+export const READ_CREDENTIALS = `if [ -f "$POLARIS_STATE_DIR/${CREDENTIALS_FILE}" ]; then . "$POLARIS_STATE_DIR/${CREDENTIALS_FILE}"; fi`;
 
 const ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -1118,6 +1118,13 @@ const CLEAR_BOOT_ENV: readonly string[] = [
     "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_AGENT_HOOK_FILE",
     'for pair in $POLARIS_CREDENTIAL_FILES; do unset "$(printf %s "$pair" | cut -d= -f1)"; done'
 ];
+
+/**
+ * What a window opened later clears before it starts an agent: what the setup
+ * cleared before the first one, since a later window starts from tmux's own
+ * environment, which is the boot's.
+ */
+export const AGENT_ENV_SCRUB: readonly string[] = CLEAR_BOOT_ENV;
 
 /**
  * What the interface window runs: the agent on the conversation the runner was
