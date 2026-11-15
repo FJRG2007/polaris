@@ -1,10 +1,16 @@
 /**
  * GET /api/agents/sessions/:id/live - a stream that says "read the session
- * again" whenever it changes in this process.
+ * again" whenever it changes, in this process or any other (see
+ * `session-live.ts`).
  *
  * Frames carry nothing; the page answers one with a refresh, which reads the
  * session through the same checks as its first render. Same reader rule as the
  * page: the owner, or somebody it was shared with.
+ *
+ * Every frame has an id, so a browser that lost the stream (a phone that slept,
+ * a proxy that dropped it) reconnects with `Last-Event-ID`. That reconnect is
+ * answered with one change straight away: whatever moved while it was away is
+ * read rather than waited for.
  */
 
 import { backgroundUser, sessionCan } from "@/lib/session";
@@ -65,16 +71,20 @@ export async function GET(
                     // Already closed by the client going away.
                 }
             };
-            unsubscribe = subscribeSession(id, () => {
+            const change = () => {
                 if (pending) return;
                 pending = setTimeout(() => {
                     pending = null;
-                    send("event: change\ndata: {}\n\n");
+                    send(`id: ${Date.now()}\nevent: change\ndata: {}\n\n`);
                 }, COALESCE_MS);
-            });
+            };
+            unsubscribe = subscribeSession(id, change);
             heartbeat = setInterval(() => send(": keep-alive\n\n"), HEARTBEAT_MS);
             request.signal.addEventListener("abort", stop, { once: true });
-            send("retry: 5000\n\n");
+            // The id is set even by a frame without data, so a stream dropped
+            // before its first change still comes back as a reconnect.
+            send(`retry: 5000\nid: ${Date.now()}\n\n`);
+            if (request.headers.has("last-event-id")) change();
         },
         cancel() {
             closed = true;
