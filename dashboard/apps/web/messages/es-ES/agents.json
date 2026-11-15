@@ -513,6 +513,92 @@
             "noRepo": "Un espacio de trabajo no tiene rama desde la que bifurcar.",
             "from": "Bifurcada de",
             "parent": "la sesión original"
+        },
+        "pr": {
+            "refresh": "Leer de nuevo",
+            "openOnGithub": "Abrir en GitHub",
+            "branches": "{source} en {target}",
+            "states": {
+                "open": "Abierta",
+                "closed": "Cerrada",
+                "merged": "Fusionada",
+                "draft": "Borrador"
+            },
+            "checksTitle": "Checks",
+            "checkStates": {
+                "passed": "Pasó",
+                "failed": "Falló",
+                "pending": "En curso",
+                "skipped": "Omitido",
+                "unknown": "Sin datos"
+            },
+            "review": {
+                "approved": "Aprobada",
+                "changes_requested": "Cambios pedidos",
+                "review_required": "Falta revisión",
+                "none": "Sin revisión"
+            },
+            "reviewStates": {
+                "approved": "aprobó",
+                "changes_requested": "pidió cambios",
+                "commented": "revisó",
+                "dismissed": "revisión descartada"
+            },
+            "activity": "Actividad",
+            "empty": "Aún no hay actividad.",
+            "pushed": "subió {sha}",
+            "commented": "comentó",
+            "onLine": "{path}, línea {line}",
+            "resolved": "Resuelto",
+            "moreReplies": "{count} más en GitHub",
+            "bot": "bot",
+            "commits": "{count} commits",
+            "reply": "Responder",
+            "replyPlaceholder": "Tu respuesta",
+            "commentPlaceholder": "Comenta en la pull request",
+            "comment": "Comentar",
+            "send": "Enviar",
+            "sending": "Enviando...",
+            "you": "Tú",
+            "mergeBlocks": {
+                "notOpen": "Esta pull request no está abierta.",
+                "readOnly": "Los ajustes de este repositorio no dejan a los agentes subir aquí.",
+                "draft": "Es un borrador. Márcala lista para revisión en GitHub antes.",
+                "conflicts": "Tiene conflictos con su rama base. Resuélvelos antes.",
+                "behind": "La rama base exige que esté al día. Actualízala antes.",
+                "protected": "La protección de rama la bloquea: falta una revisión o un check obligatorio."
+            },
+            "errors": {
+                "invalid": "No se pudo enviar. Inténtalo de nuevo.",
+                "unreachable": "No se pudo contactar con GitHub para esta pull request. Inténtalo en un momento."
+            },
+            "replyErrors": {
+                "unknownThread": "Ese hilo ya no está en esta pull request. Léela de nuevo.",
+                "notAllowed": "GitHub no te deja comentar en este repositorio.",
+                "limited": "Se alcanzó el límite de GitHub. Inténtalo en unos minutos.",
+                "failed": "GitHub no publicó el comentario. Inténtalo de nuevo."
+            },
+            "claim": {
+                "open": "Enlazar una pull request existente",
+                "title": "Enlazar una pull request",
+                "description": "Sus checks, revisiones y fusión se ven aquí, y el estado de la sesión la sigue.",
+                "label": "Número o enlace de la pull request",
+                "placeholder": "#123 o un enlace de GitHub",
+                "submit": "Enlazar",
+                "linking": "Enlazando...",
+                "takeover": "Traerla aquí",
+                "done": "Pull request #{number} enlazada.",
+                "refusals": {
+                    "ended": "Esta sesión ha terminado.",
+                    "workspace": "Esta sesión no tiene repositorio.",
+                    "invalid": "Escribe un número de pull request o su enlace de GitHub.",
+                    "otherRepo": "Esa pull request es de otro repositorio.",
+                    "noAuth": "Polaris no tiene acceso de GitHub a este repositorio. Conéctalo en los ajustes de Agentes.",
+                    "missing": "GitHub no tiene esa pull request, o Polaris no puede verla.",
+                    "notOpen": "Esa pull request está fusionada o cerrada. Solo se puede vincular una abierta.",
+                    "taken": "Otra sesión en curso tiene esta pull request. Tráela aquí para vincularla a esta."
+                }
+            }
         }
     },
     "rules": {

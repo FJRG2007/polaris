@@ -23,12 +23,14 @@ import * as polls from "@/components/agents/sessions/sessions-polls";
 import type { FileAnswer, FilesAnswer } from "@/lib/agents/session-files";
 import type { PreviewPortsAnswer } from "@/lib/agents/session-preview";
 import { SessionChanges } from "@/components/agents/sessions/session-changes";
+import { SessionPullTab } from "@/components/agents/sessions/session-pr-tab";
 import { openAgentInterfaceAction } from "@/components/agents/sessions/actions";
 import {
     ExternalLink,
     FileCode2,
     FolderTree,
     GitCompare,
+    GitPullRequest,
     Globe,
     RefreshCw,
     RotateCw,
@@ -36,7 +38,7 @@ import {
     SquareTerminal
 } from "lucide-react";
 
-type Pane = "files" | "preview" | "changes" | "terminal";
+type Pane = "files" | "preview" | "changes" | "pull" | "terminal";
 
 /** How often the file list is read again while the agent works. */
 const FILES_MS = 20_000;
@@ -114,6 +116,19 @@ export function PolarCodeWorkspace({
                                     </span>
                                 )
                             },
+                            ...(session.repoFullName
+                                ? [
+                                      {
+                                          value: "pull" as const,
+                                          label: (
+                                              <span className="flex items-center gap-1.5">
+                                                  <GitPullRequest className="size-4" />
+                                                  {t("code.pane.pull")}
+                                              </span>
+                                          )
+                                      }
+                                  ]
+                                : []),
                             {
                                 value: "terminal",
                                 label: (
@@ -138,6 +153,15 @@ export function PolarCodeWorkspace({
                                     fallback={<ui.Skeleton className="h-24 w-full" />}
                                 >
                                     <SessionChanges session={session} />
+                                </ClientMessages>
+                            </div>
+                        ) : pane === "pull" ? (
+                            <div className="h-full overflow-y-auto overscroll-contain">
+                                <ClientMessages
+                                    namespaces={["agents"]}
+                                    fallback={<ui.Skeleton className="h-24 w-full" />}
+                                >
+                                    <SessionPullTab session={session} />
                                 </ClientMessages>
                             </div>
                         ) : live ? (

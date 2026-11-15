@@ -1430,7 +1430,8 @@
             "fileFailed": "This file could not be read just now.",
             "binary": "This is not a text file.",
             "tooLarge": "This file is too large to show here.",
-            "missing": "This file is no longer there."
+            "missing": "This file is no longer there.",
+            "pull": "Pull request"
         },
         "preview": {
             "none": "No web server is running in this session yet.",

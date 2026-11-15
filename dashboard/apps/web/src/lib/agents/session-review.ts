@@ -15,7 +15,9 @@ import * as changes from "./session-changes";
 import * as github from "@/lib/github-service";
 import { runInSession } from "./session-runtime";
 import { saveSessionWork, type SaveOutcome } from "./session-work";
-import { seedPullFacts } from "./session-pr-facts";
+import * as prFacts from "./session-pr-facts";
+import * as timelines from "./session-pr-timeline";
+import { githubTokenForUser } from "@/lib/github-access";
 import type { SessionView, SessionWorkReason } from "./session-service";
 
 /** Why a session's checkout cannot be read right now. */
@@ -202,7 +204,7 @@ const defaultDeps: ShipDeps = {
         });
         // A baseline the poll reads first, so its facts arrive even where no
         // webhook does.
-        if (session.repo) await seedPullFacts(sessionId, session.repo.repoFullName, pull.number, pull.url);
+        if (session.repo) await prFacts.seedPullFacts(sessionId, session.repo.repoFullName, pull.number, pull.url);
     }
 };
 
@@ -317,4 +319,272 @@ export async function sessionPushSetting(sessionId: string): Promise<string | nu
         select: { repo: { select: { push: true } } }
     });
     return row?.repo?.push ?? null;
+}
+// ---------------------------------------------------------------------------
+// The pull request tab: timeline, reply, merge, claim
+//
+// Ported from frontend/src/renderer/components/PRActions.tsx (when merge is
+// offered), backend/internal/adapters/scm/github/merge_action.go (the merge
+// guarded by the head commit that was read) and
+// backend/internal/service/session/claim_pr.go (claiming an existing pull
+// request) of Agent Orchestrator (Apache-2.0, commit e4ded08c6f15).
+// ---------------------------------------------------------------------------
+
+/** The token a pull request is read, merged or commented on with: the person's
+ *  own linked GitHub account when they have one, so GitHub holds them to their
+ *  own permissions on the repository, else the App installation. */
+export async function pullRequestToken(userId: string, owner: string): Promise<string | null> {
+    return (
+        (await githubTokenForUser(userId, owner).catch(() => null)) ??
+        (await github.githubAppInstallationToken(owner).catch(() => null))
+    );
+}
+
+/** Why the merge button is not offered, as a code the page words itself. */
+export type MergeBlock = "notOpen" | "readOnly" | "draft" | "conflicts" | "behind" | "protected";
+
+/**
+ * Whether GitHub would refuse a merge right now, from its own merge state
+ * (GraphQL `mergeStateStatus` or REST `mergeable_state`, any case). Only what
+ * GitHub itself reports as blocking disables the button: an unknown or
+ * unstable state leaves the decision to GitHub, which enforces branch
+ * protection on the merge call either way.
+ */
+export function mergeBlock(input: {
+    state: "open" | "closed" | "merged" | null;
+    draft: boolean;
+    mergeState: string;
+    push: string | null;
+}): MergeBlock | null {
+    if (input.state !== "open") return "notOpen";
+    if (input.push === "disabled") return "readOnly";
+    const state = input.mergeState.trim().toUpperCase();
+    if (input.draft || state === "DRAFT") return "draft";
+    if (state === "DIRTY") return "conflicts";
+    if (state === "BEHIND") return "behind";
+    if (state === "BLOCKED") return "protected";
+    return null;
+}
+
+/** A pull request a person named: `12`, `#12`, or its GitHub link. */
+export type PullRef = { number: number; repoFullName: string | null };
+
+const PULL_PATH = /^\/([\w.-]{1,100})\/([\w.-]{1,100})\/pull\/(\d{1,9})(?:\/.*)?$/;
+
+export function parsePullRef(raw: string): PullRef | null {
+    const ref = raw.trim().replace(/^#/, "");
+    if (/^\d{1,9}$/.test(ref)) {
+        const number = Number(ref);
+        return number > 0 ? { number, repoFullName: null } : null;
+    }
+    let url: URL;
+    try {
+        url = new URL(ref);
+    } catch {
+        return null;
+    }
+    if (url.protocol !== "https:" || url.hostname.toLowerCase() !== "github.com") return null;
+    const match = PULL_PATH.exec(url.pathname);
+    if (!match) return null;
+    const number = Number(match[3]);
+    return number > 0 ? { number, repoFullName: `${match[1]}/${match[2]}` } : null;
+}
+
+export const CLAIM_REFUSALS = [
+    "ended",
+    "workspace",
+    "invalid",
+    "otherRepo",
+    "noAuth",
+    "missing",
+    "notOpen",
+    "taken"
+] as const;
+export type ClaimRefusal = (typeof CLAIM_REFUSALS)[number];
+
+export type ClaimSession = Pick<SessionView, "id" | "repoFullName" | "state" | "pullRequest">;
+
+export interface ClaimDeps {
+    token: (owner: string) => Promise<string | null>;
+    read: (
+        owner: string,
+        repo: string,
+        number: number,
+        token: string
+    ) => Promise<github.BranchPullRequest | null>;
+    /** Other live sessions of the same repository that link this number. */
+    holders: (sessionId: string, number: number) => Promise<string[]>;
+    record: (
+        session: ClaimSession,
+        pull: github.BranchPullRequest,
+        takeFrom: readonly string[]
+    ) => Promise<void>;
+}
+
+export type ClaimResult =
+    | { kind: "claimed"; pull: github.BranchPullRequest; takenFrom: string[] }
+    | { kind: "refused"; reason: ClaimRefusal };
+
+/**
+ * Attaches an existing pull request to a session, the way AO's `claim-pr`
+ * does: same repository only, open ones only (a draft is open work), and never
+ * silently away from another live session - that takes `takeover`.
+ *
+ * The session's branch is left as it is, as AO leaves its workspace: the
+ * session's pull request becomes this one for its status, checks and merge.
+ */
+export async function claimSessionPullRequest(
+    session: ClaimSession,
+    raw: string,
+    options: { takeover: boolean },
+    deps: ClaimDeps
+): Promise<ClaimResult> {
+    if (core.isSessionOver(session.state)) return { kind: "refused", reason: "ended" };
+    if (!session.repoFullName) return { kind: "refused", reason: "workspace" };
+    const ref = parsePullRef(raw);
+    if (!ref) return { kind: "refused", reason: "invalid" };
+    if (ref.repoFullName && ref.repoFullName.toLowerCase() !== session.repoFullName.toLowerCase())
+        return { kind: "refused", reason: "otherRepo" };
+    const [owner, repo] = session.repoFullName.split("/") as [string, string];
+    const token = await deps.token(owner);
+    if (!token) return { kind: "refused", reason: "noAuth" };
+    const pull = await deps.read(owner, repo, ref.number, token);
+    if (!pull) return { kind: "refused", reason: "missing" };
+    if (pull.state !== "open") return { kind: "refused", reason: "notOpen" };
+    if (session.pullRequest?.number === pull.number) return { kind: "claimed", pull, takenFrom: [] };
+    const holders = await deps.holders(session.id, pull.number);
+    if (holders.length > 0 && !options.takeover) return { kind: "refused", reason: "taken" };
+    await deps.record(session, pull, holders);
+    return { kind: "claimed", pull, takenFrom: holders };
+}
+
+/** The most live sessions a claim looks through for another holder. */
+const HOLDERS_CAP = 20;
+
+export function claimDeps(userId: string): ClaimDeps {
+    return {
+        token: (owner) => pullRequestToken(userId, owner),
+        read: (owner, repo, number, token) => github.readPullRequest(owner, repo, number, token),
+        holders: async (sessionId, number) => {
+            const own = await prisma.agentSession.findUnique({
+                where: { id: sessionId },
+                select: { repoId: true }
+            });
+            if (!own?.repoId) return [];
+            const rows = await prisma.agentSession.findMany({
+                // Live ones only: an ended session holds nothing worth asking about.
+                where: {
+                    repoId: own.repoId,
+                    prNumber: number,
+                    id: { not: sessionId },
+                    state: { notIn: ["stopped", "failed"] }
+                },
+                select: { id: true },
+                orderBy: { createdAt: "desc" },
+                take: HOLDERS_CAP
+            });
+            return rows.map((row) => row.id);
+        },
+        record: async (session, pull, takeFrom) => {
+            const previous = session.pullRequest?.number ?? null;
+            const others = [...takeFrom];
+            await prisma.$transaction([
+                ...(others.length
+                    ? [
+                          prisma.agentSession.updateMany({
+                              where: { id: { in: others }, prNumber: pull.number },
+                              data: { prNumber: null, prUrl: null }
+                          }),
+                          prisma.sessionPullFacts.deleteMany({
+                              where: { sessionId: { in: others }, number: pull.number }
+                          })
+                      ]
+                    : []),
+                // The pull request the session linked before is no longer its own,
+                // so its facts no longer speak for the session's status.
+                ...(previous !== null && previous !== pull.number
+                    ? [
+                          prisma.sessionPullFacts.deleteMany({
+                              where: { sessionId: session.id, number: previous }
+                          })
+                      ]
+                    : []),
+                prisma.agentSession.update({
+                    where: { id: session.id },
+                    data: { prNumber: pull.number, prUrl: pull.url },
+                    select: { id: true }
+                })
+            ]);
+            await prFacts.seedPullFacts(session.id, session.repoFullName, pull.number, pull.url);
+            timelines.forgetTimeline(session.id);
+            for (const id of others) timelines.forgetTimeline(id);
+        }
+    };
+}
+
+export type TimelineAnswer =
+    | { kind: "timeline"; timeline: timelines.PullTimeline }
+    | { kind: "none" }
+    | { kind: "noAuth" }
+    | { kind: "unreachable" };
+
+/**
+ * The session's pull request's timeline: from the few-second cache when it is
+ * fresh, else from GitHub, refreshing the stored facts with the same answer.
+ */
+export async function sessionPullTimeline(
+    session: Pick<SessionView, "id" | "repoFullName" | "pullRequest">,
+    userId: string,
+    options: { fresh?: boolean } = {}
+): Promise<TimelineAnswer> {
+    if (!session.pullRequest || !session.repoFullName) return { kind: "none" };
+    const number = session.pullRequest.number;
+    if (!options.fresh) {
+        const hit = timelines.cachedTimeline(session.id, number);
+        if (hit) return { kind: "timeline", timeline: hit };
+    }
+    const [owner, repo] = session.repoFullName.split("/") as [string, string];
+    const token = await pullRequestToken(userId, owner);
+    if (!token) return { kind: "noAuth" };
+    const outcome = await timelines.fetchPullTimeline(owner, repo, number, token);
+    if (outcome.kind !== "ok" || outcome.timeline.number !== number) return { kind: "unreachable" };
+    timelines.rememberTimeline(session.id, outcome.timeline);
+    await prFacts
+        .writePullFacts(session.id, session.repoFullName, outcome.observation)
+        .catch((error) => console.error("polaris: pull request facts could not be stored:", error));
+    return { kind: "timeline", timeline: outcome.timeline };
+}
+
+export type ReplyResult =
+    | { ok: true }
+    | { ok: false; reason: "noPull" | "noAuth" | "unknownThread" | "notAllowed" | "limited" | "failed"; message?: string };
+
+/**
+ * Posts on the session's pull request: a reply in one of its review threads,
+ * or a comment on its conversation. A thread is only replied to when this
+ * pull request's own timeline has it, so an id from anywhere else is refused
+ * here rather than posted wherever the token reaches.
+ */
+export async function replyOnSessionPull(
+    session: Pick<SessionView, "id" | "repoFullName" | "pullRequest">,
+    userId: string,
+    input: { body: string; threadId?: string }
+): Promise<ReplyResult> {
+    if (!session.pullRequest || !session.repoFullName) return { ok: false, reason: "noPull" };
+    const [owner, repo] = session.repoFullName.split("/") as [string, string];
+    const token = await pullRequestToken(userId, owner);
+    if (!token) return { ok: false, reason: "noAuth" };
+    if (input.threadId) {
+        const answer = await sessionPullTimeline(session, userId);
+        const known =
+            answer.kind === "timeline" &&
+            answer.timeline.entries.some((entry) => entry.kind === "thread" && entry.id === input.threadId);
+        if (!known) return { ok: false, reason: "unknownThread" };
+        const result = await timelines.replyToReviewThread(input.threadId, input.body, token);
+        timelines.forgetTimeline(session.id);
+        return result;
+    }
+    const posted = await github.commentOnIssue(owner, repo, session.pullRequest.number, input.body, token);
+    timelines.forgetTimeline(session.id);
+    return posted ? { ok: true } : { ok: false, reason: "failed" };
 }

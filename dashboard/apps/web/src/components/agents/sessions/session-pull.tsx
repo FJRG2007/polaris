@@ -16,22 +16,9 @@ import type { SessionView } from "@/lib/agents/session-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { CheckCircle2, CircleDot, GitMerge, Loader2, Send, XCircle } from "lucide-react";
+import { Button, Popover, PopoverContent, PopoverTrigger, Switch } from "@polaris/ui";
+import { SessionMergeDialog } from "./session-merge-dialog";
 import {
-    Button,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-    Select,
-    Switch
-} from "@polaris/ui";
-import {
-    mergeSessionPullAction,
     sendFailingChecksAction,
     sessionChecksAction,
     setSessionAutoFeedbackAction,
@@ -39,17 +26,14 @@ import {
 } from "./actions";
 
 const REFRESH_MS = 30_000;
-type MergeMethod = "squash" | "merge" | "rebase";
 
 export function SessionPull({ session }: { session: SessionView }) {
     const t = useTranslations("agents");
-    const tcommon = useTranslations("common");
     const router = useRouter();
     const [view, setView] = useState<SessionChecksView | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
     const [merging, setMerging] = useState(false);
-    const [method, setMethod] = useState<MergeMethod>("squash");
     const [busy, startTransition] = useTransition();
     const number = session.pullRequest?.number ?? null;
 
@@ -105,22 +89,13 @@ export function SessionPull({ session }: { session: SessionView }) {
         }
     };
 
-    const merge = () =>
-        startTransition(async () => {
-            const result = await runAction(
-                () => mergeSessionPullAction({ sessionId: session.id, method }),
-                setError
-            );
-            if (!result) return;
-            if (result.error) {
-                setError(result.error);
-                return;
-            }
-            setMerging(false);
-            setNote(t("session.merge.done", { number }));
-            await load();
-            router.refresh();
-        });
+    const merged = () => {
+        setMerging(false);
+        setNote(t("session.merge.done", { number }));
+        void load();
+        router.refresh();
+    };
+    const blockReason = view.mergeBlock ? t(`session.pr.mergeBlocks.${view.mergeBlock}`) : undefined;
 
     return (
         <span className="flex min-w-0 flex-wrap items-center gap-2">
@@ -190,7 +165,7 @@ export function SessionPull({ session }: { session: SessionView }) {
             </Popover>
             {failed > 0 && !core.isSessionOver(session.state) ? (
                 <Button size="sm" variant="secondary" onClick={sendFailing} disabled={busy}>
-                    {busy && !merging ? (
+                    {busy ? (
                         <Loader2 className="size-4 shrink-0 animate-spin" />
                     ) : (
                         <Send className="size-4 shrink-0" />
@@ -206,49 +181,30 @@ export function SessionPull({ session }: { session: SessionView }) {
                     setMerging(true);
                 }}
                 disabled={!view.canMerge}
-                title={view.canMerge ? undefined : t("session.ship.refusals.readOnly")}
+                title={blockReason}
             >
                 <GitMerge className="size-4 shrink-0" />
                 {t("session.merge.open")}
             </Button>
+            {blockReason ? (
+                <span className="min-w-0 max-w-full truncate text-xs text-muted-foreground" title={blockReason}>
+                    {blockReason}
+                </span>
+            ) : null}
             {note ? <span className="text-xs text-muted-foreground">{note}</span> : null}
             {error && !merging ? <span className="text-xs text-danger">{error}</span> : null}
             {merging ? (
-                <Dialog open onOpenChange={(open) => !open && !busy && setMerging(false)}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>{t("session.merge.title", { number })}</DialogTitle>
-                            <DialogDescription>
-                                {view.mergeableState === "blocked"
-                                    ? t("session.merge.blocked")
-                                    : failed > 0 || pending > 0
-                                      ? t("session.merge.checksNotGreen")
-                                      : t("session.merge.description")}
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-1">
-                            <label className="text-sm font-medium">{t("session.merge.method")}</label>
-                            <Select
-                                value={method}
-                                onValueChange={(next) => setMethod(next as MergeMethod)}
-                                options={(["squash", "merge", "rebase"] as const).map((value) => ({
-                                    value,
-                                    label: t(`session.merge.methods.${value}`)
-                                }))}
-                            />
-                        </div>
-                        {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        <DialogFooter>
-                            <Button variant="ghost" onClick={() => setMerging(false)} disabled={busy}>
-                                {tcommon("actions.cancel")}
-                            </Button>
-                            <Button onClick={merge} disabled={busy}>
-                                {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
-                                {busy ? t("session.merge.merging") : t("session.merge.submit")}
-                            </Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
+                <SessionMergeDialog
+                    sessionId={session.id}
+                    number={number}
+                    description={
+                        failed > 0 || pending > 0
+                            ? t("session.merge.checksNotGreen")
+                            : t("session.merge.description")
+                    }
+                    onClose={() => setMerging(false)}
+                    onMerged={merged}
+                />
             ) : null}
         </span>
     );

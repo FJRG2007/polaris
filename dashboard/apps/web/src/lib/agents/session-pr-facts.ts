@@ -57,9 +57,10 @@ const POLL_UNSEEN_WITHIN_MS = 30 * 24 * 60 * 60_000;
 const WEBHOOK_REFRESH_CAP = 10;
 const FETCH_TIMEOUT_MS = 10_000;
 
-const PULL_QUERY = `query($owner:String!,$repo:String!,$number:Int!){
-  repository(owner:$owner,name:$repo){
-    pullRequest(number:$number){
+/** The fields of a pull request every read of one asks for: the facts' own
+ *  projection reads exactly these. The timeline (`session-pr-timeline.ts`)
+ *  asks for them too, plus what only a person reading the page needs. */
+export const PULL_FIELDS = `
       number
       url
       state
@@ -78,8 +79,8 @@ const PULL_QUERY = `query($owner:String!,$repo:String!,$number:Int!){
           contexts(first:${CHECK_CONTEXT_LIMIT}){
             nodes{
               __typename
-              ... on CheckRun { name status conclusion databaseId checkSuite{ workflowRun{ event workflow{ name } } } }
-              ... on StatusContext { context state }
+              ... on CheckRun { name status conclusion databaseId detailsUrl checkSuite{ workflowRun{ event workflow{ name } } } }
+              ... on StatusContext { context state targetUrl }
             }
             pageInfo{ hasNextPage }
           }
@@ -88,7 +89,11 @@ const PULL_QUERY = `query($owner:String!,$repo:String!,$number:Int!){
       reviewThreads(last:${REVIEW_THREAD_LIMIT}){ nodes{
         isResolved
         comments(first:${THREAD_COMMENT_LIMIT}){ nodes{ author{ login __typename } } }
-      } }
+      } }`;
+
+const PULL_QUERY = `query($owner:String!,$repo:String!,$number:Int!){
+  repository(owner:$owner,name:$repo){
+    pullRequest(number:$number){${PULL_FIELDS}
     }
   }
 }`;
@@ -114,11 +119,13 @@ const contextNode = z.object({
         })
         .nullish(),
     context: optStr,
-    state: optStr
+    state: optStr,
+    detailsUrl: optStr,
+    targetUrl: optStr
 });
 export type ContextNode = z.infer<typeof contextNode>;
 
-const pullNode = z.object({
+export const pullNode = z.object({
     number: z.number().int().positive(),
     url: str,
     state: str,

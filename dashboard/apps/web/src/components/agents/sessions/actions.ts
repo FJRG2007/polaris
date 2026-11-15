@@ -25,6 +25,7 @@ import * as work from "@/lib/agents/session-work";
 import * as repoOptions from "@/lib/agents/repo-options";
 import { sessionCursorSchema } from "@/lib/agents/session-cursor";
 import * as review from "@/lib/agents/session-review";
+import * as timelines from "@/lib/agents/session-pr-timeline";
 import * as files from "@/lib/agents/session-files";
 import * as preview from "@/lib/agents/session-preview";
 import * as history from "@/lib/agents/session-history";
@@ -34,12 +35,7 @@ import { addComment } from "@/lib/tasks/task-detail-service";
 import { noteIssueOfPull } from "@/lib/agents/issue-sessions";
 import * as loop from "@/lib/agents/session-review-loop";
 import * as forking from "@/lib/agents/session-fork";
-import { githubTokenForUser } from "@/lib/github-access";
-import {
-    githubAppInstallationToken,
-    mergePullRequest,
-    pullRequestChecks
-} from "@/lib/github-service";
+import { mergePullRequest, pullRequestChecks } from "@/lib/github-service";
 import { agentChoicesFor, agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
 import { chatCredentialFor } from "@/lib/agents/model-keys";
 import * as sessionAttachments from "@/lib/agents/session-attachments";
@@ -1065,17 +1061,12 @@ export interface SessionChecksView {
     canMerge: boolean;
     /** Whether failing checks, review comments and conflicts go to the agent unasked. */
     autoFeedback: boolean;
+    /** Why merge is not offered, or null when it is. */
+    mergeBlock: review.MergeBlock | null;
 }
 
-/** The token a merge or a checks read is made with: the person's own linked
- *  GitHub account when they have one, so GitHub holds them to their own
- *  permissions on the repository, else the App installation. */
-async function pullToken(userId: string, owner: string): Promise<string | null> {
-    return (
-        (await githubTokenForUser(userId, owner).catch(() => null)) ??
-        (await githubAppInstallationToken(owner).catch(() => null))
-    );
-}
+/** The token a merge or a checks read is made with (see `pullRequestToken`). */
+const pullToken = review.pullRequestToken;
 
 /** The session's pull request's checks, as GitHub reports them now. */
 export async function sessionChecksAction(
@@ -1097,6 +1088,12 @@ export async function sessionChecksAction(
         prisma.agentSession.findUnique({ where: { id: session.id }, select: { autoFeedback: true } })
     ]);
     if (!found) return { error: t("session.checks.unreachable") };
+    const block = review.mergeBlock({
+        state: pull?.state ?? null,
+        draft: pull?.draft ?? false,
+        mergeState: found.mergeableState,
+        push
+    });
     return {
         view: {
             checks: found.checks.map((check) => ({
@@ -1112,7 +1109,8 @@ export async function sessionChecksAction(
             tally: loop.checksTally(found.checks),
             mergeableState: found.mergeableState,
             pullState: pull?.state ?? null,
-            canMerge: pull?.state === "open" && push !== "disabled",
+            canMerge: block === null,
+            mergeBlock: block,
             autoFeedback: auto?.autoFeedback ?? true
         }
     };
@@ -1159,7 +1157,16 @@ export async function sendFailingChecksAction(input: unknown): Promise<{ error?:
 }
 
 const mergeInputSchema = z
-    .object({ sessionId: sessionIdSchema, method: z.enum(["merge", "squash", "rebase"]) })
+    .object({
+        sessionId: sessionIdSchema,
+        method: z.enum(["merge", "squash", "rebase"]),
+        /** The head commit the person saw: GitHub refuses the merge if the
+         *  branch moved since, instead of merging commits nobody reviewed. */
+        sha: z
+            .string()
+            .regex(/^[0-9a-f]{40}([0-9a-f]{24})?$/i)
+            .optional()
+    })
     .strict();
 
 /** Merge the session's pull request on GitHub. Branch protection, required
@@ -1183,12 +1190,125 @@ export async function mergeSessionPullAction(input: unknown): Promise<{ error?: 
         owner,
         repo,
         session.pullRequest.number,
-        { method: parsed.data.method },
+        { method: parsed.data.method, sha: parsed.data.sha },
         token
     );
+    timelines.forgetTimeline(session.id);
     if (result.ok) return {};
     const said = result.message
         ? ` ${t("session.merge.githubSaid", { message: result.message })}`
         : "";
     return { error: `${t(`session.merge.errors.${result.reason}`)}${said}` };
+}
+// ---------------------------------------------------------------------------
+// The pull request tab
+//
+// Checks, reviews, comments and commits read from GitHub on demand (and kept a
+// few seconds), a reply to a comment, and claiming a pull request that already
+// exists. Only whoever may steer the session reaches any of them, and every
+// write is made with the person's own GitHub account when they linked one, so
+// GitHub holds them to their own permissions on the repository.
+// ---------------------------------------------------------------------------
+
+export interface SessionPullTabView {
+    timeline: timelines.PullTimeline;
+    mergeBlock: review.MergeBlock | null;
+    /** Whether the reply boxes are offered: never on a merged or closed one. */
+    canReply: boolean;
+}
+
+const pullTabInputSchema = z
+    .object({ sessionId: sessionIdSchema, fresh: z.boolean().optional() })
+    .strict();
+
+/** The session's pull request as its tab shows it, or `view: null` when the
+ *  session links none yet. */
+export async function sessionPullTabAction(
+    input: unknown
+): Promise<{ view?: SessionPullTabView | null; error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const parsed = pullTabInputSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.pr.errors.invalid") };
+    const session = await sessions.getSession(parsed.data.sessionId, user.id);
+    if (!session) return { error: t("sessions.errors.gone") };
+    const [answer, push] = await Promise.all([
+        review.sessionPullTimeline(session, user.id, { fresh: parsed.data.fresh }),
+        review.sessionPushSetting(session.id)
+    ]);
+    if (answer.kind === "none") return { view: null };
+    if (answer.kind === "noAuth") return { error: t("session.ship.refusals.noAuth") };
+    if (answer.kind === "unreachable") return { error: t("session.pr.errors.unreachable") };
+    const { timeline } = answer;
+    return {
+        view: {
+            timeline,
+            mergeBlock: review.mergeBlock({
+                state: timeline.state,
+                draft: timeline.draft,
+                mergeState: timeline.mergeState,
+                push
+            }),
+            canReply: timeline.state === "open"
+        }
+    };
+}
+
+const replyInputSchema = z
+    .object({
+        sessionId: sessionIdSchema,
+        body: z.string().trim().min(1).max(timelines.BODY_MAX),
+        threadId: z
+            .string()
+            .regex(/^[A-Za-z0-9_=-]{1,200}$/)
+            .optional()
+    })
+    .strict();
+
+/** A reply in a review thread, or a comment on the conversation. */
+export async function replySessionPullAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const parsed = replyInputSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.pr.errors.invalid") };
+    const session = await sessions.getSession(parsed.data.sessionId, user.id);
+    if (!session) return { error: t("sessions.errors.gone") };
+    const result = await review.replyOnSessionPull(session, user.id, {
+        body: parsed.data.body,
+        threadId: parsed.data.threadId
+    });
+    if (result.ok) return {};
+    if (result.reason === "noPull") return { error: t("session.checks.noPull") };
+    if (result.reason === "noAuth") return { error: t("session.ship.refusals.noAuth") };
+    const said = result.message ? ` ${t("session.merge.githubSaid", { message: result.message })}` : "";
+    return { error: `${t(`session.pr.replyErrors.${result.reason}`)}${said}` };
+}
+
+const claimInputSchema = z
+    .object({
+        sessionId: sessionIdSchema,
+        ref: z.string().trim().min(1).max(500),
+        takeover: z.boolean().optional()
+    })
+    .strict();
+
+/** Attach a pull request that already exists to the session. */
+export async function claimSessionPullAction(
+    input: unknown
+): Promise<{ pull?: { number: number; url: string }; refusal?: review.ClaimRefusal; error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const parsed = claimInputSchema.safeParse(input);
+    if (!parsed.success) return { refusal: "invalid", error: t("session.pr.claim.refusals.invalid") };
+    const session = await sessions.getSession(parsed.data.sessionId, user.id);
+    if (!session) return { error: t("sessions.errors.gone") };
+    const result = await review.claimSessionPullRequest(
+        session,
+        parsed.data.ref,
+        { takeover: parsed.data.takeover === true },
+        review.claimDeps(user.id)
+    );
+    if (result.kind === "refused")
+        return { refusal: result.reason, error: t(`session.pr.claim.refusals.${result.reason}`) };
+    return { pull: { number: result.pull.number, url: result.pull.url } };
 }

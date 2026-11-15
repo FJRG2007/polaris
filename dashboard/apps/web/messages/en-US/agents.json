@@ -513,6 +513,92 @@
             "noRepo": "A workspace has no branch to fork from.",
             "from": "Forked from",
             "parent": "the original session"
+        },
+        "pr": {
+            "refresh": "Read again",
+            "openOnGithub": "Open on GitHub",
+            "branches": "{source} into {target}",
+            "states": {
+                "open": "Open",
+                "closed": "Closed",
+                "merged": "Merged",
+                "draft": "Draft"
+            },
+            "checksTitle": "Checks",
+            "checkStates": {
+                "passed": "Passed",
+                "failed": "Failed",
+                "pending": "Running",
+                "skipped": "Skipped",
+                "unknown": "Unknown"
+            },
+            "review": {
+                "approved": "Approved",
+                "changes_requested": "Changes requested",
+                "review_required": "Review required",
+                "none": "No review yet"
+            },
+            "reviewStates": {
+                "approved": "approved",
+                "changes_requested": "requested changes",
+                "commented": "reviewed",
+                "dismissed": "review dismissed"
+            },
+            "activity": "Activity",
+            "empty": "No activity yet.",
+            "pushed": "pushed {sha}",
+            "commented": "commented",
+            "onLine": "{path}, line {line}",
+            "resolved": "Resolved",
+            "moreReplies": "{count} more on GitHub",
+            "bot": "bot",
+            "commits": "{count} commits",
+            "reply": "Add a reply",
+            "replyPlaceholder": "Write a reply",
+            "commentPlaceholder": "Comment on the pull request",
+            "comment": "Comment",
+            "send": "Send",
+            "sending": "Sending...",
+            "you": "You",
+            "mergeBlocks": {
+                "notOpen": "This pull request is not open.",
+                "readOnly": "This repository's settings do not let agents push here.",
+                "draft": "It is a draft. Mark it ready for review on GitHub first.",
+                "conflicts": "It conflicts with its base branch. Resolve that first.",
+                "behind": "The base branch requires it to be up to date. Update it first.",
+                "protected": "Branch protection blocks it: a required review or check is missing."
+            },
+            "errors": {
+                "invalid": "That could not be sent. Try again.",
+                "unreachable": "GitHub could not be reached for this pull request. Try again in a moment."
+            },
+            "replyErrors": {
+                "unknownThread": "That thread is no longer on this pull request. Read it again.",
+                "notAllowed": "GitHub does not let you comment on this repository.",
+                "limited": "GitHub's rate limit was reached. Try again in a few minutes.",
+                "failed": "GitHub did not post the comment. Try again."
+            },
+            "claim": {
+                "open": "Link an existing pull request",
+                "title": "Link a pull request",
+                "description": "Its checks, reviews and merge show here, and the session's status follows it.",
+                "label": "Pull request number or link",
+                "placeholder": "#123 or a GitHub link",
+                "submit": "Link",
+                "linking": "Linking...",
+                "takeover": "Move it here",
+                "done": "Pull request #{number} linked.",
+                "refusals": {
+                    "ended": "This session has ended.",
+                    "workspace": "This session has no repository.",
+                    "invalid": "Type a pull request number or its GitHub link.",
+                    "otherRepo": "That pull request is in another repository.",
+                    "noAuth": "Polaris has no GitHub access to this repository. Connect it under Agents settings.",
+                    "missing": "GitHub has no such pull request, or Polaris cannot see it.",
+                    "notOpen": "That pull request is merged or closed. Only an open one can be linked.",
+                    "taken": "Another running session has this pull request. Move it here to link it to this one."
+                }
+            }
         }
     },
     "rules": {
