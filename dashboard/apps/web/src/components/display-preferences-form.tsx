@@ -21,11 +21,10 @@ import { useMemo, useState, type FormEvent } from "react";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { Button, Card, CardBody, LanguageSelect, Select, type SelectOption } from "@polaris/ui";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import { localeChoices } from "@/lib/i18n/language-choices";
 import {
     CURRENCIES,
-    LOCALES,
     THEMES,
-    LOCALE_INFO,
     weekdayOrder,
     weekdayNames,
     createDisplayFormat,
@@ -117,7 +116,7 @@ function sampled(value: string, short: string, sample: string, t: Translate): Fi
  * module, because the words depend on the locale the page is drawn in - a
  * module-level list would be frozen in whichever language loaded it first.
  */
-function buildFields(t: Translate, locale: Locale): FieldSpec[] {
+function buildFields(t: Translate, locale: Locale, partial: string): FieldSpec[] {
     const days = weekdayNames(locale, "long");
     return [
         {
@@ -191,10 +190,10 @@ function buildFields(t: Translate, locale: Locale): FieldSpec[] {
             hint: t("display.language.hint"),
             // Each in its own name, so it can be found by somebody who cannot
             // read the language the page is in.
-            options: LOCALES.map((code) => ({
-                value: code,
-                label: LOCALE_INFO[code].name,
-                short: LOCALE_INFO[code].name
+            options: localeChoices(partial).map((choice) => ({
+                value: choice.value,
+                label: choice.note ? `${choice.label} (${choice.note})` : choice.label!,
+                short: choice.label!
             }))
         },
         {
@@ -211,9 +210,6 @@ function buildFields(t: Translate, locale: Locale): FieldSpec[] {
         }
     ];
 }
-
-/** The deployment's languages for the shared picker, each named in itself. */
-const LANGUAGES = LOCALES.map((code) => ({ value: code, tag: code, label: LOCALE_INFO[code].name }));
 
 function toSelectOptions(options: FieldOption[]): SelectOption[] {
     return options.map((option) => ({ value: option.value, label: option.label }));
@@ -256,10 +252,11 @@ export function DisplayPreferencesForm({
     const [done, setDone] = useState(false);
 
     const fields = useMemo(() => {
-        return buildFields(t, locale).filter(
+        return buildFields(t, locale, tc("languagePicker.partial")).filter(
             (field) => (allowTheme || field.key !== "theme") && (allowLanguage || field.key !== "language")
         );
-    }, [t, locale, allowTheme, allowLanguage]);
+    }, [t, tc, locale, allowTheme, allowLanguage]);
+    const languages = useMemo(() => localeChoices(tc("languagePicker.partial")), [tc]);
     const effective = useMemo(() => resolveDisplayPreferences(fallback, values), [fallback, values]);
     const format = useMemo(() => createDisplayFormat(effective), [effective]);
     const changed = !same(values, saved);
@@ -314,7 +311,7 @@ export function DisplayPreferencesForm({
                                         <LanguageSelect
                                             value={String(values[field.key])}
                                             onValueChange={(value) => pick(field.key, value)}
-                                            languages={LANGUAGES}
+                                            languages={languages}
                                             readerLocale={locale}
                                             searchPlaceholder={tc("languagePicker.search")}
                                             emptyText={tc("languagePicker.empty")}

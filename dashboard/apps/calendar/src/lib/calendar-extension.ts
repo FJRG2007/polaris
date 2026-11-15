@@ -82,7 +82,7 @@ export const calendarExtension: AppExtension = {
 
     // What a person reads for each of those tools, in their language.
     mcpToolLabels: async (locale) =>
-        (await import("../../messages")).calendarCatalogs.catalogs[locale].mcpTools,
+        (await import("../../messages")).calendarCatalogs.pick(locale, ["mcpTools"]).mcpTools as Readonly<Record<string, string>>,
 
     // How `polaris_search` finds its calendars and events, by the same rules.
     mcpSearch: async () => (await import("./mcp-tools")).calendarMcpSearch(),

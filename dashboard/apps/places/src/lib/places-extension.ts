@@ -163,7 +163,7 @@ export const placesExtension: AppExtension = {
 
     // What a person reads for each of those tools, in their language.
     mcpToolLabels: async (locale) =>
-        (await import("../../messages")).placesCatalogs.catalogs[locale].mcpTools,
+        (await import("../../messages")).placesCatalogs.pick(locale, ["mcpTools"]).mcpTools as Readonly<Record<string, string>>,
 
     // How `polaris_search` finds its devices, cameras, places, rooms and
     // routines, by the same rules.

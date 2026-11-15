@@ -15,6 +15,7 @@ import { deckChanged } from "./live";
 import { isDeckScope } from "./scopes";
 import { callTool, mcpCallerFor } from "./tool-call";
 import { MCP_ONLY_SCOPES } from "@/lib/mcp/scope-table";
+import { wordsFor } from "@polaris/core";
 import { scopesAvailableTo } from "@polaris/auth";
 import { translatorFor } from "@/lib/i18n/translate";
 import { appDeckActions } from "@/lib/app-extensions/registry";
@@ -105,7 +106,7 @@ export async function lockedActions(
             id: action.id,
             label: action.core
                 ? words(`deck.actions.${action.id.replace(".", "_")}`)
-                : action.app!.label[caller.locale],
+                : wordsFor(action.app!.label, caller.locale),
             message: reconnectMessage(baseScope(action.scope), caller, words)
         });
     }
@@ -185,7 +186,7 @@ async function viewOf(
             if (field.fixed) {
                 choices = field.fixed.map((choice) => ({
                     value: choice.value,
-                    label: choice.label[caller.locale]
+                    label: wordsFor(choice.label, caller.locale)
                 }));
             }
             if (field.choices) {
@@ -196,7 +197,7 @@ async function viewOf(
             return {
                 name: field.name,
                 type: field.type,
-                label: field.label[caller.locale],
+                label: wordsFor(field.label, caller.locale),
                 required: field.required,
                 ...(field.min === undefined ? {} : { min: field.min }),
                 ...(field.max === undefined ? {} : { max: field.max }),
@@ -208,7 +209,7 @@ async function viewOf(
         id: app.id,
         kind: app.kind,
         area: app.area,
-        label: app.label[caller.locale],
+        label: wordsFor(app.label, caller.locale),
         icon: app.icon,
         options: fields,
         live: app.read !== undefined,

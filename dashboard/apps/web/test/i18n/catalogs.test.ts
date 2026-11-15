@@ -2,11 +2,16 @@
  * Every catalog, in every locale, checked where a mistake would otherwise reach
  * a reader.
  *
- * A key present in English and missing in Spanish draws as the key; a Spanish
- * message that drops `{count}` says the wrong thing; a brace out of place is a
- * message that cannot be formatted at all. All three are silent at build time,
+ * A key present in English and missing from a complete locale reads in English
+ * on a screen promised in that language; a Spanish message that drops `{count}`
+ * says the wrong thing; a brace out of place is a message that cannot be
+ * formatted at all. All three are silent at build time,
  * so they fail here instead - for the dashboard's catalogs and for every
  * installable app's (`apps/<app>/messages`), which are found rather than listed.
+ *
+ * A locale the registry does not mark complete may leave out any namespace or
+ * key - it reads the source's for those - but what it does carry is held to the
+ * same rules: no key the source lacks, the same arguments and tags, valid ICU.
  *
  * The navigation's labels are checked against the app catalogue itself: a screen
  * added to `lib/apps.ts` needs its label here, and the English one must be the
@@ -21,6 +26,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import {
     flattenCatalog,
     inspectMessage,
+    isCompleteLocale,
     LOCALES,
     PRESENCE_DURATIONS,
     SOURCE_LOCALE,
@@ -48,7 +54,10 @@ function namespacesIn(root: string, locale: string): string[] {
 }
 
 function load(root: string, locale: string, namespace: string): Catalog {
-    return JSON.parse(readFileSync(join(root, locale, `${namespace}.json`), "utf8")) as Catalog;
+    const file = join(root, locale, `${namespace}.json`);
+    // A partial locale may not have started a namespace yet.
+    if (!existsSync(file) && !isCompleteLocale(locale)) return {};
+    return JSON.parse(readFileSync(file, "utf8")) as Catalog;
 }
 
 describe("the catalogs", () => {
@@ -68,8 +77,10 @@ describe("the catalogs", () => {
             expect(folders.sort()).toEqual([...LOCALES].sort());
         });
 
-        it.each(LOCALES)("%s has the same namespaces as the source", (locale) => {
-            expect(namespacesIn(root, locale)).toEqual(namespaces);
+        it.each(LOCALES)("%s has the source's namespaces (all of them when complete)", (locale) => {
+            const own = namespacesIn(root, locale);
+            if (isCompleteLocale(locale)) expect(own).toEqual(namespaces);
+            else expect(own.filter((namespace) => !namespaces.includes(namespace))).toEqual([]);
         });
 
         // One import per file: a namespace written but never listed is one no
@@ -79,15 +90,16 @@ describe("the catalogs", () => {
             const imported = [...index.matchAll(/from\s+"\.\/([\w-]+)\.json"/g)]
                 .map((match) => match[1])
                 .sort();
-            expect(imported).toEqual(namespaces);
+            expect(imported).toEqual(namespacesIn(root, locale));
         });
 
         describe.each(namespaces)("namespace %s", (namespace) => {
             const source = flattenCatalog(load(root, SOURCE_LOCALE, namespace));
 
-            it.each(LOCALES)("%s has exactly the source's keys", (locale) => {
+            it.each(LOCALES)("%s has the source's keys (exactly, when complete)", (locale) => {
                 const keys = [...flattenCatalog(load(root, locale, namespace)).keys()].sort();
-                expect(keys).toEqual([...source.keys()].sort());
+                if (isCompleteLocale(locale)) expect(keys).toEqual([...source.keys()].sort());
+                else expect(keys.filter((key) => !source.has(key))).toEqual([]);
             });
 
             it.each(LOCALES)("%s is valid ICU, with the source's arguments and tags", (locale) => {

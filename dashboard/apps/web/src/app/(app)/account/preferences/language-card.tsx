@@ -12,17 +12,12 @@
  * mistake can still find their own - and found by typing its English name too.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { Card, CardBody, LanguageSelect } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { isLocale, LOCALE_INFO, LOCALES, type Locale } from "@polaris/core";
-
-const LANGUAGES = LOCALES.map((locale) => ({
-    value: locale,
-    tag: locale,
-    label: LOCALE_INFO[locale].name
-}));
+import { isLocale, type Locale } from "@polaris/core";
+import { localeChoices } from "@/lib/i18n/language-choices";
 
 export function LanguageCard({
     current,
@@ -34,6 +29,7 @@ export function LanguageCard({
 }) {
     const t = useTranslations("account");
     const common = useTranslations("common");
+    const languages = useMemo(() => localeChoices(common("languagePicker.partial")), [common]);
     const [chosen, setChosen] = useState<Locale>(current);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState("");
@@ -65,7 +61,7 @@ export function LanguageCard({
                 <LanguageSelect
                     value={chosen}
                     onValueChange={(value) => void pick(value)}
-                    languages={LANGUAGES}
+                    languages={languages}
                     readerLocale={chosen}
                     searchPlaceholder={common("languagePicker.search")}
                     emptyText={common("languagePicker.empty")}

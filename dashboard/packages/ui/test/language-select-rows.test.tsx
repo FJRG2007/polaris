@@ -56,7 +56,7 @@ describe("language picker rows", () => {
         expect(rows[4]!.querySelectorAll("span[title]")).toHaveLength(1);
     });
 
-    it("puts each language's flag first, and an empty slot where none fits", async () => {
+    it("puts each language's flag first, and a neutral blank where none fits", async () => {
         const { rows } = open();
         expect(
             rows.map(
@@ -65,7 +65,7 @@ describe("language picker rows", () => {
                         ?.querySelector("[data-flag]")
                         ?.getAttribute("data-flag") ?? null
             )
-        ).toEqual(["dk", "de", "gb", "es", null]);
+        ).toEqual(["dk", "de", "gb", "es", "none"]);
         expect(rows[4]!.querySelector("[data-icon-placeholder]")).not.toBeNull();
         await waitFor(() =>
             expect(

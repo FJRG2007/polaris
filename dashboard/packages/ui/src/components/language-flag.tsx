@@ -104,11 +104,13 @@ export function LanguageFlag({ tag, className }: { tag: string; className?: stri
         };
     }, [code]);
 
-    if (!code) return null;
+    // No flag fits: a neutral blank of the same size, so a row without one lines
+    // up with the rows that have one.
     return (
         <span
             aria-hidden
-            data-flag={code}
+            data-flag={code ?? "none"}
+            data-icon-placeholder={code ? undefined : ""}
             className={cn(
                 "inline-block h-3 w-4 shrink-0 rounded-[2px] bg-muted bg-cover bg-center shadow-[0_0_0_1px_rgb(0_0_0/0.08)]",
                 className

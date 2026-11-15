@@ -13,14 +13,14 @@
  */
 
 import { z } from "zod";
-import type { Locale } from "@polaris/core";
+import { wordsFor, type Locale, type LocaleWords } from "@polaris/core";
 import type { AppHostTypes } from "@polaris/app-host";
 import { CLOCK_LABEL_MAX, DEFAULT_POMODORO, formatCountdown } from "./clock/model";
 
 type AppDeckAction = AppHostTypes["AppDeckAction"];
 type DeckState = ReturnType<NonNullable<AppDeckAction["read"]>["pick"]>;
 type DeckCountdown = NonNullable<DeckState["countdown"]>;
-type Words = Readonly<Record<Locale, string>>;
+type Words = LocaleWords;
 
 /** What `timer` is set to besides one of the account's timers. */
 export const NEW_TIMER = "new";
@@ -109,7 +109,7 @@ export function countdownFace(
         icon: running ? "timer" : rung ? "bell-ring" : "pause",
         on: running,
         value: keyTime(countdown.remainingMs),
-        ...(rung ? { detail: DONE[locale] } : detail ? { detail } : {}),
+        ...(rung ? { detail: wordsFor(DONE, locale) } : detail ? { detail } : {}),
         countdown
     };
 }
@@ -120,12 +120,12 @@ export function timerState(structured: unknown, locale: Locale, raw: unknown): D
     if (!options.success) {
         const loose = timerOptionsSchema.innerType().safeParse(raw);
         return loose.success && loose.data.timer === NEW_TIMER
-            ? { tone: "bad", icon: "timer", detail: UNNAMED[locale] }
+            ? { tone: "bad", icon: "timer", detail: wordsFor(UNNAMED, locale) }
             : { tone: "idle" };
     }
     const { timers, serverNow } = rowsOf(structured);
     const found = timerFor(timers, options.data);
-    if (found === "gone") return { tone: "bad", icon: "timer", detail: GONE[locale] };
+    if (found === "gone") return { tone: "bad", icon: "timer", detail: wordsFor(GONE, locale) };
     if (found === null) {
         const focus = options.data.timer === FOCUS_TIMER;
         const length = (focus ? DEFAULT_POMODORO.focus : options.data.minutes) * 60_000;
@@ -136,7 +136,7 @@ export function timerState(structured: unknown, locale: Locale, raw: unknown): D
                 durationMs: length,
                 ...(focus ? { phase: "focus" } : {})
             },
-            focus ? PHASES.focus[locale] : options.data.name,
+            focus ? wordsFor(PHASES.focus, locale) : options.data.name,
             locale
         );
     }
@@ -154,7 +154,7 @@ export function timerState(structured: unknown, locale: Locale, raw: unknown): D
     };
     return countdownFace(
         countdown,
-        found.focus ? PHASES[found.focus][locale] : found.label || undefined,
+        found.focus ? wordsFor(PHASES[found.focus], locale) : found.label || undefined,
         locale
     );
 }

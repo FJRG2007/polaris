@@ -17,9 +17,11 @@ import {
     createTranslator,
     DEFAULT_LOCALE,
     isLocale,
+    mergeCatalog,
     negotiateLocale,
     type Locale,
     type MessageKey,
+    type PartialCatalogShape,
     type Translator
 } from "@polaris/core";
 import english from "@/messages/en-US.json";
@@ -29,7 +31,12 @@ export type Catalog = typeof english;
 export type WordKey = MessageKey<Catalog>;
 export type Words = Translator<WordKey>;
 
-const CATALOGS: Readonly<Record<Locale, Catalog>> = { "en-US": english, "es-ES": spanish };
+/** Every language the extension has words in. One that has only some of them
+ *  reads the source's (English) for the rest - see `wordsIn`. */
+const CATALOGS: Readonly<Partial<Record<Locale, PartialCatalogShape<Catalog>>>> = {
+    "en-US": english,
+    "es-ES": spanish
+};
 
 /** The browser's own language, as the closest one the extension speaks. */
 export function browserLocale(): Locale {
@@ -55,7 +62,7 @@ export function pickLocale(account: unknown): Locale {
 
 /** The words for one language. */
 export function wordsIn(locale: Locale): Words {
-    return createTranslator(locale, CATALOGS[locale]);
+    return createTranslator(locale, mergeCatalog(english, CATALOGS[locale]) as Catalog);
 }
 
 /** English, for a caller that has no reader to ask - and for the tests that

@@ -15,7 +15,8 @@
         "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
         "typecheck:web": "tsc --noEmit",
         "lint": "eslint --quiet src test",
-        "i18n:scan": "node scripts/i18n-scan.mjs"
+        "i18n:scan": "node scripts/i18n-scan.mjs",
+        "i18n:coverage": "node scripts/i18n-coverage.mjs"
     },
     "dependencies": {
         "@ai-sdk/anthropic": "4.0.82",

@@ -257,7 +257,7 @@ export const gameServersExtension: AppExtension = {
 
     // What a person reads for each of those tools, in their language.
     mcpToolLabels: async (locale) =>
-        (await import("../../messages")).gameCatalogs.catalogs[locale].mcpTools,
+        (await import("../../messages")).gameCatalogs.pick(locale, ["mcpTools"]).mcpTools as Readonly<Record<string, string>>,
 
     // How `polaris_search` finds the servers and a Minecraft server's events,
     // by the same standing.

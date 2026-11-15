@@ -12,14 +12,14 @@
  */
 
 import { z } from "zod";
-import type { Locale } from "@polaris/core";
+import { wordsFor, type Locale, type LocaleWords } from "@polaris/core";
 import type { AppHostTypes } from "@polaris/app-host";
 
 type AppDeckAction = AppHostTypes["AppDeckAction"];
 type DeckState = ReturnType<NonNullable<AppDeckAction["read"]>["pick"]>;
 type DeckPress = NonNullable<DeckState["press"]>;
 
-const OFFLINE: Readonly<Record<Locale, string>> = {
+const OFFLINE: LocaleWords = {
     "en-US": "Offline",
     "es-ES": "Sin conexión"
 };
@@ -61,13 +61,13 @@ function deviceState(structured: unknown, locale: Locale) {
     const parsed = deviceRows.safeParse(structured);
     const device = parsed.success ? parsed.data.devices[0] : undefined;
     if (!device) return { tone: "idle" as const };
-    if (!device.online) return { tone: "bad" as const, detail: OFFLINE[locale] };
+    if (!device.online) return { tone: "bad" as const, detail: wordsFor(OFFLINE, locale) };
     const on = device.state === "on" ? true : device.state === "off" ? false : undefined;
     return { tone: on ? ("ok" as const) : ("idle" as const), on };
 }
 
 /** What a lock's bolt is, in the reader's language. */
-const BOLT: Readonly<Record<"locked" | "unlocked", Readonly<Record<Locale, string>>>> = {
+const BOLT: Readonly<Record<"locked" | "unlocked", LocaleWords>> = {
     locked: { "en-US": "Locked", "es-ES": "Cerrada" },
     unlocked: { "en-US": "Unlocked", "es-ES": "Abierta" }
 };
@@ -78,11 +78,11 @@ export function lockState(structured: unknown, locale: Locale) {
     const parsed = deviceRows.safeParse(structured);
     const device = parsed.success ? parsed.data.devices[0] : undefined;
     if (!device) return { tone: "idle" as const };
-    if (!device.online) return { tone: "bad" as const, detail: OFFLINE[locale] };
+    if (!device.online) return { tone: "bad" as const, detail: wordsFor(OFFLINE, locale) };
     if (device.state === "locked")
-        return { tone: "ok" as const, on: true, detail: BOLT.locked[locale] };
+        return { tone: "ok" as const, on: true, detail: wordsFor(BOLT.locked, locale) };
     if (device.state === "unlocked")
-        return { tone: "warn" as const, on: false, detail: BOLT.unlocked[locale] };
+        return { tone: "warn" as const, on: false, detail: wordsFor(BOLT.unlocked, locale) };
     return { tone: "idle" as const };
 }
 
@@ -116,7 +116,7 @@ function climateOf(structured: unknown) {
 export function climateState(structured: unknown, locale: Locale) {
     const device = climateOf(structured);
     if (!device) return { tone: "idle" as const };
-    if (!device.online) return { tone: "bad" as const, detail: OFFLINE[locale] };
+    if (!device.online) return { tone: "bad" as const, detail: wordsFor(OFFLINE, locale) };
     const on = device.state === "on";
     const target = device.climate?.target;
     return {
@@ -152,7 +152,7 @@ const PLAIN_COMMANDS = [
 ] as const;
 
 const COMMAND_WORDS: Readonly<
-    Record<(typeof PLAIN_COMMANDS)[number], Readonly<Record<Locale, string>>>
+    Record<(typeof PLAIN_COMMANDS)[number], LocaleWords>
 > = {
     "turn-on": { "en-US": "Turn on", "es-ES": "Encender" },
     "turn-off": { "en-US": "Turn off", "es-ES": "Apagar" },
@@ -248,14 +248,14 @@ export function naturalState(structured: unknown, locale: Locale) {
     const device = parsed.success ? parsed.data.devices[0] : undefined;
     if (!device) return { tone: "idle" as const };
     const icon = KIND_ICONS[device.kind ?? ""] ?? "power";
-    if (!device.online) return { tone: "bad" as const, icon, detail: OFFLINE[locale] };
+    if (!device.online) return { tone: "bad" as const, icon, detail: wordsFor(OFFLINE, locale) };
     if (device.state === "locked" || device.state === "unlocked") {
         const locked = device.state === "locked";
         return {
             tone: locked ? ("ok" as const) : ("warn" as const),
             on: locked,
             icon: locked ? "lock" : "lock-open",
-            detail: BOLT[device.state][locale]
+            detail: wordsFor(BOLT[device.state], locale)
         };
     }
     const on = device.state === "on";
@@ -282,7 +282,7 @@ const privacyRows = z.object({
     )
 });
 
-const PRIVATE: Readonly<Record<Locale, string>> = { "en-US": "Private", "es-ES": "Privada" };
+const PRIVATE: LocaleWords = { "en-US": "Private", "es-ES": "Privada" };
 
 /** A privacy key's face: on when every camera of the target is private, a
  *  count when only some are. */
@@ -291,7 +291,7 @@ export function privacyState(structured: unknown, locale: Locale) {
     const row = parsed.success ? parsed.data.targets[0] : undefined;
     if (!row || row.total === 0) return { tone: "idle" as const, icon: "video" };
     if (row.all)
-        return { tone: "ok" as const, on: true, icon: "video-off", detail: PRIVATE[locale] };
+        return { tone: "ok" as const, on: true, icon: "video-off", detail: wordsFor(PRIVATE, locale) };
     if (row.some > 0)
         return {
             tone: "warn" as const,
@@ -308,7 +308,7 @@ export function privacyPress(state: DeckState, locale: Locale): DeckPress | unde
     if (state.tone === "bad") return undefined;
     return state.on
         ? { face: { tone: "idle", on: false, icon: "video" } }
-        : { face: { tone: "ok", on: true, icon: "video-off", detail: PRIVATE[locale] } };
+        : { face: { tone: "ok", on: true, icon: "video-off", detail: wordsFor(PRIVATE, locale) } };
 }
 
 /** Every camera, zone and place, for the key's target picker. */
@@ -322,7 +322,7 @@ function privacyTargetChoices(structured: unknown) {
 }
 
 /** What a door shows while a command is on its way to it. */
-const UNDER_WAY: Readonly<Record<"open" | "lock" | "unlock", Readonly<Record<Locale, string>>>> = {
+const UNDER_WAY: Readonly<Record<"open" | "lock" | "unlock", LocaleWords>> = {
     open: { "en-US": "Opening", "es-ES": "Abriendo" },
     lock: { "en-US": "Locking", "es-ES": "Cerrando" },
     unlock: { "en-US": "Unlocking", "es-ES": "Soltando" }
@@ -343,9 +343,9 @@ export function commandPress(
 ): DeckPress | undefined {
     if (!command || state.tone === "bad") return undefined;
     const bolt =
-        state.detail === BOLT.locked[locale]
+        state.detail === wordsFor(BOLT.locked, locale)
             ? "locked"
-            : state.detail === BOLT.unlocked[locale]
+            : state.detail === wordsFor(BOLT.unlocked, locale)
               ? "unlocked"
               : null;
     if (command === "turn-on" || command === "turn-off") {
@@ -362,7 +362,7 @@ export function commandPress(
                 tone: "warn",
                 on: command === "lock",
                 icon: command === "open" ? "door-open" : command === "lock" ? "lock" : "lock-open",
-                detail: UNDER_WAY[command][locale]
+                detail: wordsFor(UNDER_WAY[command], locale)
             }
         };
     }
@@ -405,7 +405,7 @@ export function readingState(structured: unknown, locale: Locale): DeckState {
     const parsed = readingRows.safeParse(structured);
     const device = parsed.success ? parsed.data.devices[0] : undefined;
     if (!device) return { tone: "idle" };
-    if (!device.online) return { tone: "bad", detail: OFFLINE[locale] };
+    if (!device.online) return { tone: "bad", detail: wordsFor(OFFLINE, locale) };
     return device.reading
         ? { tone: "ok", value: `${device.reading.value}${device.reading.unit}` }
         : { tone: "idle" };
@@ -415,7 +415,7 @@ export function readingState(structured: unknown, locale: Locale): DeckState {
 const SETTING_COMMANDS = ["set-mode", "set-fan"] as const;
 
 const SETTING_WORDS: Readonly<
-    Record<(typeof SETTING_COMMANDS)[number], Readonly<Record<Locale, string>>>
+    Record<(typeof SETTING_COMMANDS)[number], LocaleWords>
 > = {
     "set-mode": { "en-US": "Mode", "es-ES": "Modo" },
     "set-fan": { "en-US": "Fan speed", "es-ES": "Ventilador" }

@@ -14,7 +14,14 @@ import enUS from "../../messages/en-US/common.json";
 import { useEffect, useState } from "react";
 import { readLocaleCookie } from "@/lib/i18n/cookie";
 import { isStaleBuildError, reloadForNewBuild } from "@/lib/stale-build";
-import { createTranslator, DEFAULT_LOCALE, negotiateLocale, type Locale } from "@polaris/core";
+import {
+    createTranslator,
+    DEFAULT_LOCALE,
+    mergeCatalog,
+    negotiateLocale,
+    type Locale,
+    type PartialCatalogShape
+} from "@polaris/core";
 
 /**
  * This boundary replaces the root layout, and with it the provider every other
@@ -23,7 +30,10 @@ import { createTranslator, DEFAULT_LOCALE, negotiateLocale, type Locale } from "
  * Polaris in. Chosen after mount - the server drew this in English, and
  * drawing something else before hydration would not match it.
  */
-const COMMON = { "en-US": enUS, "es-ES": esES } as const satisfies Record<Locale, unknown>;
+const COMMON: Readonly<Partial<Record<Locale, PartialCatalogShape<typeof enUS>>>> = {
+    "en-US": enUS,
+    "es-ES": esES
+};
 
 function useReaderLocale(): Locale {
     const [locale, setLocale] = useState<Locale>(DEFAULT_LOCALE);
@@ -47,7 +57,10 @@ export default function GlobalError({
 }) {
     const staleBuild = isStaleBuildError(error);
     const locale = useReaderLocale();
-    const t = createTranslator(locale, COMMON[locale] as typeof enUS, { namespace: "common" });
+    // A language with only some of `common` reads English for the rest.
+    const t = createTranslator(locale, mergeCatalog(enUS, COMMON[locale]) as typeof enUS, {
+        namespace: "common"
+    });
 
     useEffect(() => {
         console.error(error);

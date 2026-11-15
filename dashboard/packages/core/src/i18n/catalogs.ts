@@ -8,21 +8,21 @@
  * importing a line of the dashboard.
  */
 
-import { LOCALES, type Locale } from "./locales.js";
+import { isCompleteLocale, SOURCE_LOCALE, type CompleteLocale, type Locale } from "./locales.js";
 import type { Client } from "../client-surface.js";
 import {
+    catalogCoverage,
     createTranslator,
     formatMessage,
     lookupMessage,
+    mergeCatalog,
     type Catalog,
     type CatalogShape,
+    type PartialCatalogShape,
     type MessageKey,
     type MessageParams,
     type Translator
 } from "./messages.js";
-
-/** The locale whose catalogs define the keys: every other one must match it. */
-export const SOURCE_LOCALE = LOCALES[0];
 
 /** Namespaces by name, for one locale. */
 export type Namespaces = Readonly<Record<string, Catalog>>;
@@ -32,13 +32,23 @@ export type QualifiedKey<T extends Namespaces> = {
     [N in keyof T & string]: `${N}.${MessageKey<T[N]>}`;
 }[keyof T & string];
 
-/** The source locale's namespaces as they are, and every other locale's in the
- *  same shape - a missing key in a translation is a type error. */
+/** The source locale's namespaces as they are; a complete locale's in the same
+ *  shape - a missing key there is a type error - and a partial one's with any of
+ *  the source's keys and none of its own (see `LocaleInfo.complete`). */
 export type LocaleCatalogs<T extends Namespaces> = {
     readonly [SOURCE in typeof SOURCE_LOCALE]: T;
 } & {
-    readonly [L in Exclude<Locale, typeof SOURCE_LOCALE>]: CatalogShape<T>;
+    readonly [L in Exclude<CompleteLocale, typeof SOURCE_LOCALE>]: CatalogShape<T>;
+} & {
+    readonly [L in Exclude<Locale, CompleteLocale>]: PartialCatalogShape<T>;
 };
+
+/** How much of one namespace a locale has translated, counted in messages. */
+export interface NamespaceCoverage {
+    readonly namespace: string;
+    readonly translated: number;
+    readonly total: number;
+}
 
 export interface CatalogSet<T extends Namespaces> {
     readonly catalogs: LocaleCatalogs<T>;
@@ -56,8 +66,11 @@ export interface CatalogSet<T extends Namespaces> {
      *  notification, an email, a line sent into a game. */
     translate(locale: Locale, key: QualifiedKey<T>, params?: MessageParams): string;
     /** The namespaces a screen asked for, in one locale: what a server hands the
-     *  browser, which never receives the rest. */
+     *  browser, which never receives the rest. A partial locale's arrive filled
+     *  in from the source, so the browser never has a key with no words. */
     pick(locale: Locale, namespaces: readonly (keyof T & string)[]): Namespaces;
+    /** Every namespace's coverage in one locale. */
+    coverage(locale: Locale): NamespaceCoverage[];
 }
 
 /** Build the set. Called once per catalog owner, at module level. */
@@ -65,9 +78,23 @@ export function defineCatalogs<T extends Namespaces>(catalogs: LocaleCatalogs<T>
     const source = catalogs[SOURCE_LOCALE];
     const namespaces = Object.keys(source) as (keyof T & string)[];
     const translators = new Map<string, unknown>();
+    const merged = new Map<string, Catalog | undefined>();
 
-    function namespaceOf(locale: Locale, namespace: string): Catalog | undefined {
+    function ownNamespace(locale: Locale, namespace: string): Catalog | undefined {
         return (catalogs[locale] as Namespaces | undefined)?.[namespace];
+    }
+
+    /** A namespace as a reader of the locale gets it: a complete locale's as it
+     *  is, a partial one's with the source's message wherever it has none. */
+    function namespaceOf(locale: Locale, namespace: string): Catalog | undefined {
+        const own = ownNamespace(locale, namespace);
+        if (locale === SOURCE_LOCALE || isCompleteLocale(locale)) return own;
+        const id = `${locale}:${namespace}`;
+        if (!merged.has(id)) {
+            const base = (source as Namespaces)[namespace];
+            merged.set(id, base ? mergeCatalog(base, own) : own);
+        }
+        return merged.get(id);
     }
 
     function translator<N extends keyof T & string>(
@@ -102,5 +129,12 @@ export function defineCatalogs<T extends Namespaces>(catalogs: LocaleCatalogs<T>
         return picked;
     }
 
-    return { catalogs, namespaces, translator, translate, pick };
+    function coverage(locale: Locale): NamespaceCoverage[] {
+        return namespaces.map((namespace) => ({
+            namespace,
+            ...catalogCoverage(source[namespace]!, ownNamespace(locale, namespace))
+        }));
+    }
+
+    return { catalogs, namespaces, translator, translate, pick, coverage };
 }

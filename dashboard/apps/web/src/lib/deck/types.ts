@@ -5,7 +5,7 @@
  * Client-safe: types only.
  */
 
-import type { Locale } from "@polaris/core";
+import type { Locale, LocaleWords } from "@polaris/core";
 
 /** What pressing it does. `run` acts once, `toggle` flips something whose state
  *  the key shows, `state` only shows, `dial` turns, and `open` has the plugin
@@ -170,7 +170,7 @@ export interface AppDeckAction {
     readonly area: DeckArea;
     readonly icon: string;
     /** Every locale, so no reader gets another language's name. */
-    readonly label: Readonly<Record<Locale, string>>;
+    readonly label: LocaleWords;
     /** The permission the deck's key must hold for it to be offered at all. */
     readonly scope: string;
     readonly options: DeckOptionsSchema;
@@ -178,14 +178,14 @@ export interface AppDeckAction {
     readonly fields: readonly {
         readonly name: string;
         readonly type: DeckOptionField["type"];
-        readonly label: Readonly<Record<Locale, string>>;
+        readonly label: LocaleWords;
         readonly required: boolean;
         readonly min?: number;
         readonly max?: number;
         /** For `choice`: fixed values, named in every locale. */
         readonly fixed?: readonly {
             readonly value: string;
-            readonly label: Readonly<Record<Locale, string>>;
+            readonly label: LocaleWords;
         }[];
         /** For `choice`: the tool that lists them and how to read its answer,
          *  after any `fixed` ones. */

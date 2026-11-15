@@ -25,6 +25,8 @@ export interface LanguageChoice {
     tag: string;
     /** The row's text; the language's name in itself when left out. */
     label?: string;
+    /** A word on the row beside its name - "Partially translated". */
+    note?: string;
 }
 
 /** A language's name in another language, or the tag when the runtime has no name for it. */
@@ -68,7 +70,7 @@ export function languageOptions(
     // A row with no flag keeps an empty slot when others have one, so every
     // name starts at the same place.
     const anyFlag = languages.some(({ tag }) => languageFlagCode(tag) !== null);
-    return languages.map(({ value, tag, label }) => {
+    return languages.map(({ value, tag, label, note }) => {
         const own = label ?? languageListName(tag, tag);
         const theirs = readerLocale ? languageListName(tag, readerLocale) : undefined;
         const names = [own, languageName(tag, tag), languageName(tag, "en")];
@@ -76,14 +78,12 @@ export function languageOptions(
         if (theirs) names.push(theirs);
         names.push(tag);
         const keywords = [...new Set([...names, ...names.map(folded)])].join(" ");
-        const hint =
+        const named =
             theirs && theirs.toLocaleLowerCase() !== own.toLocaleLowerCase() ? theirs : undefined;
-        const icon =
-            languageFlagCode(tag) !== null ? (
-                <LanguageFlag tag={tag} />
-            ) : anyFlag ? (
-                <span aria-hidden data-icon-placeholder className="inline-block h-3 w-4 shrink-0" />
-            ) : undefined;
+        const hint = [named, note].filter(Boolean).join(" - ") || undefined;
+        // A language with no flag of its own gets the neutral one, so every name
+        // still starts at the same place.
+        const icon = anyFlag ? <LanguageFlag tag={tag} /> : undefined;
         return { value, label: own, keywords, hint, icon };
     });
 }

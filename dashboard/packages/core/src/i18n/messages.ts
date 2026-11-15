@@ -13,8 +13,8 @@
  * Minecraft message, an email or a notification as well as from a screen.
  */
 
-import type { Locale } from "./locales.js";
-import { IntlMessageFormat, type PrimitiveType } from "intl-messageformat";
+import { isCompleteLocale, SOURCE_LOCALE, type Locale } from "./locales.js";
+import { IntlMessageFormat, type Formatters, type PrimitiveType } from "intl-messageformat";
 import { clientMessageValues, type Client } from "../client-surface.js";
 
 /** What a message reads `{clientKind}` and `{surface}` as when nobody said: a browser,
@@ -36,6 +36,12 @@ export type MessageKey<T> = T extends string
 /** The shape another locale's catalog must have: the same keys, any wording. */
 export type CatalogShape<T> = {
     readonly [K in keyof T]: T[K] extends string ? string : CatalogShape<T[K]>;
+};
+
+/** The shape a partly translated locale's catalog may have: any of the source's
+ *  keys, none of its own. */
+export type PartialCatalogShape<T> = {
+    readonly [K in keyof T]?: T[K] extends string ? string : PartialCatalogShape<T[K]>;
 };
 
 /** A value a message can be filled with. Dates are better formatted first, with
@@ -62,7 +68,9 @@ export interface MessageProblem {
 export interface Translator<K extends string = string> {
     /** The message at `key`, filled in. Returns the key itself when there is no
      *  such message, which the catalog tests make a build failure rather than
-     *  something a reader sees. */
+     *  something a reader sees. A partial locale's catalogs reach a translator
+     *  already filled in from the source (`mergeCatalog`), so a message it has
+     *  not translated yet is read in the source language, never as its key. */
     (key: K, params?: MessageParams): string;
     /** The same, for a message with tags in it: the parts in order, ready to be
      *  rendered side by side. Never concatenate two translations instead. */
@@ -78,11 +86,56 @@ export interface Translator<K extends string = string> {
 const MAX_CACHED = 4000;
 const formats = new Map<string, IntlMessageFormat>();
 
+/** Numbers and dates in the reader's locale, plurals chosen by the source's
+ *  rules: for a message whose branches were written for the source language. */
+const SOURCE_PLURALS: Formatters = {
+    getNumberFormat: (locales, options) =>
+        new Intl.NumberFormat(locales, options as Intl.NumberFormatOptions),
+    getDateTimeFormat: (...args) => new Intl.DateTimeFormat(...args),
+    getPluralRules: (_locales, options) => new Intl.PluralRules(SOURCE_LOCALE, options)
+};
+
+interface PluralNode {
+    readonly type: number;
+    readonly pluralType?: "cardinal" | "ordinal";
+    readonly options?: Readonly<Record<string, { readonly value: readonly PluralNode[] }>>;
+    readonly children?: readonly PluralNode[];
+}
+
+/** Whether every plural in a message has a branch for every category the
+ *  locale's own rules can pick. A message that does not was written for another
+ *  language - the source's message a partial locale fell back to - and its
+ *  branches only make sense under that language's rules. */
+function coversPlurals(locale: Locale, nodes: readonly PluralNode[]): boolean {
+    for (const node of nodes) {
+        if (node.type === 6 && node.options) {
+            const wanted = new Intl.PluralRules(locale, {
+                type: node.pluralType ?? "cardinal"
+            }).resolvedOptions().pluralCategories;
+            if (wanted.some((category) => !Object.hasOwn(node.options!, category))) return false;
+        }
+        for (const option of Object.values(node.options ?? {}))
+            if (!coversPlurals(locale, option.value)) return false;
+        if (node.children && !coversPlurals(locale, node.children)) return false;
+    }
+    return true;
+}
+
 function formatterFor(locale: Locale, message: string): IntlMessageFormat {
     const cacheKey = `${locale}\u0000${message}`;
     const found = formats.get(cacheKey);
     if (found) return found;
-    const created = new IntlMessageFormat(message, locale);
+    let created = new IntlMessageFormat(message, locale);
+    // A partial locale reads some messages in the source language. Their numbers
+    // and dates still follow the reader's locale, like the rest of the screen,
+    // but "one" and "other" were written for the source's plural rules: under a
+    // language that picks "one" for 21, or has no "one" at all, they would choose
+    // the wrong form. See docs/i18n.md, "Partial locales".
+    if (
+        !isCompleteLocale(locale) &&
+        !coversPlurals(locale, created.getAst() as unknown as PluralNode[])
+    )
+        created = new IntlMessageFormat(message, locale, undefined, { formatters: SOURCE_PLURALS });
     if (formats.size >= MAX_CACHED) formats.clear();
     formats.set(cacheKey, created);
     return created;
@@ -254,6 +307,42 @@ export function flattenCatalog(catalog: Catalog, prefix = ""): Map<string, strin
         else for (const [inner, text] of flattenCatalog(value, key)) found.set(inner, text);
     }
     return found;
+}
+
+/**
+ * A partial locale's catalog filled in from the source's: every key the source
+ * has, in the translation where there is one and in the source's words where
+ * there is not. A key only the translation has is dropped - it names nothing a
+ * screen can ask for, and the catalog tests report it.
+ */
+export function mergeCatalog(source: Catalog, translated: Catalog | undefined): Catalog {
+    if (!translated) return source;
+    const merged: Record<string, string | Catalog> = {};
+    for (const [name, value] of Object.entries(source)) {
+        const own = Object.hasOwn(translated, name) ? translated[name] : undefined;
+        merged[name] =
+            typeof value === "string"
+                ? typeof own === "string"
+                    ? own
+                    : value
+                : mergeCatalog(value, typeof own === "object" ? own : undefined);
+    }
+    return merged;
+}
+
+/** How much of a source catalog a translation covers, counted in messages. */
+export function catalogCoverage(
+    source: Catalog,
+    translated: Catalog | undefined
+): { readonly translated: number; readonly total: number } {
+    const own = translated ? flattenCatalog(translated) : new Map<string, string>();
+    let done = 0;
+    let total = 0;
+    for (const key of flattenCatalog(source).keys()) {
+        total += 1;
+        if (own.has(key)) done += 1;
+    }
+    return { translated: done, total };
 }
 
 interface AstNode {

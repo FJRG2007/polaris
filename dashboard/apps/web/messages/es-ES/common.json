@@ -171,7 +171,8 @@
     },
     "languagePicker": {
         "search": "Buscar idiomas",
-        "empty": "Ningún idioma coincide"
+        "empty": "Ningún idioma coincide",
+        "partial": "Traducido en parte"
     },
     "textTranslation": {
         "translate": "Traducir",
