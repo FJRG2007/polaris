@@ -7,6 +7,7 @@
  */
 
 import { useState } from "react";
+import { saveFile } from "@/components/transfers/move-file";
 import * as codeStatus from "@/lib/polar/code-status";
 import type { PolarCodeThread } from "@/lib/polar/code";
 import { Download, GitBranch, Pencil, X } from "lucide-react";
@@ -27,14 +28,10 @@ export function transcriptHref(sessionId: string, format: TranscriptFormat): str
     return `/api/polar/code/transcript?${new URLSearchParams({ sessionId, format }).toString()}`;
 }
 
-/** Start the download of a transcript, for "/export". */
-export function downloadTranscript(sessionId: string, format: TranscriptFormat): void {
-    const link = document.createElement("a");
-    link.href = transcriptHref(sessionId, format);
-    link.download = "";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+/** Start the download of a transcript, for "/export" and the menu: through the
+ *  shared download, so the reader is told when it has started. */
+export function downloadTranscript(sessionId: string, format: TranscriptFormat, label: string): void {
+    saveFile(transcriptHref(sessionId, format), label);
 }
 
 /** The compact line under the reply box: model, effort, context, cost, branch. */
@@ -266,10 +263,10 @@ export function CodeExportMenu({ sessionId }: { sessionId: string }) {
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => downloadTranscript(sessionId, "md")}>
+                <DropdownMenuItem onSelect={() => downloadTranscript(sessionId, "md", t("code.export.markdown"))}>
                     {t("code.export.markdown")}
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => downloadTranscript(sessionId, "jsonl")}>
+                <DropdownMenuItem onSelect={() => downloadTranscript(sessionId, "jsonl", t("code.export.jsonl"))}>
                     {t("code.export.jsonl")}
                 </DropdownMenuItem>
             </DropdownMenuContent>

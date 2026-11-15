@@ -80,7 +80,6 @@ import { useCodeSlash } from "@/components/polar/polar-code-slash";
 import * as codeCommands from "@/lib/polar/code-commands";
 import * as goals from "@/lib/polar/goals";
 import { goalStateKey, PolarGoalBar } from "@/components/polar/polar-goal";
-import { RepoMemorySection } from "@/app/(app)/automations/code-review/repo-memory-section";
 import { usePolarCommands } from "@/components/polar/polar-commands";
 import { ContextBar } from "@/components/polar/polar-context";
 import * as codeStatus from "@/lib/polar/code-status";
@@ -124,6 +123,15 @@ import type {
 import type { SessionView } from "@/lib/agents/session-service";
 import { Code2, MessageSquare, PanelRight, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import dynamic from "next/dynamic";
+
+/** `/memory`'s panel: loaded when it is opened, with the server actions it calls. */
+const RepoMemorySection = dynamic(
+    () =>
+        import("@/app/(app)/automations/code-review/repo-memory-section").then(
+            (module) => module.RepoMemorySection
+        ),
+    { ssr: false }
+);
 
 /** Loaded after the thread, not with it: its terminal is not needed to read one. */
 const PolarCodeWorkspace = dynamic(
@@ -1404,7 +1412,10 @@ function CodeThread({
         if (command === "resume") return onHistory();
         if (command === "diff") return setWorkspace(true);
         if (command === "context") return setShowContext(true);
-        if (command === "export") return downloadTranscript(sessionId, rest.toLowerCase() === "jsonl" ? "jsonl" : "md");
+        if (command === "export") {
+            const format = rest.toLowerCase() === "jsonl" ? "jsonl" : "md";
+            return downloadTranscript(sessionId, format, t(format === "jsonl" ? "code.export.jsonl" : "code.export.markdown"));
+        }
         if (command === "rename") {
             if (!rest) return setReply("/rename ");
             setError(null);

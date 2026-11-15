@@ -1,6 +1,7 @@
 // Download a Code session's transcript, as Markdown (?format=md) or JSONL (?format=jsonl).
 import { z } from "zod";
 import { NextResponse } from "next/server";
+import { downloadTicketHeaders } from "@/lib/download-ticket";
 import { polarCaller } from "@/lib/polar/access";
 import { polarCodeTranscript } from "@/lib/polar/code";
 import { TRANSCRIPT_FORMATS } from "@/lib/polar/code-transcript";
@@ -31,7 +32,8 @@ export async function GET(request: Request): Promise<Response> {
             "content-type": file.type,
             "content-disposition": `attachment; filename="${file.name}"`,
             "cache-control": "no-store",
-            "x-content-type-options": "nosniff"
+            "x-content-type-options": "nosniff",
+            ...downloadTicketHeaders(request)
         }
     });
 }
