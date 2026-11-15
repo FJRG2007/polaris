@@ -314,6 +314,18 @@ function VariableEditor({
     // on screen while it is not yet a number.
     const [minText, setMinText] = useState(declared.min === undefined ? "" : String(declared.min));
     const [maxText, setMaxText] = useState(declared.max === undefined ? "" : String(declared.max));
+    // A row is keyed by its place, so moving one hands it another's bounds:
+    // the text follows the bound whenever the bound changes from outside.
+    const [seen, setSeen] = useState({ min: declared.min, max: declared.max });
+    if (seen.min !== declared.min || seen.max !== declared.max) {
+        setSeen({ min: declared.min, max: declared.max });
+        if (boundOf(minText) !== (declared.min ?? null)) {
+            setMinText(declared.min === undefined ? "" : String(declared.min));
+        }
+        if (boundOf(maxText) !== (declared.max ?? null)) {
+            setMaxText(declared.max === undefined ? "" : String(declared.max));
+        }
+    }
     const bounded = vars.BOUNDED_TYPES.includes(declared.type);
     const initial = vars.normalizeValue(declared.type, declared.initial);
     // An empty default is allowed: the run dialog then starts empty.
