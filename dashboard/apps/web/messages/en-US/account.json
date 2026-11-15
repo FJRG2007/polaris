@@ -1265,6 +1265,7 @@
         "errors": {
             "notAssisted": "That is not a sign-in Polaris can run for you.",
             "couldNotStart": "Polaris could not start a machine for the sign-in. Try again in a moment.",
+            "couldNotType": "Polaris could not type that command. Type it in the terminal below.",
             "notOpen": "That sign-in is no longer open.",
             "notSignedInYet": "The sign-in has not finished yet. Finish it in the terminal above, then try again.",
             "typeSomething": "Type something"

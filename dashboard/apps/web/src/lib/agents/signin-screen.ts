@@ -261,3 +261,13 @@ export function screenTokenIn(env: string, screen: string): string | null {
     }
     return found;
 }
+
+/**
+ * Whether any of a tool's ready markers is on the screen. Plain substrings, as
+ * the tool prints them: a marker is a few words of its first screen, and an
+ * empty list never matches, so a tool with no known marker is never typed into
+ * on a guess.
+ */
+export function screenShowsAny(screen: string, markers: readonly string[]): boolean {
+    return markers.some((marker) => marker.length > 0 && screen.includes(marker));
+}

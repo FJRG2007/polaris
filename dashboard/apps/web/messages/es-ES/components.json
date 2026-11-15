@@ -1117,7 +1117,15 @@
             "usedToday": "{used} hoy",
             "usedMonth": "{used} este mes",
             "failed": "No se guardaron los límites."
-        }
+        },
+        "signout": "Salir",
+        "signoutTitle": "¿Cerrar la sesión de {tool}?",
+        "signoutBody": "Ejecuta el cierre de sesión de {tool} en la máquina de tus sesiones. Dejan de tener sesión hasta que vuelvas a entrar.",
+        "signoutOffer": "Eliminada. {tool} puede seguir con sesión en la máquina de tus sesiones.",
+        "signoutKeep": "Dejarla",
+        "homeTitle": "Con sesión en la máquina de tus sesiones",
+        "homeHint": "Estas herramientas guardan su propio acceso. Polaris lo hace en la máquina de tus sesiones y no guarda nada.",
+        "homeSignin": "Entrar"
     },
     "signinDialog": {
         "title": "Iniciar sesión en {tool}",
@@ -1155,7 +1163,15 @@
         "codePlaceholder": "Código de acceso",
         "gettingPage": "Obteniendo la página...",
         "tokenHint": "Polaris guarda cifrado el token que imprime el acceso. No hay nada que copiar.",
-        "tokenMissed": "Polaris no pudo leer el token. Cópialo desde el terminal."
+        "tokenMissed": "Polaris no pudo leer el token. Cópialo desde el terminal.",
+        "signoutTitle": "Salir de {tool}",
+        "signoutIntro": "Polaris ejecuta el cierre de sesión de la herramienta en la máquina de tus sesiones.",
+        "homeIntro": "Polaris inicia la sesión en la máquina de tus sesiones. La herramienta guarda allí el acceso y Polaris no guarda nada.",
+        "signedOut": "Sesión de {tool} cerrada",
+        "signedOutHint": "Las sesiones vuelven a entrar cuando tú entres.",
+        "homeLinked": "Tus sesiones usan este acceso a partir de ahora.",
+        "typeLogin": "Escribir {command}",
+        "typeLoginHint": "Cuando la herramienta haya arrancado, escribe {command} para abrir su acceso."
     },
     "providerSelect": {
         "free": {

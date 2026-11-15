@@ -72,16 +72,25 @@ export interface SigninDialogActions {
      *  a file. Absent on a screen that offers only pasted tokens. */
     capture?: (input: unknown) => Promise<{ value?: string; error?: string }>;
     save: (secret: string, identity: SigninIdentity, name: string) => Promise<{ error?: string }>;
+    /** Type a login's in-tool command (`/login`) into its terminal. Absent on
+     *  a screen that offers no in-tool login. */
+    type?: (id: unknown) => Promise<{ error?: string }>;
 }
+
+/** What one opening of the dialog runs: a login, or the vendor's sign-out. */
+export type SigninDialogMode = "login" | "logout";
 
 export function SigninDialog({
     signin,
     actions,
+    mode = "login",
     onClose,
     onDone
 }: {
     signin: AgentSignin;
     actions: SigninDialogActions;
+    /** A sign-out runs the same machine and screen, and stores nothing. */
+    mode?: SigninDialogMode;
     onClose: () => void;
     onDone: () => void;
 }) {
@@ -114,13 +123,19 @@ export function SigninDialog({
     // changing: React folds the two into one render and the effect never reran.
     const [retries, setRetries] = useState(0);
     const terminal = useRef<HTMLPreElement>(null);
+    // The in-tool command, once typed from the button: hidden from then on.
+    const [typedInput, setTypedInput] = useState(false);
 
     const ready = view?.ready ?? false;
     const device = view?.flow === "device";
     const code = view?.code ?? null;
     const finished = view?.finished ?? false;
     const stopped = view !== null && view.exitCode !== null && !finished;
-    const capture = (signin.file || signin.onScreen) && !manual ? actions.capture : undefined;
+    // Whether this run ends in a stored row. A sign-out and a login kept in the
+    // home store nothing: they are over when the tool says it is done.
+    const keeps = mode === "login" && !signin.home;
+    const done = linked || (!keeps && finished);
+    const capture = keeps && (signin.file || signin.onScreen) && !manual ? actions.capture : undefined;
     // Folded while Polaris drives the login itself; open where the person has
     // to read something off it.
     const terminalOpen = showTerminal ?? (!device && !capture);
@@ -189,9 +204,10 @@ export function SigninDialog({
             return;
         }
         if (id) void actions.end(id);
-        onClose();
+        if (done) onDone();
+        else onClose();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id, linked, onClose, onDone]);
+    }, [id, linked, done, onClose, onDone]);
 
     const restart = () => {
         if (id) void actions.end(id);
@@ -203,6 +219,7 @@ export function SigninDialog({
         setLine("");
         setManual(false);
         setShowTerminal(null);
+        setTypedInput(false);
         autoLinks.current = 0;
         setRound((value) => value + 1);
     };
@@ -283,8 +300,20 @@ export function SigninDialog({
         return () => clearTimeout(timer);
     }, [finished, capture, linked, busy, link, retries]);
 
+    const typeInput = () => {
+        const type = actions.type;
+        if (!id || !type) return;
+        setTypedInput(true);
+        void runAction(() => type(id), setError).then((result) => {
+            // Offered again when it did not reach the terminal.
+            if (!result || result.error) setTypedInput(false);
+            if (result?.error) setError(result.error);
+        });
+    };
+
     const openLabel = url ? hostOf(url) : null;
-    const showLink = !linked && (!device || finished || stopped);
+    const showLink = keeps && !linked && (!device || finished || stopped);
+    const tool = signin.serves[0]?.label ?? signin.label;
 
     return (
         <Dialog open onOpenChange={close}>
@@ -293,28 +322,44 @@ export function SigninDialog({
                 scrollbar and made every line of the login half-visible. */}
             <DialogContent className="max-h-[92vh] w-[min(48rem,96vw)] max-w-[min(48rem,96vw)] overflow-y-auto overscroll-contain">
                 <DialogHeader>
-                    <DialogTitle>{t("signinDialog.title", { tool: signin.serves[0]?.label ?? signin.label })}</DialogTitle>
+                    <DialogTitle>
+                        {mode === "logout" ? t("signinDialog.signoutTitle", { tool }) : t("signinDialog.title", { tool })}
+                    </DialogTitle>
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
-                    <p className="text-muted-foreground text-xs">{t("signinDialog.intro")}</p>
+                    <p className="text-muted-foreground text-xs">
+                        {mode === "logout"
+                            ? t("signinDialog.signoutIntro")
+                            : signin.home
+                              ? t("signinDialog.homeIntro")
+                              : t("signinDialog.intro")}
+                    </p>
                     {/* Worth saying before rather than after: the vendor may well
                         retire whatever it minted last time, and finding that out
                         from a session that stopped working is finding it out in
                         the worst place. */}
-                    {signin.subscription && !linked ? (
+                    {keeps && signin.subscription && !linked ? (
                         <p className="text-muted-foreground text-xs">{t("signinDialog.subscription")}</p>
                     ) : null}
 
-                    {linked ? (
+                    {done ? (
                         <div className="bg-elevated flex flex-col items-center gap-2 rounded-md border border-border px-4 py-8 text-center">
                             <CheckCircle2 className="text-success-ink size-8 shrink-0" />
                             <p className="min-w-0 break-words text-sm font-medium">
-                                {view?.signedInAs
-                                    ? t("signinDialog.signedInAs", { login: view.signedInAs })
-                                    : t("signinDialog.signedIn")}
+                                {mode === "logout"
+                                    ? t("signinDialog.signedOut", { tool })
+                                    : view?.signedInAs
+                                      ? t("signinDialog.signedInAs", { login: view.signedInAs })
+                                      : t("signinDialog.signedIn")}
                             </p>
-                            <p className="text-muted-foreground text-xs">{t("signinDialog.linked")}</p>
+                            <p className="text-muted-foreground text-xs">
+                                {mode === "logout"
+                                    ? t("signinDialog.signedOutHint")
+                                    : signin.home
+                                      ? t("signinDialog.homeLinked")
+                                      : t("signinDialog.linked")}
+                            </p>
                         </div>
                     ) : !ready && !expired && !error ? (
                         // Until the machine says anything there is nothing to show,
@@ -335,8 +380,9 @@ export function SigninDialog({
                             finished={finished}
                             signedInAs={view?.signedInAs ?? null}
                         />
-                    ) : ready && !device && !stopped && !expired ? (
+                    ) : ready && mode === "login" && !device && !stopped && !expired ? (
                         <PasteSteps
+                            code={view?.flow !== "open"}
                             url={url}
                             line={line}
                             onLine={setLine}
@@ -349,13 +395,25 @@ export function SigninDialog({
                         />
                     ) : null}
 
-                    {(stopped || expired) && !linked ? (
+                    {(stopped || expired) && !done ? (
                         <div className="flex flex-wrap items-center gap-2">
                             <p className="text-danger min-w-0 flex-1 text-sm">
                                 {expired ? t("signinDialog.expired") : t("signinDialog.ended")}
                             </p>
                             <Button size="sm" variant="outline" onClick={restart}>
                                 {t("signinDialog.restart")}
+                            </Button>
+                        </div>
+                    ) : null}
+
+                    {view?.input && actions.type && !typedInput && !done && ready ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-muted-foreground min-w-0 flex-1 text-xs">
+                                {t("signinDialog.typeLoginHint", { command: view.input })}
+                            </p>
+                            <Button size="sm" variant="outline" onClick={typeInput}>
+                                <CornerDownLeft className="size-4 shrink-0" />
+                                {t("signinDialog.typeLogin", { command: view.input })}
                             </Button>
                         </div>
                     ) : null}
@@ -369,7 +427,7 @@ export function SigninDialog({
                     {/* Only the CLI rung has a terminal. The direct rung is the
                         vendor's endpoints called from the server, with nothing
                         to type and nothing to show. */}
-                    {ready && !linked && view?.rung !== "direct" ? (
+                    {ready && !done && view?.rung !== "direct" ? (
                         <div className="flex flex-col gap-2">
                             <Button
                                 size="sm"
@@ -422,7 +480,7 @@ export function SigninDialog({
                         </div>
                     ) : null}
 
-                    {!linked ? (
+                    {keeps && !linked ? (
                         <label className="block space-y-1 border-t border-border pt-3">
                             <span className="text-xs text-muted-foreground">{t("signinDialog.nameHint")}</span>
                             <Input
@@ -433,7 +491,7 @@ export function SigninDialog({
                         </label>
                     ) : null}
 
-                    {linked || device ? null : capture ? (
+                    {!keeps || linked || device ? null : capture ? (
                         <p className="text-xs text-muted-foreground">
                             {signin.onScreen ? t("signinDialog.tokenHint") : t("signinDialog.fileHint")}
                         </p>
@@ -455,8 +513,8 @@ export function SigninDialog({
                 </div>
 
                 <DialogFooter>
-                    {linked ? (
-                        <Button onClick={onDone}>{t("signinDialog.done")}</Button>
+                    {done ? (
+                        <Button onClick={close}>{t("signinDialog.done")}</Button>
                     ) : (
                         <>
                             <Button variant="ghost" onClick={close}>
@@ -482,6 +540,7 @@ export function SigninDialog({
 /** The two steps of a login that wants a code typed back: open the page, then
  *  paste what it shows into a field of its own rather than into a terminal. */
 function PasteSteps({
+    code,
     url,
     line,
     onLine,
@@ -490,6 +549,8 @@ function PasteSteps({
     busy,
     finished
 }: {
+    /** False for a login that only waits for the page: no step two. */
+    code: boolean;
     url: string | null;
     line: string;
     onLine: (value: string) => void;
@@ -520,42 +581,44 @@ function PasteSteps({
                     </span>
                 )}
             </li>
-            <li className="flex min-w-0 flex-col gap-2">
-                <span className="text-sm">
-                    <span className="text-muted-foreground me-2 font-mono">2</span>
-                    {t("signinDialog.pasteStepCode")}
-                </span>
-                {field ? (
-                    <div className="flex items-center gap-2">
-                        <Input
-                            value={line}
-                            onChange={(event) => onLine(event.target.value)}
-                            onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                    event.preventDefault();
-                                    onSend();
-                                }
-                            }}
-                            placeholder={t("signinDialog.codePlaceholder")}
-                            aria-label={t("signinDialog.codePlaceholder")}
-                            autoComplete="off"
-                            spellCheck={false}
-                            className="min-w-0 flex-1 font-mono"
-                            disabled={busy}
-                        />
-                        <Button
-                            size="icon-sm"
-                            variant="outline"
-                            onClick={onSend}
-                            aria-label={t("signinDialog.pasteStepCode")}
-                            title={t("signinDialog.pasteStepCode")}
-                            disabled={busy || !line.trim()}
-                        >
-                            <CornerDownLeft className="size-4 shrink-0" />
-                        </Button>
-                    </div>
-                ) : null}
-            </li>
+            {code ? (
+                <li className="flex min-w-0 flex-col gap-2">
+                    <span className="text-sm">
+                        <span className="text-muted-foreground me-2 font-mono">2</span>
+                        {t("signinDialog.pasteStepCode")}
+                    </span>
+                    {field ? (
+                        <div className="flex items-center gap-2">
+                            <Input
+                                value={line}
+                                onChange={(event) => onLine(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                        event.preventDefault();
+                                        onSend();
+                                    }
+                                }}
+                                placeholder={t("signinDialog.codePlaceholder")}
+                                aria-label={t("signinDialog.codePlaceholder")}
+                                autoComplete="off"
+                                spellCheck={false}
+                                className="min-w-0 flex-1 font-mono"
+                                disabled={busy}
+                            />
+                            <Button
+                                size="icon-sm"
+                                variant="outline"
+                                onClick={onSend}
+                                aria-label={t("signinDialog.pasteStepCode")}
+                                title={t("signinDialog.pasteStepCode")}
+                                disabled={busy || !line.trim()}
+                            >
+                                <CornerDownLeft className="size-4 shrink-0" />
+                            </Button>
+                        </div>
+                    ) : null}
+                </li>
+            ) : null}
             {finished ? (
                 <li className="text-muted-foreground flex items-center gap-2 text-xs" aria-live="polite">
                     <Loader2 className="size-4 shrink-0 animate-spin" />

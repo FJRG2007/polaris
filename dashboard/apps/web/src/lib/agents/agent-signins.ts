@@ -93,6 +93,10 @@ export interface AgentSignin {
     /** Which catalogued tools this one signs in. Carries the id as well as the
      *  label so a screen can draw the tool's mark without matching on words. */
     readonly serves: readonly { readonly id: string; readonly label: string }[];
+    /** The login stays in the sessions' home and nothing is stored for it. */
+    readonly home?: boolean;
+    /** The vendor documents a sign-out Polaris can run in that home. */
+    readonly signout?: boolean;
 }
 
 /**

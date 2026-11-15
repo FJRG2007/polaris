@@ -32,7 +32,7 @@ import { shellQuote } from "./session-hooks";
 import * as commands from "./session-commands";
 import { upWithFreshImage } from "./session-image";
 import { HostdPorts } from "@/lib/deploy/ports-hostd";
-import { agentSignins, type AgentSignin } from "./agent-signins";
+import { agentSignins, signinSlug, type AgentSignin } from "./agent-signins";
 import * as screens from "./signin-screen";
 import * as direct from "./signin-direct";
 import { configuredRequest, readCapped } from "@/lib/safe-fetch";
@@ -100,9 +100,27 @@ export interface LoginCommand {
     readonly flow: SigninFlow;
     /** Questions on the screen Polaris answers itself, once each. */
     readonly autoAnswers?: readonly screens.SigninAutoAnswer[];
+    /**
+     * The login stays in the person's home and nothing is stored.
+     *
+     * For a tool whose login is documented but whose credential location is
+     * not: the container mounts the same persistent home a session does, so the
+     * login it leaves there is the sessions' login. There is no row, no capture
+     * and nothing to paste - the key is Polaris's own name for the sign-in.
+     */
+    readonly home?: true;
+    /**
+     * A command typed into the tool once it is ready, for a tool whose login is
+     * a command inside its own interface (`/login`) rather than a subcommand.
+     * Typed on its own once one of `after` is on the screen; with no marker
+     * known, the dialog offers it as a button instead of guessing when.
+     */
+    readonly input?: { readonly text: string; readonly after?: readonly string[] };
 }
 
-export type SigninFlow = "device" | "paste";
+/** "device" prints an address and a code; "paste" asks for something typed
+ *  back; "open" only prints an address to open and waits for the browser. */
+export type SigninFlow = "device" | "paste" | "open";
 
 export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
     CLAUDE_CODE_OAUTH_TOKEN: {
@@ -166,7 +184,108 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
         command: "auggie auth login --headless",
         logout: "auggie auth logout",
         flow: "paste"
-    }
+    },
+
+    // Logins kept in the home (`home: true`): documented commands whose
+    // credential location the vendor does not name. Each source is in
+    // docs/agent-catalogue.md ("Sign-in commands").
+
+    // cursor.com/docs/cli/reference/authentication: `login` with
+    // NO_OPEN_BROWSER=1 prints the address instead of opening a browser, and
+    // `logout` clears it. Run as the catalogue's binary, which the CLI installs.
+    CURSOR_HOME_LOGIN: {
+        cli: "cursor",
+        command: "NO_OPEN_BROWSER=1 cursor-agent login",
+        logout: "cursor-agent logout",
+        flow: "open",
+        home: true
+    },
+    // kiro.dev/docs/getting-started/authentication: `kiro-cli login`, a sign-in
+    // method chosen on the screen, device flow in remote environments. No CLI
+    // logout is documented.
+    KIRO_HOME_LOGIN: { cli: "kiro", command: "kiro-cli login", flow: "paste", home: true },
+    // docs.x.ai/build/cli/reference: `grok login --device-auth` for headless or
+    // remote environments, `grok logout` to clear the cached credentials.
+    GROK_HOME_LOGIN: {
+        cli: "grok",
+        command: "grok login --device-auth",
+        logout: "grok logout",
+        flow: "device",
+        home: true
+    },
+    // docs.devin.ai/cli/reference/commands: `--force-manual-token-flow` skips
+    // the browser and takes a pasted token; `devin auth logout` removes it.
+    DEVIN_HOME_LOGIN: {
+        cli: "devin",
+        command: "devin auth login --force-manual-token-flow",
+        logout: "devin auth logout",
+        flow: "paste",
+        home: true
+    },
+    // ampcode.com/docs/cli: `amp login` adds an account, `amp logout` removes
+    // the active one. Whether it finishes without a local browser is not said,
+    // so the terminal stays open for whatever it asks.
+    AMP_HOME_LOGIN: { cli: "amp", command: "amp login", logout: "amp logout", flow: "paste", home: true },
+    // docs.autohand.ai/working-with-autohand-code/cli-reference.
+    AUTOHAND_HOME_LOGIN: {
+        cli: "autohand",
+        command: "autohand login",
+        logout: "autohand logout",
+        flow: "paste",
+        home: true
+    },
+    // codewhale.net/en/docs/auth: browser sign-in with a one-time code, and
+    // `codewhale account logout` to remove the profile's session.
+    CODEWHALE_HOME_LOGIN: {
+        cli: "codewhale",
+        command: "codewhale login",
+        logout: "codewhale account logout",
+        flow: "device",
+        home: true
+    },
+    // fx.sh/docs/getting-started/authentication: without a provider name,
+    // `fx login` signs in to Vercel and `fx logout` signs out of it.
+    FX_HOME_LOGIN: { cli: "fx", command: "fx login", logout: "fx logout", flow: "paste", home: true },
+    // mimo.mi.com/docs/en-US/tokenplan/integration/mimo-code: `mimo auth login`,
+    // then MiMo chosen on the screen. No logout is documented.
+    MIMO_HOME_LOGIN: { cli: "mimo-code", command: "mimo auth login", flow: "paste", home: true },
+    // code.minimax.io/docs/cli/quick-start: `mcode login --region global` for a
+    // Global account (the bare command is the Mainland China one), and
+    // `mcode logout`.
+    MINIMAX_HOME_LOGIN: {
+        cli: "minimax-code",
+        command: "mcode login --region global",
+        logout: "mcode logout",
+        flow: "paste",
+        home: true
+    },
+
+    // Logins typed into the tool itself once it is ready. The ready markers are
+    // Agent Orchestrator's, as observed on each tool's first screen.
+    // Ported from Agent Orchestrator (github.com/aoagents/agent-orchestrator,
+    // backend/internal/service/agentauth/plans.go), Apache-2.0.
+
+    // moonshotai.github.io/kimi-code/en/guides/getting-started: "enter `/login`
+    // to begin the login flow", whose Kimi Code option is a device-code flow.
+    KIMI_HOME_LOGIN: {
+        cli: "kimi",
+        command: "kimi",
+        flow: "paste",
+        home: true,
+        input: { text: "/login", after: ["Run /login or /provider to get started."] }
+    },
+    // github.com/earendil-works/pi README: "run `/login` inside Pi to connect a
+    // subscription or API key".
+    PI_HOME_LOGIN: {
+        cli: "pi",
+        command: "pi",
+        flow: "paste",
+        home: true,
+        input: { text: "/login", after: ["0.0%/", "Pi can explain its own features"] }
+    },
+    // docs.factory.com/cli/configuration/cli-reference: `/login` signs in to
+    // Factory. No ready marker is known, so the dialog offers it as a button.
+    DROID_HOME_LOGIN: { cli: "droid", command: "droid", flow: "paste", home: true, input: { text: "/login" } }
 };
 
 /** What an attempt runs: the vendor's login, or its documented sign-out. */
@@ -223,9 +342,46 @@ export function canAssistSignin(env: string): boolean {
     return env in LOGIN_COMMANDS;
 }
 
+/** Whether this sign-in leaves its login in the home and stores nothing. */
+export function isHomeSignin(env: string): boolean {
+    return LOGIN_COMMANDS[env]?.home === true;
+}
+
+/**
+ * The sign-ins that store nothing, shaped like the ones that do so one dialog
+ * runs both. Never in `agentSignins()`: that list is what may be stored, and
+ * these have no row to store.
+ */
+export function homeSignins(): AgentSignin[] {
+    return Object.entries(LOGIN_COMMANDS).flatMap(([env, login]) => {
+        const cli = login.home ? core.agentCliById(login.cli) : null;
+        if (!cli) return [];
+        return [
+            {
+                env,
+                slug: signinSlug(env),
+                label: cli.label,
+                url: cli.docs,
+                howto: null,
+                subscription: true,
+                file: null,
+                onScreen: false,
+                serves: [{ id: cli.id, label: cli.label }],
+                home: true,
+                signout: canSignout(env)
+            }
+        ];
+    });
+}
+
 /** The sign-ins Polaris can walk somebody through, for a screen that offers it. */
 export function assistedSignins(): AgentSignin[] {
-    return agentSignins().filter((signin) => canAssistSignin(signin.env));
+    return [
+        ...agentSignins()
+            .filter((signin) => canAssistSignin(signin.env) && !isHomeSignin(signin.env))
+            .map((signin) => ({ ...signin, signout: canSignout(signin.env) })),
+        ...homeSignins()
+    ];
 }
 
 /**
@@ -501,6 +657,10 @@ export interface SigninView extends screens.SigninProgress {
     readonly rung: SigninRung;
     /** The direct rung failed and this is the CLI standing in for it. */
     readonly fellBack: boolean;
+    /** The command this login types into its tool, while it is still to be
+     *  typed: the dialog offers it as a button, for a tool with no known ready
+     *  marker and for one whose marker never showed. */
+    readonly input?: string | null;
 }
 
 /**
@@ -517,6 +677,25 @@ export function signinCaptureCommand(): string {
 /** Attempts whose prompt has been answered, by prompt, so each is answered once
  *  even when two polls read the same screen. Cleared when the attempt ends. */
 const answered = new Map<string, Set<string>>();
+/** Attempts whose in-tool login command was typed, by Polaris or from the
+ *  dialog's button. Cleared when the attempt ends. */
+const typed = new Set<string>();
+
+/**
+ * Type a login's in-tool command once, from the dialog's button.
+ *
+ * The text is the catalogue's, never the browser's: the button only says when.
+ */
+export async function typeSigninInput(userId: string, id: string): Promise<void> {
+    const attempt = await prisma.agentSigninAttempt.findFirst({
+        where: { id, userId, endedAt: null },
+        select: { env: true }
+    });
+    const input = attempt ? LOGIN_COMMANDS[attempt.env]?.input : undefined;
+    if (!input || typed.has(id) || signingOut.has(id)) return;
+    typed.add(id);
+    await answerSignin(userId, id, input.text);
+}
 
 export async function signinScreen(userId: string, id: string): Promise<SigninView> {
     const attempt = await prisma.agentSigninAttempt.findFirst({
@@ -557,12 +736,21 @@ export async function signinScreen(userId: string, id: string): Promise<SigninVi
         await answerSignin(userId, id, reply).catch(() => undefined);
     }
 
+    // A login typed into the tool: typed once, as soon as the tool says it is
+    // ready. A sign-out never types it.
+    const input = login?.input && !signingOut.has(id) && !typed.has(id) ? login.input : null;
+    if (input && screens.screenShowsAny(progress.screen, input.after ?? [])) {
+        typed.add(id);
+        await answerSignin(userId, id, input.text).catch(() => undefined);
+    }
+
     return {
         ...progress,
         ready: progress.screen.trim().length > 0,
         flow: login?.flow ?? "paste",
         rung: "cli",
-        fellBack: fellBack.has(id)
+        fellBack: fellBack.has(id),
+        input: input && !typed.has(id) ? input.text : null
     };
 }
 
@@ -653,6 +841,7 @@ export async function answerSignin(userId: string, id: string, text: string): Pr
  */
 export async function endSignin(userId: string, id: string): Promise<void> {
     answered.delete(id);
+    typed.delete(id);
     if (directAttempts.get(id)?.userId === userId) directAttempts.delete(id);
     fellBack.delete(id);
     signingOut.delete(id);
@@ -680,6 +869,7 @@ export async function sweepExpired(): Promise<number> {
         fellBack.delete(attempt.id);
         signingOut.delete(attempt.id);
         answered.delete(attempt.id);
+        typed.delete(attempt.id);
         await prisma.agentSigninAttempt
             .update({ where: { id: attempt.id }, data: { endedAt: new Date() } })
             .catch(() => undefined);
@@ -848,7 +1038,7 @@ export function parseCredentialFile(output: string): string | null {
  * otherwise the file it wrote. Throws only when the attempt is not this person's.
  */
 export async function captureSignin(userId: string, id: string, env: string): Promise<string | null> {
-    if (!(env in LOGIN_COMMANDS) || signingOut.has(id)) return null;
+    if (!(env in LOGIN_COMMANDS) || isHomeSignin(env) || signingOut.has(id)) return null;
     if (screens.hasScreenToken(env)) {
         const screen = await runIn(userId, id, signinCaptureCommand());
         return screens.screenTokenIn(env, screens.readSigninScreen(screen).screen);

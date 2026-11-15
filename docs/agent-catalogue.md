@@ -104,31 +104,64 @@ documents one; it is never inferred from the login.
 | GitHub Copilot | `copilot login --device-code` | - | existing entry |
 | Auggie | `auggie auth login --headless` | `auggie auth logout` | docs.augmentcode.com/cli/setup-auggie/authentication |
 
+Kept in the home (`home: true`): the login lands in the person's persistent
+home, which every session mounts, and nothing is stored. Used where the vendor
+documents the command but not where the login is kept. Listed under "Signed in
+on your sessions' machine" on Account > AI keys, each with a Sign out button
+when the vendor documents one. A removed stored sign-in whose tool has a logout
+is offered the same sign-out.
+
+| Tool | Login | Logout | Source |
+| --- | --- | --- | --- |
+| Cursor | `NO_OPEN_BROWSER=1 cursor-agent login` | `cursor-agent logout` | cursor.com/docs/cli/reference/authentication (docs say `agent`; `cursor-agent` is the catalogue binary) |
+| Kiro | `kiro-cli login` (device flow in remote environments) | - (none documented) | kiro.dev/docs/getting-started/authentication |
+| Grok Build | `grok login --device-auth` | `grok logout` | docs.x.ai/build/cli/reference |
+| Devin | `devin auth login --force-manual-token-flow` | `devin auth logout` | docs.devin.ai/cli/reference/commands (file: `~/.local/share/devin/credentials.toml`, docs.devin.ai/cli/enterprise/devin-auth) |
+| Amp | `amp login` | `amp logout` | ampcode.com/docs/cli |
+| Autohand | `autohand login` | `autohand logout` | docs.autohand.ai/working-with-autohand-code/cli-reference |
+| Codewhale | `codewhale login` (one-time code) | `codewhale account logout` | codewhale.net/en/docs/auth |
+| fx | `fx login` (Vercel) | `fx logout` | fx.sh/docs/getting-started/authentication |
+| MiMo Code | `mimo auth login` | - (none documented) | mimo.mi.com/docs/en-US/tokenplan/integration/mimo-code |
+| MiniMax Code | `mcode login --region global` | `mcode logout` | code.minimax.io/docs/cli/quick-start |
+
+Typed into the tool (`input`): the tool starts, and `/login` is typed once one
+of its ready markers is on the screen (markers ported from Agent Orchestrator,
+Apache-2.0). With no known marker, or one that never shows, the dialog offers a
+"Type /login" button instead of typing on a guess.
+
+| Tool | Typed | Ready marker | Source |
+| --- | --- | --- | --- |
+| Kimi Code | `/login` | `Run /login or /provider to get started.` | moonshotai.github.io/kimi-code/en/guides/getting-started |
+| Pi | `/login` | `0.0%/`, `Pi can explain its own features` | github.com/earendil-works/pi README |
+| Droid | `/login` | none known (button) | docs.factory.com/cli/configuration/cli-reference |
+
+None of the above has been exercised: this machine has no Docker. The commands
+are the vendors' documented ones; what each draws on screen was not seen.
+
 Not listed, and why (checked 2026-11-15):
 
-- **Cursor**: `agent login` / `agent logout` with `NO_OPEN_BROWSER=1` are
-  documented (cursor.com/docs/cli/reference/authentication), but the docs do not
-  say where the login is kept, and AO only reads display fields from
-  `~/.cursor/cli-config.json`. Waits on a sign-in kind that needs no captured
-  file (see `U6-PLAN.md`).
-- **Kiro**: `kiro-cli login` with device flow is documented for containers
-  (kiro.dev/docs/getting-started/authentication), no logout is, and the docs do
-  not say where the login is kept. Same wait as Cursor.
 - **Continue**: `cn login` is documented as a browser flow; nothing says it can
   finish from another machine, and no credential location or logout is named.
-- **Amp, Devin, Grok, OpenCode, Kilo Code**: AO lists `amp login`/`logout`,
-  `devin auth login`/`logout`, `grok login`, `opencode auth login`/`logout` and
-  `kilo auth login`, but the vendor pages fetched did not document them
-  (ampcode.com/manual, docs.devin.ai/cli, docs.x.ai/build/overview,
-  opencode.ai/docs/cli and /providers, kilo.ai CLI page).
-- **MiMo Code, Crush, Cline, Muse, Autohand, fx, Command Code, Stakpak,
-  Codewhale**: AO's login subcommands were not checked against vendor docs in
-  this pass.
-- **TUI logins** (MiniMax Code, Droid, Prime Agent, Kimi, Pi, Kimchi, Qwen,
-  OMP, Agy) and **setup wizards** (Goose, Vibe, Hermes, OpenHands, DeepSeek
-  Harness): AO types `/login` or drives a first-run wizard rather than running a
-  login subcommand; Polaris's sign-in starts one command and does not yet send
-  input once a TUI has drawn its ready marker.
+- **OpenCode, Kilo Code**: their docs name only `/connect` inside the tool
+  (opencode.ai/docs/providers, kilo.ai/docs/code-with-ai/platforms/cli), not the
+  `auth login`/`logout` subcommands AO runs, and no ready marker is known.
+- **Crush**: no login subcommand documented (README: ctrl+l and paste a key).
+- **Cline**: `cline auth` only stores a provider API key
+  (docs.cline.bot/cline-cli/cli-reference); the key field already does that.
+- **Stakpak**: `stakpak auth login --api-key` only stores a key (README).
+- **Command Code**: `cmd login` stores an API key in `~/.commandcode/auth.json`
+  (commandcode.ai/docs/quickstart); its docs send containers to
+  `COMMAND_CODE_API_KEY`, which the key field already takes.
+- **Kimchi**: `kimchi login` hands the key back to the CLI from a local browser
+  (docs.kimchi.dev/docs/service-keys), which cannot finish from another machine.
+- **Qwen**: OAuth is `/auth` inside the tool, and its docs say containers should
+  use an API key instead (qwenlm.github.io/qwen-code-docs/en/users/configuration/auth).
+- **Muse, Prime Agent**: no vendor page documenting a login was found (AO links
+  ai.meta.com/llama and a quickstart that returns 404).
+- **MiniMax Code (Mainland China)**: only the Global region is offered; the bare
+  `mcode login` is the China one.
+- **Setup wizards** (Goose, Vibe, Hermes, OpenHands, DeepSeek Harness, OMP):
+  AO drives a first-run wizard rather than a login; not ported.
 
 ## Left out, and why
 

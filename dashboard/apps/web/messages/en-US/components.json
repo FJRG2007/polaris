@@ -1117,7 +1117,15 @@
             "usedToday": "{used} today",
             "usedMonth": "{used} this month",
             "failed": "Couldn't save the limits."
-        }
+        },
+        "signout": "Sign out",
+        "signoutTitle": "Sign {tool} out of your sessions?",
+        "signoutBody": "Runs {tool}'s own sign-out on the machine your sessions use. They stop being signed in until you sign in again.",
+        "signoutOffer": "Removed. {tool} may still be signed in on your sessions' machine.",
+        "signoutKeep": "Keep it",
+        "homeTitle": "Signed in on your sessions' machine",
+        "homeHint": "These tools keep their own login. Polaris runs it on the machine your sessions use and stores nothing.",
+        "homeSignin": "Sign in"
     },
     "signinDialog": {
         "title": "Sign in to {tool}",
@@ -1155,7 +1163,15 @@
         "codePlaceholder": "Authorization code",
         "gettingPage": "Getting the sign-in page...",
         "tokenHint": "Polaris keeps the token the login prints, encrypted. There is nothing to copy.",
-        "tokenMissed": "Polaris could not read the token. Copy it in from the terminal."
+        "tokenMissed": "Polaris could not read the token. Copy it in from the terminal.",
+        "signoutTitle": "Sign out of {tool}",
+        "signoutIntro": "Polaris runs the tool's own sign-out on the machine your sessions use.",
+        "homeIntro": "Polaris runs the sign-in on the machine your sessions use. The tool keeps the login there, and Polaris stores nothing.",
+        "signedOut": "Signed out of {tool}",
+        "signedOutHint": "Sessions sign in again when you do.",
+        "homeLinked": "Your sessions use this login from now on.",
+        "typeLogin": "Type {command}",
+        "typeLoginHint": "When the tool has finished starting, type {command} to open its sign-in."
     },
     "providerSelect": {
         "free": {

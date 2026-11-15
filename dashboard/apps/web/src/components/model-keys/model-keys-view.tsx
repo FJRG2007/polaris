@@ -23,9 +23,9 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
 import type { AgentSignin } from "@/lib/agents/agent-signins";
-import { SigninDialog, type SigninDialogActions } from "./signin-dialog";
+import { SigninDialog, type SigninDialogActions, type SigninDialogMode } from "./signin-dialog";
 import { useConfirm } from "@/components/confirm-dialog";
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import type { ModelKeyView } from "@/lib/agents/model-keys";
 import type { ProviderRow } from "@/lib/agents/model-key-providers";
@@ -42,6 +42,8 @@ import {
     ChevronUp,
     Gauge,
     GripVertical,
+    LogIn,
+    LogOut,
     MoreHorizontal,
     Pencil,
     Plus,
@@ -95,7 +97,10 @@ export interface ModelKeyActions {
 export interface AssistedSignin {
     /** The credentials there is a login for, by the slug the table stores. */
     signins: AgentSignin[];
-    actions: Omit<SigninDialogActions, "save">;
+    actions: Omit<SigninDialogActions, "save"> & {
+        /** Starts the vendor's own sign-out, for a sign-in whose docs name one. */
+        signout?: (env: unknown) => Promise<{ id?: string; error?: string }>;
+    };
 }
 
 export interface ModelKeysCopy {
@@ -258,6 +263,35 @@ export function ModelKeysView({
         setStatuses(health);
     }
     const [limiting, setLimiting] = useState<ModelKeyView | null>(null);
+    // A sign-in whose stored row was just removed, offered a sign-out of the
+    // home too: removing the row stops Polaris handing it out, but the tool's
+    // own login in the sessions' home is still there.
+    const [signoutOffer, setSignoutOffer] = useState<AgentSignin | null>(null);
+    // The sign-in dialog opened from this table rather than from Add: a login
+    // kept in the home, or a sign-out.
+    const [running, setRunning] = useState<{ signin: AgentSignin; mode: SigninDialogMode } | null>(null);
+    const homeSignins = assist?.signins.filter((signin) => signin.home) ?? [];
+    const canSignOut = (signin: AgentSignin) => Boolean(signin.signout && assist?.actions.signout);
+
+    // The offer a sign-out replaced, put back if the sign-out does not finish.
+    const offerBack = useRef<AgentSignin | null>(null);
+    // Asked first, in the app's own dialog: a sign-out ends the tool's login in
+    // every session that uses the home. The offer goes at once and comes back
+    // if the sign-out does not finish.
+    const signOut = async (signin: AgentSignin) => {
+        const tool = signin.serves[0]?.label ?? signin.label;
+        const ok = await confirm({
+            title: t("modelKeys.signoutTitle", { tool }),
+            description: t("modelKeys.signoutBody", { tool }),
+            confirmLabel: t("modelKeys.signout"),
+            danger: true
+        });
+        if (!ok) return;
+        const offered = signoutOffer;
+        setSignoutOffer(null);
+        setRunning({ signin, mode: "logout" });
+        offerBack.current = offered;
+    };
 
     const byslug = useMemo(
         () => new Map(providers.map((provider) => [provider.slug, provider])),
@@ -370,6 +404,8 @@ export function ModelKeysView({
             if (result?.error) setError(result.error);
             return;
         }
+        const signin = assist?.signins.find((one) => one.slug === key.provider);
+        setSignoutOffer(signin && canSignOut(signin) ? signin : null);
         router.refresh();
     };
 
@@ -383,6 +419,23 @@ export function ModelKeysView({
                 <p className="rounded-lg border border-warning-edge bg-warning-soft px-3 py-2 text-sm text-warning-ink">
                     {notice}
                 </p>
+            ) : null}
+
+            {signoutOffer ? (
+                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border px-3 py-2">
+                    <p className="min-w-0 flex-1 text-sm">
+                        {t("modelKeys.signoutOffer", {
+                            tool: signoutOffer.serves[0]?.label ?? signoutOffer.label
+                        })}
+                    </p>
+                    <Button size="sm" variant="ghost" onClick={() => setSignoutOffer(null)}>
+                        {t("modelKeys.signoutKeep")}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => void signOut(signoutOffer)}>
+                        <LogOut className="size-4 shrink-0" />
+                        {t("modelKeys.signout")}
+                    </Button>
+                </div>
             ) : null}
 
             {/* No card around it, as on Account > API keys: a table inside a
@@ -479,6 +532,61 @@ export function ModelKeysView({
                     </table>
                 </div>
             </section>
+
+            {homeSignins.length > 0 && assist ? (
+                <section className="flex flex-col gap-3">
+                    <div className="min-w-0">
+                        <h2 className="text-sm font-medium">{t("modelKeys.homeTitle")}</h2>
+                        <p className="text-muted-foreground text-xs">{t("modelKeys.homeHint")}</p>
+                    </div>
+                    <ul className="divide-y divide-border rounded-lg border border-border">
+                        {homeSignins.map((signin) => (
+                            <li key={signin.env} className="flex flex-wrap items-center gap-2 px-3 py-2">
+                                <span className="min-w-0 flex-1 truncate text-sm" title={signin.label}>
+                                    {signin.label}
+                                </span>
+                                {canSignOut(signin) ? (
+                                    <Button size="sm" variant="ghost" onClick={() => void signOut(signin)}>
+                                        <LogOut className="size-4 shrink-0" />
+                                        {t("modelKeys.signout")}
+                                    </Button>
+                                ) : null}
+                                <Button size="sm" variant="outline" onClick={() => setRunning({ signin, mode: "login" })}>
+                                    <LogIn className="size-4 shrink-0" />
+                                    {t("modelKeys.homeSignin")}
+                                </Button>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            ) : null}
+
+            {running && assist ? (
+                <SigninDialog
+                    key={`${running.signin.env}-${running.mode}`}
+                    signin={running.signin}
+                    mode={running.mode}
+                    actions={{
+                        ...assist.actions,
+                        begin:
+                            running.mode === "logout" && assist.actions.signout
+                                ? assist.actions.signout
+                                : assist.actions.begin,
+                        // Nothing from these is stored.
+                        save: async () => ({})
+                    }}
+                    onClose={() => {
+                        // A sign-out that did not finish: the offer is back.
+                        if (running.mode === "logout" && offerBack.current) setSignoutOffer(offerBack.current);
+                        offerBack.current = null;
+                        setRunning(null);
+                    }}
+                    onDone={() => {
+                        offerBack.current = null;
+                        setRunning(null);
+                    }}
+                />
+            ) : null}
 
             {footer}
 

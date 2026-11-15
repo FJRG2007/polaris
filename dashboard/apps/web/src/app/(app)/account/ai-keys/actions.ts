@@ -20,6 +20,7 @@ import {
     endSignin,
     identifySignin,
     signinScreen,
+    typeSigninInput,
     type SigninIdentity,
     type SigninView
 } from "@/lib/agents/signin-runtime";
@@ -129,6 +130,21 @@ export async function beginAgentSignoutAction(
         }
         console.error("[agent-signin] could not start a sign-out:", error);
         return { error: t("aiKeys.errors.couldNotStart") };
+    }
+}
+
+/** Type the login's own in-tool command (`/login`) into its terminal, once. */
+export async function typeAgentSigninInputAction(id: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = agentSigninIdSchema.safeParse(id);
+    const t = await getTranslations("account");
+    if (!parsed.success) return { error: t("aiKeys.errors.notAssisted") };
+    try {
+        await typeSigninInput(user.id, parsed.data);
+        return {};
+    } catch (error) {
+        console.error("[agent-signin] could not type the login command:", error);
+        return { error: t("aiKeys.errors.couldNotType") };
     }
 }
 

@@ -11,17 +11,22 @@ import * as core from "@polaris/core";
 import { describe, expect, it } from "vitest";
 import {
     LOGIN_COMMANDS,
+    assistedSignins,
     canAssistSignin,
     canSignout,
+    homeSignins,
+    isHomeSignin,
     signinCommand,
     signinCredentialFile,
     signinInstall
 } from "@/lib/agents/signin-runtime";
-import { hasScreenToken } from "@/lib/agents/signin-screen";
+import { agentSignins } from "@/lib/agents/agent-signins";
+import { hasScreenToken, screenShowsAny } from "@/lib/agents/signin-screen";
 
 describe("sign-in commands", () => {
-    it("captures something from every login", () => {
+    it("captures something from every login that is stored", () => {
         for (const env of Object.keys(LOGIN_COMMANDS)) {
+            if (isHomeSignin(env)) continue;
             const captured = hasScreenToken(env) || signinCredentialFile(env) !== null;
             expect(captured, env).toBe(true);
         }
@@ -33,6 +38,14 @@ describe("sign-in commands", () => {
             expect(login.logout, env).not.toMatch(/[\n\r]/);
             const cli = core.AGENT_CLIS.find((one) => one.id === login.cli);
             const binary = login.logout.replace(/^[A-Z_]+=\S+\s+/, "").split(" ")[0];
+            expect(cli?.binaries, env).toContain(binary);
+        }
+    });
+
+    it("runs every login with the binary of the tool it names", () => {
+        for (const [env, login] of Object.entries(LOGIN_COMMANDS)) {
+            const cli = core.AGENT_CLIS.find((one) => one.id === login.cli);
+            const binary = login.command.replace(/^[A-Z_]+=\S+\s+/, "").split(" ")[0];
             expect(cli?.binaries, env).toContain(binary);
         }
     });
@@ -59,5 +72,40 @@ describe("sign-in commands", () => {
         expect(canSignout("CLAUDE_CODE_OAUTH_TOKEN")).toBe(false);
         expect(signinCommand("GEMINI_API_KEY", "login")).toBeNull();
         expect(canSignout("GEMINI_API_KEY")).toBe(false);
+    });
+
+    it("lists a login kept in the home as one, and never as something to store", () => {
+        const home = homeSignins();
+        expect(home.map((one) => one.env)).toEqual(
+            Object.keys(LOGIN_COMMANDS).filter((env) => isHomeSignin(env))
+        );
+        const storable = new Set(agentSignins().map((one) => one.env));
+        for (const signin of home) {
+            expect(signin.home, signin.env).toBe(true);
+            expect(signin.file, signin.env).toBeNull();
+            expect(storable.has(signin.env), signin.env).toBe(false);
+            expect(canAssistSignin(signin.env), signin.env).toBe(true);
+        }
+        expect(assistedSignins().filter((one) => one.home)).toHaveLength(home.length);
+    });
+
+    it("signs Cursor in without opening a browser, and Kiro with no logout", () => {
+        expect(signinCommand("CURSOR_HOME_LOGIN", "login")).toBe("NO_OPEN_BROWSER=1 cursor-agent login");
+        expect(signinCommand("CURSOR_HOME_LOGIN", "logout")).toBe("cursor-agent logout");
+        expect(LOGIN_COMMANDS.CURSOR_HOME_LOGIN?.flow).toBe("open");
+        expect(signinCommand("KIRO_HOME_LOGIN", "login")).toBe("kiro-cli login");
+        expect(canSignout("KIRO_HOME_LOGIN")).toBe(false);
+        expect(homeSignins().find((one) => one.env === "CURSOR_HOME_LOGIN")?.signout).toBe(true);
+    });
+
+    it("types an in-tool login only once a ready marker is on the screen", () => {
+        const kimi = LOGIN_COMMANDS.KIMI_HOME_LOGIN?.input;
+        expect(kimi?.text).toBe("/login");
+        expect(screenShowsAny("Welcome Run /login or /provider to get started.", kimi?.after ?? [])).toBe(true);
+        expect(screenShowsAny("Installing...", kimi?.after ?? [])).toBe(false);
+        // Droid has no known marker: never typed on a guess, offered as a button.
+        expect(LOGIN_COMMANDS.DROID_HOME_LOGIN?.input?.after).toBeUndefined();
+        expect(screenShowsAny("anything", [])).toBe(false);
+        expect(screenShowsAny("anything", [""])).toBe(false);
     });
 });
