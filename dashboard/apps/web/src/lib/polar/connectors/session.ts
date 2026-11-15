@@ -21,6 +21,7 @@ import * as oauth from "@/lib/polar/connectors/oauth";
 import * as store from "@/lib/polar/connectors/store";
 import { hostAllowed } from "@/lib/polar/connectors/shared";
 import { connectorFetch } from "@/lib/polar/connectors/fetch";
+import { paramHeadersFor, withParamHeaders } from "@/lib/polar/connectors/param-headers";
 import type { PolarConnectorPolicy } from "@/lib/polar/access";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
@@ -139,18 +140,25 @@ async function refresh(
     return stored;
 }
 
+/** The `tools/call` a client is opened for, and the `Mcp-Param-*` headers it carries. */
+interface ToolCallHeaders {
+    tool: string;
+    headers: Record<string, string>;
+}
+
 /** Opens the connector, runs `run`, and always closes it again. */
 async function withClient<T>(
     found: { row: store.ConnectorRow; secret: store.ConnectorSecret | null },
     policy: PolarConnectorPolicy,
-    run: (client: Client) => Promise<T>
+    run: (client: Client) => Promise<T>,
+    call?: ToolCallHeaders
 ): Promise<T> {
     // Checked again on every use: an administrator may have narrowed the
     // hosts since this connector was added.
     if (!hostAllowed(found.row.url, policy.hosts)) throw new ConnectorError("host");
     const token = await bearerFor(found, policy);
     try {
-        return await openAndRun(found, policy, token, run);
+        return await openAndRun(found, policy, token, run, call);
     } catch (error) {
         // An OAuth token the server turned away is refreshed once and the
         // request made again, before the person is asked to sign in.
@@ -162,7 +170,7 @@ async function withClient<T>(
             Boolean(found.secret?.tokens?.refreshToken);
         if (!refreshable) throw error;
         const fresh = await refreshOnce(found.row, policy, token);
-        return openAndRun(found, policy, fresh, run);
+        return openAndRun(found, policy, fresh, run, call);
     }
 }
 
@@ -170,7 +178,8 @@ async function openAndRun<T>(
     found: { row: store.ConnectorRow; secret: store.ConnectorSecret | null },
     policy: PolarConnectorPolicy,
     token: string | null,
-    run: (client: Client) => Promise<T>
+    run: (client: Client) => Promise<T>,
+    call?: ToolCallHeaders
 ): Promise<T> {
     const url = new URL(found.row.url);
     const headers = connectorRequestHeaders(found.row.auth, {
@@ -186,7 +195,9 @@ async function openAndRun<T>(
                   eventSourceInit: { fetch: fetchFor(policy, "sse") } as never
               })
             : new StreamableHTTPClientTransport(url, {
-                  fetch: fetchFor(policy, "http"),
+                  fetch: call
+                      ? withParamHeaders(fetchFor(policy, "http"), call.tool, call.headers)
+                      : fetchFor(policy, "http"),
                   requestInit
               });
     const client = new Client({ name: "Polaris", version: "1.0.0" }, { capabilities: {} });
@@ -229,7 +240,10 @@ export async function checkConnector(
             }
             return tools;
         });
-        await store.recordCheck(ownerId, id, { status: "ok", tools: toCachedTools(listed) });
+        await store.recordCheck(ownerId, id, {
+            status: "ok",
+            tools: toCachedTools(listed, found.row.transport)
+        });
     } catch (error) {
         const code = failureOf(error);
         await store.recordCheck(ownerId, id, {
@@ -252,11 +266,21 @@ export async function callConnectorTool(
     const found = await store.ownConnector(ownerId, id);
     if (!found || !found.row.enabled) throw new ConnectorError("failed");
     const policy = await store.connectorPolicy();
-    return withClient(found, policy, (client) =>
-        client.callTool({ name: tool, arguments: input }, undefined, {
-            timeout: CALL_TIMEOUT_MS,
-            ...(signal ? { signal } : {})
-        })
+    // Built from the tool list stored at the last check, the most recent
+    // `inputSchema` Polaris has; a tool never listed sends none. Only Streamable
+    // HTTP carries them, as the spec scopes them.
+    const listed = found.row.tools.find((entry) => entry.name === tool);
+    const headers =
+        found.row.transport === "http" && listed ? paramHeadersFor(listed.inputSchema, input) : {};
+    return withClient(
+        found,
+        policy,
+        (client) =>
+            client.callTool({ name: tool, arguments: input }, undefined, {
+                timeout: CALL_TIMEOUT_MS,
+                ...(signal ? { signal } : {})
+            }),
+        { tool, headers }
     );
 }
 

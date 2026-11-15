@@ -20,6 +20,7 @@
 
 import { z } from "zod";
 import { createHash } from "node:crypto";
+import { scanParamHeaders } from "@/lib/polar/connectors/param-headers";
 
 export const CONNECTOR_TRANSPORTS = ["http", "sse"] as const;
 export type ConnectorTransport = (typeof CONNECTOR_TRANSPORTS)[number];
@@ -225,9 +226,13 @@ const listedToolSchema = z.object({
 /**
  * A server's tool list as Polar keeps it: each entry checked, its text cut to
  * size, a schema too big or not an object left out with its tool, and no
- * name twice.
+ * name twice. Over Streamable HTTP a tool whose `x-mcp-header` marks break
+ * the spec's rules is left out too, as the spec requires (`param-headers.ts`).
  */
-export function toCachedTools(listed: readonly unknown[]): CachedTool[] {
+export function toCachedTools(
+    listed: readonly unknown[],
+    transport: ConnectorTransport = "http"
+): CachedTool[] {
     const tools: CachedTool[] = [];
     const seen = new Set<string>();
     for (const entry of listed) {
@@ -236,6 +241,13 @@ export function toCachedTools(listed: readonly unknown[]): CachedTool[] {
         if (!parsed.success || seen.has(parsed.data.name)) continue;
         const schema = parsed.data.inputSchema ?? { type: "object" };
         if (schema.type !== "object" || JSON.stringify(schema).length > SCHEMA_MAX) continue;
+        if (transport === "http") {
+            const scan = scanParamHeaders(schema);
+            if (!scan.valid) {
+                console.warn(`polar: connector tool "${parsed.data.name}" left out: ${scan.reason}`);
+                continue;
+            }
+        }
         seen.add(parsed.data.name);
         const readOnly = parsed.data.annotations?.readOnlyHint === true;
         tools.push({

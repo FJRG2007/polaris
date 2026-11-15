@@ -22,6 +22,7 @@ import type { PolarAccess } from "@/lib/polar/access";
 import type { SearchEntry } from "@/lib/polar/tool-relevance";
 import * as rules from "@/lib/polar/connectors/policy";
 import { hostAllowed } from "@/lib/polar/connectors/shared";
+import { scanParamHeaders } from "@/lib/polar/connectors/param-headers";
 import { connectorPolicy, ownConnectors, setToolPolicy } from "@/lib/polar/connectors/store";
 
 export interface ConnectorToolSet {
@@ -64,6 +65,8 @@ export async function polarConnectorTools(
         for (const entry of row.tools) {
             const answer = rules.effectiveToolPolicy(entry, row.policies);
             if (answer === "block") continue;
+            // A tool stored before its `x-mcp-header` marks were checked.
+            if (row.transport === "http" && !scanParamHeaders(entry.inputSchema).valid) continue;
             const name = rules.connectorToolName(row, entry.name);
             if (result.tools[name]) continue;
             result.tools[name] = tool({
