@@ -71,6 +71,7 @@ import { NodeIcon, nodeHint, nodeTitle } from "../shared";
 import { scheduleSummary } from "./schedule-words";
 import {
     AppLogo,
+    PolarisMark,
     Button,
     ContextMenuGroup,
     ContextMenuItem,
@@ -832,9 +833,11 @@ const GROUP_ICONS: Record<catalog.CatalogGroupId, LucideIcon> = {
  * icon above stays where that app has no logo, and on the groups that are not an app.
  */
 const GROUP_APP_LOGOS: Partial<Record<catalog.CatalogGroupId, string>> = {
+    automations: "automations",
     places: catalog.PLACES_APP,
     "game-servers": "games",
-    deploy: "deploy",
+    // The deploy group is the Apps app, as the sidebar names and draws it.
+    deploy: "apps",
     chat: "chat",
     tasks: "tasks",
     mail: "mail",
@@ -874,15 +877,18 @@ export function Palette({
                     return {
                         id: group.id,
                         label: t(`picker.groups.${group.id}`),
-                        icon: GROUP_APP_LOGOS[group.id] ? (
-                            <AppLogo
-                                appId={GROUP_APP_LOGOS[group.id]!}
-                                size={16}
-                                fallback={<Icon aria-hidden="true" />}
-                            />
-                        ) : (
-                            <Icon aria-hidden="true" />
-                        ),
+                        icon:
+                            group.id === "polaris" ? (
+                                <PolarisMark nameClassName="hidden" />
+                            ) : GROUP_APP_LOGOS[group.id] ? (
+                                <AppLogo
+                                    appId={GROUP_APP_LOGOS[group.id]!}
+                                    size={16}
+                                    fallback={<Icon aria-hidden="true" />}
+                                />
+                            ) : (
+                                <Icon aria-hidden="true" />
+                            ),
                         items: group.items.map((item) => ({
                             value: item.value,
                             label: item.preset
