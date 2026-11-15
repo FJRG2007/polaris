@@ -816,6 +816,14 @@ async function tellOwner(
     before: core.AgentSessionState,
     after: core.AgentSessionState
 ): Promise<void> {
+    // The agent's first word: its tool is installed and signed in now, so its
+    // own model list can be read. Imported here because the reader runs
+    // commands through the runtime, which imports this module.
+    if (before === "starting" && after !== "starting" && !core.isSessionOver(after)) {
+        void import("./native-models-service")
+            .then((reader) => reader.refreshSessionModelsSoon(sessionId))
+            .catch(() => undefined);
+    }
     if (after === "waiting") {
         await noticeSessionWaiting(sessionId);
         return;

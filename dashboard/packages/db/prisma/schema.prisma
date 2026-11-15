@@ -313,6 +313,7 @@ model User {
     extensionSessions    ExtensionSession[]
     trustedDevices      TrustedDevice[]
     agentRunners        AgentRunner[]
+    agentNativeModels   AgentNativeModels[]
     accountDevices      AccountDevice[]
     deviceCodes         DeviceCode[]
     emails              UserEmail[]
@@ -8860,6 +8861,26 @@ model AgentModel {
     refreshedAt   DateTime @updatedAt
 
     @@index([provider])
+}
+
+// The models a coding tool itself reported on a session's machine, per person
+// and tool: the tool's own model command and caches, read once the agent is up
+// (`lib/agents/native-models.ts`). The last good list is kept when a later read
+// fails, so a picker never loses what it showed; `error` says why the newest
+// read did not replace it.
+model AgentNativeModels {
+    id        String    @id @default(uuid(7)) @db.Uuid
+    userId    String    @db.Uuid
+    user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    cli       String
+    // JSON array of { id, name, provider }, bounded when written.
+    models    String    @default("[]")
+    // When `models` was last replaced by a read that found some.
+    fetchedAt DateTime?
+    error     String?
+    checkedAt DateTime  @default(now())
+
+    @@unique([userId, cli])
 }
 
 model AgentDefaults {

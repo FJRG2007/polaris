@@ -295,6 +295,8 @@
         "noReasoning": "Este modelo tiene un único nivel",
         "search": "Buscar modelo",
         "noMatch": "Sin coincidencias",
+        "typed": "Otro modelo",
+        "useTyped": "Usar {model}",
         "more": "Ver más",
         "recent": "Recientes",
         "order": "Ordenar proveedores",

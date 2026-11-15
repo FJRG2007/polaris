@@ -103,4 +103,19 @@ describe("Code's model picker", () => {
         await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Couldn't save the order"));
         expect(items()[0]).toContain("OpenRouter");
     });
+
+    it("takes a model id typed by hand for a tool that takes one, never for Polar's own providers", async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        render(<CodeModelPicker sources={sources} value={null} onChange={onChange} automatic disabled={false} />, {
+            wrapper: MessagesWrapper
+        });
+        await user.click(screen.getByRole("button", { name: /Model/ }));
+        await user.type(await screen.findByPlaceholderText("Find a model"), "claude-next-9");
+        const typed = await screen.findAllByRole("menuitem", { name: /Use claude-next-9/ });
+        expect(typed).toHaveLength(1);
+        expect(screen.queryByText("No models match")).toBeNull();
+        await user.click(typed[0]!);
+        expect(onChange).toHaveBeenCalledWith({ source: `account:${PLAN}`, provider: "anthropic", model: "claude-next-9" });
+    });
 });

@@ -19,6 +19,7 @@
 import * as core from "@polaris/core";
 import { listAgents } from "@/lib/polar/agents/store";
 import { latestCatalogModels } from "@/lib/agents/model-catalog";
+import { nativeModelsFor } from "@/lib/agents/native-models-service";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
 import {
     codeSourcesFor,
@@ -177,10 +178,15 @@ export async function codeComposerFor(
     userId: string,
     options: readonly AgentOption[]
 ): Promise<CodeComposer> {
-    const [defaults, custom, catalogue] = await Promise.all([
+    const [defaults, custom, catalogue, native] = await Promise.all([
         agentDefaultsFor(userId).catch(() => new Map<string, AgentWork>()),
         listAgents(userId).catch(() => []),
-        toolCatalogue().catch(() => [])
+        toolCatalogue().catch(() => []),
+        // What each tool reported on the person's last session with it; a
+        // failed read offers the index's models alone.
+        nativeModelsFor(userId, [...new Set(options.map((option) => option.cli))]).catch(
+            () => new Map<string, never[]>()
+        )
     ]);
     const policies = new Map<string, EnginePolicy>(
         [...defaults.entries()].map(([engine, work]) => [
@@ -188,7 +194,7 @@ export async function codeComposerFor(
             { models: work.models, modelPolicy: work.modelPolicy }
         ])
     );
-    const sources = codeSourcesFor(options, catalogue, policies);
+    const sources = codeSourcesFor(options, catalogue, policies, native);
     const personas: CodePersona[] = custom.map((agent) => {
         const first = agent.models[0];
         let pick: CodePick | null = null;

@@ -181,11 +181,23 @@ function ordered(candidates: readonly string[], rule: SourceRule | null): string
     return [...preferred, ...candidates.filter((engine) => !preferred.includes(engine))];
 }
 
-/** The models an engine serves, kept to its saved list when it must keep to it. */
+/** What a tool itself reported it runs, by engine (`native-models.ts`). */
+export type NativeModelLists = ReadonlyMap<string, readonly { id: string; name: string; provider: string }[]>;
+
+/**
+ * The models an engine serves, kept to its saved list when it must keep to it.
+ *
+ * The tool's own list, where it has reported one, comes before the public
+ * index's: it is what the tool, signed in the way it is, accepts. The index
+ * fills in what the tool did not name. Only for a tool Polaris can hand a model
+ * to - a listed model the tool is never told about would be a choice that does
+ * nothing.
+ */
 function modelsOf(
     engine: string | undefined,
     catalogue: readonly { provider: string; model: string; name: string }[],
-    policies: ReadonlyMap<string, EnginePolicy>
+    policies: ReadonlyMap<string, EnginePolicy>,
+    native: NativeModelLists = new Map()
 ): CodeSourceModel[] {
     const provider = engine ? core.agentCliById(engine)?.model?.provider : undefined;
     const fallback: CodeSourceModel = { provider: provider ?? "", model: null, name: "" };
@@ -197,12 +209,20 @@ function modelsOf(
         .filter((entry) => entry.provider === provider)
         .map((entry) => ({ provider, model: entry.model, name: named(entry.model) }));
     if (policy?.modelPolicy === "required" && listed.length > 0) return listed;
+    const reported = (native.get(engine) ?? [])
+        .filter((entry) => !listed.some((other) => other.model === entry.id))
+        .map((entry) => ({
+            provider,
+            model: entry.id,
+            name: entry.name && entry.name !== entry.id ? entry.name : named(entry.id)
+        }));
+    const offered = new Set([...listed, ...reported].map((entry) => entry.model));
     return [
         fallback,
         ...listed,
+        ...reported,
         ...catalogue
-            .filter((entry) => entry.provider === provider)
-            .filter((entry) => !listed.some((other) => other.model === entry.model))
+            .filter((entry) => entry.provider === provider && !offered.has(entry.model))
             .map((entry) => ({ provider, model: entry.model, name: entry.name }))
     ];
 }
@@ -216,7 +236,8 @@ function modelsOf(
 export function codeSourcesFor(
     options: readonly SourceOption[],
     catalogue: readonly { provider: string; model: string; name: string }[] = [],
-    policies: ReadonlyMap<string, EnginePolicy> = new Map()
+    policies: ReadonlyMap<string, EnginePolicy> = new Map(),
+    native: NativeModelLists = new Map()
 ): CodeSource[] {
     const accounts = new Map<string, SourceOption[]>();
     const machines: SourceOption[] = [];
@@ -253,7 +274,7 @@ export function codeSourcesFor(
             machine: false,
             polarProvider: env && first.apiKey ? (POLAR_PROVIDER_OF[env] ?? null) : null,
             payer: null,
-            models: modelsOf(engines[0], catalogue, policies)
+            models: modelsOf(engines[0], catalogue, policies, native)
         });
     }
     sources.sort((left, right) => Number(left.mine === false) - Number(right.mine === false));
@@ -273,7 +294,7 @@ export function codeSourcesFor(
             machine: false,
             polarProvider: null,
             payer: null,
-            models: modelsOf(option.cli, catalogue, policies)
+            models: modelsOf(option.cli, catalogue, policies, native)
         });
     }
     for (const option of machines) {
@@ -292,7 +313,7 @@ export function codeSourcesFor(
             machine: true,
             polarProvider: null,
             payer: null,
-            models: modelsOf(option.cli, catalogue, policies)
+            models: modelsOf(option.cli, catalogue, policies, native)
         });
     }
     return sources;

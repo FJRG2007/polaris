@@ -10,6 +10,7 @@
  */
 
 import Fuse from "fuse.js";
+import * as core from "@polaris/core";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDownUp, Check, History, KeyRound, Shuffle } from "lucide-react";
@@ -30,6 +31,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     AUTOMATIC_PICK,
     isAutomaticPick,
+    isPolarSource,
     type CodePick,
     type CodeSource,
     type CodeSourceModel
@@ -83,6 +85,15 @@ interface Row {
     readonly model: CodeSourceModel;
     readonly name: string;
 }
+
+/** The most sources a typed model id is offered with, so a long list of keys
+ *  does not bury the search. */
+const TYPED_SOURCES = 5;
+
+/** Whether a model id typed by hand can go to this source: a tool Polaris can
+ *  hand a model to. Polar's own providers keep to their listed models. */
+const takesTyped = (source: CodeSource) =>
+    !isPolarSource(source.key) && Boolean(source.engines[0] && core.agentTakesModel(source.engines[0]));
 
 const same = (pick: CodePick | null, source: string, model: string | null) =>
     pick?.source === source && pick.model === model;
@@ -144,6 +155,18 @@ export function CodeModelPicker({
             .filter((group) => group.models.length > 0);
     }, [ordered, rows, index, query, searching]);
     const { shown, more } = useMemo(() => firstModels(groups, limit), [groups, limit]);
+    // Any model id can be typed: a tool's list, however it was read, is never
+    // the whole of what it accepts.
+    const typed = query.trim();
+    const typedSources = useMemo(
+        () =>
+            searching && core.SAFE_MODEL_ID.test(typed)
+                ? ordered
+                      .filter((entry) => takesTyped(entry) && !entry.models.some((row) => row.model === typed))
+                      .slice(0, TYPED_SOURCES)
+                : [],
+        [ordered, searching, typed]
+    );
     const recent = useMemo(
         () =>
             prefs.recent.flatMap((pick) => {
@@ -234,7 +257,7 @@ export function CodeModelPicker({
                         {rows.length > 0 ? (
                             <MenuSearch value={query} onChange={setQuery} placeholder={t("picker.search")} />
                         ) : null}
-                        {searching && groups.length === 0 ? (
+                        {searching && groups.length === 0 && typedSources.length === 0 ? (
                             <p className="px-2 py-3 text-center text-xs text-muted-foreground">
                                 {t("picker.noMatch")}
                             </p>
@@ -314,6 +337,31 @@ export function CodeModelPicker({
                                 </div>
                             );
                         })}
+                        {typedSources.length > 0 ? (
+                            <div data-typed-model>
+                                <DropdownMenuLabel>{t("picker.typed")}</DropdownMenuLabel>
+                                {typedSources.map((entry) => (
+                                    <DropdownMenuItem
+                                        key={`typed-${entry.key}`}
+                                        onSelect={() =>
+                                            onChange({
+                                                source: entry.key,
+                                                provider: entry.models[0]?.provider ?? "",
+                                                model: typed
+                                            })
+                                        }
+                                    >
+                                        <SourceMark source={entry} className="size-3.5 shrink-0" />
+                                        <span className="min-w-0 truncate" title={typed}>
+                                            {t("picker.useTyped", { model: typed })}
+                                        </span>
+                                        <span className="min-w-0 shrink truncate text-xs text-muted-foreground">
+                                            {sourceTitle(entry, t)}
+                                        </span>
+                                    </DropdownMenuItem>
+                                ))}
+                            </div>
+                        ) : null}
                         {more ? (
                             <MoreModels
                                 onMore={() => setLimit((current) => current + MODELS_PAGE)}

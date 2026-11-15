@@ -295,6 +295,8 @@
         "noReasoning": "This model has one fixed level",
         "search": "Find a model",
         "noMatch": "No models match",
+        "typed": "Other model",
+        "useTyped": "Use {model}",
         "more": "Show more",
         "recent": "Recent",
         "order": "Order providers",
