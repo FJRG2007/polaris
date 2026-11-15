@@ -74,6 +74,7 @@ vi.mock("@/lib/analytics-service", () => ({
     holdsPolarisSite: vi.fn(async (held: ReadonlySet<string>) => held.has(POLARIS_RECORD)),
     ...service
 }));
+vi.mock("@/lib/analytics-annotations", () => ({ annotationsBetween: async () => [] }));
 vi.mock("@/lib/analytics-reports", () => ({ ...reports, sessionWhere: () => ({}) }));
 vi.mock("@/lib/domain-edge", () => ({ dashboardHosts: async () => ["polaris.test"] }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: vi.fn() }));

@@ -67,6 +67,7 @@ vi.mock("@/lib/analytics-service", () => ({
     externalSiteOwner: vi.fn((scopeId: string) => /^([0-9a-f-]{36}):/i.exec(scopeId)?.[1] ?? null),
     holdsPolarisSite: vi.fn(async () => false)
 }));
+vi.mock("@/lib/analytics-annotations", () => ({ annotationsBetween: async () => [] }));
 vi.mock("@/lib/analytics-reports", () => ({
     listReports: vi.fn(async () => []),
     previousPeriod: vi.fn(async () => null)
