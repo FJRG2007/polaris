@@ -132,7 +132,7 @@ const INFO = {
 } as const satisfies Record<Locale, Omit<LocaleInfo, "direction">>;
 
 export const LOCALE_INFO: Readonly<Record<Locale, LocaleInfo>> = Object.fromEntries(
-    LOCALES.map((locale) => [locale, { ...INFO[locale], direction: scriptDirection(locale) }])
+    LOCALES.map((locale): [Locale, LocaleInfo] => [locale, { ...INFO[locale], direction: scriptDirection(locale) }])
 ) as Record<Locale, LocaleInfo>;
 
 /** The locales marked complete, as a type: their catalogs must match the
