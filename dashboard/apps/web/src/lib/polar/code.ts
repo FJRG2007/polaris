@@ -265,7 +265,8 @@ export async function polarCodeThread(
         at: message.at,
         type: "message",
         role: message.role,
-        text: message.body,
+        // Polaris's own lines (an account switch, a resend) in the reader's words.
+        text: message.role === "system" ? agentText(t, message.body) : message.body,
         detail: ""
     }));
     const events: PolarCodeEntry[] = threadEvents(detail.events).map((event) => {
@@ -278,9 +279,12 @@ export async function polarCodeThread(
             detail:
                 event.kind === "session.end"
                     ? endReason(t, event.detail)
-                    : event.detail
-                      ? agentText(t, event.detail)
-                      : event.subject
+                    : event.kind === "prompt" && event.subject
+                      ? // The account the turn ran on.
+                        t("session.events.onAccount", { detail: event.detail, account: event.subject })
+                      : event.detail
+                        ? agentText(t, event.detail)
+                        : event.subject
         };
     });
     // Stable on equal times, so a prompt and the event it caused keep the order

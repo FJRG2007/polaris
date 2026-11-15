@@ -1013,6 +1013,24 @@ export async function promptSession(sessionId: string, text: string): Promise<vo
 }
 
 /**
+ * Send a turn again through the runner's queue only, after its credentials
+ * were moved to another account. Never typed: an agent process already running
+ * in the terminal keeps the variables it started with, so typing the turn into
+ * it would meet the same limit and move the session through every account.
+ * False when the session has no runner taking prompts, or its interface is
+ * open; the turn then waits for the person.
+ */
+export async function queueTurnAgain(sessionId: string, text: string): Promise<boolean> {
+    const [, placement] = await Promise.all([refreshCredentials(sessionId), sessionPlacement(sessionId)]);
+    if (!placement) return false;
+    const queued = await runInSession(
+        sessionId,
+        commands.queuePromptCommand(stateDirFor(placement), text)
+    ).catch(() => null);
+    return queued?.code === 0;
+}
+
+/**
  * The prompt somebody started a session with, delivered once there is an agent to
  * deliver it to.
  *

@@ -49,6 +49,7 @@ import { Shimmer } from "@/components/polar/elements/shimmer";
 import { BusyVerb } from "@/components/polar/elements/busy-verb";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useDisplayFormat } from "@/components/display-format";
 import { Button, cn, SegmentedControl } from "@polaris/ui";
 import { ConversationEmptyState } from "@/components/polar/elements/conversation";
 import { PolarThreadFrame, PolarWelcome } from "@/components/polar/polar-layout";
@@ -1698,9 +1699,21 @@ function CodePermission({
     );
 }
 
+/** A time as Polaris writes it into a session notice. */
+const ISO_TIME = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g;
+
 /** A message of the session, in Chat's bubbles: the person's words as typed,
  *  the agent's as Markdown. */
 function CodeMessage({ entry }: { entry: PolarCodeEntry }) {
+    const format = useDisplayFormat();
+    // Polaris's own line (an account switch, a wait): quiet, not a reply. Its
+    // times travel as ISO and are written in the reader's zone and format.
+    if (entry.role === "system")
+        return (
+            <p role="status" className="min-w-0 break-words text-xs text-muted-foreground">
+                {entry.text.replace(ISO_TIME, (iso) => format.dateTime(iso))}
+            </p>
+        );
     const from = entry.role === "user" ? "user" : "assistant";
     return (
         <Message from={from}>

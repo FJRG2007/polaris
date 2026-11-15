@@ -171,7 +171,14 @@
         "unknownReason": "unknown",
         "firstPrompt": "Polaris could not send the first prompt: {reason}. Send it again from the box below.",
         "workflowFinished": "The workflow finished as {conclusion}. Its log is on the run in GitHub Actions.",
-        "reportedFailure": "The run reported a failure without saying why. Its log is on the run in GitHub Actions."
+        "reportedFailure": "The run reported a failure without saying why. Its log is on the run in GitHub Actions.",
+        "accountSwitched": "Switched to {to} - {from} hit its limit, resets at {at}.",
+        "accountSwitchedBack": "Switched to {to} - {from} hit its limit, back in rotation at {at}.",
+        "accountsCooling": "Every account for this agent is at its limit ({accounts}). The session waits and carries on at {at} on {account}.",
+        "accountsOut": "Every account for this agent is at its limit or refused ({accounts}). The session waits until one is linked again or put back in rotation.",
+        "accountResumed": "Carrying on with {account} now that its limit has reset.",
+        "overloadedRetry": "The provider is overloaded. Polaris sends the turn again in {count} seconds.",
+        "resendYourself": "Send your last message again to carry on."
     },
     "errors": {
         "checkSettings": "Check the settings",
@@ -292,6 +299,7 @@
             "compact": "Compacting its context",
             "turnEnd": "Finished a turn",
             "turnFailed": "Stopped on an error",
+            "onAccount": "{detail} - on {account}",
             "sessionClear": "Started over",
             "sessionEnd": "Ended",
             "endReason": {

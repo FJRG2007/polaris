@@ -171,7 +171,14 @@
         "unknownReason": "desconocido",
         "firstPrompt": "Polaris no pudo enviar el primer prompt: {reason}. Vuelve a enviarlo desde el cuadro de abajo.",
         "workflowFinished": "El workflow terminó como {conclusion}. Su log está en la ejecución de GitHub Actions.",
-        "reportedFailure": "La ejecución informó de un fallo sin decir por qué. Su log está en la ejecución de GitHub Actions."
+        "reportedFailure": "La ejecución informó de un fallo sin decir por qué. Su log está en la ejecución de GitHub Actions.",
+        "accountSwitched": "Cambiado a {to} - {from} llegó a su límite, se restablece a las {at}.",
+        "accountSwitchedBack": "Cambiado a {to} - {from} llegó a su límite, vuelve a la rotación a las {at}.",
+        "accountsCooling": "Todas las cuentas de este agente están en su límite ({accounts}). La sesión espera y sigue a las {at} con {account}.",
+        "accountsOut": "Todas las cuentas de este agente están en su límite o rechazadas ({accounts}). La sesión espera a que una se vuelva a vincular o vuelva a la rotación.",
+        "accountResumed": "Sigue con {account} ahora que su límite se ha restablecido.",
+        "overloadedRetry": "El proveedor está saturado. Polaris vuelve a enviar el turno en {count} segundos.",
+        "resendYourself": "Vuelve a enviar tu último mensaje para seguir."
     },
     "errors": {
         "checkSettings": "Revisa los ajustes",
@@ -292,6 +299,7 @@
             "compact": "Compactando su contexto",
             "turnEnd": "Terminó un turno",
             "turnFailed": "Paró por un error",
+            "onAccount": "{detail} - con {account}",
             "sessionClear": "Empezó de nuevo",
             "sessionEnd": "Terminó",
             "endReason": {

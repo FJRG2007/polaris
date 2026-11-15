@@ -9174,6 +9174,15 @@ model AgentSession {
     // The vendor message id last counted. One API message is written as several
     // transcript lines, each repeating its usage, and they can straddle reads.
     usageMessageId String?
+    // The hook (its `x-polaris-seq`) whose usage limit was last acted on, so a
+    // duplicate or late copy of the same failure never moves the session twice.
+    limitSeq       BigInt?
+    // Until when the session waits because every account of its agent is at
+    // its limit. Null is not waiting. The sweep picks it up from here.
+    limitWaitUntil DateTime?
+    // How many times in a row a turn was sent again because the provider was
+    // overloaded. Back to 0 when a turn finishes.
+    limitRetries   Int       @default(0)
     createdAt   DateTime  @default(now())
     updatedAt   DateTime  @updatedAt
 
@@ -9198,6 +9207,8 @@ model AgentSession {
     @@index([state, lastEventAt])
     @@index([taskId])
     @@index([hostId])
+    // The sweep that carries on a session once an account frees up.
+    @@index([limitWaitUntil])
 }
 
 // What a person's agent remembers about one repository, carried between the

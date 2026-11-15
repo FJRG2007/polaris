@@ -220,7 +220,27 @@ const SHAPED: readonly (readonly [RegExp, NamespaceKey<"agents">, readonly strin
         /^The workflow finished as (.+)\. Its log is on the run in GitHub Actions\.$/,
         "text.workflowFinished",
         ["conclusion"]
-    ]
+    ],
+    // A session moving between accounts on a usage limit (`account-rotation.ts`).
+    [/^Switched to (.+) - (.+) hit its limit, resets at (\S+)\.$/, "text.accountSwitched", ["to", "from", "at"]],
+    [
+        /^Switched to (.+) - (.+) hit its limit, back in rotation at (\S+)\.$/,
+        "text.accountSwitchedBack",
+        ["to", "from", "at"]
+    ],
+    [
+        /^Every account for this agent is at its limit \((.+)\)\. The session waits and carries on at (\S+) on (.+)\.$/,
+        "text.accountsCooling",
+        ["accounts", "at", "account"]
+    ],
+    [
+        /^Every account for this agent is at its limit or refused \((.+)\)\. The session waits until one is linked again or put back in rotation\.$/,
+        "text.accountsOut",
+        ["accounts"]
+    ],
+    [/^Carrying on with (.+) now that its limit has reset\.$/, "text.accountResumed", ["account"]],
+    [/^Send your last message again to carry on\.$/, "text.resendYourself", []],
+    [/^The provider is overloaded\. Polaris sends the turn again in (\d+) seconds\.$/, "text.overloadedRetry", ["count"]]
 ];
 
 /** The usage-limit refusal, which names whose limit, what and over what window. */

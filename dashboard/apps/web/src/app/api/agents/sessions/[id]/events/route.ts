@@ -32,6 +32,7 @@ import { isSessionOver, parseHookSequence } from "@polaris/core";
 import { after } from "next/server";
 import * as history from "@/lib/agents/session-history";
 import { isSignInRefusal, noteRefusedSignIn } from "@/lib/agents/signin-refusal";
+import { handleTurnFailure, noteTurnFinished, turnAccountName } from "@/lib/agents/account-rotation";
 
 /** The events after which the transcript is read. */
 const HISTORY_KINDS = new Set(["turn.end", "turn.failed", "tool.end", "tool.failed"]);
@@ -102,12 +103,13 @@ export async function POST(
     // A tool that failed and one that worked arrive through the same event; the
     // outcome is in what the tool answered.
     const kind = event.kind === "tool.end" && hookEventFailed(payload) ? "tool.failed" : event.kind;
+    // A turn starting names the account it runs on, so the log says which of
+    // several sign-ins did each turn after a switch.
+    const subject =
+        kind === "prompt" ? ((await turnAccountName(id).catch(() => null)) ?? event.subject) : event.subject;
 
-    const state = await recordSessionEvents(
-        id,
-        [{ kind, detail: event.detail, subject: event.subject }],
-        parseHookSequence(request.headers.get("x-polaris-seq"))
-    );
+    const seq = parseHookSequence(request.headers.get("x-polaris-seq"));
+    const state = await recordSessionEvents(id, [{ kind, detail: event.detail, subject }], seq);
     // A finished turn or tool is when the transcript has something new. After
     // the answer, so the hook is never held on a read of the machine; the read
     // is claimed per session, so a burst of tools is one read.
@@ -115,6 +117,12 @@ export async function POST(
     // refused, so the keys screen and the picker say so, and the session asks
     // for it to be linked again (`polarCodeThread`).
     if (kind === "turn.failed" && isSignInRefusal(event.detail)) after(() => noteRefusedSignIn(id));
+    // A usage limit moves the session to the next account and sends the turn
+    // again; an overloaded provider gets it again after a wait
+    // (`account-rotation.ts`). Read from the whole payload: the stored detail
+    // is clipped before the reset time.
+    else if (kind === "turn.failed") after(() => handleTurnFailure(id, payload, seq));
+    else if (kind === "turn.end") after(() => noteTurnFinished(id));
     if (state && isSessionOver(state)) after(() => history.syncFinalSessionHistory(id));
     else if (HISTORY_KINDS.has(kind)) after(() => history.syncSessionHistorySoon(id));
     return acknowledged();
