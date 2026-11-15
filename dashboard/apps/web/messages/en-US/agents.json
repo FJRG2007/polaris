@@ -208,6 +208,7 @@
             "repoNotConnected": "That repository is not connected to code review.",
             "noSharedMachine": "This Polaris does not offer a shared machine.",
             "serverNotYours": "That server is not one of yours.",
+            "computerNotYours": "That computer is not one of yours.",
             "signInHost": "Nothing here signs {agent} in. Either sign it in on that server yourself, or add {ways} under AI keys.",
             "noModelKey": "There is no key for the model you picked. Add one under AI keys, or pick another model.",
             "files": {

@@ -11,6 +11,7 @@
  */
 
 import { z } from "zod";
+import { computerFor } from "@/lib/computers/computer-service";
 import { after } from "next/server";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
@@ -216,6 +217,15 @@ async function startParsed(
         if (!host) return { error: t("sessions.errors.serverNotYours") };
     }
 
+    // Same for a computer: the runtime sends to the runner the row names, and
+    // this is the check that it is the starter's own. An offline one is said
+    // now rather than as a failed session.
+    if (value.place === "computer") {
+        const owned = await computerFor(user.id, value.runnerId ?? "");
+        if (!owned) return { error: t("sessions.errors.computerNotYours") };
+        if (!owned.online) return { error: t("text.computerOffline", { name: owned.name }) };
+    }
+
     // Several sessions of one person may share a workspace (see
     // `workspaceRefusal`); only the shared machine held by somebody else refuses.
     if (!value.repoId) {
@@ -256,7 +266,8 @@ async function startParsed(
     if ("refusal" in files) return { error: t(`sessions.errors.files.${files.refusal}`) };
 
     const blocked =
-        value.accountId || value.useMachineLogin || keyed
+        // A computer signs its tools in itself; nothing Polaris holds is asked for.
+        value.place === "computer" || value.accountId || value.useMachineLogin || keyed
             ? undefined
             : (await agentChoicesFor(user.id)).find(
                   (agent) => agent.id === value.cli && agent.readiness === "missing"
@@ -304,6 +315,7 @@ async function startParsed(
         useMachineLogin: value.useMachineLogin,
         modelChoice: value.modelChoice,
         hostId: value.place === "host" ? value.hostId : null,
+        runnerId: value.place === "computer" ? value.runnerId : null,
         baseRef: value.baseRef,
         taskId: value.taskId,
         parentId: fork?.parentId ?? null,

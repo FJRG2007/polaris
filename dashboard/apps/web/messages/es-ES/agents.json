@@ -208,6 +208,7 @@
             "repoNotConnected": "Ese repositorio no está conectado a la revisión de código.",
             "noSharedMachine": "Este Polaris no ofrece una máquina compartida.",
             "serverNotYours": "Ese servidor no es tuyo.",
+            "computerNotYours": "Ese equipo no es tuyo.",
             "signInHost": "Nada de aquí inicia sesión en {agent}. Inicia sesión tú en ese servidor o añade {ways} en Claves de IA.",
             "noModelKey": "No hay clave para el modelo elegido. Añade una en Claves de IA o elige otro.",
             "files": {

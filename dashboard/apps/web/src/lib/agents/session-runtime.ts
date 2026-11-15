@@ -459,7 +459,8 @@ export async function refreshCredentials(sessionId: string): Promise<void> {
             sessionViewById(sessionId),
             sessionPlacement(sessionId)
         ]);
-        if (!session || !placement || core.isSessionOver(placement.state)) return;
+        // A computer's tools use that machine's own sign-ins: nothing is sent.
+        if (!session || !placement || placement.place === "computer" || core.isSessionOver(placement.state)) return;
         const cli = agentCommandFor(session, false).cli;
         const fresh = await credentialEnvFor(session, cli);
         const files = new Set(
