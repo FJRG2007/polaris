@@ -7,7 +7,9 @@
 import * as core from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import type { SessionUser } from "@/lib/session";
+import { polarPreferences } from "@/lib/polar/preferences";
 import { agentOptionsFor } from "@/lib/agents/agent-readiness";
+import { engineFor, NATIVE_ENGINE, sessionEngineSchema } from "@/lib/polar/native/engine-choice";
 import {
     codePickSchema,
     codeSourcesFor,
@@ -40,6 +42,20 @@ function legacyPick(body: Record<string, unknown>): CodePick | null {
     return { source, provider: model?.provider ?? "", model: model?.model ?? null };
 }
 
+/** Every CLI id the catalogue knows, for the engine choice. */
+const KNOWN_ENGINES = core.AGENT_CLIS.map((cli) => cli.id);
+
+/** The person's stored engine; Automatic when it cannot be read, so a start
+ *  never fails over a setting. */
+async function engineSetting(userId: string): Promise<string | null> {
+    try {
+        return (await polarPreferences(userId)).sessionEngine;
+    } catch (error) {
+        console.error("[polar] session engine setting unreadable", error);
+        return null;
+    }
+}
+
 /**
  * The start body with the engine the pick resolves to, from this person's own
  * sources - never a tool the client named. An error when the pick is not one
@@ -49,7 +65,15 @@ export async function resolvedStart(
     user: SessionUser,
     raw: Record<string, unknown>
 ): Promise<{ input: Record<string, unknown> } | { error: string }> {
-    const { pick: rawPick, cli: _cli, accountId: _account, useMachineLogin: _machine, modelChoice: _model, ...rest } = raw;
+    const {
+        pick: rawPick,
+        engine: rawEngine,
+        cli: _cli,
+        accountId: _account,
+        useMachineLogin: _machine,
+        modelChoice: _model,
+        ...rest
+    } = raw;
     let pick: CodePick | null = null;
     if (rawPick !== undefined && rawPick !== null) {
         const parsed = codePickSchema.safeParse(rawPick);
@@ -66,6 +90,7 @@ export async function resolvedStart(
     const source = isPolarSource(pick.source)
         ? {
               key: pick.source,
+              kind: "polar" as const,
               engines: [POLAR_RUNTIME, POLAR_KEYS_ENGINE].filter(
                   (engine) => engine === POLAR_RUNTIME || offered.has(engine)
               ),
@@ -80,14 +105,34 @@ export async function resolvedStart(
     const resolved = source
         ? resolveCodeEngine(source, { provider: pick.provider, model: pick.model }, { needsSession: true })
         : null;
-    if (!resolved) return { error: (await getTranslations("polar"))("code.noSource") };
+    if (!source || !resolved) return { error: (await getTranslations("polar"))("code.noSource") };
+    // The person's engine, or this session's override from the composer;
+    // either is honoured only where it can run the pick, else Automatic.
+    const override = sessionEngineSchema.safeParse(rawEngine);
+    const engine = engineFor({
+        source,
+        fallback: resolved.cli,
+        setting: await engineSetting(user.id),
+        override: override.success ? override.data : null,
+        known: KNOWN_ENGINES,
+        installed: null
+    });
+    // Another CLI that serves the source resolves its own model and sign-in.
+    const chosen =
+        engine === resolved.cli || engine === NATIVE_ENGINE
+            ? resolved
+            : (resolveCodeEngine(
+                  { ...source, engines: [engine, ...source.engines.filter((entry) => entry !== engine)] },
+                  { provider: pick.provider, model: pick.model },
+                  { needsSession: true }
+              ) ?? resolved);
     return {
         input: {
             ...rest,
-            cli: resolved.cli,
-            accountId: resolved.accountId,
-            useMachineLogin: resolved.useMachineLogin,
-            modelChoice: resolved.modelChoice
+            cli: engine === NATIVE_ENGINE ? NATIVE_ENGINE : chosen.cli,
+            accountId: chosen.accountId,
+            useMachineLogin: chosen.useMachineLogin,
+            modelChoice: chosen.modelChoice
         }
     };
 }
