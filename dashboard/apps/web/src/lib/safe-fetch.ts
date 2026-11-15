@@ -55,6 +55,10 @@ export const FETCH_TIMEOUT_MS = 5000;
 /** How many redirects are followed. Enough for the ordinary http-to-https and a
  *  canonical host, and not enough to be walked around a network. */
 const MAX_HOPS = 3;
+/** The longest address a redirect may send the walk to. Far past a pasted
+ *  link's: a hop is chosen by the server answering, and a signed download URL
+ *  (a GitHub release asset, an S3 object) runs to about a kilobyte. */
+const REDIRECT_MAX_LENGTH = 8192;
 
 /**
  * How many name lookups for outside addresses may run at once.
@@ -305,7 +309,7 @@ async function walk(
         } catch {
             return null;
         }
-        const checked = safeUrl(url.href);
+        const checked = safeUrl(url.href, REDIRECT_MAX_LENGTH);
         if (!checked) return null;
         url = checked;
         if (arrived?.(url)) return (await reachable(url.hostname)) ? { response: null, url } : null;

@@ -85,6 +85,17 @@ describe("what comes back", () => {
         responses.set("https://pictures.example/", picture());
         expect((await fetchImage("https://pictures.example/", CAP))?.name).toBe("picture");
     });
+
+    it("follows a redirect to a signed download address longer than a pasted link", async () => {
+        // A GitHub release asset redirects to a signed address of about 900
+        // characters; held to a pasted link's 512, the hop was refused and the
+        // Enigma skill list read as unavailable.
+        const signed = `https://pictures.example/asset.gif?sig=${"a".repeat(900)}`;
+        responses.set("https://redirector.test/a.gif", { status: 302, headers: { location: signed }, body: "" });
+        responses.set(signed, picture());
+        expect((await fetchImage("https://redirector.test/a.gif", CAP))?.contentType).toBe("image/gif");
+        expect(fetched).toEqual(["https://redirector.test/a.gif", signed]);
+    });
 });
 
 describe("what it refuses", () => {
