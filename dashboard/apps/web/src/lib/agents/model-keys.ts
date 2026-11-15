@@ -33,7 +33,7 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 import { readGatewayConfig } from "@/lib/integrations/registry";
 import {
     GATEWAY_SLUG,
-    MODEL_PROVIDERS,
+    modelProviders,
     ANTHROPIC_HEADERS_ENV,
     ANTHROPIC_WORKSPACE_HEADER
 } from "@/lib/agents/agent-providers";
@@ -58,19 +58,13 @@ export const INSTANCE: KeyOwner = null;
 /** Whether an account with no key of its own may run on the deployment's. */
 const SHARE_KEY = "agents.keys.shareInstance";
 
-/** Every slug somebody may store a key under. The gateway is one of them: it is
- *  how an account reuses a subscription it already pays for. */
-const STORABLE = new Set<string>([
-    ...MODEL_PROVIDERS.map((provider) => provider.slug),
-    GATEWAY_SLUG
-]);
-
+/** Every slug somebody may store a key under: the catalogue's providers (read
+ *  live, since an operator can add one while the process runs) and the gateway,
+ *  which is how an account reuses a subscription it already pays for. Agent
+ *  sign-ins live in this table too, under their own prefix. */
 export function isStorableProvider(slug: string): boolean {
-    // Agent sign-ins live in this table too, under their own prefix. Asked
-    // separately rather than folded into the set above because that set is
-    // built once at module load and the sign-ins are derived from a catalogue -
-    // a set frozen at import would go stale the moment one was added.
-    return STORABLE.has(slug) || isSigninSlug(slug);
+    if (slug === GATEWAY_SLUG || isSigninSlug(slug)) return true;
+    return modelProviders().some((provider) => provider.slug === slug);
 }
 
 export async function instanceKeysAreShared(): Promise<boolean> {
@@ -712,7 +706,7 @@ export async function runSecretsFor(userId: string | null): Promise<Record<strin
 
         const secrets: Record<string, string> = {};
         const used: string[] = [];
-        for (const provider of MODEL_PROVIDERS) {
+        for (const provider of modelProviders()) {
             const picked = firstUsable(own, provider.slug) ?? firstUsable(instance, provider.slug);
             if (!picked || !picked.secret) continue;
             secrets[provider.envVar] = picked.secret;
@@ -1041,7 +1035,7 @@ export async function apiKeyOptionsFor(
     userId: string | null
 ): Promise<Array<{ id: string; env: string; name: string; source: KeySource }>> {
     const envOf = new Map(
-        MODEL_PROVIDERS.filter((provider) => provider.slug !== GATEWAY_SLUG).map((provider) => [
+        modelProviders().filter((provider) => provider.slug !== GATEWAY_SLUG).map((provider) => [
             provider.slug,
             provider.envVar
         ])
@@ -1177,7 +1171,7 @@ export async function secretForAccount(
         const signin = agentSignins().find((entry) => entry.slug === row.provider)?.env;
         const provider = signin
             ? null
-            : MODEL_PROVIDERS.find(
+            : modelProviders().find(
                   (entry) => entry.slug === row.provider && entry.slug !== GATEWAY_SLUG
               );
         const env = signin ?? provider?.envVar;

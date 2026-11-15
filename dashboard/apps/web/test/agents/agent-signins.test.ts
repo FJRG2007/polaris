@@ -17,7 +17,7 @@
 import * as core from "@polaris/core";
 import { describe, expect, it } from "vitest";
 import { modelProviderSlugSchema } from "@polaris/core";
-import { MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
+import { modelProviders } from "@/lib/agents/agent-providers";
 import {
     agentSignins,
     isSigninRow,
@@ -30,7 +30,7 @@ import {
 
 describe("agentSignins", () => {
     it("asks only for what nothing else supplies", () => {
-        const served = new Set(MODEL_PROVIDERS.map((provider) => provider.envVar));
+        const served = new Set(modelProviders().map((provider) => provider.envVar));
         for (const signin of agentSignins()) {
             expect(served.has(signin.env), signin.env).toBe(false);
         }
@@ -78,7 +78,7 @@ describe("signinSlug", () => {
     });
 
     it("cannot collide with a model provider", () => {
-        const providers = new Set(MODEL_PROVIDERS.map((provider) => provider.slug));
+        const providers = new Set(modelProviders().map((provider) => provider.slug));
         for (const signin of agentSignins()) {
             expect(providers.has(signin.slug), signin.slug).toBe(false);
             expect(signin.slug.startsWith(SIGNIN_PREFIX)).toBe(true);

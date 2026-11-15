@@ -23,7 +23,7 @@
  */
 
 import * as core from "@polaris/core";
-import { MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
+import { modelProviders } from "@/lib/agents/agent-providers";
 import { hasScreenToken } from "@/lib/agents/signin-screen";
 
 /**
@@ -73,7 +73,7 @@ const SUPPLIED_BY_THE_SESSION = new Set<string>();
  *  hold a key for. Derived rather than restated: a provider added there stops
  *  being asked for here on the same commit. */
 function servedByModelKeys(): Set<string> {
-    return new Set(MODEL_PROVIDERS.map((provider) => provider.envVar));
+    return new Set(modelProviders().map((provider) => provider.envVar));
 }
 
 /** One credential somebody can link, and the tools it would sign in. */

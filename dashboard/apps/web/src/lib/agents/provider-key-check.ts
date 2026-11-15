@@ -21,7 +21,7 @@ import {
     ANTHROPIC_WORKSPACE_HEADER,
     anthropicWorkspaceHeaders
 } from "@/lib/agents/agent-providers";
-import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
+import { catalogProvider } from "@/lib/integrations/provider-catalog-snapshot";
 
 /** Why a key was not accepted, in the terms a caller can branch on. `workspace`
  *  is an Anthropic key that needs a workspace ID, or was given a wrong one. */
@@ -130,28 +130,27 @@ const PROBES: Record<string, Probe> = {
         prefix: "Bearer "
     },
 
-    // The long tail, from the table that carries the rest of what a provider is.
-    // Only the ones whose model list is actually refused without a key appear
-    // there, which is why this is thinner than the provider list: a provider
-    // that publishes its catalogue publicly would accept every string pasted at
-    // it, and saying "checked" about that is worse than saying nothing.
-    ...Object.fromEntries(
-        MODEL_PROVIDER_SEEDS.filter((seed) => seed.probe).map((seed) => [
-            seed.slug,
-            {
-                endpoint: seed.probe as string,
-                method: "GET" as const,
-                header: "Authorization",
-                prefix: "Bearer "
-            }
-        ])
-    )
 };
+
+/**
+ * The probe for one provider: the nine above, else the catalogue's (the seed
+ * table, the public index, operator-added providers). Only rows whose endpoint
+ * actually refuses a request without a key carry one, which is why far fewer
+ * are checkable than are listed: a provider that publishes its model list would
+ * accept every string pasted at it, and saying "checked" about that is worse
+ * than saying nothing.
+ */
+function probeFor(provider: string): Probe | undefined {
+    const written = PROBES[provider];
+    if (written) return written;
+    const probe = catalogProvider(provider)?.probe;
+    return probe ? { endpoint: probe, method: "GET", header: "Authorization", prefix: "Bearer " } : undefined;
+}
 
 /** Whether this provider can be checked at all, for a screen that says so before
  *  somebody presses Save. */
 export function providerIsCheckable(provider: string): boolean {
-    return provider in PROBES;
+    return probeFor(provider) !== undefined;
 }
 
 /** How long to wait. Long enough for a provider having a slow morning, short
@@ -200,7 +199,7 @@ async function probeKey(
             words: { key: "ownEndpoint" }
         };
     }
-    const probe = PROBES[provider];
+    const probe = probeFor(provider);
     if (!probe) {
         return {
             state: "unverified",

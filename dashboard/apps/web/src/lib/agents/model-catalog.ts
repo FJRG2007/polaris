@@ -22,17 +22,13 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
-import { MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
+import { modelProviders } from "@/lib/agents/agent-providers";
 import { readerWords } from "@/lib/i18n/reader-words";
-
-/** Where the catalogue comes from. Public, unauthenticated, and the same index
- *  the agent CLIs resolve model ids against, so what Polaris offers and what a
- *  run can address are the same list. */
-const CATALOG_URL = "https://models.dev/api.json";
-
-/** Long enough that the download is not on anybody's critical path, short enough
- *  that a deployment does not sit on a dead request. */
-const FETCH_TIMEOUT_MS = 20_000;
+import {
+    downloadModelIndex,
+    noteIndexFailure,
+    storeProviderIndex
+} from "@/lib/integrations/provider-catalog";
 
 /** How stale the catalogue may be before a refresh is due. Providers move
  *  faster than a week and slower than an hour; a day is the honest middle, and
@@ -218,7 +214,7 @@ export function parseCatalogPayload(payload: unknown): ModelRow[] {
     const parsed = catalogSchema.safeParse(payload);
     if (!parsed.success) return [];
 
-    const wanted = new Set(MODEL_PROVIDERS.map((provider) => provider.modelPrefix));
+    const wanted = new Set(modelProviders().map((provider) => provider.modelPrefix));
     const rows: ModelRow[] = [];
     for (const [providerId, entry] of Object.entries(parsed.data)) {
         if (!wanted.has(providerId)) continue;
@@ -265,35 +261,27 @@ export interface CatalogRefresh {
  * list shrinks in a later release.
  */
 export async function refreshModelCatalog(): Promise<CatalogRefresh> {
-    let payload: unknown;
-    try {
-        const response = await fetch(CATALOG_URL, {
-            signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-            headers: { accept: "application/json" },
-            cache: "no-store"
-        });
-        if (!response.ok) {
-            return {
-                ok: false,
-                models: 0,
-                error: (await readerWords("api"))("refusals.aiKeys.catalogAnswered", {
-                    status: response.status
-                })
-            };
-        }
-        payload = await response.json();
-    } catch (error) {
-        // Offline, blocked, or slow. All of them mean the same thing to a
-        // caller: keep whatever is stored and try again later.
+    // One download feeds both catalogues: the providers first, so a provider the
+    // index just added is one whose models are kept below.
+    const download = await downloadModelIndex();
+    if (download.state === "unchanged") {
+        // Nothing moved since the last good download; say so, so the next tick
+        // does not ask again for another day.
+        await prisma.agentModel.updateMany({ data: { refreshedAt: new Date() } });
+        return { ok: true, models: await prisma.agentModel.count() };
+    }
+    if (download.state === "failed") {
+        await noteIndexFailure(download.error);
         return {
             ok: false,
             models: 0,
-            error:
-                error instanceof Error
-                    ? error.message
-                    : (await readerWords("api"))("refusals.aiKeys.catalogUnreachable")
+            error: (await readerWords("api"))("refusals.aiKeys.catalogUnreachable")
         };
     }
+    const payload = download.payload;
+    await storeProviderIndex(payload, download.etag).catch((error) =>
+        noteIndexFailure(error instanceof Error ? error.message : "unknown")
+    );
 
     const rows = parseCatalogPayload(payload);
 

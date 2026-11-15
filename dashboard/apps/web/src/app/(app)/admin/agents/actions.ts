@@ -20,7 +20,7 @@ import { instanceRouting, setInstanceRouting } from "@/lib/polar/router/store";
 import { SHARED_WORKSPACE_KEY } from "@/lib/agents/session-capacity";
 import type { PickerModel } from "@/components/model-picker";
 import { savePlatformAgentDefaults } from "@/lib/agents/agent-defaults-service";
-import { MODEL_PROVIDERS, providerForModel } from "@/lib/agents/agent-providers";
+import { modelProviders, providerForModel } from "@/lib/agents/agent-providers";
 import { deleteUsageLimit, saveUsageLimit } from "@/lib/agents/agent-usage-limits";
 import { connectedProviders, setInstanceKeysShared } from "@/lib/agents/model-keys";
 import { agentDefaultsSchema, LIMIT_METRICS, LIMIT_PERIODS, LIMIT_SUBJECTS } from "@polaris/core";
@@ -36,7 +36,7 @@ import {
 export async function platformModelChoices(): Promise<PickerModel[]> {
     await requireAdmin();
     const providers = await connectedProviders();
-    const prefixes = MODEL_PROVIDERS.filter((provider) => providers.includes(provider.slug)).map(
+    const prefixes = modelProviders().filter((provider) => providers.includes(provider.slug)).map(
         (provider) => provider.modelPrefix
     );
     if (prefixes.length === 0) return [];

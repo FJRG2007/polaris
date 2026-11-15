@@ -168,7 +168,7 @@ export function liveSourceFor(
     return null;
 }
 
-/** The chat provider slug an API key credential is (`MODEL_PROVIDERS`). */
+/** The chat provider slug an API key credential is (`modelProviders()`). */
 const POLAR_PROVIDER_OF: Readonly<Record<string, string>> = {
     ANTHROPIC_API_KEY: "anthropic",
     OPENAI_API_KEY: "openai",

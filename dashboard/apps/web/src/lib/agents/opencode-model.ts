@@ -16,7 +16,8 @@
  * Pure, so the mapping is asserted in a test.
  */
 
-import { GATEWAY_SLUG, MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
+import { GATEWAY_SLUG, modelProviders } from "@/lib/agents/agent-providers";
+import { catalogProvider } from "@/lib/integrations/provider-catalog-snapshot";
 
 /** The variable the configuration reads the key from. Polaris's own name. */
 export const OPENCODE_KEY_ENV = "POLARIS_OPENCODE_KEY";
@@ -42,7 +43,7 @@ export interface OpencodeModelInput {
 /** OpenCode's provider id for one of Polaris's slugs. */
 export function opencodeProviderId(slug: string): string {
     if (slug === GATEWAY_SLUG) return OPENCODE_GATEWAY_ID;
-    return MODEL_PROVIDERS.find((entry) => entry.slug === slug)?.modelPrefix ?? slug;
+    return modelProviders().find((entry) => entry.slug === slug)?.modelPrefix ?? slug;
 }
 
 /** The configuration OpenCode is started with, as an object. */
@@ -59,6 +60,24 @@ export function opencodeModelConfig(input: OpencodeModelInput): Record<string, u
                     name: "Gateway",
                     options: { baseURL: (input.baseUrl ?? "").replace(/\/+$/, ""), apiKey },
                     models: { [model]: { name: model } }
+                }
+            }
+        };
+    }
+    // A provider outside the public index (Coarena, an operator's own) is one
+    // OpenCode cannot resolve by name, so it is declared the way the gateway is:
+    // the OpenAI-compatible package, its endpoint, and the model it runs.
+    const outside = catalogProvider(input.provider);
+    if (outside?.outsideIndex && outside.baseUrl) {
+        return {
+            $schema: "https://opencode.ai/config.json",
+            model: `${outside.slug}/${input.model}`,
+            provider: {
+                [outside.slug]: {
+                    npm: OPENAI_COMPATIBLE_NPM,
+                    name: outside.name,
+                    options: { baseURL: outside.baseUrl.replace(/\/+$/, ""), apiKey },
+                    models: { [input.model]: { name: input.model } }
                 }
             }
         };

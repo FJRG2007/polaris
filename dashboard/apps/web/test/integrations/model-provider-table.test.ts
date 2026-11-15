@@ -23,7 +23,7 @@ vi.mock("@/lib/integration-service", () => ({
 }));
 
 const { MODEL_PROVIDER_SEEDS, SEEDED_MODEL_INTEGRATIONS } = await import("../../src/lib/integrations/model-providers");
-const { MODEL_PROVIDERS } = await import("../../src/lib/agents/agent-providers");
+const { modelProviders } = await import("../../src/lib/agents/agent-providers");
 const { providerIsCheckable } = await import("../../src/lib/agents/provider-key-check");
 
 describe("the model provider table", () => {
@@ -36,7 +36,7 @@ describe("the model provider table", () => {
         // Across the whole list, not just the table: two providers sharing a
         // variable means the second key silently overwrites the first, and the
         // one that loses is whichever happens to be second in the array.
-        const vars = MODEL_PROVIDERS.map((provider) => provider.envVar);
+        const vars = modelProviders().map((provider) => provider.envVar);
         expect(new Set(vars).size).toBe(vars.length);
     });
 

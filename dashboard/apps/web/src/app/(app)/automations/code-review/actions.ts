@@ -31,7 +31,7 @@ import { MODEL_INTEGRATIONS } from "@/lib/integrations/registry";
 import { stopServerRun } from "@/lib/agents/agent-server-executor";
 import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { finishAgentRun, getAgentRun } from "@/lib/agents/agent-run-service";
-import { MODEL_PROVIDERS, providerForModel } from "@/lib/agents/agent-providers";
+import { modelProviders, providerForModel } from "@/lib/agents/agent-providers";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { agentText, knownAgentText } from "@/lib/agents/words";
@@ -115,7 +115,7 @@ const MODEL_DEFAULTS: Record<string, string> = Object.fromEntries(
 export async function agentModelChoices(): Promise<PickerModel[]> {
     const user = await requirePermission("agents.manage");
     const providers = await providersFor(user.id);
-    const prefixes = MODEL_PROVIDERS.filter((provider) => providers.includes(provider.slug)).map(
+    const prefixes = modelProviders().filter((provider) => providers.includes(provider.slug)).map(
         (provider) => provider.modelPrefix
     );
     if (prefixes.length === 0) return [];

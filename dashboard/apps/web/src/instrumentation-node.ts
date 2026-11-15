@@ -55,6 +55,12 @@ export async function registerNode(): Promise<void> {
     // the rollover: two deploys of one commit, two restarts of the call server, a
     // tunnel recreated under a name the other is serving. The previous process keeps
     // them running until the moment it stops, so nothing is missed by waiting.
+    // The AI provider catalogue: seeded from code and read into memory before
+    // the first run asks which key a model needs. Never throws; a store that
+    // cannot be read leaves the seed table in place.
+    const { ensureProviderCatalog } = await import("./lib/integrations/provider-catalog");
+    void ensureProviderCatalog();
+
     const { afterPredecessor, whenAlone } = await import("./lib/deploy/dashboard-peers");
     const { startMetricsCollector } = await import("./lib/metrics-collector-service");
     void afterPredecessor().then(startMetricsCollector);

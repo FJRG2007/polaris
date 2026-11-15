@@ -21,6 +21,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createMistral } from "@ai-sdk/mistral";
 import { PROVIDER_ENDPOINTS } from "@/lib/polar/provider-endpoints";
+import { catalogEndpoint, catalogProvider } from "@/lib/integrations/provider-catalog-snapshot";
 import { polarRouting } from "@/lib/polar/router/store";
 import {
     STEPS_MOST,
@@ -47,7 +48,7 @@ import {
 } from "@/lib/polar/automatic";
 import {
     GATEWAY_SLUG,
-    MODEL_PROVIDERS,
+    modelProviders,
     anthropicWorkspaceHeaders
 } from "@/lib/agents/agent-providers";
 import { listCatalogModels, type CatalogModel } from "@/lib/agents/model-catalog";
@@ -85,7 +86,8 @@ export function polarServesProvider(slug: string): boolean {
         slug === "google-ai" ||
         slug === GATEWAY_SLUG ||
         slug in OPENAI_COMPATIBLE_BASES ||
-        slug in PROVIDER_ENDPOINTS
+        slug in PROVIDER_ENDPOINTS ||
+        catalogEndpoint(slug) !== null
     );
 }
 
@@ -138,7 +140,7 @@ export async function polarModelOptions(
     if (served.length === 0) return [];
     const prefixes = new Map<string, string>();
     for (const slug of served) {
-        const prefix = MODEL_PROVIDERS.find((provider) => provider.slug === slug)?.modelPrefix;
+        const prefix = modelProviders().find((provider) => provider.slug === slug)?.modelPrefix;
         if (prefix) prefixes.set(prefix, slug);
     }
     const [catalogue, windows] = await Promise.all([
@@ -150,7 +152,13 @@ export async function polarModelOptions(
         const payers: Payer[] = [sources.get(slug) ?? "own"];
         const name = modelProviderName(slug);
         let models: PolarModelOption[];
-        if (slug === GATEWAY_SLUG) {
+        const outside = catalogProvider(slug);
+        if (outside?.outsideIndex && outside.defaultModel.slug) {
+            // Not in the index, so the catalogue has no models for it: the one
+            // its row names, the way the gateway offers its one model.
+            const model = outside.defaultModel.slug.slice(slug.length + 1);
+            models = model ? [gatewayOption(slug, name, model)] : [];
+        } else if (slug === GATEWAY_SLUG) {
             const credential = await polarCredentialFor(userId, slug, null, granted);
             models = credential?.gatewayModel
                 ? [gatewayOption(slug, name, credential.gatewayModel)]
@@ -523,7 +531,8 @@ export function languageModel(
                 apiKey: apiKey || undefined
             })(model);
         default: {
-            const endpoint = PROVIDER_ENDPOINTS[credential.provider];
+            const endpoint =
+                PROVIDER_ENDPOINTS[credential.provider] ?? catalogEndpoint(credential.provider);
             if (endpoint?.api === "anthropic") {
                 return createAnthropic({ apiKey, baseURL: endpoint.baseUrl })(model);
             }

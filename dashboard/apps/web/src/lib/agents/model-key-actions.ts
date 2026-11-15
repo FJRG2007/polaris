@@ -16,6 +16,7 @@ import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit-service";
 import { readGatewayConfig } from "@/lib/integrations/registry";
 import { checkProviderKey } from "@/lib/agents/provider-key-check";
+import { ensureProviderCatalog } from "@/lib/integrations/provider-catalog";
 import { createModelKeySchema, reorderModelKeysSchema, updateModelKeySchema } from "@polaris/core";
 import {
     createModelKey,
@@ -100,6 +101,9 @@ export async function addKey(scope: KeyScope, input: unknown): Promise<KeyAction
                 parsed.error.issues[0]?.message ??
                 (await readerWords("api"))("refusals.aiKeys.checkKey")
         };
+    // A provider an operator added in another process is known once the
+    // catalogue is read again.
+    await ensureProviderCatalog();
     if (!isStorableProvider(parsed.data.provider))
         return { error: (await readerWords("api"))("refusals.aiKeys.notAProvider") };
 

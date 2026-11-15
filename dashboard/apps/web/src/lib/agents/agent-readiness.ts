@@ -15,7 +15,7 @@
  */
 
 import * as core from "@polaris/core";
-import { ANTHROPIC_HEADERS_ENV, MODEL_PROVIDERS } from "@/lib/agents/agent-providers";
+import { ANTHROPIC_HEADERS_ENV, modelProviders } from "@/lib/agents/agent-providers";
 import {
     apiKeyOptionsFor,
     keySourcesFor,
@@ -39,7 +39,7 @@ export async function credentialsHeldBy(userId: string | null): Promise<Set<stri
     const held = new Set<string>(ALWAYS_PRESENT);
     if (userId) {
         const sources = await keySourcesFor(userId);
-        for (const provider of MODEL_PROVIDERS) {
+        for (const provider of modelProviders()) {
             if (sources.has(provider.slug)) held.add(provider.envVar);
         }
     }

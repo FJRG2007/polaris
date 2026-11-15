@@ -12,7 +12,7 @@
  */
 
 import { SPEECH_PROVIDER_SEEDS } from "@/lib/integrations/speech-providers";
-import { MODEL_PROVIDER_SEEDS } from "@/lib/integrations/model-providers";
+import { catalogProviders, catalogRevision } from "@/lib/integrations/provider-catalog-snapshot";
 
 /** One provider Polaris can hand a run. */
 export interface ModelProvider {
@@ -26,7 +26,8 @@ export interface ModelProvider {
     readonly modelPrefix: string;
 }
 
-export const MODEL_PROVIDERS: readonly ModelProvider[] = [
+/** The providers written out here, which the catalogue store does not carry. */
+const BUILTIN_PROVIDERS: readonly ModelProvider[] = [
     { slug: "anthropic", name: "Anthropic", envVar: "ANTHROPIC_API_KEY", modelPrefix: "anthropic" },
     { slug: "openai", name: "OpenAI", envVar: "OPENAI_API_KEY", modelPrefix: "openai" },
     { slug: "google-ai", name: "Google AI", envVar: "GEMINI_API_KEY", modelPrefix: "google" },
@@ -45,27 +46,44 @@ export const MODEL_PROVIDERS: readonly ModelProvider[] = [
         name: "OpenRouter",
         envVar: "OPENROUTER_API_KEY",
         modelPrefix: "openrouter"
-    },
-
-    // The long tail, from the one table that also decides what the marketplace
-    // lists. Their slugs are their ids in the public model index, so the prefix
-    // and the slug are the same word and cannot drift apart.
-    ...MODEL_PROVIDER_SEEDS.map((seed) => ({
-        slug: seed.slug,
-        name: seed.name,
-        envVar: seed.envVar,
-        modelPrefix: seed.slug
-    })),
-
-    // Speech-to-text keys (`speech-providers.ts`): stored and handed over the
-    // same way, though no model slug is ever prefixed with them.
-    ...SPEECH_PROVIDER_SEEDS.map((seed) => ({
-        slug: seed.slug,
-        name: seed.name,
-        envVar: seed.envVar,
-        modelPrefix: seed.slug
-    }))
+    }
 ];
+
+let derived: { revision: number; list: readonly ModelProvider[] } | null = null;
+
+/**
+ * Every provider a run can be handed a key for: the nine above, then the
+ * catalogue (`provider-catalog.ts`: the seed table, the public index and the
+ * providers an operator added), then the speech-to-text keys.
+ *
+ * The catalogue's slugs are their ids in the public model index, so the prefix
+ * and the slug are the same word and cannot drift apart. A provider outside the
+ * index is addressed by its endpoint, and its slug is still the prefix of the
+ * model slugs Polaris hands out for it.
+ */
+export function modelProviders(): readonly ModelProvider[] {
+    const revision = catalogRevision();
+    if (derived?.revision === revision) return derived.list;
+    const list: ModelProvider[] = [
+        ...BUILTIN_PROVIDERS,
+        ...catalogProviders().map((row) => ({
+            slug: row.slug,
+            name: row.name,
+            envVar: row.envVar,
+            modelPrefix: row.slug
+        })),
+        // Speech-to-text keys (`speech-providers.ts`): stored and handed over the
+        // same way, though no model slug is ever prefixed with them.
+        ...SPEECH_PROVIDER_SEEDS.map((seed) => ({
+            slug: seed.slug,
+            name: seed.name,
+            envVar: seed.envVar,
+            modelPrefix: seed.slug
+        }))
+    ];
+    derived = { revision, list };
+    return list;
+}
 
 /**
  * The gateway integration.
@@ -99,5 +117,5 @@ export function anthropicWorkspaceHeaders(
  *  it (a raw specifier, or a provider Polaris does not carry a credential for). */
 export function providerForModel(model: string): ModelProvider | null {
     const prefix = model.split("/")[0]?.toLowerCase() ?? "";
-    return MODEL_PROVIDERS.find((provider) => provider.modelPrefix === prefix) ?? null;
+    return modelProviders().find((provider) => provider.modelPrefix === prefix) ?? null;
 }

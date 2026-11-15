@@ -8883,6 +8883,69 @@ model AgentNativeModels {
     @@unique([userId, cli])
 }
 
+// One AI provider a key can be stored for: the catalogue the marketplace lists,
+// a run is handed keys from, and a pasted key is checked against. Data rather
+// than code, because it is a marketplace of thousands: seeded from the table in
+// apps/web/src/lib/integrations/model-providers.ts on every boot, widened from
+// the public model index on the catalogue's daily refresh, and added to by hand
+// (`source` custom) for an OpenAI- or Anthropic-compatible endpoint the index
+// does not carry (apps/web/src/lib/integrations/provider-catalog.ts).
+model ModelProviderEntry {
+    slug             String   @id
+    name             String
+    // lab | host | gateway | listed (from the index, nothing more known)
+    kind             String
+    // builtin | seed | index | custom. builtin and seed rows are rewritten from
+    // code on boot, an index row from the index on refresh, a custom row only by
+    // an operator.
+    source           String
+    // Listing order before the name: the hand-written providers first.
+    rank             Int      @default(100)
+    envVar           String
+    summary          String   @default("")
+    docsUrl          String   @default("")
+    keyUrl           String?
+    // An endpoint that refuses an unknown key; null where none is known.
+    probe            String?
+    // The endpoint a chat is sent to and the wire it speaks there (openai |
+    // anthropic), for a provider no client knows by name.
+    baseUrl          String?
+    wire             String?
+    // Where an Anthropic-compatible client (Claude Code) is pointed, when the
+    // provider serves one.
+    anthropicBaseUrl String?
+    // Outside the public index: the agent runtimes cannot resolve it by name and
+    // are handed the endpoint instead.
+    outsideIndex     Boolean  @default(false)
+    defaultModelSlug  String  @default("")
+    defaultModelLabel String  @default("")
+    // free | trial, and its one-line note (never a number).
+    freeKind         String?
+    freeNote         String?
+    // Lowercased name, slug and aliases, which the server-side search matches.
+    searchText       String   @default("")
+    createdById      String?  @db.Uuid
+    createdAt        DateTime @default(now())
+    updatedAt        DateTime @updatedAt
+
+    @@index([kind])
+    @@index([freeKind])
+    @@index([source])
+    @@index([rank, name])
+}
+
+// The public index's last download, as the provider refresh remembers it: the
+// validator to send next time and what went wrong last, so a failure keeps the
+// last good catalogue and says why. One row, id "index".
+model ModelProviderIndexState {
+    id          String    @id
+    etag        String?
+    refreshedAt DateTime?
+    providers   Int       @default(0)
+    lastError   String?
+    updatedAt   DateTime  @updatedAt
+}
+
 model AgentDefaults {
     id           String   @id @default(uuid(7)) @db.Uuid
     ownerId      String   @db.Uuid

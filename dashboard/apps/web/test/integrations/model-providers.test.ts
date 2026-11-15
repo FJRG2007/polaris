@@ -18,24 +18,24 @@ vi.mock("@/lib/integration-service", () => ({
     listIntegrationStates: async () => new Map()
 }));
 
-const { MODEL_PROVIDERS, GATEWAY_SLUG, providerForModel } = await import("../../src/lib/agents/agent-providers");
+const { modelProviders, GATEWAY_SLUG, providerForModel } = await import("../../src/lib/agents/agent-providers");
 const { MODEL_INTEGRATIONS, readGatewayConfig } = await import("../../src/lib/integrations/registry");
 
 describe("the Models catalog", () => {
     it("gives every provider on the screen a place in the run environment", () => {
-        const wired = new Set([...MODEL_PROVIDERS.map((provider) => provider.slug), GATEWAY_SLUG]);
+        const wired = new Set([...modelProviders().map((provider) => provider.slug), GATEWAY_SLUG]);
         const orphans = MODEL_INTEGRATIONS.filter((entry) => !wired.has(entry.slug)).map((entry) => entry.slug);
         expect(orphans).toEqual([]);
     });
 
     it("offers a card for every provider a run can be handed a key for", () => {
         const listed = new Set(MODEL_INTEGRATIONS.map((entry) => entry.slug));
-        const hidden = MODEL_PROVIDERS.filter((provider) => !listed.has(provider.slug)).map((provider) => provider.slug);
+        const hidden = modelProviders().filter((provider) => !listed.has(provider.slug)).map((provider) => provider.slug);
         expect(hidden).toEqual([]);
     });
 
     it("reads each key from its own environment variable", () => {
-        const vars = MODEL_PROVIDERS.map((provider) => provider.envVar);
+        const vars = modelProviders().map((provider) => provider.envVar);
         expect(new Set(vars).size).toBe(vars.length);
     });
 
@@ -50,7 +50,7 @@ describe("the Models catalog", () => {
         const gateway = MODEL_INTEGRATIONS.find((entry) => entry.slug === GATEWAY_SLUG);
         expect(gateway?.defaultModel?.slug).toBe("openai-compatible/byok");
         // Deliberately outside providerForModel: the gateway carries a base URL,
-        // not a provider key, so no MODEL_PROVIDERS entry should claim it.
+        // not a provider key, so no modelProviders() entry should claim it.
         expect(providerForModel("openai-compatible/byok")).toBeNull();
     });
 });
