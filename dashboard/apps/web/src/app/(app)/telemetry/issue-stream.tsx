@@ -412,7 +412,7 @@ function IssueRowItem({
                                 {row.title}
                             </span>
                             {row.status !== "unresolved" && (
-                                <span className="shrink-0 rounded bg-muted px-1.5 text-[0.6875rem] text-muted-foreground">
+                                <span className="min-w-0 max-w-full shrink-0 truncate rounded bg-muted px-1.5 text-[0.6875rem] text-muted-foreground" title={t(`view.statuses.${row.status === "resolved" ? "resolved" : "ignored"}`)}>
                                     {t(`view.statuses.${row.status === "resolved" ? "resolved" : "ignored"}`)}
                                 </span>
                             )}

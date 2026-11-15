@@ -731,7 +731,7 @@ function ListsSection({
                                 <span className="min-w-0 flex-1 truncate">
                                     {listLabel(t, list.name)}
                                 </span>
-                                <span className="shrink-0 tabular-nums text-muted-foreground">
+                                <span className="min-w-0 max-w-full shrink-0 truncate tabular-nums text-muted-foreground" title={t("insights.domains", { count: list.count.toLocaleString() })}>
                                     {t("insights.domains", { count: list.count.toLocaleString() })}
                                 </span>
                             </li>

@@ -334,7 +334,7 @@ export function PeopleView({
                                                 : t("people.notEmailed", { name: invite.invitedBy })}
                                         </p>
                                     </div>
-                                    <span className="text-muted-foreground hidden shrink-0 text-xs lg:inline">
+                                    <span className="text-muted-foreground hidden min-w-0 max-w-full shrink-0 truncate text-xs lg:inline" title={t("people.until", { date: format.date(invite.expiresAt) })}>
                                         {t("people.until", { date: format.date(invite.expiresAt) })}
                                     </span>
                                     <Badge variant="neutral">{invite.roleName}</Badge>
@@ -411,7 +411,7 @@ export function PeopleView({
                                                 : t("people.invitedBy", { name: invitation.invitedBy })}
                                         </p>
                                     </div>
-                                    <span className="text-muted-foreground hidden shrink-0 text-xs lg:inline">
+                                    <span className="text-muted-foreground hidden min-w-0 max-w-full shrink-0 truncate text-xs lg:inline" title={t("people.until", { date: format.date(invitation.expiresAt) })}>
                                         {t("people.until", { date: format.date(invitation.expiresAt) })}
                                     </span>
                                     <Badge variant="neutral">{invitation.roleName}</Badge>

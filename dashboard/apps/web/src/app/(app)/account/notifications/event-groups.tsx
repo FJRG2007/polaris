@@ -232,7 +232,7 @@ export function EventGroup({
                     <span className="truncate text-sm font-semibold" title={label}>
                         {label}
                     </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
+                    <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("holds.summary", { on, total })}>
                         {t("holds.summary", { on, total })}
                     </span>
                 </button>

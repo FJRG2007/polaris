@@ -220,7 +220,7 @@ export function SecurityView({ landing = NO_LANDING }: { landing?: Landing }) {
                 </div>
                 {servers && servers.length > 0 ? (
                     <div className="flex min-w-0 items-center gap-2 text-sm">
-                        <span className="shrink-0">{t("server")}</span>
+                        <span className="min-w-0 max-w-full shrink-0 truncate" title={t("server")}>{t("server")}</span>
                         <PagedPicker<Server>
                             className="h-8 min-w-0 max-w-[16rem]"
                             read={actions.serverOptionsAction}

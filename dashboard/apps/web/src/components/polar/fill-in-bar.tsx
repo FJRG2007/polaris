@@ -27,7 +27,7 @@ export function FillInBar({
             className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-md border border-warning-edge bg-warning-soft px-2 py-1.5 text-xs text-warning-ink"
         >
             <TextCursorInput className="size-3.5 shrink-0" aria-hidden />
-            <span className="shrink-0">{t("improve.fillIn", { count: fields.length })}</span>
+            <span className="min-w-0 max-w-full shrink-0 truncate" title={t("improve.fillIn", { count: fields.length })}>{t("improve.fillIn", { count: fields.length })}</span>
             {fields.map((label) => (
                 <button
                     key={label}

@@ -124,7 +124,7 @@ export function TranslationDialog({
                 </div>
                 {outgoing && (
                     <label className="flex min-w-0 items-center gap-3 text-sm">
-                        <span className="shrink-0">{t("translation.outgoingLanguage")}</span>
+                        <span className="min-w-0 max-w-full shrink-0 truncate" title={t("translation.outgoingLanguage")}>{t("translation.outgoingLanguage")}</span>
                         <LanguageSelect
                             value={language}
                             onChange={setLanguage}

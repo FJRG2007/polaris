@@ -304,7 +304,7 @@ function RailLink({
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
-                "flex items-center gap-2.5 rounded-md px-2 py-1.5 text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground",
+                "flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground",
                 active && "bg-primary/15 font-medium text-foreground hover:bg-primary/15"
             )}
         >

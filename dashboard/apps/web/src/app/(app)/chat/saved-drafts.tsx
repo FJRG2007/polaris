@@ -105,7 +105,7 @@ export function SavedDraftsBar({
                         ? t("savedDrafts.one", { excerpt: plainExcerpt(drafts[0]!.body, 80) })
                         : t("savedDrafts.many", { count: drafts.length })}
                 </span>
-                <span className="ml-auto shrink-0 underline-offset-2 hover:underline">
+                <span className="ml-auto min-w-0 max-w-full shrink-0 truncate underline-offset-2 hover:underline" title={t("savedDrafts.see", { count: drafts.length })}>
                     {t("savedDrafts.see", { count: drafts.length })}
                 </span>
             </button>

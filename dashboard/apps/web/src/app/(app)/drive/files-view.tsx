@@ -2720,7 +2720,7 @@ export function FilesView({
                 >
                     {selectedEntries.length > 0 ? (
                         <>
-                            <span className="shrink-0 font-medium">
+                            <span className="min-w-0 max-w-full shrink-0 truncate font-medium" title={t("filesView.tally.selected", { count: selectedEntries.length })}>
                                 {t("filesView.tally.selected", { count: selectedEntries.length })}
                             </span>
                             <div className="ml-auto flex items-center gap-1">

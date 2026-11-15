@@ -91,7 +91,7 @@ function ProjectCard({ project, href }: { project: GridProject; href: string }) 
                             </p>
                         </div>
                         {!project.enabled && (
-                            <span className="shrink-0 rounded-md border border-border px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground">
+                            <span className="min-w-0 max-w-full shrink-0 truncate rounded-md border border-border px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground" title={t("grid.off")}>
                                 {t("grid.off")}
                             </span>
                         )}

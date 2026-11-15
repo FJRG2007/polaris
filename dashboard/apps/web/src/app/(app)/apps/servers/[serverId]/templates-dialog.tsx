@@ -638,7 +638,9 @@ export function TemplatesDialog({ open, onClose }: { open: boolean; onClose: () 
                                                 </span>
                                             ) : null}
                                         </button>
-                                        <span className="shrink-0 text-xs text-muted-foreground">
+                                        <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("templates.editor.servers", {
+                                                count: template.servers
+                                            })}>
                                             {t("templates.editor.servers", {
                                                 count: template.servers
                                             })}

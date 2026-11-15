@@ -109,7 +109,7 @@ export function ConditionBuilder({
                             {t("conditions.expressionHint")}
                         </p>
                     )}
-                    <span className="shrink-0 text-xs text-muted-foreground">
+                    <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("conditions.characters", { used: draft.length, max: core.WAF_EXPRESSION_MAX })}>
                         {t("conditions.characters", { used: draft.length, max: core.WAF_EXPRESSION_MAX })}
                     </span>
                 </div>

@@ -293,7 +293,7 @@ export function QuickSendView({
                                             <User className="size-4 shrink-0" aria-hidden />
                                             <span className="min-w-0 flex-1 truncate" title={person.name}>{person.name}</span>
                                             {!person.allowed ? (
-                                                <span className="shrink-0 text-xs text-muted-foreground">
+                                                <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("disposable.notReceiving")}>
                                                     {t("disposable.notReceiving")}
                                                 </span>
                                             ) : null}

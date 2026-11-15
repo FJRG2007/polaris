@@ -190,7 +190,7 @@ export function AgentWorkFields({
                                             {labelOf(entry)}
                                         </span>
                                         {index === 0 ? (
-                                            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                                            <span className="min-w-0 max-w-full shrink-0 truncate rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary" title={t("settings.agents.work.preferred")}>
                                                 {t("settings.agents.work.preferred")}
                                             </span>
                                         ) : null}

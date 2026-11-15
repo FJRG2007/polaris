@@ -550,7 +550,7 @@ function AlertHistory({ projectId, version }: { projectId: string; version: numb
                             >
                                 {row.issueTitle}
                             </Link>
-                            <span className="shrink-0 text-xs text-muted-foreground">
+                            <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("alerts.history.notified", { count: row.notified })}>
                                 {t("alerts.history.notified", { count: row.notified })}
                             </span>
                             <span className="shrink-0 text-xs text-muted-foreground">

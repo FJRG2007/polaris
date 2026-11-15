@@ -265,7 +265,7 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
                     <ArrowLeft className="size-4" />
                 </Link>
                 <Smile className="size-4 shrink-0 text-primary" />
-                <span className="shrink-0 text-sm font-semibold">{t("spaceEmoji.title")}</span>
+                <span className="min-w-0 max-w-full shrink-0 truncate text-sm font-semibold" title={t("spaceEmoji.title")}>{t("spaceEmoji.title")}</span>
                 {spaceName && (
                     <span
                         className="min-w-0 truncate text-sm text-muted-foreground"
@@ -536,7 +536,10 @@ function EmojiSection({
                     {title}
                 </h2>
                 {items !== null && (
-                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                    <span className="min-w-0 max-w-full shrink-0 truncate text-xs tabular-nums text-muted-foreground" title={t("spaceEmoji.slots", {
+                            count: items.length,
+                            total: core.CUSTOM_EMOJI_SLOTS
+                        })}>
                         {t("spaceEmoji.slots", {
                             count: items.length,
                             total: core.CUSTOM_EMOJI_SLOTS

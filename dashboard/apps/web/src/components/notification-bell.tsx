@@ -135,7 +135,7 @@ export function NotificationBell() {
                                                         {audience.text}
                                                     </span>
                                                     {item.actionRequired ? (
-                                                        <span className="shrink-0 text-warning">
+                                                        <span className="min-w-0 max-w-full shrink-0 truncate text-warning" title={t("bell.actionNeeded")}>
                                                             {t("bell.actionNeeded")}
                                                         </span>
                                                     ) : null}

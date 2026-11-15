@@ -93,7 +93,7 @@ export function LabelsView({ labels }: { labels: MailLabelView[] }) {
                             <span className="min-w-0 flex-1 truncate text-[13px]" title={label.name}>
                                 {label.name}
                             </span>
-                            <span className="shrink-0 text-[12px] text-foreground-subtle">
+                            <span className="min-w-0 max-w-full shrink-0 truncate text-[12px] text-foreground-subtle" title={t("labels.count", { count: label.count })}>
                                 {t("labels.count", { count: label.count })}
                             </span>
                             <Button

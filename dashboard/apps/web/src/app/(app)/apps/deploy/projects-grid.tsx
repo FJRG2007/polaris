@@ -548,7 +548,7 @@ const ProjectCard = forwardRef<
                 <h3 className="truncate text-sm font-medium" title={project.name}>
                     {project.name}
                 </h3>
-                <span className="shrink-0 text-xs text-muted-foreground">
+                <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("projects.services", { count: project.total })}>
                     {t("projects.services", { count: project.total })}
                 </span>
             </div>

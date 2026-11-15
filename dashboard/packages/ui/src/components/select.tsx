@@ -38,7 +38,10 @@ export const SelectTrigger = forwardRef<
         className={cn(
             // The value renders as a flex row (icon beside label), which is why the
             // label carries the truncation: `line-clamp` cannot apply to a flex box.
-            "group flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-field px-2.5 text-[0.8125rem] transition-colors duration-fast placeholder:text-foreground-subtle hover:border-border-strong disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-foreground-subtle data-[state=open]:border-border-strong [&>span]:flex [&>span]:min-w-0 [&>span]:items-center [&>span]:gap-2",
+            // A value that is bare text has no label to carry it, so that one is a
+            // block and truncates itself; either way it is clipped at the chevron
+            // rather than running under it.
+            "group flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-field px-2.5 text-[0.8125rem] transition-colors duration-fast placeholder:text-foreground-subtle hover:border-border-strong disabled:cursor-not-allowed disabled:opacity-50 data-[placeholder]:text-foreground-subtle data-[state=open]:border-border-strong [&>span]:flex [&>span]:min-w-0 [&>span]:items-center [&>span]:gap-2 [&>span]:truncate [&>span:not(:has(>*))]:!block [&>span>span]:min-w-0 [&>span>span]:truncate",
             className
         )}
         {...props}

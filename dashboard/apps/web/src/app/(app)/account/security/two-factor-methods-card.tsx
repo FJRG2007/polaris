@@ -135,7 +135,7 @@ export function TwoFactorMethodsCard({
                                     ) : null}
                                 </div>
                                 {isAuthenticator ? (
-                                    <span className="shrink-0 text-xs text-muted-foreground">{t("methods.alwaysOn")}</span>
+                                    <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("methods.alwaysOn")}>{t("methods.alwaysOn")}</span>
                                 ) : (
                                     <Switch
                                         checked={on}

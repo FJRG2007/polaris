@@ -604,7 +604,7 @@ function GithubDialog(props: {
                                                     {key.fingerprint}
                                                 </span>
                                                 {already ? (
-                                                    <span className="shrink-0 text-muted-foreground">
+                                                    <span className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t("sshKeys.alreadyThere")}>
                                                         {t("sshKeys.alreadyThere")}
                                                     </span>
                                                 ) : null}

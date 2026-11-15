@@ -80,7 +80,7 @@ export function TotalCell({
         <span className="flex h-8 w-full min-w-0 items-center justify-end gap-1.5 px-2.5 text-[0.75rem]">
             {column.aggregate ? (
                 <>
-                    <span className="shrink-0 text-muted-foreground">
+                    <span className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t(`aggregates.short.${column.aggregate}`)}>
                         {t(`aggregates.short.${column.aggregate}`)}
                     </span>
                     <span

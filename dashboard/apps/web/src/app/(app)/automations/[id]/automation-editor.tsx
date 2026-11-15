@@ -862,7 +862,7 @@ function VersionsDialog({
                 ) : (
                     <>
                         <label className="flex min-w-0 items-center gap-2 text-sm">
-                            <span className="shrink-0 text-muted-foreground">
+                            <span className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t("versions.compareWith")}>
                                 {t("versions.compareWith")}
                             </span>
                             <Select

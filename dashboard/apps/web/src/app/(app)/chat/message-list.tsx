@@ -1080,7 +1080,7 @@ function Message({
                                 through one of the channel's webhooks, under a name
                                 it chose. Discord's APP tag says the same. */}
                                 {message.fromAgent && (
-                                    <span className="shrink-0 self-center rounded bg-primary px-1 text-[0.625rem] font-semibold uppercase leading-4 text-primary-foreground">
+                                    <span className="min-w-0 max-w-full shrink-0 truncate self-center rounded bg-primary px-1 text-[0.625rem] font-semibold uppercase leading-4 text-primary-foreground" title={t("polar.badge")}>
                                         {t("polar.badge")}
                                     </span>
                                 )}
@@ -1775,7 +1775,7 @@ function VoiceCard({
             {joined ? (
                 <span
                     aria-disabled="true"
-                    className="pointer-events-none shrink-0 rounded-md bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground"
+                    className="pointer-events-none min-w-0 max-w-full shrink-0 truncate rounded-md bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground" title={t("messageList.joined")}
                 >
                     {t("messageList.joined")}
                 </span>
@@ -1864,7 +1864,7 @@ function QuoteLine({
         <>
             <CornerUpLeft className="size-3 shrink-0" />
             {quote.forwarded && (
-                <span className="shrink-0 font-medium">{t("messageList.forwardedFrom")}</span>
+                <span className="min-w-0 max-w-full shrink-0 truncate font-medium" title={t("messageList.forwardedFrom")}>{t("messageList.forwardedFrom")}</span>
             )}
             <span className="shrink-0 font-medium text-foreground">
                 {quote.authorName ?? t("messageList.somebodyWhoHasLeft")}

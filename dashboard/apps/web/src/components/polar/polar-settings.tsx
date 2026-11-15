@@ -500,7 +500,7 @@ function ServerRow({
                         {name}
                     </span>
                     {group.kind === "polaris" ? (
-                        <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground">
+                        <span className="min-w-0 max-w-full shrink-0 truncate rounded bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground" title={t("settings.tools.builtIn")}>
                             {t("settings.tools.builtIn")}
                         </span>
                     ) : null}

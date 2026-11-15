@@ -406,7 +406,7 @@ export function CallNoticeStrip({ order }: { order: NoticeOrder<ShownNotice> }) 
                     ))}
                     {consequences.length > 0 && (
                         <>
-                            <p className="shrink-0 px-1 text-[11px] text-muted-foreground">
+                            <p className="min-w-0 max-w-full shrink-0 truncate px-1 text-[11px] text-muted-foreground" title={t("callNotices.followsFrom")}>
                                 {t("callNotices.followsFrom")}
                             </p>
                             {consequences.map((notice) => (

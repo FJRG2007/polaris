@@ -71,7 +71,11 @@ export function UsageLimitsCard({ limits }: { limits: UsageLimitView[] }) {
                             {t(`agents.limits.subjects.${row.subjectType}.label`)}
                             {row.subjectId ? ` - ${row.subjectId}` : ""}
                         </span>
-                        <span className="text-muted-foreground shrink-0 text-xs">
+                        <span className="text-muted-foreground min-w-0 max-w-full shrink-0 truncate text-xs" title={t("agents.limits.rule", {
+                                amount: String(row.amount),
+                                metric: row.metric,
+                                period: row.period
+                            })}>
                             {t("agents.limits.rule", {
                                 amount: String(row.amount),
                                 metric: row.metric,

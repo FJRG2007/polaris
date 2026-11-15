@@ -266,7 +266,7 @@ export function ReleaseList({
                         <span className="min-w-0 flex-1 truncate font-mono text-sm" title={row.value}>
                             {row.value}
                         </span>
-                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                        <span className="min-w-0 max-w-full shrink-0 truncate text-xs tabular-nums text-muted-foreground" title={t("releases.events", { count: row.events })}>
                             {t("releases.events", { count: row.events })}
                         </span>
                         <span className="hidden w-24 shrink-0 text-right text-xs text-muted-foreground sm:block">

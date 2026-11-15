@@ -205,7 +205,9 @@ export function LitterControls({
                                     {use.pet ?? t("devicePanel.litter.someCat")}
                                 </span>
                                 {use.grams !== null && (
-                                    <span className="ml-auto shrink-0 tabular-nums">
+                                    <span className="ml-auto min-w-0 max-w-full shrink-0 truncate tabular-nums" title={t("devicePanel.litter.weight", {
+                                            kg: (use.grams / 1000).toFixed(2)
+                                        })}>
                                         {t("devicePanel.litter.weight", {
                                             kg: (use.grams / 1000).toFixed(2)
                                         })}

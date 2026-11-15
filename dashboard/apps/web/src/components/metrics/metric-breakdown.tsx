@@ -374,7 +374,7 @@ function Row({ row, format }: { row: BreakdownRow; format: (value: number) => st
                             <span className="flex-1" />
                         )}
                         {row.limit ? (
-                            <span className="shrink-0 whitespace-nowrap tabular-nums">
+                            <span className="min-w-0 max-w-full shrink-0 truncate whitespace-nowrap tabular-nums" title={t("breakdown.limit", { limit: format(row.limit) })}>
                                 {t("breakdown.limit", { limit: format(row.limit) })}
                             </span>
                         ) : null}

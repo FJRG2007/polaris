@@ -517,7 +517,7 @@ export function CodeWhereChip({
                                             {name}
                                         </span>
                                         {name === fallback ? (
-                                            <span className="shrink-0 rounded bg-muted px-1 text-[0.6875rem] text-muted-foreground">
+                                            <span className="min-w-0 max-w-full shrink-0 truncate rounded bg-muted px-1 text-[0.6875rem] text-muted-foreground" title={t("code.branchDefault")}>
                                                 {t("code.branchDefault")}
                                             </span>
                                         ) : null}

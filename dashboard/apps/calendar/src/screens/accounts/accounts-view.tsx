@@ -637,7 +637,7 @@ function SourceRow({
                         <span className="min-w-0 truncate font-medium" title={name}>
                             {name}
                         </span>
-                        <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                        <span className="min-w-0 max-w-full shrink-0 truncate rounded bg-surface px-1.5 py-0.5 text-[11px] text-muted-foreground" title={t(`accounts.kinds.${source.kind}`)}>
                             {t(`accounts.kinds.${source.kind}`)}
                         </span>
                     </p>

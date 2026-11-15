@@ -36,7 +36,7 @@ export function CodeTodos({ todos }: { todos: readonly SessionTodo[] }) {
             >
                 <ListChecks className="size-4 shrink-0 text-primary" aria-hidden />
                 <span className="truncate">{t("code.todos.title")}</span>
-                <span className="ml-auto shrink-0 text-xs font-normal text-muted-foreground">
+                <span className="ml-auto min-w-0 max-w-full shrink-0 truncate text-xs font-normal text-muted-foreground" title={t("code.todos.done", { done, total: todos.length })}>
                     {t("code.todos.done", { done, total: todos.length })}
                 </span>
                 <ChevronDown className={cn("size-4 shrink-0 transition-transform", open && "rotate-180")} aria-hidden />

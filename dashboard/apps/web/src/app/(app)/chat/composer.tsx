@@ -1116,7 +1116,7 @@ export function Composer({
             {replyingTo && !editing && (
                 <div className="mb-2 flex items-center gap-2 rounded-md bg-muted px-2 py-1 text-xs">
                     <CornerUpLeft className="size-3 shrink-0 text-muted-foreground" />
-                    <span className="shrink-0 text-muted-foreground">
+                    <span className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t("composer.replyingTo")}>
                         {t("composer.replyingTo")}
                     </span>
                     <span className="shrink-0 font-medium">

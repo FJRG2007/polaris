@@ -230,7 +230,7 @@ export function SetupWizard({
                                                         {app.name}
                                                     </span>
                                                     {present ? (
-                                                        <span className="shrink-0 text-xs text-muted-foreground">
+                                                        <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("wizard.status.installed")}>
                                                             {t("wizard.status.installed")}
                                                         </span>
                                                     ) : null}

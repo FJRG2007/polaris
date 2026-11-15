@@ -333,7 +333,7 @@ export function SessionChanges({ session }: { session: SessionView }) {
                                             {file.path}
                                         </span>
                                         {file.added === null ? (
-                                            <span className="shrink-0 text-muted-foreground">
+                                            <span className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t("session.changes.binaryCount")}>
                                                 {t("session.changes.binaryCount")}
                                             </span>
                                         ) : (

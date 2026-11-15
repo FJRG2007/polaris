@@ -1,6 +1,7 @@
 /** Small status pill used for edition, capability, and share-state labels. */
 
 import { cn } from "../lib/cn";
+import { fitText } from "../lib/fit-text";
 import type { HTMLAttributes } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 
@@ -10,8 +11,11 @@ import { cva, type VariantProps } from "class-variance-authority";
 // tint and the ink inside it are right on a white card and a dark one alike.
 // A label never breaks inside itself and never gives up width to a neighbour: a
 // badge squeezed into "Time / out" or a sliver beside a long title reads as a bug.
+// It is still never wider than the row it is in (`max-w-full`): a translation
+// longer than the row ends in an ellipsis, the whole of it in `title`, instead of
+// running out of the cell.
 const badgeVariants = cva(
-    "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded border px-1.5 py-px text-[0.6875rem] font-medium leading-[18px]",
+    "inline-flex min-w-0 max-w-full shrink-0 items-center gap-1 whitespace-nowrap rounded border px-1.5 py-px text-[0.6875rem] font-medium leading-[18px]",
     {
         variants: {
             variant: {
@@ -29,8 +33,12 @@ const badgeVariants = cva(
 export interface BadgeProps
     extends HTMLAttributes<HTMLSpanElement>, VariantProps<typeof badgeVariants> {}
 
-export function Badge({ className, variant, ...props }: BadgeProps) {
-    return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
+export function Badge({ className, variant, children, ...props }: BadgeProps) {
+    return (
+        <span className={cn(badgeVariants({ variant }), className)} {...props}>
+            {fitText(children)}
+        </span>
+    );
 }
 
 /** The class list of a status chip, for the few places that are not a Badge - a

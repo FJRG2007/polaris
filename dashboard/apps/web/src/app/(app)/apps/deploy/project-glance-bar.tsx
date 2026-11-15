@@ -242,7 +242,7 @@ export function ProjectGlanceBar({
                         className="inline-flex min-w-0 items-center gap-2 rounded-md text-xs text-muted-foreground hover:text-foreground"
                         title={t("glance.open", { name: last.service })}
                     >
-                        <span className="shrink-0">{t("glance.lastDeploy")}</span>
+                        <span className="min-w-0 max-w-full shrink-0 truncate" title={t("glance.lastDeploy")}>{t("glance.lastDeploy")}</span>
                         <Badge variant={deployVariant(last.status)} className="shrink-0 capitalize">
                             {deployOutcome(last.status) in OUTCOME_LABEL
                                 ? t(

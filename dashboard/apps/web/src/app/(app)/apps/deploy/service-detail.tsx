@@ -257,7 +257,7 @@ export function ServiceDetail({
                     </DialogTitle>
                     {app.deployStatus && <RunStatePill app={app} />}
                     {staged && (
-                        <span className="shrink-0 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                        <span className="min-w-0 max-w-full shrink-0 truncate rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary" title={t("panel.removalPending")}>
                             {t("panel.removalPending")}
                         </span>
                     )}
@@ -887,7 +887,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                             <Globe className="size-4 shrink-0 text-muted-foreground" />{" "}
                             {primary.hostname}
                             {isLocalDomain(primary) && (
-                                <span className="shrink-0 rounded bg-warning-soft px-1 text-[0.625rem] font-medium text-warning-ink">
+                                <span className="min-w-0 max-w-full shrink-0 truncate rounded bg-warning-soft px-1 text-[0.625rem] font-medium text-warning-ink" title={t("deployments.lan")}>
                                     {t("deployments.lan")}
                                 </span>
                             )}

@@ -70,7 +70,7 @@ export function PanelDeviceList({
                         className="h-11 pl-9"
                     />
                 </div>
-                <span className="shrink-0 text-sm text-muted-foreground" role="status">
+                <span className="min-w-0 max-w-full shrink-0 truncate text-sm text-muted-foreground" title={t("panelList.count", { count: shown })} role="status">
                     {t("panelList.count", { count: shown })}
                 </span>
             </div>
@@ -114,7 +114,7 @@ export function PanelDeviceList({
                                         >
                                             {label}
                                         </span>
-                                        <span className="shrink-0 text-xs text-muted-foreground">
+                                        <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("panelList.count", { count: row.count })}>
                                             {t("panelList.count", { count: row.count })}
                                         </span>
                                     </div>

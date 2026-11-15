@@ -246,7 +246,7 @@ export function ContextBar({
                         style={{ width: `${Math.min(100, fill.share * 100)}%` }}
                     />
                 </div>
-                <span className="shrink-0 text-xs tabular-nums text-foreground-subtle">
+                <span className="min-w-0 max-w-full shrink-0 truncate text-xs tabular-nums text-foreground-subtle" title={t("contextBar.short", { share })}>
                     {t("contextBar.short", { share })}
                 </span>
             </div>

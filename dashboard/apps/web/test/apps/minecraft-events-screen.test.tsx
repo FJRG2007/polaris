@@ -437,10 +437,10 @@ describe("the Events tab", () => {
         await waitFor(() =>
             expect(screen.getAllByText("Give it a name").length).toBeGreaterThan(0)
         );
-        expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(true);
         fireEvent.change(name, { target: { value: "Friday fishing" } });
         await waitFor(() =>
-            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+            expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(false)
         );
     });
 
@@ -508,7 +508,7 @@ describe("the treasure hunt, gathering, rare catch and experience boost", () => 
                 screen.getAllByText("Give something for kills, ores or both").length
             ).toBeGreaterThan(0)
         );
-        expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(true);
     });
 
     it("says beside the field when a hunt's treasure is too far out, and asks no number of chests", async () => {
@@ -521,7 +521,7 @@ describe("the treasure hunt, gathering, rare catch and experience boost", () => 
             target: { value: "2000" }
         });
         await waitFor(() => expect(screen.getAllByText("At most 1000").length).toBeGreaterThan(0));
-        expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(true);
     });
 });
 
@@ -543,9 +543,9 @@ describe("setting up a horde defense", () => {
         expect(waves.value).toBe("5");
         fireEvent.change(waves, { target: { value: "12" } });
         expect(screen.getAllByText("At most 10 waves").length).toBeGreaterThan(0);
-        expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(true);
         fireEvent.change(waves, { target: { value: "7" } });
-        expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false);
+        expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(false);
     });
 
     it("lets Done save a new event as it opens, before anything is changed", () => {
@@ -560,7 +560,7 @@ describe("setting up a horde defense", () => {
                 onSave={(next) => saved.push(next)}
             />
         );
-        expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false);
+        expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(false);
         fireEvent.click(screen.getByText("Done"));
         expect(saved).toEqual([preset]);
     });
@@ -574,7 +574,7 @@ describe("setting up a horde defense", () => {
                 onSave={() => undefined}
             />
         );
-        expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(true);
     });
 });
 
@@ -716,7 +716,7 @@ describe("setting up a meteor shower", () => {
         expect(count.value).toBe("10");
         fireEvent.change(count, { target: { value: "40" } });
         expect(screen.getAllByText("At most 30").length).toBeGreaterThan(0);
-        expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(true);
     });
 });
 
@@ -739,10 +739,10 @@ describe("the parkour and spleef editors", () => {
         expect(screen.getByText("Difficulty")).toBeTruthy();
         fireEvent.change(jumps, { target: { value: "5" } });
         await waitFor(() => expect(screen.getAllByText("At least 10").length).toBeGreaterThan(0));
-        expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(true);
         fireEvent.change(jumps, { target: { value: "35" } });
         await waitFor(() =>
-            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+            expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(false)
         );
         // Every shape on; the last one left cannot be switched off.
         const tower = screen.getByLabelText("A tower climbed round and round") as HTMLButtonElement;
@@ -820,7 +820,7 @@ describe("the TNT run, ice boat race and dropper editors", () => {
         await waitFor(() => expect(screen.getAllByText("At most 4").length).toBeGreaterThan(0));
         fireEvent.change(field(/^Floors(?! to)/), { target: { value: "4" } });
         await waitFor(() =>
-            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+            expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(false)
         );
         fireEvent.click(screen.getByText("Done"));
         expect(saved.at(-1)!.options).toMatchObject({ layers: 4, size: 9, height: 30 });
@@ -832,7 +832,7 @@ describe("the TNT run, ice boat race and dropper editors", () => {
         expect(field(/^Laps/).value).toBe("2");
         fireEvent.change(field(/^Laps/), { target: { value: "3" } });
         await waitFor(() =>
-            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+            expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(false)
         );
         fireEvent.click(screen.getByText("Done"));
         expect(saved.at(-1)!.options).toMatchObject({ laps: 3, height: 30 });
@@ -847,7 +847,7 @@ describe("the TNT run, ice boat race and dropper editors", () => {
         await waitFor(() => expect(screen.getAllByText("At most 40").length).toBeGreaterThan(0));
         fireEvent.change(field(/^Height \(blocks\)/), { target: { value: "35" } });
         await waitFor(() =>
-            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+            expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(false)
         );
         fireEvent.click(screen.getByText("Done"));
         expect(saved.at(-1)!.options).toMatchObject({ steepness: "gentle", height: 35 });
@@ -861,7 +861,7 @@ describe("the TNT run, ice boat race and dropper editors", () => {
         await waitFor(() => expect(screen.getAllByText("At most 20").length).toBeGreaterThan(0));
         fireEvent.change(field(/^Floors to fall through/), { target: { value: "15" } });
         await waitFor(() =>
-            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+            expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(false)
         );
         fireEvent.click(screen.getByText("Done"));
         expect(saved.at(-1)!.options).toMatchObject({ levels: 15, difficulty: "medium" });
@@ -912,7 +912,7 @@ describe("the editor of an event players join", () => {
             />
         );
     };
-    const done = () => screen.getByText("Done") as HTMLButtonElement;
+    const done = () => screen.getByRole("button", { name: "Done" }) as HTMLButtonElement;
 
     it("asks a build battle of your own themes for one, and takes them one a line", async () => {
         const saved: catalog.EventPreset[] = [];
@@ -1080,7 +1080,7 @@ describe("the glass bridge editor", () => {
         await waitFor(() => expect(screen.getAllByText("At most 20").length).toBeGreaterThan(0));
         fireEvent.change(field(/^Rows of glass/), { target: { value: "8" } });
         await waitFor(() =>
-            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+            expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(false)
         );
         fireEvent.click(screen.getByText("Done"));
         expect(saved.at(-1)!.options).toMatchObject({ mode: "free", steps: 8, turnSeconds: 20 });
@@ -1095,7 +1095,7 @@ describe("the glass bridge editor", () => {
         await waitFor(() => expect(screen.getAllByText("At least 10").length).toBeGreaterThan(0));
         fireEvent.change(field(/^Time for each row/), { target: { value: "30" } });
         await waitFor(() =>
-            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+            expect((screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled).toBe(false)
         );
         fireEvent.click(screen.getByText("Done"));
         expect(saved.at(-1)!.options).toMatchObject({ mode: "turns", turnSeconds: 30 });

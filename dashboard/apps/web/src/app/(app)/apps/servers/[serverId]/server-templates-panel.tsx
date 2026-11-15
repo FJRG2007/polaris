@@ -329,7 +329,7 @@ export function ServerTemplatesPanel({
                                                         {t("templates.fix")}
                                                     </Button>
                                                 ) : (
-                                                    <span className="shrink-0 text-xs text-muted-foreground">
+                                                    <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("templates.manual")}>
                                                         {t("templates.manual")}
                                                     </span>
                                                 )}

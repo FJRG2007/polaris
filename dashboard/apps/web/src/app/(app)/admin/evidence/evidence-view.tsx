@@ -86,7 +86,7 @@ export function EvidenceView() {
                         <CardBody className="flex flex-col gap-3 text-sm">
                             <p>{t("evidence.export.summary", { at: format.dateTime(exported.generatedAt) })}</p>
                             <div className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-surface px-3 py-2">
-                                <span className="shrink-0 text-xs text-muted-foreground">{t("evidence.export.hash")}</span>
+                                <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("evidence.export.hash")}>{t("evidence.export.hash")}</span>
                                 <code className="min-w-0 flex-1 truncate font-mono text-xs" title={exported.sha256}>
                                     {exported.sha256}
                                 </code>

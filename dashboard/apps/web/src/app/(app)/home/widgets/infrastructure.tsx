@@ -462,7 +462,7 @@ function GamePlayers({ server }: { server: OverviewGames["servers"][number] }) {
     }
     if (server.slots === null) return null;
     return (
-        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+        <span className="min-w-0 max-w-full shrink-0 truncate text-xs tabular-nums text-muted-foreground" title={t("games.slots", { count: server.slots })}>
             {t("games.slots", { count: server.slots })}
         </span>
     );

@@ -117,7 +117,7 @@ describe("what each row says", () => {
     it("says one it cannot reach is unreachable before anybody tests it", async () => {
         await renderLoaded();
 
-        const status = within(rowOf("Cache")).getByText("Unreachable");
+        const status = within(rowOf("Cache")).getByText("Unreachable").closest("[title]")!;
         expect(status.getAttribute("title")).toContain("not published on a port");
         expect(within(rowOf("Shop")).getByText("Not checked")).not.toBeNull();
     });

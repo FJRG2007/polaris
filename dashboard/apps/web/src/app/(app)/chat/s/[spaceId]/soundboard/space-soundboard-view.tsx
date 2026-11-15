@@ -138,7 +138,7 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                     <ArrowLeft className="size-4" />
                 </Link>
                 <Music2 className="size-4 shrink-0 text-primary" />
-                <span className="shrink-0 text-sm font-semibold">
+                <span className="min-w-0 max-w-full shrink-0 truncate text-sm font-semibold" title={t("soundboardSettings.title")}>
                     {t("soundboardSettings.title")}
                 </span>
                 {spaceName && (

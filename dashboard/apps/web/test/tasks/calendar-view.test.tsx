@@ -143,7 +143,7 @@ describe("the calendar grid", () => {
         const markup = render([taskRow({ dueDate: due })], DISPLAY_DEFAULTS);
         expect(markup).toContain("Review the quarter");
         expect(markup).toContain('aria-label="Change view"');
-        expect(markup).toMatch(/>Month<svg/);
+        expect(markup).toContain(">Month</span><svg");
     });
 
     it("draws a done task with a check that reopens it, struck through", () => {

@@ -314,7 +314,7 @@ function MachineRow({
                 </p>
                 {reach}
             </div>
-            <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+            <span className="min-w-0 max-w-full shrink-0 truncate text-xs tabular-nums text-muted-foreground" title={t("admin.code.pool.live", { live, sessions })}>
                 {t("admin.code.pool.live", { live, sessions })}
             </span>
             <SessionsInput value={sessions} disabled={off} label={name} onChange={onSessions} />

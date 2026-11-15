@@ -118,7 +118,7 @@ export function OrgSuccessorCard({
                             </p>
                         </div>
                         {successor.inherited ? (
-                            <span className="text-muted-foreground shrink-0 text-[0.6875rem]">
+                            <span className="text-muted-foreground min-w-0 max-w-full shrink-0 truncate text-[0.6875rem]" title={t("successor.fromAccount")}>
                                 {t("successor.fromAccount")}
                             </span>
                         ) : null}

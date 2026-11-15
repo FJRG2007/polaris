@@ -89,7 +89,7 @@ export function SelectionBar({
                 </button>
                 <span
                     aria-live="polite"
-                    className="shrink-0 whitespace-nowrap px-1 text-[0.8125rem] font-medium tabular-nums"
+                    className="min-w-0 max-w-full shrink-0 truncate whitespace-nowrap px-1 text-[0.8125rem] font-medium tabular-nums" title={t("bulk.selected", { count: shown.current })}
                 >
                     {t("bulk.selected", { count: shown.current })}
                 </span>

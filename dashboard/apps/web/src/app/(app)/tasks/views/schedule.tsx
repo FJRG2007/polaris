@@ -64,7 +64,9 @@ export function GanttView(props: ViewProps) {
             <div className="overflow-x-auto rounded-lg border border-border">
                 <div className="min-w-[48rem]">
                     <div className="relative flex border-b border-border bg-muted/40 text-[0.6875rem] text-muted-foreground">
-                        <div className="w-56 shrink-0 px-3 py-1.5">{t("gantt.task")}</div>
+                        <div className="w-56 shrink-0 truncate px-3 py-1.5" title={t("gantt.task")}>
+                            {t("gantt.task")}
+                        </div>
                         <div className="relative flex-1 py-1.5">
                             {ticks.map((tick) => (
                                 <span

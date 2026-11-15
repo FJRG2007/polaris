@@ -499,7 +499,7 @@ export function DomainReadingView({ reading }: { reading: DomainReading | undefi
             )}
             {tailnet && (
                 <p className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
-                    <span className="shrink-0">{t("publicNet.tailnetAddress")}</span>
+                    <span className="min-w-0 max-w-full shrink-0 truncate" title={t("publicNet.tailnetAddress")}>{t("publicNet.tailnetAddress")}</span>
                     <a
                         href={tailnet}
                         target="_blank"
@@ -609,7 +609,7 @@ export function TcpProxyList({
                         <span className="min-w-0 flex-1 truncate font-mono text-xs" title={address}>
                             {address}
                         </span>
-                        <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground">
+                        <span className="min-w-0 max-w-full shrink-0 truncate rounded-full bg-muted px-1.5 py-0.5 text-[0.625rem] text-muted-foreground" title={t("publicNet.tcpTo", { port: proxy.container })}>
                             {t("publicNet.tcpTo", { port: proxy.container })}
                         </span>
                         {host && <CopyButton value={address} label={address} />}

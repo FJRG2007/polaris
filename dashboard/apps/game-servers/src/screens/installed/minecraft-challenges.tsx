@@ -704,7 +704,10 @@ export function MinecraftChallenges({
                                                             </span>
                                                             {one.name}
                                                         </span>
-                                                        <span className="shrink-0 tabular-nums text-muted-foreground">
+                                                        <span className="min-w-0 max-w-full shrink-0 truncate tabular-nums text-muted-foreground" title={t("season.tierPoints", {
+                                                                tier: one.tier,
+                                                                points: one.points
+                                                            })}>
                                                             {t("season.tierPoints", {
                                                                 tier: one.tier,
                                                                 points: one.points

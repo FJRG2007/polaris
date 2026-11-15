@@ -222,9 +222,11 @@ export function AppSwitcher({
     // control that does nothing - so it becomes a plain label instead.
     if (apps.length === 0) {
         return (
-            <span className="flex shrink-0 items-center gap-2 px-1.5 py-1.5 text-sm font-medium sm:px-2">
+            <span className="flex min-w-0 shrink-0 items-center gap-2 px-1.5 py-1.5 text-sm font-medium sm:px-2">
                 <CurrentMark app={current} />
-                <span className="sr-only sm:not-sr-only">{current.label}</span>
+                <span className="sr-only sm:not-sr-only sm:max-w-[12rem] sm:truncate" title={current.label}>
+                    {current.label}
+                </span>
             </span>
         );
     }
@@ -395,7 +397,7 @@ export function AppSwitcher({
                 trigger keeps its glyph and drops the app name and the chevron. */}
             <DropdownMenuTrigger
                 data-tour="shell.switcher"
-                className="flex shrink-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-sm font-medium transition-colors hover:bg-muted sm:px-2"
+                className="flex min-w-0 shrink-0 items-center gap-2 rounded-md px-1.5 py-1.5 text-sm font-medium transition-colors hover:bg-muted sm:px-2"
             >
                 <span className="relative grid size-6 shrink-0 place-items-center">
                     <CurrentMark app={current} />
@@ -406,7 +408,9 @@ export function AppSwitcher({
                         />
                     ) : null}
                 </span>
-                <span className="sr-only sm:not-sr-only">{current.label}</span>
+                <span className="sr-only sm:not-sr-only sm:max-w-[12rem] sm:truncate" title={current.label}>
+                    {current.label}
+                </span>
                 <ChevronDown className="hidden size-4 text-muted-foreground sm:block" />
             </DropdownMenuTrigger>
             {/* Height, width and scrolling come from the menu itself, which keeps

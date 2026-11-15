@@ -648,7 +648,9 @@ export function Composer() {
                         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
                             <div className="space-y-1.5 border-b border-border px-4 py-3">
                                 <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                                    <span className="w-12 shrink-0">{t("compose.from")}</span>
+                                    <span className="min-w-12 max-w-[40%] shrink-0 truncate" title={t("compose.from")}>
+                                        {t("compose.from")}
+                                    </span>
                                     {accounts.length > 1 || own.length > 0 ? (
                                         <Select
                                             value={
@@ -735,7 +737,9 @@ export function Composer() {
                                 )}
 
                                 <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                                    <span className="w-12 shrink-0">{t("compose.subject")}</span>
+                                    <span className="min-w-12 max-w-[40%] shrink-0 truncate" title={t("compose.subject")}>
+                                        {t("compose.subject")}
+                                    </span>
                                     <Input
                                         value={subject}
                                         onChange={(event) => setSubject(event.target.value)}

@@ -635,7 +635,7 @@ function SetupValue({ kind, value }: { kind: IntegrationSetupValue; value: strin
 
     return (
         <div className="flex items-center gap-2 rounded border border-border bg-field px-2 py-1">
-            <span className="shrink-0 text-xs text-muted-foreground">
+            <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t(`integrations.setupValue.label.${kind}`)}>
                 {t(`integrations.setupValue.label.${kind}`)}
             </span>
             <code className="min-w-0 flex-1 truncate text-xs" title={value}>

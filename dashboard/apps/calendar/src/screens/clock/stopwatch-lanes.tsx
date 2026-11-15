@@ -394,7 +394,7 @@ export function StopwatchLanes({ clock }: { clock: ClockRead }) {
                                     <ol className="flex flex-col gap-0.5 pl-6 text-xs tabular-nums text-muted-foreground">
                                         {lane.laps.map((total, lap) => (
                                             <li key={lap} className="flex gap-3">
-                                                <span className="w-10 shrink-0">
+                                                <span className="min-w-10 shrink-0">
                                                     {t("time.lanes.lapNumber", { lap: lap + 1 })}
                                                 </span>
                                                 <span className="w-20 shrink-0 text-right">

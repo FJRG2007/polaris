@@ -166,7 +166,7 @@ export function DnsReputationCard() {
                                     )
                                 )}
                                 {allowed.has(row.domain) ? (
-                                    <span className="shrink-0 text-xs text-muted-foreground">
+                                    <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("reputation.allowed")}>
                                         {t("reputation.allowed")}
                                     </span>
                                 ) : (

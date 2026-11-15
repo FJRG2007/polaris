@@ -954,7 +954,7 @@ function TimeGrid({
 
                     {columns.some((column) => column.allDay.length > 0) && (
                         <div className="flex border-b border-border">
-                            <div className="w-12 shrink-0 px-1 py-1 text-right text-[0.625rem] text-muted-foreground sm:w-14">
+                            <div className="w-12 shrink-0 hyphens-auto break-words px-1 py-1 text-right text-[0.625rem] text-muted-foreground sm:w-14">
                                 {t("calendar.allDay")}
                             </div>
                             {columns.map((column) => (

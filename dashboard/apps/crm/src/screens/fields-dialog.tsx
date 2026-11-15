@@ -136,7 +136,7 @@ export function FieldsDialog({
                                         >
                                             {field.label}
                                         </span>
-                                        <span className="shrink-0 text-[0.75rem] text-muted-foreground">
+                                        <span className="min-w-0 max-w-full shrink-0 truncate text-[0.75rem] text-muted-foreground" title={t(`customFields.kinds.${field.kind}`)}>
                                             {t(`customFields.kinds.${field.kind}`)}
                                         </span>
                                         <Button

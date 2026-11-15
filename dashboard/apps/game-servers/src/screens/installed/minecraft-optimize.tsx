@@ -133,7 +133,7 @@ export function WorldOptimizeCard({
                     </div>
                     {settings.enabled && (
                         <label className="flex max-w-xs items-center gap-2 text-xs">
-                            <span className="shrink-0 text-muted-foreground">{t("optimize.atMostOnceEvery")}</span>
+                            <span className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t("optimize.atMostOnceEvery")}>{t("optimize.atMostOnceEvery")}</span>
                             <Input
                                 type="number"
                                 min={1}
@@ -147,7 +147,7 @@ export function WorldOptimizeCard({
                                     })
                                 }
                             />
-                            <span className="shrink-0 text-muted-foreground">{t("optimize.days")}</span>
+                            <span className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t("optimize.days")}>{t("optimize.days")}</span>
                         </label>
                     )}
                     {lastRun && (

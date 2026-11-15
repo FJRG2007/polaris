@@ -598,7 +598,7 @@ export function CodingToolsEditor({
                             className="w-36 shrink-0"
                         />
                     ) : (
-                        <span className="shrink-0 text-xs text-muted-foreground">
+                        <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t(`routing.effort.${value.defaultReasoning}`)}>
                             {t(`routing.effort.${value.defaultReasoning}`)}
                         </span>
                     )}

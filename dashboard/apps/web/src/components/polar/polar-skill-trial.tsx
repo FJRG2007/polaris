@@ -78,7 +78,7 @@ export function SkillTrialBar({ trial, onEnd }: { trial: SkillTrial; onEnd: () =
                     {t("skillTrial.banner", { name })}
                 </span>
                 {state === "added" ? (
-                    <span role="status" className="shrink-0 text-success-ink">
+                    <span role="status" className="min-w-0 max-w-full shrink-0 truncate text-success-ink" title={t("skillTrial.added")}>
                         {t("skillTrial.added")}
                     </span>
                 ) : (

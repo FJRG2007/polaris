@@ -939,7 +939,7 @@ function ContainerPortCard({ app, onChanged }: { app: ProjectApp; onChanged: () 
             />
             {app.ipUrl && (
                 <div className="flex min-w-0 items-center gap-1.5 text-xs">
-                    <span className="shrink-0 text-foreground-subtle">
+                    <span className="min-w-0 max-w-full shrink-0 truncate text-foreground-subtle" title={t("kit.directAddress")}>
                         {t("kit.directAddress")}
                     </span>
                     <a

@@ -76,7 +76,7 @@ export function StatusPagesScreen({
 function SharedBadge() {
     const t = useStatusT();
     return (
-        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+        <span className="min-w-0 max-w-full shrink-0 truncate rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground" title={t("list.sharedWithYou")}>
             {t("list.sharedWithYou")}
         </span>
     );
@@ -158,7 +158,9 @@ function PagesList({ manager }: { manager: boolean }) {
                             </Link>
                             {manager ? null : <SharedBadge />}
                             {page.openIncidents > 0 ? (
-                                <span className="shrink-0 rounded-full bg-danger/15 px-2 py-0.5 text-xs text-danger">
+                                <span className="min-w-0 max-w-full shrink-0 truncate rounded-full bg-danger/15 px-2 py-0.5 text-xs text-danger" title={t("list.openIncidents", {
+                                        count: page.openIncidents.toString()
+                                    })}>
                                     {t("list.openIncidents", {
                                         count: page.openIncidents.toString()
                                     })}

@@ -272,7 +272,7 @@ export function ModelSelector({
                         </span>
                     )}
                     {!triggerContent && choice && leveled ? (
-                        <span className="shrink-0">{t(`intelligence.${choice.intelligence}`)}</span>
+                        <span className="min-w-0 max-w-full shrink-0 truncate" title={t(`intelligence.${choice.intelligence}`)}>{t(`intelligence.${choice.intelligence}`)}</span>
                     ) : null}
                 </button>
             </DropdownMenuTrigger>

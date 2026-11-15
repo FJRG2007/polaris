@@ -748,7 +748,7 @@ export function ShareDialog({
                                                             </span>
                                                         ) : null}
                                                     </span>
-                                                    <span className="shrink-0 text-[11px] text-foreground-subtle">
+                                                    <span className="min-w-0 max-w-full shrink-0 truncate text-[11px] text-foreground-subtle" title={t(`share.kinds.${one.type}`)}>
                                                         {t(`share.kinds.${one.type}`)}
                                                     </span>
                                                 </li>
@@ -879,7 +879,7 @@ export function ShareDialog({
                                             {t("share.peopleWithAccess")}
                                         </h3>
                                         {rows !== null ? (
-                                            <span className="shrink-0 text-[12px] text-muted-foreground">
+                                            <span className="min-w-0 max-w-full shrink-0 truncate text-[12px] text-muted-foreground" title={t("share.peopleCount", { count: total })}>
                                                 {t("share.peopleCount", { count: total })}
                                             </span>
                                         ) : null}

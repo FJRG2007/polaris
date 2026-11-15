@@ -1649,7 +1649,7 @@ export function MailView({
                             </>
                         ) : (
                             <div className="flex min-w-0 flex-1 items-center gap-1">
-                                <span className="mr-1 shrink-0 text-[12px] text-muted-foreground tabular-nums">
+                                <span className="mr-1 min-w-0 max-w-full shrink-0 truncate text-[12px] text-muted-foreground tabular-nums" title={t("list.picked", { count: selected.length })}>
                                     {t("list.picked", { count: selected.length })}
                                 </span>
                                 {context.canArchive ? (

@@ -134,7 +134,7 @@ function AddressRow({
                     {address.url}
                 </a>
                 <ExternalLink className="size-3 shrink-0 text-muted-foreground" />
-                <span className="shrink-0 text-xs text-muted-foreground">{t(`addresses.kinds.${address.kind}`)}</span>
+                <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t(`addresses.kinds.${address.kind}`)}>{t(`addresses.kinds.${address.kind}`)}</span>
                 {down ? (
                     <span
                         className="flex shrink-0 items-center gap-1 text-xs text-warning"

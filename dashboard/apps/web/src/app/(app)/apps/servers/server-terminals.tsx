@@ -241,7 +241,7 @@ export function ServerTerminals({
                                 >
                                     <span className="min-w-0 truncate">{name(s)}</span>
                                     {s.mode === "ssh-root" ? (
-                                        <span className="shrink-0 rounded bg-warning-soft px-1 text-[0.625rem] text-warning">
+                                        <span className="min-w-0 max-w-full shrink-0 truncate rounded bg-warning-soft px-1 text-[0.625rem] text-warning" title={t("terminal.sessions.root")}>
                                             {t("terminal.sessions.root")}
                                         </span>
                                     ) : null}
@@ -273,9 +273,11 @@ export function ServerTerminals({
                         <span
                             role="tab"
                             aria-selected
-                            className="flex h-7 shrink-0 items-center rounded-md border border-border bg-muted px-2 text-xs text-muted-foreground"
+                            className="flex h-7 min-w-0 max-w-full shrink-0 items-center rounded-md border border-border bg-muted px-2 text-xs text-muted-foreground"
                         >
-                            {t("terminal.sessions.opening")}
+                            <span className="min-w-0 truncate" title={t("terminal.sessions.opening")}>
+                                {t("terminal.sessions.opening")}
+                            </span>
                         </span>
                     ) : null}
                 </div>

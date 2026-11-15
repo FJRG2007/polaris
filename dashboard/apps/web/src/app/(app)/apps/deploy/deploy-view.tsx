@@ -2055,7 +2055,7 @@ export function ElsewhereLines({ entries }: { entries: readonly ElsewhereSummary
                         ) : (
                             <span className="truncate text-muted-foreground">{entry.name}</span>
                         )}
-                        <span className="shrink-0 text-[0.625rem] text-muted-foreground">
+                        <span className="min-w-0 max-w-full shrink-0 truncate text-[0.625rem] text-muted-foreground" title={t("view.production")}>
                             {t("view.production")}
                         </span>
                         {entry.domains.length > 1 && (

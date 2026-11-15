@@ -3025,7 +3025,7 @@ function Tile({
                     />
                 ) : null}
                 {guest && (
-                    <span className="shrink-0 text-muted-foreground">{t("callRoom.guest")}</span>
+                    <span className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t("callRoom.guest")}>{t("callRoom.guest")}</span>
                 )}
                 {sharing && <LiveBadge />}
                 {volumeKey && volume === 0 && (

@@ -191,8 +191,13 @@ export function RankList({
         <div className={cn("flex min-w-0 flex-col gap-1", className)}>
             <div className="flex items-center gap-3 px-2 text-xs text-muted-foreground">
                 <span className="min-w-0 flex-1 truncate">{t("lists.item")}</span>
-                <span className="w-16 shrink-0 text-right">{t("lists.visitors")}</span>
-                <span className="hidden w-16 shrink-0 text-right sm:inline">
+                <span className="w-16 shrink-0 truncate text-right" title={t("lists.visitors")}>
+                    {t("lists.visitors")}
+                </span>
+                <span
+                    className="hidden w-16 shrink-0 truncate text-right sm:inline"
+                    title={dimension === "event" ? t("lists.events") : t("lists.views")}
+                >
                     {dimension === "event" ? t("lists.events") : t("lists.views")}
                 </span>
             </div>

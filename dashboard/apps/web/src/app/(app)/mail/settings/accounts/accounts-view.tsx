@@ -348,7 +348,7 @@ function AccountRow({
                             </span>
                         ) : null}
                         {account.auth === "oauth" ? (
-                            <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                            <span className="min-w-0 max-w-full shrink-0 truncate rounded bg-surface px-1.5 py-0.5 text-[11px] text-muted-foreground" title={t("accounts.authorized")}>
                                 {t("accounts.authorized")}
                             </span>
                         ) : null}

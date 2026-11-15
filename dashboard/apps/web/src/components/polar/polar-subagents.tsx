@@ -449,7 +449,7 @@ export function SubagentBar({
             >
                 <Workflow className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 <span className="min-w-0 truncate">{t("subagents.panelOpen")}</span>
-                <span className="shrink-0 font-medium text-primary">
+                <span className="min-w-0 max-w-full shrink-0 truncate font-medium text-primary" title={t("subagents.panelRunning", { count: running })}>
                     {t("subagents.panelRunning", { count: running })}
                 </span>
             </button>

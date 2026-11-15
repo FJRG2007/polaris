@@ -323,7 +323,7 @@ export function TeamPanel({
                                                     </span>
                                                 ) : null}
                                             </span>
-                                            <span className="text-muted-foreground shrink-0 text-xs">
+                                            <span className="text-muted-foreground min-w-0 max-w-full shrink-0 truncate text-xs" title={t(`teams.spaceRoles.${grant.role}`)}>
                                                 {t(`teams.spaceRoles.${grant.role}`)}
                                             </span>
                                         </li>

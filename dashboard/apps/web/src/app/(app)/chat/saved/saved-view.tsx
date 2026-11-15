@@ -206,7 +206,10 @@ export function SavedView() {
                                         key={reminder.id}
                                         className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-sm"
                                     >
-                                        <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
+                                        <span className="min-w-0 max-w-full shrink-0 truncate whitespace-nowrap text-xs text-muted-foreground" title={t("reminders.due", {
+                                                date: format.date(due),
+                                                time: format.time(due)
+                                            })}>
                                             {t("reminders.due", {
                                                 date: format.date(due),
                                                 time: format.time(due)

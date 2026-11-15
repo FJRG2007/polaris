@@ -195,7 +195,7 @@ export function InviteDialog({
                         <DialogDescription className="flex min-w-0 items-center gap-1">
                             {landing ? (
                                 <>
-                                    <span className="shrink-0">{t("invite.landsIn")}</span>
+                                    <span className="min-w-0 max-w-full shrink-0 truncate" title={t("invite.landsIn")}>{t("invite.landsIn")}</span>
                                     <Hash className="size-3.5 shrink-0" />
                                     <span className="truncate font-medium text-foreground">
                                         {landing.name}
@@ -314,7 +314,7 @@ export function InviteDialog({
                                                 )}
                                             </span>
                                             {person.member ? (
-                                                <span className="shrink-0 text-xs text-muted-foreground">
+                                                <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("invite.alreadyMember")}>
                                                     {t("invite.alreadyMember")}
                                                 </span>
                                             ) : (

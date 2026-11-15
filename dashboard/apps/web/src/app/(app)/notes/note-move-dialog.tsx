@@ -251,7 +251,7 @@ function Destination({
                     </span>
                 )}
             </span>
-            {here && <span className="shrink-0 text-xs text-muted-foreground">{t("move.here")}</span>}
+            {here && <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("move.here")}>{t("move.here")}</span>}
         </button>
     );
 }

@@ -153,7 +153,7 @@ export function TimesheetView({
                                         </span>
                                         <span className="truncate">{entry.taskName}</span>
                                         {entry.billable && (
-                                            <span className="shrink-0 text-[0.625rem] text-success">{t("timesheet.billableTag")}</span>
+                                            <span className="min-w-0 max-w-full shrink-0 truncate text-[0.625rem] text-success" title={t("timesheet.billableTag")}>{t("timesheet.billableTag")}</span>
                                         )}
                                     </Link>
                                     <p className="truncate text-[0.6875rem] text-muted-foreground">

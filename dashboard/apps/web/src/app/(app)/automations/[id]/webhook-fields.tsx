@@ -601,7 +601,7 @@ function Advanced({
                 onClick={() => setOpen(!open)}
                 className="flex w-full min-w-0 items-center gap-2 px-2.5 py-2 text-left"
             >
-                <span className="shrink-0 text-sm font-medium">{t("webhook.advanced")}</span>
+                <span className="min-w-0 max-w-full shrink-0 truncate text-sm font-medium" title={t("webhook.advanced")}>{t("webhook.advanced")}</span>
                 <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={summary}>
                     {summary}
                 </span>

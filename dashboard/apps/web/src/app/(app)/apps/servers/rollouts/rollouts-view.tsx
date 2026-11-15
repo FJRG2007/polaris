@@ -680,7 +680,7 @@ function ServerRow({
             </div>
             <dl className="grid min-w-0 grid-cols-1 gap-x-4 gap-y-1 text-xs sm:grid-cols-3">
                 <div className="flex min-w-0 gap-1">
-                    <dt className="shrink-0 text-muted-foreground">{t("servers.columns.agent")}</dt>
+                    <dt className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t("servers.columns.agent")}>{t("servers.columns.agent")}</dt>
                     <dd
                         className="min-w-0 truncate"
                         title={server.version ? server.version : t("servers.noAgentHint")}
@@ -689,7 +689,7 @@ function ServerRow({
                     </dd>
                 </div>
                 <div className="flex min-w-0 gap-1">
-                    <dt className="shrink-0 text-muted-foreground">{t("servers.columns.seen")}</dt>
+                    <dt className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t("servers.columns.seen")}>{t("servers.columns.seen")}</dt>
                     <dd className="min-w-0 truncate">
                         {server.heartbeatAt
                             ? format.dateTime(server.heartbeatAt)
@@ -697,7 +697,7 @@ function ServerRow({
                     </dd>
                 </div>
                 <div className="flex min-w-0 gap-1">
-                    <dt className="shrink-0 text-muted-foreground">
+                    <dt className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t("servers.columns.waiting")}>
                         {t("servers.columns.waiting")}
                     </dt>
                     <dd>{server.waiting.length}</dd>

@@ -21,6 +21,7 @@
  */
 
 import { cn } from "../lib/cn";
+import { fitText, FIT_TEXT_CLASS } from "../lib/fit-text";
 import { ScrollRow } from "./scroll-row";
 import type { ReactNode } from "react";
 
@@ -110,7 +111,9 @@ export function SegmentedControl<T extends string>({
                             //
                             // `shrink-0 whitespace-nowrap`: an option never gets
                             // narrower than its label - the track scrolls instead.
-                            "flex-1 shrink-0 basis-auto whitespace-nowrap rounded font-medium transition-colors duration-fast disabled:pointer-events-none disabled:opacity-50",
+                            // `max-w-full`: except one label longer than the whole
+                            // track, which ends in an ellipsis, `title` holding it.
+                            "max-w-full flex-1 shrink-0 basis-auto whitespace-nowrap rounded font-medium transition-colors duration-fast disabled:pointer-events-none disabled:opacity-50",
                             size === "sm"
                                 ? "px-2 py-0.5 text-xs"
                                 : size === "lg"
@@ -121,7 +124,7 @@ export function SegmentedControl<T extends string>({
                                 : "border border-transparent text-muted-foreground hover:text-foreground"
                         )}
                     >
-                        {option.label}
+                        {fitText(option.label, size === "lg" ? FIT_TEXT_CLASS : `block ${FIT_TEXT_CLASS}`)}
                     </button>
                 );
             })}

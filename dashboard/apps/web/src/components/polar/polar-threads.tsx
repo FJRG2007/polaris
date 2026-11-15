@@ -2033,7 +2033,7 @@ function SearchDialog({
                                     >
                                         <span className="min-w-0 truncate">{row.title}</span>
                                         {row.archivedAt && !archived ? (
-                                            <span className="shrink-0 rounded bg-muted px-1.5 text-xs text-muted-foreground">
+                                            <span className="min-w-0 max-w-full shrink-0 truncate rounded bg-muted px-1.5 text-xs text-muted-foreground" title={t("history.archivedBadge")}>
                                                 {t("history.archivedBadge")}
                                             </span>
                                         ) : null}

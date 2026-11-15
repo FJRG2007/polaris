@@ -138,7 +138,7 @@ export function AuditScreen() {
         return (
             <li key={event.id} className="flex min-w-0 flex-col gap-1 px-3 py-2">
                 <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                    <span className="shrink-0 text-[0.8125rem] font-medium">
+                    <span className="min-w-0 max-w-full shrink-0 truncate text-[0.8125rem] font-medium" title={t(`audit.kinds.${event.kind}`)}>
                         {t(`audit.kinds.${event.kind}`)}
                     </span>
                     {event.recordName !== null ? (
@@ -154,7 +154,7 @@ export function AuditScreen() {
                             {t("audit.deleted")}
                         </span>
                     )}
-                    <span className="shrink-0 text-[0.75rem] text-muted-foreground">
+                    <span className="min-w-0 max-w-full shrink-0 truncate text-[0.75rem] text-muted-foreground" title={t(`objects.${event.object}.plural`)}>
                         {t(`objects.${event.object}.plural`)}
                     </span>
                     <span className="ml-auto flex min-w-0 items-baseline gap-2 text-[0.75rem] text-muted-foreground">

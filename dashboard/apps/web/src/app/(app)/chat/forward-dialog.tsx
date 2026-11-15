@@ -375,7 +375,7 @@ export function ForwardDialog({
                                                     target.spaceId === space.id &&
                                                     chosen.includes(target.id)
                                             ) && (
-                                                <span className="shrink-0 rounded bg-primary/15 px-1.5 text-[0.6875rem] text-primary">
+                                                <span className="min-w-0 max-w-full shrink-0 truncate rounded bg-primary/15 px-1.5 text-[0.6875rem] text-primary" title={t("forward.chosen")}>
                                                     {t("forward.chosen")}
                                                 </span>
                                             )}
@@ -428,7 +428,7 @@ export function ForwardDialog({
                                                 )}
                                             </span>
                                             {chosen.includes(target.id) && (
-                                                <span className="shrink-0 text-[0.6875rem] text-primary">
+                                                <span className="min-w-0 max-w-full shrink-0 truncate text-[0.6875rem] text-primary" title={t("forward.chosen")}>
                                                     {t("forward.chosen")}
                                                 </span>
                                             )}

@@ -13,15 +13,21 @@
  *
  * The focus ring is the application's one ring, defined in tokens.css - nothing
  * here restates it.
+ *
+ * A label never pushes a button out of its row: the button is at most as wide as
+ * the row (`max-w-full`) and its text ends in an ellipsis past that, the whole of
+ * it in `title`. It does not shrink below its label while the row has room - a
+ * neighbour that can give way does so first.
  */
 
 import { cn } from "../lib/cn";
+import { fitText } from "../lib/fit-text";
 import { Slot } from "@radix-ui/react-slot";
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 
 const buttonVariants = cva(
-    "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium no-underline transition-colors duration-fast disabled:pointer-events-none disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
+    "inline-flex max-w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium no-underline transition-colors duration-fast disabled:pointer-events-none disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 [&_svg]:size-4 [&_svg]:shrink-0",
     {
         variants: {
             variant: {
@@ -57,14 +63,18 @@ export interface ButtonProps
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-    ({ className, variant, size, asChild = false, ...props }, ref) => {
-        const Comp = asChild ? Slot : "button";
+    ({ className, variant, size, asChild = false, children, ...props }, ref) => {
+        // A Slot takes exactly one child, so a borrowed element keeps its own.
+        if (asChild)
+            return (
+                <Slot ref={ref} className={cn(buttonVariants({ variant, size, className }))} {...props}>
+                    {children}
+                </Slot>
+            );
         return (
-            <Comp
-                ref={ref}
-                className={cn(buttonVariants({ variant, size, className }))}
-                {...props}
-            />
+            <button ref={ref} className={cn(buttonVariants({ variant, size, className }))} {...props}>
+                {fitText(children)}
+            </button>
         );
     }
 );
