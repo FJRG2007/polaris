@@ -35,6 +35,7 @@ import { tooManyCalls } from "@/lib/deploy/api/http";
 import { auditToolChange, spendToolBudget, viaOf } from "@/lib/mcp/call-guard";
 import { sessionForToken, sessionOwner } from "@/lib/agents/session-service";
 import { sessionRole } from "@/lib/agents/orchestration-service";
+import { heldSessionScopes } from "@/lib/mcp/session-scopes";
 import { clientIp } from "@/lib/request-context";
 import { mcpScopes } from "@/lib/mcp/oauth/scopes";
 import { originOf } from "@/lib/mcp/oauth/origin";
@@ -244,7 +245,9 @@ async function callerFor(
         // agents on one project do. A worker in a run may not: its run decides.
         ...(role.works || role.coordinates ? [] : (["agents.manage"] as const)),
         ...(role.coordinates ? (["agents.coordinate"] as const) : []),
-        ...(role.works ? (["agents.report"] as const) : [])
+        ...(role.works ? (["agents.report"] as const) : []),
+        // The devices in the person's places, when they hold them (`session-scopes.ts`).
+        ...(await heldSessionScopes(owner).catch(() => []))
     ];
     return { userId: owner, isAdmin: false, scopes, sessionId: session.id };
 }
