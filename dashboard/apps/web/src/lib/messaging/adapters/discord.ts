@@ -9,6 +9,7 @@ import {
     ChannelType,
     Client,
     ComponentType,
+    Events,
     GatewayIntentBits,
     Partials,
     type APIActionRowComponent,
@@ -128,7 +129,10 @@ export class DiscordAdapter implements ChannelAdapter {
     }
 
     private async login(): Promise<{ externalId?: string }> {
-        const ready = new Promise<void>((resolve) => this.client.once("ready", () => resolve()));
+        // `clientReady`: the installed discord.js (14.27) emits it, and v15 emits only it.
+        const ready = new Promise<void>((resolve) =>
+            this.client.once(Events.ClientReady, () => resolve())
+        );
         await this.client.login(this.token);
         await Promise.race([ready, new Promise<void>((resolve) => setTimeout(resolve, 8000))]);
         return { externalId: this.client.user?.tag };

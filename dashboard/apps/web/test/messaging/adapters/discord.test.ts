@@ -137,3 +137,32 @@ describe("DiscordAdapter DM recipient resolution", () => {
         expect(fake.usersFetched).toEqual([]);
     });
 });
+
+describe("DiscordAdapter login", () => {
+    it("is ready when discord.js says clientReady, without waiting out the timeout", async () => {
+        vi.useFakeTimers();
+        try {
+            const listeners = new Map<string, () => void>();
+            const client = {
+                user: { tag: "polaris#0001" },
+                once: (event: string, listener: () => void) => listeners.set(event, listener),
+                // The gateway is up: v15 only ever emits this name, 14.27 emits both.
+                login: async () => listeners.get("clientReady")?.()
+            };
+            const adapter = new DiscordAdapter("fake-token", "chan-1", ctx());
+            (adapter as unknown as { client: unknown }).client = client;
+            let settled = false;
+            const done = (adapter as unknown as { login: () => Promise<unknown> })
+                .login()
+                .then((result) => {
+                    settled = true;
+                    return result;
+                });
+            await vi.advanceTimersByTimeAsync(100);
+            expect(settled).toBe(true);
+            await expect(done).resolves.toEqual({ externalId: "polaris#0001" });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
