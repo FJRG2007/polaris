@@ -1917,7 +1917,7 @@
         "columnsLabel": "Columnas",
         "moreDone": "Ver más",
         "allRepos": "Todos los repos",
-        "allAgents": "Todos los agentes",
+        "allAgents": "Todos",
         "allPeople": "Todos",
         "repoFilter": "Repositorio",
         "agentFilter": "Agente",
@@ -1956,10 +1956,10 @@
             "approved": "Aprobada",
             "mergeable": "Fusionable",
             "merged": "Fusionada",
-            "needs_input": "Espera respuesta",
+            "needs_input": "Te espera",
             "exited": "Salió",
-            "idle": "Inactiva",
-            "terminated": "Terminada",
+            "idle": "Parada",
+            "terminated": "Acabada",
             "no_signal": "Sin señal"
         }
     }
