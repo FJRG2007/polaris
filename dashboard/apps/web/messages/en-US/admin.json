@@ -1653,151 +1653,19 @@
     },
     "inbox": {
         "connect": {
-            "connected": "{name} is connected",
-            "connectedDescription": "The token works. Finish the setup so the bot can reach people.",
-            "done": "Done",
             "close": "Close",
-            "qrTitle": "Scan to link WhatsApp",
-            "qrConnected": "Connected.",
-            "qrFailed": "Connection failed - try again.",
-            "qrWaiting": "Waiting for the scan...",
-            "addTitle": "Add a channel",
-            "addDescription": "Pick a platform, then how to connect it.",
-            "connectTitle": "Connect {name}",
-            "variantDescription": "Pick how to connect {name}.",
-            "back": "Back",
             "name": "Name",
-            "namePlaceholder": "Support bot",
-            "phoneNumberId": "Phone number id",
-            "phoneNumberIdPlaceholder": "From the WhatsApp > API setup page",
-            "showQr": "Show QR",
             "connect": "Connect"
-        },
-        "qr": {
-            "steps": "On your phone: WhatsApp > Linked devices > Link a device, then scan this code.",
-            "alt": "WhatsApp QR code"
-        },
-        "catalog": {
-            "badges": {
-                "free": "Free",
-                "official": "Official",
-                "sendOnly": "Send-only"
-            },
-            "tokens": {
-                "accessToken": "Access token",
-                "botToken": "Bot token",
-                "webhookUrl": "Webhook URL"
-            },
-            "whatsappWeb": {
-                "name": "WhatsApp (QR)",
-                "tagline": "Free. Links your phone by QR - unofficial, carries a ban risk.",
-                "help": "Scan a QR with your phone to link it. Free but unofficial - use a spare number, not your main one."
-            },
-            "whatsappCloud": {
-                "name": "WhatsApp Cloud",
-                "tagline": "Official Meta API. Native buttons and templates, paid.",
-                "help": "Meta access token + phone-number id from the WhatsApp API setup page. Point its webhook at this Polaris."
-            },
-            "telegram": {
-                "tagline": "A @BotFather bot. Buttons and inline menus.",
-                "help": "Create a bot with @BotFather in Telegram and paste the token it gives you."
-            },
-            "discord": {
-                "tagline": "A bot application. Buttons and select menus.",
-                "tokenPlaceholder": "Bot token from the Developer Portal",
-                "help": "Create an app and bot in the Discord Developer Portal and paste the bot token. Polaris then shows you what is left to switch on."
-            },
-            "discordWebhook": {
-                "name": "Discord webhook",
-                "tagline": "One-way alerts to a channel, no bot needed.",
-                "help": "In Discord: the channel's Edit > Integrations > Webhooks > New Webhook > Copy Webhook URL."
-            },
-            "slack": {
-                "tagline": "A workspace app. Blocks and interactive actions.",
-                "help": "Install a Slack app to your workspace and paste its Bot User OAuth token (starts with xoxb-)."
-            },
-            "slackWebhook": {
-                "name": "Slack webhook",
-                "tagline": "One-way alerts to a channel, no app token.",
-                "help": "Create an Incoming Webhook in your Slack app and paste its URL."
-            },
-            "groups": {
-                "whatsapp": "Your number by QR, or the official Cloud API.",
-                "telegram": "A @BotFather bot with buttons and menus.",
-                "discord": "A bot for two-way chat, or a webhook for alerts.",
-                "slack": "A workspace bot, or a webhook for alerts."
-            }
-        },
-        "platforms": {
-            "email": "Email"
-        },
-        "discordSetup": {
-            "checking": "Checking what the bot can reach...",
-            "notRunning": "The bridge is not running this bot right now, so there is nothing to check.",
-            "noServer": "The bot is in no server yet",
-            "inServers": "{count, plural, one {In # server} other {In # servers}}",
-            "noServerHint": "It can only send once somebody adds it to one.",
-            "serversHint": "It can send to any channel in those servers.",
-            "checkAgain": "Check again",
-            "addBot": "Add the bot to a server",
-            "addBotHint": "Discord asks which of your servers, then to confirm: {permissions}.",
-            "noAppId": "The bot has not reported its application id, so there is no invite link to build. Reconnect it and check again.",
-            "intents": "Privileged intents",
-            "intentsOn": "Both are on.",
-            "intentOff": "{intent} is off. {effect}",
-            "effects": {
-                "serverMembers": "Needed to reach someone by username. Their numeric User ID works without it.",
-                "messageContent": "Without it, messages the bot receives in server channels arrive empty."
-            },
-            "switchOn": "Switch them on under Bot > Privileged Gateway Intents",
-            "reconnectAfter": "Reconnect the channel afterward - the intents are chosen when the bot logs in.",
-            "botPermissions": "view channels, send messages, embed links, attach files, read message history"
-        },
-        "errors": {
-            "checkForm": "Check the form",
-            "connectFailed": "Could not connect the channel",
-            "stateFailed": "Could not read channel state",
-            "removeChannelFailed": "Could not remove the channel",
-            "nothingToUpdate": "Nothing to update",
-            "updateChannelFailed": "Could not update the channel",
-            "reconnectFailed": "Could not reconnect the channel"
         }
     },
     "inboxChannels": {
-        "title": "Channels",
-        "intro": "The messaging channels alerts, notices and sign-in codes go out over.",
-        "connect": "Connect a channel",
-        "empty": "Nothing connected yet. Connect a messaging channel to start chatting.",
         "status": "{status, select, connected {connected} connecting {connecting} qr {qr} error {error} disconnected {disconnected} ready {ready} other {{status}}}",
-        "connected": "Connected",
         "readyToSend": "Ready to send",
-        "scanAgain": "Not linked. Open Manage and press Re-link to scan the QR again.",
-        "edit": {
-            "telegram": "From @BotFather. Leave the token blank to keep the current one.",
-            "discord": "From the Discord Developer Portal (Bot > Token). Leave blank to keep the current one.",
-            "slack": "The Bot User OAuth token (xoxb-...). Leave blank to keep the current one.",
-            "whatsappCloud": "Meta access token and phone-number id. Leave a field blank to keep it.",
-            "whatsappWeb": "Linked by QR. Use Re-link to show a QR and scan again if the session dropped; remove and re-add to link a different number."
-        },
         "manage": {
             "button": "Manage",
             "title": "Manage {name}",
-            "status": "Status: <tone>{status}</tone>",
-            "relink": "Re-link",
-            "reconnect": "Reconnect",
-            "linkFailed": "Connection failed - try Re-link again.",
-            "tokenPlaceholder": "Saved - enter a new token to replace it",
-            "keepCurrent": "Leave blank to keep the current one",
             "remove": "Remove",
-            "removeTitle": "Remove {name}?",
-            "removeDescription": "This disconnects the channel and deletes its conversations and messages. It cannot be undone."
-        },
-        "connectPage": {
-            "intro": "Pick what to connect. Add as many as you like.",
-            "messaging": "Messaging",
-            "messagingHint": "Where alerts, notices and sign-in codes are sent.",
-            "setUp": "Set up",
-            "needsManage": "Ask an admin to connect channels."
+            "removeTitle": "Remove {name}?"
         },
         "email": {
             "saveFailed": "Could not save the channel.",
@@ -3174,7 +3042,7 @@
             "title": "What counts as a second step",
             "hint": "People pick from whichever of these works on this deployment.",
             "fixed": "Always accepted. It needs nothing from this deployment, so it is what people can still use when everything else is unreachable.",
-            "noMail": "No email channel carries account mail yet, so nobody can pick this. Connect a sender under Management > Email, then nominate it there.",
+            "noMail": "No email channel carries account mail yet, so nobody can pick this. Add a sender under Management > Integrations > Email & SMS, then nominate it there.",
             "totp": {
                 "label": "Authenticator app",
                 "description": "A code the phone generates on its own, with no network involved."

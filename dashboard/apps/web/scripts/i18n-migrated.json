@@ -2410,6 +2410,7 @@
         "web/src/app/(app)/admin/integrations/email/senders-view.tsx",
         "web/src/app/(app)/admin/integrations/email/channel-card.tsx",
         "web/src/app/(app)/admin/integrations/email/page.tsx",
+        "web/src/app/(app)/admin/integrations/email/polaris-mail-panel.tsx",
         "security-scans/src/lib/service.ts",
         "security-scans/src/lib/i18n.ts",
         "security-scans/src/model/parse.ts",

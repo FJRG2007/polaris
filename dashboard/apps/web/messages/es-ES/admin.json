@@ -1653,151 +1653,19 @@
     },
     "inbox": {
         "connect": {
-            "connected": "{name} está conectado",
-            "connectedDescription": "El token funciona. Termina la configuración para que el bot pueda llegar a la gente.",
-            "done": "Listo",
             "close": "Cerrar",
-            "qrTitle": "Escanea y enlaza WhatsApp",
-            "qrConnected": "Conectado.",
-            "qrFailed": "La conexión ha fallado. Inténtalo de nuevo.",
-            "qrWaiting": "Esperando el escaneo...",
-            "addTitle": "Añadir un canal",
-            "addDescription": "Elige una plataforma y cómo conectarla.",
-            "connectTitle": "Conectar {name}",
-            "variantDescription": "Elige cómo conectar {name}.",
-            "back": "Atrás",
             "name": "Nombre",
-            "namePlaceholder": "Bot de soporte",
-            "phoneNumberId": "Id del número",
-            "phoneNumberIdPlaceholder": "De la página WhatsApp > API setup",
-            "showQr": "Mostrar QR",
             "connect": "Conectar"
-        },
-        "qr": {
-            "steps": "En tu teléfono: WhatsApp > Dispositivos vinculados > Vincular un dispositivo, y escanea este código.",
-            "alt": "QR de WhatsApp"
-        },
-        "catalog": {
-            "badges": {
-                "free": "Gratis",
-                "official": "Oficial",
-                "sendOnly": "Solo envío"
-            },
-            "tokens": {
-                "accessToken": "Token de acceso",
-                "botToken": "Token bot",
-                "webhookUrl": "URL webhook"
-            },
-            "whatsappWeb": {
-                "name": "WhatsApp (QR)",
-                "tagline": "Gratis. Vincula tu teléfono por QR; no es oficial y hay riesgo de bloqueo.",
-                "help": "Escanea un QR con tu teléfono para vincularlo. Gratis pero no oficial: usa un número de repuesto, no el principal."
-            },
-            "whatsappCloud": {
-                "name": "WhatsApp Cloud",
-                "tagline": "API oficial de Meta. Botones y plantillas nativos, de pago.",
-                "help": "Token de acceso de Meta + id del número de teléfono de la página API setup de WhatsApp. Apunta su webhook a este Polaris."
-            },
-            "telegram": {
-                "tagline": "Un bot de @BotFather. Botones y menús integrados.",
-                "help": "Crea un bot con @BotFather en Telegram y pega el token que te dé."
-            },
-            "discord": {
-                "tagline": "Una aplicación bot. Botones y menús de selección.",
-                "tokenPlaceholder": "Token del bot del Developer Portal",
-                "help": "Crea una app y un bot en el Discord Developer Portal y pega el token del bot. Polaris te muestra luego lo que falta por activar."
-            },
-            "discordWebhook": {
-                "name": "Webhook de Discord",
-                "tagline": "Alertas de un solo sentido a un canal, sin bot.",
-                "help": "En Discord: Editar canal > Integraciones > Webhooks > Nuevo webhook > Copiar URL del webhook."
-            },
-            "slack": {
-                "tagline": "Una app del espacio de trabajo. Bloques y acciones interactivas.",
-                "help": "Instala una app de Slack en tu espacio de trabajo y pega su Bot User OAuth token (empieza por xoxb-)."
-            },
-            "slackWebhook": {
-                "name": "Webhook de Slack",
-                "tagline": "Alertas de un solo sentido a un canal, sin token de app.",
-                "help": "Crea un Incoming Webhook en tu app de Slack y pega su URL."
-            },
-            "groups": {
-                "whatsapp": "Tu número por QR, o la API oficial Cloud.",
-                "telegram": "Un bot de @BotFather con botones y menús.",
-                "discord": "Un bot para chatear en ambos sentidos, o un webhook para alertas.",
-                "slack": "Un bot del espacio de trabajo, o un webhook para alertas."
-            }
-        },
-        "platforms": {
-            "email": "Correo"
-        },
-        "discordSetup": {
-            "checking": "Comprobando a qué puede llegar el bot...",
-            "notRunning": "El puente no está ejecutando este bot ahora mismo, así que no hay nada que comprobar.",
-            "noServer": "El bot aún no está en un servidor",
-            "inServers": "{count, plural, one {En # servidor} other {En # servidores}}",
-            "noServerHint": "Solo podrá enviar cuando alguien lo añada a uno.",
-            "serversHint": "Puede enviar a cualquier canal de esos servidores.",
-            "checkAgain": "Comprobar",
-            "addBot": "Añadir el bot a un servidor",
-            "addBotHint": "Discord te pregunta en cuál de tus servidores y luego pide confirmar: {permissions}.",
-            "noAppId": "El bot no ha informado de su id de aplicación, así que no se puede crear el enlace de invitación. Vuelve a conectarlo y comprueba de nuevo.",
-            "intents": "Intents privilegiados",
-            "intentsOn": "Los dos están activados.",
-            "intentOff": "{intent} está desactivado. {effect}",
-            "effects": {
-                "serverMembers": "Hace falta para llegar a alguien por nombre de usuario. Su User ID numérico funciona sin él.",
-                "messageContent": "Sin él, los mensajes que recibe el bot en canales del servidor llegan vacíos."
-            },
-            "switchOn": "Actívalos en Bot > Privileged Gateway Intents",
-            "reconnectAfter": "Después vuelve a conectar el canal: los intents se eligen cuando el bot inicia sesión.",
-            "botPermissions": "ver canales, enviar mensajes, insertar enlaces, adjuntar archivos, leer el historial de mensajes"
-        },
-        "errors": {
-            "checkForm": "Revisa los datos",
-            "connectFailed": "No se pudo conectar el canal",
-            "stateFailed": "No se pudo leer el estado del canal",
-            "removeChannelFailed": "No se pudo quitar el canal",
-            "nothingToUpdate": "Nada que cambiar",
-            "updateChannelFailed": "No se pudo actualizar el canal",
-            "reconnectFailed": "No se pudo volver a conectar el canal"
         }
     },
     "inboxChannels": {
-        "title": "Canales",
-        "intro": "Los canales por los que salen alertas, avisos y códigos de acceso.",
-        "connect": "Conectar un canal",
-        "empty": "Aún no hay nada conectado. Conecta un canal de mensajería para empezar a chatear.",
         "status": "{status, select, connected {conectado} connecting {conectando} qr {QR} error {error} disconnected {desconectado} ready {listo} other {{status}}}",
-        "connected": "Conectado",
         "readyToSend": "Listo para enviar",
-        "scanAgain": "Sin vincular. Abre Gestionar y pulsa Enlazar para escanear el QR.",
-        "edit": {
-            "telegram": "De @BotFather. Deja el token en blanco para mantener el actual.",
-            "discord": "Del Discord Developer Portal (Bot > Token). Déjalo en blanco para mantener el actual.",
-            "slack": "El Bot User OAuth token (xoxb-...). Déjalo en blanco para mantener el actual.",
-            "whatsappCloud": "Token de acceso de Meta e id del número de teléfono. Deja un campo en blanco para mantenerlo.",
-            "whatsappWeb": "Vinculado por QR. Usa Volver a vincular para mostrar un QR y escanearlo de nuevo si la sesión se ha caído; quítalo y vuelve a añadirlo para vincular otro número."
-        },
         "manage": {
             "button": "Gestionar",
             "title": "Gestionar {name}",
-            "status": "Estado: <tone>{status}</tone>",
-            "relink": "Enlazar",
-            "reconnect": "Reconectar",
-            "linkFailed": "La conexión ha fallado. Prueba de nuevo con Volver a vincular.",
-            "tokenPlaceholder": "Guardado: introduce un token nuevo para sustituirlo",
-            "keepCurrent": "Déjalo en blanco para mantener el actual",
             "remove": "Quitar",
-            "removeTitle": "¿Quitar {name}?",
-            "removeDescription": "Se desconecta el canal y se eliminan sus conversaciones y mensajes. No se puede deshacer."
-        },
-        "connectPage": {
-            "intro": "Elige qué conectar. Añade todos los que quieras.",
-            "messaging": "Mensajería",
-            "messagingHint": "Donde se envían alertas, avisos y códigos de acceso.",
-            "setUp": "Preparar",
-            "needsManage": "Pide a un admin que conecte canales."
+            "removeTitle": "¿Quitar {name}?"
         },
         "email": {
             "saveFailed": "No se pudo guardar el canal.",
@@ -3174,7 +3042,7 @@
             "title": "Qué cuenta como segundo paso",
             "hint": "Cada persona elige entre los que funcionan en este despliegue.",
             "fixed": "Siempre aceptada. No necesita nada de este despliegue, así que es lo que se puede seguir usando cuando todo lo demás falla.",
-            "noMail": "Todavía ningún canal de correo envía el correo de cuenta, así que nadie puede elegir esta opción. Conecta un remitente en Administración > Correo y luego elígelo allí.",
+            "noMail": "Todavía ningún canal de correo envía el correo de cuenta, así que nadie puede elegir esta opción. Añade un remitente en Administración > Integraciones > Correo y SMS y luego elígelo allí.",
             "totp": {
                 "label": "App de autenticación",
                 "description": "Un código que el móvil genera por sí solo, sin conexión."

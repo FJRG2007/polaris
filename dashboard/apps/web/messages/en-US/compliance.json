@@ -71,7 +71,7 @@
     },
     "where": {
         "security": "Management > Security",
-        "email": "Management > Email",
+        "email": "Management > Integrations > Email & SMS",
         "accountSecurity": "My account > Security",
         "users": "Management > Users",
         "activity": "Management > Activity",

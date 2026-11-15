@@ -973,7 +973,6 @@
         "projectWebhookGone": "Un webhook elegido se borró o ya no es tuyo.",
         "messaging": "Un canal de mensajería mío",
         "messagingNone": "No tienes canales de mensajería conectados.",
-        "messagingAdd": "Conectar",
         "messagingOption": "{name} ({platform})",
         "messagingPick": "Elige el canal",
         "messagingPeer": "A quién escribir en él",

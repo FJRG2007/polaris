@@ -71,7 +71,7 @@
     },
     "where": {
         "security": "Administración > Seguridad",
-        "email": "Administración > Correo",
+        "email": "Administración > Integraciones > Correo y SMS",
         "accountSecurity": "Mi cuenta > Seguridad",
         "users": "Administración > Usuarios",
         "activity": "Administración > Actividad",
