@@ -545,3 +545,92 @@ describe("a window that cannot hold the tool list", () => {
         expect(tiny.doGenerate).not.toHaveBeenCalled();
     });
 });
+
+// Recorded from an OpenAI-compatible provider (ERNIE free via a gateway): it
+// thinks in `reasoning_content` and ends with no `content` and no tool call.
+const REASONING_ONLY = [
+    { type: "stream-start", warnings: [] },
+    { type: "reasoning-start", id: "reasoning-0" },
+    { type: "reasoning-delta", id: "reasoning-0", delta: "The user wants the dehumidifier off." },
+    { type: "reasoning-end", id: "reasoning-0" },
+    { type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage: {} }
+];
+// OpenRouter's mid-stream error after a 200: the status is a number in `code`.
+const OPENROUTER_MID_STREAM = { code: 502, message: "Provider returned error" };
+
+describe("a turn that says nothing, or breaks for no named reason", () => {
+    it("routes past a model that only reasoned and answered nothing", async () => {
+        const silent = fakeModel("ernie", async () => streamOf(REASONING_ONLY));
+        const other = fakeModel("other", async () =>
+            streamOf([
+                { type: "text-start", id: "t" },
+                { type: "text-delta", id: "t", delta: "Hecho." },
+                { type: "text-end", id: "t" },
+                { type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage: {} }
+            ])
+        );
+        const onAnswered = vi.fn();
+        const result = await stream(
+            routeMiddleware([step(silent, "baidu"), step(other, "groq")], { ...noWait, onAnswered })
+        );
+        const parts = (await partsOf(result as never)) as Array<{ type: string; delta?: string }>;
+        expect(parts.some((part) => part.delta === "Hecho.")).toBe(true);
+        expect(onAnswered).toHaveBeenCalledWith(1, "other");
+    });
+
+    it("keeps a reasoning answer whole once text follows it", async () => {
+        const thinker = fakeModel("r1", async () =>
+            streamOf([
+                ...REASONING_ONLY.slice(0, 4),
+                { type: "text-start", id: "t" },
+                { type: "text-delta", id: "t", delta: "¿Algo más?" },
+                { type: "text-end", id: "t" },
+                REASONING_ONLY[4]
+            ])
+        );
+        const result = await stream(routeMiddleware([step(thinker, "deepseek")], noWait));
+        const parts = (await partsOf(result as never)) as Array<{ type: string; delta?: string }>;
+        expect(parts.map((part) => part.type)).toContain("reasoning-delta");
+        // The text is passed on exactly as the provider sent it: no "¿" lost.
+        expect(parts.find((part) => part.type === "text-delta")?.delta).toBe("¿Algo más?");
+    });
+
+    it("reads OpenRouter's numeric code as the status it is", () => {
+        expect(isRoutable(OPENROUTER_MID_STREAM)).toBe(true);
+    });
+
+    it("asks once more, then moves on, on a failure nothing explains", async () => {
+        const flaky = fakeModel("nemo", async () => streamOf([{ type: "error", error: { message: "?" } }]));
+        const other = fakeModel("other", async () =>
+            streamOf([
+                { type: "text-delta", id: "t", delta: "ok" },
+                { type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage: {} }
+            ])
+        );
+        await stream(routeMiddleware([step(flaky, "openrouter"), step(other, "groq")], noWait));
+        expect(flaky.doStream).toHaveBeenCalledTimes(2);
+        expect(other.doStream).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps a tool loop going on the next model when the one answering breaks mid-turn", async () => {
+        let calls = 0;
+        const first = fakeModel("nemo", async () =>
+            ++calls === 1
+                ? streamOf([
+                      { type: "tool-call", toolCallId: "c1", toolName: "places_devices", input: "{}" },
+                      { type: "finish", finishReason: { unified: "tool-calls", raw: "tool_calls" }, usage: {} }
+                  ])
+                : streamOf([{ type: "error", error: OPENROUTER_MID_STREAM }])
+        );
+        const second = fakeModel("other", async () =>
+            streamOf([
+                { type: "text-delta", id: "t", delta: "Apagado." },
+                { type: "finish", finishReason: { unified: "stop", raw: "stop" }, usage: {} }
+            ])
+        );
+        const middleware = routeMiddleware([step(first, "openrouter"), step(second, "groq")], noWait);
+        await partsOf((await stream(middleware)) as never);
+        const parts = (await partsOf((await stream(middleware)) as never)) as Array<{ delta?: string }>;
+        expect(parts.some((part) => part.delta === "Apagado.")).toBe(true);
+    });
+});

@@ -201,10 +201,12 @@ describe("a model picked by hand against one Polar chose", () => {
     const auto = automaticChoice();
     const list = [choice("mistral", "mistral-small-latest"), choice("groq", "llama"), auto];
 
-    it("keeps a model picked by hand to itself", () => {
+    it("hands a model picked by hand to Automatic unless the person switched that off", () => {
         const picked = choice("mistral", "mistral-small-latest");
         expect(pinnedByHand(picked, picked)).toBe(true);
-        expect(turnStandIns(picked, [picked], picked, false, auto)).toEqual([]);
+        expect(turnStandIns(picked, [picked], picked, false, auto)).toEqual([auto]);
+        expect(turnStandIns(picked, [picked], picked, false, auto, false)).toEqual([]);
+        expect(turnStandIns(picked, [picked], picked, true, auto)).toEqual([]);
     });
 
     it("walks on to the rest of Polar's list and then Automatic when the person left it on Automatic", () => {

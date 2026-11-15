@@ -84,9 +84,29 @@ const ROUTABLE: ReadonlySet<FailureKind> = new Set([
     "model"
 ]);
 
+/**
+ * Whether a failure is one the router moves past. Besides the refusals above,
+ * a failure with no HTTP status that names nothing - a stream that broke or
+ * ended with no answer (`EmptyAnswer`), an error object nobody documents - is
+ * the model's, not the call's: a 4xx with a status stays the call's. Pure.
+ */
+export function routes(failure: { kind: FailureKind; status: number | null }): boolean {
+    return ROUTABLE.has(failure.kind) || (failure.kind === "other" && failure.status === null);
+}
+
 /** Whether a refusal is one the router moves past. Pure. */
 export function isRoutable(error: unknown): boolean {
-    return ROUTABLE.has(classifyProviderFailure(error).kind);
+    return routes(classifyProviderFailure(error));
+}
+
+/** A stream that ended with no text and no tool call: nothing reached the
+ *  reader, so it is routed past like a refusal rather than shown as an empty
+ *  answer. Reasoning alone is not an answer. */
+export class EmptyAnswer extends Error {
+    constructor() {
+        super("the model answered nothing");
+        this.name = "EmptyAnswer";
+    }
 }
 
 /** The refusals worth asking the same step again after a wait. */
@@ -177,8 +197,19 @@ const PREAMBLE: ReadonlySet<string> = new Set([
     "response-metadata",
     "raw",
     "text-start",
-    "reasoning-start"
+    "text-end",
+    // Reasoning is held with the rest: a model that thinks and then says
+    // nothing has not answered, and is routed past (`EmptyAnswer`).
+    "reasoning-start",
+    "reasoning-delta",
+    "reasoning-end"
 ]);
+
+/** Whether a part that is not preamble says nothing either: an empty text
+ *  delta, or the end of a stream that said nothing before it. */
+function saysNothing(part: { type: string; delta?: unknown }): boolean {
+    return part.type === "text-delta" && !part.delta;
+}
 
 /** A stream's error part as the error it carries. */
 class StreamRefusal extends Error {
@@ -220,15 +251,22 @@ export async function heldStream(
         else if (part.type.startsWith("tool-")) delivered.tools = true;
     };
     try {
+        let said = false;
         for (;;) {
             const { value, done } = await reader.read();
             if (done) break;
             const part = value as StreamPart & { type: string; error?: unknown };
             if (part.type === "error") throw new StreamRefusal(part.error);
+            // The end before anything was said: no text, no tool call.
+            if (part.type === "finish") break;
             held.push(value);
             note(part);
-            if (!PREAMBLE.has(part.type)) break;
+            if (!PREAMBLE.has(part.type) && !saysNothing(part)) {
+                said = true;
+                break;
+            }
         }
+        if (!said) throw new EmptyAnswer();
     } catch (error) {
         reader.cancel().catch(() => undefined);
         release();
@@ -404,6 +442,7 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
                 if (depth >= MAX_CONTINUATIONS || signal?.aborted || !continuable(error)) return null;
                 // A structured answer is not one a second model can finish.
                 if (params.responseFormat?.type === "json") return null;
+                // A dropped connection leaves the step in, to be asked again.
                 const { kind } = classifyProviderFailure(error);
                 const refused = ROUTABLE.has(kind);
                 if (refused) {
@@ -454,8 +493,9 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
                 return await attempt(held);
             } catch (error) {
                 if (error instanceof Busy || signal?.aborted) throw error;
-                const { kind } = classifyProviderFailure(error);
-                if (!ROUTABLE.has(kind)) throw error;
+                const failure = classifyProviderFailure(error);
+                const { kind } = failure;
+                if (!routes(failure)) throw error;
                 ruleOut(ruled, steps[held]!, kind);
                 void noteRefusal(subjectOf(steps[held]!), kind, error);
                 hooks.onRefused?.(kind, held);
@@ -512,16 +552,20 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
                         return null;
                     }
                     if (signal?.aborted) throw error;
-                    const { kind } = classifyProviderFailure(error);
-                    if (!ROUTABLE.has(kind)) throw error;
+                    const failure = classifyProviderFailure(error);
+                    const { kind } = failure;
+                    if (!routes(failure)) throw error;
                     const retryAfter = retryAfterMs(error);
                     const pause = backoffMs(retry + 1, retryAfter);
-                    const mayRetry =
+                    // A failure nothing explains is asked once more on the same
+                    // step before the call moves on: most are a blip.
+                    const unexplained = kind === "other" && retry === 0;
+                    const mayRetry = unexplained || (
                         !later &&
                         RETRYABLE.has(kind) &&
                         retry < RETRY.times &&
                         (retryAfter ?? 0) <= RETRY.mostMs &&
-                        waited + pause <= RETRY.totalMs;
+                        waited + pause <= RETRY.totalMs);
                     if (mayRetry) {
                         waited += pause;
                         await wait(pause, signal);

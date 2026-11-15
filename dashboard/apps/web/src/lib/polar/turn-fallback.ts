@@ -6,9 +6,9 @@
  * A model Polar chose - Automatic, Polar's or an agent's own list, the first
  * model offered when the one picked was retired - is a means to an answer, so
  * the turn walks on to the next one that fits. A model the person picked by
- * hand is what they asked for: its refusal is shown with its actions, and the
- * turn only walks the fallback list they configured themselves
- * (`pinnedFallsBack`). The technique is OpenRouter's `models` fallback list:
+ * hand is asked first, then its keys and the fallback list they configured,
+ * then Automatic unless they switched `pinnedFallsBack` off: a refusal with a
+ * Try again button is the last resort, and the answer names who answered. The technique is OpenRouter's `models` fallback list:
  * the same request, retried down an ordered list on a provider error.
  *
  * Pure and isomorphic.
@@ -27,16 +27,17 @@ export function pinnedByHand(picked: Named, answering: Named): boolean {
 /**
  * The choices a turn moves on to after the one answering it, in order: the
  * rest of the list it was resolved from, then Automatic unless the list is all
- * the turn may use. None for a model picked by hand.
+ * the turn may use. Only Automatic for a model picked by hand.
  */
 export function turnStandIns(
     picked: ModelChoice,
     tries: readonly ModelChoice[],
     answering: ModelChoice,
     keepsToList: boolean,
-    automatic: ModelChoice
+    automatic: ModelChoice,
+    pinnedFallsBack = true
 ): ModelChoice[] {
-    if (pinnedByHand(picked, answering)) return [];
+    if (pinnedByHand(picked, answering)) return pinnedFallsBack && !keepsToList ? [automatic] : [];
     const at = tries.findIndex(
         (entry) => entry.provider === answering.provider && entry.model === answering.model
     );

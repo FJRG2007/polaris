@@ -121,6 +121,7 @@ import {
     type ResolvedModel
 } from "@/lib/polar/models";
 import { pinnedByHand, turnStandIns } from "@/lib/polar/turn-fallback";
+import { polarRouting } from "@/lib/polar/router/store";
 import { isToolFailure, toolFailureText, withTaggedToolErrors } from "@/lib/polar/tool-failure";
 import { POLAR_RUNS_MAX, beginPolarRun } from "@/lib/polar/runs";
 import { GOAL_CONDITION_MAX, goalHasRoom, goalTurnOf } from "@/lib/polar/goals";
@@ -365,16 +366,21 @@ export async function POST(request: Request): Promise<Response> {
         }
     }
     if (typeof resolved === "string") return refuse(resolved, 409);
-    // A model Polar chose hands the turn on when it cannot answer: the same
-    // model through an aggregator, the rest of the list it came from, then
-    // Automatic. A model picked by hand shows its refusal (`turn-fallback.ts`).
-    if (!pinnedByHand(body.data.choice, choice)) {
+    // A turn hands itself on when its model cannot answer: the same model
+    // through an aggregator, the rest of the list it came from, then
+    // Automatic - for a model picked by hand too, unless the person switched
+    // that off (`turn-fallback.ts`). Automatic resolves with tool use, as
+    // every chat turn is offered tools (`signals.agentic`).
+    const pinned = pinnedByHand(body.data.choice, choice);
+    const routing = pinned ? await polarRouting(user.id) : null;
+    {
         const later = turnStandIns(
             body.data.choice,
             tries,
             choice,
             keepsToList,
-            automaticChoice(choice.intelligence)
+            automaticChoice(choice.intelligence),
+            routing?.pinnedFallsBack ?? true
         );
         const others: ResolvedModel[] = [];
         const twin = resolved.automatic ? null : await sameModelElsewhere(user.id, resolved.option, access);

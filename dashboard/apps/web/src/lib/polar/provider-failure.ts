@@ -147,8 +147,16 @@ const BODY_MOST = 16_384;
  *  messages. Reads `error`, `metadata` and Gemini's `details` a few levels
  *  deep, an array's first entry (Gemini's streaming errors), and a body that
  *  is not JSON as text. */
-function reasonsOf(body: unknown): { reasons: string[]; text: string; forwarded: boolean } {
+function reasonsOf(body: unknown): {
+    reasons: string[];
+    text: string;
+    forwarded: boolean;
+    code: number | null;
+} {
     const reasons: string[] = [];
+    // OpenRouter's error object carries the HTTP status as a number in `code`,
+    // on a refused call and on an error sent mid-stream after a 200.
+    let code: number | null = null;
     const texts: string[] = [];
     let forwarded = false;
     const read = (value: unknown, depth: number) => {
@@ -157,6 +165,12 @@ function reasonsOf(body: unknown): { reasons: string[]; text: string; forwarded:
         for (const key of ["type", "code", "status", "error_type", "limit_source", "reason"]) {
             const named = entry[key];
             if (typeof named === "string" && named.length <= 80) reasons.push(named.toLowerCase());
+        }
+        for (const key of ["code", "status"]) {
+            const number = entry[key];
+            if (code === null && Number.isInteger(number) && (number as number) >= 400 && (number as number) <= 599) {
+                code = number as number;
+            }
         }
         // OpenRouter names the upstream provider whose own refusal it passes on.
         if (typeof entry.provider_name === "string" || typeof entry.provider_code === "string") {
@@ -185,7 +199,7 @@ function reasonsOf(body: unknown): { reasons: string[]; text: string; forwarded:
         }
     }
     read(Array.isArray(parsed) ? parsed[0] : parsed, 0);
-    return { reasons, text: texts.join(" "), forwarded };
+    return { reasons, text: texts.join(" "), forwarded, code };
 }
 
 /** The kind a body's structured reasons name, the strongest first. */
@@ -245,7 +259,13 @@ export function isPaidModelError(error: unknown, depth = 0): boolean {
 export function classifyProviderFailure(error: unknown): ProviderFailure {
     if (isPaidModelError(error)) return { kind: "paid", status: 402 };
     const found = callError(error);
-    if (!found) return { kind: kindOfReasons(reasonsOf(error).reasons) ?? "other", status: null };
+    if (!found) {
+        const read = reasonsOf(error);
+        const named = kindOfReasons(read.reasons);
+        if (named) return { kind: named, status: null };
+        if (read.code !== null) return { kind: kindOfStatus(read.code, read.text), status: read.code };
+        return { kind: "other", status: null };
+    }
     const status = found.statusCode as number;
     const { reasons, text: said, forwarded } = reasonsOf(found.responseBody);
     const text = `${said} ${typeof found.message === "string" ? found.message : ""}`;
