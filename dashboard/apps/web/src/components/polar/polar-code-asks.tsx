@@ -142,6 +142,38 @@ export function CodeAsk({
 }) {
     const t = useTranslations("polar");
     const { error, busy, send } = useAnswer(requestId, onAnswered);
+    return (
+        <AskCard
+            title={t("code.ask.title")}
+            questions={questions}
+            busy={busy}
+            error={error}
+            onAnswer={(answers) => send("allow", { answers })}
+            onSkip={() => send("deny", {})}
+        />
+    );
+}
+
+/**
+ * Questions with options, one at a time: shared by a Code session's agent and
+ * Polar's own `polar_ask`. Answers go out keyed by each question's text.
+ */
+export function AskCard({
+    title,
+    questions,
+    busy,
+    error,
+    onAnswer,
+    onSkip
+}: {
+    title: string;
+    questions: readonly AskQuestion[];
+    busy: boolean;
+    error: string | null;
+    onAnswer: (answers: Record<string, string>) => void;
+    onSkip: () => void;
+}) {
+    const t = useTranslations("polar");
     const [index, setIndex] = useState(0);
     const [picked, setPicked] = useState<Picked[]>(() => questions.map(() => ({ labels: [], other: null })));
     const question = questions[index]!;
@@ -151,9 +183,7 @@ export function CodeAsk({
 
     const update = (next: Picked) => setPicked((all) => all.map((entry, at) => (at === index ? next : entry)));
     const submit = (all: readonly Picked[]) =>
-        send("allow", {
-            answers: Object.fromEntries(questions.map((entry, at) => [entry.question, answerText(all[at]!)]))
-        });
+        onAnswer(Object.fromEntries(questions.map((entry, at) => [entry.question, answerText(all[at]!)])));
     const pick = (option: number) => {
         const label = question.options[option]!.label;
         if (question.multiSelect) {
@@ -171,10 +201,10 @@ export function CodeAsk({
     useNumberKeys(question.options.length, pick, !busy);
 
     return (
-        <section aria-label={t("code.ask.title")} className={CARD}>
+        <section aria-label={title} className={CARD}>
             <div className="flex min-w-0 items-center gap-1.5 text-sm font-medium">
                 <MessageCircleQuestion className="size-4 shrink-0 text-primary" aria-hidden />
-                <span className="min-w-0 truncate">{question.header || t("code.ask.title")}</span>
+                <span className="min-w-0 truncate">{question.header || title}</span>
                 {questions.length > 1 ? (
                     <span className="ml-auto flex shrink-0 items-center gap-1 text-xs font-normal text-muted-foreground">
                         <button
@@ -263,7 +293,7 @@ export function CodeAsk({
                         {last ? t("code.ask.submit") : t("code.ask.continue")}
                     </Button>
                 ) : null}
-                <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => send("deny", {})}>
+                <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onSkip}>
                     {t("code.ask.skip")}
                 </Button>
                 {question.multiSelect && mine.labels.length > 0 ? (

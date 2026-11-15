@@ -31,8 +31,8 @@ export interface SessionTodo {
 
 const MAX_TODOS = 50;
 const MAX_TODO_CHARS = 300;
-const MAX_QUESTIONS = 4;
-const MAX_OPTIONS = 9;
+export const MAX_QUESTIONS = 4;
+export const MAX_OPTIONS = 9;
 const MAX_PLAN_CHARS = 40_000;
 export const MAX_ANSWER_CHARS = 2_000;
 
@@ -165,7 +165,7 @@ export function applyTaskTool(payload: unknown, current: readonly SessionTodo[])
     return current.map((todo, index) => (index === at ? { ...todo, text, status } : todo));
 }
 
-const questionSchema = z.object({
+export const questionSchema = z.object({
     question: z.string().trim().min(1).max(500),
     header: z.string().trim().max(60).optional(),
     multiSelect: z.boolean().optional(),

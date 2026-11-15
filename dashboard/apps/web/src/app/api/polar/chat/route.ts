@@ -33,6 +33,8 @@ import {
 } from "ai";
 import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
+import { polarAskTools } from "@/lib/polar/ask-tools";
+import { settleUnansweredAsks } from "@/lib/polar/ask";
 import { connectorStandIns, polarConnectorTools } from "@/lib/polar/connectors/tools";
 import { offWithServers } from "@/lib/polar/tool-servers";
 import {
@@ -285,6 +287,8 @@ export async function POST(request: Request): Promise<Response> {
     const weatherTools = polarWeatherTools();
     const repoTools = polarRepoTools(user.id);
     const browserTools = polarBrowserTools(user.id);
+    // Put to the person in the chat; offered to this turn only, never to a subagent.
+    const askTools = polarAskTools();
     const checked = await safeValidateUIMessages({
         messages: body.data.messages,
         tools: {
@@ -295,6 +299,7 @@ export async function POST(request: Request): Promise<Response> {
             ...weatherTools,
             ...repoTools,
             ...browserTools,
+            ...askTools,
             ...NATIVE_SEARCH_STAND_INS,
             ...polarWebTools("", ""),
             ...connectorSet.tools,
@@ -304,7 +309,9 @@ export async function POST(request: Request): Promise<Response> {
         } as never
     });
     if (!checked.success) return refuse("invalid", 400);
-    const messages = (checked.data as UIMessage[]).map((message, index, list) =>
+    // A question the person moved past without answering is settled as such
+    // (`ask.ts`), so no call reaches the model without a result.
+    const messages = settleUnansweredAsks(checked.data as UIMessage[]).map((message, index, list) =>
         // The newest question carries the screen it was asked on, stored with
         // it; older ones keep what they were saved with.
         index === list.length - 1 && message.role === "user"
@@ -538,7 +545,8 @@ export async function POST(request: Request): Promise<Response> {
             : []),
         // Skills are listed in the system prompt, so the tool that reads them goes with it.
         ...(USE_SKILL in skillTools ? [USE_SKILL] : []),
-        ...(TASK_TOOL in taskTools ? [TASK_TOOL] : [])
+        ...(TASK_TOOL in taskTools ? [TASK_TOOL] : []),
+        ...Object.keys(askTools)
     ];
     // The six browser_* tools `browser` replaced stay registered for old turns
     // but are never sent again.
@@ -554,7 +562,7 @@ export async function POST(request: Request): Promise<Response> {
             always,
             new Set([...used, ...found])
         ) as (keyof typeof tools & string)[];
-    const turnTools = { ...tools, ...taskTools };
+    const turnTools = { ...tools, ...taskTools, ...askTools };
 
     const parentFor = (index: number, list: readonly UIMessage[]): string | null =>
         index === list.length - 1 && list[index]?.role === "user"

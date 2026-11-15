@@ -1772,5 +1772,21 @@
             "no_model": "Ninguno de los modelos de ese agente se puede usar ahora.",
             "not_resumable": "Ese subagente no se puede continuar."
         }
+    },
+    "ask": {
+        "title": "Polar pregunta",
+        "chip": "Hizo una pregunta",
+        "chipMany": "Hizo {count} preguntas",
+        "waiting": "Esperando tu respuesta",
+        "skipped": "Omitida",
+        "unanswered": "Sin respuesta"
+    },
+    "form": {
+        "title": "Formulario",
+        "submit": "Enviar",
+        "sent": "Enviado",
+        "required": "Obligatorio",
+        "invalid": "Revisa este campo",
+        "stars": "{count} de {max} estrellas"
     }
 }

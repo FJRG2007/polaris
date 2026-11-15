@@ -149,6 +149,8 @@ import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion"
 import { WebSources } from "@/components/polar/elements/sources";
 import { citeSources, isWebTool, sourcesOf, webCallsOf, webStepOf } from "@/lib/polar/web-sources";
 import { answeredNothing } from "@/lib/polar/unanswered";
+import { askAnswered, isAskPart, pendingAsk, POLAR_ASK_TOOL } from "@/lib/polar/ask";
+import { AskChip, PolarAskBar } from "@/components/polar/polar-ask";
 import { withoutPseudoToolCalls } from "@/lib/polar/pseudo-tools";
 import { repoStepOf } from "@/lib/polar/code-host";
 import {
@@ -1009,7 +1011,10 @@ export function PolarChat({
         id: threadId,
         messages: opening,
         transport,
-        sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+        // Approvals given, or Polar's question answered (`ask.ts`): the turn goes on.
+        sendAutomaticallyWhen: (options) =>
+            lastAssistantMessageIsCompleteWithApprovalResponses(options) ||
+            askAnswered(options.messages),
         // An answer keeps running after its chat is left; opening the chat
         // again picks it up where it is (`chat/[id]/stream`).
         resume: true
@@ -1051,6 +1056,8 @@ export function PolarChat({
     const waitingApproval = chat.messages
         .at(-1)
         ?.parts.some((part) => "state" in part && part.state === "approval-requested");
+    // Polar's question waiting on an answer; the composer stays in use beside it.
+    const waitingAsk = busy ? null : pendingAsk(chat.messages);
 
     // Every message on screen joins the version tree as it appears.
     useEffect(() => {
@@ -2378,6 +2385,23 @@ export function PolarChat({
                     />
                 </div>
             ) : null}
+            {waitingAsk ? (
+                <div className="px-3 pb-2">
+                    <PolarAskBar
+                        key={waitingAsk.toolCallId}
+                        questions={waitingAsk.questions}
+                        busy={busy}
+                        onAnswer={(output) => {
+                            turnChoice.current = null;
+                            void chat.addToolOutput({
+                                tool: POLAR_ASK_TOOL as never,
+                                toolCallId: waitingAsk.toolCallId,
+                                output: output as never
+                            });
+                        }}
+                    />
+                </div>
+            ) : null}
             <PolarComposer
                 kit={voiceKit}
                 notice={voiceNotice}
@@ -3251,7 +3275,7 @@ function MessageView({
         part.type === `tool-${subagentShared.TASK_TOOL}`;
     const folded = (part: UIMessage["parts"][number]) => {
         if (part.type === "reasoning") return true;
-        if (isTask(part)) return false;
+        if (isTask(part) || isAskPart(part)) return false;
         if (isVisualPart(part)) return !drawn(part);
         const found = toolOf(part);
         return !!found && !found.tool.approval && found.tool.state !== "output-error";
@@ -3395,6 +3419,13 @@ function MessageView({
                             }
                             onOpen={(id) => onOpenSubagent?.(id)}
                         />
+                    );
+                }
+                if (isAskPart(part)) {
+                    const tool = part as unknown as ToolPart;
+                    if (tool.state === "input-streaming") return null;
+                    return (
+                        <AskChip key={index} input={tool.input} output={tool.output} waiting={last} />
                     );
                 }
                 if (drawn(part)) {

@@ -1772,5 +1772,21 @@
             "no_model": "None of that agent's models can be used now.",
             "not_resumable": "That subagent cannot be continued."
         }
+    },
+    "ask": {
+        "title": "Polar asks",
+        "chip": "Asked a question",
+        "chipMany": "Asked {count} questions",
+        "waiting": "Waiting for your answer",
+        "skipped": "Skipped",
+        "unanswered": "Not answered"
+    },
+    "form": {
+        "title": "Form",
+        "submit": "Send",
+        "sent": "Sent",
+        "required": "Required",
+        "invalid": "Check this field",
+        "stars": "{count} of {max} stars"
     }
 }

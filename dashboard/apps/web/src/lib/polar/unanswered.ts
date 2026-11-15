@@ -7,6 +7,7 @@
 
 import { FAILURE_PART } from "@/lib/polar/provider-failure";
 import { POLAR_VISUAL_TOOL } from "@/lib/polar/visuals";
+import { POLAR_ASK_TOOL } from "@/lib/polar/ask";
 import { withoutPseudoToolCalls } from "@/lib/polar/pseudo-tools";
 
 type AnswerPart = { type: string; text?: string; state?: string; toolName?: string };
@@ -19,6 +20,7 @@ export function answeredNothing(parts: readonly AnswerPart[]): boolean {
             part.type === "file" ||
             part.type === FAILURE_PART ||
             part.type === `tool-${POLAR_VISUAL_TOOL}` ||
+            part.type === `tool-${POLAR_ASK_TOOL}` ||
             (part.type === "dynamic-tool" && part.toolName === POLAR_VISUAL_TOOL) ||
             part.state === "approval-requested"
     );
