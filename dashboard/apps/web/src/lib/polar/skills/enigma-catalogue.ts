@@ -1,5 +1,5 @@
 /**
- * The skills Enigma ships, read from its published package.
+ * The skills and "/" commands Enigma ships, read from its published package.
  *
  * A version's package never changes once published, so its skills are read once
  * per version: fetched from where it is published, read entry by entry without unpacking
@@ -25,11 +25,24 @@ export interface EnigmaSkill {
     readonly instructions: string;
 }
 
+/** One of the "/" commands Enigma ships (`assets/commands/<name>.md`). */
+export interface EnigmaCommand {
+    readonly name: string;
+    readonly description: string;
+    /** What the command takes after its name, as its front matter spells it. */
+    readonly argumentHint: string | null;
+    readonly instructions: string;
+    /** False when its instructions run a shell or work on a repository, so it
+     *  can only run inside a Code session, never in a chat. */
+    readonly chat: boolean;
+}
+
 export interface EnigmaCatalogue {
     readonly version: string;
     /** False while the package could not be read: the list is unknown, not empty. */
     readonly available: boolean;
     readonly skills: readonly EnigmaSkill[];
+    readonly commands: readonly EnigmaCommand[];
 }
 
 /** A published package is around a megabyte; this is the most fetched. */
@@ -39,11 +52,16 @@ const ENTRY_MAX = 512 * 1024;
 const DESCRIPTION_MAX = 1024;
 /** More skills than the package has ever shipped. */
 const SKILLS_MOST = 100;
+/** More commands than the package has ever shipped (1.73.0 ships four). */
+const COMMANDS_MOST = 50;
+const HINT_MAX = 200;
 /** How long a failed read is remembered before the registry is asked again. */
 const RETRY_MS = 10 * 60 * 1000;
 const KEY_PREFIX = "enigma.skills.";
+const COMMANDS_PREFIX = "enigma.commands.";
 const VERSION = /^\d+\.\d+\.\d+$/;
 const SKILL_PATH = /^package\/assets\/skills\/([a-z0-9][a-z0-9-]{0,63})\/(skill\.json|SKILL\.md)$/;
+const COMMAND_PATH = /^package\/assets\/commands\/([a-z0-9][a-z0-9-]{0,63})\.md$/;
 
 const manifestSchema = z.object({
     name: z.string().regex(core.ENIGMA_SKILL_NAME),
@@ -60,15 +78,69 @@ const storedSchema = z
     )
     .max(SKILLS_MOST);
 
+const storedCommandsSchema = z
+    .array(
+        z.object({
+            name: z.string().regex(core.ENIGMA_SKILL_NAME),
+            description: z.string().max(DESCRIPTION_MAX),
+            argumentHint: z.string().max(HINT_MAX).nullable(),
+            instructions: z.string(),
+            chat: z.boolean()
+        })
+    )
+    .max(COMMANDS_MOST);
+
 const FRONT_MATTER = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---\r?\n/;
+
+/** One field of a front matter block, unquoted, or null when it is absent or empty. */
+function frontField(front: string | undefined, field: string): string | null {
+    const line = front?.split(/\r?\n/).find((entry) => entry.startsWith(`${field}:`));
+    return line?.slice(field.length + 1).trim().replace(/^(["'])(.*)\1$/, "$2") || null;
+}
 
 /** A SKILL.md's body, and the description its front matter gives - the one
  *  written to say when the skill applies, longer than the manifest's. */
 function readSkillMarkdown(markdown: string): { body: string; description: string | null } {
-    const front = FRONT_MATTER.exec(markdown);
-    const line = front?.[1]?.split(/\r?\n/).find((entry) => entry.startsWith("description:"));
-    const description = line?.slice("description:".length).trim().replace(/^(["'])(.*)\1$/, "$2") || null;
-    return { body: markdown.replace(FRONT_MATTER, "").trim(), description };
+    const front = FRONT_MATTER.exec(markdown)?.[1];
+    return { body: markdown.replace(FRONT_MATTER, "").trim(), description: frontField(front, "description") };
+}
+
+/** A shell block, or a command line quoted inline, in a command's instructions. */
+const SHELL = /```(?:bash|sh|shell|console|zsh)\b|`(?:enigma|git|gh|npm|npx|pnpm|yarn|bun)\s/;
+/** Words that only mean something with a checkout to work on. */
+const WORKSPACE =
+    /\b(?:repositor(?:y|ies)|repo|branch(?:es)?|codebase|commits?|worktree|working tree|pull requests?|this project)\b/i;
+
+/**
+ * Whether a command's instructions can be followed in a chat, which has no
+ * shell and no checkout. The package says nothing about it, so it is read from
+ * the instructions themselves: one that runs a command line or works on a
+ * repository needs a Code session.
+ */
+export function runsInChat(instructions: string): boolean {
+    return !SHELL.test(instructions) && !WORKSPACE.test(instructions);
+}
+
+/** The commands in a package's files, by `assets/commands/<name>.md`, sorted by name. */
+export function parseEnigmaCommands(files: ReadonlyMap<string, Buffer>): EnigmaCommand[] {
+    const commands: EnigmaCommand[] = [];
+    for (const [path, data] of files) {
+        const name = COMMAND_PATH.exec(path)?.[1];
+        if (!name) continue;
+        const markdown = data.toString("utf8");
+        const front = FRONT_MATTER.exec(markdown)?.[1];
+        const description = frontField(front, "description");
+        const body = markdown.replace(FRONT_MATTER, "").trim();
+        if (!description || !body) continue;
+        commands.push({
+            name,
+            description: description.slice(0, DESCRIPTION_MAX),
+            argumentHint: frontField(front, "argument-hint")?.slice(0, HINT_MAX) ?? null,
+            instructions: body,
+            chat: runsInChat(body)
+        });
+    }
+    return commands.sort((a, b) => a.name.localeCompare(b.name)).slice(0, COMMANDS_MOST);
 }
 
 /** The skills in a package's files, by `assets/skills/<name>/`, sorted by name. */
@@ -104,14 +176,21 @@ export function parseEnigmaSkills(files: ReadonlyMap<string, Buffer>): EnigmaSki
     return skills.sort((a, b) => a.name.localeCompare(b.name)).slice(0, SKILLS_MOST);
 }
 
-/** The skills in a package tarball, or null when it is not one. */
-export async function readEnigmaTarball(bytes: Uint8Array): Promise<EnigmaSkill[] | null> {
+/** The skills and commands in a package tarball, or null when it is not one. */
+export async function readEnigmaPackage(
+    bytes: Uint8Array
+): Promise<{ skills: EnigmaSkill[]; commands: EnigmaCommand[] } | null> {
     const files = await readTarEntries(
         Readable.from([Buffer.from(bytes)]),
-        (name) => SKILL_PATH.test(name),
+        (name) => SKILL_PATH.test(name) || COMMAND_PATH.test(name),
         ENTRY_MAX
     ).catch(() => null);
-    return files ? parseEnigmaSkills(files) : null;
+    return files ? { skills: parseEnigmaSkills(files), commands: parseEnigmaCommands(files) } : null;
+}
+
+/** The skills in a package tarball, or null when it is not one. */
+export async function readEnigmaTarball(bytes: Uint8Array): Promise<EnigmaSkill[] | null> {
+    return (await readEnigmaPackage(bytes))?.skills ?? null;
 }
 
 /**
@@ -140,8 +219,25 @@ export type TarballFetcher = (version: string) => Promise<Uint8Array | null>;
 
 interface Remembered {
     readonly skills: readonly EnigmaSkill[];
+    readonly commands: readonly EnigmaCommand[];
     readonly available: boolean;
+    /** False until both lists are read: an unavailable catalogue, or skills
+     *  from a stored copy whose commands could not be read yet. Asked again. */
+    readonly complete: boolean;
     readonly at: number;
+}
+
+/** A stored copy that still parses, or null. */
+async function readStored<T>(key: string, schema: z.ZodType<T>): Promise<T | null> {
+    const stored = await getSetting(key).catch(() => null);
+    if (!stored) return null;
+    try {
+        const parsed = schema.safeParse(JSON.parse(stored));
+        return parsed.success ? parsed.data : null;
+    } catch {
+        // Unreadable: read the package again and store over it.
+        return null;
+    }
 }
 
 const remembered = new Map<string, Remembered>();
@@ -149,27 +245,41 @@ const reading = new Map<string, Promise<Remembered>>();
 
 async function load(version: string, fetcher: TarballFetcher): Promise<Remembered> {
     const key = `${KEY_PREFIX}${version}`;
-    const stored = await getSetting(key).catch(() => null);
-    if (stored) {
-        try {
-            const parsed = storedSchema.safeParse(JSON.parse(stored));
-            if (parsed.success && parsed.data.length > 0)
-                return { skills: parsed.data, available: true, at: Date.now() };
-        } catch {
-            // Unreadable: read the package again and store over it.
-        }
-    }
+    const commandsKey = `${COMMANDS_PREFIX}${version}`;
+    const [storedSkills, storedCommands] = await Promise.all([
+        readStored(key, storedSchema),
+        readStored(commandsKey, storedCommandsSchema)
+    ]);
+    const known = storedSkills && storedSkills.length > 0 ? storedSkills : null;
+    // A copy stored before commands were read has no commands key: the package
+    // is read once more for them.
+    if (known && storedCommands)
+        return { skills: known, commands: storedCommands, available: true, complete: true, at: Date.now() };
     const bytes = await fetcher(version).catch(() => null);
-    const skills = bytes ? await readEnigmaTarball(bytes) : null;
-    if (!skills || skills.length === 0) return { skills: [], available: false, at: Date.now() };
-    await setSetting(key, JSON.stringify(skills)).catch((error: unknown) => {
+    const read = bytes ? await readEnigmaPackage(bytes) : null;
+    if (!read || read.skills.length === 0) {
+        return known
+            ? { skills: known, commands: [], available: true, complete: false, at: Date.now() }
+            : { skills: [], commands: [], available: false, complete: false, at: Date.now() };
+    }
+    await Promise.all([
+        setSetting(key, JSON.stringify(read.skills)),
+        setSetting(commandsKey, JSON.stringify(read.commands))
+    ]).catch((error: unknown) => {
         console.error("enigma: could not store the skills catalogue", error);
     });
     // One version is ever in use; an older one's copy is nothing anybody reads.
-    await prisma.setting
-        .deleteMany({ where: { key: { startsWith: KEY_PREFIX, not: key } } })
-        .catch(() => undefined);
-    return { skills, available: true, at: Date.now() };
+    await Promise.all(
+        [
+            { prefix: KEY_PREFIX, keep: key },
+            { prefix: COMMANDS_PREFIX, keep: commandsKey }
+        ].map(({ prefix, keep }) =>
+            prisma.setting
+                .deleteMany({ where: { key: { startsWith: prefix, not: keep } } })
+                .catch(() => undefined)
+        )
+    );
+    return { skills: read.skills, commands: read.commands, available: true, complete: true, at: Date.now() };
 }
 
 function refresh(version: string, fetcher: TarballFetcher): Promise<Remembered> {
@@ -186,7 +296,7 @@ function refresh(version: string, fetcher: TarballFetcher): Promise<Remembered> 
 }
 
 /**
- * The skills of one Enigma version, the pinned one by default.
+ * The skills and commands of one Enigma version, the pinned one by default.
  *
  * Read once per version and process. A failed read answers an empty,
  * unavailable catalogue; once it is old, the next read still answers it at once
@@ -196,9 +306,9 @@ export async function enigmaCatalogue(
     version: string = core.ENIGMA_VERSION,
     fetcher: TarballFetcher = fetchTarball
 ): Promise<EnigmaCatalogue> {
-    if (!VERSION.test(version)) return { version, available: false, skills: [] };
+    if (!VERSION.test(version)) return { version, available: false, skills: [], commands: [] };
     const known = remembered.get(version);
-    if (known && !known.available && Date.now() - known.at > RETRY_MS) void refresh(version, fetcher);
+    if (known && !known.complete && Date.now() - known.at > RETRY_MS) void refresh(version, fetcher);
     const value = known ?? (await refresh(version, fetcher));
-    return { version, available: value.available, skills: value.skills };
+    return { version, available: value.available, skills: value.skills, commands: value.commands };
 }

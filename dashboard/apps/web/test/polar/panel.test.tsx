@@ -888,7 +888,7 @@ describe("matching the / list", () => {
     });
     const labels = (input: string, own = [row("tldr"), row("translate"), row("fix-tests")]) =>
         slashMatches(input, own).map((match) =>
-            match.kind === "own" ? match.row.shortcut : match.command
+            match.kind === "own" ? match.row.shortcut : match.kind === "enigma" ? match.command.name : match.command
         );
 
     it("ranks a prefix over a contained run over letters in order, Polar's first", () => {
@@ -906,6 +906,18 @@ describe("matching the / list", () => {
         expect(labels("/ft")).toEqual(["fix-tests"]);
         expect(labels("/zz")).toEqual([]);
         expect(labels("/tldr now")).toEqual([]);
+    });
+
+    it("lists Enigma's chat commands last, behind Polar's and the person's own names", () => {
+        const enigma = [
+            { name: "recap", description: "Sum up.", argumentHint: null },
+            { name: "tldr", description: "Shadowed by the person's own.", argumentHint: null },
+            { name: "stop", description: "Shadowed by Polar's.", argumentHint: null }
+        ];
+        const found = slashMatches("/", [row("tldr")], enigma);
+        expect(found.filter((match) => match.kind === "enigma")).toEqual([{ kind: "enigma", command: enigma[0] }]);
+        expect(found.at(-1)?.kind).toBe("enigma");
+        expect(slashMatches("/rec", [], enigma)).toEqual([{ kind: "enigma", command: enigma[0] }]);
     });
 
     it("finds the command a message starts with, and nothing for any other", () => {

@@ -32,8 +32,27 @@ import {
 } from "@/components/polar/elements/model-selector";
 import * as polarShared from "@/lib/polar/shared";
 import type { CommandShortcutIssue, ModelChoice, PolarCommandRow } from "@/lib/polar/shared";
+import * as enigmaSlash from "@/lib/polar/enigma-slash";
 
 const CACHE_KEY = "polar.commands";
+const ENIGMA_CACHE_KEY = "polar.commands.enigma";
+
+function readEnigmaCache(): enigmaSlash.EnigmaSlashLists | null {
+    try {
+        const raw = window.localStorage.getItem(ENIGMA_CACHE_KEY);
+        return raw ? enigmaSlash.readEnigmaLists(JSON.parse(raw)) : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeEnigmaCache(lists: enigmaSlash.EnigmaSlashLists): void {
+    try {
+        window.localStorage.setItem(ENIGMA_CACHE_KEY, JSON.stringify(lists));
+    } catch {
+        // A private window: the list is read from the server each time.
+    }
+}
 
 function readCache(): PolarCommandRow[] | null {
     try {
@@ -58,6 +77,8 @@ const byShortcut = (a: PolarCommandRow, b: PolarCommandRow) =>
 
 export interface PolarCommands {
     commands: PolarCommandRow[];
+    /** Enigma's commands each composer can run; empty while Enigma is off. */
+    enigma: enigmaSlash.EnigmaSlashLists;
     /** Puts a saved command in the list, replacing the one with its id. */
     saved: (row: PolarCommandRow) => void;
     /** Removes one at once, putting it back if the server refuses. */
@@ -69,6 +90,7 @@ export function usePolarCommands(): PolarCommands {
     const t = useTranslations("polar");
     const toast = useToast();
     const [commands, setCommands] = useState<PolarCommandRow[]>([]);
+    const [enigma, setEnigma] = useState<enigmaSlash.EnigmaSlashLists>(enigmaSlash.NO_ENIGMA_COMMANDS);
     const set = useCallback((next: PolarCommandRow[]) => {
         setCommands(next);
         writeCache(next);
@@ -76,10 +98,17 @@ export function usePolarCommands(): PolarCommands {
     useEffect(() => {
         const cached = readCache();
         if (cached) setCommands(cached);
+        const cachedEnigma = readEnigmaCache();
+        if (cachedEnigma) setEnigma(cachedEnigma);
         fetch("/api/polar/commands")
             .then((response) => (response.ok ? response.json() : null))
-            .then((data: { commands?: PolarCommandRow[] } | null) => {
+            .then((data: { commands?: PolarCommandRow[]; enigma?: unknown } | null) => {
                 if (Array.isArray(data?.commands)) set(data.commands);
+                if (data && "enigma" in data) {
+                    const lists = enigmaSlash.readEnigmaLists(data.enigma);
+                    setEnigma(lists);
+                    writeEnigmaCache(lists);
+                }
             })
             .catch(() => undefined);
     }, [set]);
@@ -104,7 +133,7 @@ export function usePolarCommands(): PolarCommands {
         },
         [set, t, toast]
     );
-    return { commands, saved, remove };
+    return { commands, enigma, saved, remove };
 }
 
 /** What the form opens with: a command to edit, or a draft for a new one. */

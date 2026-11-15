@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import * as codeCommands from "@/lib/polar/code-commands";
 import { codeSlashMatches } from "@/components/polar/polar-code-slash";
 import { automaticChoice, type PolarCommandRow } from "@/lib/polar/shared";
+import * as enigmaSlash from "@/lib/polar/enigma-slash";
 
 describe("the commands on offer", () => {
     it("starts a task with its own commands only", () => {
@@ -113,5 +114,46 @@ describe("the list", () => {
             { kind: "command", command: "security-review" }
         ]);
         expect(codeSlashMatches("/stop now", [], own, commands)).toEqual([]);
+    });
+});
+
+describe("Enigma's commands on each surface", () => {
+    const catalogue = [
+        { name: "gate", description: "Validate changes.", argumentHint: "[task]", chat: false },
+        { name: "handoff", description: "Hand over.", argumentHint: null, chat: false },
+        { name: "recap", description: "Sum up.", argumentHint: null, chat: true },
+        { name: "review", description: "Shadowed.", argumentHint: null, chat: true }
+    ];
+    const strip = ({ name, description, argumentHint }: (typeof catalogue)[number]) => ({
+        name,
+        description,
+        argumentHint
+    });
+
+    it("offers Code every command and Chat only those that need no checkout", () => {
+        expect(enigmaSlash.enigmaSlashFor(catalogue, "code")).toEqual(catalogue.map(strip));
+        expect(enigmaSlash.enigmaSlashFor(catalogue, "chat").map((entry) => entry.name)).toEqual([
+            "recap",
+            "review"
+        ]);
+    });
+
+    it("lists them after the person's own in Code, behind any name already taken", () => {
+        const enigma = enigmaSlash.enigmaSlashFor(catalogue, "code");
+        const own: PolarCommandRow[] = [{ id: "1", shortcut: "handoff", prompt: "Mine", choice: automaticChoice() }];
+        const found = codeSlashMatches("/", [{ name: "recap", description: "skill" }], own, ["review"], enigma);
+        expect(found.filter((match) => match.kind === "enigma")).toEqual([
+            { kind: "enigma", command: strip(catalogue[0]!) }
+        ]);
+        expect(found.at(-1)?.kind).toBe("enigma");
+        expect(codeSlashMatches("/ga", [], [], [], enigma)).toEqual([{ kind: "enigma", command: strip(catalogue[0]!) }]);
+        expect(codeSlashMatches("/gate now", [], [], [], enigma)).toEqual([]);
+    });
+
+    it("reads back only well-formed rows from a cache", () => {
+        expect(
+            enigmaSlash.readEnigmaLists({ code: [{ name: "gate", description: "d" }, { name: 1 }], chat: "x" })
+        ).toEqual({ code: [{ name: "gate", description: "d", argumentHint: null }], chat: [] });
+        expect(enigmaSlash.readEnigmaLists(null)).toEqual(enigmaSlash.NO_ENIGMA_COMMANDS);
     });
 });

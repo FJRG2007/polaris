@@ -59,6 +59,7 @@ import { polarAgentDefault } from "@/lib/polar/agents/defaults";
 import { trialSkillSchema } from "@/lib/polar/skills/shared";
 import { ownEnigma } from "@/lib/agents/agent-defaults-service";
 import { enigmaCatalogue } from "@/lib/polar/skills/enigma-catalogue";
+import { chatCommandSkills } from "@/lib/polar/skills/enigma-commands";
 import {
     USE_SKILL,
     chatSkills,
@@ -431,8 +432,16 @@ export async function POST(request: Request): Promise<Response> {
             .then(async ({ resolved }) => {
                 if (!resolved.enabled) return null;
                 const off = new Set(resolved.skillsOff);
-                const { skills } = await enigmaCatalogue();
-                return skills.filter((skill) => !off.has(skill.name));
+                const { skills, commands } = await enigmaCatalogue();
+                const own = skills.filter((skill) => !off.has(skill.name));
+                // Its "/" commands a chat can run load like skills; a skill of
+                // the same name keeps it.
+                return [
+                    ...own,
+                    ...chatCommandSkills(commands).filter(
+                        (command) => !skills.some((skill) => skill.name === command.name)
+                    )
+                ];
             })
             .catch((error: unknown) => {
                 console.error("polar: could not read the Enigma settings", error);

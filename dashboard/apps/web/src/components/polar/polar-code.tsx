@@ -821,7 +821,7 @@ function CodeStart({
     const [issuePick, setIssue] = useState<{ repoId: string; issue: PickedIssue } | null>(null);
     const issue = issuePick?.repoId === repoId ? issuePick.issue : null;
     const [skill, setSkill] = useState<string | null>(null);
-    const own = usePolarCommands().commands;
+    const { commands: own, enigma } = usePolarCommands();
     const slash = useCodeSlash({
         value: prompt,
         onValueChange: setPrompt,
@@ -830,6 +830,7 @@ function CodeStart({
         onSkill: setSkill,
         place: "start",
         commands: START_COMMANDS,
+        enigma: enigma.code,
         onCommand: (command) => {
             setPrompt("");
             if (command === "help") return setPrompt("/");
@@ -1163,7 +1164,7 @@ function CodeThread({
     const [workspace, setWorkspace] = useState(false);
     const [failed, setFailed] = useState(false);
     const [reply, setReply] = useState("");
-    const own = usePolarCommands().commands;
+    const { commands: own, enigma } = usePolarCommands();
     const [error, setError] = useState<string | null>(null);
     const [busy, startTransition] = useTransition();
     const parts = useCodeComposerParts(busy);
@@ -1181,6 +1182,7 @@ function CodeThread({
         onSkill: null,
         place: "thread",
         commands,
+        enigma: enigma.code,
         onCommand: (command, rest) => runCommand(command, rest)
     });
 

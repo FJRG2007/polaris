@@ -3,8 +3,8 @@
 /**
  * Code's "/" list, on the same list and keys as Chat's: Code's own commands
  * (`lib/polar/code-commands`), the person's skills (a new task starts with the
- * one picked) and their own commands, which are spelled out when the message
- * is sent.
+ * one picked), their own commands, which are spelled out when the message
+ * is sent, and Enigma's, handed to the session's agent as typed.
  */
 
 import { useId, useState } from "react";
@@ -21,6 +21,7 @@ import {
     Plus,
     ScanSearch,
     ShieldCheck,
+    Sparkles,
     Square,
     SquareSlash,
     Wand2
@@ -34,6 +35,7 @@ import {
 } from "@/components/rich-text/suggestion-list";
 import * as polarSlash from "@/lib/polar/slash";
 import * as codeCommands from "@/lib/polar/code-commands";
+import * as enigmaSlash from "@/lib/polar/enigma-slash";
 import type { PolarCommandRow } from "@/lib/polar/shared";
 import { PolarSlashMenu } from "@/components/polar/polar-slash-menu";
 
@@ -70,16 +72,18 @@ export interface CodeSlashSkill {
 export type CodeSlashMatch =
     | { kind: "command"; command: CodeCommand }
     | { kind: "skill"; skill: CodeSlashSkill }
-    | { kind: "own"; row: PolarCommandRow };
+    | { kind: "own"; row: PolarCommandRow }
+    | { kind: "enigma"; command: enigmaSlash.EnigmaSlashCommand };
 
-/** The rows that match what has been typed: Code's commands, the skills, then
- *  the person's own. One of theirs that shares a command's name is hidden by
- *  it, as in Chat. */
+/** The rows that match what has been typed: Code's commands, the skills, the
+ *  person's own, then Enigma's. One of theirs that shares a command's name is
+ *  hidden by it, as in Chat, and Enigma's steps aside for any name above it. */
 export function codeSlashMatches(
     input: string,
     skills: readonly CodeSlashSkill[],
     own: readonly PolarCommandRow[],
-    commands: readonly CodeCommand[] = []
+    commands: readonly CodeCommand[] = [],
+    enigma: readonly enigmaSlash.EnigmaSlashCommand[] = []
 ): CodeSlashMatch[] {
     const query = polarSlash.slashQuery(input);
     if (query === null) return [];
@@ -97,7 +101,14 @@ export function codeSlashMatches(
                 (row) => row.shortcut,
                 query
             )
-            .map((row): CodeSlashMatch => ({ kind: "own", row }))
+            .map((row): CodeSlashMatch => ({ kind: "own", row })),
+        ...enigmaSlash
+            .matchEnigmaCommands(
+                input,
+                enigma,
+                new Set([...taken, ...skills.map((skill) => skill.name), ...own.map((row) => row.shortcut)])
+            )
+            .map((command): CodeSlashMatch => ({ kind: "enigma", command }))
     ];
 }
 
@@ -105,6 +116,7 @@ export function codeSlashMatches(
  * The list and the keys it answers for one Code composer. `onSkill` is null
  * where a skill cannot be applied (a session already running). `commands` are
  * Code's own on offer here, and `onCommand` runs one, picked or typed whole.
+ * `enigma` are Enigma's commands, sent to the session's agent as typed.
  */
 export function useCodeSlash({
     value,
@@ -114,6 +126,7 @@ export function useCodeSlash({
     onSkill,
     place = "thread",
     commands = [],
+    enigma = [],
     onCommand
 }: {
     value: string;
@@ -123,6 +136,7 @@ export function useCodeSlash({
     onSkill: ((name: string) => void) | null;
     place?: codeCommands.CodeCommandPlace;
     commands?: readonly CodeCommand[];
+    enigma?: readonly enigmaSlash.EnigmaSlashCommand[];
     onCommand?: (command: CodeCommand, rest: string) => void;
 }) {
     const t = useTranslations("polar");
@@ -130,7 +144,7 @@ export function useCodeSlash({
     const [active, setActive] = useState(0);
     // Escape closes the list for the "/" token it was open on.
     const [dismissed, setDismissed] = useState<string | null>(null);
-    const found = codeSlashMatches(value, onSkill ? skills : [], own, commands);
+    const found = codeSlashMatches(value, onSkill ? skills : [], own, commands, enigma);
     const items: SuggestionListItem[] = found.map((match) =>
         match.kind === "command"
             ? {
@@ -148,13 +162,21 @@ export function useCodeSlash({
                     icon: Wand2,
                     group: t("slash.groups.skills")
                 }
-              : {
-                    key: `own:${match.row.id}`,
-                    label: `/${match.row.shortcut}`,
-                    detail: match.row.prompt,
-                    icon: SquareSlash,
-                    group: t("slash.groups.own")
-                }
+              : match.kind === "enigma"
+                ? {
+                      key: `enigma:${match.command.name}`,
+                      label: `/${match.command.name}`,
+                      detail: match.command.description,
+                      icon: Sparkles,
+                      group: t("slash.groups.enigma")
+                  }
+                : {
+                      key: `own:${match.row.id}`,
+                      label: `/${match.row.shortcut}`,
+                      detail: match.row.prompt,
+                      icon: SquareSlash,
+                      group: t("slash.groups.own")
+                  }
     );
     const open = dismissed !== value && items.length > 0;
     const highlight =
@@ -175,6 +197,8 @@ export function useCodeSlash({
             onValueChange("");
             return;
         }
+        // Enigma's command is sent as typed, with whatever follows its name.
+        if (match.kind === "enigma") return onValueChange(`/${match.command.name} `);
         // The shortcut stays in the box; what is typed after it is added to
         // the command's words when the message is sent.
         onValueChange(`/${match.row.shortcut} `);
@@ -184,7 +208,9 @@ export function useCodeSlash({
         if (!match) return;
         if (match.kind === "skill") return pick(index);
         setActive(0);
-        onValueChange(`/${match.kind === "command" ? match.command : match.row.shortcut} `);
+        onValueChange(
+            `/${match.kind === "command" ? match.command : match.kind === "enigma" ? match.command.name : match.row.shortcut} `
+        );
     };
 
     const onKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {

@@ -85,6 +85,7 @@ import {
     SquareSlash,
     Target,
     Zap,
+    Sparkles,
     RotateCw,
     X
 } from "lucide-react";
@@ -103,6 +104,7 @@ import * as polarSubagents from "@/components/polar/polar-subagents";
 import * as subagentShared from "@/lib/polar/subagents/shared";
 import * as polarShared from "@/lib/polar/shared";
 import * as polarSlash from "@/lib/polar/slash";
+import * as enigmaSlash from "@/lib/polar/enigma-slash";
 import * as embedBridge from "@/lib/polar/embed-bridge";
 import * as settingsPath from "@/lib/polar/settings-path";
 import { SIDEBAR_KEY, THREAD_KEY, readStored, writeStored } from "@/lib/polar/stored";
@@ -642,18 +644,21 @@ const TAKES_TEXT = new Set<Control>(["rename", "goal"]);
 export type SlashMatch =
     | { kind: "builtin"; command: Command }
     | { kind: "control"; command: Control }
-    | { kind: "own"; row: polarShared.PolarCommandRow };
+    | { kind: "own"; row: polarShared.PolarCommandRow }
+    | { kind: "enigma"; command: enigmaSlash.EnigmaSlashCommand };
 
 export { ownCommandIn, shortcutRank } from "@/lib/polar/slash";
 const ranked = polarSlash.rankedByShortcut;
 const ownCommandIn = polarSlash.ownCommandIn;
 
-/** The "/" commands that match what has been typed, Polar's first and the
- *  person's own after, or none once the token has a space in it (a command
+/** The "/" commands that match what has been typed, Polar's first, the
+ *  person's own after, then Enigma's that a chat can run (one sharing a name
+ *  above steps aside), or none once the token has a space in it (a command
  *  with words after it is a message). */
 export function slashMatches(
     input: string,
-    own: readonly polarShared.PolarCommandRow[] = []
+    own: readonly polarShared.PolarCommandRow[] = [],
+    enigma: readonly enigmaSlash.EnigmaSlashCommand[] = []
 ): SlashMatch[] {
     if (!input.startsWith("/") || /\s/.test(input)) return [];
     const query = input.slice(1).toLowerCase();
@@ -669,7 +674,14 @@ export function slashMatches(
         ...ranked(own, (row) => row.shortcut, query).map((row): SlashMatch => ({
             kind: "own",
             row
-        }))
+        })),
+        ...enigmaSlash
+            .matchEnigmaCommands(
+                input,
+                enigma,
+                new Set<string>([...COMMANDS, ...CONTROLS, ...own.map((row) => row.shortcut)])
+            )
+            .map((command): SlashMatch => ({ kind: "enigma", command }))
     ];
 }
 
@@ -2061,7 +2073,7 @@ export function PolarChat({
     const lastMessage = chat.messages.at(-1);
     const canCompact = !busy && !compacting && !!lastMessage && !compactionOf(lastMessage);
     const commandsFull = commands.commands.length >= polarShared.POLAR_COMMAND_MOST;
-    const slashFound = slashMatches(input, commands.commands);
+    const slashFound = slashMatches(input, commands.commands, commands.enigma.chat);
     const slashItems: SuggestionListItem[] = [
         ...slashFound.map((match): SuggestionListItem =>
             match.kind === "control"
@@ -2083,13 +2095,21 @@ export function PolarChat({
                         disabled: LATER.has(match.command),
                         group: t("slash.groups.polar")
                     }
-                  : {
-                        key: `own:${match.row.id}`,
-                        label: `/${match.row.shortcut}`,
-                        detail: polarShared.firstLine(match.row.prompt),
-                        icon: Zap,
-                        group: t("slash.groups.own")
-                    }
+                  : match.kind === "enigma"
+                    ? {
+                          key: `enigma:${match.command.name}`,
+                          label: `/${match.command.name}`,
+                          detail: match.command.description,
+                          icon: Sparkles,
+                          group: t("slash.groups.enigma")
+                      }
+                    : {
+                          key: `own:${match.row.id}`,
+                          label: `/${match.row.shortcut}`,
+                          detail: polarShared.firstLine(match.row.prompt),
+                          icon: Zap,
+                          group: t("slash.groups.own")
+                      }
         ),
         ...(input.startsWith("/") && !/\s/.test(input)
             ? [
@@ -2135,10 +2155,11 @@ export function PolarChat({
             return;
         }
         const match = slashFound[index];
-        if (match?.kind === "own") {
+        if (match?.kind === "own" || match?.kind === "enigma") {
             // The shortcut goes into the box, and what is typed after it is
-            // added to the prompt when the message is sent.
-            setInput(`/${match.row.shortcut} `);
+            // added to the prompt when the message is sent. Enigma's is sent
+            // as typed; the chat's model loads its instructions by name.
+            setInput(`/${match.kind === "own" ? match.row.shortcut : match.command.name} `);
             textarea.current?.focus();
             return;
         }
@@ -2163,7 +2184,9 @@ export function PolarChat({
                 ? input.slice(1)
                 : match.kind === "own"
                   ? match.row.shortcut
-                  : match.command;
+                  : match.kind === "enigma"
+                    ? match.command.name
+                    : match.command;
         // The space after the name closes the list on its own.
         setInput(`/${name}${key === NEW_COMMAND ? "" : " "}`);
         textarea.current?.focus();
