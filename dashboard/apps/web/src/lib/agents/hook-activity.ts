@@ -91,6 +91,28 @@ const claude: Derive = (signal, payload) => {
     return null;
 };
 
+/**
+ * The plugins Polaris writes for the OpenCode family (OpenCode, Kilo Code, MiMo
+ * Code): a permission ask holds the turn until it is answered, and the answer
+ * is reported, so the block can be cleared.
+ */
+const opencode: Derive = (signal) => {
+    if (signal === "session-start" || signal === "user-prompt-submit" || TOOL_TRAFFIC.has(signal))
+        return "active";
+    if (signal === "permission-request") return "blocked";
+    if (signal === "permission-resolved") return "active";
+    if (signal === "stop") return "idle";
+    return null;
+};
+
+/** Pi and Prime Agent: a session that starts is waiting for its first prompt. */
+const pi: Derive = (signal) => {
+    if (signal === "session-start" || signal === "stop") return "idle";
+    if (signal === "user-prompt-submit") return "active";
+    if (signal === "session-end") return "exited";
+    return null;
+};
+
 const DERIVERS: Readonly<Record<string, Derive>> = {
     claude,
     codex: (signal) =>
@@ -140,7 +162,42 @@ const DERIVERS: Readonly<Record<string, Derive>> = {
     goose: standard,
     openhands: standard,
     devin: standard,
-    autohand: standard
+    autohand: standard,
+    // Why the turn ended decides it: a finished or interrupted turn is idle,
+    // one that failed or ran out of iterations wants the person.
+    auggie: (signal, payload) => {
+        if (signal === "session-start" || signal === "pre-tool-use" || signal === "post-tool-use") return "active";
+        if (signal === "session-end") return "exited";
+        if (signal !== "stop") return null;
+        const cause = text(payload, "agent_stop_cause");
+        if (cause === "end_turn" || cause === "interrupted") return "idle";
+        if (cause === "error" || cause === "max_iterations") return "waiting_input";
+        return null;
+    },
+    kimi: (signal) => {
+        if (signal === "permission-request") return "blocked";
+        if (signal === "permission-resolved") return "active";
+        return standard(signal, {});
+    },
+    vibe: (signal) =>
+        signal === "pre-tool-use" || signal === "post-tool-use" ? "active" : signal === "stop" ? "idle" : null,
+    opencode,
+    kilocode: opencode,
+    "mimo-code": opencode,
+    // Amp reports its thread's state: running, idle, or awaiting approval.
+    amp: (signal, payload) => {
+        if (signal === "user-prompt-submit" || signal === "pre-tool-use") return "active";
+        if (signal === "permission-request") return "waiting_input";
+        if (signal === "stop") return text(payload, "status") === "error" ? "waiting_input" : "idle";
+        return null;
+    },
+    pi,
+    "prime-agent": pi,
+    omp: (signal, payload) => {
+        if (signal === "permission-request") return "waiting_input";
+        if (signal === "permission-resolved") return "active";
+        return pi(signal, payload);
+    }
 };
 
 /**

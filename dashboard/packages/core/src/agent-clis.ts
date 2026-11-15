@@ -150,6 +150,24 @@ export interface AgentFirstRunAnswer {
      *  `FIRST_RUN_WORKDIR`. Left out where every answer for the file is
      *  asserted. */
     readonly json?: Readonly<Record<string, AgentFirstRunValue>>;
+    /**
+     * The whole file, for one Polaris owns outright: a hook script, or a plugin
+     * the tool loads. Written where there is no file yet or where the one there
+     * is Polaris's own (it names `POLARIS_STATE_DIR`), and never over a file
+     * somebody else wrote under the same name. Not JSON; `json` and `assert`
+     * are ignored beside it.
+     */
+    readonly text?: string;
+    /** With `text`: the file is made executable, for a tool that runs it by
+     *  path rather than through a shell. */
+    readonly executable?: boolean;
+    /**
+     * A block of lines Polaris keeps inside a file that is otherwise the
+     * person's, between `# polaris: managed hooks` and its closing line, for a
+     * file in a format the first-run program cannot parse (TOML). Replaced in
+     * place on every run; everything around it is left as it was.
+     */
+    readonly block?: string;
 }
 
 /** What an answer may be. Objects nest; everything else is a leaf, written
@@ -373,6 +391,12 @@ export interface AgentCli {
      * `AgentFirstRunAnswer`.
      */
     readonly firstRun: readonly AgentFirstRunAnswer[];
+    /**
+     * Arguments that load the activity hook a `firstRun` answer wrote, for a
+     * tool that only runs an extension it is pointed at. Added to the launch
+     * only where the first run is written (not on somebody's own server).
+     */
+    readonly hookArgs?: readonly string[];
     /**
      * The flags that run one turn without the tool's full-screen interface:
      * the prompt on standard input, the answer printed, the process gone. A
@@ -639,7 +663,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["opencode"],
         install: "npm install -g opencode-ai",
         home: ".config/opencode",
-        observe: "output",
+        observe: "hooks",
         docs: "https://opencode.ai/docs",
         acp: ["acp"],
         credentials: [
@@ -662,7 +686,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: [],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("opencode")
     },
     {
         id: "gemini",
@@ -773,7 +797,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["amp"],
         install: "npm install -g @ampcode/cli",
         home: ".config/amp",
-        observe: "output",
+        observe: "hooks",
         docs: "https://ampcode.com/manual",
         credentials: [
             {
@@ -786,7 +810,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: [],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("amp")
     },
     {
         id: "goose",
@@ -1020,12 +1044,12 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["kimi"],
         install: "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash",
         home: ".kimi",
-        observe: "output",
+        observe: "hooks",
         docs: "https://moonshotai.github.io/kimi-code/en/",
         credentials: [apiKey("KIMI_API_KEY", "Kimi API key", "https://moonshotai.github.io/kimi-code/en/")],
         autonomyArgs: ["-y"],
         autonomyEnv: {},
-        firstRun: [],
+        firstRun: hookFileAnswers("kimi"),
         acp: ["acp"]
     },
     {
@@ -1035,13 +1059,14 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["pi"],
         install: "npm install -g @earendil-works/pi-coding-agent",
         home: ".pi",
-        observe: "output",
+        observe: "hooks",
         docs: "https://github.com/earendil-works/pi",
         credentials: [ANTHROPIC_KEY, OPENAI_KEY],
         // Pi has no permission prompt to skip.
         autonomyArgs: [],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("pi"),
+        hookArgs: ["--extension", ".polaris/hooks/pi-activity.ts"]
     },
     {
         id: "auggie",
@@ -1050,7 +1075,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["auggie"],
         install: "npm install -g @augmentcode/auggie",
         home: ".augment",
-        observe: "output",
+        observe: "hooks",
         docs: "https://docs.augmentcode.com/cli/overview",
         credentials: [
             // `auggie auth login --headless` signs the account in on a machine
@@ -1069,7 +1094,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: [],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("auggie")
     },
     {
         id: "continue",
@@ -1121,7 +1146,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["kilo", "kilocode"],
         install: "npm install -g @kilocode/cli",
         home: null,
-        observe: "output",
+        observe: "hooks",
         docs: "https://kilo.ai/docs/code-with-ai/platforms/cli",
         credentials: [
             apiKey("KILO_API_KEY", "Kilo API key", "https://kilo.ai/docs/code-with-ai/platforms/cli"),
@@ -1131,7 +1156,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         // Its permissions are a configuration file, not a flag.
         autonomyArgs: [],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("kilocode")
     },
     {
         id: "vibe",
@@ -1140,12 +1165,12 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["vibe"],
         install: "uv tool install mistral-vibe",
         home: ".vibe",
-        observe: "output",
+        observe: "hooks",
         docs: "https://github.com/mistralai/mistral-vibe",
         credentials: [apiKey("MISTRAL_API_KEY", "Mistral API key", "https://github.com/mistralai/mistral-vibe")],
         autonomyArgs: ["--trust", "--agent", "auto-approve"],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("vibe")
     },
     {
         id: "muse",
@@ -1217,7 +1242,7 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["prime-agent"],
         install: "curl -fsSL https://app.primeintellect.ai/prime-agent/install.sh | sh",
         home: ".prime",
-        observe: "output",
+        observe: "hooks",
         docs: "https://github.com/PrimeIntellect-ai/prime-agent/blob/main/packages/coding-agent/docs/quickstart.md",
         credentials: [
             apiKey(
@@ -1230,7 +1255,8 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         ],
         autonomyArgs: [],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("prime-agent"),
+        hookArgs: ["--extension", ".polaris/hooks/prime-agent-activity.ts"]
     },
     {
         id: "omp",
@@ -1239,12 +1265,13 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["omp"],
         install: "curl -fsSL https://omp.sh/install | sh",
         home: ".omp",
-        observe: "output",
+        observe: "hooks",
         docs: "https://github.com/can1357/oh-my-pi",
         credentials: [],
         autonomyArgs: [],
         autonomyEnv: {},
-        firstRun: [],
+        firstRun: hookFileAnswers("omp"),
+        hookArgs: ["--extension", ".polaris/hooks/omp-activity.ts"],
         acp: ["acp"]
     },
     {
@@ -1284,12 +1311,12 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         binaries: ["mimo"],
         install: "npm install -g @mimo-ai/cli",
         home: null,
-        observe: "output",
+        observe: "hooks",
         docs: "https://github.com/XiaomiMiMo/MiMo-Code",
         credentials: [],
         autonomyArgs: ["--trust"],
         autonomyEnv: {},
-        firstRun: []
+        firstRun: hookFileAnswers("mimo-code")
     },
     {
         id: "minimax-code",

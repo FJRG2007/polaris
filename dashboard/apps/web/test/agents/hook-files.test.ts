@@ -159,6 +159,12 @@ describe("hook file rendering, per tool", () => {
             expect(cli(id).firstRun, id).toEqual([core.hookFileAnswer(id)]);
             expect(hasHookActivity(id), id).toBe(true);
         }
+        for (const id of Object.keys(core.AGENT_HOOK_WRITERS)) {
+            expect(core.AGENT_HOOK_FILES[id], id).toBeUndefined();
+            expect(cli(id).observe, id).toBe("hooks");
+            expect(cli(id).firstRun, id).toEqual(core.AGENT_HOOK_WRITERS[id]!());
+            expect(hasHookActivity(id), id).toBe(true);
+        }
         // And every tool observed through hooks has its events read.
         for (const entry of core.AGENT_CLIS)
             if (entry.observe === "hooks") expect(hasHookActivity(entry.id), entry.id).toBe(true);
@@ -176,7 +182,9 @@ describe("hook file rendering, per tool", () => {
         for (const signal of core.HOOK_SIGNALS) {
             const event = core.HOOK_SIGNAL_EVENTS[signal];
             const read = normalizeHookEvent({ hook_event_name: event });
-            if (signal === "pre-invocation") expect(read).toBeNull();
+            // Neither says anything a session's timeline shows: one is
+            // Antigravity's per-invocation tick, the other only clears a block.
+            if (signal === "pre-invocation" || signal === "permission-resolved") expect(read).toBeNull();
             else expect(read, signal).not.toBeNull();
         }
         expect(normalizeHookEvent({ hook_event_name: "PostToolUseFailure", tool_name: "Bash" })).toEqual(

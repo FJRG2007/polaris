@@ -30,6 +30,8 @@ import { shellQuote } from "./session-hooks";
 import { INSTALL_GH } from "./session-gh";
 import {
     FIRST_RUN_WORKDIR,
+    HOOK_BLOCK_END,
+    HOOK_BLOCK_START,
     HOOK_FILE_WORKDIR,
     hasControlCharacter,
     isAgentEffortLevel,
@@ -553,8 +555,32 @@ export function firstRunProgram(): string {
         // an agent on a screen nobody could reach can have answered already. See
         // `CLAUDE_WIZARD_ANSWER`.
         // What marks a hook entry as one Polaris wrote: the relay names the
-        // session's state directory, and nothing a person writes does.
-        'const ours = (value) => JSON.stringify(value).includes("POLARIS_STATE_DIR");',
+        // session's state directory, and nothing a person writes does - or,
+        // for a tool that runs a hook by path, the path is one of Polaris's
+        // relay scripts.
+        'const ours = (value) => { const text = JSON.stringify(value); return text.includes("POLARIS_STATE_DIR") || text.includes("polaris-hooks"); };',
+        // A path inside the worktree, in a value: `{workdir}/` at the start of a
+        // string is the session's checkout (a hook script run by path).
+        `const inCheckout = (value) => JSON.parse(JSON.stringify(value), (key, leaf) => typeof leaf === "string" && leaf.startsWith(${JSON.stringify(HOOK_FILE_WORKDIR)}) ? path.join(workdir, leaf.slice(${HOOK_FILE_WORKDIR.length})) : leaf);`,
+        // The lines Polaris keeps inside a file it cannot parse (TOML), between
+        // two markers, replaced in place; what is around them stays as it was.
+        // Ported from replaceVibeManagedBlock / joinVibeTOML in Agent
+        // Orchestrator's adapters/agent/vibe/hooks.go.
+        `const BLOCK_START = ${JSON.stringify(HOOK_BLOCK_START)};`,
+        `const BLOCK_END = ${JSON.stringify(HOOK_BLOCK_END)};`,
+        "function withBlock(existing, body) {",
+        '    const block = BLOCK_START + "\\n\\n" + body.replace(/\\n*$/, "\\n") + BLOCK_END + "\\n";',
+        '    let prefix = existing, suffix = "";',
+        "    const start = existing.indexOf(BLOCK_START);",
+        "    if (start >= 0) {",
+        "        prefix = existing.slice(0, start);",
+        "        const end = existing.indexOf(BLOCK_END, start + BLOCK_START.length);",
+        "        if (end >= 0) suffix = existing.slice(end + BLOCK_END.length);",
+        "    }",
+        '    prefix = prefix.replace(/\\n+$/, "");',
+        '    suffix = suffix.replace(/^\\n+/, "");',
+        '    return (prefix ? prefix + "\\n\\n" : "") + block + (suffix ? "\\n" + suffix : "");',
+        "}",
         // A hook file the tool reads from the checkout rather than the home:
         // kept out of every commit the agent makes. Untracked, it goes into
         // the clone's own exclude list; tracked (a repository that ships its
@@ -619,14 +645,39 @@ export function firstRunProgram(): string {
         "    if (inWorkdir && !workdir) continue;",
         `    const rel = inWorkdir ? answer.file.slice(${HOOK_FILE_WORKDIR.length}) : answer.file;`,
         "    const file = path.join(inWorkdir ? workdir : home, rel);",
+        // A file that is not JSON: one Polaris owns whole (a relay script, a
+        // plugin), or a block of lines in one that is somebody else's (TOML).
+        // A file of the same name that Polaris did not write is left alone and
+        // said so, never overwritten.
+        '    if (typeof answer.text === "string" || typeof answer.block === "string") {',
+        "        let existing = null;",
+        '        try { existing = fs.readFileSync(file, "utf8"); } catch {}',
+        '        if (typeof answer.text === "string" && existing !== null && !existing.includes("POLARIS_STATE_DIR")) {',
+        '            console.log("polaris: left " + file + " as it was; it is not one Polaris wrote");',
+        "            continue;",
+        "        }",
+        '        const next = typeof answer.text === "string" ? answer.text : withBlock(existing || "", answer.block);',
+        "        try {",
+        "            if (existing !== next) {",
+        "                fs.mkdirSync(path.dirname(file), { recursive: true });",
+        "                fs.writeFileSync(file, next);",
+        "                if (inWorkdir) keepOutOfCommits(rel);",
+        '                console.log("polaris: answered its first run in " + file);',
+        "            }",
+        "            if (answer.executable) fs.chmodSync(file, 0o755);",
+        "        } catch (error) {",
+        '            console.log("polaris: could not write " + file + " (" + error.message + ")");',
+        "        }",
+        "        continue;",
+        "    }",
         "    let current = {};",
         // A file that is not there, or is half-written, is answered the same way
         // as an empty one. The alternative is a session that will not start
         // because a cache file the tool owns had a byte out of place.
         '    try { current = JSON.parse(fs.readFileSync(file, "utf8")); } catch { current = {}; }',
         '    if (!current || typeof current !== "object" || Array.isArray(current)) current = {};',
-        "    let changed = answer.json ? fill(current, answer.json, false) : false;",
-        "    if (answer.assert && fill(current, answer.assert, true)) changed = true;",
+        "    let changed = answer.json ? fill(current, inCheckout(answer.json), false) : false;",
+        "    if (answer.assert && fill(current, inCheckout(answer.assert), true)) changed = true;",
         "    if (!changed) continue;",
         // Said out loud, on the screen somebody is watching - and said AFTER the
         // write rather than before it. Where a tool keeps its configuration is a

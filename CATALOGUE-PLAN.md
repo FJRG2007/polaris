@@ -5,9 +5,10 @@ The 38 terminal agents Agent Orchestrator (AO) runs are all in
 What is left, each item needing a value verified against AO source or the tool's
 own docs before it is written:
 
-1. Hooks for the new agents: ten are written from `AGENT_HOOK_FILES`
-   (`dashboard/packages/core/src/agent-hook-files.ts`); the rest, and why each
-   needs more than a table row, are in `U3-PLAN.md`.
+1. Hooks for the new agents: twenty are written from `AGENT_HOOK_FILES` and
+   `AGENT_HOOK_WRITERS` (`dashboard/packages/core/src/agent-hook-files.ts`);
+   the rest (codewhale, kiro, cline, muse, memcode), and why, are in
+   `U3-PLAN.md`.
 2. Model choice: most new agents take `--model`. Add `model: { provider, flag }`
    once the models.dev provider for each is confirmed (AO
    `docs/harnesses/model-catalogs.md`, `adapters/agent/modelcatalog`).

@@ -249,10 +249,15 @@ function agentCommandFor(
     // The effort picked for this session, on the flag the tool documents; only
     // a level that tool lists ever reaches the line.
     const effortArgs = core.agentEffortArgs(cli.id, session.effort);
+    // The extension that reports this session's activity, for a tool that only
+    // loads one it is pointed at. Only where the first run wrote it: on
+    // somebody's own server it was never written, and a missing extension is
+    // an agent that will not start.
+    const hookArgs = session.place === "host" ? [] : (cli.hookArgs ?? []);
     return {
         cli,
         binary,
-        command: [binary, ...args, ...modelArgs, ...effortArgs].join(" "),
+        command: [binary, ...args, ...modelArgs, ...effortArgs, ...hookArgs].join(" "),
         install: cli.install ?? "",
         launcher
     };

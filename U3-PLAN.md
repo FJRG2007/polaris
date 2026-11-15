@@ -1,26 +1,39 @@
 # U3 hook files - what is left
 
-Done in this branch: one renderer and per-CLI table
-(`dashboard/packages/core/src/agent-hook-files.ts`), event -> activity mapping
-(`dashboard/apps/web/src/lib/agents/hook-activity.ts`), Claude Code rendered
-through the shared `hookGroup`, and hook files for qwen, goose, droid,
-openhands, kimchi, devin, command-code, cursor, agy and autohand (plus the
-existing codex, gemini, copilot).
+Done in this branch (`dashboard/packages/core/src/agent-hook-files.ts`,
+`dashboard/apps/web/src/lib/agents/hook-activity.ts`, the first-run program in
+`session-commands.ts`):
 
-Not covered yet, each needing a writer the first-run program does not have
-(it edits JSON only). Source: AO `backend/internal/adapters/agent/<name>/hooks.go`.
+- JSON hook files from `AGENT_HOOK_FILES`: qwen, goose, droid, openhands,
+  kimchi, devin, command-code, cursor, agy, autohand (plus codex, gemini,
+  copilot in `agent-clis.ts`).
+- `AGENT_HOOK_WRITERS`, with two new first-run answer kinds (`text`, whole
+  file Polaris owns, never over a foreign file; `block`, a managed TOML block
+  between `# polaris: managed hooks` markers): auggie (relay scripts + settings),
+  kimi and vibe (TOML), opencode, kilocode, mimo-code, amp (plugins), pi, omp,
+  prime-agent (extensions loaded with `hookArgs: --extension ...`).
 
-1. auggie - `.augment/settings.local.json` must point at executable script
-   files (`.augment/ao-hooks/ao-<event>`), not a shell command; needs the boot
-   script to write one relay script per event, then one table row.
-2. TOML hook files: kimi (`config.toml`, 8 events), vibe (`.vibe/hooks.toml`, 3),
-   codewhale (`managed_config.toml`). Needs a TOML-aware writer.
-3. Plugin/extension files: opencode, opencode-v2, kilocode, amp, pi, omp,
-   prime-agent, crush (JS/TS plugin or extension the CLI loads).
-4. kiro - hooks live in an agent definition (`.kiro/agents/ao.json`) that only
-   applies when the CLI is started with that agent selected; needs a launch flag.
-5. cline (`.clinerules` hook scripts + payload session id), muse (env-prefixed
-   command, hook state in AO's data dir), memcode (context-chunk hooks and a
-   launch witness), mimo-code - each a custom format.
-6. Persist `hookActivity()` per session: U4 (`deriveSessionStatus`) is where it
-   is consumed. Today only `sessionEndIsSwap` is wired (events route).
+Not covered, and why:
+
+1. crush - nothing to port: Agent Orchestrator writes no activity hooks for it
+   (`crush/hooks.go` only manages a system-prompt file and the model).
+2. codewhale - reports through a `[lifecycle_outbox]` webhook named in a
+   managed config that `CODEWHALE_MANAGED_CONFIG_PATH` points at. Needs that
+   variable in the launch environment and a route that reads Codewhale's
+   lifecycle payloads; neither the payload shape nor the route exists here.
+3. kiro - hooks live in an agent definition (`.kiro/agents/<name>.json`) that
+   applies only when the CLI starts with that agent selected; needs the
+   definition written plus a `hookArgs` agent flag, after reading
+   `kiro/hooks.go` in full.
+4. cline (`.clinerules` hook scripts, session id from the payload), muse
+   (env-prefixed command, state in AO's data dir), memcode (context-chunk
+   hooks and a launch witness) - each a custom format; port from their
+   `hooks.go` with the `text`/`block` answers.
+5. Persist `hookActivity()` per session: U4 (`deriveSessionStatus`) consumes
+   it. Today only `sessionEndIsSwap` is wired (events route).
+
+Unverified here (no Docker on this machine): that each tool loads the file
+from the path written. The plugins were compiled and driven with events in
+`test/agents/hook-writers.test.ts`; the tools themselves were not run.
+prime-agent builds without `--extension` will refuse the flag (AO probes
+`--help` first; Polaris does not).
