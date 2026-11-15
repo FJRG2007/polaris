@@ -191,6 +191,7 @@ describe("the work Polaris runs on a schedule", () => {
             // and walk the same automation clock twice.
             "home-automations",
             "home-availability",
+            "home-readings",
             "home-recording",
             "home-retention",
             // Two passes would each tell a relay to hold the same camera, and a

@@ -72,8 +72,9 @@ export const placesExtension: AppExtension = {
             // Folds a week-old hour of readings into one row and drops what is
             // past the retention. Hourly: it only ever has an hour to fold.
             everyMs: Number(process.env.POLARIS_HOME_READINGS_MS) || 60 * MINUTE,
-            // Leased: two passes folding the same hour would count it twice.
-            leaseMs: 30 * MINUTE,
+            // Leased past the hour it runs on: two passes folding the same hour
+            // would count it twice.
+            leaseMs: 90 * MINUTE,
             run: async () => (await import("./readings")).sweepReadings()
         },
         {
