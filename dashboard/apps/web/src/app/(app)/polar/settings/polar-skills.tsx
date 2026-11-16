@@ -12,7 +12,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { Download, FlaskConical, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { Download, Eye, FlaskConical, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import {
     Badge,
     Button,
@@ -43,8 +43,11 @@ import {
     type SkillView,
     type TrialSkill
 } from "@/lib/polar/skills/shared";
+import { skillKey } from "@/lib/polar/skills/overrides";
+import type { OverrideSummary } from "@/lib/polar/skills/override-store";
+import { setBuiltinSkillEnabledAction } from "./skill-override-actions";
+import { EditedBadges, SkillDetailDialog, type SkillTarget } from "./skill-detail-dialog";
 import {
-    addTrialSkillAction,
     deleteSkillAction,
     importSkillsAction,
     saveSkillAction,
@@ -73,7 +76,16 @@ export function trySkillHref(trial: TrialSkill): string {
     return "/polar?new=1&skill=draft";
 }
 
-export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readOnly: boolean }) {
+export function PolarSkills({
+    initial,
+    summaries: initialSummaries,
+    readOnly
+}: {
+    initial: SkillView[];
+    /** Built-in skills by key: edited, outdated, switched on. */
+    summaries: Record<string, OverrideSummary>;
+    readOnly: boolean;
+}) {
     const t = useTranslations("polar");
     const router = useRouter();
     const [rows, setRows] = useState(initial);
@@ -82,7 +94,8 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
     const [editing, setEditing] = useState<Editing>(null);
     const [importing, setImporting] = useState<{ review: ImportReview | null } | null>(null);
     const [removing, setRemoving] = useState<SkillView | null>(null);
-    const [adding, setAdding] = useState<string | null>(null);
+    const [summaries, setSummaries] = useState(initialSummaries);
+    const [detail, setDetail] = useState<SkillTarget>(null);
 
     const wanted = rows.length > SEARCH_FROM ? query.trim().toLowerCase() : "";
     const shown = rows.filter(
@@ -121,13 +134,20 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
         }
     }
 
-    async function addFromCatalog(id: string) {
+    function setSummary(key: string, next: OverrideSummary) {
+        setSummaries((current) => ({ ...current, [key]: next }));
+    }
+
+    async function toggleBuiltin(key: string, enabled: boolean) {
         setError(null);
-        setAdding(id);
-        const answer = await addTrialSkillAction({ catalog: id });
-        setAdding(null);
-        if (answer.ok) setRows((current) => [...current, answer.value]);
-        else setError(answer.error);
+        const before = summaries[key];
+        const fallback: OverrideSummary = { edited: null, upstreamChanged: false, enabled: false };
+        setSummary(key, { ...(before ?? fallback), enabled });
+        const answer = await setBuiltinSkillEnabledAction({ skill: key, enabled });
+        if (!answer.ok) {
+            setSummary(key, before ?? fallback);
+            setError(answer.error);
+        }
     }
 
     return (
@@ -235,6 +255,16 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
                                         type="button"
                                         size="icon-sm"
                                         variant="ghost"
+                                        aria-label={t("settings.skills.upstream.open")}
+                                        title={t("settings.skills.upstream.open")}
+                                        onClick={() => setDetail({ kind: "own", skill: row })}
+                                    >
+                                        <Eye className="size-4 shrink-0" />
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="icon-sm"
+                                        variant="ghost"
                                         aria-label={t("settings.skills.download")}
                                         title={t("settings.skills.download")}
                                         onClick={() => downloadSkill(row)}
@@ -285,14 +315,27 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
                 <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {SKILL_CATALOG.map((skill) => {
                         const added = held.has(skill.id) || heldNames.has(skill.name);
+                        const key = skillKey("builtin", skill.id);
+                        const summary = summaries[key];
                         return (
                             <li key={skill.id} className="min-w-0">
                                 <Card className="h-full">
                                     <CardBody className="flex h-full flex-col gap-3">
                                         <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-medium">
-                                                {t(`settings.skills.catalog.${skill.id}.title` as never)}
-                                            </p>
+                                            <div className="flex min-w-0 items-start gap-2">
+                                                <p
+                                                    className="min-w-0 flex-1 truncate text-sm font-medium"
+                                                    title={t(`settings.skills.catalog.${skill.id}.title` as never)}
+                                                >
+                                                    {t(`settings.skills.catalog.${skill.id}.title` as never)}
+                                                </p>
+                                                <Switch
+                                                    checked={summary?.enabled === true}
+                                                    disabled={readOnly}
+                                                    aria-label={t("settings.skills.use")}
+                                                    onChange={(enabled) => void toggleBuiltin(key, enabled)}
+                                                />
+                                            </div>
                                             <p className="text-xs text-muted-foreground">
                                                 {t(`settings.skills.catalog.${skill.id}.description` as never)}
                                             </p>
@@ -309,20 +352,26 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
                                                 <FlaskConical className="h-3.5 w-3.5 shrink-0" />
                                                 {t("settings.skills.try")}
                                             </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="ghost"
+                                                onClick={() => setDetail({ kind: "upstream", key })}
+                                            >
+                                                {readOnly ? (
+                                                    <Eye className="h-3.5 w-3.5 shrink-0" />
+                                                ) : (
+                                                    <Pencil className="h-3.5 w-3.5 shrink-0" />
+                                                )}
+                                                {readOnly
+                                                    ? t("settings.skills.upstream.open")
+                                                    : t("settings.skills.upstream.openEdit")}
+                                            </Button>
+                                            <EditedBadges summary={summary} />
                                             {added ? (
-                                                <Badge variant="success">
+                                                <Badge variant="neutral" title={t("settings.skills.upstream.copyHint")}>
                                                     {t("settings.skills.added")}
                                                 </Badge>
-                                            ) : !readOnly ? (
-                                                <Button
-                                                    type="button"
-                                                    size="sm"
-                                                    disabled={adding === skill.id}
-                                                    onClick={() => void addFromCatalog(skill.id)}
-                                                >
-                                                    <Plus className="h-3.5 w-3.5 shrink-0" />
-                                                    {t("settings.skills.add")}
-                                                </Button>
                                             ) : null}
                                         </div>
                                     </CardBody>
@@ -333,6 +382,12 @@ export function PolarSkills({ initial, readOnly }: { initial: SkillView[]; readO
                 </ul>
             </div>
 
+            <SkillDetailDialog
+                target={detail}
+                readOnly={readOnly}
+                onClose={() => setDetail(null)}
+                onChanged={setSummary}
+            />
             <SkillImportDialog
                 open={importing !== null}
                 review={importing?.review ?? null}

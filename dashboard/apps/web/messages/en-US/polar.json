@@ -635,7 +635,9 @@
                 "unreachable": "Couldn't reach that address. Check it and try again.",
                 "address": "No skill can be read from that address.",
                 "nothing": "There's no SKILL.md there.",
-                "too_many": "Over 30 skills there. Point at one folder."
+                "too_many": "Over 30 skills there. Point at one folder.",
+                "adminOnly": "Only administrators can edit skills for everyone.",
+                "moved": "The original changed while you were editing. Open it again."
             },
             "catalog": {
                 "commit-message": {
@@ -705,6 +707,38 @@
                 "pass": "Passed every audit",
                 "warn": "Flagged by {providers}",
                 "fail": "Failed an audit by {providers}"
+            },
+            "upstream": {
+                "open": "Open",
+                "openEdit": "View and edit",
+                "builtin": "Built-in",
+                "enigma": "Enigma",
+                "fileLabel": "SKILL.md",
+                "loading": "Loading the skill...",
+                "loadFailed": "Couldn't load the skill.",
+                "retry": "Try again",
+                "close": "Close",
+                "tabFile": "SKILL.md",
+                "tabChanges": "Changes",
+                "tabEdit": "Edit",
+                "view": "View",
+                "tier": "Who the edit is for",
+                "tierMine": "Just me",
+                "tierAll": "Everyone",
+                "editedMine": "Edited",
+                "editedAll": "Edited for all",
+                "moved": "Update available",
+                "movedBody": "The original changed after this edit. Merge the two, keep your version, or take the new one.",
+                "merge": "Merge",
+                "keepMine": "Keep mine",
+                "takeTheirs": "Take theirs",
+                "reset": "Reset to original",
+                "mineLabel": "edited",
+                "theirsLabel": "original",
+                "conflicts": "Settle every <<<<<<< block before saving.",
+                "hintMine": "Only you get this version. The original keeps updating underneath.",
+                "hintAll": "Everyone on this Polaris gets this version unless they edit their own.",
+                "copyHint": "You also keep an older copy of this skill in your list."
             }
         },
         "groups": {

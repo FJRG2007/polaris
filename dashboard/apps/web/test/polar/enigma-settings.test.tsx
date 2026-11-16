@@ -12,6 +12,12 @@ import { applyEnigmaPrefs, enigmaPrefsOf, enigmaPrefsSchema, type EnigmaPrefs } 
 
 const saved: EnigmaPrefs[] = [];
 
+vi.mock("@/app/(app)/polar/settings/skill-override-actions", () => ({
+    readUpstreamSkillAction: async () => ({ ok: false, error: "x" }),
+    saveSkillOverrideAction: async () => ({ ok: false, error: "x" }),
+    resetSkillOverrideAction: async () => ({ ok: false, error: "x" }),
+    keepSkillOverrideAction: async () => ({ ok: false, error: "x" })
+}));
 vi.mock("@/app/(app)/polar/settings/skills-actions", () => ({
     saveEnigmaAction: async (prefs: EnigmaPrefs) => {
         saved.push(prefs);
@@ -92,7 +98,7 @@ describe("Enigma preferences", () => {
 
 describe("the Enigma group on the Skills page", () => {
     it("lists each skill with a switch, and saves the one switched off", async () => {
-        render(<EnigmaSettings initial={DEFAULTS} available skills={SKILLS} readOnly={false} />, {
+        render(<EnigmaSettings initial={DEFAULTS} available skills={SKILLS} summaries={{}} readOnly={false} />, {
             wrapper: MessagesWrapper
         });
         expect(screen.getByText("Enigma skills")).toBeTruthy();
@@ -104,7 +110,7 @@ describe("the Enigma group on the Skills page", () => {
     });
 
     it("says the list is unavailable rather than showing an empty one", () => {
-        render(<EnigmaSettings initial={DEFAULTS} available={false} skills={[]} readOnly={false} />, {
+        render(<EnigmaSettings initial={DEFAULTS} available={false} skills={[]} summaries={{}} readOnly={false} />, {
             wrapper: MessagesWrapper
         });
         expect(screen.getByText("The skill list can't be loaded right now.")).toBeTruthy();
@@ -112,7 +118,7 @@ describe("the Enigma group on the Skills page", () => {
 
     it("hides the settings and skills while Enigma is off", () => {
         render(
-            <EnigmaSettings initial={{ ...DEFAULTS, enabled: false }} available skills={SKILLS} readOnly={false} />,
+            <EnigmaSettings initial={{ ...DEFAULTS, enabled: false }} available skills={SKILLS} summaries={{}} readOnly={false} />,
             { wrapper: MessagesWrapper }
         );
         expect(screen.queryByLabelText("Use git-policy")).toBeNull();

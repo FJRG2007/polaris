@@ -10,7 +10,11 @@
 
 import { useState } from "react";
 import type { NamespaceKey } from "@/lib/i18n/types";
-import { Card, CardBody, Select, Switch } from "@polaris/ui";
+import { Eye, Pencil } from "lucide-react";
+import { Button, Card, CardBody, Select, Switch } from "@polaris/ui";
+import { skillKey } from "@/lib/polar/skills/overrides";
+import type { OverrideSummary } from "@/lib/polar/skills/override-store";
+import { EditedBadges, SkillDetailDialog, type SkillTarget } from "./skill-detail-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     ENIGMA_CHOICES,
@@ -57,15 +61,20 @@ export function EnigmaSettings({
     initial,
     available,
     skills,
+    summaries: initialSummaries,
     readOnly
 }: {
     initial: EnigmaPrefs;
     available: boolean;
     skills: readonly EnigmaSkillRow[];
+    /** Enigma's skills by key: edited, outdated. */
+    summaries: Record<string, OverrideSummary>;
     readOnly: boolean;
 }) {
     const t = useTranslations("polar");
     const [prefs, setPrefs] = useState(initial);
+    const [summaries, setSummaries] = useState(initialSummaries);
+    const [detail, setDetail] = useState<SkillTarget>(null);
     const [error, setError] = useState<string | null>(null);
     const off = new Set(prefs.skillsOff);
 
@@ -177,12 +186,25 @@ export function EnigmaSettings({
                             <CardBody className="flex flex-col divide-y divide-border p-0">
                                 {skills.map((skill) => (
                                     <Row key={skill.name} label={skill.name} hint={skill.description}>
+                                        <div className="flex flex-wrap items-center justify-end gap-2">
+                                        <EditedBadges summary={summaries[skillKey("enigma", skill.name)]} />
+                                        <Button
+                                            type="button"
+                                            size="icon-sm"
+                                            variant="ghost"
+                                            aria-label={readOnly ? t("settings.skills.upstream.open") : t("settings.skills.upstream.openEdit")}
+                                            title={readOnly ? t("settings.skills.upstream.open") : t("settings.skills.upstream.openEdit")}
+                                            onClick={() => setDetail({ kind: "upstream", key: skillKey("enigma", skill.name) })}
+                                        >
+                                            {readOnly ? <Eye className="size-4 shrink-0" /> : <Pencil className="size-4 shrink-0" />}
+                                        </Button>
                                         <Switch
                                             checked={!off.has(skill.name)}
                                             disabled={readOnly}
                                             aria-label={t("settings.enigma.useSkill", { name: skill.name })}
                                             onChange={(on) => setSkill(skill.name, on)}
                                         />
+                                        </div>
                                     </Row>
                                 ))}
                             </CardBody>
@@ -190,6 +212,12 @@ export function EnigmaSettings({
                     )}
                 </div>
             ) : null}
+            <SkillDetailDialog
+                target={detail}
+                readOnly={readOnly}
+                onClose={() => setDetail(null)}
+                onChanged={(key, next) => setSummaries((current) => ({ ...current, [key]: next }))}
+            />
         </section>
     );
 }

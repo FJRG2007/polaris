@@ -27,6 +27,7 @@ import { enigmaPrefsOf } from "@/lib/polar/enigma-prefs";
 import { ownEnigma } from "@/lib/agents/agent-defaults-service";
 import { enigmaCatalogue } from "@/lib/polar/skills/enigma-catalogue";
 import { listSkills } from "@/lib/polar/skills/store";
+import { overrideSummaries } from "@/lib/polar/skills/override-store";
 import { PolarAgents } from "./polar-agents";
 import { listAgents } from "@/lib/polar/agents/store";
 import type { AgentWork } from "@/lib/polar/agents/shared";
@@ -98,17 +99,20 @@ async function ConnectorsSection({
 
 /** The skills, once read; a viewer acting as somebody else reads and never writes. */
 async function SkillsSection({ userId, readOnly }: { userId: string; readOnly: boolean }) {
-    return <PolarSkills initial={await listSkills(userId)} readOnly={readOnly} />;
+    const [initial, summaries] = await Promise.all([listSkills(userId), overrideSummaries(userId, [])]);
+    return <PolarSkills initial={initial} summaries={summaries} readOnly={readOnly} />;
 }
 
 /** Enigma's settings and skills, from the person's own tier and the pinned catalogue. */
 async function EnigmaSection({ userId, readOnly }: { userId: string; readOnly: boolean }) {
     const [{ resolved }, catalogue] = await Promise.all([ownEnigma(userId), enigmaCatalogue()]);
+    const summaries = await overrideSummaries(userId, catalogue.skills);
     return (
         <EnigmaSettings
             initial={enigmaPrefsOf(resolved)}
             available={catalogue.available}
             skills={catalogue.skills.map(({ name, description }) => ({ name, description }))}
+            summaries={summaries}
             readOnly={readOnly}
         />
     );
