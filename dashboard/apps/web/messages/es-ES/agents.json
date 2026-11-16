@@ -666,6 +666,47 @@
                     "taken": "Otra sesión en curso tiene esta pull request. Tráela aquí para vincularla a esta."
                 }
             }
+        },
+        "reviewer": {
+            "title": "Agente revisor",
+            "hint": "Revisa cada commit nuevo de esta PR en solo lectura, en un contenedor aparte que no puede hacer push.",
+            "tool": "Herramienta",
+            "off": "Sin revisor",
+            "model": "Modelo del revisor",
+            "modelPlaceholder": "Por defecto",
+            "save": "Guardar",
+            "again": "Nueva revisión",
+            "running": "Revisando",
+            "none": "Sin revisión aún. El próximo commit se revisa solo.",
+            "ownerOnly": "Solo el dueño del repositorio cambia su revisor.",
+            "fedBack": "Los cambios pedidos se enviaron a la sesión.",
+            "promptIntro": "El agente revisor pidió cambios en la pull request #{number}:",
+            "states": {
+                "running": "Revisando",
+                "approved": "Aprobada",
+                "changesRequested": "Pide cambios",
+                "failed": "Falló",
+                "cancelled": "Cancelada"
+            },
+            "errors": {
+                "invalid": "Esa configuración del revisor no es válida.",
+                "noRepo": "Esta sesión no tiene repositorio.",
+                "notOwner": "Solo el dueño del repositorio cambia su revisor.",
+                "start_failed": "La revisión no arrancó. Revisa el acceso de la herramienta.",
+                "timed_out": "La revisión tardó demasiado y se paró.",
+                "container_gone": "La revisión se paró antes de acabar.",
+                "no_result": "El revisor terminó sin resultado."
+            },
+            "refused": {
+                "missing_reviewer": "Elige antes una herramienta.",
+                "review_running": "Ya se está revisando este commit.",
+                "terminated": "Esta sesión terminó.",
+                "no_pr": "Esta sesión aún no tiene pull request.",
+                "closed_pr": "La pull request está cerrada.",
+                "merged_pr": "La pull request está fusionada.",
+                "start_failed": "La revisión no arrancó. Revisa el acceso de la herramienta.",
+                "other": "La revisión no pudo arrancar."
+            }
         }
     },
     "rules": {

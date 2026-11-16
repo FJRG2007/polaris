@@ -31,6 +31,8 @@ import * as repoOptions from "@/lib/agents/repo-options";
 import { sessionCursorSchema } from "@/lib/agents/session-cursor";
 import * as review from "@/lib/agents/session-review";
 import * as timelines from "@/lib/agents/session-pr-timeline";
+import * as reviewer from "@/lib/agents/session-reviewer";
+import { requestReview } from "@/lib/agents/session-reviewer-service";
 import * as files from "@/lib/agents/session-files";
 import * as preview from "@/lib/agents/session-preview";
 import * as history from "@/lib/agents/session-history";
@@ -1474,4 +1476,137 @@ export async function claimSessionPullAction(
     if (result.kind === "refused")
         return { refusal: result.reason, error: t(`session.pr.claim.refusals.${result.reason}`) };
     return { pull: { number: result.pull.number, url: result.pull.url } };
+}
+
+// ---------------------------------------------------------------------------
+// Reviewer agent (session-reviewer.ts)
+// ---------------------------------------------------------------------------
+
+/** How many passes the tab lists, newest first. */
+const REVIEWS_SHOWN = 5;
+
+export interface SessionReviewerView {
+    /** The tools that can review, for the picker. */
+    options: { id: string; label: string }[];
+    cli: string | null;
+    model: string | null;
+    /** Whether this reader may change the repository's reviewer: its owner only. */
+    canEdit: boolean;
+    reviews: {
+        id: string;
+        headSha: string;
+        attempt: number;
+        trigger: string;
+        cli: string;
+        state: string;
+        verdict: string | null;
+        summary: string | null;
+        findings: reviewer.ReviewFinding[];
+        error: string | null;
+        fedBack: boolean;
+        startedAt: string;
+    }[];
+}
+
+/** The repository's reviewer and the latest passes over this session's pull request. */
+export async function sessionReviewerAction(
+    input: unknown
+): Promise<{ view?: SessionReviewerView | null; error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const parsed = sessionIdSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await sessions.getSession(parsed.data, user.id);
+    if (!session) return { error: t("sessions.errors.gone") };
+    if (!session.repoId) return { view: null };
+    const [repo, rows] = await Promise.all([
+        prisma.agentRepo.findUnique({
+            where: { id: session.repoId },
+            select: { ownerId: true, sessionReviewer: true, sessionReviewerModel: true }
+        }),
+        session.pullRequest
+            ? prisma.sessionReview.findMany({
+                  where: { sessionId: session.id, number: session.pullRequest.number },
+                  orderBy: { startedAt: "desc" },
+                  take: REVIEWS_SHOWN,
+                  select: {
+                      id: true,
+                      headSha: true,
+                      attempt: true,
+                      trigger: true,
+                      cli: true,
+                      state: true,
+                      verdict: true,
+                      summary: true,
+                      findings: true,
+                      error: true,
+                      fedBack: true,
+                      startedAt: true
+                  }
+              })
+            : Promise.resolve([])
+    ]);
+    if (!repo) return { view: null };
+    return {
+        view: {
+            options: reviewer.reviewerClis().map((cli) => ({ id: cli.id, label: cli.label })),
+            cli: reviewer.reviewerCli(repo.sessionReviewer)?.id ?? null,
+            model: repo.sessionReviewerModel,
+            canEdit: repo.ownerId === user.id,
+            reviews: rows.map((row) => ({
+                ...row,
+                findings: reviewer.readFindings(row.findings),
+                startedAt: row.startedAt.toISOString()
+            }))
+        }
+    };
+}
+
+const reviewerSettingsSchema = z
+    .object({
+        sessionId: sessionIdSchema,
+        cli: z.string().trim().max(64).nullable(),
+        model: z
+            .string()
+            .trim()
+            .max(200)
+            .nullable()
+            .transform((value) => (value ? value : null))
+            .refine((value) => value === null || core.SAFE_MODEL_ID.test(value))
+    })
+    .strict();
+
+/** Pick the repository's reviewer tool and model; a null tool turns it off. */
+export async function setSessionReviewerAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const parsed = reviewerSettingsSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.reviewer.errors.invalid") };
+    const cli = parsed.data.cli ? reviewer.reviewerCli(parsed.data.cli) : null;
+    if (parsed.data.cli && !cli) return { error: t("session.reviewer.errors.invalid") };
+    const session = await sessions.getSession(parsed.data.sessionId, user.id);
+    if (!session) return { error: t("sessions.errors.gone") };
+    if (!session.repoId) return { error: t("session.reviewer.errors.noRepo") };
+    const updated = await prisma.agentRepo.updateMany({
+        where: { id: session.repoId, ownerId: user.id },
+        data: { sessionReviewer: cli?.id ?? null, sessionReviewerModel: cli ? parsed.data.model : null }
+    });
+    if (updated.count === 0) return { error: t("session.reviewer.errors.notOwner") };
+    return {};
+}
+
+/** Review the pull request's current head now, whatever the last pass said. */
+export async function requestSessionReviewAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const parsed = sessionIdSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await sessions.getSession(parsed.data, user.id);
+    if (!session) return { error: t("sessions.errors.gone") };
+    if (!session.pullRequest) return { error: t("session.checks.noPull") };
+    const outcome = await requestReview({ sessionId: session.id, number: session.pullRequest.number, trigger: "manual" });
+    if (outcome.started) return {};
+    const known = ["missing_reviewer", "review_running", "terminated", "no_pr", "closed_pr", "merged_pr", "start_failed"] as const;
+    const reason = known.find((one) => one === outcome.reason) ?? "other";
+    return { error: t(`session.reviewer.refused.${reason}`) };
 }

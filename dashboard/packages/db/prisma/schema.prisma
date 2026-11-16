@@ -8853,6 +8853,12 @@ model AgentRepo {
     // Which pull requests are reviewed on their own, as stringified JSON in the
     // shape of ReviewSettings. Null, and any null inside it, inherits.
     review        String?
+    // The tool that reviews every new head of a Code session's pull request
+    // in this repository, read-only, in a container of its own: a catalogue id
+    // from AGENT_CLIS with a headless mode, or null for no reviewer (the
+    // default). Its model, or null for the tool's own default.
+    sessionReviewer      String?
+    sessionReviewerModel String?
     // What the agent noted about this repository across runs - its commands,
     // quirks and the corrections people gave it - as Markdown. Written back by
     // each run and editable by the operator. Null is nothing noted yet.
@@ -9565,6 +9571,7 @@ model AgentSession {
     messages AgentSessionMessage[]
     queuedPrompts AgentQueuedPrompt[]
     pullFacts SessionPullFacts[]
+    reviews   SessionReview[]
 
     @@unique([tokenHash])
     @@index([repoId, createdAt])
@@ -9641,6 +9648,45 @@ model SessionPullFacts {
     @@index([repoFullName, number])
     // The poll: open ones, stalest first.
     @@index([state, fetchedAt])
+}
+
+// One reviewer pass over one head commit of a Code session's pull request
+// (lib/agents/session-reviewer.ts). A head is reviewed once; a pass that
+// failed is retried up to a bound, each try its own row.
+model SessionReview {
+    id        String    @id @default(uuid(7)) @db.Uuid
+    sessionId String    @db.Uuid
+    number    Int
+    headSha   String
+    // Which try on this head this is, from 1.
+    attempt   Int       @default(1)
+    // auto | manual
+    trigger   String    @default("auto")
+    // The catalogue id that reviewed it, and the model, when one was picked.
+    cli       String
+    model     String?
+    // Where its container runs: the pool server, or null for this box.
+    hostId    String?   @db.Uuid
+    // running | complete | failed | cancelled
+    state     String    @default("running")
+    // approved | changes_requested, once complete.
+    verdict   String?
+    // The reviewer's own summary and findings, bounded where they are parsed.
+    summary   String?
+    findings  Json      @default("[]")
+    error     String?
+    // Whether the requested changes were queued to the session.
+    fedBack   Boolean   @default(false)
+    startedAt DateTime  @default(now())
+    finishedAt DateTime?
+
+    session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+    // One row per try on one head: two triggers racing for the same head
+    // cannot both start a container.
+    @@unique([sessionId, number, headSha, attempt])
+    // The sweep: running ones, oldest first.
+    @@index([state, startedAt])
 }
 
 // What a person's agent remembers about one repository, carried between the

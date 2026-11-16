@@ -666,6 +666,47 @@
                     "taken": "Another running session has this pull request. Move it here to link it to this one."
                 }
             }
+        },
+        "reviewer": {
+            "title": "Reviewer agent",
+            "hint": "Reviews each new commit of this pull request read-only, in a separate container that cannot push.",
+            "tool": "Reviewer tool",
+            "off": "No reviewer",
+            "model": "Reviewer model",
+            "modelPlaceholder": "Tool default",
+            "save": "Save",
+            "again": "Review again",
+            "running": "Reviewing",
+            "none": "No review yet. The next commit is reviewed automatically.",
+            "ownerOnly": "Only the repository's owner can change its reviewer.",
+            "fedBack": "Requested changes were sent to the session.",
+            "promptIntro": "The reviewer agent asked for changes on pull request #{number}:",
+            "states": {
+                "running": "Reviewing",
+                "approved": "Approved",
+                "changesRequested": "Changes requested",
+                "failed": "Failed",
+                "cancelled": "Cancelled"
+            },
+            "errors": {
+                "invalid": "That reviewer setting is not valid.",
+                "noRepo": "This session has no repository.",
+                "notOwner": "Only the repository's owner can change its reviewer.",
+                "start_failed": "The review could not start. Check the tool's sign-in and try again.",
+                "timed_out": "The review took too long and was stopped.",
+                "container_gone": "The review stopped before it finished.",
+                "no_result": "The reviewer finished without a result."
+            },
+            "refused": {
+                "missing_reviewer": "Pick a reviewer tool first.",
+                "review_running": "A review of this commit is already running.",
+                "terminated": "This session has ended.",
+                "no_pr": "This session has no pull request yet.",
+                "closed_pr": "The pull request is closed.",
+                "merged_pr": "The pull request is merged.",
+                "start_failed": "The review could not start. Check the tool's sign-in and try again.",
+                "other": "The review could not start."
+            }
         }
     },
     "rules": {

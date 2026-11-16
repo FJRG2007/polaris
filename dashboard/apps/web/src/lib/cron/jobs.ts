@@ -71,6 +71,7 @@ import { advanceActiveRuns } from "@/lib/agents/orchestration-service";
 import { reapLeftoverContainers, reapPoolLeftovers } from "@/lib/agents/leftover-containers";
 import { sweepSpares } from "@/lib/agents/session-spares";
 import { pollPullFacts } from "@/lib/agents/session-pr-facts";
+import { sweepReviews } from "@/lib/agents/session-reviewer-service";
 import { readPool } from "@/lib/agents/session-placement";
 import { recheckReach } from "@/lib/agents/pool-reach";
 import { removeLeftoverVolumes } from "@/lib/deploy/leftover-volumes";
@@ -762,6 +763,14 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // twice, out of the same installation's quota.
         leaseMs: 10 * MINUTE,
         run: () => pollPullFacts()
+    },
+    {
+        key: "agent-session-reviews",
+        // Collects reviewer passes whose container has exited, and stops one
+        // past its timeout. Leased: two runners would read the same logs.
+        everyMs: Number(process.env.POLARIS_SESSION_REVIEW_SWEEP_MS) || MINUTE,
+        leaseMs: 5 * MINUTE,
+        run: () => sweepReviews()
     },
     {
         key: "task-reminders",

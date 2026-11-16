@@ -444,6 +444,9 @@ export interface FeedbackDeps {
     enqueue(sessionId: string, ownerId: string, key: string, text: string): Promise<boolean>;
     saveState(sessionId: string, number: number, state: FeedbackState): Promise<void>;
     deliver(sessionId: string): Promise<void>;
+    /** Starts the repository's reviewer on this head when one is due
+     *  (`session-reviewer-service.ts`). Optional: absent starts none. */
+    review?(sessionId: string, number: number): void;
 }
 
 const DEFAULT_DEPS: FeedbackDeps = {
@@ -485,6 +488,13 @@ const DEFAULT_DEPS: FeedbackDeps = {
     deliver: async (sessionId) => {
         const queue = await import("@/lib/agents/session-prompt-queue");
         await queue.deliverNextQueued(sessionId);
+    },
+    // Not awaited: a container coming up (an image pull) must not hold the
+    // webhook or the poll that stored the facts. It catches its own failures.
+    review: (sessionId, number) => {
+        void import("@/lib/agents/session-reviewer-service")
+            .then((service) => service.requestReview({ sessionId, number, trigger: "auto" }))
+            .catch((error) => console.error(`[agent-session] ${sessionId}: the reviewer could not be asked`, error));
     }
 };
 
@@ -502,6 +512,7 @@ export async function reactToPullFacts(
         for (const kind of pullNoticeKinds(input.previous, facts))
             await deps.notice(sessionId, kind, { prNumber: facts.number, headSha: facts.headSha || null });
         await routeFeedback(input, deps);
+        if (facts.state === "open" && facts.headSha) deps.review?.(sessionId, facts.number);
     } catch (error) {
         console.error(`[agent-session] ${sessionId}: pull request feedback could not be routed`, error);
     }

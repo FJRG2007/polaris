@@ -51,6 +51,7 @@ import {
     XCircle
 } from "lucide-react";
 import { SessionMergeDialog } from "./session-merge-dialog";
+import { SessionReviewerPanel } from "./session-reviewer-panel";
 import {
     claimSessionPullAction,
     replySessionPullAction,
@@ -258,6 +259,7 @@ export function SessionPullTab({ session }: { session: SessionView }) {
             </header>
 
             <ChecksSection checks={timeline.checks} />
+            <SessionReviewerPanel session={session} />
 
             <section className="flex min-w-0 flex-col gap-2">
                 <h4 className="text-sm font-semibold">{t("session.pr.activity")}</h4>
