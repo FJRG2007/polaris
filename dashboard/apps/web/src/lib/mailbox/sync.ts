@@ -810,6 +810,8 @@ async function storeMessages(
         (await import("@/lib/automations/app-events")
             .then(({ anyListening }) => anyListening("mail.received"))
             .catch(() => false));
+    /** When each of these went into the trash, for the auto-empty. */
+    const trashedAt = folder.role === "trash" ? await trashMoments(account.id, fetched) : null;
 
     for (const message of fetched) {
         const envelope = message.envelope;
@@ -906,6 +908,9 @@ async function storeMessages(
                 draft: message.flags.has("\\Draft"),
                 deleted: message.flags.has("\\Deleted"),
                 important: message.flags.has(IMPORTANT),
+                ...(trashedAt
+                    ? { trashedAt: trashedAt.get(shape.messageId) ?? new Date() }
+                    : {}),
                 hasAttachments: message.structure.hasAttachments,
                 wantsReceipt: Boolean(
                     message.headers["disposition-notification-to"] ??
@@ -1016,6 +1021,39 @@ const TEXT_PREVIEW_BYTES = 4096;
  * the subject to go on. Only messages whose plain part was silent pay for this.
  */
 const HTML_PREVIEW_BYTES = 65536;
+
+/** How old a trash note may be and still date the row it belongs to. */
+const TRASH_NOTE_TRUST_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * When each of these messages entered the trash, by Message-Id: the note a move
+ * into the trash wrote (`MailTrashOrigin`) where there is one. A message put in
+ * the trash by another client has none and counts from the moment it is first
+ * seen here, the direction in which the auto-empty waits rather than destroys.
+ *
+ * A note is believed only while it is young. The row normally lands seconds
+ * after the move; an old note can belong to an earlier trip to the trash - put
+ * back from a phone, which leaves the note behind, and binned again weeks later
+ * - and dating the new trip from the old one would destroy it early.
+ */
+async function trashMoments(
+    accountId: string,
+    fetched: readonly Fetched[]
+): Promise<Map<string, Date>> {
+    const ids = [
+        ...new Set(fetched.map((message) => core.bareMessageId(message.envelope?.messageId ?? "")))
+    ].filter(Boolean);
+    if (ids.length === 0) return new Map();
+    const notes = await prisma.mailTrashOrigin.findMany({
+        where: {
+            accountId,
+            messageId: { in: ids },
+            at: { gte: new Date(Date.now() - TRASH_NOTE_TRUST_MS) }
+        },
+        select: { messageId: true, at: true }
+    });
+    return new Map(notes.map((note) => [note.messageId, note.at]));
+}
 
 /** The first few kilobytes of each message's text part, for the line under the
  *  subject. A message with no text part gets none, which is what a picture-only

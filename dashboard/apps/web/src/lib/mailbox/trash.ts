@@ -31,6 +31,7 @@ import * as refusal from "./action-refusal";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount, ownedMessages } from "./access";
 import { addDelta, nudgeFolderUnread, unseenByFolder } from "./folder-counts";
 import { rememberRemoved } from "./removed-uids";
+import { sweepableUids } from "./trash-sweep";
 
 /** What is remembered about a message on its way to the trash. */
 interface Trashed {
@@ -303,9 +304,10 @@ export async function emptyEveryFolderOfRole(
  * empties is not a safety net, it is a second mailbox that grows for ever - on
  * the mail server, where the quota is, and in Polaris' own copy of it.
  *
- * The date is the server's own search rather than a scan of what is cached here:
- * the window Polaris holds is the newest few hundred messages of the folder, and
- * the ones old enough to go are exactly the ones outside it. A mailbox set to
+ * The period counts from when a message entered the trash, which only Polaris'
+ * own row knows (`trashedAt`): the server's date is when it arrived, and an old
+ * message binned today is not a month in the bin. So only messages held here are
+ * swept, and one the server has that is not held here waits. A mailbox set to
  * zero is not asked about at all.
  *
  * Never throws. One unreachable mailbox must not stop the sweep for every other
@@ -325,15 +327,25 @@ export async function sweepTrash(): Promise<number> {
             await withImap(account, async (client) => {
                 const lock = await client.getMailboxLock(folder.path);
                 try {
-                    // `before` is the server's own comparison, against the date
-                    // the message carries - which is what a reader means by "it
-                    // has been in the bin a month".
+                    // The server's `before` compares the date a message arrived,
+                    // which a move keeps; the row's `trashedAt` is when it went
+                    // in the bin. Only what both call old goes - see
+                    // `sweepableUids`.
                     const old = await client.search({ before }, { uid: true });
                     if (!old || old.length === 0) return;
-                    await client.messageDelete(old, { uid: true });
-                    rememberRemoved(folder.id, old);
+                    const held = await prisma.mailMessage.findMany({
+                        where: { folderId: folder.id, trashedAt: { lt: before } },
+                        select: { uid: true, trashedAt: true },
+                        orderBy: { uid: "asc" },
+                        take: SWEEP_BATCH
+                    });
+                    const due = sweepableUids(old, held, before);
+                    if (due.length === 0) return;
+                    const removed = await client.messageDelete(due, { uid: true });
+                    if (!removed) return;
+                    rememberRemoved(folder.id, due);
                     const { count } = await prisma.mailMessage.deleteMany({
-                        where: { folderId: folder.id, uid: { in: old.map((uid) => BigInt(uid)) } }
+                        where: { folderId: folder.id, uid: { in: due.map((uid) => BigInt(uid)) } }
                     });
                     dropped += count;
                 } finally {
@@ -350,6 +362,9 @@ export async function sweepTrash(): Promise<number> {
     }
     return dropped;
 }
+
+/** Rows read per mailbox per sweep; the rest go on the next one. */
+const SWEEP_BATCH = 2000;
 
 /** A day, for the window above. */
 const DAY_MS = 24 * 60 * 60 * 1000;

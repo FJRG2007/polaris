@@ -13990,6 +13990,8 @@ model MailMessage {
     // Where it came back to when the snooze ends.
     snoozeFolderId String?   @db.Uuid
     pinned         Boolean   @default(false)
+    /// When it entered the trash, for the auto-empty. Null outside the trash.
+    trashedAt      DateTime?
 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt

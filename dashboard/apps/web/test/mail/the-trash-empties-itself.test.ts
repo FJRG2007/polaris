@@ -46,19 +46,19 @@ describe("the sweep itself", () => {
         expect(source).toContain("where: { trashKeepDays: { gt: 0 } }");
     });
 
-    it("lets the server decide what is old, not the window Polaris holds", async () => {
-        // The messages old enough to go are exactly the ones outside the few
-        // hundred this machine caches, so a scan of the cache would find none of
-        // them.
+    it("destroys only what the server and the row both call old", async () => {
+        // The server's date is when a message arrived, which a move keeps; only
+        // the row knows when it went in the bin (trash-empties-from-when-binned).
         const source = await trash;
         expect(source).toContain("const old = await client.search({ before }, { uid: true });");
-        expect(source).toContain("await client.messageDelete(old, { uid: true });");
+        expect(source).toContain("const due = sweepableUids(old, held, before);");
+        expect(source).toContain("await client.messageDelete(due, { uid: true });");
     });
 
     it("drops the rows it deleted rather than waiting for a sync to notice", async () => {
         const source = await trash;
         expect(source).toContain("await prisma.mailMessage.deleteMany({");
-        expect(source).toContain("uid: { in: old.map((uid) => BigInt(uid)) }");
+        expect(source).toContain("uid: { in: due.map((uid) => BigInt(uid)) }");
     });
 
     it("does not let one unreachable mailbox stop the rest", async () => {
