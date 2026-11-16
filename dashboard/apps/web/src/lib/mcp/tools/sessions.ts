@@ -14,13 +14,11 @@
  */
 
 import { z } from "zod";
-import { prisma } from "@polaris/db";
-import { after } from "next/server";
 import * as core from "@polaris/core";
 import { McpRefusal, type McpTool } from "../protocol";
 import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
-import * as queue from "@/lib/agents/session-queue";
+import { promptRefusal, startAgentSession } from "@/lib/agents/session-api";
 
 const listInput = z.object({
     live: z.boolean().default(true).describe("Only sessions that have not ended.")
@@ -124,11 +122,8 @@ const promptSessionTool: McpTool<z.infer<typeof promptInput>> = {
         if (!session) throw new McpRefusal("No session with that id that this key can reach.");
         if (session.id === caller.sessionId)
             throw new McpRefusal("That is this session. Send it to another one.");
-        if (core.isSessionOver(session.state)) throw new McpRefusal("That session has ended.");
-        if (core.isSessionQueued(session.state))
-            throw new McpRefusal(
-                "That session is still waiting for a free slot. It gets its first prompt when it starts."
-            );
+        const refused = promptRefusal(session);
+        if (refused) throw new McpRefusal(refused);
         const sender = caller.sessionId
             ? await sessions.getSession(caller.sessionId, caller.userId)
             : null;
@@ -170,44 +165,6 @@ const startInput = z.object({
         .describe("Branch to start from. Empty takes the repository's default.")
 });
 
-/**
- * Where a started session works.
- *
- * A named repository is looked up as before. With none, a session started BY a
- * session lands beside it - its repository (on a branch of its own), or the same
- * workspace directory on the same machine - which is what "start an agent on
- * the backend" means from inside a project. With neither, a workspace on the
- * person's own machine. Never the shared machine (see below).
- */
-export async function startPlace(
-    repoName: string,
-    caller: { userId: string; sessionId?: string | null }
-): Promise<{ repoId: string | null; place: core.AgentSessionPlace; hostId: string | null }> {
-    if (repoName.length > 0) {
-        const repo = await prisma.agentRepo.findFirst({
-            where: { ownerId: caller.userId, repoFullName: repoName, enabled: true },
-            select: { id: true }
-        });
-        if (!repo)
-            throw new McpRefusal(
-                `${repoName} is not a repository the Agents app reaches for this key.`
-            );
-        return { repoId: repo.id, place: "local", hostId: null };
-    }
-    const parent = caller.sessionId
-        ? await sessions.getSession(caller.sessionId, caller.userId)
-        : null;
-    if (!parent) return { repoId: null, place: "local", hostId: null };
-    // Somebody's own computer is theirs to put work on, never a model's: a
-    // session on one hands off to the Polaris box.
-    if (parent.place === "computer") return { repoId: parent.repoId, place: "local", hostId: null };
-    return {
-        repoId: parent.repoId,
-        place: parent.place,
-        hostId: parent.place === "host" ? parent.hostId : null
-    };
-}
-
 const startSessionTool: McpTool<z.infer<typeof startInput>> = {
     name: "agent_session_start",
     // i18n-ignore shown by the calling client, which has no locale to ask for
@@ -221,66 +178,20 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
     readOnly: false,
     destructive: false,
     async run(input, caller) {
-        const where = await startPlace(input.repo, caller);
-
-        // Through the same admission as the screen, so a model cannot start past
-        // the ceilings a person is held to: over one, the session queues.
-        let admission: Awaited<ReturnType<typeof queue.admitSession>>;
+        let started: Awaited<ReturnType<typeof startAgentSession>>;
         try {
-            admission = await queue.admitSession(
-                {
-            repoId: where.repoId,
-            startedById: caller.userId,
-            title: input.title,
-            cli: input.agent,
-            command: null,
-            // Not the agent's to choose. A session started over MCP runs in a
-            // container, where the default already applies; letting a tool call
-            // ask for more would be an agent widening its own permissions.
-            unattended: null,
-            // Whichever resolves. Choosing between somebody's subscriptions is
-            // not a thing to hand a model.
-            accountId: null,
-            // Whichever stored credential resolves, as it always did. Asking the
-            // machine to answer for itself is a choice a person makes on the
-            // form about a machine they signed in; a tool call has no machine in
-            // mind and would be choosing it blind.
-            useMachineLogin: false,
-            // The Polaris box, or the server the calling session already runs
-            // on - which its person chose. A model never picks a server itself.
-            place: where.place,
-            // Never the shared machine. A tool call is an agent acting for one
-            // person, and putting that on a container holding everybody's logins
-            // is not something an agent gets to decide.
-            sharedHome: false,
-            hostId: where.hostId,
-            baseRef: input.baseRef,
-            taskId: null,
-            enigma: null
-        },
-                input.prompt
-            );
+            started = await startAgentSession(caller, input);
         } catch (error) {
             if (error instanceof sessions.SessionRefusal) throw new McpRefusal(error.message);
             throw error;
         }
-        const { session } = admission;
-        if (admission.startError) {
-            throw new McpRefusal(
-                sessions.readableFailure(admission.startError, `starting ${session.id}`)
-            );
-        }
-        if (admission.queuedAt !== null) {
+        const { session, queuedAt } = started;
+        if (queuedAt !== null) {
             return {
-                text: `Queued ${session.id} on ${session.branch}: every slot is taken, and it is number ${admission.queuedAt} in line. It starts by itself when one frees, and gets the prompt then.`,
-                structured: { id: session.id, branch: session.branch, queuedAt: admission.queuedAt }
+                text: `Queued ${session.id} on ${session.branch}: every slot is taken, and it is number ${queuedAt} in line. It starts by itself when one frees, and gets the prompt then.`,
+                structured: { id: session.id, branch: session.branch, queuedAt }
             };
         }
-        // After the answer, not before it: the container is still cloning and
-        // installing, and a model held for that would spend its turn waiting on
-        // apt-get. The delivery waits for the agent's terminal and records what
-        // happened on the session either way.
-        after(() => runtime.deliverFirstPrompt(session.id, input.prompt));
         return {
             text: `Started ${session.id} on ${session.branch}. It gets the prompt as soon as it is up; check on it with agent_session_get.`,
             structured: { id: session.id, branch: session.branch, queuedAt: null }
