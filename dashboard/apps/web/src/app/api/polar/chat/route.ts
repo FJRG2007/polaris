@@ -460,13 +460,15 @@ export async function POST(request: Request): Promise<Response> {
                 if (!resolved.enabled) return null;
                 const off = new Set(resolved.skillsOff);
                 const { skills, commands } = await enigmaCatalogue();
-                // With the person's and the instance's edits applied.
-                const own = (
-                    await effectiveUpstreamSkills(
-                        user.id,
-                        skills.filter((skill) => !off.has(skill.name))
-                    )
-                ).enigma;
+                // With the person's and the instance's edits applied; when the
+                // edits cannot be read, Enigma's own copies still load.
+                const switchedOn = skills.filter((skill) => !off.has(skill.name));
+                const own = await effectiveUpstreamSkills(user.id, switchedOn)
+                    .then((found) => found.enigma)
+                    .catch((error: unknown) => {
+                        console.error("polar: could not read the skill edits", error);
+                        return switchedOn;
+                    });
                 // Its "/" commands a chat can run load like skills; a skill of
                 // the same name keeps it.
                 return [

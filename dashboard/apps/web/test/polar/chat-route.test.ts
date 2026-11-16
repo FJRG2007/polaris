@@ -57,6 +57,9 @@ const state = {
 };
 
 vi.mock("@/lib/polar/skills/store", () => ({ enabledSkills: async () => [], agentSkills: async () => [] }));
+vi.mock("@/lib/polar/skills/override-store", () => ({
+    effectiveUpstreamSkills: async (_userId: string, enigma: readonly unknown[]) => ({ builtins: [], enigma: [...enigma] })
+}));
 vi.mock("@/lib/agents/agent-defaults-service", () => ({
     ownEnigma: async () => ({ own: {}, resolved: { enabled: state.enigma, skillsOff: ["ci-policy"] } })
 }));
