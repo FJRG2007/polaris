@@ -285,7 +285,7 @@ export function SessionBoard({
                                         aria-controls={`board-column-${key}`}
                                         onClick={() => pickColumn(key)}
                                         className={ui.cn(
-                                            "flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-[0.8125rem] transition-colors",
+                                            "flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 text-[0.8125rem] transition-colors [@media(pointer:coarse)]:h-11",
                                             column === key
                                                 ? "bg-muted font-medium text-foreground"
                                                 : "text-muted-foreground hover:bg-card-hover hover:text-foreground"

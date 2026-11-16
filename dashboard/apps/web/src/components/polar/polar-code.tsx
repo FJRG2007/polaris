@@ -26,7 +26,7 @@ import { runAction } from "@/lib/run-action";
 import { fromWire } from "@/lib/app-bundles/wire";
 import { readPoll, sendAction, useUnmountSignal } from "@/lib/poll-fetch";
 import { mergeCodeRows } from "@/lib/polar/code-history";
-import { readStored, writeStored } from "@/lib/polar/stored";
+import { REPLY_TO_KEY, readStored, takeStored, writeStored } from "@/lib/polar/stored";
 import { CODE_AGENT_STORAGE_KEY, customAgentKey } from "@/lib/polar/agents/shared";
 import type { EnginePolicy } from "@/lib/polar/agents/code-sources";
 import {
@@ -1482,6 +1482,15 @@ function CodeThread({
     // Told the moment the session changes - an answer stored, a step taken -
     // rather than on the next poll, which stays underneath as the fallback.
     useEffect(() => (live ? watchSession(sessionId, read) : undefined), [live, sessionId, read]);
+    // Opened from a notification's Reply: the cursor goes to the reply box
+    // once the thread has drawn one.
+    const drawn = Boolean(thread);
+    useEffect(() => {
+        if (!drawn || readStored(REPLY_TO_KEY, "session") !== sessionId) return;
+        takeStored(REPLY_TO_KEY, "session");
+        const frame = requestAnimationFrame(() => focusInput(inputId));
+        return () => cancelAnimationFrame(frame);
+    }, [drawn, sessionId, inputId]);
 
     // What was just sent, shown at once and until the thread carries a new
     // message from the person - counted, so a repeat of an earlier line is not
@@ -2078,7 +2087,7 @@ function CodeThread({
                     onClick={onKeysHelp}
                     aria-label={t("code.keys.shortcuts")}
                     title={t("code.keys.shortcuts")}
-                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:size-11"
+                    className="max-md:hidden inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:size-11"
                 >
                     <Keyboard className="size-4" />
                 </button>
@@ -2264,12 +2273,14 @@ function CodePermission({
                 />
             ) : null}
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <Button type="button" size="sm" onClick={() => answer("allow")} disabled={busy}>
+                <Button type="button" size="sm"
+                    className="[@media(pointer:coarse)]:h-11" onClick={() => answer("allow")} disabled={busy}>
                     {t("code.permission.allow")}
                 </Button>
                 <Button
                     type="button"
                     size="sm"
+                    className="[@media(pointer:coarse)]:h-11"
                     variant="outline"
                     onClick={() => answer("always")}
                     disabled={busy}
@@ -2279,6 +2290,7 @@ function CodePermission({
                 <Button
                     type="button"
                     size="sm"
+                    className="[@media(pointer:coarse)]:h-11"
                     variant="ghost"
                     onClick={() => answer("deny")}
                     disabled={busy}

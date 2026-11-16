@@ -2579,6 +2579,11 @@
         "web/src/lib/name-tags/name-tag-service.ts",
         "web/src/app/u/[username]/profile-body.tsx",
         "web/src/app/(app)/account/layout.tsx",
-        "web/src/app/(app)/admin/layout.tsx"
+        "web/src/app/(app)/admin/layout.tsx",
+        "web/src/components/notification-bell.tsx",
+        "web/src/components/polar/polar-code-asks.tsx",
+        "web/src/components/polar/code-board/session-board.tsx",
+        "web/src/components/agents/sessions/continue-button.tsx",
+        "web/src/lib/agents/agent-notices.ts"
     ]
 }

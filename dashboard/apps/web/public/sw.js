@@ -63,25 +63,33 @@ self.addEventListener("fetch", (event) => {
 /*
  * A notice drawn through here - one with buttons, like a message's "Mark as
  * read". A press on a button makes the request the page put on it, which works
- * with no Polaris tab open at all; a press on the notice brings a Polaris window
- * forward on the page it names, or opens one.
+ * with no Polaris tab open at all; a button that names a page instead (an agent's
+ * "Reply") opens it; a press on the notice brings a Polaris window forward on
+ * the page it names, or opens one. A device that draws no buttons only
+ * ever has the last, so every notice with buttons also names its page.
  */
 self.addEventListener("notificationclick", (event) => {
     const notice = event.notification;
     const data = notice.data || {};
     notice.close();
-    const href =
-        typeof data.href === "string" && data.href.startsWith("/") && !data.href.startsWith("//")
-            ? data.href
-            : null;
+    const href = inAppPath(data.href);
 
     const pressed = (Array.isArray(data.actions) ? data.actions : []).find(
         (one) => one && one.id === event.action
     );
     if (pressed) {
+        const opens = inAppPath(pressed.href);
+        if (opens && !pressed.request) {
+            event.waitUntil(openOn(opens));
+            return;
+        }
         const request = pressed.request || {};
-        // Only a request back to this Polaris's own API.
-        if (typeof request.url !== "string" || !request.url.startsWith("/api/")) return;
+        // Only a request back to this Polaris's own API; anything else opens
+        // the notice's page, where the reader can answer it there.
+        if (typeof request.url !== "string" || !request.url.startsWith("/api/")) {
+            event.waitUntil(openOn(href));
+            return;
+        }
         event.waitUntil(
             fetch(request.url, {
                 method: "POST",
@@ -99,6 +107,11 @@ self.addEventListener("notificationclick", (event) => {
     }
     event.waitUntil(openOn(href));
 });
+
+/** A path on this Polaris, or null: never another origin, never `//host`. */
+function inAppPath(value) {
+    return typeof value === "string" && value.startsWith("/") && !value.startsWith("//") ? value : null;
+}
 
 /** Whether a button's request was turned down: a failed status, or an action
  *  route's `{ value: { error } }`. */
@@ -158,7 +171,11 @@ self.addEventListener("push", (event) => {
         actions: buttons.map((one) => ({ action: one.action, title: one.title })),
         data: {
             href: typeof notice.href === "string" ? notice.href : "/",
-            actions: buttons.map((one) => ({ id: one.action, request: one.request || null }))
+            actions: buttons.map((one) => ({
+                id: one.action,
+                request: one.request || null,
+                href: inAppPath(one.href)
+            }))
         }
     };
     event.waitUntil(self.registration.showNotification(title, options));

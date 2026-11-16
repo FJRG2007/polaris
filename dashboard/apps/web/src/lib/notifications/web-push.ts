@@ -119,6 +119,8 @@ export interface PushAction {
     readonly title: string;
     /** What a press posts, to this Polaris's own API only, with no tab open. */
     readonly request?: { readonly url: string; readonly body: unknown };
+    /** In-app path a press opens instead, for a button with no request. */
+    readonly href?: string;
 }
 
 /** What the service worker draws. Kept small: push services cap a payload at 4 KB. */

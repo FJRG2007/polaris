@@ -15,7 +15,8 @@
 import { prisma } from "@polaris/db";
 import { notify, pushNotice } from "@/lib/notifications/dispatch";
 import { wordsFor } from "@/lib/notifications/notice-words";
-import { sessionViewSubject } from "@/lib/notifications/view-subject";
+import type { PushAction } from "@/lib/notifications/web-push";
+import { sessionReplyHref, sessionViewSubject } from "@/lib/notifications/view-subject";
 
 export const WAITING_EVENT = "agent.waiting";
 
@@ -35,6 +36,39 @@ export function sessionPushTag(sessionId: string): string {
  */
 export function polarSessionHref(sessionId: string): string {
     return sessionViewSubject(sessionId);
+}
+
+/** The route a notification's button answers a permission prompt through. */
+const PERMISSION_ANSWER_URL = "/api/agents/sessions/permission";
+
+/** The words on each button, from the owner's `notices` catalog. */
+const CHOICE_WORDS = {
+    allow: "agents.permissionAllow",
+    deny: "agents.permissionDeny",
+    always: "agents.permissionAlways"
+} as const;
+const REPLY_WORD = "agents.reply";
+
+/**
+ * The buttons pushed with a session that needs its owner. A permission prompt
+ * is answered on the notification itself; "Always" last, so a device that
+ * draws only two buttons keeps the two that answer this prompt alone. A
+ * question or a plan is answered in words, so it gets Answer, which opens the
+ * session with the cursor in the reply box. A device that draws no buttons
+ * opens the session from the notification either way. Pure.
+ */
+export function sessionPushActions(
+    sessionId: string,
+    words: (key: (typeof CHOICE_WORDS)[keyof typeof CHOICE_WORDS] | typeof REPLY_WORD) => string,
+    prompt: { requestId: string } | null
+): PushAction[] {
+    if (!prompt)
+        return [{ action: "reply", title: words(REPLY_WORD), href: sessionReplyHref(sessionId) }];
+    return (["allow", "deny", "always"] as const).map((choice) => ({
+        action: choice,
+        title: words(CHOICE_WORDS[choice]),
+        request: { url: PERMISSION_ANSWER_URL, body: { requestId: prompt.requestId, choice } }
+    }));
 }
 
 /** The page a run's notices point at. */
@@ -94,7 +128,11 @@ export async function noticeSessionWaiting(sessionId: string): Promise<void> {
             href: polarSessionHref(subject.id),
             actionRequired: true,
             metadata: { sessionId: subject.id },
-            push: { tag: sessionPushTag(subject.id), requireInteraction: true }
+            push: {
+                tag: sessionPushTag(subject.id),
+                requireInteraction: true,
+                actions: sessionPushActions(subject.id, t, null)
+            }
         });
     } catch (error) {
         quietly(`session ${sessionId} waiting`, error);
@@ -142,17 +180,6 @@ export async function readSessionWaiting(sessionId: string, userId: string): Pro
     }
 }
 
-/** The route a notification's button answers a permission prompt through. */
-const PERMISSION_ANSWER_URL = "/api/agents/sessions/permission";
-
-/** "Always" last, so a device that draws only two buttons keeps the two that
- *  answer this prompt alone. */
-const CHOICE_WORDS = {
-    allow: "agents.permissionAllow",
-    deny: "agents.permissionDeny",
-    always: "agents.permissionAlways"
-} as const;
-
 /**
  * A permission prompt Polaris can answer: pushed to the owner's devices with
  * Allow and Deny on the notification itself, in place of the "needs you" one.
@@ -179,11 +206,7 @@ export async function pushPermissionRequest(
             push: {
                 tag: sessionPushTag(subject.id),
                 requireInteraction: true,
-                actions: (buttons ? (["allow", "deny", "always"] as const) : []).map((choice) => ({
-                    action: choice,
-                    title: t(CHOICE_WORDS[choice]),
-                    request: { url: PERMISSION_ANSWER_URL, body: { requestId, choice } }
-                }))
+                actions: sessionPushActions(subject.id, t, buttons ? { requestId } : null)
             }
         });
     } catch (error) {

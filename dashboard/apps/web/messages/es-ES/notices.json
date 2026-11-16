@@ -494,6 +494,7 @@
         "permissionTitle": "{session} pide permiso",
         "permissionAllow": "Permitir",
         "permissionDeny": "Denegar",
+        "reply": "Responder",
         "permissionAlways": "Permitir siempre"
     },
     "cloudLeft": {

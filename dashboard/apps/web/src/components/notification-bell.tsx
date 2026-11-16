@@ -11,10 +11,13 @@
  * alert you have read the whole of in the badge - most of them are one line - was
  * to follow it somewhere you did not want to go, or to clear the ones you had not
  * read with it.
+ *
+ * On a phone the same list opens as a sheet over the whole screen instead of a
+ * menu hanging off the bar: rows a finger can hit, and room for more of them.
  */
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Bell, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { badgeLabel } from "@/lib/notification-badge";
@@ -24,7 +27,11 @@ import { NotificationRepeats } from "@/components/notifications/notification-rep
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import { NotificationFace } from "@/components/notifications/notification-face";
 import { describeAudience } from "@/components/notifications/notification-visuals";
+import type { NotificationView } from "@/lib/notification-service";
 import {
+    Dialog,
+    DialogTitle,
+    SheetContent,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -35,6 +42,61 @@ import {
 
 /** How many alerts the dropdown previews before sending the user to the page. */
 const PREVIEW_COUNT = 8;
+/** How many the phone's sheet lists: it has the whole screen to scroll. */
+const SHEET_COUNT = 30;
+/** Below `sm`, where the bell opens a sheet rather than a menu. */
+const PHONE_QUERY = "(max-width: 639px)";
+
+/** Whether the screen is a phone's. Not on the server, where the menu is drawn. */
+function usePhone(): boolean {
+    return useSyncExternalStore(
+        (notify) => {
+            if (typeof window.matchMedia !== "function") return () => undefined;
+            const query = window.matchMedia(PHONE_QUERY);
+            query.addEventListener("change", notify);
+            return () => query.removeEventListener("change", notify);
+        },
+        () => typeof window.matchMedia === "function" && window.matchMedia(PHONE_QUERY).matches,
+        () => false
+    );
+}
+
+/** Where a notice goes when it is pressed: its own page, or the full list. */
+function noticeHref(item: NotificationView): string {
+    return item.href && item.href.startsWith("/") ? item.href : "/account/notifications";
+}
+
+/** A notice's face, title and the line under it: the same in the menu and the sheet. */
+function NoticeSummary({ item }: { item: NotificationView }) {
+    const t = useTranslations("components");
+    const audience = describeAudience(item.audience, item.audienceLabel, t);
+    return (
+        <>
+            <NotificationFace row={item} className="mt-0.5" />
+            <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5">
+                    {!item.read ? <span className="size-1.5 shrink-0 rounded-full bg-primary" /> : null}
+                    <span className="truncate text-[0.8125rem]" title={item.title}>
+                        {item.title}
+                    </span>
+                </span>
+                <span className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
+                    <RelativeTime iso={item.createdAt} />
+                    <NotificationRepeats row={item} />
+                    <span aria-hidden="true">-</span>
+                    <span className="truncate" title={audience.text}>
+                        {audience.text}
+                    </span>
+                    {item.actionRequired ? (
+                        <span className="min-w-0 max-w-full shrink-0 truncate text-warning" title={t("bell.actionNeeded")}>
+                            {t("bell.actionNeeded")}
+                        </span>
+                    ) : null}
+                </span>
+            </span>
+        </>
+    );
+}
 
 export function NotificationBell() {
     const { items, unread, markAllRead, markRead } = useNotificationFeed();
@@ -42,6 +104,82 @@ export function NotificationBell() {
     const badge = badgeLabel(unread);
     const [open, setOpen] = useState(false);
     const router = useRouter();
+    const phone = usePhone();
+
+    if (phone)
+        return (
+            <>
+                <button
+                    type="button"
+                    data-tour="shell.notifications"
+                    className="relative grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground before:absolute before:-inset-1.5 before:content-['']"
+                    aria-label={t("bell.label", { unread })}
+                    aria-haspopup="dialog"
+                    onClick={() => setOpen(true)}
+                >
+                    <Bell className="size-4" />
+                    {badge ? (
+                        <span className="absolute -end-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] font-medium leading-4 text-white">
+                            {badge}
+                        </span>
+                    ) : null}
+                </button>
+                <Dialog open={open} onOpenChange={setOpen}>
+                    <SheetContent aria-describedby={undefined}>
+                        <div className="flex min-w-0 shrink-0 items-center gap-2 border-b border-border px-4 py-2 pe-14">
+                            <DialogTitle className="min-w-0 flex-1 truncate text-base">{t("bell.heading")}</DialogTitle>
+                            {unread > 0 ? (
+                                <button
+                                    type="button"
+                                    onClick={markAllRead}
+                                    className="min-h-11 shrink-0 px-2 text-sm text-primary hover:underline"
+                                >
+                                    {t("bell.markAllRead")}
+                                </button>
+                            ) : null}
+                        </div>
+                        {items.length === 0 ? (
+                            <p className="px-4 py-10 text-center text-sm text-muted-foreground">{t("bell.empty")}</p>
+                        ) : (
+                            <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1">
+                                {items.slice(0, SHEET_COUNT).map((item) => (
+                                    <li key={item.id} className="flex min-w-0 items-stretch">
+                                        <Link
+                                            href={noticeHref(item)}
+                                            onClick={() => {
+                                                markRead(item.id);
+                                                setOpen(false);
+                                            }}
+                                            className="flex min-h-14 min-w-0 flex-1 items-start gap-2 px-4 py-2.5 hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+                                        >
+                                            <NoticeSummary item={item} />
+                                        </Link>
+                                        {!item.read ? (
+                                            <button
+                                                type="button"
+                                                aria-label={t("bell.markReadNamed", { title: item.title })}
+                                                title={t("bell.markRead")}
+                                                onClick={() => markRead(item.id)}
+                                                className="grid size-11 shrink-0 place-items-center self-center text-muted-foreground/70 hover:text-success"
+                                            >
+                                                <Check className="size-4" />
+                                            </button>
+                                        ) : null}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                        <Link
+                            href="/account/notifications"
+                            onClick={() => setOpen(false)}
+                            className="mt-auto flex min-h-12 shrink-0 items-center justify-center border-t border-border text-sm text-muted-foreground hover:text-foreground"
+                        >
+                            {t("bell.viewAll")}
+                        </Link>
+                    </SheetContent>
+                </Dialog>
+            </>
+        );
 
     return (
         // Controlled and non-modal for the double press below, the same way the
@@ -96,7 +234,6 @@ export function NotificationBell() {
                 ) : (
                     <div className="max-h-80 min-h-0 overflow-auto overscroll-contain">
                         {items.slice(0, PREVIEW_COUNT).map((item) => {
-                            const audience = describeAudience(item.audience, item.audienceLabel, t);
                             return (
                                 <div key={item.id} className="flex items-start">
                                     <DropdownMenuItem
@@ -104,43 +241,8 @@ export function NotificationBell() {
                                         onSelect={() => markRead(item.id)}
                                         className="min-w-0 flex-1"
                                     >
-                                        <Link
-                                            href={
-                                                item.href && item.href.startsWith("/")
-                                                    ? item.href
-                                                    : "/account/notifications"
-                                            }
-                                        >
-                                            <NotificationFace row={item} className="mt-0.5" />
-                                            <span className="min-w-0 flex-1">
-                                                <span className="flex items-center gap-1.5">
-                                                    {!item.read ? (
-                                                        <span className="size-1.5 shrink-0 rounded-full bg-primary" />
-                                                    ) : null}
-                                                    <span
-                                                        className="truncate text-[0.8125rem]"
-                                                        title={item.title}
-                                                    >
-                                                        {item.title}
-                                                    </span>
-                                                </span>
-                                                <span className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
-                                                    <RelativeTime iso={item.createdAt} />
-                                                    <NotificationRepeats row={item} />
-                                                    <span aria-hidden="true">-</span>
-                                                    <span
-                                                        className="truncate"
-                                                        title={audience.text}
-                                                    >
-                                                        {audience.text}
-                                                    </span>
-                                                    {item.actionRequired ? (
-                                                        <span className="min-w-0 max-w-full shrink-0 truncate text-warning" title={t("bell.actionNeeded")}>
-                                                            {t("bell.actionNeeded")}
-                                                        </span>
-                                                    ) : null}
-                                                </span>
-                                            </span>
+                                        <Link href={noticeHref(item)}>
+                                            <NoticeSummary item={item} />
                                         </Link>
                                     </DropdownMenuItem>
                                     {!item.read ? (

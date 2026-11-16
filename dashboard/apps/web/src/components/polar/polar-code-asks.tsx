@@ -18,6 +18,8 @@ import type { AskAnswer, AskQuestion, SessionAsk, SessionTodo } from "@/lib/agen
 import { Check, ChevronDown, ChevronLeft, ChevronRight, Circle, CircleDot, ListChecks, MessageCircleQuestion, NotebookPen } from "lucide-react";
 
 const CARD = "flex min-w-0 flex-col gap-2 rounded-lg border border-border bg-card p-3";
+/** A button a finger has to hit: 44px tall on a touch screen. */
+const TOUCH = "[@media(pointer:coarse)]:h-11";
 
 /** The agent's todo list, folded to its progress line until opened. */
 export function CodeTodos({ todos }: { todos: readonly SessionTodo[] }) {
@@ -212,7 +214,7 @@ export function AskCard({
                             onClick={() => setIndex(index - 1)}
                             disabled={index === 0}
                             aria-label={t("code.ask.previous")}
-                            className="rounded p-0.5 hover:bg-card-hover disabled:opacity-40"
+                            className="rounded p-0.5 hover:bg-card-hover disabled:opacity-40 [@media(pointer:coarse)]:grid [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:place-items-center"
                         >
                             <ChevronLeft className="size-4" aria-hidden />
                         </button>
@@ -222,7 +224,7 @@ export function AskCard({
                             onClick={() => setIndex(index + 1)}
                             disabled={last}
                             aria-label={t("code.ask.next")}
-                            className="rounded p-0.5 hover:bg-card-hover disabled:opacity-40"
+                            className="rounded p-0.5 hover:bg-card-hover disabled:opacity-40 [@media(pointer:coarse)]:grid [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:place-items-center"
                         >
                             <ChevronRight className="size-4" aria-hidden />
                         </button>
@@ -242,7 +244,7 @@ export function AskCard({
                             onClick={() => pick(at)}
                             disabled={busy}
                             className={cn(
-                                "flex min-w-0 items-start gap-2 rounded-md border px-2 py-1.5 text-start text-sm transition-colors hover:bg-card-hover disabled:opacity-60",
+                                "flex min-w-0 items-start gap-2 rounded-md border px-2 py-1.5 text-start text-sm transition-colors hover:bg-card-hover disabled:opacity-60 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:py-2.5",
                                 on ? "border-primary" : "border-border"
                             )}
                         >
@@ -266,7 +268,7 @@ export function AskCard({
                         type="button"
                         onClick={() => update({ labels: question.multiSelect ? mine.labels : [], other: "" })}
                         disabled={busy}
-                        className="rounded-md border border-dashed border-border px-2 py-1.5 text-start text-sm text-muted-foreground hover:bg-card-hover"
+                        className="rounded-md border border-dashed border-border px-2 py-1.5 text-start text-sm text-muted-foreground hover:bg-card-hover [@media(pointer:coarse)]:min-h-11"
                     >
                         {t("code.ask.other")}
                     </button>
@@ -286,14 +288,14 @@ export function AskCard({
                 {question.multiSelect || mine.other !== null || questions.length > 1 ? (
                     <Button
                         type="button"
-                        size="sm"
+                        size="sm" className={TOUCH}
                         disabled={busy || (last ? !picked.every(answered) : !answered(mine))}
                         onClick={() => (last ? submit(picked) : setIndex(index + 1))}
                     >
                         {last ? t("code.ask.submit") : t("code.ask.continue")}
                     </Button>
                 ) : null}
-                <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={onSkip}>
+                <Button type="button" size="sm" className={TOUCH} variant="ghost" disabled={busy} onClick={onSkip}>
                     {t("code.ask.skip")}
                 </Button>
                 {question.multiSelect && mine.labels.length > 0 ? (
@@ -343,17 +345,17 @@ export function CodePlan({
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {feedback === null ? (
                     <>
-                        <Button type="button" size="sm" disabled={busy} onClick={() => send("allow", {})}>
+                        <Button type="button" size="sm" className={TOUCH} disabled={busy} onClick={() => send("allow", {})}>
                             {t("code.plan.approve")}
                         </Button>
-                        <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setFeedback("")}>
+                        <Button type="button" size="sm" className={TOUCH} variant="outline" disabled={busy} onClick={() => setFeedback("")}>
                             {t("code.plan.keepPlanning")}
                         </Button>
                     </>
                 ) : (
                     <Button
                         type="button"
-                        size="sm"
+                        size="sm" className={TOUCH}
                         disabled={busy}
                         onClick={() => send("deny", feedback.trim() ? { feedback: feedback.trim() } : {})}
                     >

@@ -168,3 +168,57 @@ describe("a pushed agent permission prompt", () => {
         expect(sw.opened).toEqual(["/apps/agents/sessions/s1"]);
     });
 });
+
+const QUESTION = {
+    title: "Fix the build needs you",
+    body: "The agent stopped to ask something.",
+    href: "/polar?session=s1",
+    tag: "agent-session:s1",
+    actions: [{ action: "reply", title: "Reply", href: "/polar?session=s1&reply=1" }]
+};
+
+describe("a pushed agent question", () => {
+    it("carries Reply as a button that opens the session's reply box", async () => {
+        const sw = worker([]);
+        await sw.push(QUESTION);
+        const options = sw.shown[0]!.options as { data: { actions: { id: string; href: string | null }[] } };
+        expect(options.data.actions).toEqual([{ id: "reply", request: null, href: "/polar?session=s1&reply=1" }]);
+        await sw.click("reply", options.data);
+        expect(sw.opened).toEqual(["/polar?session=s1&reply=1"]);
+        expect(sw.fetched).toEqual([]);
+    });
+
+    it("brings an open window to the reply box rather than opening another", async () => {
+        const open = { focused: true, told: [] as unknown[] };
+        const sw = worker([open]);
+        await sw.push(QUESTION);
+        await sw.click("reply", (sw.shown[0]!.options as { data: unknown }).data);
+        expect(open.told).toEqual([{ kind: "polaris-notice-open", href: "/polar?session=s1&reply=1" }]);
+        expect(sw.opened).toEqual([]);
+    });
+
+    it("never opens a page on another site from a button", async () => {
+        const sw = worker([]);
+        await sw.push({ ...QUESTION, actions: [{ action: "reply", title: "Reply", href: "//elsewhere.test/x" }] });
+        const data = (sw.shown[0]!.options as { data: { actions: { href: unknown }[] } }).data;
+        expect(data.actions[0]!.href).toBeNull();
+        await sw.click("reply", data);
+        // Nothing to request and nowhere of its own: the notice's page instead.
+        expect(sw.opened).toEqual(["/polar?session=s1"]);
+    });
+
+    it("opens the notice's page when a button's request points elsewhere", async () => {
+        const sw = worker([]);
+        const elsewhere = { ...READ, request: { url: "https://elsewhere.test/steal", body: {} } };
+        await sw.click("read", { href: "/chat/c/c1/m1", actions: [elsewhere] });
+        expect(sw.fetched).toEqual([]);
+        expect(sw.opened).toEqual(["/chat/c/c1/m1"]);
+    });
+
+    it("opens the session from the notice itself where a device draws no buttons", async () => {
+        const sw = worker([]);
+        await sw.push(QUESTION);
+        await sw.click("", (sw.shown[0]!.options as { data: unknown }).data);
+        expect(sw.opened).toEqual(["/polar?session=s1"]);
+    });
+});

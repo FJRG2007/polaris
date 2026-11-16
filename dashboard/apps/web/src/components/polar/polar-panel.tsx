@@ -107,7 +107,8 @@ import * as polarSlash from "@/lib/polar/slash";
 import * as enigmaSlash from "@/lib/polar/enigma-slash";
 import * as embedBridge from "@/lib/polar/embed-bridge";
 import * as settingsPath from "@/lib/polar/settings-path";
-import { SIDEBAR_KEY, THREAD_KEY, readStored, writeStored } from "@/lib/polar/stored";
+import { REPLY_PARAM } from "@/lib/notifications/view-subject";
+import { REPLY_TO_KEY, SIDEBAR_KEY, THREAD_KEY, readStored, writeStored } from "@/lib/polar/stored";
 import { useWide } from "@/components/polar/use-wide";
 import * as droppedItems from "@/lib/polar/dropped-items";
 import * as polarCommands from "@/components/polar/polar-commands";
@@ -1474,6 +1475,10 @@ export function PolarChat({
         // lands in the composer, never sent, so the person reads it first.
         const prompt = params?.get("prompt")?.slice(0, MAX_HANDED_PROMPT) ?? null;
         if (session) {
+            // A notification's Reply: the reply box takes the cursor once the
+            // session draws.
+            if (session !== "new" && params?.get(REPLY_PARAM) === "1")
+                writeStored(REPLY_TO_KEY, session, "session");
             window.history.replaceState(null, "", window.location.pathname);
             setInCode(false);
             code.open(session === "new" ? null : session);

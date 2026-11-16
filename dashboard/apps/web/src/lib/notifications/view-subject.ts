@@ -21,6 +21,15 @@ export function sessionViewSubject(sessionId: string): string {
     return `/polar?session=${encodeURIComponent(sessionId)}`;
 }
 
+/** The query value that asks a session's page to put the cursor in its reply box. */
+export const REPLY_PARAM = "reply";
+
+/** The session opened with its reply box focused: what a notification's Reply
+ *  opens. Its subject is still the session's, so presence matches it. */
+export function sessionReplyHref(sessionId: string): string {
+    return `${sessionViewSubject(sessionId)}&${REPLY_PARAM}=1`;
+}
+
 /**
  * The subject an in-app link names, in its one canonical form, or null when it
  * names none: an external link, a path with no subjects, or one without the

@@ -26,6 +26,22 @@ export function writeStored(key: string, value: string, which: StoredArea = "loc
     }
 }
 
+/** Reads a value once: it is gone from storage after this. */
+export function takeStored(key: string, which: StoredArea = "local"): string | null {
+    const value = readStored(key, which);
+    if (value === null) return null;
+    try {
+        area(which).removeItem(key);
+    } catch {
+        // Blocked storage: nothing was there to keep.
+    }
+    return value;
+}
+
+/** A session whose reply box takes the cursor when it draws, once: set when a
+ *  notification's Reply opened it. Kept in the tab, not the browser. */
+export const REPLY_TO_KEY = "polar.code.replyTo";
+
 /** The open chat, kept across reloads and shared by every page of Polar. */
 export const THREAD_KEY = "polar.thread";
 /** Whether the conversation list is put away, on /polar and its settings alike. */

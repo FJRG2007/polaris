@@ -25,6 +25,8 @@ export function ContinueOnPhoneButton({ sessionId }: { sessionId: string }) {
             <Button
                 size="icon"
                 variant="ghost"
+                // Offered on a computer's screen: on a phone it is the phone.
+                className="max-md:hidden"
                 aria-label={t("session.continue.button")}
                 title={t("session.continue.button")}
                 onClick={() => setOpen(true)}
