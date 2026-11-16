@@ -7,6 +7,7 @@ import {
     bedrockSigningFetch,
     checkCloudCredential,
     cloudListsModel,
+    snowflakeBody,
     vertexBase
 } from "@/lib/polar/cloud-models";
 
@@ -130,5 +131,13 @@ describe("checking a new cloud account", () => {
         });
         expect(asked).toBe("https://inference.do-ai.run/v1/models Bearer t");
         expect(result).toEqual({ ok: false, reason: "refused" });
+    });
+});
+
+describe("Snowflake Cortex request body", () => {
+    it("sends max_completion_tokens in place of the refused max_tokens", () => {
+        expect(snowflakeBody({ model: "m", max_tokens: 1024 })).toEqual({ model: "m", max_completion_tokens: 1024 });
+        expect(snowflakeBody({ model: "m" })).toEqual({ model: "m" });
+        expect(snowflakeBody({ model: "m", max_tokens: undefined })).toEqual({ model: "m" });
     });
 });

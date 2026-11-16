@@ -141,6 +141,17 @@ function vertexModel(credential: Vertex, model: string): LanguageModel {
     return createGoogle({ apiKey: "vertex", baseURL: vertexBase(credential), fetch: fetchWithToken })(model);
 }
 
+/**
+ * Cortex's Chat Completions refuses `max_tokens` ("Error (deprecated)" in its
+ * compatibility table, docs.snowflake.com/en/user-guide/snowflake-cortex/open_ai_sdk)
+ * and takes `max_completion_tokens`, as OpenCode's plugin sets. Pure.
+ */
+export function snowflakeBody(body: Record<string, unknown>): Record<string, unknown> {
+    if (!("max_tokens" in body)) return body;
+    const { max_tokens: most, ...rest } = body;
+    return most === undefined ? rest : { ...rest, max_completion_tokens: most };
+}
+
 /** The AI SDK model for a stored cloud credential's secret. */
 export function cloudLanguageModel(secret: string, model: string): LanguageModel {
     const credential = readCloudSecret(secret);
@@ -156,7 +167,8 @@ export function cloudLanguageModel(secret: string, model: string): LanguageModel
             return createOpenAICompatible({
                 name: "snowflake-cortex",
                 baseURL: snowflakeBase(credential.account),
-                apiKey: credential.token
+                apiKey: credential.token,
+                transformRequestBody: snowflakeBody
             })(model);
         case "digitalocean":
             return createOpenAICompatible({ name: "digitalocean", baseURL: DIGITALOCEAN_BASE, apiKey: credential.token })(
