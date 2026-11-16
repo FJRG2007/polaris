@@ -36,30 +36,30 @@
    Chat option yet.
 5. U14b (the remaining ACP agents) and U14c (Codex app-server).
 
-## Next round (asked by the coordinator, not started - turn limit)
+## Next round - status (2026-11-16)
 
-1. Gap 3: in `switchSessionSurface` (`session-runtime.ts`), on entering Chat
-   stop the terminal agent first: `interruptSession` path, then kill the
-   interface window (`commands.INTERFACE_WINDOW`) and stop the runner's agent
-   process in the main window; on leaving Chat, after `acpStopCommand`,
-   `resumeAgent(sessionId, vendorSessionId)` when a vendor id is stored.
-   Test the command order in `test/agents/acp`.
-2. Gap 4: before `start` in `AcpSessionDriver.open`, when `binding.minVersion`
-   is set run `qwen --version` through `runInSession` (new dep `version()`),
-   compare semver, and throw `AcpRefusal("Qwen Code 0.16 or later is needed
-   for Chat. Update it on the session's machine, or use Terminal.")`; add the
-   sentence to `EXACT` in `words.ts` and `agents.json` en-US/es-ES.
-3. Gap 5: a Chat / Terminal option in the start form (`polar-code.tsx` start
-   area near the `PermissionModePicker` at the start composer), shown only
-   when `acpProviders.chatAvailable(cli, place)`; pass `surface` through
-   `SessionCreateInput` -> `createSession` data -> the start action's Zod
-   schema; reuse `SessionSurfacePicker`.
-4. Gap 1/2: one throwaway `polaris-acp-test-*` container on lirio-0 from the
-   session image, no credentials; `npx -y @agentclientprotocol/claude-agent-acp@0.99.1`
-   resolves; `gemini --acp` / `qwen --acp` answer `initialize`; save the real
-   frames over `test/agents/acp/fixtures/agents/{gemini,qwen}.jsonl` lines 1;
-   remove the container.
-5. U14b: bindings for droid, grok (`agent stdio`), opencode, opencode-v2, pi,
-   omp 15+, kimchi, hermes, command-code, deepseek-harness, copilot, agy,
-   docker-agent - each only with a flag from the vendor's docs (core's
-   `acp` field lists AO's args as a starting point, not a source).
+1. DONE 9258fe257a - entering Chat stops the terminal's agent
+   (`terminalAgentStopCommand`: runner turn interrupted + interface window
+   closed, or every process under the main window's shell ended once the agent
+   flag exists); leaving Chat hands the conversation back
+   (`conversationHandBackCommand` writes `agent-session-id` for a runner, else
+   `resumeAgent` when the terminal is at its shell). `startAcpAgent` also runs
+   the stop before every launch. Shell logic not executed (no tmux test run).
+2. DONE 52aa1599fb - version floor (`meetsFloor`, `deps.version`), refusal
+   `TOO_OLD`, i18n `text.acpTooOld`. Gap: Polaris does not update an old Qwen
+   itself; the sentence says to use Terminal.
+3. DONE c57f70acb9 + test fix - Conversation picker in the start composer,
+   `surface` taken by `polarCodeStart` (own Zod enum, no core schema change),
+   applied after creation by `withSurface` when `chatAvailable`.
+4. DONE 5124e69a0a - one `polaris-acp-test-u14` container on lirio-0 (node:24,
+   no credentials, removed, none left): adapter 0.99.1, Gemini 0.66.0, Qwen
+   0.26.5 all answered `initialize`; line 1 of claude/gemini/qwen fixtures is
+   now the real frame. Not exercised: session/new and a prompt (needs sign-in),
+   kimi and cursor.
+5. NOT STARTED - U14b: bindings for droid, grok (`agent stdio`), opencode,
+   opencode-v2, pi, omp 15+, kimchi, hermes, command-code, deepseek-harness,
+   copilot, agy, docker-agent - each only with a flag sourced from the vendor's
+   own docs (core's `acp` field is AO's list, not a source). Add each to
+   `BINDINGS` in `acp/providers.ts`, a composed fixture in
+   `test/agents/acp/fixtures/agents/<cli>.jsonl`, and the cli to `AGENTS` in
+   `session-driver.test.ts`.
