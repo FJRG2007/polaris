@@ -8,7 +8,7 @@
  */
 
 import { FileUp } from "lucide-react";
-import { useRef, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
     Button,
     Dialog,
@@ -17,10 +17,12 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    Textarea
+    AsyncSelect,
+    Textarea,
+    type AsyncLoad
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { readAgentFilesAction, type ReadAgentFile } from "./agents-actions";
+import { readAgentFilesAction, repoAgentFilesAction, type ReadAgentFile } from "./agents-actions";
 import { AGENT_FILE_MAX, type AgentFile } from "@/lib/polar/agents/agent-files";
 
 /** Files read in one go, as the action takes them. */
@@ -29,14 +31,11 @@ const FILES_MAX = 20;
 export function AgentImportDialog({
     open,
     onClose,
-    onUse,
-    extra
+    onUse
 }: {
     open: boolean;
     onClose: () => void;
     onUse: (agent: AgentFile) => void;
-    /** More places to read from, such as a repository; given the result setter. */
-    extra?: (show: (read: ReadAgentFile[] | string) => void) => ReactNode;
 }) {
     const t = useTranslations("polar");
     const picker = useRef<HTMLInputElement>(null);
@@ -133,7 +132,7 @@ export function AgentImportDialog({
                             />
                         </div>
                     </div>
-                    {extra ? extra(show) : null}
+                    <RepoAgentsSource show={show} />
                     {error ? (
                         <p role="alert" className="text-sm text-danger">
                             {error}
@@ -186,5 +185,68 @@ export function AgentImportDialog({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** Where Code reads a page of the person's connected repositories. */
+const REPOS_ROUTE = "/api/polar/code/repos";
+
+interface RepoEntry {
+    id: string;
+    name: string;
+}
+
+/** Reads the agent files of a connected repository: its .polaris/agents,
+ *  .opencode/agent(s) and .claude/agents, on the default branch. */
+function RepoAgentsSource({ show }: { show: (read: ReadAgentFile[] | string) => void }) {
+    const t = useTranslations("polar");
+    const [repo, setRepo] = useState<RepoEntry | null>(null);
+    const [pending, setPending] = useState(false);
+    const load = useCallback<AsyncLoad<RepoEntry>>(async ({ query, cursor }) => {
+        const params = new URLSearchParams({ query, ...(cursor ? { cursor } : {}) });
+        const response = await fetch(`${REPOS_ROUTE}?${params}`, { cache: "no-store" });
+        if (!response.ok) throw new Error(String(response.status));
+        const page = (await response.json()) as { items?: RepoEntry[]; next?: string | null } | null;
+        return { items: page?.items ?? [], next: page?.next ?? null };
+    }, []);
+
+    async function read() {
+        if (!repo || pending) return;
+        setPending(true);
+        const answer = await repoAgentFilesAction({ repoId: repo.id });
+        setPending(false);
+        show(answer.ok ? answer.value : answer.error);
+    }
+
+    return (
+        <div className="flex min-w-0 flex-col gap-1 text-sm">
+            <span>{t("settings.agents.import.repo")}</span>
+            <div className="flex min-w-0 flex-wrap gap-2">
+                <AsyncSelect<RepoEntry>
+                    value={repo?.id ?? null}
+                    selectedLabel={repo?.name}
+                    onValueChange={(_, item) => setRepo(item)}
+                    load={load}
+                    cacheKey="polar-agent-import-repos"
+                    itemValue={(item) => item.id}
+                    itemLabel={(item) => item.name}
+                    placeholder={t("settings.agents.import.repoPick")}
+                    searchPlaceholder={t("settings.agents.import.repoSearch")}
+                    emptyText={t("settings.agents.import.repoNone")}
+                    aria-label={t("settings.agents.import.repoPick")}
+                    className="h-9 min-w-0 flex-1 basis-48"
+                />
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-9 shrink-0"
+                    aria-disabled={!repo || pending}
+                    onClick={() => void read()}
+                >
+                    {t("settings.agents.import.repoRead")}
+                </Button>
+            </div>
+        </div>
     );
 }

@@ -9,6 +9,7 @@
 
 import { z } from "zod";
 import { requireUser } from "@/lib/session";
+import { polarCodeRepoAgentFiles } from "@/lib/polar/code";
 import * as store from "@/lib/polar/agents/store";
 import { polarAccessFor } from "@/lib/polar/access";
 import { getTranslations } from "@/lib/i18n/request";
@@ -88,6 +89,17 @@ export async function readAgentFilesAction(input: unknown): Promise<Result<ReadA
         return { ok: false, error: t("settings.agents.errors.failed") };
     }
     return { ok: true, value: readFiles(parsed.data.files) };
+}
+
+/** The agent files of a connected repository, read the same way. */
+export async function repoAgentFilesAction(input: unknown): Promise<Result<ReadAgentFile[]>> {
+    const t = await getTranslations("polar");
+    const parsed = z.object({ repoId: z.string().uuid() }).safeParse(input);
+    if (!parsed.success) return { ok: false, error: t("settings.agents.errors.failed") };
+    const user = await requireUser();
+    const files = await polarCodeRepoAgentFiles(user, parsed.data.repoId);
+    if (!files) return { ok: false, error: t("settings.agents.errors.noAccess") };
+    return { ok: true, value: readFiles(files) };
 }
 
 function readFiles(files: readonly { path: string; content: string }[]): ReadAgentFile[] {

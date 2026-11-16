@@ -19,6 +19,7 @@
  */
 
 import { claudePermissionSettings, configFromRules, rulesOf, type PermissionRule } from "@/lib/polar/agents/permissions";
+import { repoAgentFiles, sessionAgentFiles } from "@/lib/polar/agents/repo-agents";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { execCommand } from "@polaris/ssh";
@@ -185,6 +186,9 @@ interface Bootstrap {
     readonly repoSetup: string;
     /** Whether a failing setup script stops the session before the agent starts. */
     readonly repoSetupRequired: boolean;
+    /** The repository's .polaris/agents as the coding tools' own agent files
+     *  (`sessionAgentFiles`), JSON in base64, or empty for none. */
+    readonly repoAgents: string;
     /** The path on Polaris's address a web server in the container is previewed
      *  under, a port after it. Empty where there is no preview: a session on
      *  somebody's own account on a server. See `session-preview`. */
@@ -325,6 +329,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
     // GitHub would be refusing over a repository nobody named.
     const githubToken = session.repoFullName ? await cloneToken(session.repoFullName) : "";
     const setup = session.repoId ? await repoSetupFor(session.repoId) : null;
+    const agentFiles = await repoAgentFilesFor(session, githubToken);
 
     const base = (await appBaseUrl()).replace(/\/+$/, "");
     const ingest = `${base}/api/agents/sessions/${session.id}/events`;
@@ -426,6 +431,7 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         gitCredential: session.repoFullName ? gitCredentialScript(credential, token) : "",
         repoSetup: setup?.setupScript.trim() ? asFile(setup.setupScript) : "",
         repoSetupRequired: setup?.setupRequired ?? false,
+        repoAgents: agentFiles,
         previewBase: session.place === "local" ? previewBase(session.id) : "",
         // The account the person picked wins over whatever would have resolved.
         // Somebody holding three subscriptions chose one of them on the form,
@@ -715,6 +721,25 @@ async function cloneToken(repoFullName: string): Promise<string> {
 
 /** The repository's setup script and whether it may fail. Null for a repository
  *  that is gone, which runs nothing rather than refusing the session. */
+/**
+ * The repository's own agents (`.polaris/agents`, OpenCode's format) as the
+ * files Claude Code and OpenCode read in a checkout, encoded for the boot
+ * environment. Empty for a workspace, a repository with none, or when GitHub
+ * does not answer: the session starts either way.
+ */
+export async function repoAgentFilesFor(
+    session: Pick<SessionView, "repoFullName" | "baseRef">,
+    token: string
+): Promise<string> {
+    const [owner, name] = session.repoFullName.split("/");
+    if (!owner || !name) return "";
+    const files = await repoAgentFiles({ owner, name, token: token || null }, session.baseRef || null, [
+        ".polaris/agents"
+    ]).catch(() => []);
+    const rendered = sessionAgentFiles(files);
+    return Object.keys(rendered).length > 0 ? asFile(JSON.stringify(rendered)) : "";
+}
+
 async function repoSetupFor(
     repoId: string
 ): Promise<{ setupScript: string; setupRequired: boolean } | null> {
@@ -797,6 +822,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_GIT_CREDENTIAL: boot.gitCredential ? asFile(boot.gitCredential) : "",
         POLARIS_REPO_SETUP: boot.repoSetup,
         POLARIS_REPO_SETUP_REQUIRED: boot.repoSetupRequired ? "yes" : "",
+        POLARIS_REPO_AGENTS: boot.repoAgents,
         // Told to the agent, so a framework that needs its base path can be
         // started under it (see PREVIEW_PROMPT).
         POLARIS_PREVIEW_BASE: boot.previewBase,

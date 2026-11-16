@@ -13,6 +13,7 @@
  */
 
 import * as core from "@polaris/core";
+import { repoAgentFiles, type RepoAgentFile } from "@/lib/polar/agents/repo-agents";
 import { z } from "zod";
 import { getTranslations } from "@/lib/i18n/request";
 import { GOAL_CONDITION_MAX, readGoal, type PolarGoal } from "@/lib/polar/goals";
@@ -528,6 +529,19 @@ export async function polarCodeBranches(
     ]);
     if (listed === null) return null;
     return { defaultBranch, branches: orderBranches(listed, defaultBranch) };
+}
+
+/**
+ * The agent files of one of the person's connected repositories, on its
+ * default branch (`repo-agents.ts`). Null where the repository is not theirs.
+ */
+export async function polarCodeRepoAgentFiles(
+    user: SessionUser,
+    repoId: string
+): Promise<RepoAgentFile[] | null> {
+    if ((await accessOf(user)) !== "manage") return null;
+    const reach = await repoReach(user.id, repoId);
+    return reach ? repoAgentFiles(reach, null) : null;
 }
 
 /**

@@ -1115,7 +1115,7 @@ const RUNNER_SCRIPT_BASE64 = Buffer.from(RUNNER_SCRIPT, "utf8").toString("base64
 /** What the setup cleared before the agent started, cleared again by anything
  *  that starts it later from tmux's own environment, which is the boot's. */
 const CLEAR_BOOT_ENV: readonly string[] = [
-    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_AGENT_HOOK_FILE",
+    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_REPO_AGENTS POLARIS_AGENT_HOOK_FILE",
     'for pair in $POLARIS_CREDENTIAL_FILES; do unset "$(printf %s "$pair" | cut -d= -f1)"; done'
 ];
 
@@ -1381,6 +1381,40 @@ const LAUNCH_SCRIPT_BASE64 = Buffer.from(LAUNCH_SCRIPT, "utf8").toString("base64
 const FIRST_RUN_FILE = "$(printenv TMPDIR || echo /tmp)/polaris-first-run.json";
 
 /**
+ * The repository's own `.polaris/agents`, handed to the coding tools as
+ * the agent files they read in a checkout (`sessionAgentFiles`):
+ * `.opencode/agent/` for OpenCode, `.claude/agents/` for Claude Code. A file
+ * the repository already has there is never written over, and what is added
+ * is listed in `.git/info/exclude`, so it is never committed.
+ */
+export const REPO_AGENTS_PROGRAM = [
+    "const fs = require(\"fs\"), path = require(\"path\");",
+    "const files = JSON.parse(fs.readFileSync(process.argv[2], \"utf8\"));",
+    "const added = [];",
+    "for (const [rel, text] of Object.entries(files)) {",
+    "  if (typeof text !== \"string\" || !/^[.](claude[/]agents|opencode[/]agent)[/][a-z0-9._-]+[.]md$/.test(rel)) continue;",
+    "  const target = path.join(process.cwd(), rel);",
+    "  if (fs.existsSync(target)) continue;",
+    "  fs.mkdirSync(path.dirname(target), { recursive: true });",
+    "  fs.writeFileSync(target, text, { flag: \"wx\" });",
+    "  added.push(\"/\" + rel);",
+    "}",
+    "if (added.length > 0) {",
+    "  const exclude = path.join(process.cwd(), \".git\", \"info\", \"exclude\");",
+    "  fs.mkdirSync(path.dirname(exclude), { recursive: true });",
+    "  fs.appendFileSync(exclude, [\"\", ...added, \"\"].join(String.fromCharCode(10)));",
+    "}"
+].join("\n");
+
+export const REPO_AGENTS = [
+    'if [ -n "$POLARIS_REPO_AGENTS" ] && [ -n "$GITHUB_REPOSITORY" ]; then',
+    '  printf %s "$POLARIS_REPO_AGENTS" | base64 -d > "$POLARIS_STATE_DIR/repo-agents.json"',
+    `  printf %s ${Buffer.from(REPO_AGENTS_PROGRAM, "utf8").toString("base64")} | base64 -d > "$POLARIS_STATE_DIR/repo-agents.js"`,
+    '  (cd "$POLARIS_WORKDIR" && as_agent "node \\"$POLARIS_STATE_DIR/repo-agents.js\\" \\"$POLARIS_STATE_DIR/repo-agents.json\\"") || echo "polaris: the agents in .polaris/agents could not be handed to the agent"',
+    "fi"
+];
+
+/**
  * The repository's own setup script - installing dependencies, seeding a
  * database - run in the fresh checkout before the agent starts, in the window
  * somebody watching the session sees.
@@ -1469,7 +1503,7 @@ const START_AGENT = [
     '  as_agent "sh \\"$POLARIS_STATE_DIR/skills-sync.sh\\" \\"$POLARIS_HOME\\"" || true',
     "fi",
     "unset GIT_AUTH_HEADER",
-    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_AGENT_HOOK_FILE",
+    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_REPO_AGENTS POLARIS_AGENT_HOOK_FILE",
     // Said once, in the terminal the person is looking at, because on a machine
     // they cannot see "please sign in" with no way to and no reason given is the
     // whole of what was wrong with this. Only when Polaris is carrying no
@@ -1560,6 +1594,7 @@ export const SESSION_SETUP = [
     ...INSTALL_AGENT,
     ...REQUIRE_AGENT,
     ...INSTALL_GH,
+    ...REPO_AGENTS,
     ...REPO_SETUP,
     ...START_AGENT
 ].join("\n");
