@@ -45,6 +45,16 @@ export interface BackgroundProcess {
     kill(): void;
 }
 
+/** A long-lived process spoken to over its standard input and output (a
+ *  language server). Its standard error is dropped. */
+export interface PipedProcess {
+    write(data: string | Buffer): void;
+    onData(listener: (chunk: Buffer) => void): void;
+    /** Once, when it exits or fails to start. */
+    onExit(listener: () => void): void;
+    kill(): void;
+}
+
 export interface FileStat {
     readonly kind: "file" | "directory" | "other";
     readonly size: number;
@@ -57,6 +67,8 @@ export interface Workspace {
     readonly platform: NodeJS.Platform;
     exec(argv: readonly string[], options?: ExecOptions): Promise<ExecResult>;
     spawnBackground(argv: readonly string[], options?: { cwd?: string }): BackgroundProcess;
+    /** Absent where a workspace cannot hold a process open. */
+    spawnPiped?(argv: readonly string[], options?: { cwd?: string }): PipedProcess;
     readFile(file: string): Promise<Buffer>;
     writeFile(file: string, data: string): Promise<void>;
     stat(file: string): Promise<FileStat | null>;
@@ -165,6 +177,34 @@ export function nodeWorkspace(root: string, baseEnv: NodeJS.ProcessEnv = process
                 output: () => output,
                 exitCode: () => exit,
                 running: () => exit === undefined,
+                kill: () => killTree(child)
+            };
+        },
+        spawnPiped(argv, options = {}) {
+            const [program, ...args] = argv;
+            const child = spawn(program ?? "", args, {
+                cwd: options.cwd ?? absolute,
+                env: envOf(),
+                detached: process.platform !== "win32",
+                windowsHide: true,
+                stdio: ["pipe", "pipe", "ignore"]
+            });
+            const exits: (() => void)[] = [];
+            let exited = false;
+            const finish = () => {
+                if (exited) return;
+                exited = true;
+                for (const listener of exits) listener();
+            };
+            child.on("error", finish);
+            child.on("close", finish);
+            child.stdin?.on("error", () => undefined);
+            return {
+                write: (data) => {
+                    if (!exited) child.stdin?.write(data);
+                },
+                onData: (listener) => child.stdout?.on("data", listener),
+                onExit: (listener) => (exited ? listener() : exits.push(listener)),
                 kill: () => killTree(child)
             };
         },

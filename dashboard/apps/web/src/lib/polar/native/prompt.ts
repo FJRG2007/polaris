@@ -17,7 +17,8 @@ export interface PromptEnvironment {
     readonly date: string;
     readonly model: string;
     readonly planMode: boolean;
-    /** The repository's own instructions (AGENTS.md, CLAUDE.md), already read. */
+    /** The instruction files (AGENTS.md, CLAUDE.md) the session found, already
+     *  read, in the order they are quoted (`rules.ts`). */
     readonly memory: readonly { readonly file: string; readonly text: string }[];
     /** The task the session was started with, when it came from Polar Code. */
     readonly task?: string | null;
@@ -25,9 +26,6 @@ export interface PromptEnvironment {
 
 /** The longest any one memory file is quoted. */
 export const MEMORY_MAX_CHARS = 40_000;
-
-/** The files a session reads its instructions from, in order. */
-export const MEMORY_FILES = ["AGENTS.md", "CLAUDE.md"] as const;
 
 const CORE = [
     "You are Polar, a coding agent working directly in a software project for the user. You read and change code, run commands, and use git, through the tools you are given. Your work is real: files you write are saved and commands you run execute.",
@@ -91,8 +89,8 @@ export function nativeSystemPrompt(env: PromptEnvironment): string {
             memory.text.length > MEMORY_MAX_CHARS ? `${memory.text.slice(0, MEMORY_MAX_CHARS)}\n[cut]` : memory.text;
         parts.push(
             [
-                `# Project instructions (${memory.file})`,
-                "These are the repository's own instructions for agents. Follow them; they override the defaults above where they conflict, but never the safety rules.",
+                `# Instructions from: ${memory.file}`,
+                "These are the user's and the repository's own instructions for agents; a later file is closer to the working directory. Follow them; they override the defaults above where they conflict, but never the safety rules.",
                 "",
                 text.trim()
             ].join("\n")

@@ -17,6 +17,7 @@
 
 import { z } from "zod";
 import * as path from "node:path";
+import { afterWrite } from "@/lib/polar/native/post-edit";
 import type { BackgroundProcess, Workspace } from "@/lib/polar/native/workspace";
 
 export const PERMISSION_MODES = ["default", "acceptEdits", "plan", "bypassPermissions"] as const;
@@ -194,7 +195,7 @@ export const writeTool: NativeTool<z.infer<typeof writeInput>> = {
     schema: writeInput,
     gate: "edit",
     writes: true,
-    async run(input, { ws, state }) {
+    async run(input, { ws, state, signal }) {
         const file = resolvePath(state, input.file_path);
         const info = await ws.stat(file);
         if (info?.kind === "directory") return fail(`${file} is a directory.`);
@@ -205,7 +206,7 @@ export const writeTool: NativeTool<z.infer<typeof writeInput>> = {
         await ws.writeFile(file, input.content);
         const after = await ws.stat(file);
         if (after) state.read.set(file, after.mtimeMs);
-        return ok(info ? `Updated ${file}.` : `Created ${file}.`);
+        return ok(`${info ? `Updated ${file}.` : `Created ${file}.`}${await afterWrite({ ws, state, signal }, file)}`);
     }
 };
 
@@ -229,14 +230,14 @@ export const editTool: NativeTool<z.infer<typeof editInput>> = {
     schema: editInput,
     gate: "edit",
     writes: true,
-    async run(input, { ws, state }) {
+    async run(input, { ws, state, signal }) {
         const file = resolvePath(state, input.file_path);
         if (input.old_string === input.new_string) return fail("old_string and new_string are identical; nothing to change.");
         const info = await ws.stat(file);
         if (!info) {
             if (input.old_string === "") {
                 await ws.writeFile(file, input.new_string);
-                return ok(`Created ${file}.`);
+                return ok(`Created ${file}.${await afterWrite({ ws, state, signal }, file)}`);
             }
             return fail(`File does not exist: ${file}`);
         }
@@ -259,7 +260,7 @@ export const editTool: NativeTool<z.infer<typeof editInput>> = {
         if (after) state.read.set(file, after.mtimeMs);
         const replaced = input.replace_all ? count : 1;
         const drift = info.mtimeMs > seen ? " The file had changed on disk since it was read; the edit matched its current content." : "";
-        return ok(`Edited ${file}: ${replaced} replacement${replaced === 1 ? "" : "s"}.${drift}`);
+        return ok(`Edited ${file}: ${replaced} replacement${replaced === 1 ? "" : "s"}.${drift}${await afterWrite({ ws, state, signal }, file)}`);
     }
 };
 

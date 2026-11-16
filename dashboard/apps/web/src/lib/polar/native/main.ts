@@ -22,6 +22,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 import * as readline from "node:readline";
+import { discoverRules } from "@/lib/polar/native/rules";
 import { CONVERSATION_ID, replayTranscript } from "@/lib/polar/native/resume";
 import { PERMISSION_MODES, type PermissionMode } from "@/lib/polar/native/tools";
 import { launchModel, launchSession, readLaunchEnv, transcriptDir, transcriptPathOf, type LaunchConfig } from "@/lib/polar/native/launch";
@@ -72,18 +73,6 @@ export function conversationOf(config: LaunchConfig, args: AgentArgs): { id: str
     return { id: args.resume, from };
 }
 
-/** The repository's instruction files, as the prompt quotes them. */
-function memoryOf(workdir: string): { file: string; text: string }[] {
-    return ["AGENTS.md", "CLAUDE.md"].flatMap((file) => {
-        try {
-            const text = fs.readFileSync(path.join(workdir, file), "utf8");
-            return text.trim() ? [{ file, text }] : [];
-        } catch {
-            return [];
-        }
-    });
-}
-
 /** Strips the bracketed-paste markers a terminal wraps pasted text in. */
 export function pasteState(line: string, inPaste: boolean): { text: string; inPaste: boolean } {
     let state = inPaste;
@@ -120,9 +109,12 @@ async function main(): Promise<number> {
         // A fork's file starts as a copy of its parent's, so its history reads whole.
         if (conversation.from !== transcriptPath && previous) fs.writeFileSync(transcriptPath, previous);
     }
+    const rules = discoverRules({ cwd: config.POLARIS_WORKDIR });
+    // The session's terminal is where a person sees which rules were read.
+    if (rules.length > 0) process.stderr.write(`polaris-agent: instructions from ${rules.map((rule) => rule.file).join(", ")}\n`);
     const session = launchSession(config, {
         writeTranscript: (line) => fs.appendFileSync(transcriptPath, `${line}\n`),
-        memory: memoryOf(config.POLARIS_WORKDIR),
+        memory: rules.map(({ file, text }) => ({ file, text })),
         conversationId: conversation.id
     });
     if (args.mode) session.setMode(args.mode);
