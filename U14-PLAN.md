@@ -35,3 +35,31 @@
 4. The surface is only switchable on a running session; the start form has no
    Chat option yet.
 5. U14b (the remaining ACP agents) and U14c (Codex app-server).
+
+## Next round (asked by the coordinator, not started - turn limit)
+
+1. Gap 3: in `switchSessionSurface` (`session-runtime.ts`), on entering Chat
+   stop the terminal agent first: `interruptSession` path, then kill the
+   interface window (`commands.INTERFACE_WINDOW`) and stop the runner's agent
+   process in the main window; on leaving Chat, after `acpStopCommand`,
+   `resumeAgent(sessionId, vendorSessionId)` when a vendor id is stored.
+   Test the command order in `test/agents/acp`.
+2. Gap 4: before `start` in `AcpSessionDriver.open`, when `binding.minVersion`
+   is set run `qwen --version` through `runInSession` (new dep `version()`),
+   compare semver, and throw `AcpRefusal("Qwen Code 0.16 or later is needed
+   for Chat. Update it on the session's machine, or use Terminal.")`; add the
+   sentence to `EXACT` in `words.ts` and `agents.json` en-US/es-ES.
+3. Gap 5: a Chat / Terminal option in the start form (`polar-code.tsx` start
+   area near the `PermissionModePicker` at the start composer), shown only
+   when `acpProviders.chatAvailable(cli, place)`; pass `surface` through
+   `SessionCreateInput` -> `createSession` data -> the start action's Zod
+   schema; reuse `SessionSurfacePicker`.
+4. Gap 1/2: one throwaway `polaris-acp-test-*` container on lirio-0 from the
+   session image, no credentials; `npx -y @agentclientprotocol/claude-agent-acp@0.99.1`
+   resolves; `gemini --acp` / `qwen --acp` answer `initialize`; save the real
+   frames over `test/agents/acp/fixtures/agents/{gemini,qwen}.jsonl` lines 1;
+   remove the container.
+5. U14b: bindings for droid, grok (`agent stdio`), opencode, opencode-v2, pi,
+   omp 15+, kimchi, hermes, command-code, deepseek-harness, copilot, agy,
+   docker-agent - each only with a flag from the vendor's docs (core's
+   `acp` field lists AO's args as a starting point, not a source).
