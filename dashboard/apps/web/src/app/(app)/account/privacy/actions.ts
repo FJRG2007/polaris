@@ -19,6 +19,8 @@
  */
 
 import { z } from "zod";
+import { prisma } from "@polaris/db";
+import { isVanishDuration } from "@/lib/chat/vanish-rules";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
@@ -296,6 +298,30 @@ export async function saveActivitySettingsAction(input: unknown): Promise<{ erro
     }
     await saveActivitySettings(user.id, parsed.data);
     await announceActivity([user.id]);
+    revalidatePath(PRIVACY_PATH);
+    return {};
+}
+
+// ---------------------------------------------------------------------------
+// The timer a new direct message starts with
+// ---------------------------------------------------------------------------
+
+const chatTimerSchema = z.number().int().refine((value) => isVanishDuration(value));
+
+/** The disappearing timer every direct message this account starts begins
+ *  with - off, or one of the offered durations. */
+export async function saveChatTimerAction(seconds: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = chatTimerSchema.safeParse(seconds);
+    if (!parsed.success) {
+        return { error: (await getTranslations("accountPrivacy"))("errors.notSaved") };
+    }
+    await prisma.userPrivacy.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, chatVanishAfter: parsed.data },
+        update: { chatVanishAfter: parsed.data },
+        select: { userId: true }
+    });
     revalidatePath(PRIVACY_PATH);
     return {};
 }

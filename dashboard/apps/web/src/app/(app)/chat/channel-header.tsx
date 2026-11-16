@@ -36,6 +36,9 @@ import { GameLinkChips } from "./game-link-badge";
 import { MuteOptions, type MenuParts } from "./mute-menu";
 import { GroupSettingsDialog } from "./group-settings-dialog";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
+import type { DirectRulesView } from "@/lib/chat/vanish";
+import type { VanishDuration } from "@/lib/chat/vanish-rules";
+import { VanishBadge, VanishMenu } from "./vanish-controls";
 import {
     ArrowLeft,
     Hash,
@@ -89,7 +92,8 @@ export function ChannelHeader({
     onPins,
     onMembers,
     membersOpen = false,
-    searchInPanel = false
+    searchInPanel = false,
+    vanish
 }: {
     channel: ChatChannelView;
     /** Who is reading, which decides one thing here: a group's owner is the only
@@ -116,6 +120,14 @@ export function ChannelHeader({
     /** The panel on the right is open as a column and carries the search box
      *  at its top, the way Discord draws it, so the bar leaves it out. */
     searchInPanel?: boolean;
+    /** A direct conversation's disappearing timer and deleting it, as its
+     *  rules allow. Absent where it has none - a space's channel. */
+    vanish?: {
+        readonly rules: DirectRulesView;
+        readonly onTimer: (seconds: VanishDuration) => void;
+        readonly onAllowDelete: (allowed: boolean) => void;
+        readonly onDeleteChat: () => void;
+    };
 }) {
     const t = useTranslations("chat");
     const router = useRouter();
@@ -237,6 +249,7 @@ export function ChannelHeader({
                         className="text-sm font-semibold"
                     />
                 </span>
+                {vanish && <VanishBadge seconds={vanish.rules.vanishAfter} />}
                 {/* A call running in a one-to-one or a group, said beside who
                     it is with. Only to somebody who may take calls - the same
                     rule as the call button. */}
@@ -535,6 +548,14 @@ export function ChannelHeader({
                                         {t("channelHeader.deleteChannel")}
                                     </DropdownMenuItem>
                                 </>
+                            )}
+                            {vanish && (
+                                <VanishMenu
+                                    rules={vanish.rules}
+                                    onTimer={vanish.onTimer}
+                                    onAllowDelete={vanish.onAllowDelete}
+                                    onDeleteChat={vanish.onDeleteChat}
+                                />
                             )}
                             {/* The row above, on a phone, where it does not fit
                                 beside the name. Hidden at `sm` and up, where

@@ -274,5 +274,9 @@
         "after": "Minutes after",
         "saved": "Automatic status saved.",
         "failed": "Could not save automatic status. Try again."
+    },
+    "chatTimer": {
+        "label": "Default timer for new direct messages",
+        "hint": "Messages in direct chats you start disappear after this time."
     }
 }

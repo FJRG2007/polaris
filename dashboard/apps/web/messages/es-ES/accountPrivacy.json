@@ -274,5 +274,9 @@
         "after": "Minutos después",
         "saved": "Estado automático guardado.",
         "failed": "No se pudo guardar el estado automático. Inténtalo de nuevo."
+    },
+    "chatTimer": {
+        "label": "Temporizador para mensajes directos nuevos",
+        "hint": "Los mensajes de los chats directos que inicies desaparecen tras este tiempo."
     }
 }

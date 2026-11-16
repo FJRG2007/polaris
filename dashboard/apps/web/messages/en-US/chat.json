@@ -896,7 +896,8 @@
         "custom": "Custom...",
         "reminderSet": "Reminder set for {date} at {time}",
         "speak": "Speak message",
-        "stopSpeaking": "Stop reading"
+        "stopSpeaking": "Stop reading",
+        "deleteForMe": "Delete for me"
     },
     "poll": {
         "createAPoll": "Create a poll",
@@ -2369,5 +2370,44 @@
             "hytale": "1. Open Hytale and go to Servers.\n2. Add a server with the address {address}.\n3. Pick it and join.",
             "other": "Open the game and connect to {address}."
         }
+    },
+    "vanish": {
+        "timer": "Disappearing messages",
+        "duration": {
+            "off": "Turned off",
+            "day": "24 hours",
+            "week": "7 days",
+            "month": "30 days",
+            "quarter": "90 days"
+        },
+        "short": {
+            "off": "Off",
+            "day": "24h",
+            "week": "7d",
+            "month": "30d",
+            "quarter": "90d"
+        },
+        "badge": "Messages disappear after {duration}",
+        "mark": "Disappearing message",
+        "proposeHint": "Changes are proposed to the others first",
+        "allowDeleteForAll": "Allow deleting the chat for everyone",
+        "deleteChat": "Delete chat",
+        "chatKind": "chat",
+        "deleteTitle": "Delete this chat?",
+        "forMeQuestion": "Its messages are removed for you only. Everyone else keeps them.",
+        "forAllQuestion": "Every message is removed for everyone in the chat, and cannot be recovered.",
+        "deleteForMe": "Delete for me",
+        "deleteForAll": "Delete for everyone",
+        "alsoFor": "Also delete for {name}",
+        "alsoForHint": "Removes every message for everyone in the chat.",
+        "alsoForOff": "Not allowed until everyone in the chat agrees to it",
+        "proposalTimer": "{name} proposes: messages disappear after {duration}",
+        "proposalTimerOff": "{name} proposes: messages do not disappear",
+        "proposalDeleteYes": "Deleting the chat for everyone allowed",
+        "proposalDeleteNo": "Deleting the chat for everyone not allowed",
+        "waiting": "Waiting for the others to accept your proposal",
+        "accept": "Accept",
+        "decline": "Decline",
+        "deleteFailed": "The chat could not be deleted. Try again."
     }
 }

@@ -38,6 +38,7 @@ import { useTranslateToggle } from "./translated-body";
 import { messageTarget, NOTHING, type MessageTarget } from "./message-target";
 import type { ChatAttachmentView, ChatMessageView } from "@/lib/chat/messages";
 import type { DeleteMessage } from "./delete-message";
+import { useHideMessage } from "./vanish-controls";
 import { AUDIO_FORMATS, extensionOf, saveRecording, type AudioFormat } from "./audio-download";
 import {
     AlarmClock,
@@ -58,6 +59,7 @@ import {
     PinOff,
     SmilePlus,
     Star,
+    EyeOff,
     Trash2,
     Volume2,
     VolumeX
@@ -235,6 +237,7 @@ export function MessageMenu({
         : null;
     const recording = pointedFile && isPlayable(pointedFile.contentType) ? pointedFile : null;
     const loose = pointedFile && !recording && !picture && !clip ? pointedFile : null;
+    const hide = useHideMessage();
     const reactable = canPost && !message.deleted && message.kind !== "system" && actions.onReact;
     const remindable = !message.deleted && message.kind !== "system";
     const speakable = !message.deleted && Boolean(message.body.trim()) && browserCanSpeak();
@@ -650,9 +653,21 @@ export function MessageMenu({
                         </ContextMenuItem>
                     )}
 
-                    {canPost && !message.deleted && (mine || canModerate) && (
+                    {/* Anybody's message, gone from this reader's screen only.
+                        Absent where there is no conversation to hide it from. */}
+                    {hide && (
                         <>
                             <ContextMenuSeparator />
+                            <ContextMenuItem variant="danger" onSelect={() => hide(message)}>
+                                <EyeOff className="size-3.5" />
+                                {t("messageMenu.deleteForMe")}
+                            </ContextMenuItem>
+                        </>
+                    )}
+
+                    {canPost && !message.deleted && (mine || canModerate) && (
+                        <>
+                            {!hide && <ContextMenuSeparator />}
                             {/* Shift held skips the question - only the click
                                 knows it was. A key press or a tap arrives as a
                                 click as well. */}

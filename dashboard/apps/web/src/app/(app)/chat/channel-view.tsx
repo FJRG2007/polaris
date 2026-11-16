@@ -89,6 +89,16 @@ import {
 import { ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { keepReading, readingPosition, type ReadingPosition } from "./reading-position";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import * as vanishActions from "./vanish-actions";
+import type { VanishDuration } from "@/lib/chat/vanish-rules";
+import {
+    DeleteChatDialog,
+    HideMessage,
+    ProposalBar,
+    useDirectRules,
+    useDropExpired,
+    useHide
+} from "./vanish-controls";
 import { Button, EmptyState, ResizeHandle, Skeleton, cn, useToast } from "@polaris/ui";
 import { PersonCardProvider } from "./person-card";
 import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
@@ -2080,6 +2090,108 @@ export function ChannelView({
      *  height from a taller window is not the height this one is showing. */
     const bandSize = callBandSize(bandHeight, bandDrawn?.height ?? null, bandLimit, BAND);
 
+    // Disappearing messages, delete for me and deleting the chat - only where
+    // the conversation has those rules: a direct message, or a group outside
+    // any space.
+    const direct = Boolean(
+        channel && !channel.spaceId && (channel.kind === "dm" || channel.kind === "group")
+    );
+    const vanish = useDirectRules(channelId, direct);
+    const hideMessage = useHide(setMessages, setError);
+    useDropExpired(messages, setMessages);
+    const [deletingChat, setDeletingChat] = useState(false);
+    // Every change of the rules is announced by a line Polaris writes into
+    // the chat, so a new one is when the rules are worth asking again - not
+    // every message that arrives.
+    const lastNotice = useMemo(() => {
+        for (let index = (messages?.length ?? 0) - 1; index >= 0; index--) {
+            const message = messages?.[index];
+            if (message?.kind === "system") return `${channelId}:${message.id}`;
+        }
+        return null;
+    }, [messages, channelId]);
+    const seenNotice = useRef<string | null>(null);
+    const reloadRules = vanish.reload;
+    useEffect(() => {
+        const was = seenNotice.current;
+        seenNotice.current = lastNotice;
+        // The first look at a conversation is the load the rules already made.
+        if (!lastNotice || !was || !was.startsWith(`${channelId}:`) || was === lastNotice) return;
+        void reloadRules();
+    }, [lastNotice, channelId, reloadRules]);
+
+    const setTimer = (seconds: VanishDuration) => {
+        const before = vanish.rules;
+        if (!before) return;
+        // In the open mode it takes effect at once; in the agreement mode it is
+        // a proposal, which the bar under the messages shows once it is made.
+        if (before.mode === "open") vanish.setRules({ ...before, vanishAfter: seconds });
+        void runAction(() => vanishActions.setVanishTimerAction(channelId, seconds), setError).then(
+            (result) => {
+                if (!result || result.error) {
+                    if (result?.error) setError(result.error);
+                    vanish.setRules(before);
+                    return;
+                }
+                void reloadRules();
+            }
+        );
+    };
+    const allowDeleteForAll = (allowed: boolean) => {
+        const current = vanish.rules;
+        if (!current) return;
+        void runAction(
+            () =>
+                vanishActions.proposeRulesAction(channelId, {
+                    vanishAfter: current.vanishAfter,
+                    deleteForAll: allowed
+                }),
+            setError
+        ).then((result) => {
+            if (result?.error) setError(result.error);
+            void reloadRules();
+        });
+    };
+    const answerProposal = async (proposalId: string, accept: boolean) => {
+        const before = vanish.rules;
+        // The bar goes at once; it comes back with the reason on a refusal.
+        if (before) vanish.setRules({ ...before, proposal: null });
+        const result = await runAction(
+            () => vanishActions.answerProposalAction(proposalId, accept),
+            setError
+        );
+        if (!result || result.error) {
+            if (result?.error) setError(result.error);
+            vanish.setRules(before);
+            return;
+        }
+        void reloadRules();
+    };
+    /** Empties the screen at once and puts it back on a refusal, which the
+     *  dialog then shows. */
+    const deleteChat = async (everybody: boolean): Promise<string | null> => {
+        const before = messages;
+        let failure: string | null = null;
+        setMessages([]);
+        const result = await runAction(
+            () =>
+                everybody
+                    ? vanishActions.deleteChatForAllAction(channelId)
+                    : vanishActions.clearChatAction(channelId),
+            (message) => {
+                failure = message;
+            }
+        );
+        const refusal = result ? (result.error ?? null) : (failure ?? "");
+        if (refusal !== null) {
+            setMessages(before);
+            return refusal || t("vanish.deleteFailed");
+        }
+        void load();
+        refresh();
+        return null;
+    };
+
     // Waiting rather than refused while the list has not arrived: a first page
     // that lands before it is the ordinary way in from a link, and saying the
     // conversation is not theirs until the list catches up was a refusal that
@@ -2127,7 +2239,7 @@ export function ChannelView({
      * other with neither of them tall enough to read.
      */
     const conversation = (
-        <>
+        <HideMessage.Provider value={hideMessage}>
             <div
                 ref={scroller}
                 onScroll={(event) => {
@@ -2315,6 +2427,17 @@ export function ChannelView({
                 </p>
             )}
 
+            {direct && vanish.rules?.proposal && (
+                <ProposalBar
+                    rules={vanish.rules}
+                    proposerName={
+                        channel.others.find(
+                            (person) => person.id === vanish.rules?.proposal?.proposedById
+                        )?.name ?? viewerName
+                    }
+                    onAnswer={answerProposal}
+                />
+            )}
             {error && (
                 <p role="alert" className="px-4 pb-1 text-xs text-danger">
                     {error}
@@ -2448,7 +2571,7 @@ export function ChannelView({
                     />
                 </>
             )}
-        </>
+        </HideMessage.Provider>
     );
 
     /**
@@ -2600,7 +2723,26 @@ export function ChannelView({
                     // beside it is too narrow to share with a roster.
                     onMembers={voiceRoom ? undefined : members.toggle}
                     membersOpen={members.open && !thread && !searching}
+                    vanish={
+                        direct && vanish.rules
+                            ? {
+                                  rules: vanish.rules,
+                                  onTimer: setTimer,
+                                  onAllowDelete: allowDeleteForAll,
+                                  onDeleteChat: () => setDeletingChat(true)
+                              }
+                            : undefined
+                    }
                 />
+                {direct && vanish.rules && (
+                    <DeleteChatDialog
+                        open={deletingChat}
+                        onOpenChange={setDeletingChat}
+                        name={channel.name}
+                        rules={vanish.rules}
+                        onDelete={deleteChat}
+                    />
+                )}
 
                 {!needsCode && (
                     <PinnedBar

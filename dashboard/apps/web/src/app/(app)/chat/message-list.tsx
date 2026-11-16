@@ -18,6 +18,7 @@
  * was taken back.
  */
 
+import { VanishMark } from "./vanish-controls";
 import { InviteCards } from "./invite-card";
 import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -952,9 +953,10 @@ function Message({
                                 {/* Without a header there is nowhere else to say it, so
                                 the marks sit in the gutter until the hover takes
                                 it for the time. */}
-                                {(pinned || message.starred) && (
+                                {(pinned || message.starred || message.expiresAt) && (
                                     <span className="flex items-center gap-0.5 pt-1 group-hover:hidden group-data-[state=open]:hidden">
                                         <Marks pinned={pinned} starred={message.starred} />
+                                        <VanishMark expiresAt={message.expiresAt} />
                                     </span>
                                 )}
                             </>
@@ -1097,6 +1099,7 @@ function Message({
                                     className="whitespace-nowrap text-[0.6875rem] text-foreground-subtle"
                                 />
                                 <Marks pinned={pinned} starred={message.starred} />
+                                <VanishMark expiresAt={message.expiresAt} />
                             </p>
                         )}
 

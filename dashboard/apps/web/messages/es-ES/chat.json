@@ -896,7 +896,8 @@
         "custom": "Personalizado...",
         "reminderSet": "Recordatorio para el {date} a las {time}",
         "speak": "Leer en voz alta",
-        "stopSpeaking": "Dejar de leer"
+        "stopSpeaking": "Dejar de leer",
+        "deleteForMe": "Borrar para mí"
     },
     "poll": {
         "createAPoll": "Crear encuesta",
@@ -2369,5 +2370,44 @@
             "hytale": "1. Abre Hytale y ve a Servidores.\n2. Añade un servidor con la dirección {address}.\n3. Elígelo y entra.",
             "other": "Abre el juego y conéctate a {address}."
         }
+    },
+    "vanish": {
+        "timer": "Mensajes temporales",
+        "duration": {
+            "off": "Desactivado",
+            "day": "24 horas",
+            "week": "7 días",
+            "month": "30 días",
+            "quarter": "90 días"
+        },
+        "short": {
+            "off": "No",
+            "day": "24h",
+            "week": "7d",
+            "month": "30d",
+            "quarter": "90d"
+        },
+        "badge": "Los mensajes desaparecen tras {duration}",
+        "mark": "Mensaje temporal",
+        "proposeHint": "Los cambios se proponen antes a los demás",
+        "allowDeleteForAll": "Permitir borrar el chat para todos",
+        "deleteChat": "Borrar chat",
+        "chatKind": "chat",
+        "deleteTitle": "¿Borrar este chat?",
+        "forMeQuestion": "Sus mensajes se borran solo para ti. Los demás los conservan.",
+        "forAllQuestion": "Todos los mensajes se borran para todos en el chat y no se pueden recuperar.",
+        "deleteForMe": "Borrar para mí",
+        "deleteForAll": "Borrar para todos",
+        "alsoFor": "Borrar también para {name}",
+        "alsoForHint": "Borra todos los mensajes para todos en el chat.",
+        "alsoForOff": "No se permite hasta que todos en el chat lo acepten",
+        "proposalTimer": "{name} propone: los mensajes desaparecen tras {duration}",
+        "proposalTimerOff": "{name} propone: los mensajes no desaparecen",
+        "proposalDeleteYes": "Se permite borrar el chat para todos",
+        "proposalDeleteNo": "No se permite borrar el chat para todos",
+        "waiting": "Esperando a que los demás acepten tu propuesta",
+        "accept": "Aceptar",
+        "decline": "Rechazar",
+        "deleteFailed": "No se pudo borrar el chat. Inténtalo de nuevo."
     }
 }
