@@ -38,7 +38,7 @@ export function changesUnavailable(
     return null;
 }
 
-async function machineOf(sessionId: string): Promise<{ workdir: string; hasMachine: boolean }> {
+export async function machineOf(sessionId: string): Promise<{ workdir: string; hasMachine: boolean }> {
     const row = await prisma.agentSession.findUnique({
         where: { id: sessionId },
         select: { place: true, hostId: true, containerId: true, workdir: true }

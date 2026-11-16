@@ -30,6 +30,8 @@ import * as work from "@/lib/agents/session-work";
 import * as repoOptions from "@/lib/agents/repo-options";
 import { sessionCursorSchema } from "@/lib/agents/session-cursor";
 import * as review from "@/lib/agents/session-review";
+import * as turns from "@/lib/agents/session-snapshot-service";
+import { COMMIT_PATTERN } from "@/lib/agents/session-snapshots";
 import * as timelines from "@/lib/agents/session-pr-timeline";
 import * as reviewer from "@/lib/agents/session-reviewer";
 import { requestReview } from "@/lib/agents/session-reviewer-service";
@@ -832,6 +834,37 @@ export async function revertSessionChangeAction(
     return {
         answer: await review.revertSessionChange(session, { path: parsed.data.path, hunk: parsed.data.hunk })
     };
+}
+
+const stepTurnInputSchema = z.object({
+    sessionId: sessionIdSchema,
+    direction: z.enum(["undo", "redo"]),
+    to: z.string().regex(COMMIT_PATTERN).optional()
+});
+
+/** The session's turns that can be undone, newest first. */
+export async function sessionTurnsAction(
+    sessionId: unknown
+): Promise<{ answer?: turns.TurnsAnswer; error?: string }> {
+    const t = await getTranslations("agents");
+    const parsed = sessionIdSchema.safeParse(sessionId);
+    if (!parsed.success) return { error: t("session.turns.errors.invalid") };
+    const session = await controlledSession(parsed.data);
+    if (!session) return { error: t("sessions.errors.gone") };
+    return { answer: await turns.listSessionTurns(session) };
+}
+
+/** Put the checkout back to before a turn, or forward again. Destructive for
+ *  what the agent wrote since: the screen asks first. */
+export async function stepSessionTurnAction(
+    input: unknown
+): Promise<{ answer?: turns.StepAnswer; error?: string }> {
+    const t = await getTranslations("agents");
+    const parsed = stepTurnInputSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.turns.errors.invalid") };
+    const session = await controlledSession(parsed.data.sessionId);
+    if (!session) return { error: t("sessions.errors.gone") };
+    return { answer: await turns.stepSessionTurn(session, parsed.data) };
 }
 
 /** The files in a running session's checkout, for the workspace beside it. */

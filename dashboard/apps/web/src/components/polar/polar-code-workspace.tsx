@@ -26,6 +26,7 @@ import type { PreviewPortsAnswer } from "@/lib/agents/session-preview";
 import type { PickedElement } from "@/lib/agents/preview-picker";
 import { usePreviewPicker } from "@/components/preview/use-preview-picker";
 import { SessionChanges } from "@/components/agents/sessions/session-changes";
+import { SessionTurns } from "@/components/agents/sessions/session-turns";
 import { useCheckoutWake } from "@/components/polar/use-checkout-wake";
 import { SessionPullTab } from "@/components/agents/sessions/session-pr-tab";
 import { openAgentInterfaceAction } from "@/components/agents/sessions/actions";
@@ -98,6 +99,8 @@ export function PolarCodeWorkspace({
     const theme = useCodeTheme();
     const [pane, setPane] = useState<Pane>("files");
     const wake = useCheckoutWake({ sessionId: session.id, active: open && live, lastEdit, lastTool });
+    // Bumped after an undo or redo moved the files, so the changes read again.
+    const [stepped, setStepped] = useState(0);
     // Whether the person picked a pane since the workspace opened: until they
     // do, the first web server the session runs brings the preview forward.
     const chosen = useRef(false);
@@ -212,7 +215,8 @@ export function PolarCodeWorkspace({
                                     namespaces={["agents"]}
                                     fallback={<ui.Skeleton className="h-24 w-full" />}
                                 >
-                                    <SessionChanges session={session} wake={wake} />
+                                    <SessionTurns session={session} onStepped={() => setStepped((n) => n + 1)} />
+                                    <SessionChanges session={session} wake={stepped ? `${wake ?? ""}#${stepped}` : wake} />
                                 </ClientMessages>
                             </div>
                         ) : pane === "pull" ? (

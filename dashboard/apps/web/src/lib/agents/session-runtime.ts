@@ -69,6 +69,7 @@ import { startContainer } from "./session-container";
 import { claimSpare } from "./session-spares";
 import { previewBase } from "./session-preview-link";
 import * as placement from "./session-placement";
+import * as snapshots from "./session-snapshots";
 import * as computer from "@/lib/computers/computer-sessions";
 import {
     addSessionMessage,
@@ -1222,6 +1223,30 @@ async function waitForAgent(
 }
 
 /**
+ * Snapshot the checkout before a turn (`session-snapshots.ts`), so the turn can
+ * be undone, and hand back the prompt to send. When an undo was in progress the
+ * snapshot keeps it, and the agent is told which message was undone: its own
+ * conversation cannot be cut from here. Never holds a prompt longer than
+ * `CAPTURE_TIMEOUT_S`, and a snapshot that fails only loses the undo point.
+ */
+async function snapshotBeforeTurn(sessionId: string, workdir: string, text: string): Promise<string> {
+    const capture = runInSession(sessionId, snapshots.captureScript({ workdir, prompt: text }))
+        .then((result) => snapshots.parseCapture(result.output))
+        .catch((error: unknown) => {
+            console.error(`polaris: could not snapshot session ${sessionId} before a turn:`, error);
+            return null;
+        });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), snapshots.CAPTURE_TIMEOUT_S * 1000);
+    });
+    const said = await Promise.race([capture, late]).finally(() => clearTimeout(timer));
+    return said?.kind === "kept" ? `${snapshots.undoneNote(said.undoneLabel)}
+
+${text}` : text;
+}
+
+/**
  * Send a session something to work on.
  *
  * Two calls with a wait between them, and the wait is the point: the paste has to
@@ -1242,10 +1267,12 @@ export async function promptSession(sessionId: string, text: string): Promise<vo
     // queue: nothing typed, nothing that has to look ready first.
     if (!placement) throw new Error("That session no longer exists.");
     if (placement.place === "computer") return computer.promptOnComputer(sessionId, text);
-    if (acpProviders.usesAcp(placement)) return acpPrompt(sessionId, placement.cli, text);
+    // Saved before either kind of turn, so a Chat-driven turn can be undone too.
+    const sent = await snapshotBeforeTurn(sessionId, placement.workdir, text);
+    if (acpProviders.usesAcp(placement)) return acpPrompt(sessionId, placement.cli, sent);
     const queued = await runInSession(
         sessionId,
-        commands.queuePromptCommand(stateDirFor(placement), text)
+        commands.queuePromptCommand(stateDirFor(placement), sent)
     ).catch(() => null);
     if (queued?.code === 0) return;
     // The interface is open beside the runner: the prompt goes to it, typed.
@@ -1255,8 +1282,8 @@ export async function promptSession(sessionId: string, text: string): Promise<vo
             : commands.TMUX_SESSION;
     if (queued && queued.code !== commands.NOT_QUEUED.interactive && target === commands.TMUX_SESSION)
         throw new Error("The agent's machine did not take the prompt");
-    await steer(sessionId, commands.pastePromptCommand(text, target), "The agent's terminal did not take the prompt");
-    await new Promise((resolve) => setTimeout(resolve, commands.submitDelayMs(text)));
+    await steer(sessionId, commands.pastePromptCommand(sent, target), "The agent's terminal did not take the prompt");
+    await new Promise((resolve) => setTimeout(resolve, commands.submitDelayMs(sent)));
     await steer(sessionId, commands.submitCommand(target), "The prompt was pasted but not submitted");
 }
 

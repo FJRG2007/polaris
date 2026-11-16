@@ -707,6 +707,35 @@
                 "start_failed": "La revisión no arrancó. Revisa el acceso de la herramienta.",
                 "other": "La revisión no pudo arrancar."
             }
+        },
+        "turns": {
+            "title": "Turnos",
+            "undo": "Anular",
+            "redo": "Rehacer",
+            "refresh": "Actualizar turnos",
+            "undoTo": "Deshacer hasta antes de esto",
+            "undone": "Deshecho",
+            "unnamed": "Mensaje",
+            "empty": "Cada mensaje guarda antes los archivos para poder deshacerlo.",
+            "nothing": "No queda nada a lo que ir.",
+            "stale": "Ese turno ya no está en la sesión. Actualiza y elige otro.",
+            "failed": "No se pudieron mover los archivos. No cambió nada.",
+            "unreachable": "No se pudo contactar con la máquina de la sesión.",
+            "undoTitle": "¿Deshacer archivos?",
+            "undoDescription": "Los archivos vuelven a como estaban antes de tu último mensaje. Lo escrito después se guarda y Rehacer lo recupera hasta tu próximo mensaje.",
+            "undoToDescription": "Los archivos vuelven a como estaban antes de \"{label}\". Rehacer los recupera hasta tu próximo mensaje.",
+            "redoTitle": "¿Rehacer archivos?",
+            "redoDescription": "Los archivos avanzan un turno otra vez y sustituyen lo que hay ahora.",
+            "errors": {
+                "invalid": "La solicitud no es válida."
+            },
+            "unavailable": {
+                "workspace": "La sesión no tiene repositorio: no hay archivos que deshacer.",
+                "ended": "La copia de trabajo de la sesión ya no existe.",
+                "starting": "La sesión aún está arrancando.",
+                "computer": "Deshacer aún no está disponible en un ordenador.",
+                "over": "La sesión terminó y sus archivos se quedan como están."
+            }
         }
     },
     "rules": {

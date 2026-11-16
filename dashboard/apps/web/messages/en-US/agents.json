@@ -707,6 +707,35 @@
                 "start_failed": "The review could not start. Check the tool's sign-in and try again.",
                 "other": "The review could not start."
             }
+        },
+        "turns": {
+            "title": "Turns",
+            "undo": "Undo",
+            "redo": "Redo",
+            "refresh": "Refresh turns",
+            "undoTo": "Undo to before this message",
+            "undone": "Undone",
+            "unnamed": "Message",
+            "empty": "Each message you send saves the files first, so it can be undone.",
+            "nothing": "There is nothing left to step to.",
+            "stale": "That turn is no longer in this session. Refresh and pick again.",
+            "failed": "The files could not be moved. Nothing was changed.",
+            "unreachable": "Could not reach the session's machine.",
+            "undoTitle": "Undo files?",
+            "undoDescription": "The files go back to how they were before your last message. What the agent wrote since is saved, and Redo brings it back until you send a new message.",
+            "undoToDescription": "The files go back to how they were before \"{label}\". Redo brings them back until you send a new message.",
+            "redoTitle": "Redo files?",
+            "redoDescription": "The files go forward one turn again, replacing what is in the checkout now.",
+            "errors": {
+                "invalid": "That request was not valid."
+            },
+            "unavailable": {
+                "workspace": "This session has no repository, so there are no files to undo.",
+                "ended": "The session's checkout is gone.",
+                "starting": "The session is still starting.",
+                "computer": "Undo is not available for a session on a computer yet.",
+                "over": "The session has ended, so its files stay as they are."
+            }
         }
     },
     "rules": {
