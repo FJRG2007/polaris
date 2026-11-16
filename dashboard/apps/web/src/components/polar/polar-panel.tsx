@@ -227,6 +227,9 @@ import { PolarReachContext } from "@/components/polar/polar-reach";
 import { listsCodeSessions } from "@/lib/polar/code-history";
 import { useViewSubject } from "@/components/notifications/presence-reporter";
 import { sessionViewSubject } from "@/lib/notifications/view-subject";
+import { PickedChips } from "@/components/preview/picked-chips";
+import { PreviewPickContext } from "@/components/preview/use-preview-picker";
+import { pickedContext, PICKS_MAX, type PickedElement } from "@/lib/agents/preview-picker";
 
 // ---------------------------------------------------------------------------
 // Page context
@@ -815,6 +818,9 @@ export function PolarChat({
     const codeOpening = useRef<string | null>(null);
     const [input, setInput] = useState("");
     const [quote, setQuote] = useState<string | null>(null);
+    // Elements picked in a page an answer previews, carried ahead of the next
+    // message the way a quote is.
+    const [picks, setPicks] = useState<readonly PickedElement[]>([]);
     /** "/page" with the page switched off in settings: the page goes with the
      *  next message only. */
     const pageOnce = useRef(false);
@@ -1567,6 +1573,7 @@ export function PolarChat({
         setQueue([]);
         setInput("");
         setQuote(null);
+        setPicks([]);
         clearFiles();
         setEditing(null);
         composerNext.current = drawer;
@@ -2016,7 +2023,8 @@ export function PolarChat({
             own && (polarShared.isAutomatic(own.row.choice) || offered(providers, own.row.choice))
                 ? own.row.choice
                 : null;
-        const text = quote ? `${polarShared.quoteBlock(quote)}\n\n${body}` : body;
+        const quoted = quote ? `${polarShared.quoteBlock(quote)}\n\n${body}` : body;
+        const text = picks.length > 0 ? `${pickedContext(picks)}\n\n${quoted}` : quoted;
         const message = {
             text,
             files: ready.map((file) => ({
@@ -2191,6 +2199,10 @@ export function PolarChat({
               attach: "polar-attach",
               suggestion: "polar-suggestion"
           };
+    const pick = (element: PickedElement) => {
+        setPicks((list) => [...list, element].slice(-PICKS_MAX));
+        window.setTimeout(() => document.getElementById(ids.input)?.focus(), 0);
+    };
     const pickSlash = (index: number) => {
         const key = slashItems[index]?.key;
         if (!key) return;
@@ -2475,6 +2487,7 @@ export function PolarChat({
                     />
                 </div>
             ) : null}
+            <PickedChips picks={picks} onRemove={(index) => setPicks((list) => list.filter((_, at) => at !== index))} />
             <PolarComposer
                 kit={voiceKit}
                 notice={voiceNotice}
@@ -2954,6 +2967,7 @@ export function PolarChat({
                                     {suggestions}
                                 </ConversationEmptyState>
                             ) : null}
+                            <PreviewPickContext.Provider value={pick}>
                             {chat.messages.map((message, index) => {
                                 const marker = compactionOf(message);
                                 if (marker) {
@@ -3076,6 +3090,7 @@ export function PolarChat({
                                     />
                                 );
                             })}
+                            </PreviewPickContext.Provider>
                             {compacting ? (
                                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                     <ThinkingOrb state="breathing" size={20} decorative />

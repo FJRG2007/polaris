@@ -22,7 +22,8 @@ import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import * as polls from "@/components/agents/sessions/sessions-polls";
 import type { FileAnswer, FilesAnswer } from "@/lib/agents/session-files";
 import type { PreviewPortsAnswer } from "@/lib/agents/session-preview";
-import { PICKER_CHANNEL, readPickerMessage, type PickedElement } from "@/lib/agents/preview-picker";
+import type { PickedElement } from "@/lib/agents/preview-picker";
+import { usePreviewPicker } from "@/components/preview/use-preview-picker";
 import { SessionChanges } from "@/components/agents/sessions/session-changes";
 import { useCheckoutWake } from "@/components/polar/use-checkout-wake";
 import { SessionPullTab } from "@/components/agents/sessions/session-pr-tab";
@@ -428,32 +429,7 @@ function PreviewPane({
     const [version, setVersion] = useState(0);
     const [device, setDevice] = useState<PreviewDevice>("full");
     const [follow, setFollow] = useState(true);
-    const [picking, setPicking] = useState(false);
-    const frame = useRef<HTMLIFrameElement | null>(null);
-
-    // The page is the agent's: a message counts only when it comes from this
-    // frame, from the opaque origin the sandbox gives it, and reads as the
-    // picker's. What it says is cut to size before anything uses it.
-    const tell = useCallback((action: "start" | "stop") => {
-        frame.current?.contentWindow?.postMessage({ type: PICKER_CHANNEL, action }, "*");
-    }, []);
-    useEffect(() => {
-        if (!onPick) return;
-        const listen = (event: MessageEvent) => {
-            if (!frame.current || event.source !== frame.current.contentWindow || event.origin !== "null") return;
-            const message = readPickerMessage(event.data);
-            if (!message) return;
-            if (message.action === "picked") {
-                setPicking(false);
-                onPick(message.element);
-            } else if (message.action === "stopped") setPicking(false);
-            // A page that reloaded while picking picks again.
-            else if (picking) tell("start");
-        };
-        window.addEventListener("message", listen);
-        return () => window.removeEventListener("message", listen);
-    }, [onPick, picking, tell]);
-    useEffect(() => tell(picking ? "start" : "stop"), [picking, tell]);
+    const { frame, picking, setPicking } = usePreviewPicker(onPick);
 
     // The agent's writes reload the page, once a burst of them settles. The
     // edit already on screen when the pane opened is not one.

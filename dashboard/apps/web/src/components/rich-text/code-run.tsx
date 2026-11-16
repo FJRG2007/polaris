@@ -11,9 +11,11 @@
  */
 
 import { cn } from "@polaris/ui";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
+import { injectPicker } from "@/lib/agents/preview-picker";
+import { PreviewPickContext, usePreviewPicker } from "@/components/preview/use-preview-picker";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Eraser, Eye, Loader2, Play, Square, X } from "lucide-react";
+import { Crosshair, Eraser, Eye, Loader2, Play, Square, X } from "lucide-react";
 import {
     OUTPUT_LIMIT,
     parseRunnerMessage,
@@ -194,26 +196,56 @@ export function RunButton({ run, kind }: { run: CodeRun; kind: RunKind }) {
     );
 }
 
+/**
+ * A page's preview, in a frame of its own origin. Inside a thread that takes
+ * picked elements (Polar's chat), the picker goes into the page too, and what
+ * is clicked there goes into the next message, as in the Code preview.
+ */
+function PagePreview({ id, srcdoc }: { id: number; srcdoc: string }) {
+    const t = useTranslations("components");
+    const onPick = useContext(PreviewPickContext);
+    const { frame, picking, setPicking } = usePreviewPicker(onPick);
+    return (
+        <div className="border-t border-border">
+            {onPick ? (
+                <div className="flex min-w-0 items-center gap-2 px-2.5 py-1">
+                    <button
+                        type="button"
+                        onClick={() => setPicking((on) => !on)}
+                        aria-pressed={picking}
+                        title={t("editor.pickElement")}
+                        aria-label={t("editor.pickElement")}
+                        className={cn(BUTTON, picking && "bg-card-hover text-foreground")}
+                    >
+                        <Crosshair className="size-3.5" />
+                        <span className="hidden sm:inline">{t("editor.pick")}</span>
+                    </button>
+                    {picking ? (
+                        <span role="status" className="min-w-0 truncate text-xs text-muted-foreground">
+                            {t("editor.picking")}
+                        </span>
+                    ) : null}
+                </div>
+            ) : null}
+            <iframe
+                ref={frame}
+                key={id}
+                title={t("editor.previewTitle")}
+                sandbox="allow-scripts"
+                referrerPolicy="no-referrer"
+                srcDoc={onPick ? injectPicker(srcdoc) : srcdoc}
+                className="block h-80 w-full resize-y bg-white"
+            />
+        </div>
+    );
+}
+
 /** The output under the block, or the preview of a page. Nothing until Run. */
 export function RunOutput({ run }: { run: CodeRun }) {
     const t = useTranslations("components");
     const { state } = run;
     if (state.phase === "idle") return null;
-
-    if (state.phase === "preview") {
-        return (
-            <div className="border-t border-border">
-                <iframe
-                    key={state.id}
-                    title={t("editor.previewTitle")}
-                    sandbox="allow-scripts"
-                    referrerPolicy="no-referrer"
-                    srcDoc={state.srcdoc ?? ""}
-                    className="block h-80 w-full resize-y bg-white"
-                />
-            </div>
-        );
-    }
+    if (state.phase === "preview") return <PagePreview id={state.id} srcdoc={state.srcdoc ?? ""} />;
 
     return (
         <div className="border-t border-border">
