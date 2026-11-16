@@ -34,10 +34,13 @@ export interface EnigmaSkillRow {
 function Row({
     label,
     hint,
+    badges,
     children
 }: {
     label: string;
     hint?: string;
+    /** Under the hint, so on a phone they never squeeze the label. */
+    badges?: React.ReactNode;
     children: React.ReactNode;
 }) {
     return (
@@ -51,6 +54,7 @@ function Row({
                         {hint}
                     </p>
                 ) : null}
+                {badges ? <div className="mt-1 flex flex-wrap gap-1">{badges}</div> : null}
             </div>
             <div className="shrink-0">{children}</div>
         </div>
@@ -185,9 +189,17 @@ export function EnigmaSettings({
                         <Card>
                             <CardBody className="flex flex-col divide-y divide-border p-0">
                                 {skills.map((skill) => (
-                                    <Row key={skill.name} label={skill.name} hint={skill.description}>
-                                        <div className="flex flex-wrap items-center justify-end gap-2">
-                                        <EditedBadges summary={summaries[skillKey("enigma", skill.name)]} />
+                                    <Row
+                                        key={skill.name}
+                                        label={skill.name}
+                                        hint={skill.description}
+                                        badges={
+                                            summaries[skillKey("enigma", skill.name)]?.edited ? (
+                                                <EditedBadges summary={summaries[skillKey("enigma", skill.name)]} />
+                                            ) : null
+                                        }
+                                    >
+                                        <div className="flex items-center gap-2">
                                         <Button
                                             type="button"
                                             size="icon-sm"
