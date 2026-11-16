@@ -394,7 +394,7 @@ export async function actOnMessages(
         refusal.refuseWhileSignedOut(account);
         /** Where the messages went, so it can be read again before anybody looks
          *  for them there. */
-        const landed = new Set<string>();
+        const landed = new Map<string, number[]>();
         /** What each folder's unread number owes this action, so the rail is
          *  right the moment the answer lands rather than at the next sync. */
         const deltas = new Map<string, number>();
@@ -408,6 +408,7 @@ export async function actOnMessages(
                 const uids = rows.map((row) => Number(row.uid));
                 const lock = await client.getMailboxLock(folder.path);
                 let target = "";
+                let arrived: readonly number[] = [];
                 try {
                     refusal.forgetRefusal(client);
                     const outcome = await applyOne(
@@ -421,6 +422,7 @@ export async function actOnMessages(
                     );
                     done += outcome.done;
                     target = outcome.movedTo;
+                    arrived = outcome.arrived ?? [];
                     if (outcome.refused) refused.push(refusal.lastRefusal(client));
                     // Unread mail leaving is unread mail the folder no longer
                     // has, whether it went to Trash or was destroyed outright.
@@ -429,7 +431,7 @@ export async function actOnMessages(
                 } finally {
                     lock.release();
                 }
-                if (target) landed.add(target);
+                if (target) landed.set(target, [...(landed.get(target) ?? []), ...arrived]);
             }
         });
         await nudgeFolderUnread(deltas);
@@ -447,7 +449,7 @@ export async function actOnMessages(
         // It is not skipped, only moved: the stream frame that follows is what
         // redraws the screen once the new home is readable, and until then the
         // list somebody is looking at is already right.
-        if (options.settle !== false) settle(account, [...landed], userId);
+        if (options.settle !== false) settle(account, landed, userId);
     }
     if (options.settle !== false) {
         await refreshThreadsFor(messages.map((message) => message.accountId));
@@ -473,14 +475,15 @@ export async function actOnMessages(
  */
 function settle(
     account: MailConnectionSource & { id: string },
-    folderIds: readonly string[],
+    /** Each destination folder, with the uids the move said landed there. */
+    folders: ReadonlyMap<string, readonly number[]>,
     userId: string
 ): void {
-    if (folderIds.length === 0) return;
+    if (folders.size === 0) return;
     const read = async (): Promise<void> => {
         await withImap(account, async (client) => {
-            for (const folderId of folderIds) {
-                await catchUpFolder(client, account.id, folderId).catch(() => undefined);
+            for (const [folderId, arrived] of folders) {
+                await catchUpFolder(client, account.id, folderId, arrived).catch(() => undefined);
             }
         }).catch(() => undefined);
         await refreshThreadsFor([account.id]).catch(() => undefined);
@@ -629,6 +632,9 @@ async function setFlag(
 interface Applied {
     readonly done: number;
     readonly movedTo: string;
+    /** The uids the server said the moved messages have in `movedTo` (COPYUID),
+     *  so its read can wait until they are there. Empty when it did not say. */
+    readonly arrived?: readonly number[];
     /** How many of them were unread, so the folder they left and the folder they
      *  arrived in can both say so before the next sync. */
     readonly unseen: number;
@@ -705,7 +711,12 @@ async function applyOne(
     // server actually gave them, and a guessed uid is a row that points at
     // somebody else's message.
     await prisma.mailMessage.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
-    return { done: rows.length, movedTo: target.id, unseen };
+    return {
+        done: rows.length,
+        movedTo: target.id,
+        unseen,
+        arrived: typeof moved === "object" && moved.uidMap ? [...moved.uidMap.values()] : []
+    };
 }
 
 function groupByAccount<T extends { accountId: string }>(rows: readonly T[]): Map<string, T[]> {

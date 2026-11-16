@@ -41,6 +41,7 @@ import { recordAccountAttempt, recordAccountState } from "./accounts";
 import { missingFromWindow, nextCursor } from "./folder-window";
 import { reconcileDeletions } from "./reconcile-deletions";
 import { forgetRemoved, removedFrom, withoutRemoved } from "./removed-uids";
+import { readUntilLanded } from "./settle-landing";
 import { getSetting } from "@/lib/setting-store";
 import { recordCredentialRefusal } from "./refused";
 import { recordSubscription } from "./subscriptions";
@@ -437,7 +438,10 @@ const importantFrom = core.importantAfterSync;
 export async function catchUpFolder(
     client: ImapFlow,
     accountId: string,
-    folderId: string
+    folderId: string,
+    /** Uids a move just said it gave messages here: read again, a moment apart,
+     *  until they are stored - see `settle-landing`. */
+    arrived: readonly number[] = []
 ): Promise<void> {
     const [account, folder] = await Promise.all([
         prisma.mailAccount.findUnique({ where: { id: accountId }, select: ACCOUNT_COLUMNS }),
@@ -447,7 +451,25 @@ export async function catchUpFolder(
     // The window is read here too: this runs right after a move, on the
     // destination folder, and the message that was just filed is the newest
     // thing in it - so it is inside the window and its body comes down with it.
-    await syncFolder(client, account, folder, await bodyWindowEdge(accountId));
+    const edge = await bodyWindowEdge(accountId);
+    if (arrived.length === 0) {
+        await syncFolder(client, account, folder, edge);
+        return;
+    }
+    await readUntilLanded(arrived, async (attempt) => {
+        // Again: ask the session what it holds now, and read from the cursor
+        // the last read stored, not the one this started with.
+        if (attempt > 0) await client.noop();
+        const current =
+            attempt === 0 ? folder : await prisma.mailFolder.findUnique({ where: { id: folderId } });
+        if (!current) return new Set(arrived);
+        await syncFolder(client, account, current, edge);
+        const stored = await prisma.mailMessage.findMany({
+            where: { folderId, uid: { in: arrived.map((uid) => BigInt(uid)) } },
+            select: { uid: true }
+        });
+        return new Set(stored.map((row) => Number(row.uid)));
+    });
 }
 
 /** How many older messages one reach for the bottom of a list brings down. */
