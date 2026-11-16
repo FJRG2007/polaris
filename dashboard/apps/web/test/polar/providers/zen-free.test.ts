@@ -57,7 +57,7 @@ const { polarCredentialsFor } = await import("@/lib/polar/access");
 const zen = await import("@/lib/polar/zen-free");
 const { ZEN_FREE_SLUG } = await import("@/lib/polar/shared");
 
-const ACCESS = { use: true, spend: false, web: true, connectors: false };
+const ACCESS = { use: true, spend: false, web: true, connectors: false, zenStandInEveryone: false };
 
 beforeEach(() => {
     state.sources = new Map();
@@ -182,18 +182,34 @@ describe("the catalogue with no keys", () => {
 });
 
 describe("the plan", () => {
-    it("ends on Zen after a person's own model", async () => {
-        state.sources = new Map([["openai", "own"]]);
+    const plan = async (access = ACCESS) => {
         const { resolvePolarModel } = await import("@/lib/polar/models");
         const resolved = await resolvePolarModel(
             "u1",
             { kind: "language", provider: "openai", model: "mini", intelligence: "balanced", payer: null },
             undefined,
-            ACCESS
+            access
         );
         if (typeof resolved === "string") throw new Error(resolved);
-        const steps = resolved.routed?.steps ?? [];
+        return resolved.routed?.steps ?? [];
+    };
+
+    it("ends on Zen after the deployment's model for a person with no key", async () => {
+        state.sources = new Map([["openai", "instance"]]);
+        const steps = await plan({ ...ACCESS, spend: true });
         expect(steps.at(-1)?.option.provider).toBe(ZEN_FREE_SLUG);
         expect(steps[0]?.option.provider).toBe("openai");
+    });
+
+    it("does not end on Zen after a person's own model", async () => {
+        state.sources = new Map([["openai", "own"]]);
+        const steps = await plan();
+        expect(steps.map((step) => step.option.provider)).not.toContain(ZEN_FREE_SLUG);
+    });
+
+    it("ends on Zen after a person's own model once everyone is opted in", async () => {
+        state.sources = new Map([["openai", "own"]]);
+        const steps = await plan({ ...ACCESS, zenStandInEveryone: true });
+        expect(steps.at(-1)?.option.provider).toBe(ZEN_FREE_SLUG);
     });
 });

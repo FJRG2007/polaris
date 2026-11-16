@@ -154,6 +154,11 @@
             "freeModels": {
                 "label": "Modelos gratis sin cuenta",
                 "hint": "Quien no tiene clave propia usa los modelos gratis de OpenCode Zen, que pueden guardar los mensajes para mejorar."
+            },
+            "zenStandInEveryone": {
+                "label": "Respaldo gratis para todos",
+                "hint": "Si todos los modelos rechazan un turno, responde uno gratis, también a quien tiene clave propia.",
+                "off": "Activa antes los modelos gratis sin cuenta."
             }
         }
     },

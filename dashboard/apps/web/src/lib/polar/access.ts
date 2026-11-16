@@ -81,7 +81,12 @@ export const polarPolicySchema = z.object({
     /** Whether an account with no usable key gets OpenCode Zen's free models
      *  (`zen-free.ts`). On unless an administrator turned it off, so a policy
      *  saved before this existed keeps it on. */
-    freeModels: z.boolean().default(true)
+    freeModels: z.boolean().default(true),
+    /** Whether a plan ends on a free model for everybody, a person with keys of
+     *  their own included (`zen-stand-in.ts`). Off unless an administrator
+     *  turned it on, so a policy saved before this existed keeps the free
+     *  stand-in to the people with no key. */
+    zenStandInEveryone: z.boolean().default(false)
 });
 export type PolarPolicy = z.infer<typeof polarPolicySchema>;
 
@@ -100,7 +105,8 @@ export const DEFAULT_POLAR_POLICY: PolarPolicy = {
     spend: { who: "admins", userIds: [], groupIds: [], guests: false },
     web: true,
     connectors: DEFAULT_CONNECTOR_POLICY,
-    freeModels: true
+    freeModels: true,
+    zenStandInEveryone: false
 };
 
 /**
@@ -203,6 +209,9 @@ export interface PolarAccess {
     web: boolean;
     /** Whether this account may connect and use its own MCP servers. */
     connectors: boolean;
+    /** Whether this account's plans end on the free stand-in even when it
+     *  holds keys of its own. */
+    zenStandInEveryone: boolean;
 }
 
 /** One account's answer to both questions. Pure. */
@@ -214,7 +223,8 @@ export function decidePolarAccess(policy: PolarPolicy, facts: AccessFacts): Pola
         spend: use && admitted(facts.grants?.spend, policy.spend, facts),
         web: use && policy.web,
         connectors:
-            use && (connectors.who === "everyone" || (connectors.who === "admins" && facts.isAdmin))
+            use && (connectors.who === "everyone" || (connectors.who === "admins" && facts.isAdmin)),
+        zenStandInEveryone: use && policy.freeModels && policy.zenStandInEveryone
     };
 }
 
@@ -257,7 +267,7 @@ export async function polarAccessFor(userId: string): Promise<PolarAccess> {
         return decidePolarAccess(policy, facts);
     } catch (error) {
         console.error("polar: could not read the access policy", error);
-        return { use: false, spend: false, web: false, connectors: false };
+        return { use: false, spend: false, web: false, connectors: false, zenStandInEveryone: false };
     }
 }
 

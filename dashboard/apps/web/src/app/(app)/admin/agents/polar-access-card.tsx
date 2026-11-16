@@ -274,6 +274,26 @@ export function PolarAccessCard({
                         aria-label={t("agents.polarAccess.freeModels.label")}
                     />
                 </div>
+                <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                        <p className="text-sm font-medium">
+                            {t("agents.polarAccess.zenStandInEveryone.label")}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                            {t(
+                                current.freeModels
+                                    ? "agents.polarAccess.zenStandInEveryone.hint"
+                                    : "agents.polarAccess.zenStandInEveryone.off"
+                            )}
+                        </p>
+                    </div>
+                    <Switch
+                        checked={current.freeModels && current.zenStandInEveryone}
+                        disabled={!current.freeModels}
+                        onChange={(zenStandInEveryone) => save({ ...current, zenStandInEveryone })}
+                        aria-label={t("agents.polarAccess.zenStandInEveryone.label")}
+                    />
+                </div>
                 <div className="space-y-2">
                     <div className="min-w-0 space-y-1">
                         <p className="text-sm font-medium">

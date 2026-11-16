@@ -154,6 +154,11 @@
             "freeModels": {
                 "label": "Free models with no account",
                 "hint": "People with no key of their own chat on OpenCode Zen's free models, which may keep prompts to improve the model."
+            },
+            "zenStandInEveryone": {
+                "label": "Free stand-in for everyone",
+                "hint": "When every model refuses a turn, a free model answers it, also for people with keys of their own.",
+                "off": "Turn on free models with no account first."
             }
         }
     },

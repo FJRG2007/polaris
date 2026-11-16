@@ -503,7 +503,7 @@ export async function resolvePolarModel(
     if (routing.pinnedFallsBack || options.fallBack) {
         entries.push(...(await fallbackEntries(userId, routing.fallbacks, catalogue, keysOf)));
     }
-    await endOnZen(entries, userId, granted, signals);
+    await endOnZen(entries, userId, granted, signals, catalogue);
     const steps = await planSteps(entries, async () => !(await polarLimitReached(userId)));
     return resolvedOf(steps, (kind, slug) => rememberRefusal(userId, slug, kind));
 }
@@ -513,11 +513,15 @@ async function endOnZen(
     entries: PlanEntry[],
     userId: string,
     access: PolarAccess,
-    signals: TurnSignals
+    signals: TurnSignals,
+    catalogue: readonly PolarProviderOption[]
 ): Promise<void> {
     const last = entries.at(-1)?.option.provider ?? null;
     try {
-        const step = await zenLastStep(access, last, signals.files > 0);
+        // The catalogue is this person's keys (`polarKeySources`), read once
+        // already: a provider paid as "own" is a key of their own.
+        const ownKey = catalogue.some((provider) => provider.payers.includes("own"));
+        const step = await zenLastStep(access, last, { needsAttachment: signals.files > 0, ownKey });
         if (step) entries.push(entryOf(userId, step.option, [step.credential], []));
     } catch (error) {
         // The free tier is a last resort; failing to read it never fails a turn.
@@ -812,7 +816,7 @@ async function resolveAutomatic(
             if (keys.length === 0) continue;
             entries.push(entryOf(userId, entry, keys, options));
         }
-        await endOnZen(entries, userId, access, signals);
+        await endOnZen(entries, userId, access, signals, options);
         const steps = await planSteps(entries, async () => !(await polarLimitReached(userId)));
         return {
             ...resolvedOf(steps, (kind, slug) => rememberRefusal(userId, slug, kind), true),
