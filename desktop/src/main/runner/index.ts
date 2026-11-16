@@ -22,6 +22,7 @@ import { hostname, release } from "node:os";
 import { app, safeStorage } from "electron";
 import { version } from "../../../package.json";
 import { ChatHost, type ClaudeSdk } from "./chat";
+import { Folders } from "./folders";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { RunnerConnection, type RunnerSocket, type RunnerState } from "./connection";
 import { SessionHost, type SpawnTerminal, type Terminal, type ToolchainProgressFrame } from "./sessions";
@@ -68,6 +69,15 @@ async function loadCredentials(): Promise<Record<string, Credential>> {
 async function saveCredentials(all: Record<string, Credential>): Promise<void> {
     await writeFile(credentialFile(), safeStorage.encryptString(JSON.stringify(all)), { mode: 0o600 });
 }
+
+/** The folders a `path` session may use, encrypted like the credential. */
+const folders = new Folders({
+    read: async () => (canKeep() ? safeStorage.decryptString(await readFile(join(app.getPath("userData"), "runner-folders.bin"))) : null),
+    write: async (json) => {
+        if (!canKeep()) throw new Error("storage");
+        await writeFile(join(app.getPath("userData"), "runner-folders.bin"), safeStorage.encryptString(json), { mode: 0o600 });
+    }
+});
 
 /** The pseudo-terminal library, loaded once and only when a session starts,
  *  so an app whose package lacks it still runs everything else. */
@@ -134,7 +144,7 @@ class RunnerService {
     readonly #sessions = new SessionHost({
         root: join(app.getPath("userData"), "runner"),
         platform: process.platform,
-        allowedFolders: () => [],
+        allowedFolders: () => folders.list(this.#server),
         send: (frame) => this.#connection?.send(frame) ?? false,
         spawnTerminal,
         prepare: (agents, onProgress) => this.#prepare(agents, onProgress),
@@ -172,6 +182,7 @@ class RunnerService {
         this.#disconnect();
         this.#server = server;
         if (!server) return this.#changed();
+        await folders.load();
         const credential = (await loadCredentials())[server];
         this.#paired = Boolean(credential);
         if (credential && this.#server === server) this.#connect(server, credential);
@@ -234,6 +245,24 @@ class RunnerService {
         this.#connect(server, answer.data);
         this.#changed();
         return { ok: true };
+    }
+
+    /** The folders chosen for the Polaris open here. */
+    async folders(): Promise<readonly string[]> {
+        await folders.load();
+        return folders.list(this.#server);
+    }
+
+    /** Keep a folder the person chose in the native dialog. Null when there is
+     *  no Polaris open or nowhere safe to keep it. */
+    async addFolder(folder: string): Promise<readonly string[] | null> {
+        if (!this.#server || !canKeep()) return null;
+        return folders.add(this.#server, folder);
+    }
+
+    async removeFolder(folder: string): Promise<readonly string[] | null> {
+        if (!this.#server || !canKeep()) return null;
+        return folders.remove(this.#server, folder);
     }
 
     async forget(): Promise<void> {

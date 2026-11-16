@@ -220,7 +220,18 @@ export interface ComputerBridge {
     /** Prepare the tools now (Try again). */
     prepare(): Promise<boolean>;
     onState(listener: (state: ComputerState) => void): () => void;
+    /** The folders a session on this computer may work in. Absent on an
+     *  older app. */
+    folders?(): Promise<readonly string[]>;
+    /** Choose one more in the native dialog; null when the person cancels. */
+    pickFolder?(): Promise<ComputerFolderPick>;
+    removeFolder?(folder: string): Promise<readonly string[] | null>;
 }
+
+export type ComputerFolderPick =
+    | { readonly ok: true; readonly folder: string; readonly folders: readonly string[] }
+    | { readonly ok: false; readonly reason: "refused" | "storage" }
+    | null;
 
 /** What the tunnel needs, as Polaris answered it. */
 export interface VpnConnection {
@@ -561,6 +572,9 @@ export const CHANNELS = {
     computerPair: "desktop:computer-pair",
     computerForget: "desktop:computer-forget",
     computerPrepare: "desktop:computer-prepare",
+    computerFolders: "desktop:computer-folders",
+    computerPickFolder: "desktop:computer-pick-folder",
+    computerRemoveFolder: "desktop:computer-remove-folder",
     computerEvent: "desktop:computer-event",
     defaultBrowser: "desktop:default-browser",
     systemIdle: "desktop:system-idle",

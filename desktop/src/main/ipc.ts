@@ -34,6 +34,7 @@ import { browserFromName, installRequestSchema, type InstallResult } from "@/sha
 import {
     type AddressCheck,
     CHANNELS,
+    type ComputerFolderPick,
     type ComputerPairOutcome,
     PREFERENCE_TOGGLES,
     type CustomGameInput,
@@ -475,6 +476,25 @@ export function registerIpc(host: IpcHost): void {
         return true;
     });
     ipcMain.handle(CHANNELS.computerPrepare, (event) => (fromPolaris(event) ? runner().prepareNow() : false));
+    ipcMain.handle(CHANNELS.computerFolders, (event) => (fromPolaris(event) ? runner().folders() : []));
+    // The same native folder dialog the upload picker opens, keeping the path
+    // instead of zipping it.
+    ipcMain.handle(CHANNELS.computerPickFolder, async (event): Promise<ComputerFolderPick> => {
+        if (!fromPolaris(event)) return { ok: false, reason: "refused" };
+        const window = BrowserWindow.fromWebContents(event.sender);
+        const options = { title: "Choose a folder for sessions on this computer", properties: ["openDirectory" as const] };
+        const picked = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
+        const folder = picked.canceled ? undefined : picked.filePaths[0];
+        if (!folder) return null;
+        const saved = await runner().addFolder(folder);
+        return saved ? { ok: true, folder, folders: [...saved] } : { ok: false, reason: "storage" };
+    });
+    ipcMain.handle(CHANNELS.computerRemoveFolder, async (event, raw: unknown) => {
+        const folder = z.string().min(1).max(1000).safeParse(raw);
+        if (!fromPolaris(event) || !folder.success) return null;
+        const saved = await runner().removeFolder(folder.data);
+        return saved ? [...saved] : null;
+    });
     runner().listen((state) => {
         for (const window of BrowserWindow.getAllWindows())
             if (!window.isDestroyed() && kindOf(window.webContents) === "polaris") window.webContents.send(CHANNELS.computerEvent, state);

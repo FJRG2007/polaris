@@ -142,6 +142,9 @@ const bridge: PolarisDesktop = {
         pair: (code) => ipcRenderer.invoke(CHANNELS.computerPair, code),
         forget: () => ipcRenderer.invoke(CHANNELS.computerForget),
         prepare: () => ipcRenderer.invoke(CHANNELS.computerPrepare),
+        folders: () => ipcRenderer.invoke(CHANNELS.computerFolders),
+        pickFolder: () => ipcRenderer.invoke(CHANNELS.computerPickFolder),
+        removeFolder: (folder) => ipcRenderer.invoke(CHANNELS.computerRemoveFolder, folder),
         onState: (listener) => {
             const heard = (_event: unknown, state: ComputerState) => listener(state);
             ipcRenderer.on(CHANNELS.computerEvent, heard);

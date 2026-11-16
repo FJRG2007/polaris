@@ -149,6 +149,15 @@ export interface DesktopComputer {
     forget(): Promise<boolean>;
     prepare(): Promise<boolean>;
     onState(listener: (state: DesktopComputerState) => void): () => void;
+    /** The folders a session on this computer may work in. Absent on an older app. */
+    folders?(): Promise<readonly string[]>;
+    /** Choose one more in the native dialog; null when the person cancels. */
+    pickFolder?(): Promise<
+        | { readonly ok: true; readonly folder: string; readonly folders: readonly string[] }
+        | { readonly ok: false; readonly reason: "refused" | "storage" }
+        | null
+    >;
+    removeFolder?(folder: string): Promise<readonly string[] | null>;
 }
 
 export interface PolarisDesktop {
