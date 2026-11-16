@@ -118,6 +118,7 @@ export * from "./runner-runs.js";
 export * from "./runner-placement.js";
 export * from "./runner-protocol.js";
 export * from "./runner-relay.js";
+export * from "./toolchain/index.js";
 export * from "./agents.js";
 export * from "./agent-clis.js";
 export * from "./agent-hook-files.js";

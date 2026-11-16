@@ -7,6 +7,7 @@ export default defineConfig({
     resolve: {
         alias: {
             "@tv-compat": fileURLToPath(new URL("../dashboard/packages/core/src/tv-compat", import.meta.url)),
+            "@toolchain": fileURLToPath(new URL("../dashboard/packages/core/src/toolchain", import.meta.url)),
             "@": fileURLToPath(new URL("./src", import.meta.url))
         }
     },

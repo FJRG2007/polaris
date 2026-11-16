@@ -73,6 +73,10 @@
             "types": "./dist/runner-relay.d.ts",
             "import": "./dist/runner-relay.js"
         },
+        "./toolchain": {
+            "types": "./dist/toolchain/index.d.ts",
+            "import": "./dist/toolchain/index.js"
+        },
         "./runner-protocol": {
             "types": "./dist/runner-protocol.d.ts",
             "import": "./dist/runner-protocol.js"
@@ -81,7 +85,7 @@
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "scripts": {
-        "build": "tsup src/index.ts src/tokens.ts src/link-password.ts src/password-generator.ts src/identity-person.ts src/faces.ts src/waf.ts src/sheets/index.ts src/catalog-search.ts src/search-text.ts src/extension-install.ts src/browser-agent.ts src/variable-groups.ts src/instance-fallback.ts src/geo.ts src/tv-compat/index.ts src/runner-relay.ts src/runner-protocol.ts --format esm --dts --clean",
+        "build": "tsup src/index.ts src/tokens.ts src/link-password.ts src/password-generator.ts src/identity-person.ts src/faces.ts src/waf.ts src/sheets/index.ts src/catalog-search.ts src/search-text.ts src/extension-install.ts src/browser-agent.ts src/variable-groups.ts src/instance-fallback.ts src/geo.ts src/tv-compat/index.ts src/runner-relay.ts src/runner-protocol.ts src/toolchain/index.ts --format esm --dts --clean",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },
