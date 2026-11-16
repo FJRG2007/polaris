@@ -123,6 +123,29 @@ is offered the same sign-out.
 | MiMo Code | `mimo auth login` | - (none documented) | mimo.mi.com/docs/en-US/tokenplan/integration/mimo-code |
 | MiniMax Code | `mcode login --region global` | `mcode logout` | code.minimax.io/docs/cli/quick-start |
 
+Each home row shows whether it is signed in. Where the vendor documents a
+status command (`status` in `LOGIN_COMMANDS`), Polaris runs it as the agent in
+one short-lived container on the person's home, for all such tools at once, and
+reuses the answer for a minute. No vendor documents the exit codes, so only a
+clean exit that does not say "not logged in" (or similar) reads as signed in; a
+tool not installed in the home reads as signed out; a check that fails reads as
+unknown. Every other row shows the outcome of the last sign-in or sign-out run
+from Polaris, labelled "last known". Both are kept in server memory only, so a
+restart reads "unknown" until the next check or sign-in. The row offers one
+action, Sign out when signed in (where a logout is documented) and Sign in
+otherwise, with the other in its menu.
+
+| Tool | Status | Source (checked 2026-11-16) |
+| --- | --- | --- |
+| Cursor | `cursor-agent status` | cursor.com/docs/cli/reference/authentication ("whether you're authenticated") |
+| Kiro | `kiro-cli whoami` | kiro.dev/docs/getting-started/authentication ("which authentication method is active") |
+| Devin | `devin auth status` | docs.devin.ai/cli/reference/commands ("Check authentication status") |
+
+No status command is documented for Grok Build, Amp, Autohand, MiMo Code,
+Kimi Code, Pi or Droid. fx documents `fx status` (active provider, model and
+credential source) and MiniMax Code a TUI `/status`; neither says signed in or
+not as a shell command, so both rows use the last known outcome.
+
 Typed into the tool (`input`): the tool starts, and `/login` is typed once one
 of its ready markers is on the screen (markers ported from Agent Orchestrator,
 Apache-2.0). With no known marker, or one that never shows, the dialog offers a

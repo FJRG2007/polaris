@@ -14,17 +14,22 @@ import { getTranslations } from "@/lib/i18n/request";
 import {
     canAssistSignin,
     canSignout,
+    isHomeSignin,
+    LOGIN_COMMANDS,
     answerSignin,
     beginSignin,
     captureSignin,
     endSignin,
     identifySignin,
     signinScreen,
+    signinStatuses,
     typeSigninInput,
     type SigninIdentity,
     type SigninView
 } from "@/lib/agents/signin-runtime";
 import { agentSigninAnswerSchema, agentSigninEnvSchema, agentSigninIdSchema } from "@polaris/core";
+import type { SigninStatus } from "@/lib/agents/signin-status";
+import { z } from "zod";
 import {
     addKey,
     editKey,
@@ -131,6 +136,28 @@ export async function beginAgentSignoutAction(
         console.error("[agent-signin] could not start a sign-out:", error);
         return { error: t("aiKeys.errors.couldNotStart") };
     }
+}
+
+/** The home logins a status may be asked for: the catalogue's, and no more of
+ *  them than it holds. Built on call, as this file may only export actions. */
+function signinStatusRequestSchema() {
+    return z
+        .array(agentSigninEnvSchema.refine((env) => isHomeSignin(env), "Pick a sign-in"))
+        .max(Object.keys(LOGIN_COMMANDS).length);
+}
+
+/**
+ * Whether each of this person's home logins is signed in, for the rows that
+ * list them. Asked after the page is drawn; never fails - what could not be
+ * read comes back unknown.
+ */
+export async function agentSigninStatusAction(
+    envs: unknown
+): Promise<{ statuses: Record<string, SigninStatus> }> {
+    const user = await requireUser();
+    const parsed = signinStatusRequestSchema().safeParse(envs);
+    if (!parsed.success) return { statuses: {} };
+    return { statuses: await signinStatuses(user.id, parsed.data) };
 }
 
 /** Type the login's own in-tool command (`/login`) into its terminal, once. */

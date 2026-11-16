@@ -32,6 +32,7 @@ import {
     captureAgentSigninAction,
     typeAgentSigninInputAction,
     beginAgentSignoutAction,
+    agentSigninStatusAction,
     deleteModelKeyAction,
     endAgentSigninAction,
     limitModelKeyAction,
@@ -148,6 +149,7 @@ export async function AiKeysPanel({
                         capture: captureAgentSigninAction,
                         type: typeAgentSigninInputAction,
                         signout: beginAgentSignoutAction,
+                        status: agentSigninStatusAction,
                         end: endAgentSigninAction
                     }
                 }}

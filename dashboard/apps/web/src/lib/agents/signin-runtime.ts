@@ -36,6 +36,7 @@ import { agentSignins, signinSlug, type AgentSignin } from "./agent-signins";
 import * as screens from "./signin-screen";
 import * as direct from "./signin-direct";
 import { configuredRequest, readCapped } from "@/lib/safe-fetch";
+import * as status from "./signin-status";
 
 /** Stamped on every container this starts, so the sweep finds them by label
  *  rather than by matching names it does not own. */
@@ -92,6 +93,12 @@ export interface LoginCommand {
     /** Asked once, after the login, in the same container: the only way a stored
      *  credential can say whose it is. */
     readonly whoami?: string;
+    /**
+     * The vendor's own "am I signed in" command, run in the same home, for a
+     * home login whose docs name one. Absent means none is documented, and the
+     * row shows the last sign-in or sign-out Polaris ran instead.
+     */
+    readonly status?: string;
     /** First-run answers this login needs on top of the tool's own. */
     readonly firstRun?: readonly core.AgentFirstRunAnswer[];
     /** "device" for a login that prints an address and a code and waits for the
@@ -197,13 +204,22 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
         cli: "cursor",
         command: "NO_OPEN_BROWSER=1 cursor-agent login",
         logout: "cursor-agent logout",
+        // Same page: `status` shows "whether you're authenticated".
+        status: "cursor-agent status",
         flow: "open",
         home: true
     },
     // kiro.dev/docs/getting-started/authentication: `kiro-cli login`, a sign-in
     // method chosen on the screen, device flow in remote environments. No CLI
-    // logout is documented.
-    KIRO_HOME_LOGIN: { cli: "kiro", command: "kiro-cli login", flow: "paste", home: true },
+    // logout is documented. "To check which authentication method is active,
+    // run `kiro-cli whoami`" (same page).
+    KIRO_HOME_LOGIN: {
+        cli: "kiro",
+        command: "kiro-cli login",
+        status: "kiro-cli whoami",
+        flow: "paste",
+        home: true
+    },
     // docs.x.ai/build/cli/reference: `grok login --device-auth` for headless or
     // remote environments, `grok logout` to clear the cached credentials.
     GROK_HOME_LOGIN: {
@@ -219,6 +235,8 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
         cli: "devin",
         command: "devin auth login --force-manual-token-flow",
         logout: "devin auth logout",
+        // Same page: `devin auth status`, "Check authentication status".
+        status: "devin auth status",
         flow: "paste",
         home: true
     },
@@ -697,7 +715,11 @@ export async function signinScreen(userId: string, id: string): Promise<SigninVi
     const login = LOGIN_COMMANDS[attempt.env];
 
     const pending = directAttempts.get(id);
-    if (pending) return directView(id, attempt.env, pending);
+    if (pending) {
+        const view = await directView(id, attempt.env, pending);
+        if (view.finished && view.exitCode === 0) status.recordSigninOutcome(userId, attempt.env, "login");
+        return view;
+    }
     if (starting.has(id)) {
         // Fell back a moment ago and the machine is still coming up.
         return {
@@ -733,6 +755,10 @@ export async function signinScreen(userId: string, id: string): Promise<SigninVi
     if (input && screens.screenShowsAny(progress.screen, input.after ?? [])) {
         typed.add(id);
         await answerSignin(userId, id, input.text).catch(() => undefined);
+    }
+
+    if (progress.finished && progress.exitCode === 0) {
+        status.recordSigninOutcome(userId, attempt.env, signingOut.has(id) ? "logout" : "login");
     }
 
     return {
@@ -1042,4 +1068,141 @@ export async function captureSignin(userId: string, id: string, env: string): Pr
         return pending.value;
     }
     return parseCredentialFile(await runIn(userId, id, credentialFileScript(file)));
+}
+
+// ---------------------------------------------------------------------------
+// Whether each home login is signed in
+// ---------------------------------------------------------------------------
+
+/** The status command a home login's vendor documents, or null. */
+export function signinStatusCommand(env: string): string | null {
+    const login = LOGIN_COMMANDS[env];
+    return login?.home && login.status ? login.status : null;
+}
+
+/** How long one status container may take to answer before every tool in it
+ *  reads as unknown. */
+const STATUS_TIMEOUT_MS = 45_000;
+/** How many status containers run at once across the deployment. Past it a
+ *  check answers unknown rather than queueing a container per page view. */
+const STATUS_CONCURRENCY = 4;
+const statusRuns = new Map<string, Promise<Map<string, status.SigninState>>>();
+
+/**
+ * One line per tool: its status command run as the agent, and what it exited
+ * with and printed, as `polaris-status <ENV> <code> <base64 output>`. A tool
+ * that is not installed in the home is 127 without being run. The commands are
+ * catalogue values, never anything typed, and quoted all the same.
+ */
+export function statusScript(checks: readonly { env: string; command: string }[]): string {
+    const lines = checks.flatMap(({ env, command }) => {
+        const binary = command.split(" ")[0] ?? "";
+        return [
+            `if as_agent ${shellQuote(`command -v ${binary}`)} >/dev/null 2>&1; then`,
+            `  polaris_out=$(as_agent ${shellQuote(command)} 2>&1) && polaris_code=0 || polaris_code=$?`,
+            "else",
+            "  polaris_out=; polaris_code=127",
+            "fi",
+            `printf '${status.STATUS_MARKER} %s %s %s\\n' ${shellQuote(env)} "$polaris_code" "$(printf %s "$polaris_out" | head -c 2048 | base64 -w0)"`
+        ];
+    });
+    return ["{", commands.AGENT_ACCOUNT_SETUP, "} >/dev/null 2>&1", ...lines].join("\n");
+}
+
+/** Start a short-lived container on this person's home, run every status
+ *  command in it at once, and take it away. */
+async function runStatusChecks(
+    userId: string,
+    checks: readonly { env: string; command: string }[]
+): Promise<Map<string, status.SigninState>> {
+    const name = `polaris-signin-status-${crypto.randomUUID().slice(0, 12)}`;
+    const hostd = new HostdPorts();
+    try {
+        await upWithFreshImage((pullPolicy) =>
+            new HostdPorts().composeUp({
+                project: name,
+                services: [
+                    {
+                        name,
+                        image: commands.SESSION_IMAGE,
+                        pullPolicy,
+                        env: { POLARIS_RUNAS: commands.CONTAINER_USER, POLARIS_HOME: commands.AGENT_HOME },
+                        ports: [],
+                        volumes: [
+                            {
+                                source: commands.agentHomeSource(userId),
+                                target: commands.AGENT_HOME,
+                                kind: "bind" as const
+                            }
+                        ],
+                        labels: { [LABEL_KEY]: name },
+                        // Ends on its own if the removal below never lands.
+                        command: commands.bootArgv("exec sleep 120"),
+                        networks: [],
+                        restart: "no"
+                    }
+                ],
+                volumes: [],
+                networks: []
+            }),
+            () => new HostdPorts().pull(commands.SESSION_IMAGE)
+        );
+        const result = await hostd.runIn(name, commands.shellArgv(statusScript(checks)));
+        return status.parseStatusLines(result.output);
+    } finally {
+        await new HostdPorts().composeDown(name).catch(() => undefined);
+    }
+}
+
+/**
+ * Each home login's status, by variable.
+ *
+ * Checked where the vendor documents a status command - one container for all
+ * of them, its answers reused for a minute - and the last sign-in or sign-out
+ * otherwise. Never throws: a check that fails is "unknown" for the tools in it.
+ */
+export async function signinStatuses(
+    userId: string,
+    envs: readonly string[]
+): Promise<Record<string, status.SigninStatus>> {
+    const now = Date.now();
+    const out: Record<string, status.SigninStatus> = {};
+    const toCheck: { env: string; command: string }[] = [];
+    for (const env of new Set(envs)) {
+        if (!isHomeSignin(env)) continue;
+        const command = signinStatusCommand(env);
+        if (!command) {
+            out[env] = status.lastKnownStatus(userId, env);
+            continue;
+        }
+        const hit = status.cachedStatus(userId, env, now);
+        if (hit) out[env] = hit;
+        else toCheck.push({ env, command });
+    }
+    if (toCheck.length === 0) return out;
+
+    let run = statusRuns.get(userId);
+    if (!run && statusRuns.size < STATUS_CONCURRENCY) {
+        run = Promise.race([
+            runStatusChecks(userId, toCheck),
+            new Promise<Map<string, status.SigninState>>((resolve) =>
+                setTimeout(() => resolve(new Map()), STATUS_TIMEOUT_MS)
+            )
+        ])
+            .catch((error: unknown) => {
+                console.warn("[agent-signin] status check failed:", error instanceof Error ? error.name : "unknown");
+                return new Map<string, status.SigninState>();
+            })
+            .finally(() => statusRuns.delete(userId));
+        statusRuns.set(userId, run);
+    }
+    const answers = run ? await run : new Map<string, status.SigninState>();
+    const at = Date.now();
+    for (const { env } of toCheck) {
+        const state = answers.get(env) ?? "unknown";
+        status.cacheStatus(userId, env, state, at);
+        // An unanswered check falls back to what the last sign-in said.
+        out[env] = state === "unknown" ? status.lastKnownStatus(userId, env) : { state, lastKnown: false };
+    }
+    return out;
 }

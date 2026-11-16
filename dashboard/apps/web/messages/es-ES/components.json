@@ -1124,7 +1124,13 @@
         "signoutOffer": "Eliminada. {tool} puede seguir con sesión en la máquina de tus sesiones.",
         "signoutKeep": "Dejarla",
         "homeHint": "Estos agentes guardan su acceso en la máquina de tus sesiones.",
-        "homeSignin": "Entrar"
+        "homeSignin": "Entrar",
+        "statusIn": "Con sesión",
+        "statusOut": "Sin sesión",
+        "statusUnknown": "Sin datos",
+        "statusChecking": "Comprobando acceso",
+        "statusLastKnown": "{status}, último dato",
+        "statusLastKnownHint": "Del último acceso o cierre hecho aquí, no de la propia herramienta."
     },
     "signinDialog": {
         "title": "Iniciar sesión en {tool}",

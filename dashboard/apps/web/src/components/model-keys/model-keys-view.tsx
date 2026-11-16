@@ -25,7 +25,8 @@ import { IntegrationLogo } from "@/components/logos";
 import type { AgentSignin } from "@/lib/agents/agent-signins";
 import { SigninDialog, type SigninDialogActions, type SigninDialogMode } from "./signin-dialog";
 import { useConfirm } from "@/components/confirm-dialog";
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { SigninStatus } from "@/lib/agents/signin-status";
 import { RelativeTime } from "@/components/relative-time";
 import type { ModelKeyView } from "@/lib/agents/model-keys";
 import type { ProviderRow } from "@/lib/agents/model-key-providers";
@@ -67,6 +68,7 @@ import {
     Input,
     isDirty,
     SearchableSelect,
+    Skeleton,
     Switch,
     DateInput
 } from "@polaris/ui";
@@ -101,6 +103,8 @@ export interface AssistedSignin {
     actions: Omit<SigninDialogActions, "save"> & {
         /** Starts the vendor's own sign-out, for a sign-in whose docs name one. */
         signout?: (env: unknown) => Promise<{ id?: string; error?: string }>;
+        /** Whether each home login is signed in, asked after the page is drawn. */
+        status?: (envs: unknown) => Promise<{ statuses: Record<string, SigninStatus> }>;
     };
 }
 
@@ -279,6 +283,29 @@ export function ModelKeysView({
     const [running, setRunning] = useState<{ signin: AgentSignin; mode: SigninDialogMode } | null>(null);
     const homeSignins = assist?.signins.filter((signin) => signin.home) ?? [];
     const canSignOut = (signin: AgentSignin) => Boolean(signin.signout && assist?.actions.signout);
+
+    // Each home login's status, null while it is being asked. Asked after the
+    // first paint and again whenever a sign-in or sign-out dialog closes. Never
+    // cached in the browser: it is a statement about a login.
+    const [homeStatus, setHomeStatus] = useState<Record<string, SigninStatus> | null>(null);
+    const [statusTick, setStatusTick] = useState(0);
+    const askStatus = assist?.actions.status;
+    const homeEnvs = homeSignins.map((signin) => signin.env).join(",");
+    useEffect(() => {
+        if (!askStatus || !homeEnvs) return;
+        let live = true;
+        setHomeStatus(null);
+        askStatus(homeEnvs.split(","))
+            .then((result) => {
+                if (live) setHomeStatus(result.statuses);
+            })
+            .catch(() => {
+                if (live) setHomeStatus({});
+            });
+        return () => {
+            live = false;
+        };
+    }, [askStatus, homeEnvs, statusTick]);
 
     // The offer a sign-out replaced, put back if the sign-out does not finish.
     const offerBack = useRef<AgentSignin | null>(null);
@@ -550,21 +577,48 @@ export function ModelKeysView({
                         <ul className="divide-y divide-border rounded-lg border border-border">
                             {homeSignins.map((signin) => {
                                 const tool = signin.serves[0]?.label ?? signin.label;
+                                const known = homeStatus?.[signin.env];
+                                // One action: Sign out once it is signed in and
+                                // the vendor has a sign-out, Sign in otherwise.
+                                // The other one, where there is one, is in "...".
+                                const signedIn = known?.state === "in" && canSignOut(signin);
+                                const signInAction = (
+                                    <>
+                                        <LogIn className="size-4 shrink-0" />
+                                        <span className="truncate">{t("modelKeys.homeSignin")}</span>
+                                    </>
+                                );
+                                const signOutAction = (
+                                    <>
+                                        <LogOut className="size-4 shrink-0" />
+                                        <span className="truncate">{t("modelKeys.signout")}</span>
+                                    </>
+                                );
+                                const other = signedIn ? "login" : canSignOut(signin) ? "logout" : null;
                                 return (
                                     <li key={signin.env} className="flex items-center gap-2 px-3 py-2">
-                                        <span className="min-w-0 flex-1 truncate text-sm" title={tool}>
-                                            {tool}
-                                        </span>
+                                        <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+                                            <span className="max-w-full truncate text-sm" title={tool}>
+                                                {tool}
+                                            </span>
+                                            {askStatus ? (
+                                                <HomeStatusBadge
+                                                    status={homeStatus ? (known ?? null) : undefined}
+                                                    t={t}
+                                                />
+                                            ) : null}
+                                        </div>
                                         <Button
                                             size="sm"
                                             variant="outline"
                                             className="shrink-0"
-                                            onClick={() => setRunning({ signin, mode: "login" })}
+                                            onClick={() =>
+                                                signedIn ? void signOut(signin) : setRunning({ signin, mode: "login" })
+                                            }
                                         >
-                                            <LogIn className="size-4 shrink-0" />
-                                            <span className="truncate">{t("modelKeys.homeSignin")}</span>
+                                            {signedIn ? signOutAction : signInAction}
                                         </Button>
-                                        {canSignOut(signin) ? (
+                                        {other ? (
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild>
                                                     <Button
@@ -578,9 +632,14 @@ export function ModelKeysView({
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem onSelect={() => void signOut(signin)}>
-                                                        <LogOut className="size-4 shrink-0" />
-                                                        {t("modelKeys.signout")}
+                                                    <DropdownMenuItem
+                                                        onSelect={() =>
+                                                            other === "logout"
+                                                                ? void signOut(signin)
+                                                                : setRunning({ signin, mode: "login" })
+                                                        }
+                                                    >
+                                                        {other === "logout" ? signOutAction : signInAction}
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
                                             </DropdownMenu>
@@ -612,10 +671,12 @@ export function ModelKeysView({
                         if (running.mode === "logout" && offerBack.current) setSignoutOffer(offerBack.current);
                         offerBack.current = null;
                         setRunning(null);
+                        setStatusTick((tick) => tick + 1);
                     }}
                     onDone={() => {
                         offerBack.current = null;
                         setRunning(null);
+                        setStatusTick((tick) => tick + 1);
                     }}
                 />
             ) : null}
@@ -672,6 +733,39 @@ export function ModelKeysView({
             ) : null}
             {confirmElement}
         </div>
+    );
+}
+
+/**
+ * A home login's status: a skeleton while it is asked (undefined), unknown when
+ * nothing came back for it (null), and "last known" when the answer is the last
+ * sign-in or sign-out run here rather than the tool's own.
+ */
+function HomeStatusBadge({
+    status,
+    t
+}: {
+    status: SigninStatus | null | undefined;
+    t: NamespaceTranslator<"components">;
+}) {
+    if (status === undefined) {
+        return <Skeleton className="h-[18px] w-20" aria-label={t("modelKeys.statusChecking")} />;
+    }
+    const state = status?.state ?? "unknown";
+    const label =
+        state === "in"
+            ? t("modelKeys.statusIn")
+            : state === "out"
+              ? t("modelKeys.statusOut")
+              : t("modelKeys.statusUnknown");
+    const lastKnown = status?.lastKnown === true;
+    return (
+        <Badge
+            variant={state === "in" ? "success" : "neutral"}
+            title={lastKnown ? t("modelKeys.statusLastKnownHint") : undefined}
+        >
+            {lastKnown ? t("modelKeys.statusLastKnown", { status: label }) : label}
+        </Badge>
     );
 }
 
