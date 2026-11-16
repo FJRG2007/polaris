@@ -69,7 +69,16 @@ export function SelectionTranslation({
                     style={{ left: selection?.x ?? 0, top: selection?.y ?? 0 }}
                 />
             </PopoverAnchor>
-            <PopoverContent align="start" data-selection-translation aria-live="polite">
+            {/* Focus moving elsewhere never closes it: the menu that opened it
+                hands focus back as it closes, and for text selected in a
+                received email that is the email's frame, which would close the
+                panel the instant it opened. A click outside or Escape still does. */}
+            <PopoverContent
+                align="start"
+                data-selection-translation
+                aria-live="polite"
+                onFocusOutside={(event) => event.preventDefault()}
+            >
                 <div className="flex min-w-0 items-center justify-between gap-2">
                     <span className="truncate text-xs font-medium text-muted-foreground">
                         {t("textTranslation.title")}
