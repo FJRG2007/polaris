@@ -40,6 +40,7 @@ import { addressesFrom, asJson } from "./json";
 import { recordAccountAttempt, recordAccountState } from "./accounts";
 import { missingFromWindow, nextCursor } from "./folder-window";
 import { reconcileDeletions } from "./reconcile-deletions";
+import { forgetRemoved, removedFrom, withoutRemoved } from "./removed-uids";
 import { getSetting } from "@/lib/setting-store";
 import { recordCredentialRefusal } from "./refused";
 import { recordSubscription } from "./subscriptions";
@@ -612,6 +613,7 @@ async function syncFolder(
         if (validityMoved) {
             await prisma.mailMessage.deleteMany({ where: { folderId: folder.id } });
             unstored.delete(folder.id);
+            forgetRemoved(folder.id);
         }
 
         const known = validityMoved ? null : folder.uidNext;
@@ -790,6 +792,11 @@ async function storeMessages(
      *  arriving, so no rule, junk filter or away reply may act on it. */
     arrivals = true
 ): Promise<number> {
+    // A uid Polaris moved or deleted out of this folder while the pass was
+    // reading it is gone for good - uids are never reused - however stale this
+    // session's view of the folder is. See `removed-uids`.
+    fetched = withoutRemoved(folder.id, fetched);
+    if (fetched.length === 0) return 0;
     const snippets = await fetchSnippets(client, fetched);
     /** What the junk filter said to file, gathered rather than acted on one at a
      *  time: filing opens a connection, and this function is already inside one. */
@@ -1649,7 +1656,12 @@ async function refillWindow(
     const listedSet = new Set(listed);
     const skipped = [...(unstored.get(folder.id) ?? [])].filter((uid) => listedSet.has(uid));
     unstored.set(folder.id, new Set(skipped));
-    const known = new Set([...held.map((row) => Number(row.uid)), ...skipped]);
+    const known = new Set([
+        ...held.map((row) => Number(row.uid)),
+        ...skipped,
+        // Listed only because this session has not been told they left.
+        ...removedFrom(folder.id)
+    ]);
     const missing = missingFromWindow(listed, known, WINDOW, cursor);
     if (missing.length === 0) return;
     const fetched = await collect(client, missing.join(","), { uid: true }, extraHeaders);

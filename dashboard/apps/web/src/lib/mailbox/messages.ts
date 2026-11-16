@@ -36,6 +36,7 @@ import * as refusal from "./action-refusal";
 import { withImap, type MailConnectionSource } from "./imap";
 import { sameFolderSiblings } from "./folder-scope";
 import { addDelta, nudgeFolderUnread, unseenByFolder } from "./folder-counts";
+import { rememberRemoved } from "./removed-uids";
 import {
     ACCOUNT_COLUMNS,
     MailAccessError,
@@ -665,6 +666,7 @@ async function applyOne(
         // folder's own Delete button and from Empty trash, both of which say so.
         const removed = await client.messageDelete(uids, { uid: true });
         if (!removed) return { done: 0, movedTo: "", unseen: 0, refused: true };
+        rememberRemoved(folderId, uids);
         await prisma.mailMessage.deleteMany({ where: { id: { in: rows.map((row) => row.id) } } });
         if (leaving === "trash") {
             await forgetTrashOrigins(
@@ -681,6 +683,7 @@ async function applyOne(
     if (target.id === folderId) return { done: 0, movedTo: "", unseen: 0 };
     const moved = await client.messageMove(uids, target.path, { uid: true });
     if (!moved) return { done: 0, movedTo: "", unseen: 0, refused: true };
+    rememberRemoved(folderId, uids);
     // Where these were, written down now that they have actually left - so that
     // taking them out of the trash later puts them back in this folder rather
     // than in the inbox. And the other way for a message leaving the trash by
@@ -771,6 +774,7 @@ export async function moveMessages(
                     refused.push(refusal.lastRefusal(client));
                     continue;
                 }
+                rememberRemoved(sourceId, rows.map((row) => row.uid));
                 await prisma.mailMessage.deleteMany({
                     where: { id: { in: rows.map((row) => row.id) } }
                 });

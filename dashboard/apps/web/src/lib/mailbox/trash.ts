@@ -30,6 +30,7 @@ import { findFolderForRole } from "./folder-roles";
 import * as refusal from "./action-refusal";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount, ownedMessages } from "./access";
 import { addDelta, nudgeFolderUnread, unseenByFolder } from "./folder-counts";
+import { rememberRemoved } from "./removed-uids";
 
 /** What is remembered about a message on its way to the trash. */
 interface Trashed {
@@ -162,6 +163,7 @@ export async function restoreFromTrash(
                             refused.push(refusal.lastRefusal(client));
                             continue;
                         }
+                        rememberRemoved(sourceId, going.map((message) => message.uid));
                         // The row goes with the move: the destination decides the
                         // uid, and a guessed one points at somebody else's mail.
                         await prisma.mailMessage.deleteMany({
@@ -242,7 +244,17 @@ export async function emptyFolderOfRole(
         try {
             // `all` is the server's own search, so this reaches every message in
             // the folder and not only the ones cached here.
-            await client.messageDelete({ all: true }, { uid: true });
+            const emptied = await client.messageDelete({ all: true }, { uid: true });
+            if (emptied) {
+                const held = await prisma.mailMessage.findMany({
+                    where: { folderId: folder.id },
+                    select: { uid: true }
+                });
+                rememberRemoved(
+                    folder.id,
+                    held.map((row) => row.uid)
+                );
+            }
         } finally {
             lock.release();
         }
@@ -319,6 +331,7 @@ export async function sweepTrash(): Promise<number> {
                     const old = await client.search({ before }, { uid: true });
                     if (!old || old.length === 0) return;
                     await client.messageDelete(old, { uid: true });
+                    rememberRemoved(folder.id, old);
                     const { count } = await prisma.mailMessage.deleteMany({
                         where: { folderId: folder.id, uid: { in: old.map((uid) => BigInt(uid)) } }
                     });
