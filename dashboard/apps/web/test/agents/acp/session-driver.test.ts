@@ -155,10 +155,12 @@ describe("ACP provider bindings", () => {
     });
 
     it("has no binding for an agent not covered yet", () => {
+        // Codex takes Chat over its own app-server, not ACP.
         expect(acpBinding("codex")).toBeNull();
+        expect(chatAvailable("codex", "local")).toBe(true);
         // Pi has no ACP mode of its own, only third-party adapters.
         expect(acpBinding("pi")).toBeNull();
-        expect(chatAvailable("codex", "local")).toBe(false);
+        expect(chatAvailable("pi", "local")).toBe(false);
     });
 
     it("keeps Chat off a computer's runner and off every session by default", () => {
