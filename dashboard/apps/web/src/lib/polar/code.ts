@@ -54,7 +54,7 @@ import {
     threadEvents
 } from "@/lib/polar/code-history";
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
-import { shownSessionBranch } from "@/lib/agents/session-branch";
+import { lastChangeAt, shownSessionBranch } from "@/lib/agents/session-branch";
 import * as repoOptions from "@/lib/agents/repo-options";
 import {
     getSession,
@@ -165,6 +165,9 @@ export interface PolarCodeThread {
     readonly subagents: readonly PolarCodeSubagent[];
     /** The session's `/goal`, as last judged; null when it has none. */
     readonly goal: PolarGoal | null;
+    /** When the agent last finished writing into its checkout, or null: the
+     *  workspace re-reads its diffs and reloads its preview when this moves. */
+    readonly lastEdit?: string | null;
 }
 
 /** A subagent as the thread shows it. Without its transcript path, which names
@@ -371,7 +374,8 @@ export async function polarCodeThread(
                 : null,
         todos,
         subagents,
-        goal
+        goal,
+        lastEdit: lastChangeAt(detail.events)
     };
 }
 

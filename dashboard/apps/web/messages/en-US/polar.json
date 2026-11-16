@@ -1525,7 +1525,6 @@
             "openTab": "Open in a new tab",
             "address": "Address of this preview",
             "frame": "Preview of port {port}",
-            "hotReload": "Changes do not reload here by themselves. Reload to see them.",
             "errors": {
                 "notFound": "There is no preview at this address.",
                 "gone": "This session is not running any more.",
@@ -1533,7 +1532,12 @@
                 "older": "This session started before previews existed. Start a new session to preview its servers.",
                 "unreachable": "The session's server could not be reached just now. Try again in a moment.",
                 "slow": "The server on port {port} took too long to answer."
-            }
+            },
+            "device": "Preview width",
+            "phone": "Phone",
+            "tablet": "Tablet",
+            "full": "Full width",
+            "follow": "Reload when the agent changes a file"
         },
         "noSource": "That model isn't available any more. Pick another one.",
         "sources": {

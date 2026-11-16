@@ -34,6 +34,22 @@ export function isChangeEvent(event: { kind: string; subject: string; detail: st
     return event.subject === "Bash" && GIT_WRITE.test(event.detail);
 }
 
+/**
+ * When the session last finished changing its checkout, or null when it has
+ * not: the time of its newest finished edit. A tool that is still writing has
+ * nothing to show yet, so only `tool.end` counts.
+ */
+export function lastChangeAt(
+    events: readonly { kind: string; subject: string; detail: string; at: string }[]
+): string | null {
+    let last: string | null = null;
+    for (const event of events) {
+        if (event.kind !== "tool.end" || !isChangeEvent(event)) continue;
+        if (last === null || event.at > last) last = event.at;
+    }
+    return last;
+}
+
 /** The branch to show for a session, or empty when it has none worth naming. */
 export function shownSessionBranch(
     session: {

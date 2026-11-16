@@ -1525,7 +1525,6 @@
             "openTab": "Abrir en pestaña nueva",
             "address": "Enlace de esta vista previa",
             "frame": "Vista previa del puerto {port}",
-            "hotReload": "Aquí los cambios no se recargan solos. Recarga para verlos.",
             "errors": {
                 "notFound": "No hay ninguna vista previa en esta dirección.",
                 "gone": "Esta sesión ya no está en marcha.",
@@ -1533,7 +1532,12 @@
                 "older": "Esta sesión empezó antes de que existieran las vistas previas. Empieza una nueva para verlas.",
                 "unreachable": "No se pudo llegar al servidor de la sesión ahora. Inténtalo en un momento.",
                 "slow": "El servidor del puerto {port} tardó demasiado en responder."
-            }
+            },
+            "device": "Ancho de la vista",
+            "phone": "Móvil",
+            "tablet": "Tableta",
+            "full": "Ancho total",
+            "follow": "Recargar al cambiar el agente un archivo"
         },
         "noSource": "Ese modelo ya no está disponible. Elige otro.",
         "sources": {

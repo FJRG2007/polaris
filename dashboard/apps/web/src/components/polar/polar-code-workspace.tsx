@@ -15,7 +15,7 @@ import * as ui from "@polaris/ui";
 import { languageForFile } from "@/lib/code-language";
 import { CodeSurface } from "@/components/code-surface";
 import type { SessionView } from "@/lib/agents/session-service";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ClientMessages } from "@/components/i18n/client-namespaces";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
@@ -32,10 +32,13 @@ import {
     GitCompare,
     GitPullRequest,
     Globe,
+    Monitor,
     RefreshCw,
     RotateCw,
     Search,
-    SquareTerminal
+    Smartphone,
+    SquareTerminal,
+    Tablet
 } from "lucide-react";
 
 type Pane = "files" | "preview" | "changes" | "pull" | "terminal";
@@ -51,12 +54,22 @@ const PORTS_MS = 5_000;
 const PREVIEW_FRAME_SANDBOX =
     "allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads";
 
+/** How long after the agent's last write the preview reloads: a burst of edits
+ *  is one reload, after the last of them. */
+const RELOAD_SETTLE_MS = 1_200;
+
+/** The widths the preview can be drawn at, the way browsers' device toolbars
+ *  offer them; "full" is the pane's own width. */
+const PREVIEW_DEVICES = { phone: 375, tablet: 768, full: null } as const;
+type PreviewDevice = keyof typeof PREVIEW_DEVICES;
+
 export function PolarCodeWorkspace({
     open,
     onOpenChange,
     session,
     branch,
-    live
+    live,
+    lastEdit = null
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -64,9 +77,38 @@ export function PolarCodeWorkspace({
     /** The branch to name, empty until the session changed something. */
     branch: string;
     live: boolean;
+    /** When the agent last finished writing a file: the preview reloads and
+     *  the changes are read again when it moves. */
+    lastEdit?: string | null;
 }) {
     const t = useTranslations("polar");
     const [pane, setPane] = useState<Pane>("files");
+    // Whether the person picked a pane since the workspace opened: until they
+    // do, the first web server the session runs brings the preview forward.
+    const chosen = useRef(false);
+    useEffect(() => {
+        if (!open) chosen.current = false;
+    }, [open]);
+    useEffect(() => {
+        if (!open || !live || pane === "preview") return;
+        const controller = new AbortController();
+        const look = () => {
+            if (chosen.current || document.visibilityState !== "visible") return;
+            polls
+                .sessionPreview(session.id, controller.signal)
+                .then((result) => {
+                    const answer = result?.answer;
+                    if (!chosen.current && answer?.kind === "ports" && answer.open.length > 0) setPane("preview");
+                })
+                .catch(() => undefined);
+        };
+        look();
+        const timer = window.setInterval(look, PORTS_MS);
+        return () => {
+            controller.abort();
+            window.clearInterval(timer);
+        };
+    }, [open, live, pane, session.id]);
     return (
         <ui.Dialog open={open} onOpenChange={onOpenChange}>
             <ui.SheetContent className="sm:w-[min(72rem,calc(100vw-1rem))]">
@@ -87,7 +129,10 @@ export function PolarCodeWorkspace({
                         className="self-start"
                         aria-label={t("code.pane.title")}
                         value={pane}
-                        onValueChange={(next) => setPane(next)}
+                        onValueChange={(next) => {
+                            chosen.current = true;
+                            setPane(next);
+                        }}
                         options={[
                             {
                                 value: "files",
@@ -144,7 +189,7 @@ export function PolarCodeWorkspace({
                         {pane === "files" ? (
                             <FilesPane sessionId={session.id} live={live} />
                         ) : pane === "preview" ? (
-                            <PreviewPane sessionId={session.id} live={live} />
+                            <PreviewPane sessionId={session.id} live={live} lastEdit={lastEdit} />
                         ) : pane === "changes" ? (
                             <div className="h-full overflow-y-auto overscroll-contain">
                                 {/* Code lives under Polar, whose routes hand down no Agents catalog. */}
@@ -351,7 +396,15 @@ function FilesPane({ sessionId, live }: { sessionId: string; live: boolean }) {
     );
 }
 
-function PreviewPane({ sessionId, live }: { sessionId: string; live: boolean }) {
+function PreviewPane({
+    sessionId,
+    live,
+    lastEdit
+}: {
+    sessionId: string;
+    live: boolean;
+    lastEdit: string | null;
+}) {
     const t = useTranslations("polar");
     const [answer, setAnswer] = useState<PreviewPortsAnswer | null>(null);
     const [failed, setFailed] = useState(false);
@@ -359,6 +412,20 @@ function PreviewPane({ sessionId, live }: { sessionId: string; live: boolean }) 
     // Bumped by Reload: a new frame, since the page's own origin is opaque and
     // nothing outside it can tell it to reload.
     const [version, setVersion] = useState(0);
+    const [device, setDevice] = useState<PreviewDevice>("full");
+    const [follow, setFollow] = useState(true);
+
+    // The agent's writes reload the page, once a burst of them settles. The
+    // edit already on screen when the pane opened is not one.
+    const seenEdit = useRef(lastEdit);
+    useEffect(() => {
+        if (!follow || lastEdit === seenEdit.current) return;
+        const timer = window.setTimeout(() => {
+            seenEdit.current = lastEdit;
+            setVersion((n) => n + 1);
+        }, RELOAD_SETTLE_MS);
+        return () => window.clearTimeout(timer);
+    }, [follow, lastEdit]);
 
     const read = useCallback(
         (signal?: AbortSignal) => {
@@ -463,6 +530,24 @@ function PreviewPane({ sessionId, live }: { sessionId: string; live: boolean }) 
                 >
                     <RotateCw className="size-4" />
                 </ui.Button>
+                <ui.SegmentedControl
+                    size="sm"
+                    aria-label={t("code.preview.device")}
+                    value={device}
+                    onValueChange={setDevice}
+                    options={(["phone", "tablet", "full"] as const).map((one) => ({
+                        value: one,
+                        title: t(`code.preview.${one}`),
+                        label:
+                            one === "phone" ? (
+                                <Smartphone className="size-4" aria-label={t("code.preview.phone")} />
+                            ) : one === "tablet" ? (
+                                <Tablet className="size-4" aria-label={t("code.preview.tablet")} />
+                            ) : (
+                                <Monitor className="size-4" aria-label={t("code.preview.full")} />
+                            )
+                    }))}
+                />
                 <ui.CopyButton value={address} label={t("code.preview.address")} className="p-2" />
                 <a
                     href={path}
@@ -475,15 +560,23 @@ function PreviewPane({ sessionId, live }: { sessionId: string; live: boolean }) 
                     <ExternalLink className="size-4" />
                 </a>
             </div>
-            <iframe
-                key={`${port}:${version}`}
-                src={path}
-                title={t("code.preview.frame", { port })}
-                sandbox={PREVIEW_FRAME_SANDBOX}
-                referrerPolicy="no-referrer"
-                className="min-h-0 w-full flex-1 rounded-md border border-border bg-white"
-            />
-            <p className="text-xs text-muted-foreground">{t("code.preview.hotReload")}</p>
+            <div className="flex min-h-0 min-w-0 flex-1 justify-center overflow-auto overscroll-contain">
+                <iframe
+                    key={`${port}:${version}`}
+                    src={path}
+                    title={t("code.preview.frame", { port })}
+                    sandbox={PREVIEW_FRAME_SANDBOX}
+                    referrerPolicy="no-referrer"
+                    style={PREVIEW_DEVICES[device] ? { width: PREVIEW_DEVICES[device] } : undefined}
+                    className="h-full min-h-0 w-full max-w-full shrink-0 rounded-md border border-border bg-white"
+                />
+            </div>
+            <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                <ui.Switch checked={follow} onChange={setFollow} aria-label={t("code.preview.follow")} />
+                <span className="min-w-0 truncate" title={t("code.preview.follow")}>
+                    {t("code.preview.follow")}
+                </span>
+            </div>
             {inside}
         </div>
     );

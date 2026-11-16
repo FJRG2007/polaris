@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createdSessionBranch, isChangeEvent, shownSessionBranch } from "@/lib/agents/session-branch";
+import { createdSessionBranch, isChangeEvent, lastChangeAt, shownSessionBranch } from "@/lib/agents/session-branch";
 
 const ID = "6364280b-0000-4000-8000-000000000000";
 
@@ -67,5 +67,21 @@ describe("shownSessionBranch", () => {
 describe("isChangeEvent", () => {
     it("ignores events that are not tools", () => {
         expect(isChangeEvent({ kind: "prompt", subject: "Edit", detail: "" })).toBe(false);
+    });
+});
+
+describe("lastChangeAt", () => {
+    it("is the newest finished edit, and nothing else", () => {
+        const at = (kind: string, subject: string, when: string) => ({ kind, subject, detail: "", at: when });
+        expect(lastChangeAt([])).toBeNull();
+        expect(
+            lastChangeAt([
+                at("tool.end", "Edit", "2026-11-16T10:00:01.000Z"),
+                at("tool.end", "Write", "2026-11-16T10:00:03.000Z"),
+                // Still writing: nothing on disk to show yet.
+                at("tool.start", "Edit", "2026-11-16T10:00:05.000Z"),
+                at("tool.end", "Read", "2026-11-16T10:00:06.000Z")
+            ])
+        ).toBe("2026-11-16T10:00:03.000Z");
     });
 });

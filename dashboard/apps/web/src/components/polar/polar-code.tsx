@@ -1985,6 +1985,7 @@ function CodeThread({
                     session={thread.view}
                     branch={thread.session.branch}
                     live={live}
+                    lastEdit={thread.lastEdit ?? null}
                 />
             ) : null}
         </>
