@@ -1,4 +1,12 @@
 {
+    "continueSession": {
+        "title": "Seguir en el móvil",
+        "waiting": "Permite este móvil en tu ordenador con tu PIN.",
+        "approved": "Sesión iniciada. Abriendo la sesión...",
+        "denied": "El acceso se rechazó en tu ordenador.",
+        "gone": "Este enlace ya se usó o caducó. Crea otro en tu ordenador.",
+        "busy": "Demasiados intentos desde aquí. Espera un minuto y repite."
+    },
     "layout": {
         "signIn": "Entrar",
         "about": "Acerca de",

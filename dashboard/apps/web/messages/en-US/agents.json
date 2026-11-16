@@ -292,6 +292,29 @@
         "start": "Starting the agent"
     },
     "session": {
+        "continue": {
+            "button": "Continue on phone",
+            "title": "Continue on phone",
+            "description": "Scan this with your phone to open this session there.",
+            "expires": "Works once, for 5 minutes.",
+            "copy": "Copy link",
+            "copied": "Link copied",
+            "phoneAsks": "A phone wants to sign in to open this session.",
+            "device": "Device",
+            "from": "From",
+            "pin": "Your PIN",
+            "needsPin": "Set a quick-unlock PIN in Security to allow it.",
+            "allow": "Allow",
+            "refuse": "Refuse",
+            "gone": "This link was used or expired.",
+            "again": "New link",
+            "errors": {
+                "busy": "Too many links. Try again in a few minutes.",
+                "denied": "Only this session's owner can open it elsewhere.",
+                "failed": "Could not do that. Try again.",
+                "copy": "Could not copy the link."
+            }
+        },
         "account": {
             "button": "Account",
             "title": "Switch account",

@@ -1,4 +1,12 @@
 {
+    "continueSession": {
+        "title": "Continue on phone",
+        "waiting": "Allow this phone on your computer with your PIN.",
+        "approved": "Signed in. Opening the session...",
+        "denied": "The sign-in was refused on your computer.",
+        "gone": "This link was used or expired. Make a new one on your computer.",
+        "busy": "Too many tries from here. Wait a minute and try again."
+    },
     "layout": {
         "signIn": "Sign in",
         "about": "About",

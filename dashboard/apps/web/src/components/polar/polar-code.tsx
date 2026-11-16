@@ -154,20 +154,23 @@ const PolarCodeWorkspace = dynamic(
     { ssr: false }
 );
 
-/** A session's pull request and its Share button, in the Agents app's words.
+/** A session's pull request, its Share button and Continue on phone, in the
+ *  Agents app's words.
  *  Drawn only where somebody can steer the session, so loaded there. */
 const SessionTools = dynamic(
     () =>
         Promise.all([
             import("@/components/agents/sessions/session-pull"),
             import("@/components/agents/sessions/share-button"),
-            import("@/components/i18n/client-namespaces")
-        ]).then(([pull, share, i18n]) =>
+            import("@/components/i18n/client-namespaces"),
+            import("@/components/agents/sessions/continue-button")
+        ]).then(([pull, share, i18n, phone]) =>
             function SessionTools({ session }: { session: SessionView }) {
                 return (
                     <i18n.ClientMessages namespaces={["agents"]} fallback={null}>
                         {session.pullRequest ? <pull.SessionPull session={session} /> : null}
                         <share.SessionShareButton sessionId={session.id} title={session.title} />
+                        <phone.ContinueOnPhoneButton sessionId={session.id} />
                     </i18n.ClientMessages>
                 );
             }

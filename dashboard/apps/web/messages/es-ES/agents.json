@@ -292,6 +292,29 @@
         "start": "Iniciando el agente"
     },
     "session": {
+        "continue": {
+            "button": "Seguir en el móvil",
+            "title": "Seguir en el móvil",
+            "description": "Escanéalo con tu móvil para abrir allí esta sesión.",
+            "expires": "Sirve una vez, durante 5 minutos.",
+            "copy": "Copiar URL",
+            "copied": "Enlace copiado",
+            "phoneAsks": "Un móvil quiere entrar para abrir esta sesión.",
+            "device": "Equipo",
+            "from": "Desde",
+            "pin": "Tu PIN",
+            "needsPin": "Crea un PIN rápido en Seguridad para permitirlo.",
+            "allow": "Permitir",
+            "refuse": "Rechazar",
+            "gone": "Este enlace ya se usó o caducó.",
+            "again": "Otro enlace",
+            "errors": {
+                "busy": "Demasiados enlaces. Prueba en unos minutos.",
+                "denied": "Solo el dueño de la sesión puede abrirla en otro sitio.",
+                "failed": "No se pudo hacer. Inténtalo de nuevo.",
+                "copy": "No se pudo copiar el enlace."
+            }
+        },
         "account": {
             "button": "Cuenta",
             "title": "Cambiar cuenta",
