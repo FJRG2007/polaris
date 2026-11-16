@@ -379,6 +379,22 @@
             "notSetUp": "Sin configurar. Añade su clave en Integraciones.",
             "nothingSetUp": "Aún no hay ningún servicio configurado, así que no se revisa nada.",
             "openIntegrations": "Abrir Integraciones"
+        },
+        "directRules": {
+            "title": "Reglas de chats directos",
+            "invalid": "Esa opción no está disponible",
+            "open": {
+                "label": "Abierto",
+                "hint": "Cualquiera activa los mensajes temporales y puede borrar el chat para ambos."
+            },
+            "agreement": {
+                "label": "Acuerdo",
+                "hint": "Los cambios esperan a que todos en el chat los acepten."
+            },
+            "line": {
+                "label": "Mostrar una línea al borrar un chat para ambos",
+                "hint": "Apagado: el chat se vacía sin dejar ninguna línea."
+            }
         }
     },
     "consumption": {

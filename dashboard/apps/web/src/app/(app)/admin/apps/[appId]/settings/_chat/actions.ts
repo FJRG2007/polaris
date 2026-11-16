@@ -20,6 +20,8 @@ import * as calls from "@/lib/chat/call-server";
 import { recordAudit } from "@/lib/audit-service";
 import { syncCallServerRoute } from "@/lib/chat/call-edge";
 import { saveLinkSafetySettings } from "@/lib/chat/link-safety";
+import { isDmRuleMode } from "@/lib/chat/vanish-rules";
+import { setDeleteChatLineShown, setDmRuleMode } from "@/lib/chat/vanish";
 
 export async function setChatRulesAction(
     scope: unknown,
@@ -156,6 +158,42 @@ export async function setCallServerAction(
         targetType: "setting",
         targetId: "chat.calls",
         metadata: { cleared: String(url ?? "").trim() === "" }
+    });
+    revalidatePath(CHAT_SETTINGS_PATH);
+    return {};
+}
+
+/**
+ * How direct conversations decide their rules: "open", where either person
+ * changes them, or "agreement", where a change waits for everybody to accept.
+ * Going back to open keeps each conversation's accepted rules as they are.
+ */
+export async function setDmRuleModeAction(mode: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    if (!isDmRuleMode(mode)) return { error: (await getTranslations("admin"))("chat.directRules.invalid") };
+    await setDmRuleMode(mode);
+    await recordAudit({
+        actorId: admin.id,
+        action: "chat.dmRules.set",
+        targetType: "setting",
+        targetId: "chat.dmRules",
+        metadata: { mode }
+    });
+    revalidatePath(CHAT_SETTINGS_PATH);
+    return {};
+}
+
+/** Whether deleting a chat for everybody leaves a line saying who did it. */
+export async function setDeleteChatLineAction(shown: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    if (typeof shown !== "boolean") return { error: (await getTranslations("admin"))("chat.directRules.invalid") };
+    await setDeleteChatLineShown(shown);
+    await recordAudit({
+        actorId: admin.id,
+        action: "chat.deleteChatLine.set",
+        targetType: "setting",
+        targetId: "chat.deleteChatLine",
+        metadata: { shown }
     });
     revalidatePath(CHAT_SETTINGS_PATH);
     return {};

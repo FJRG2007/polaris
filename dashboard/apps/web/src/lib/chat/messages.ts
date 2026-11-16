@@ -59,6 +59,7 @@ import { MAX_REREAD } from "./reread-limit";
 import * as history from "./history-visibility";
 import { webhookFace } from "./webhook-face";
 import { expiryForChannel } from "./vanish";
+import { hasDirectRules } from "./vanish-rules";
 import { concealedFor, requireUnlocked, unhideOnMessage } from "./chat-lock";
 
 /** One message, with everything the list needs to draw it. */
@@ -551,7 +552,9 @@ export async function send(
 
     // Stamped once, from the timer in force now: changing it later never moves
     // a message already sent.
-    const expiresAt = await expiryForChannel(input.channelId, new Date());
+    const expiresAt = hasDirectRules(access)
+        ? await expiryForChannel(input.channelId, new Date())
+        : null;
     const id = await prisma.$transaction(async (tx) => {
         const message = await tx.chatMessage.create({
             data: {

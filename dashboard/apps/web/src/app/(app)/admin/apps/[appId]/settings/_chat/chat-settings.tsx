@@ -15,6 +15,8 @@ import { driveShare } from "@/lib/chat/drive-share";
 import { DriveShareView } from "./drive-share-view";
 import { linkSafetyOverview } from "@/lib/chat/link-safety";
 import { LinkSafetyView } from "./link-safety-view";
+import { DirectRulesView } from "./direct-rules-view";
+import { deleteChatLineShown, dmRuleMode } from "@/lib/chat/vanish";
 
 /** The screens, by the path segment after `settings` ("" is the first). */
 export const CHAT_ADMIN_SCREENS = ["", "files", "organizations", "links", "calls"] as const;
@@ -31,6 +33,9 @@ export async function ChatAdminSettings({ screen }: { screen: ChatAdminScreen })
         // the width of the screen is the whole reason the old page looked wrong.
         <div className="flex w-full max-w-2xl flex-col">
             {screen === "" ? <ChatRulesView initial={await allChatRules()} /> : null}
+            {screen === "" ? (
+                <DirectRulesView mode={await dmRuleMode()} line={await deleteChatLineShown()} />
+            ) : null}
             {screen === "files" ? <DriveShareView how={await driveShare()} /> : null}
             {screen === "organizations" ? <OrgChatView offered={await orgChatOffered()} /> : null}
             {screen === "links" ? <LinkSafetyView initial={await linkSafetyOverview()} /> : null}

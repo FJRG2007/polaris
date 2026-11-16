@@ -379,6 +379,22 @@
             "notSetUp": "Not set up. Add its key in Integrations to use it.",
             "nothingSetUp": "No link checking service is set up yet, so nothing is checked.",
             "openIntegrations": "Open Integrations"
+        },
+        "directRules": {
+            "title": "Direct message rules",
+            "invalid": "That choice is not available",
+            "open": {
+                "label": "Open",
+                "hint": "Either person sets disappearing messages and may delete the chat for both."
+            },
+            "agreement": {
+                "label": "Agreement",
+                "hint": "Changes wait until everyone in the chat accepts them."
+            },
+            "line": {
+                "label": "Show a line when someone deletes a chat for both",
+                "hint": "Off: the chat is emptied with no line left in it."
+            }
         }
     },
     "consumption": {
