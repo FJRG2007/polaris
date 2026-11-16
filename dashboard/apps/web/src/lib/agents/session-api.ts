@@ -16,12 +16,6 @@ import type * as sdk from "@polaris/sdk";
 import * as queue from "@/lib/agents/session-queue";
 import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
-import { polarModelOptions } from "@/lib/polar/models";
-import { polarCredentialFor } from "@/lib/polar/access";
-import { agentOptionsFor } from "@/lib/agents/agent-readiness";
-import { agentDefaultsFor } from "@/lib/polar/agents/defaults";
-import { POLAR_ENGINE } from "@/lib/polar/agents/shared";
-import { codeComposerFor } from "@/lib/polar/agents/composer-agents";
 
 export interface KeyCaller {
     readonly userId: string;
@@ -120,14 +114,24 @@ export async function startModel(
     if (!spec) return null;
     const asked = readModelSpec(spec);
     if (!asked) throw new sessions.SessionRefusal(`Name the model as provider/model, not ${spec}.`);
+    // Loaded only when a model is asked for: Polar's model lists reach its
+    // provider registry, which a plain start has no use for.
+    const [models, access, readiness, defaults, shared, composer] = await Promise.all([
+        import("@/lib/polar/models"),
+        import("@/lib/polar/access"),
+        import("@/lib/agents/agent-readiness"),
+        import("@/lib/polar/agents/defaults"),
+        import("@/lib/polar/agents/shared"),
+        import("@/lib/polar/agents/composer-agents")
+    ]);
     const unavailable = () =>
         new sessions.SessionRefusal(`${spec} is not a model this account can start ${cli} on.`);
     if (core.MODEL_CHOICE_AGENT_CLIS.includes(cli)) {
-        const [providers, defaults] = await Promise.all([
-            polarModelOptions(userId),
-            agentDefaultsFor(userId).catch(() => null)
+        const [providers, saved] = await Promise.all([
+            models.polarModelOptions(userId),
+            defaults.agentDefaultsFor(userId).catch(() => null)
         ]);
-        const policy = defaults?.get(POLAR_ENGINE);
+        const policy = saved?.get(shared.POLAR_ENGINE);
         const listed = providers
             .find((option) => option.provider === asked.provider)
             ?.models.some((option) => option.model === asked.model);
@@ -137,7 +141,7 @@ export async function startModel(
             policy.models.length === 0 ||
             policy.models.some((entry) => entry.provider === asked.provider && entry.model === asked.model);
         if (!listed || !kept) throw unavailable();
-        const credential = await polarCredentialFor(userId, asked.provider, null);
+        const credential = await access.polarCredentialFor(userId, asked.provider, null);
         if (!credential) throw unavailable();
         // Pinned to the key Polar resolved, so the session spends that one.
         return { provider: asked.provider, model: asked.model, payer: credential.source };
@@ -145,8 +149,9 @@ export async function startModel(
     const own = core.agentCliById(cli)?.model?.provider;
     if (!own) throw new sessions.SessionRefusal(`${cli} does not take a model from Polaris.`);
     if (asked.provider !== own) throw unavailable();
-    const composer = await codeComposerFor(userId, await agentOptionsFor(userId));
-    const offered = composer.sources.some(
+    const offered = (
+        await composer.codeComposerFor(userId, await readiness.agentOptionsFor(userId))
+    ).sources.some(
         (source) =>
             source.engines[0] === cli && source.models.some((entry) => entry.model === asked.model)
     );
