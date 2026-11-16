@@ -14,6 +14,7 @@ import { z } from "zod";
 import { computerFor } from "@/lib/computers/computer-service";
 import { sendToRunner } from "@/lib/computers/computer-commands";
 import * as computerProgress from "@/lib/computers/computer-progress";
+import { onRunnerLive } from "@/lib/computers/computer-bus";
 import { after } from "next/server";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
@@ -680,7 +681,11 @@ export async function sessionScreenAction(
     if (!session) return { error: t("sessions.errors.gone") };
     // A session on somebody's computer has no screen to read here; what it
     // shows while starting is the runner preparing the tools.
-    if (session.place === "computer") return { screen: "", preparing: computerProgress.computerProgress(sessionId) };
+    if (session.place === "computer") {
+        // The runner may be on another node, which publishes its progress.
+        onRunnerLive(computerProgress.receiveProgressNotice);
+        return { screen: "", preparing: computerProgress.computerProgress(sessionId) };
+    }
     if (core.isSessionOver(session.state)) return { screen: "" };
     try {
         return { screen: await runtime.captureSession(sessionId) };

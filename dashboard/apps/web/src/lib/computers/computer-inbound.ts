@@ -16,6 +16,7 @@ import * as computers from "./computer-service";
 import { touchSession } from "@/lib/agents/session-live";
 import { listenForRunnerCommands } from "./computer-commands";
 import * as progress from "./computer-progress";
+import { publishRunnerLive } from "./computer-bus";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { deliverChatEvent } from "@/lib/polar/claude-subscription/turns";
 import { finishSession, recordSessionEvents } from "@/lib/agents/session-service";
@@ -53,14 +54,18 @@ export async function handleRunnerMessage(
                 const owned = await prisma.agentSession.count({
                     where: { id: message.sessionId, runnerId: identity.runnerId, place: "computer" }
                 });
-                if (owned)
-                    progress.recordComputerProgress(message.sessionId, {
+                if (owned) {
+                    const step: progress.ComputerProgress = {
                         tool: message.tool,
                         step: message.step,
                         ...(message.received !== undefined ? { received: message.received } : {}),
                         ...(message.total !== undefined ? { total: message.total } : {}),
                         ...(message.code ? { code: message.code } : {})
-                    });
+                    };
+                    progress.recordComputerProgress(message.sessionId, step);
+                    // The session screen may be served by another node.
+                    void publishRunnerLive({ k: "progress", sessionId: message.sessionId, progress: step });
+                }
             }
             return null;
         case "terminal.output":

@@ -2,10 +2,11 @@
  * "Preparing this computer": where a runner stands installing the tools a
  * session on it needs (`toolchain.progress`), kept for the session screen.
  *
- * Held in this process, on the node the runner's socket reached, for as long
- * as a start takes; the screen reads it through `sessionScreenAction`. A
- * session screen served by another node sees no progress and keeps its
- * generic starting line (TOOLCHAIN-PLAN.md, cross-node).
+ * Held in every node's process for as long as a start takes: the node the
+ * runner's socket reached records it and publishes it on the runner bus
+ * (`computer-bus.ts`), and a node that serves a session screen listens from
+ * its first read (`listenForComputerProgress`). The screen reads it through
+ * `sessionScreenAction`.
  *
  * The runner sends machine words only; `toolchainEndDetail` turns the
  * `session.ended` detail a failed preparation carries into the reader's
@@ -13,6 +14,7 @@
  */
 
 import * as core from "@polaris/core";
+import type { LiveNotice } from "./computer-bus";
 
 export interface ComputerProgress {
     readonly tool: string;
@@ -48,6 +50,11 @@ export function computerProgress(sessionId: string, now = Date.now()): ComputerP
 
 export function forgetComputerProgress(sessionId: string): void {
     held.delete(sessionId);
+}
+
+/** Another node's progress notice, kept like one of this node's own. */
+export function receiveProgressNotice(notice: LiveNotice): void {
+    if (notice.k === "progress") recordComputerProgress(notice.sessionId, notice.progress);
 }
 
 /**
