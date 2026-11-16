@@ -195,7 +195,9 @@ export async function codeComposerFor(
         ])
     );
     const sources = codeSourcesFor(options, catalogue, policies, native);
-    const personas: CodePersona[] = custom.map((agent) => {
+    // An agent only other agents start (OpenCode's "subagent" mode) is not
+    // one to pick in the composer.
+    const personas: CodePersona[] = custom.filter((agent) => agent.mode !== "subagent").map((agent) => {
         const first = agent.models[0];
         let pick: CodePick | null = null;
         if (agent.engine === POLAR_ENGINE) {

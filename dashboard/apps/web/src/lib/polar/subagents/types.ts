@@ -47,6 +47,8 @@ const EXPLORE: SubagentType = {
 export function subagentTypes(agents: readonly AgentView[]): SubagentType[] {
     const own = agents
         .filter((agent) => agent.engine === POLAR_ENGINE && agent.description.trim() !== "")
+        // A primary-only agent is picked to talk to, never started for a task.
+        .filter((agent) => agent.mode !== "primary")
         .filter((agent) => agent.name !== GENERAL.name && agent.name !== EXPLORE.name)
         .map(
             (agent): SubagentType => ({
