@@ -70,6 +70,11 @@ function mention(person: NoticePerson): string {
     return `[${label(person.name)}](polaris:user/${person.id})`;
 }
 
+/** A person as a notice names them, for a line worded elsewhere. */
+export function noticeMention(person: NoticePerson): string {
+    return mention(person);
+}
+
 /**
  * The stored body of a notice.
  *

@@ -237,7 +237,14 @@
         "lockResetUnconfirmed": "Confirm it is you first",
         "meetingEmailsNeedGuests": "Polaris accounts only: invite people by name instead of by email",
         "meetingNotInvited": "You are not invited to this meeting. Ask the host for the link",
-        "meetingTooManyEmails": "A meeting holds at most {count} email addresses"
+        "meetingTooManyEmails": "A meeting holds at most {count} email addresses",
+        "vanishNotHere": "Only a direct message has these rules",
+        "vanishBadDuration": "Pick one of the offered timers",
+        "vanishNoAgreement": "Rules here change without a proposal",
+        "vanishTooFast": "Too many changes. Try again in a few minutes",
+        "proposalGone": "That proposal is no longer open",
+        "proposalNotYours": "Only the other people in the chat can answer it",
+        "deleteForAllOff": "Deleting this chat for everyone is not allowed here"
     },
     "media": {
         "refused": {

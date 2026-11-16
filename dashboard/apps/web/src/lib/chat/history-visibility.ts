@@ -14,6 +14,13 @@
  * the setting only changes what is read from then on; nothing is deleted.
  *
  * Every read of chat messages asks this module, never a copy of the rule.
+ *
+ * Three more things decide what a reader is shown, and they live here so that
+ * every read already asking about the floor asks about them too: a message past
+ * its `expiresAt` is gone for everybody (disappearing messages), one a reader
+ * deleted for themselves (`ChatMessageHidden`) is gone for them, and a chat they
+ * deleted for themselves (`clearedAt` on their membership) starts again for
+ * them at that moment - the cleared mark is a floor like any other.
  */
 
 import { prisma, type Prisma } from "@polaris/db";
@@ -108,7 +115,29 @@ export async function historyFloors(
         });
         if (floor) floors.set(channel.id, floor);
     }
+
+    // A chat this reader deleted for themselves starts again where they cleared
+    // it. Only rows that have been cleared come back, so this is usually empty.
+    const cleared = await prisma.chatChannelMember.findMany({
+        where: { userId: actorId, channelId: { in: ids }, clearedAt: { not: null } },
+        select: { channelId: true, clearedAt: true }
+    });
+    for (const row of cleared) {
+        if (!row.clearedAt) continue;
+        const was = floors.get(row.channelId);
+        if (!was || was.getTime() < row.clearedAt.getTime()) floors.set(row.channelId, row.clearedAt);
+    }
     return floors;
+}
+
+/** Messages that have not disappeared yet. */
+export function notExpiredClause(now: Date = new Date()): Prisma.ChatMessageWhereInput {
+    return { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] };
+}
+
+/** Messages this reader has not deleted for themselves. */
+export function notHiddenClause(viewerId: string): Prisma.ChatMessageWhereInput {
+    return { hiddenFor: { none: { userId: viewerId } } };
 }
 
 /** The floor of one conversation for this reader, or null for all of it. */
@@ -116,9 +145,20 @@ export async function readableSince(actor: ChatActor, channelId: string): Promis
     return (await historyFloors(actor.id, [channelId])).get(channelId) ?? null;
 }
 
-/** A where clause for one conversation: only what this reader may read. */
-export function sinceClause(floor: Date | null): Prisma.ChatMessageWhereInput {
-    return floor ? { createdAt: { gte: floor } } : {};
+/** A where clause for one conversation: only what this reader may read - past
+ *  the floor, not expired, and not deleted by them for themselves when the
+ *  reader is named. */
+export function sinceClause(
+    floor: Date | null,
+    viewerId?: string | null
+): Prisma.ChatMessageWhereInput {
+    return {
+        AND: [
+            floor ? { createdAt: { gte: floor } } : {},
+            notExpiredClause(),
+            viewerId ? notHiddenClause(viewerId) : {}
+        ]
+    };
 }
 
 /**
@@ -126,18 +166,30 @@ export function sinceClause(floor: Date | null): Prisma.ChatMessageWhereInput {
  * unread counts, toasts). Meant to sit in an `AND` list, so it never collides
  * with an `OR` the caller already has.
  */
-export function readableWhere(floors: ReadonlyMap<string, Date>): Prisma.ChatMessageWhereInput {
-    if (floors.size === 0) return {};
-    return {
-        OR: [
-            { channelId: { notIn: [...floors.keys()] } },
-            ...[...floors].map(([channelId, gte]) => ({ channelId, createdAt: { gte } }))
-        ]
-    };
+export function readableWhere(
+    floors: ReadonlyMap<string, Date>,
+    viewerId?: string | null
+): Prisma.ChatMessageWhereInput {
+    const floored: Prisma.ChatMessageWhereInput =
+        floors.size === 0
+            ? {}
+            : {
+                  OR: [
+                      { channelId: { notIn: [...floors.keys()] } },
+                      ...[...floors].map(([channelId, gte]) => ({ channelId, createdAt: { gte } }))
+                  ]
+              };
+    return { AND: [floored, notExpiredClause(), viewerId ? notHiddenClause(viewerId) : {}] };
 }
 
-/** Whether a message written at `createdAt` is past this floor. */
-export function isReadable(floor: Date | null | undefined, createdAt: Date): boolean {
+/** Whether a message written at `createdAt` is past this floor - and, when its
+ *  expiry is passed, has not disappeared. */
+export function isReadable(
+    floor: Date | null | undefined,
+    createdAt: Date,
+    expiresAt?: Date | null
+): boolean {
+    if (expiresAt && expiresAt.getTime() <= Date.now()) return false;
     return !floor || createdAt.getTime() >= floor.getTime();
 }
 
@@ -152,12 +204,11 @@ export async function requireReadable(
     messageId: string
 ): Promise<void> {
     const floor = await readableSince(actor, channelId);
-    if (!floor) return;
-    const row = await prisma.chatMessage.findUnique({
-        where: { id: messageId },
-        select: { createdAt: true }
+    const row = await prisma.chatMessage.findFirst({
+        where: { id: messageId, AND: [notHiddenClause(actor.id)] },
+        select: { createdAt: true, expiresAt: true }
     });
-    if (!row || !isReadable(floor, row.createdAt)) throw new ChatAccessError();
+    if (!row || !isReadable(floor, row.createdAt, row.expiresAt)) throw new ChatAccessError();
 }
 
 /** The same for a file, asked by the route that serves it: a file in a message
@@ -168,10 +219,21 @@ export async function attachmentReadable(
     attachmentId: string
 ): Promise<boolean> {
     const floor = await readableSince(actor, channelId);
-    if (!floor) return true;
     const row = await prisma.chatAttachment.findUnique({
         where: { id: attachmentId },
-        select: { message: { select: { createdAt: true } } }
+        select: {
+            message: {
+                select: {
+                    createdAt: true,
+                    expiresAt: true,
+                    hiddenFor: { where: { userId: actor.id }, select: { userId: true }, take: 1 }
+                }
+            }
+        }
     });
-    return row !== null && isReadable(floor, row.message.createdAt);
+    return (
+        row !== null &&
+        row.message.hiddenFor.length === 0 &&
+        isReadable(floor, row.message.createdAt, row.message.expiresAt)
+    );
 }

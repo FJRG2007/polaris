@@ -77,7 +77,7 @@ export async function searchMessages(
             ...attachmentClause(input.has),
             ...dayClause(input.after, input.before),
             // Nothing from before this reader joined where that is hidden.
-            AND: [history.readableWhere(floors)]
+            AND: [history.readableWhere(floors, actor.id)]
         },
         orderBy: { createdAt: "desc" },
         take: core.CHAT_SEARCH_LIMIT,

@@ -10538,6 +10538,17 @@ model ChatChannel {
     lastMessageAt DateTime?
     order         Float     @default(1024)
     archived      Boolean   @default(false)
+    /// How long a message sent here lasts, in seconds; 0 is forever. Stamped on
+    /// each message as `expiresAt` when it is sent, so changing it never moves
+    /// a message already written. Only read for a dm or a group for now.
+    vanishAfter   Int       @default(0)
+    /// Whether "delete the chat for everybody" is allowed under the rules the
+    /// members agreed to. Only read when the instance decides direct-message
+    /// rules by agreement; in the open mode it is always allowed.
+    deleteForAll  Boolean   @default(false)
+    /// When the members last agreed to these rules. Null is no agreement, which
+    /// in the agreement mode means no timer and no delete for everybody.
+    rulesAgreedAt DateTime?
     createdAt     DateTime  @default(now())
     updatedAt     DateTime  @updatedAt
 
@@ -10553,6 +10564,7 @@ model ChatChannel {
     invites  ChatSpaceInvite[]
     webhooks ChatWebhook[]
     ageConfirmations ChatAgeConfirmation[]
+    ruleProposals ChatRuleProposal[]
 
     @@index([spaceId, order])
     @@index([categoryId, order])
@@ -10666,6 +10678,9 @@ model ChatChannelMember {
     locked            Boolean   @default(false)
     // Out of this reader's list until a message arrives, unless it is muted.
     hiddenAt          DateTime?
+    // This reader deleted the chat for themselves: nothing written before this
+    // is shown to them again. The other people keep all of it.
+    clearedAt         DateTime?
     createdAt         DateTime  @default(now())
 
     channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
@@ -10774,6 +10789,10 @@ model ChatMessage {
     // only the author is shown. Null for everything else; cleared on an edit,
     // since the edited words are no longer a translation of the original.
     translation  Json?
+    // When this message disappears, stamped from the conversation's timer when
+    // it was sent. Never served past it, and deleted for real by the sweep
+    // (`lib/chat/vanish`). Null is forever.
+    expiresAt   DateTime?
     createdAt   DateTime  @default(now())
 
     channel     ChatChannel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
@@ -10789,6 +10808,7 @@ model ChatMessage {
     linkFlags   ChatMessageLinkFlag[]
     edits       ChatMessageEdit[]
     reports     ChatReport[]
+    hiddenFor   ChatMessageHidden[]
 
     @@index([channelId, createdAt])
     // One channel's main conversation or one of its threads, in time order,
@@ -10799,6 +10819,43 @@ model ChatMessage {
     // The pins of one conversation, newest first, without reading its messages.
     @@index([channelId, pinnedAt])
     @@index([authorId])
+    // The disappearing-message sweep, oldest first.
+    @@index([expiresAt])
+}
+
+// A message one reader deleted for themselves. Everybody else still sees it.
+// `userId` is not a foreign key, for the reason `authorId` is not one; the rows
+// go with the message.
+model ChatMessageHidden {
+    messageId String   @db.Uuid
+    userId    String   @db.Uuid
+    createdAt DateTime @default(now())
+
+    message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@id([messageId, userId])
+    @@index([userId])
+}
+
+// A change to a conversation's rules waiting for its members to agree, when the
+// instance decides direct-message rules by agreement. One pending at a time per
+// conversation: a new one replaces it. Accepted once every member is in
+// `acceptedBy`, and then copied onto the channel.
+model ChatRuleProposal {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    channelId    String    @db.Uuid
+    proposedById String    @db.Uuid
+    vanishAfter  Int       @default(0)
+    deleteForAll Boolean   @default(false)
+    acceptedBy   String[]  @db.Uuid
+    // pending | accepted | declined | replaced
+    status       String    @default("pending")
+    createdAt    DateTime  @default(now())
+    decidedAt    DateTime?
+
+    channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+    @@index([channelId, status])
 }
 
 // A link in a message that an outside reputation service flagged, written by the
@@ -11463,6 +11520,9 @@ model UserPrivacy {
     // the one thing on this list that exists in order to be seen - and which
     // organizations it covers is a separate choice nobody has made yet.
     companies    String   @default("everyone")
+    // The disappearing-message timer a new direct message starts with, in
+    // seconds. 0 is off.
+    chatVanishAfter Int   @default(0)
     // Who may read the two follower lists on a profile. Nullable, and that is
     // the point: null is "nobody has chosen", and what that resolves to is the
     // operator's setting rather than a number frozen into this column. An

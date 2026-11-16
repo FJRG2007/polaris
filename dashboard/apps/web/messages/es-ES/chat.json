@@ -237,7 +237,14 @@
         "lockResetUnconfirmed": "Confirma primero que eres tú",
         "meetingEmailsNeedGuests": "Solo cuentas Polaris: invita a la gente por nombre, no por correo",
         "meetingNotInvited": "No tienes invitación a esta reunión. Pide el enlace a quien la organiza",
-        "meetingTooManyEmails": "Una reunión admite como mucho {count} direcciones de correo"
+        "meetingTooManyEmails": "Una reunión admite como mucho {count} direcciones de correo",
+        "vanishNotHere": "Solo un mensaje directo tiene estas reglas",
+        "vanishBadDuration": "Elige uno de los tiempos ofrecidos",
+        "vanishNoAgreement": "Aquí las reglas cambian sin propuesta",
+        "vanishTooFast": "Demasiados cambios. Prueba en unos minutos",
+        "proposalGone": "Esa propuesta ya no está abierta",
+        "proposalNotYours": "Solo los demás del chat pueden responderla",
+        "deleteForAllOff": "Aquí no se permite borrar el chat para todos"
     },
     "media": {
         "refused": {

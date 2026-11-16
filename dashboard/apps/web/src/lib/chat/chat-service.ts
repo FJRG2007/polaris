@@ -48,6 +48,7 @@ import {
 import * as history from "./history-visibility";
 import { concealedFrom, listedFor } from "./chat-lock";
 import { badgeClearedAt, laterMark } from "@/lib/badge-seen";
+import { applyDefaultTimer } from "./vanish";
 
 /** A space as the rail draws it. */
 export interface ChatSpaceView {
@@ -891,6 +892,7 @@ export async function listChannels(
         // previews, not the list - and is logged, because a failure here is
         // otherwise only a list that quietly says nothing under every name.
         lastMessages(
+            actor.id,
             channels
                 .filter((channel) => !channel.spaceId || Boolean(mine.get(channel.id)?.hiddenAt))
                 .map((channel) => channel.id)
@@ -2072,6 +2074,7 @@ export async function openDirect(
                 actorId: actor.id,
                 audience: everyone
             });
+            await applyDefaultTimer(actor, channel.id);
             return channel.id;
         } catch (caught) {
             // The other tab won the race. The unique key is what makes that
@@ -2513,7 +2516,7 @@ async function unreadCounts(
             // counting both would double every conversation that has one.
             parentId: null,
             OR: [...(unseen.length > 0 ? [{ channelId: { in: unseen } }] : []), ...since],
-            AND: [history.readableWhere(floors)]
+            AND: [history.readableWhere(floors, actor.id)]
         },
         _count: { _all: true }
     });

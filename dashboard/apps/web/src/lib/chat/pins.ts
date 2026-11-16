@@ -75,7 +75,8 @@ export async function pin(actor: ChatActor, input: PinInput): Promise<void> {
             deletedAt: true,
             pinnedAt: true,
             pinExpiresAt: true,
-            createdAt: true
+            createdAt: true,
+            expiresAt: true
         }
     });
     if (!message || message.deletedAt) throw new ChatAccessError({ key: "errors.messageGone" });
@@ -83,7 +84,8 @@ export async function pin(actor: ChatActor, input: PinInput): Promise<void> {
     if (
         !history.isReadable(
             await history.readableSince(actor, message.channelId),
-            message.createdAt
+            message.createdAt,
+            message.expiresAt
         )
     ) {
         throw new ChatAccessError();
@@ -151,7 +153,7 @@ export async function pinsIn(
     const rows = await prisma.chatMessage.findMany({
         where: {
             ...pinnedWhere(channelId, new Date()),
-            AND: [history.sinceClause(await history.readableSince(actor, channelId))]
+            AND: [history.sinceClause(await history.readableSince(actor, channelId), actor.id)]
         },
         orderBy: { pinnedAt: "desc" },
         take: MAX_PINS,

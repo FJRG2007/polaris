@@ -356,7 +356,7 @@ async function recentIn(userId: string, channelIds: readonly string[], since: Da
             createdAt: { gte: since },
             authorId: { not: userId },
             ...ageClearedWhere(userId),
-            AND: [history.readableWhere(floors)]
+            AND: [history.readableWhere(floors, userId)]
         },
         orderBy: { createdAt: "desc" },
         take,

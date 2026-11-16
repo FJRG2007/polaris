@@ -121,7 +121,7 @@ export async function listReminders(actor: ChatActor): Promise<ChatReminderView[
             messageId: true,
             dueAt: true,
             message: {
-                select: { channelId: true, body: true, deletedAt: true, createdAt: true }
+                select: { channelId: true, body: true, deletedAt: true, createdAt: true, expiresAt: true }
             }
         }
     });
@@ -134,7 +134,11 @@ export async function listReminders(actor: ChatActor): Promise<ChatReminderView[
     }
     return rows
         .filter((row) =>
-            history.isReadable(floors.get(row.message.channelId), row.message.createdAt)
+            history.isReadable(
+                floors.get(row.message.channelId),
+                row.message.createdAt,
+                row.message.expiresAt
+            )
         )
         .map((row) => ({
             id: row.id,

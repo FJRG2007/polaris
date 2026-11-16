@@ -57,6 +57,9 @@ const SOURCE_CHARS = 2000;
  * the whole read and every row in the list drew with nothing under its name.
  */
 export async function lastMessages(
+    /** Who is reading: what they deleted for themselves, or cleared, is not
+     *  what the conversation last said to them. */
+    viewerId: string,
     channelIds: readonly string[]
 ): Promise<Map<string, ChatLastMessage>> {
     if (channelIds.length === 0) return new Map();
@@ -70,6 +73,15 @@ export async function lastMessages(
             SELECT "authorId", kind, body, "createdAt", "deliveredAt", "readAt", "deletedAt"
             FROM "ChatMessage"
             WHERE "channelId" = c.id AND "parentId" IS NULL
+              AND ("expiresAt" IS NULL OR "expiresAt" > now())
+              AND NOT EXISTS (
+                  SELECT 1 FROM "ChatMessageHidden" h
+                  WHERE h."messageId" = "ChatMessage".id AND h."userId" = ${viewerId}::uuid
+              )
+              AND "createdAt" >= COALESCE((
+                  SELECT cm."clearedAt" FROM "ChatChannelMember" cm
+                  WHERE cm."channelId" = c.id AND cm."userId" = ${viewerId}::uuid
+              ), '-infinity'::timestamp)
             ORDER BY "createdAt" DESC
             LIMIT 1
         ) m`;

@@ -16,7 +16,7 @@ const { lastMessages } = await import("@/lib/chat/last-messages");
 
 describe("the last-message statement", () => {
     it("casts every number it binds", async () => {
-        await lastMessages(["c1"]);
+        await lastMessages("u1", ["c1"]);
         const [strings, ...values] = queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
         const numbers = values.flatMap((value, at) => (typeof value === "number" ? [at] : []));
         expect(numbers.length).toBeGreaterThan(0);
@@ -25,7 +25,7 @@ describe("the last-message statement", () => {
 
     it("binds the conversations as a uuid array", async () => {
         queryRaw.mockClear();
-        await lastMessages(["c1", "c2"]);
+        await lastMessages("u1", ["c1", "c2"]);
         const [strings, ...values] = queryRaw.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
         const at = values.findIndex(Array.isArray);
         expect(values[at]).toEqual(["c1", "c2"]);

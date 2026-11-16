@@ -58,6 +58,7 @@ import { ageClearedWhere, requireAgeCleared } from "./age-gate";
 import { MAX_REREAD } from "./reread-limit";
 import * as history from "./history-visibility";
 import { webhookFace } from "./webhook-face";
+import { expiryForChannel } from "./vanish";
 import { concealedFor, requireUnlocked, unhideOnMessage } from "./chat-lock";
 
 /** One message, with everything the list needs to draw it. */
@@ -97,6 +98,9 @@ export interface ChatMessageView {
         readonly original?: string;
     };
     readonly deleted: boolean;
+    /** When it disappears (disappearing messages), absent for never. The screen
+     *  takes it out at this moment; the server stops serving it then too. */
+    readonly expiresAt?: string;
     readonly reactions: readonly ChatReactionView[];
     readonly attachments: readonly ChatAttachmentView[];
     /**
@@ -308,7 +312,7 @@ export async function readChannel(
             channelId,
             parentId: null,
             ...(cursor ? { createdAt: { lt: cursor.createdAt } } : {}),
-            AND: [history.sinceClause(floor)]
+            AND: [history.sinceClause(floor, actor.id)]
         },
         orderBy: { createdAt: "desc" },
         take: PAGE + 1,
@@ -355,7 +359,7 @@ export async function readThread(
         if (!head || !history.isReadable(floor, head.createdAt)) return [];
     }
     const rows = await prisma.chatMessage.findMany({
-        where: { OR: [{ id: rootId }, { parentId: rootId }], AND: [history.sinceClause(floor)] },
+        where: { OR: [{ id: rootId }, { parentId: rootId }], AND: [history.sinceClause(floor, actor.id)] },
         orderBy: { createdAt: "asc" },
         select: MESSAGE_SELECT
     });
@@ -396,7 +400,7 @@ export async function readSince(
             channelId,
             parentId: null,
             ...(cursor ? { createdAt: { gt: cursor.createdAt } } : {}),
-            AND: [history.sinceClause(floor)]
+            AND: [history.sinceClause(floor, actor.id)]
         },
         orderBy: { createdAt: "asc" },
         take: PAGE + 1,
@@ -436,7 +440,7 @@ export async function readChanged(
             channelId,
             parentId: null,
             id: { in: ids },
-            AND: [history.sinceClause(await history.readableSince(actor, channelId))]
+            AND: [history.sinceClause(await history.readableSince(actor, channelId), actor.id)]
         },
         orderBy: { createdAt: "asc" },
         select: MESSAGE_SELECT
@@ -545,11 +549,15 @@ export async function send(
         }
     }
 
+    // Stamped once, from the timer in force now: changing it later never moves
+    // a message already sent.
+    const expiresAt = await expiryForChannel(input.channelId, new Date());
     const id = await prisma.$transaction(async (tx) => {
         const message = await tx.chatMessage.create({
             data: {
                 channelId: input.channelId,
                 authorId: actor.id,
+                ...(expiresAt ? { expiresAt } : {}),
                 kind: poll ? "poll" : "text",
                 body: input.body,
                 parentId: input.parentId ?? null,
@@ -1927,6 +1935,7 @@ export const MESSAGE_SELECT = {
     lastReplyAt: true,
     editedAt: true,
     deletedAt: true,
+    expiresAt: true,
     createdAt: true,
     webhookId: true,
     authorLabel: true,
@@ -1948,6 +1957,9 @@ interface Row {
     lastReplyAt: Date | null;
     editedAt: Date | null;
     deletedAt: Date | null;
+    /** When it disappears. Optional so a read that selected its own columns
+     *  still decorates. */
+    expiresAt?: Date | null;
     createdAt: Date;
     /** Posted through a webhook, and the name it posted under. Optional so a
      *  read that selected its own columns (search) still decorates. */
@@ -2094,7 +2106,8 @@ export async function decorateMessages(
                       authorId: true,
                       body: true,
                       deletedAt: true,
-                      createdAt: true
+                      createdAt: true,
+                      expiresAt: true
                   }
               })
             : Promise.resolve([]),
@@ -2172,7 +2185,7 @@ export async function decorateMessages(
     );
     const quoteHidden = new Set(
         quoted
-            .filter((row) => !history.isReadable(quoteFloors.get(row.channelId), row.createdAt))
+            .filter((row) => !history.isReadable(quoteFloors.get(row.channelId), row.createdAt, row.expiresAt))
             .map((row) => row.id)
     );
     const quotes = new Map(quoted.map((row) => [row.id, row]));
@@ -2277,6 +2290,7 @@ export async function decorateMessages(
             lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
             edited: row.editedAt !== null,
             deleted: row.deletedAt !== null,
+            ...(row.expiresAt ? { expiresAt: row.expiresAt.toISOString() } : {}),
             ...translatedView(row, actor.id),
             reactions: [...(onMessage.get(row.id) ?? new Map())]
                 .map(([, tally]) => ({ emoji: tally.emoji, count: tally.count, mine: tally.mine }))

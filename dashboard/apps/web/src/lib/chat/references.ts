@@ -203,6 +203,7 @@ export async function resolveChatReferences(
                   channelId: true,
                   deletedAt: true,
                   createdAt: true,
+                  expiresAt: true,
                   _count: { select: { attachments: true } }
               }
           })
@@ -214,7 +215,7 @@ export async function resolveChatReferences(
         found.map((row) => row.channelId)
     );
     const messages = found.filter((row) =>
-        history.isReadable(floors.get(row.channelId), row.createdAt)
+        history.isReadable(floors.get(row.channelId), row.createdAt, row.expiresAt)
     );
 
     const reachable = await reachableChannelIds(actor);

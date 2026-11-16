@@ -55,6 +55,7 @@ import { runDesiredStatePass } from "@/lib/deploy/desired-state";
 import { accountsToSync, syncAccount } from "@/lib/mailbox/sync";
 import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepDueReminders } from "@/lib/chat/reminders";
+import { sweepExpiredMessages } from "@/lib/chat/vanish";
 import { sweepConnectionHealth } from "@/lib/connections/health";
 import { pollSpotify } from "@/lib/presence-activity/spotify-poll";
 import { pollLastfm } from "@/lib/presence-activity/lastfm-poll";
@@ -715,6 +716,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // before it fires as well, which is what makes a second pass harmless.
         leaseMs: 5 * MINUTE,
         run: () => sweepDueReminders()
+    },
+    {
+        key: "chat-disappearing",
+        // Every minute: a disappearing message is already never served past its
+        // expiry, so this is what makes it gone from the disk as well. Bounded
+        // per run; what is left is the next minute's.
+        everyMs: MINUTE,
+        leaseMs: 5 * MINUTE,
+        run: async () => ({ removed: await sweepExpiredMessages() })
     },
     {
         key: "task-trackers",
