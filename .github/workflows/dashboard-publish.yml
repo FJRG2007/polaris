@@ -53,6 +53,7 @@ on:
       - "dashboard/package-lock.json"
       - "crates/polaris-hostd/**"
       - "crates/polaris-tunnel/**"
+      - "vendor/smoltcp/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/dashboard-publish.yml"
@@ -236,7 +237,7 @@ jobs:
           out web "$web"
           has '^dashboard/mdns/' && out mdns true || out mdns false
           has '^crates/polaris-hostd/|^Cargo\.(toml|lock)$' && out hostd true || out hostd false
-          has '^crates/polaris-tunnel/|^Cargo\.(toml|lock)$' && out tunnel true || out tunnel false
+          has '^crates/polaris-tunnel/|^vendor/smoltcp/|^Cargo\.(toml|lock)$' && out tunnel true || out tunnel false
           has '^dashboard/docker/updater/' && out updater true || out updater false
           # The guard bundles @polaris/core, so a change there is a change to the guard.
           has '^dashboard/services/edge-guard/|^dashboard/packages/core/|^dashboard/package(-lock)?\.json$' && out guard true || out guard false

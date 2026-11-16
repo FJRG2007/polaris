@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use common::*;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpStream, UdpSocket};
 
 const UP: Duration = Duration::from_secs(10);
@@ -240,6 +241,64 @@ async fn recovers_from_a_10s_blackout() {
 #[tokio::test(flavor = "current_thread")]
 async fn recovers_from_a_60s_blackout() {
     blackout_recovers(60, 22).await;
+}
+
+/// A game-like stream (1.7 KB every 50 ms over a 30 ms link that loses 0.3%)
+/// held through a 30 s outage moves again at once and catches up. Before the
+/// retransmission fix the RTT estimate sat at 10 s after the outage, so each
+/// later loss stalled the stream for 10 s and it never caught up.
+#[tokio::test(flavor = "current_thread")]
+async fn a_held_stream_catches_up_after_a_30s_blackout() {
+    let pair = ready(25).await;
+    let lossy = |blackout| Shape {
+        loss_ppm: 3_000,
+        delay: Duration::from_millis(30),
+        jitter: Duration::from_millis(5),
+        blackout,
+    };
+    pair.link.shape(lossy(false));
+    let stream = TcpStream::connect(pair.web()).await.unwrap();
+    stream.set_nodelay(true).unwrap();
+    let (mut r, mut w) = stream.into_split();
+    let chunks = 1_000usize;
+    let writer = tokio::spawn(async move {
+        let mut tick = tokio::time::interval(Duration::from_millis(50));
+        for _ in 0..chunks {
+            tick.tick().await;
+            w.write_all(&[7u8; 1700]).await.unwrap();
+        }
+        w
+    });
+    let reader = tokio::spawn(async move {
+        let mut buf = vec![0u8; 1700];
+        let mut arrived = Vec::with_capacity(chunks);
+        for _ in 0..chunks {
+            r.read_exact(&mut buf).await.unwrap();
+            arrived.push(Instant::now());
+        }
+        arrived
+    });
+    tokio::time::sleep(Duration::from_secs(10)).await;
+    pair.link.shape(lossy(true));
+    tokio::time::sleep(Duration::from_secs(30)).await;
+    pair.link.shape(lossy(false));
+    let back = Instant::now();
+    let arrived = tokio::time::timeout(Duration::from_secs(30), reader)
+        .await
+        .expect("the stream never caught up")
+        .unwrap();
+    let _ = writer.await.unwrap();
+    let after: Vec<Instant> = arrived.into_iter().filter(|t| *t > back).collect();
+    let first = after[0] - back;
+    let worst = after.windows(2).map(|p| p[1] - p[0]).max().unwrap();
+    assert!(
+        first < Duration::from_secs(3),
+        "first data {first:?} after the link returned"
+    );
+    assert!(
+        worst < Duration::from_millis(1500),
+        "a {worst:?} stall after the link returned"
+    );
 }
 
 /// Outages past WireGuard's own clocks: REKEY_ATTEMPT_TIME (90 s), the stale

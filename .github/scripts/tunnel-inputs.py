@@ -10,7 +10,7 @@ to a build of different sources; ci.yml refuses a pull request that changes the
 sources without raising the version.
 
 The inputs are the crate's manifest, its `src` tree and Dockerfile, the
-workspace manifest (profile and shared dependencies), and the Cargo.lock entries
+patched smoltcp under vendor/, the workspace manifest (profile and shared dependencies), and the Cargo.lock entries
 the crate reaches. Its tests are left out: they never reach the binary. A
 Cargo.lock change for another crate is left out too. Cargo.lock does not tell
 dev-dependencies apart, so a change to one of those counts as a change.
@@ -29,7 +29,8 @@ PATHS = [
     "Cargo.toml",
     "crates/polaris-tunnel/Cargo.toml",
     "crates/polaris-tunnel/Dockerfile",
-    "crates/polaris-tunnel/src"
+    "crates/polaris-tunnel/src",
+    "vendor/smoltcp"
 ]
 
 def git(*args: str) -> bytes:

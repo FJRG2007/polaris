@@ -21,6 +21,7 @@ on:
     branches-ignore: [main]
     paths:
       - "crates/**"
+      - "vendor/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
@@ -29,6 +30,7 @@ on:
   pull_request:
     paths:
       - "crates/**"
+      - "vendor/**"
       - "Cargo.toml"
       - "Cargo.lock"
       - "rust-toolchain.toml"
