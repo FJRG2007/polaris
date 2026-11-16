@@ -47,6 +47,8 @@ import {
 export interface ModelSelectorProvider {
     provider: string;
     name: string;
+    /** A line shown under the provider's name. */
+    note?: string;
     payers: Payer[];
     models: Array<{
         provider: string;
@@ -384,6 +386,8 @@ export function ModelSelector({
                         </DropdownMenuLabel>
                         {entry.provider === ZEN_FREE_SLUG ? (
                             <p className="text-muted-foreground px-2 pb-1 text-xs">{t("picker.zenFreeNote")}</p>
+                        ) : entry.note ? (
+                            <p className="text-muted-foreground px-2 pb-1 text-xs">{entry.note}</p>
                         ) : null}
                         {entry.models.map((option) => (
                             <DropdownMenuItem

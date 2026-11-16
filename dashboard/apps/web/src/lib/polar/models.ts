@@ -80,6 +80,8 @@ import {
 } from "@/lib/polar/access";
 import { polarLimitReached } from "@/lib/polar/usage";
 import { TRIED_MOST, type FailureKind } from "@/lib/polar/provider-failure";
+import { CLAUDE_SUBSCRIPTION_PROVIDER, subscriptionRunnerFor } from "@/lib/polar/claude-subscription/turns";
+import { subscriptionLanguageModel } from "@/lib/polar/claude-subscription/model";
 
 /** How long one call to a person's own model endpoint may run, a streamed answer
  *  included: the guarded fetch bounds the whole exchange. */
@@ -144,7 +146,65 @@ export interface PolarProviderOption {
     name: string;
     payers: Payer[];
     models: PolarModelOption[];
+    /** A line the picker shows under the provider's name. */
+    note?: string;
 }
+
+/** The models Claude Code takes by alias on a subscription (Claude Code's
+ *  model configuration), and the standard Claude context window. */
+const SUBSCRIPTION_MODELS: readonly { model: string; name: string }[] = [
+    { model: "opus", name: "Claude Opus" },
+    { model: "sonnet", name: "Claude Sonnet" },
+    { model: "haiku", name: "Claude Haiku" }
+];
+const SUBSCRIPTION_CONTEXT_TOKENS = 200_000;
+
+/** The subscription as a provider in the picker. `name` and `note` are the
+ *  reader's words, when the caller has them. Pure. */
+export function subscriptionProvider(name = "Claude", note?: string): PolarProviderOption {
+    return {
+        provider: CLAUDE_SUBSCRIPTION_PROVIDER,
+        name,
+        payers: ["own"],
+        models: SUBSCRIPTION_MODELS.map((entry) => ({
+            provider: CLAUDE_SUBSCRIPTION_PROVIDER,
+            providerName: "Claude",
+            model: entry.model,
+            name: entry.name,
+            reasoning: true,
+            attachment: false,
+            contextTokens: SUBSCRIPTION_CONTEXT_TOKENS,
+            providerContextTokens: null,
+            costInput: null,
+            costOutput: null,
+            inputs: [],
+            releaseDate: null
+        })),
+        ...(note ? { note } : {})
+    };
+}
+
+/** `options` and, while one of the person's computers can run it, Claude on
+ *  their own subscription. Never offered to Automatic: it is the person's own
+ *  plan, picked by hand or named in their fallbacks. */
+export async function withSubscription(
+    userId: string,
+    options: PolarProviderOption[],
+    words?: { name: string; note: string }
+): Promise<PolarProviderOption[]> {
+    const runner = await subscriptionRunnerFor(userId).catch(() => null);
+    return runner ? [...options, subscriptionProvider(words?.name, words?.note)] : options;
+}
+
+/** The stand-in credential the subscription is planned on: nothing is spent
+ *  from any key, the person's computer answers. */
+const SUBSCRIPTION_CREDENTIAL: ChatCredential = {
+    provider: CLAUDE_SUBSCRIPTION_PROVIDER,
+    source: "own",
+    secret: "",
+    baseUrl: null,
+    gatewayModel: null
+};
 
 /**
  * The providers and models this person can use now: only providers with a
@@ -487,13 +547,19 @@ export async function resolvePolarModel(
     if (choice.kind !== "language") return "unsupported_kind";
     const granted = access ?? (await polarAccessFor(userId));
     if (isAutomatic(choice)) return resolveAutomatic(userId, signals, granted, options);
-    const catalogue = await polarModelOptions(userId, granted);
+    const listed = await polarModelOptions(userId, granted);
+    // The subscription is planned like any model, as the first step or a
+    // fallback, only while a computer that runs it is online.
+    const catalogue = await withSubscription(userId, listed);
     const provider = catalogue.find((entry) => entry.provider === choice.provider);
     if (!provider) return "no_key";
     if (choice.payer && !provider.payers.includes(choice.payer)) return "no_key";
     const option = provider.models.find((model) => model.model === choice.model);
     if (!option) return "unknown_model";
-    const held = await polarCredentialsFor(userId, choice.provider, choice.payer, granted);
+    const held =
+        choice.provider === CLAUDE_SUBSCRIPTION_PROVIDER
+            ? [SUBSCRIPTION_CREDENTIAL]
+            : await polarCredentialsFor(userId, choice.provider, choice.payer, granted);
     const credentials = options.keyId ? held.filter((key) => key.keyId === options.keyId) : held;
     if (credentials.length === 0) return "no_key";
     const routing = await polarRouting(userId);
@@ -546,6 +612,7 @@ export interface ResolveOptions {
 function credentialCache(userId: string, access: PolarAccess) {
     const read = new Map<string, Promise<ChatCredential[]>>();
     return (provider: string): Promise<ChatCredential[]> => {
+        if (provider === CLAUDE_SUBSCRIPTION_PROVIDER) return Promise.resolve([SUBSCRIPTION_CREDENTIAL]);
         if (!read.has(provider)) {
             read.set(provider, polarCredentialsFor(userId, provider, null, access));
         }
@@ -567,7 +634,9 @@ function entryOf(
         credentials,
         reasoning,
         build: (credential) =>
-            languageModel(
+            option.provider === CLAUDE_SUBSCRIPTION_PROVIDER
+                ? subscriptionLanguageModel(userId, option.model)
+                : languageModel(
                 credential,
                 option.model,
                 freeVariantOf(option.provider, option.model, models),

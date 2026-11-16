@@ -142,6 +142,7 @@ import {
     FAILURE_PART,
     classifyProviderFailure,
     decodePolarFailure,
+    decodeSubscriptionFailure,
     encodePolarFailure,
     failureLogLine,
     withoutFailures,
@@ -155,6 +156,8 @@ import {
     withScreenNotes,
     type ModelChoice
 } from "@/lib/polar/shared";
+
+import { subscriptionFailureOf } from "@/lib/polar/claude-subscription/model";
 
 export const dynamic = "force-dynamic";
 
@@ -233,7 +236,7 @@ function failureIntoAnswer(): TransformStream<UIMessageChunk, UIMessageChunk> {
     return new TransformStream({
         transform(chunk, controller) {
             if (chunk.type === "error") {
-                const failure = decodePolarFailure(chunk.errorText);
+                const failure = decodePolarFailure(chunk.errorText) ?? decodeSubscriptionFailure(chunk.errorText);
                 if (failure) controller.enqueue({ type: FAILURE_PART, data: failure });
             }
             controller.enqueue(chunk);
@@ -795,6 +798,10 @@ export async function POST(request: Request): Promise<Response> {
                 console.warn("polar: a tool call failed", error);
                 return toolFailureText(error);
             }
+            // The person's own Claude subscription said why, in its own words
+            // (`claude-subscription/model.ts`); no provider is held to it.
+            const subscription = subscriptionFailureOf(error);
+            if (subscription) return JSON.stringify({ code: "subscription", reason: subscription });
             // Named for what happened: the model that last answered, else the
             // last one refused, with every refusal listed when the turn asked
             // more than one. Automatic tries that provider last for a few

@@ -83,7 +83,11 @@ vi.mock("ai", () => ({
         return { audio: { uint8Array: new Uint8Array([1, 2, 3]), mediaType: "audio/mpeg" } };
     }
 }));
-vi.mock("@/lib/polar/models", () => ({ polarModelOptions: async () => [] }));
+vi.mock("@/lib/polar/models", () => ({
+    polarModelOptions: async () => [],
+    withSubscription: async (_userId: string, listed: unknown[]) => listed
+}));
+vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
 vi.mock("@/lib/polar/tools", () => ({ polarTools: async () => ({ described: {} }) }));
 vi.mock("@/lib/polar/connectors/tools", () => ({
     polarConnectorTools: async () => ({ tools: {}, approval: {}, described: {} })

@@ -322,6 +322,29 @@ export const polarFailureSchema = z.object({
 });
 export type PolarFailure = z.infer<typeof polarFailureSchema>;
 
+/** Why a turn on the person's own Claude subscription did not answer: the
+ *  runner's machine words (`chat.event` errors), and `offline` for no
+ *  computer to run it on. Each is a `polar.claudeSubscription` sentence. */
+export const SUBSCRIPTION_FAILURES = ["signed-out", "rate-limited", "not-installed", "failed", "offline"] as const;
+export type SubscriptionFailure = (typeof SUBSCRIPTION_FAILURES)[number];
+
+export const subscriptionFailureSchema = z.object({
+    code: z.literal("subscription"),
+    reason: z.enum(SUBSCRIPTION_FAILURES)
+});
+export type SubscriptionFailureRecord = z.infer<typeof subscriptionFailureSchema>;
+
+/** A subscription failure a stream reported, or null for anything else. */
+export function decodeSubscriptionFailure(text: string | undefined): SubscriptionFailureRecord | null {
+    if (!text) return null;
+    try {
+        const parsed = subscriptionFailureSchema.safeParse(JSON.parse(text));
+        return parsed.success ? parsed.data : null;
+    } catch {
+        return null;
+    }
+}
+
 export function encodePolarFailure(failure: PolarFailure): string {
     return JSON.stringify(failure);
 }
@@ -374,7 +397,8 @@ export const storedFailureSchema = z.discriminatedUnion("code", [
         period: z.enum(["day", "week", "month"])
     }),
     z.object({ code: z.literal("file_unreadable"), name: z.string().max(255) }),
-    z.object({ code: z.literal("too_many_runs"), max: z.number().int().min(1).max(100) })
+    z.object({ code: z.literal("too_many_runs"), max: z.number().int().min(1).max(100) }),
+    subscriptionFailureSchema
 ]);
 export type StoredFailure = z.infer<typeof storedFailureSchema>;
 

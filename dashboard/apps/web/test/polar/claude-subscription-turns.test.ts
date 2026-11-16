@@ -9,6 +9,7 @@ vi.mock("@/lib/computers/computer-commands", () => ({
 }));
 const findMany = vi.fn();
 vi.mock("@polaris/db", () => ({ prisma: { agentRunner: { findMany: (...args: unknown[]) => findMany(...args) } } }));
+vi.mock("@/lib/computers/computer-bus", () => ({ onRunnerLive: vi.fn(), publishRunnerLive: vi.fn(async () => undefined) }));
 
 const { deliverChatEvent, runSubscriptionTurn, subscriptionRunnerFor } = await import("@/lib/polar/claude-subscription/turns");
 

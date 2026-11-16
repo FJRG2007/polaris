@@ -9,7 +9,8 @@ import { NextResponse } from "next/server";
 import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
 import { polarConnectorTools } from "@/lib/polar/connectors/tools";
-import { polarModelOptions } from "@/lib/polar/models";
+import { polarModelOptions, withSubscription } from "@/lib/polar/models";
+import { getTranslations } from "@/lib/i18n/request";
 import { polarVoiceAvailability } from "@/lib/polar/voice";
 
 export const dynamic = "force-dynamic";
@@ -18,8 +19,14 @@ export async function GET(): Promise<Response> {
     const user = await polarCaller();
     if (user instanceof NextResponse) return user;
     const access = await polarAccessFor(user.id);
+    const t = await getTranslations("polar");
     const [providers, toolset, connectorSet, voice] = await Promise.all([
-        polarModelOptions(user.id, access, { waitForWindows: true }),
+        polarModelOptions(user.id, access, { waitForWindows: true }).then((listed) =>
+            withSubscription(user.id, listed, {
+                name: t("claudeSubscription.label"),
+                note: t("claudeSubscription.note")
+            })
+        ),
         polarTools(user),
         polarConnectorTools(user, access),
         polarVoiceAvailability(user.id, access)

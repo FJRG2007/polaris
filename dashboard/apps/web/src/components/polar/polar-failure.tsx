@@ -85,6 +85,10 @@ export function PolarFailureNotice({
                 ? t("errors.tooManyRuns", { max: stored.max })
                 : stored?.code === "running"
                   ? t("errors.running")
+                  : stored?.code === "subscription"
+                    ? stored.reason === "offline"
+                        ? t("claudeSubscription.needsComputer")
+                        : t(`claudeSubscription.errors.${stored.reason}`)
                   : failure?.tried && failure.tried.length > 1
                     ? t("errors.provider.allTried", { count: failure.tried.length })
                     : failure
