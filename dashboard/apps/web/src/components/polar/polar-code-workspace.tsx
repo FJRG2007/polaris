@@ -522,7 +522,7 @@ function PreviewPane({
                 <div
                     role="group"
                     aria-label={t("code.preview.ports")}
-                    className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
+                    className="flex min-w-0 flex-1 basis-full items-center gap-1 overflow-x-auto sm:basis-0"
                 >
                     {open.map((one) => (
                         <ui.Button

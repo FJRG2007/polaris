@@ -639,9 +639,13 @@ function DiffPane({
                         variant={review.on ? "secondary" : "ghost"}
                         onClick={review.toggle}
                         aria-pressed={review.on}
+                        title={review.on ? t("session.review.stop") : t("session.review.start")}
+                        aria-label={review.on ? t("session.review.stop") : t("session.review.start")}
                     >
                         <MessageSquare className="size-4 shrink-0" />
-                        {review.on ? t("session.review.stop") : t("session.review.start")}
+                        <span className="hidden sm:inline">
+                            {review.on ? t("session.review.stop") : t("session.review.start")}
+                        </span>
                     </Button>
                 ) : null}
             </div>
