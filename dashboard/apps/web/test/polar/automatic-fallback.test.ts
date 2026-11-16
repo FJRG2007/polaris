@@ -344,14 +344,14 @@ describe("a turn falling back", () => {
 });
 
 describe("the person's OpenRouter key, whatever else they hold", () => {
-    it("is planned even past the three other providers Automatic keeps", async () => {
+    it("is planned beside every other provider the person holds", async () => {
         const resolved = await models.resolvePolarModel("fb-6", automaticChoice("fast"), PLAIN_TURN);
         if (typeof resolved === "string") throw new Error(resolved);
         const providers = (resolved.routed?.steps ?? []).map((entry) => entry.provider);
         expect(providers).toContain("openrouter");
-        // Four others were held; three of them are kept.
+        // Four others were held; every one of them is planned, not only three.
         const others = new Set(providers.filter((name) => !["groq", "openrouter"].includes(name)));
-        expect(others.size).toBe(3);
+        expect(others.size).toBe(4);
     });
 
     it("answers when every other provider refuses, with the same tools", async () => {
@@ -369,6 +369,22 @@ describe("the person's OpenRouter key, whatever else they hold", () => {
         expect(answer.text).toBe("openrouter answered");
         expect(calls.log.at(-1)?.tools).toEqual(["set_power"]);
         expect(models.answeredBy(resolved).option.provider).toBe("openrouter");
+    });
+
+    it("names the model that refused last and lists every one when none answers", async () => {
+        for (const name of ["groq", "mistral", "xai", "deepseek", "cerebras", "moonshot", "openrouter"]) {
+            calls.refuse.set(name, name === "mistral" ? MISTRAL_CREDIT : GROQ_RATE);
+        }
+        const resolved = await models.resolvePolarModel("fb-8", automaticChoice("fast"), PLAIN_TURN);
+        if (typeof resolved === "string") throw new Error(resolved);
+        await expect(
+            generateText({ model: resolved.model, prompt: "Turn the lamp off", maxRetries: 0 })
+        ).rejects.toBeTruthy();
+        const failed = models.failedTurn(resolved);
+        const refusals = resolved.routed!.refusals();
+        expect(failed.option).toBe(refusals.at(-1)!.step.option);
+        expect(failed.tried.length).toBeGreaterThan(1);
+        expect(new Set(failed.tried.map((entry) => entry.provider)).size).toBeGreaterThan(1);
     });
 });
 

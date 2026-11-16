@@ -180,7 +180,20 @@
             "openKey": "Open the key",
             "ownKey": "Check your key",
             "tryWith": "Try with {model}",
-            "retry": "Try again"
+            "retry": "Try again",
+            "allTried": "None of the {count} models Polar tried could answer. Try again in a few minutes, or check your keys.",
+            "triedList": "What each one said",
+            "triedEntry": "{provider} - {model}: {reason}",
+            "reasons": {
+                "key": "refused the key",
+                "credit": "out of credit",
+                "paid": "no credit for a paid model",
+                "rate": "rate limited this key",
+                "busy": "busy for everyone",
+                "down": "not answering",
+                "model": "does not offer this model",
+                "other": "could not answer"
+            }
         },
         "branchFailed": "Could not branch this chat. Try again in a moment.",
         "usageLimit": "You have used {used} of the {amount} tokens this Polaris allows you on its shared key per {period}. Add your own key, or ask an administrator to raise the limit.",

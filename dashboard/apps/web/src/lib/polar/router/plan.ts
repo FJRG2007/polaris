@@ -26,6 +26,42 @@ import { isFreeModel, polarOutputTokens, type LanguageModelV4 } from "@/lib/pola
 /** Most steps one call may walk. */
 export const STEPS_MOST = 16;
 
+/**
+ * At most `most` of `steps`, in their order, keeping a place for every key:
+ * a key's first step is always kept, and a further step of a key already
+ * planned only while the keys still to come keep their place. A long list of
+ * one provider's models can then never push the person's other providers out
+ * of the plan. Pure.
+ */
+export function breadthFirst<T extends Pick<RouteStep, "provider" | "keyId">>(
+    steps: readonly T[],
+    most = STEPS_MOST
+): T[] {
+    if (steps.length <= most) return [...steps];
+    const keyOf = (step: T) => step.keyId ?? `${step.provider}#`;
+    const firsts = new Set<number>();
+    const seenKeys = new Set<string>();
+    for (const [index, step] of steps.entries()) {
+        const key = keyOf(step);
+        if (seenKeys.has(key)) continue;
+        seenKeys.add(key);
+        firsts.add(index);
+    }
+    let firstsLeft = Math.min(firsts.size, most);
+    const kept: T[] = [];
+    for (const [index, step] of steps.entries()) {
+        if (kept.length >= most) break;
+        if (firsts.has(index)) {
+            if (firstsLeft === 0) continue;
+            kept.push(step);
+            firstsLeft--;
+        } else if (kept.length + firstsLeft < most) {
+            kept.push(step);
+        }
+    }
+    return kept;
+}
+
 /** One step with what it was built from, so the caller can name who answered. */
 export interface PlannedStep extends RouteStep {
     option: PolarModelOption;
@@ -81,7 +117,6 @@ export async function planSteps(
     const seen = new Set<string>();
     for (const [position, entry] of entries.entries()) {
         for (const credential of entry.credentials) {
-            if (steps.length >= STEPS_MOST) return steps;
             const id = `${credential.keyId ?? credential.provider}/${entry.option.model}`;
             if (seen.has(id)) continue;
             if (credential.keyId && spent.has(credential.keyId)) continue;
@@ -98,7 +133,7 @@ export async function planSteps(
     if (steps.length === 0 && lead?.credentials[0]) {
         steps.push({ ...plannedStep(lead, lead.credentials[0]), spent: true });
     }
-    return steps;
+    return breadthFirst(steps);
 }
 
 /** The routed model for a plan, and how to ask who answered. */
@@ -109,6 +144,8 @@ export interface RoutedModel {
     answered: () => PlannedStep | null;
     /** The refusal that moved the call off the first step, when one did. */
     firstRefusal: () => FailureKind | null;
+    /** Every refusal of the turn so far, in order, with the step it came from. */
+    refusals: () => ReadonlyArray<{ step: PlannedStep; kind: FailureKind }>;
 }
 
 export function routedModel(
@@ -118,6 +155,7 @@ export function routedModel(
 ): RoutedModel {
     let answeredAt: number | null = null;
     let refusal: FailureKind | null = null;
+    const trail: Array<{ step: PlannedStep; kind: FailureKind }> = [];
     const head = steps[0]!;
     // Wrapped even for one step: the router is also what cools a refused key
     // down, holds a key to its own allowance and notes the one that answered.
@@ -131,6 +169,7 @@ export function routedModel(
             },
             onRefused: (kind, index) => {
                 refusal ??= kind;
+                if (trail.length < STEPS_MOST * 2) trail.push({ step: steps[index]!, kind });
                 onRefused?.(kind, steps[index]!);
             }
         })
@@ -139,6 +178,7 @@ export function routedModel(
         model,
         steps,
         answered: () => (answeredAt === null ? null : steps[answeredAt]!),
-        firstRefusal: () => refusal
+        firstRefusal: () => refusal,
+        refusals: () => trail
     };
 }

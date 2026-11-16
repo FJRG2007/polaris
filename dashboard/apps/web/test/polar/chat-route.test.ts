@@ -230,6 +230,11 @@ vi.mock("@/lib/polar/models", () => ({
     // The stand-in is covered on its own (`stand-in.test.ts`): here every
     // call is answered by the model chosen.
     answeredBy: <T>(resolved: T) => resolved,
+    failedTurn: (resolved: { option: unknown; credential: unknown }) => ({
+        option: resolved.option,
+        credential: resolved.credential,
+        tried: []
+    }),
     withStandIn: <T>(resolved: T) => resolved,
     followedBy: <T>(_user: string, resolved: T) => resolved,
     sameModelElsewhere: async () => null,

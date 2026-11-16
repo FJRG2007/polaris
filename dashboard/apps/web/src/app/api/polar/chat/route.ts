@@ -119,6 +119,7 @@ import {
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
 import {
     answeredBy,
+    failedTurn,
     followedBy,
     polarModelOptions,
     reasoningFor,
@@ -136,6 +137,7 @@ import { goalCheckStream } from "@/lib/polar/goal-service";
 import { polarGoal, savePolarGoal, setPolarGoal } from "@/lib/polar/goal-store";
 import { noticePolarRunEnd } from "@/lib/polar/run-notices";
 import { polarOutputTokens } from "@/lib/polar/credit";
+import { withoutEarlierReasoning } from "@/lib/polar/reasoning-replay";
 import {
     FAILURE_PART,
     classifyProviderFailure,
@@ -658,9 +660,11 @@ export async function POST(request: Request): Promise<Response> {
 
     // The answer runs on its own, not on this request: leaving the chat leaves
     // it answering, and only its stop (`chat/[id]/stream`) ends it.
-    const modelMessages = await convertToModelMessages(withScreenNotes(withoutFailures(sendable)), {
-        tools: subagentTasks.taskToolStandIn()
-    });
+    // An earlier answer's reasoning is never sent back (`reasoning-replay.ts`).
+    const modelMessages = await convertToModelMessages(
+        withScreenNotes(withoutEarlierReasoning(withoutFailures(sendable))),
+        { tools: subagentTasks.taskToolStandIn() }
+    );
     const run = beginPolarRun(
         user.id,
         body.data.threadId,
@@ -791,10 +795,11 @@ export async function POST(request: Request): Promise<Response> {
                 console.warn("polar: a tool call failed", error);
                 return toolFailureText(error);
             }
-            // The model that last answered refused: a stand-in's own refusal
-            // names the stand-in. Automatic tries that provider last for a few
+            // Named for what happened: the model that last answered, else the
+            // last one refused, with every refusal listed when the turn asked
+            // more than one. Automatic tries that provider last for a few
             // minutes, and one out of credit only for its free models.
-            const { option, credential } = answeredBy(resolved);
+            const { option, credential, tried } = failedTurn(resolved);
             const failure = classifyProviderFailure(error);
             rememberRefusal(user.id, option.provider, failure.kind);
             console.warn(failureLogLine("a turn", option.providerName, failure));
@@ -803,7 +808,8 @@ export async function POST(request: Request): Promise<Response> {
                 kind: failure.kind,
                 provider: option.providerName,
                 slug: option.provider,
-                payer: credential.source
+                payer: credential.source,
+                ...(tried.length > 0 ? { tried } : {})
             });
         }
     });

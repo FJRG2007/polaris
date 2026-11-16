@@ -85,9 +85,11 @@ export function PolarFailureNotice({
                 ? t("errors.tooManyRuns", { max: stored.max })
                 : stored?.code === "running"
                   ? t("errors.running")
-                  : failure
-                    ? t(`errors.provider.${failure.kind}`, { provider: failure.provider })
-                    : t("errors.failed");
+                  : failure?.tried && failure.tried.length > 1
+                    ? t("errors.provider.allTried", { count: failure.tried.length })
+                    : failure
+                      ? t(`errors.provider.${failure.kind}`, { provider: failure.provider })
+                      : t("errors.failed");
     // A limit or a file is not fixed by asking again.
     const retry =
         stored?.code === "usage_limit" || stored?.code === "file_unreadable" ? undefined : onRetry;
@@ -98,6 +100,24 @@ export function PolarFailureNotice({
             className="flex flex-col gap-2 rounded-md border border-danger-edge bg-danger-soft p-2 text-sm text-danger-ink"
         >
             <p>{sentence}</p>
+            {failure?.tried && failure.tried.length > 1 ? (
+                <details className="min-w-0">
+                    <summary className="cursor-pointer font-medium">
+                        {t("errors.provider.triedList")}
+                    </summary>
+                    <ul className="mt-1 flex flex-col gap-0.5">
+                        {failure.tried.map((entry, index) => (
+                            <li key={index} className="min-w-0 break-words">
+                                {t("errors.provider.triedEntry", {
+                                    provider: entry.provider,
+                                    model: entry.model,
+                                    reason: t(`errors.provider.reasons.${entry.kind}`)
+                                })}
+                            </li>
+                        ))}
+                    </ul>
+                </details>
+            ) : null}
             {failure && keyProblem && failure.payer === "instance" && !isAdmin ? (
                 <p>{t("errors.provider.askAdmin", { provider: failure.provider })}</p>
             ) : null}

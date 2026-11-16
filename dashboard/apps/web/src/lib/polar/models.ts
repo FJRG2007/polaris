@@ -26,6 +26,7 @@ import { catalogEndpoint, catalogProvider } from "@/lib/integrations/provider-ca
 import { polarRouting } from "@/lib/polar/router/store";
 import {
     STEPS_MOST,
+    breadthFirst,
     planSteps,
     plannedStep,
     routedModel,
@@ -68,7 +69,7 @@ import {
     type PolarAccess
 } from "@/lib/polar/access";
 import { polarLimitReached } from "@/lib/polar/usage";
-import type { FailureKind } from "@/lib/polar/provider-failure";
+import { TRIED_MOST, type FailureKind } from "@/lib/polar/provider-failure";
 
 /** How long one call to a person's own model endpoint may run, a streamed answer
  *  included: the guarded fetch bounds the whole exchange. */
@@ -353,14 +354,15 @@ export function followedBy(
     others: readonly ResolvedModel[]
 ): ResolvedModel {
     if (others.length === 0) return resolved;
-    const steps: PlannedStep[] = [];
+    const all: PlannedStep[] = [];
     const seen = new Set<string>();
     for (const step of [resolved, ...others].flatMap(stepsOf)) {
         const id = `${step.keyId ?? step.provider}/${step.modelId}`;
-        if (seen.has(id) || steps.length >= STEPS_MOST) continue;
+        if (seen.has(id)) continue;
         seen.add(id);
-        steps.push(step);
+        all.push(step);
     }
+    const steps = breadthFirst(all, STEPS_MOST);
     return {
         ...resolvedOf(steps, (kind, provider) => rememberRefusal(userId, provider, kind), true),
         automatic: resolved.automatic,
@@ -396,6 +398,39 @@ export function answeredBy(
     resolved: Pick<ResolvedModel, "option" | "credential" | "standIns">
 ): Pick<ResolvedModel, "option" | "credential"> {
     return (resolved.standIns ?? []).find((entry) => entry.used()) ?? resolved;
+}
+
+/** One model a turn asked and why it did not answer, as a failure lists it. */
+export interface TriedModel {
+    provider: string;
+    model: string;
+    kind: FailureKind;
+}
+
+/**
+ * Who a failed turn names, and what it tried. The step that answered last
+ * when one did (its stream broke later); otherwise the last one refused,
+ * never the chosen model by default - a turn that walked seven steps and
+ * ended on Cerebras's refusal must not say Mistral refused. `tried` lists
+ * every refusal when more than one model was asked, so the reader sees the
+ * whole walk; empty otherwise. Pure.
+ */
+export function failedTurn(
+    resolved: Pick<ResolvedModel, "option" | "credential" | "standIns" | "routed">
+): { option: PolarModelOption; credential: ChatCredential; tried: TriedModel[] } {
+    const routed = resolved.routed;
+    const refusals = routed?.refusals() ?? [];
+    const named = routed?.answered() ?? refusals.at(-1)?.step ?? resolved;
+    const asked = new Set(refusals.map((entry) => entry.step));
+    const tried =
+        asked.size > 1
+            ? refusals.slice(-TRIED_MOST).map(({ step, kind }) => ({
+                  provider: step.option.providerName,
+                  model: step.option.name,
+                  kind
+              }))
+            : [];
+    return { option: named.option, credential: named.credential, tried };
 }
 
 /** What a refusal of `provider` teaches Automatic for this person's next
@@ -670,17 +705,13 @@ export async function sameModelElsewhere(
     return steps.length > 0 ? resolvedOf(steps, (kind, slug) => rememberRefusal(userId, slug, kind)) : null;
 }
 
-/** Most other providers a turn keeps a stand-in from: each costs a key read.
- *  An aggregator is never counted against it - it serves every other
- *  provider's models, so it is the stand-in most likely to answer. */
-const OTHER_PROVIDERS_MOST = 3;
-
 /**
  * The model Automatic answers a turn with: the first candidate a key is held
  * for, on each of its provider's keys, then - in this order - its own
  * provider's next free candidate (and, for a paid first pick, the next paid
- * one), the person's fallback list, and the first candidate of up to three
- * other providers they may spend on. Another provider's key from this Polaris
+ * one), the person's fallback list, and the first candidate of every other
+ * provider they may spend on - one key read each, the plan bounded by
+ * `STEPS_MOST` with a place kept for every key (`breadthFirst`). Another provider's key from this Polaris
  * is offered only while the administrator's ceilings leave room, as the turn
  * itself would be. A provider that refused for want of credit lately is
  * offered only its free models. "no_key" when no candidate has a key.
@@ -719,16 +750,12 @@ async function resolveAutomatic(
             ...(await fallbackEntries(userId, routing.fallbacks, options, keysOf))
         ];
         const seen = new Set([option.provider]);
-        let others = 0;
         for (const entry of later) {
             if (seen.has(entry.provider)) continue;
-            const aggregator = AGGREGATOR_PROVIDERS.includes(entry.provider);
-            if (!aggregator && others >= OTHER_PROVIDERS_MOST) continue;
             seen.add(entry.provider);
             const keys = await keysOf(entry.provider);
             if (keys.length === 0) continue;
             entries.push(entryOf(userId, entry, keys, options));
-            if (!aggregator) others++;
         }
         const steps = await planSteps(entries, async () => !(await polarLimitReached(userId)));
         return {

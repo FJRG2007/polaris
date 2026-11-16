@@ -36,7 +36,12 @@ import type { KeyLimits } from "@/lib/agents/key-limits";
 import type { LanguageModelV4 } from "@/lib/polar/credit";
 import { admit, type Admission } from "@/lib/polar/router/limits";
 import { readsSentFiles, sendsProviderTool, type StandInTarget } from "@/lib/polar/credit";
-import { classifyProviderFailure, type FailureKind } from "@/lib/polar/provider-failure";
+import {
+    classifyProviderFailure,
+    refusalLogLine,
+    type FailureKind,
+    type ProviderFailure
+} from "@/lib/polar/provider-failure";
 import { coolingOf, noteAnswered, noteRefusal, retryAfterMs } from "@/lib/polar/router/health";
 import { reasoningForRoute, type RouteReasoning, type SdkReasoning } from "@/lib/polar/routing";
 import { effortCallOptions, mergeProviderOptions } from "@/lib/polar/effort";
@@ -359,9 +364,32 @@ export function withoutProviderTools(params: Pick<CallParams, "tools" | "toolCho
     };
 }
 
-/** The call as one step receives it: its effort, and the answer length and
- *  reasoning another provider accepts. */
-function adjust(step: RouteStep, params: CallParams, origin: string): CallParams {
+/**
+ * The prompt without any reasoning part. A model's reasoning is its own: sent
+ * to another model it is at best ignored and at worst refused (OpenRouter's
+ * upstreams answer 400 "property 'reasoning_content' is unsupported"), and an
+ * Anthropic signature is only valid where it was made. Pure.
+ */
+export function withoutReasoning(prompt: CallParams["prompt"]): CallParams["prompt"] {
+    if (!prompt.some((message) => message.role === "assistant" && hasReasoning(message.content))) {
+        return prompt;
+    }
+    return prompt.map((message) =>
+        message.role === "assistant" && hasReasoning(message.content)
+            ? { ...message, content: message.content.filter((part) => part.type !== "reasoning") }
+            : message
+    );
+}
+
+function hasReasoning(content: unknown): boolean {
+    return Array.isArray(content) && content.some((part: { type?: string }) => part.type === "reasoning");
+}
+
+/** The call as one step receives it: its effort, the answer length and
+ *  reasoning another provider accepts, and the turn's earlier reasoning only
+ *  when `ownReasoning` - this step wrote it and may need it back (Anthropic's
+ *  signed thinking, DeepSeek within a tool loop). */
+function adjust(step: RouteStep, params: CallParams, origin: string, ownReasoning = true): CallParams {
     const current = params.reasoning as SdkReasoning | undefined;
     const neutral = step.reasoning
         ? reasoningForRoute(step.routeReasoning, current)
@@ -374,6 +402,7 @@ function adjust(step: RouteStep, params: CallParams, origin: string): CallParams
     );
     let next: CallParams = {
         ...params,
+        prompt: ownReasoning ? params.prompt : withoutReasoning(params.prompt),
         reasoning: effort.reasoning,
         providerOptions: mergeProviderOptions(params.providerOptions, effort.providerOptions as never)
     };
@@ -424,6 +453,18 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
     const origin = steps[0]?.provider ?? "";
     let standing: number | null = null;
     let firstRefusal: FailureKind | null = null;
+    /** The step whose answer the turn's later calls carry, reasoning and all:
+     *  the chosen one until another answers. */
+    let producedBy = 0;
+
+    /** A step refused: remembered, logged with what the provider said, and
+     *  reported, before the next step is tried. */
+    const refused = (index: number, failure: ProviderFailure, error: unknown) => {
+        const step = steps[index]!;
+        void noteRefusal(subjectOf(step), failure.kind, error);
+        console.warn(refusalLogLine(step.provider, step.modelId, failure, error));
+        hooks.onRefused?.(failure.kind, index);
+    };
 
     async function call<T>(
         params: CallParams,
@@ -443,15 +484,13 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
                 // A structured answer is not one a second model can finish.
                 if (params.responseFormat?.type === "json") return null;
                 // A dropped connection leaves the step in, to be asked again.
-                const { kind } = classifyProviderFailure(error);
-                const refused = ROUTABLE.has(kind);
-                if (refused) {
-                    void noteRefusal(subjectOf(steps[index]!), kind, error);
-                    hooks.onRefused?.(kind, index);
-                }
+                const failure = classifyProviderFailure(error);
+                const { kind } = failure;
+                const wasRefused = ROUTABLE.has(kind);
+                if (wasRefused) refused(index, failure, error);
                 standing = null;
                 const next = delivered.text ? continuationParams(params, delivered.text) : params;
-                const answer = await call(next, run, true, { index, kind: refused ? kind : null }, depth + 1);
+                const answer = await call(next, run, true, { index, kind: wasRefused ? kind : null }, depth + 1);
                 return answer as unknown as StreamResult;
             };
         const attempt = async (index: number): Promise<T> => {
@@ -460,7 +499,7 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
             const admission: Admission = admit(step.keyId, step.limits);
             if (!admission.ok) throw new Busy(admission.retryInMs);
             try {
-                const result = await run(step.model(), adjust(step, params, origin));
+                const result = await run(step.model(), adjust(step, params, origin, index === producedBy));
                 const answered = streams
                     ? ((await heldStream(result as StreamResult, admission.release, resumeFrom(index))) as T)
                     : result;
@@ -497,8 +536,7 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
                 const { kind } = failure;
                 if (!routes(failure)) throw error;
                 ruleOut(ruled, steps[held]!, kind);
-                void noteRefusal(subjectOf(steps[held]!), kind, error);
-                hooks.onRefused?.(kind, held);
+                refused(held, failure, error);
                 standing = null;
             }
         }
@@ -543,6 +581,7 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
                 try {
                     const value = await attempt(index);
                     standing = index;
+                    producedBy = index;
                     void noteAnswered(subjectOf(step));
                     hooks.onAnswered?.(index, firstRefusal);
                     return { value };
@@ -575,8 +614,7 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
                     lastError = error;
                     lastKind = kind;
                     ruleOut(ruled, step, kind);
-                    void noteRefusal(subjectOf(step), kind, error);
-                    hooks.onRefused?.(kind, index);
+                    refused(index, failure, error);
                     return null;
                 }
             }
