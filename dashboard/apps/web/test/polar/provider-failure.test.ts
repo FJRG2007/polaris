@@ -16,6 +16,8 @@ import {
     encodePolarFailure,
     failureLogLine,
     keepStoredFailures,
+    refusalLogLine,
+    scrubbedBody,
     messageFailure,
     withoutFailures,
     type PolarFailure
@@ -207,5 +209,52 @@ describe("a failure kept in the conversation", () => {
         expect(keepStoredFailures([words], [words, limit])).toEqual([words, limit]);
         expect(keepStoredFailures([words, limit], [words, limit])).toEqual([words, limit]);
         expect(keepStoredFailures([words], undefined)).toEqual([words]);
+    });
+});
+
+describe("a key that is not set up, a log that keeps no secret, a turn that tried many", () => {
+    it("reads Anthropic's missing workspace header as the key's, so the turn routes on", () => {
+        const body = JSON.stringify({
+            type: "error",
+            error: {
+                type: "invalid_request_error",
+                message:
+                    "This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header."
+            }
+        });
+        expect(classifyProviderFailure(callError(400, body))).toEqual({ kind: "key", status: 400 });
+    });
+
+    it("leaves a malformed request the call's own", () => {
+        const body = JSON.stringify({
+            error: { message: "'messages.2': property 'reasoning_content' is unsupported" }
+        });
+        expect(classifyProviderFailure(callError(400, body)).kind).toBe("other");
+    });
+
+    it("scrubs keys, ids and emails out of a logged body, and keeps it short", () => {
+        const body = JSON.stringify({
+            error: { message: `key gsk_${"x".repeat(30)} of ops@example.com is ${"over ".repeat(80)}` }
+        });
+        const line = refusalLogLine("groq", "llama", { kind: "rate", status: 429 }, callError(429, body));
+        expect(line).toContain("polar: groq/llama refused (429, rate)");
+        expect(line).not.toContain("gsk_");
+        expect(line).not.toContain("example.com");
+        expect(scrubbedBody(callError(429, body)).length).toBeLessThanOrEqual(200);
+    });
+
+    it("carries every model a turn tried through the stream and back", () => {
+        const failure: PolarFailure = {
+            code: "provider",
+            kind: "credit",
+            provider: "Cerebras",
+            slug: "cerebras",
+            payer: "own",
+            tried: [
+                { provider: "Mistral", model: "Mistral Large", kind: "key" },
+                { provider: "Cerebras", model: "GPT OSS 120B", kind: "credit" }
+            ]
+        };
+        expect(decodePolarFailure(encodePolarFailure(failure))).toEqual(failure);
     });
 });

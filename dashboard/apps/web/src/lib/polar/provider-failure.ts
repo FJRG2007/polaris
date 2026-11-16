@@ -136,6 +136,13 @@ const BUSY = /upstream|model[_ ]rate[_ ]limit|overloaded|over capacity|at capaci
  *  not have access to it", Groq's decommissioned models. */
 const MODEL =
     /model[_ ]not[_ ]found|no such model|unknown model|decommissioned|no endpoints found|model\b[^.]{0,80}\b(not found|does not exist|is not supported)/i;
+/** The key is not set up for this call, in the words of a 400 that names no
+ *  reason of its own: Anthropic's `invalid_request_error` "This API key is not
+ *  scoped to a workspace, so this request must include the
+ *  anthropic-workspace-id header", an "invalid API key" sent as a bad request.
+ *  Another key or provider answers what this one cannot. */
+const KEY_SETUP =
+    /not scoped to a workspace|workspace[_ -]id header|\bapi[_ -]?key\b[^.]{0,60}\b(is (not valid|invalid|expired|revoked|disabled)|not (valid|found|scoped))|(invalid|incorrect|expired|revoked) api[_ -]?key/i;
 /** Refused for what the request said, not for who sent it: OpenRouter's
  *  moderation flag and guardrail block are 403s that are not about the key. */
 const CONTENT = /flagged|moderation|guardrail|request blocked/i;
@@ -283,8 +290,12 @@ export function classifyProviderFailure(error: unknown): ProviderFailure {
     if (named && !(named === "down" && status < 500)) return { kind: named, status };
     if (status === 429 && BUSY.test(text)) return { kind: "busy", status };
     if (status < 500 && status !== 404 && MODEL.test(text)) return { kind: "model", status };
+    if (status === 400 && KEY_SETUP.test(text)) return { kind: "key", status };
     return { kind: kindOfStatus(status, text), status };
 }
+
+/** Most refusals a failure lists. */
+export const TRIED_MOST = 32;
 
 /** What the stream's error part carries to the panel. */
 export const polarFailureSchema = z.object({
@@ -295,7 +306,19 @@ export const polarFailureSchema = z.object({
     /** Its integration slug, so the panel can offer a model elsewhere. */
     slug: z.string().max(64),
     /** Whose key was spent: the reader's own, or the deployment's. */
-    payer: z.enum(["own", "instance"])
+    payer: z.enum(["own", "instance"]),
+    /** Every model the turn asked before it gave up, in order, when it asked
+     *  more than one: the reader sees each and why, not only the last. */
+    tried: z
+        .array(
+            z.object({
+                provider: z.string().max(80),
+                model: z.string().max(160),
+                kind: z.enum(FAILURE_KINDS)
+            })
+        )
+        .max(TRIED_MOST)
+        .optional()
 });
 export type PolarFailure = z.infer<typeof polarFailureSchema>;
 
@@ -412,4 +435,47 @@ export function keepStoredFailures(incoming: readonly Part[], stored: unknown): 
  *  or a stack, so a key that keeps failing does not bury the log. */
 export function failureLogLine(what: string, provider: string, failure: ProviderFailure): string {
     return `polar: ${what} failed at ${provider} (${failure.status ?? "no status"}, ${failure.kind})`;
+}
+
+/** Characters of a refusal's body a log line keeps. */
+const LOGGED_BODY_MOST = 200;
+
+/** Anything in a body that could name a credential or an account: a key or
+ *  token shaped string, an id with a known prefix, a UUID, an email, a long
+ *  run of letters and digits. */
+const SECRETISH = [
+    /[\w.+-]+@[\w-]+(\.[\w-]+)+/g,
+    /\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi,
+    /\b(sk|pk|rk|gsk|csk|xai|key|org|acct|account|user|proj|project|ws|wrkspc|req|sess)[-_][\w-]{4,}/gi,
+    /\b(Bearer|Basic)\s+\S+/gi,
+    /[A-Za-z0-9_\-]{24,}/g
+];
+
+/** A refusal's body as a log may hold it: its first characters with every
+ *  credential- or account-shaped string replaced. Pure. */
+export function scrubbedBody(error: unknown): string {
+    const found = callError(error);
+    const raw = found?.responseBody ?? (error instanceof Error ? error.message : error);
+    let text = typeof raw === "string" ? raw : (() => {
+        try {
+            return JSON.stringify(raw) ?? "";
+        } catch {
+            return "";
+        }
+    })();
+    text = text.slice(0, BODY_MOST);
+    for (const pattern of SECRETISH) text = text.replace(pattern, "[redacted]");
+    return text.replace(/\s+/g, " ").trim().slice(0, LOGGED_BODY_MOST);
+}
+
+/** One log line for a refusal the router moved past: who, which model, what
+ *  it was read as, and the scrubbed start of what the provider said, so a
+ *  report shows the whole trail of a turn. */
+export function refusalLogLine(
+    provider: string,
+    model: string,
+    failure: ProviderFailure,
+    error: unknown
+): string {
+    return `polar: ${provider}/${model} refused (${failure.status ?? "no status"}, ${failure.kind}): ${scrubbedBody(error)}`;
 }
