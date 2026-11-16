@@ -203,7 +203,7 @@ export function PolarCodeWorkspace({
                                     namespaces={["agents"]}
                                     fallback={<ui.Skeleton className="h-24 w-full" />}
                                 >
-                                    <SessionChanges session={session} />
+                                    <SessionChanges session={session} wake={lastEdit} />
                                 </ClientMessages>
                             </div>
                         ) : pane === "pull" ? (

@@ -58,6 +58,21 @@ import type { LineComment } from "@/lib/agents/session-review-loop";
 
 /** How often the list is read again while the agent is still working. */
 const REFRESH_MS = 15_000;
+/** The same, when the caller says each time the agent writes: only a fallback
+ *  for a notice that never came. */
+const FOLLOWED_REFRESH_MS = 60_000;
+/** How long a burst of writes is gathered into one read. */
+const WAKE_SETTLE_MS = 500;
+
+/** The files whose counts moved between two reads, or that are new in the
+ *  second. */
+export function movedFiles(before: readonly ChangedFile[] | null, after: readonly ChangedFile[]): Set<string> {
+    if (!before) return new Set();
+    const was = new Map(before.map((file) => [file.path, `${file.added}:${file.removed}`]));
+    return new Set(
+        after.filter((file) => was.get(file.path) !== `${file.added}:${file.removed}`).map((file) => file.path)
+    );
+}
 
 interface ReadDiff {
     generation: number;
@@ -70,9 +85,21 @@ interface Listing {
     next: number | null;
 }
 
-export function SessionChanges({ session }: { session: SessionView }) {
+export function SessionChanges({
+    session,
+    wake
+}: {
+    session: SessionView;
+    /** Moves each time the agent finishes a write, when the caller is told
+     *  (the session's live stream): the list and the open diff are read again
+     *  then, rather than on a timer. */
+    wake?: string | null;
+}) {
     const t = useTranslations("agents");
     const [listing, setListing] = useState<Listing | null>(null);
+    // The files the agent changed in the last read, marked until the next.
+    const [moved, setMoved] = useState<ReadonlySet<string>>(() => new Set());
+    const followed = wake !== undefined;
     const [problem, setProblem] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [more, setMore] = useState(false);
@@ -90,6 +117,8 @@ export function SessionChanges({ session }: { session: SessionView }) {
         null
     );
     const reads = useRef(0);
+    // The list as it was last read, to tell what the agent just changed.
+    const last = useRef<ChangedFile[] | null>(null);
     const shown = useRef(0);
 
     /** The words for an answer that is not a list. */
@@ -142,18 +171,40 @@ export function SessionChanges({ session }: { session: SessionView }) {
         }
         setProblem(null);
         shown.current = files.length;
+        const changed = movedFiles(last.current, files);
+        last.current = files;
+        setMoved(changed);
+        // Following the agent: with nothing open, its newest change opens.
+        if (followed && changed.size > 0)
+            setSelected((current) => current ?? files.find((file) => changed.has(file.path))?.path ?? null);
         setListing({ total, files, next });
         setGeneration(read);
-    }, [session.id, t, wordsFor]);
+    }, [followed, session.id, t, wordsFor]);
+    // The newest read, for the timers: a parent drawn again (each time the
+    // thread is read) must not read the list again by itself.
+    const latestLoad = useRef(load);
+    latestLoad.current = load;
 
     useEffect(() => {
-        void load();
+        void latestLoad.current();
         if (over) return;
         const timer = setInterval(() => {
-            if (document.visibilityState === "visible") void load();
-        }, REFRESH_MS);
+            if (document.visibilityState === "visible") void latestLoad.current();
+        }, followed ? FOLLOWED_REFRESH_MS : REFRESH_MS);
         return () => clearInterval(timer);
-    }, [load, over]);
+    }, [followed, over, session.id]);
+
+    // Each write the agent finishes: the list again, and with it the open
+    // diff. The write already on screen when this opened is not one.
+    const seenWake = useRef(wake);
+    useEffect(() => {
+        if (!followed || wake === seenWake.current) return;
+        const timer = setTimeout(() => {
+            seenWake.current = wake;
+            void latestLoad.current();
+        }, WAKE_SETTLE_MS);
+        return () => clearTimeout(timer);
+    }, [followed, wake]);
 
     const loadMore = async () => {
         if (!listing?.next) return;
@@ -326,6 +377,14 @@ export function SessionChanges({ session }: { session: SessionView }) {
                                             selected === file.path && "bg-muted"
                                         )}
                                     >
+                                        {moved.has(file.path) ? (
+                                            <span
+                                                className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary"
+                                                role="img"
+                                                aria-label={t("session.changes.justChanged")}
+                                                title={t("session.changes.justChanged")}
+                                            />
+                                        ) : null}
                                         <span
                                             className="min-w-0 flex-1 truncate font-mono"
                                             title={file.path}

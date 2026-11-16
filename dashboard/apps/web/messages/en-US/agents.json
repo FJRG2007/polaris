@@ -402,7 +402,8 @@
             },
             "errors": {
                 "invalid": "That request could not be read. Refresh the page."
-            }
+            },
+            "justChanged": "Just changed"
         },
         "ship": {
             "open": "Open a pull request",
