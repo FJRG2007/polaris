@@ -20,6 +20,7 @@ import { prisma } from "@polaris/db";
 import { tool, type FlexibleSchema, type ToolSet } from "ai";
 import * as store from "@/lib/polar/custom-tools/store";
 import * as shared from "@/lib/polar/custom-tools/shared";
+import * as modules from "@/lib/polar/custom-tools/opencode-modules";
 import { runInSession } from "@/lib/agents/session-runtime";
 
 /** The live states a session takes commands in. */
@@ -55,7 +56,7 @@ const NO_SANDBOX =
 /** One call of a tool, parsed and run in the sandbox. */
 export async function runTool(
     sandbox: Sandbox,
-    definition: shared.CustomTool,
+    definition: shared.RunnableTool,
     written: unknown,
     run: typeof runInSession = runInSession
 ): Promise<CallOutcome> {
@@ -79,6 +80,8 @@ export interface ProjectReview extends shared.ProjectTools {
     readonly digest: string;
     readonly approved: boolean;
     readonly files: shared.ProjectFile[];
+    /** Whether the sandbox has Bun, which OpenCode's TypeScript tools need. */
+    readonly hasBun: boolean;
 }
 
 export async function reviewProjectTools(
@@ -93,33 +96,94 @@ export async function reviewProjectTools(
     if (files.length === 0) return null;
     const digest = await shared.projectDigest(files);
     const approved = await store.isApproved(userId, sandbox.repository, digest);
-    return { ...shared.parseProjectTools(files), digest, approved, files };
+    return { ...shared.parseProjectTools(files), digest, approved, files, hasBun: shared.readHasBun(result.output) };
 }
 
-/** Project reviews kept a short while, so a chat turn does not read the
- *  checkout every time. A new revision shows up within the window. */
-const REVIEW_TTL_MS = 30_000;
-const reviews = new Map<string, { at: number; review: ProjectReview | null }>();
+/** The approved repository tools of a sandbox, OpenCode's modules read
+ *  with Bun included, and the modules that could not be offered. */
+export interface ProjectOffer {
+    readonly tools: shared.ProjectTool[];
+    readonly unavailable: modules.UnavailableModule[];
+}
 
-async function cachedReview(userId: string, sandbox: Sandbox): Promise<ProjectReview | null> {
+const NO_OFFER: ProjectOffer = { tools: [], unavailable: [] };
+
+/** What an approved review offers. Modules are imported only here, after the
+ *  approval, and only where the sandbox has Bun to import them with. */
+export async function projectOffer(
+    sandbox: Sandbox,
+    review: ProjectReview | null,
+    run: typeof runInSession = runInSession
+): Promise<ProjectOffer> {
+    if (!review?.approved) return NO_OFFER;
+    if (review.modules.length === 0) return { tools: review.tools, unavailable: [] };
+    if (!review.hasBun)
+        return { tools: review.tools, unavailable: review.modules.map((path) => ({ path, reason: "no_bun" as const })) };
+    const listed = await run(sandbox.sessionId, modules.moduleListCommand(review.modules)).catch(() => null);
+    if (!listed)
+        return { tools: review.tools, unavailable: review.modules.map((path) => ({ path, reason: "load_failed" as const })) };
+    const read = modules.readModuleList(
+        listed.output,
+        review.modules,
+        sandbox.sessionId,
+        new Set(review.tools.map((entry) => entry.name))
+    );
+    return { tools: [...review.tools, ...read.tools], unavailable: read.unavailable };
+}
+
+/** Project offers kept a short while, so a chat turn or a session's tool list
+ *  does not read the checkout every time. A new revision shows up within the
+ *  window. */
+const REVIEW_TTL_MS = 30_000;
+const offers = new Map<string, { at: number; offer: ProjectOffer }>();
+
+async function cachedOffer(userId: string, sandbox: Sandbox): Promise<ProjectOffer> {
     const key = `${userId}:${sandbox.sessionId}`;
-    const hit = reviews.get(key);
-    if (hit && Date.now() - hit.at < REVIEW_TTL_MS) return hit.review;
+    const hit = offers.get(key);
+    if (hit && Date.now() - hit.at < REVIEW_TTL_MS) return hit.offer;
     const review = await reviewProjectTools(userId, sandbox).catch(() => null);
-    if (reviews.size > 500) reviews.clear();
-    reviews.set(key, { at: Date.now(), review });
-    return review;
+    const offer = await projectOffer(sandbox, review).catch(() => NO_OFFER);
+    if (offers.size > 500) offers.clear();
+    offers.set(key, { at: Date.now(), offer });
+    return offer;
 }
 
 /** Forgets a cached review, after the person approved one. */
 export function forgetReview(userId: string, sessionId: string): void {
-    reviews.delete(`${userId}:${sessionId}`);
+    offers.delete(`${userId}:${sessionId}`);
 }
 
 export interface CustomToolSet {
     tools: ToolSet;
     approval: Record<string, () => Promise<"approved" | "user-approval">>;
     described: Record<string, { title: string; writes: boolean; destructive: boolean }>;
+}
+
+/** A tool a sandbox offers, and whether a call needs the person's yes. */
+export interface OfferedTool {
+    readonly definition: shared.RunnableTool;
+    readonly fromProject: boolean;
+    /** A repository's tool is always asked about: the approval was for the
+     *  files, not for every call any input could make. */
+    readonly asks: boolean;
+}
+
+/** Every tool a sandbox offers the person: their own switched-on tools, then
+ *  the approved repository tools whose names they do not already use. */
+export async function sandboxTools(
+    userId: string,
+    sandbox: Sandbox | null
+): Promise<{ tools: OfferedTool[]; unavailable: modules.UnavailableModule[] }> {
+    const own = (await store.listTools(userId).catch(() => [])).filter(offered);
+    const offer = sandbox ? await cachedOffer(userId, sandbox) : NO_OFFER;
+    const project = offer.tools.filter((entry) => !own.some((mine) => mine.name === entry.name));
+    return {
+        tools: [
+            ...own.map((definition) => ({ definition, fromProject: false, asks: definition.permission !== "allow" })),
+            ...project.map((definition) => ({ definition, fromProject: true, asks: true }))
+        ],
+        unavailable: offer.unavailable
+    };
 }
 
 /** Whether a definition is offered at all. */
@@ -134,14 +198,11 @@ export function offered(definition: Pick<shared.CustomTool, "enabled" | "permiss
  * approval comes back.
  */
 export async function polarCustomTools(userId: string): Promise<CustomToolSet> {
-    const own = (await store.listTools(userId).catch(() => [])).filter(offered);
     const sandbox = await sandboxFor(userId).catch(() => null);
-    const review = sandbox ? await cachedReview(userId, sandbox) : null;
-    const project = review?.approved ? review.tools.filter((entry) => !own.some((mine) => mine.name === entry.name)) : [];
+    const offer = await sandboxTools(userId, sandbox);
     const set: CustomToolSet = { tools: {}, approval: {}, described: {} };
-    for (const definition of [...own, ...project]) {
+    for (const { definition, fromProject, asks } of offer.tools) {
         const name = shared.turnToolName(definition.name);
-        const fromProject = "path" in definition;
         set.tools[name] = tool({
             description: definition.description,
             inputSchema: shared.callSchema(definition.input) as unknown as FlexibleSchema<Record<string, unknown>>,
@@ -151,9 +212,7 @@ export async function polarCustomTools(userId: string): Promise<CustomToolSet> {
                 return runTool(at, definition, written);
             }
         });
-        // A repository's tool is always asked about: the approval was for the
-        // files, not for every call any input could make.
-        const allowed = definition.permission === "allow" && !fromProject;
+        const allowed = !asks;
         set.approval[name] = async () => (allowed ? "approved" : "user-approval");
         set.described[name] = { title: definition.name, writes: true, destructive: !allowed };
     }

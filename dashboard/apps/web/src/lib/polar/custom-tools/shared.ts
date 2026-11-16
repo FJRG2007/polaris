@@ -90,6 +90,11 @@ export const customToolSchema = z.object({
 export type CustomToolInput = z.input<typeof customToolSchema>;
 export type CustomTool = z.infer<typeof customToolSchema>;
 
+/** What actually runs a tool: a saved one's runtime, or Bun for one of
+ *  OpenCode's TypeScript modules (never offered on the settings form). */
+export type RunnerKind = ToolRuntime | "bun";
+export type RunnableTool = Omit<CustomTool, "runtime"> & { readonly runtime: RunnerKind };
+
 /**
  * Every call is parsed against this before anything is sent to the sandbox: the
  * declared properties, typed, the required ones present, and nothing else.
@@ -134,11 +139,11 @@ function base64(text: string): string {
  * `OUTPUT_MAX` bytes are printed, followed by the exit code on a line of its own.
  */
 export function toolCommand(
-    tool: Pick<CustomTool, "runtime" | "script" | "timeoutSeconds">,
+    tool: Pick<RunnableTool, "runtime" | "script" | "timeoutSeconds">,
     args: Record<string, unknown>
 ): string {
-    const file = tool.runtime === "node" ? "run.mjs" : "run.sh";
-    const runner = tool.runtime === "node" ? "node" : "sh";
+    const file = tool.runtime === "node" ? "run.mjs" : tool.runtime === "bun" ? "run.ts" : "run.sh";
+    const runner = tool.runtime === "shell" ? "sh" : tool.runtime;
     const seconds = Math.min(Math.max(1, Math.trunc(tool.timeoutSeconds)), TIMEOUT_MOST);
     return [
         'd="$(mktemp -d)" || exit 1',
@@ -213,8 +218,8 @@ export interface ProjectFile {
     readonly contents: string;
 }
 
-export interface ProjectTool extends CustomTool {
-    /** The manifest it came from. */
+export interface ProjectTool extends RunnableTool {
+    /** The manifest or module it came from. */
     readonly path: string;
 }
 
@@ -222,7 +227,14 @@ export interface ProjectTools {
     readonly tools: ProjectTool[];
     /** Manifests that could not be read, by path, so the person sees why. */
     readonly refused: string[];
+    /** OpenCode's TypeScript or JavaScript tool modules, by path: code that
+     *  only says what it takes once it runs, so read in the sandbox with Bun
+     *  after the approval (`moduleListCommand`), never before. */
+    readonly modules: string[];
 }
+
+/** A file OpenCode loads as a tool module (`.opencode/tool(s)/<name>.ts`). */
+export const MODULE_FILE = /^\.opencode\/tools?\/[^/]+\.(ts|js|mjs)$/;
 
 /** The tools a checkout's files declare. The first folder wins a name. */
 export function parseProjectTools(files: readonly ProjectFile[]): ProjectTools {
@@ -230,6 +242,7 @@ export function parseProjectTools(files: readonly ProjectFile[]): ProjectTools {
     const tools: ProjectTool[] = [];
     const refused: string[] = [];
     const taken = new Set<string>();
+    const referenced = new Set<string>();
     for (const dir of PROJECT_TOOL_DIRS) {
         const manifests = files
             .filter((file) => file.path.startsWith(`${dir}/`) && file.path.endsWith(".json"))
@@ -253,6 +266,7 @@ export function parseProjectTools(files: readonly ProjectFile[]): ProjectTools {
                 refused.push(file.path);
                 continue;
             }
+            if (manifest.data.file) referenced.add(`${dir}/${manifest.data.file}`);
             const script = manifest.data.script ?? byPath.get(`${dir}/${manifest.data.file}`);
             if (!script) {
                 refused.push(file.path);
@@ -278,7 +292,11 @@ export function parseProjectTools(files: readonly ProjectFile[]): ProjectTools {
             tools.push({ ...parsed.data, path: file.path });
         }
     }
-    return { tools, refused };
+    const modules = files
+        .map((file) => file.path)
+        .filter((path) => MODULE_FILE.test(path) && !referenced.has(path))
+        .sort();
+    return { tools, refused, modules };
 }
 
 /**
@@ -300,11 +318,19 @@ export async function projectDigest(files: readonly ProjectFile[]): Promise<stri
 export function projectFilesCommand(): string {
     const dirs = PROJECT_TOOL_DIRS.map((dir) => `'${dir}'`).join(" ");
     return [
+        `if command -v bun >/dev/null 2>&1; then echo '${BUN_MARK}1'; else echo '${BUN_MARK}0'; fi`,
         'cd "${POLARIS_WORKDIR:-$HOME}" 2>/dev/null || exit 0',
         `for dir in ${dirs}; do [ -d "$dir" ] && find "$dir" -maxdepth 1 -type f -size -${SCRIPT_MAX / 1024}k; done | sort | head -n ${PROJECT_FILES_MOST} | while IFS= read -r f; do`,
         '    printf \'%s\\t%s\\n\' "$f" "$(base64 < "$f" | tr -d \'\\n\')"',
         "done"
     ].join("\n");
+}
+
+/** The line `projectFilesCommand` starts with: whether the sandbox has Bun. */
+export const BUN_MARK = "polaris-bun:";
+
+export function readHasBun(output: string): boolean {
+    return output.split("\n").some((line) => line.trim() === `${BUN_MARK}1`);
 }
 
 /** The lines `projectFilesCommand` printed, as files. */
