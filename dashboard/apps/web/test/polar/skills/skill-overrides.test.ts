@@ -22,6 +22,7 @@ vi.mock("@/lib/polar/skills/enigma-catalogue", () => ({
 }));
 
 import { SKILL_CATALOG } from "@/lib/polar/skills/catalog";
+import { canEditInstanceSkills } from "@/lib/polar/skills/override-access";
 import { effectiveUpstreamSkills } from "@/lib/polar/skills/override-store";
 import {
     OVERRIDE_INSTRUCTIONS_MAX,
@@ -182,5 +183,13 @@ describe("what a chat loads", () => {
         const loaded = await effectiveUpstreamSkills("u1", [enigma]);
         expect(loaded.builtins).toEqual([]);
         expect(loaded.enigma).toEqual([enigma]);
+    });
+});
+
+describe("who edits for everyone", () => {
+    it("is an administrator acting as themselves, nobody else", () => {
+        expect(canEditInstanceSkills({ isAdmin: true, viewingAs: undefined })).toBe(true);
+        expect(canEditInstanceSkills({ isAdmin: false, viewingAs: undefined })).toBe(false);
+        expect(canEditInstanceSkills({ isAdmin: true, viewingAs: { mode: "user" } as never })).toBe(false);
     });
 });

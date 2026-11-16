@@ -24,7 +24,7 @@ import {
     Skeleton
 } from "@polaris/ui";
 import * as layers from "@/lib/polar/skills/overrides";
-import type { SkillView } from "@/lib/polar/skills/shared";
+import { SKILL_DESCRIPTION_MAX, type SkillView } from "@/lib/polar/skills/shared";
 import { CodeEditor, CodeView } from "@/components/json-view";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { OverrideSummary } from "@/lib/polar/skills/override-store";
@@ -296,7 +296,7 @@ export function SkillDetailDialog({
                                         <Input
                                             id="skill-override-description"
                                             value={draft.description}
-                                            maxLength={1024}
+                                            maxLength={SKILL_DESCRIPTION_MAX}
                                             aria-invalid={draft.description.trim() ? undefined : true}
                                             onChange={(event) => setDraft((current) => ({ ...current, description: event.target.value }))}
                                         />
