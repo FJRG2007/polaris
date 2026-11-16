@@ -47,10 +47,13 @@ const STATELESS_RESPONSES: LanguageModelMiddleware = {
 /** A Copilot model on the API that answers it: `/responses` for the models
  *  served only there, `/chat/completions` for the rest (`copilotEndpoint`). */
 /**
- * Whether a catalogue model is offered on a login provider. Copilot drops one
- * alias; every other provider lists what the catalogue carries. Pure.
+ * Whether a catalogue model is offered on a login provider. GitLab's gateway
+ * answers only the ids its own table maps (`duoModel`), so a model the
+ * catalogue lists beyond it would fail every turn; Copilot drops one alias.
+ * Every other provider lists what the catalogue carries. Pure.
  */
 export function loginListsModel(provider: string, model: string): boolean {
+    if (provider === "gitlab") return duoModel(model) !== null;
     if (provider === "github-copilot") return copilotListsModel(model);
     return true;
 }
