@@ -43,7 +43,10 @@ export const createSessionBody = z
         /** Which coding agent runs it. */
         agent: z.string().trim().min(1).max(40).default("claude"),
         /** The branch to start from. Empty takes the repository's default. */
-        baseRef: z.string().trim().max(200).default("")
+        baseRef: z.string().trim().max(200).default(""),
+        /** The model, as "provider/model", from the ones this person can start
+         *  the agent on. Empty takes the agent's own default. */
+        model: z.string().trim().max(265).default("")
     })
     .strict();
 export type CreateSessionBody = z.input<typeof createSessionBody>;

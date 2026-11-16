@@ -11,7 +11,7 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { authenticateApiKey, type ApiKeyPrincipal } from "@/lib/api-key-auth";
 import { withKeyUsage } from "@/lib/api-usage/recorder";
 import { DeployApiRefusal } from "@/lib/deploy/api/refusal";
-import { SessionRefusal } from "@/lib/agents/session-service";
+import { SessionRefusal, getSession, type SessionView } from "@/lib/agents/session-service";
 
 /** Calls one key may make in a minute, and how many may change something.
  *  Room for a CI job and its stream reconnects; a ceiling for a script in a loop. */
@@ -127,4 +127,14 @@ export function answer(data: unknown, status = 200): Response {
 export function sessionNotFound(): SessionApiRefusal {
     // i18n-ignore: as above
     return new SessionApiRefusal(404, "No session with that id that this key can reach.");
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The session a route's `:id` names, when this key reaches it. */
+export async function sessionFor(context: SessionRouteContext): Promise<SessionView> {
+    const id = context.params.id ?? "";
+    const session = UUID.test(id) ? await getSession(id.toLowerCase(), context.principal.userId) : null;
+    if (!session) throw sessionNotFound();
+    return session;
 }

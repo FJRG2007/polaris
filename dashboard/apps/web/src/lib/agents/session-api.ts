@@ -16,6 +16,12 @@ import type * as sdk from "@polaris/sdk";
 import * as queue from "@/lib/agents/session-queue";
 import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
+import { polarModelOptions } from "@/lib/polar/models";
+import { polarCredentialFor } from "@/lib/polar/access";
+import { agentOptionsFor } from "@/lib/agents/agent-readiness";
+import { agentDefaultsFor } from "@/lib/polar/agents/defaults";
+import { POLAR_ENGINE } from "@/lib/polar/agents/shared";
+import { codeComposerFor } from "@/lib/polar/agents/composer-agents";
 
 export interface KeyCaller {
     readonly userId: string;
@@ -84,6 +90,68 @@ export interface StartRequest {
     readonly prompt: string;
     readonly agent: string;
     readonly baseRef: string;
+    /** "provider/model", or empty (or absent) for the agent's own default. */
+    readonly model?: string;
+}
+
+/** A model asked for by name, split; null when it is not "provider/model". */
+export function readModelSpec(spec: string): { provider: string; model: string } | null {
+    const slash = spec.indexOf("/");
+    if (slash < 1) return null;
+    const provider = spec.slice(0, slash);
+    const model = spec.slice(slash + 1);
+    if (!/^[a-z0-9][a-z0-9._-]{0,63}$/i.test(provider) || !core.SAFE_MODEL_ID.test(model)) return null;
+    return { provider, model };
+}
+
+/**
+ * The model a session started with a key runs on, chosen the way Code's
+ * composer chooses it and held to the same lists: for a tool that runs on
+ * Polar's keys (OpenCode), a model Polar offers this person, on the key Polar's
+ * rule lets them spend; for a tool that takes its model by name, one of the
+ * models its sources offer, signing in the way it would without one. Null for
+ * the agent's own default.
+ */
+export async function startModel(
+    userId: string,
+    cli: string,
+    spec: string
+): Promise<core.SessionModelChoice | null> {
+    if (!spec) return null;
+    const asked = readModelSpec(spec);
+    if (!asked) throw new sessions.SessionRefusal(`Name the model as provider/model, not ${spec}.`);
+    const unavailable = () =>
+        new sessions.SessionRefusal(`${spec} is not a model this account can start ${cli} on.`);
+    if (core.MODEL_CHOICE_AGENT_CLIS.includes(cli)) {
+        const [providers, defaults] = await Promise.all([
+            polarModelOptions(userId),
+            agentDefaultsFor(userId).catch(() => null)
+        ]);
+        const policy = defaults?.get(POLAR_ENGINE);
+        const listed = providers
+            .find((option) => option.provider === asked.provider)
+            ?.models.some((option) => option.model === asked.model);
+        // Polar's own list, where its settings say to keep to it.
+        const kept =
+            policy?.modelPolicy !== "required" ||
+            policy.models.length === 0 ||
+            policy.models.some((entry) => entry.provider === asked.provider && entry.model === asked.model);
+        if (!listed || !kept) throw unavailable();
+        const credential = await polarCredentialFor(userId, asked.provider, null);
+        if (!credential) throw unavailable();
+        // Pinned to the key Polar resolved, so the session spends that one.
+        return { provider: asked.provider, model: asked.model, payer: credential.source };
+    }
+    const own = core.agentCliById(cli)?.model?.provider;
+    if (!own) throw new sessions.SessionRefusal(`${cli} does not take a model from Polaris.`);
+    if (asked.provider !== own) throw unavailable();
+    const composer = await codeComposerFor(userId, await agentOptionsFor(userId));
+    const offered = composer.sources.some(
+        (source) =>
+            source.engines[0] === cli && source.models.some((entry) => entry.model === asked.model)
+    );
+    if (!offered) throw unavailable();
+    return { provider: own, model: asked.model, payer: null };
 }
 
 /** The prompt's first line, as a title when none was given. */
@@ -105,7 +173,10 @@ export async function startAgentSession(
 ): Promise<{ session: sessions.SessionView; queuedAt: number | null }> {
     const agent = core.agentCliIdSchema.safeParse(request.agent);
     if (!agent.success) throw new sessions.SessionRefusal(`${request.agent} is not an agent Polaris runs.`);
-    const where = await startPlace(request.repo, caller);
+    const [where, modelChoice] = await Promise.all([
+        startPlace(request.repo, caller),
+        startModel(caller.userId, agent.data, request.model ?? "")
+    ]);
     const admission = await queue.admitSession(
         {
             repoId: where.repoId,
@@ -123,6 +194,8 @@ export async function startAgentSession(
             // Whichever stored credential resolves. Asking the machine to answer
             // for itself is a choice a person makes about a machine they signed in.
             useMachineLogin: false,
+            // Checked against what this person can start the agent on, above.
+            modelChoice,
             // The Polaris box, or the server the calling session already runs
             // on - which its person chose. A key never picks a server itself.
             place: where.place,
