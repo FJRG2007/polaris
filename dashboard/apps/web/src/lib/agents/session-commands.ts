@@ -27,6 +27,7 @@
  */
 
 import { shellQuote } from "./session-hooks";
+import { POLICY_PATHS } from "@/lib/polar/agents/cli-policies";
 import { INSTALL_GH, PREINSTALL_GH } from "./session-gh";
 import {
     FIRST_RUN_WORKDIR,
@@ -389,6 +390,14 @@ const PREPARE_WORKTREE = [
     '    "$POLARIS_STATE_DIR"/*/*|*..*) ;;',
     '    "$POLARIS_STATE_DIR"/?*) printf %s "$POLARIS_AGENT_HOOK_FILE" | base64 -d > "$POLARIS_AGENT_HOOK_PATH" && chmod 0600 "$POLARIS_AGENT_HOOK_PATH" || true ;;',
     "  esac",
+    "fi",
+    // The agent's permission rules as its tool's policy file (`cliPolicyFile`),
+    // kept beside the checkout until each start puts it in the home
+    // (AGENT_POLICY_INSTALL). A file that does not decode is a marker that
+    // stops the agent: rules it was meant to keep, gone, are not a default.
+    'rm -f "$POLARIS_STATE_DIR/agent-policy" "$POLARIS_STATE_DIR/agent-policy-failed"',
+    'if [ -n "$POLARIS_AGENT_POLICY" ]; then',
+    '  printf %s "$POLARIS_AGENT_POLICY" | base64 -d > "$POLARIS_STATE_DIR/agent-policy" || { rm -f "$POLARIS_STATE_DIR/agent-policy"; : > "$POLARIS_STATE_DIR/agent-policy-failed"; }',
     "fi",
     // Made as root because the image starts as root; owned by the agent, because
     // the agent is who edits it.
@@ -969,6 +978,32 @@ export function writeCredentialsCommand(stateDir: string, part: string, body: st
 /** Beside the checkout when the boot found the tool refuses its `hookArgs`. */
 export const HOOK_ARGS_REFUSED_FILE = "hook-args-refused";
 
+/**
+ * Puts the agent's policy file in its home on every start, or takes away one
+ * an earlier session left there. Codex and Gemini read theirs once, when they
+ * start, so another session of the same person rewriting it later does not
+ * change a running agent's rules. Only the tools' fixed paths, and only in a
+ * home Polaris made. Not in place is not started.
+ */
+export const AGENT_POLICY_INSTALL = [
+    'if [ -n "$POLARIS_HOME" ]; then',
+    '  case "$POLARIS_AGENT_POLICY_PATH" in',
+    `    ${Object.values(POLICY_PATHS).join("|")})`,
+    '      p="$POLARIS_HOME/$POLARIS_AGENT_POLICY_PATH"',
+    '      if [ -e "$POLARIS_STATE_DIR/agent-policy-failed" ]; then echo "polaris: the permission rules of this agent did not arrive, so it does not start"; exit 1; fi',
+    '      if [ -f "$POLARIS_STATE_DIR/agent-policy" ]; then',
+    '        if mkdir -p "$(dirname "$p")" && cp "$POLARIS_STATE_DIR/agent-policy" "$p.part" && mv "$p.part" "$p"; then',
+    '          if [ "$POLARIS_AS_ROOT" = "yes" ]; then chown "$POLARIS_RUNAS" "$(dirname "$p")" "$p" 2>/dev/null || true; fi',
+    "        else",
+    '          rm -f "$p.part"',
+    '          echo "polaris: the permission rules of this agent could not be put in place, so it does not start"',
+    "          exit 1",
+    "        fi",
+    '      else rm -f "$p"; fi ;;',
+    "  esac",
+    "fi"
+];
+
 export const LAUNCH_SCRIPT = [
     "#!/bin/sh",
     "# Written by Polaris. Starts this session's agent; an argument reopens that conversation.",
@@ -1028,6 +1063,7 @@ export const LAUNCH_SCRIPT = [
     '  line="$line --settings \\"$POLARIS_STATE_DIR/settings.json\\" --mcp-config \\"$POLARIS_STATE_DIR/mcp.json\\""',
     `  if [ -n "\${POLARIS_PREVIEW_BASE:-}" ]; then line="$line --append-system-prompt \\"${PREVIEW_PROMPT}\\""; fi`,
     "fi",
+    ...AGENT_POLICY_INSTALL,
     'if [ -n "$turn" ]; then :; elif [ -n "$id" ]; then echo "polaris: starting $POLARIS_AGENT_COMMAND on conversation $id"; else echo "polaris: starting $POLARIS_AGENT_COMMAND"; fi',
     // Written last, so anything holding a prompt knows the terminal it is about
     // to type into belongs to the agent rather than to the installer.
@@ -1115,7 +1151,7 @@ const RUNNER_SCRIPT_BASE64 = Buffer.from(RUNNER_SCRIPT, "utf8").toString("base64
 /** What the setup cleared before the agent started, cleared again by anything
  *  that starts it later from tmux's own environment, which is the boot's. */
 const CLEAR_BOOT_ENV: readonly string[] = [
-    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_REPO_AGENTS POLARIS_AGENT_HOOK_FILE",
+    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_REPO_AGENTS POLARIS_AGENT_HOOK_FILE POLARIS_AGENT_POLICY",
     'for pair in $POLARIS_CREDENTIAL_FILES; do unset "$(printf %s "$pair" | cut -d= -f1)"; done'
 ];
 
@@ -1503,7 +1539,7 @@ const START_AGENT = [
     '  as_agent "sh \\"$POLARIS_STATE_DIR/skills-sync.sh\\" \\"$POLARIS_HOME\\"" || true',
     "fi",
     "unset GIT_AUTH_HEADER",
-    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_REPO_AGENTS POLARIS_AGENT_HOOK_FILE",
+    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_REPO_AGENTS POLARIS_AGENT_HOOK_FILE POLARIS_AGENT_POLICY",
     // Said once, in the terminal the person is looking at, because on a machine
     // they cannot see "please sign in" with no way to and no reason given is the
     // whole of what was wrong with this. Only when Polaris is carrying no

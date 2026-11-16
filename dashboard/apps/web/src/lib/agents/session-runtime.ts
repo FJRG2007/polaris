@@ -18,6 +18,7 @@
  * anything able to list processes can read.
  */
 
+import { cliPolicyFile, POLICY_PATHS } from "@/lib/polar/agents/cli-policies";
 import { claudePermissionSettings, configFromRules, rulesOf, type PermissionRule } from "@/lib/polar/agents/permissions";
 import { repoAgentFiles, sessionAgentFiles } from "@/lib/polar/agents/repo-agents";
 import { prisma } from "@polaris/db";
@@ -194,6 +195,12 @@ interface Bootstrap {
     /** The repository's .polaris/agents as the coding tools' own agent files
      *  (`sessionAgentFiles`), JSON in base64, or empty for none. */
     readonly repoAgents: string;
+    /** The agent's permission rules as the tool's own policy file in its home
+     *  (`cliPolicyFile`), base64, or empty for none; the path is the tool's
+     *  fixed one, set for Codex and Gemini even without rules, so a file an
+     *  earlier session left there is taken away. */
+    readonly agentPolicy: string;
+    readonly agentPolicyPath: string;
     /** The path on Polaris's address a web server in the container is previewed
      *  under, a port after it. Empty where there is no preview: a session on
      *  somebody's own account on a server. See `session-preview`. */
@@ -437,6 +444,9 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         repoSetup: setup?.setupScript.trim() ? asFile(setup.setupScript) : "",
         repoSetupRequired: setup?.setupRequired ?? false,
         repoAgents: agentFiles,
+        // Only into a home Polaris made, as with the first run: a server's
+        // home is the person's own, and its policies are theirs.
+        ...agentPolicyFor(session.place === "host" ? null : agent.cli.id, await agentRulesFor(session.id)),
         previewBase: session.place === "local" ? previewBase(session.id) : "",
         // The account the person picked wins over whatever would have resolved.
         // Somebody holding three subscriptions chose one of them on the form,
@@ -492,6 +502,16 @@ async function credentialEnvFor(
         // The provider and model picked on the form, last, so they win.
         ...withOpencodePermission(cli.id, await modelEnvFor(session), await agentRulesFor(session.id))
     };
+}
+
+/** The boot's policy file for a tool that reads its rules from one. */
+export function agentPolicyFor(
+    cli: string | null,
+    rules: readonly PermissionRule[]
+): { agentPolicy: string; agentPolicyPath: string } {
+    if (cli !== "codex" && cli !== "gemini") return { agentPolicy: "", agentPolicyPath: "" };
+    const file = cliPolicyFile(cli, rules);
+    return { agentPolicy: file ? asFile(file.contents) : "", agentPolicyPath: POLICY_PATHS[cli] };
 }
 
 /** The Polar agent's rules a session was started with; none when unreadable. */
@@ -828,6 +848,8 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_REPO_SETUP: boot.repoSetup,
         POLARIS_REPO_SETUP_REQUIRED: boot.repoSetupRequired ? "yes" : "",
         POLARIS_REPO_AGENTS: boot.repoAgents,
+        POLARIS_AGENT_POLICY: boot.agentPolicy,
+        POLARIS_AGENT_POLICY_PATH: boot.agentPolicyPath,
         // Told to the agent, so a framework that needs its base path can be
         // started under it (see PREVIEW_PROMPT).
         POLARIS_PREVIEW_BASE: boot.previewBase,

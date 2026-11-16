@@ -7,14 +7,19 @@
  */
 
 import { Button, Input, Select } from "@polaris/ui";
+import { useMemo } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { cliPolicyGaps, type PolicyGap } from "@/lib/polar/agents/cli-policies";
 import {
     PERMISSION_EFFECTS,
     PERMISSION_RULES_MAX,
     permissionRuleSchema,
     type PermissionRule
 } from "@/lib/polar/agents/permissions";
+
+/** The tools' names as their own screens write them. */
+const CLI_NAMES: Record<PolicyGap["cli"], string> = { codex: "Codex", gemini: "Gemini CLI" };
 
 /** A new row: asks before any use of a tool the person then names. */
 const NEW_RULE: PermissionRule = { action: "", resource: "*", effect: "ask" };
@@ -31,6 +36,20 @@ export function PermissionRulesEditor({
         value: effect,
         label: t(`settings.agents.rules.effects.${effect}`)
     }));
+    // Codex and Gemini CLI read the rules from a policy file of their own that
+    // cannot say everything; what they hold differently is said on the row.
+    // Over the rules as a session reads them, which leaves out what is invalid.
+    const { gaps, validIndex } = useMemo(() => {
+        const positions = new Map<number, number>();
+        const valid: PermissionRule[] = [];
+        value.forEach((rule, at) => {
+            const parsed = permissionRuleSchema.safeParse(rule);
+            if (!parsed.success) return;
+            positions.set(at, valid.length);
+            valid.push(parsed.data);
+        });
+        return { gaps: cliPolicyGaps(valid), validIndex: positions };
+    }, [value]);
     const update = (index: number, patch: Partial<PermissionRule>) =>
         onChange(value.map((rule, at) => (at === index ? { ...rule, ...patch } : rule)));
     const move = (index: number, by: -1 | 1) => {
@@ -119,6 +138,16 @@ export function PermissionRulesEditor({
                                 {invalid ? (
                                     <span className="text-xs text-danger">{t("settings.agents.rules.invalid")}</span>
                                 ) : null}
+                                {(["stricter", "unenforced"] as const).map((kind) => {
+                                    const tools = gaps
+                                        .filter((gap) => gap.index === validIndex.get(index) && gap.kind === kind)
+                                        .map((gap) => CLI_NAMES[gap.cli]);
+                                    return tools.length > 0 ? (
+                                        <span key={kind} className="text-xs text-muted-foreground">
+                                            {t(`settings.agents.rules.gaps.${kind}`, { tools: tools.join(", ") })}
+                                        </span>
+                                    ) : null;
+                                })}
                             </li>
                         );
                     })}

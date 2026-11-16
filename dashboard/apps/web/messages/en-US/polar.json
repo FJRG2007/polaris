@@ -906,7 +906,11 @@
                 "down": "Move down",
                 "remove": "Remove rule",
                 "add": "Add rule",
-                "invalid": "Name a tool, with a pattern up to 500 characters."
+                "invalid": "Name a tool, with a pattern up to 500 characters.",
+                "gaps": {
+                    "stricter": "Stricter in {tools}: it asks or denies more than this.",
+                    "unenforced": "Not applied in {tools}: its own settings decide."
+                }
             }
         },
         "writing": {

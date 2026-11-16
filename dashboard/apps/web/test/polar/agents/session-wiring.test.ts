@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import type { AgentView } from "@/lib/polar/agents/shared";
 import { subagentTypes } from "@/lib/polar/subagents/types";
-import { withOpencodePermission } from "@/lib/agents/session-runtime";
+import { agentPolicyFor, withOpencodePermission } from "@/lib/agents/session-runtime";
+import { AGENT_POLICY_INSTALL } from "@/lib/agents/session-commands";
 import { REPO_AGENTS, REPO_AGENTS_PROGRAM } from "@/lib/agents/session-commands";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { claudeAgentFile, sessionAgentFiles, SESSION_AGENT_FILES_BYTES } from "@/lib/polar/agents/repo-agents";
@@ -107,6 +108,27 @@ describe("agent rules in an OpenCode session", () => {
         const env = { OPENCODE_CONFIG_CONTENT: "{}" };
         expect(withOpencodePermission("claude", env, [{ action: "*", resource: "*", effect: "deny" }])).toBe(env);
         expect(withOpencodePermission("opencode", env, [])).toBe(env);
+    });
+});
+
+describe("agent rules in Codex and Gemini sessions", () => {
+    const rules = [{ action: "shell", resource: "rm *", effect: "deny" as const }];
+
+    it("hands the policy file base64 with its fixed path, and the path alone without rules", () => {
+        const codex = agentPolicyFor("codex", rules);
+        expect(codex.agentPolicyPath).toBe(".codex/rules/polaris.rules");
+        expect(Buffer.from(codex.agentPolicy, "base64").toString("utf8")).toContain("decision = \"forbidden\"");
+        expect(codex.agentPolicy).not.toMatch(/[^A-Za-z0-9+/=]/);
+        expect(agentPolicyFor("gemini", [])).toEqual({ agentPolicy: "", agentPolicyPath: ".gemini/policies/polaris.toml" });
+        expect(agentPolicyFor("claude", rules)).toEqual({ agentPolicy: "", agentPolicyPath: "" });
+        expect(agentPolicyFor(null, rules)).toEqual({ agentPolicy: "", agentPolicyPath: "" });
+    });
+
+    it("installs only at the tools own paths, and refuses to start without the rules", () => {
+        const script = AGENT_POLICY_INSTALL.join("\n");
+        expect(script).toContain(".codex/rules/polaris.rules|.gemini/policies/polaris.toml)");
+        expect(script).toContain("agent-policy-failed");
+        expect(script.match(/exit 1/g)).toHaveLength(2);
     });
 });
 

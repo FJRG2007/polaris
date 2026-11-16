@@ -906,7 +906,11 @@
                 "down": "Bajar",
                 "remove": "Quitar regla",
                 "add": "Nueva regla",
-                "invalid": "Indica una herramienta y un patrón de hasta 500 caracteres."
+                "invalid": "Indica una herramienta y un patrón de hasta 500 caracteres.",
+                "gaps": {
+                    "stricter": "Más estricta en {tools}: pregunta o deniega más que esto.",
+                    "unenforced": "No se aplica en {tools}: deciden sus propios ajustes."
+                }
             }
         },
         "writing": {
