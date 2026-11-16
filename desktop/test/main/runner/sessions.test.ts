@@ -106,6 +106,10 @@ describe("runner sessions", () => {
         expect(JSON.parse(files.get(`${ROOT}/state/${SESSION_ID}/claude-settings.json`)!).hooks.Stop).toBeTruthy();
         expect(sent.at(-1)).toEqual({ type: "session.started", sessionId: SESSION_ID, workdir: join(ROOT, "sessions", SESSION_ID), branch: "polar/fix-1" });
         expect(host.ids()).toEqual([SESSION_ID]);
+        expect(host.checkout(SESSION_ID)).toEqual({ workdir: join(ROOT, "sessions", SESSION_ID), env: { PATH: "/tc/bin" } });
+        expect(host.checkout("0b7c5d1e-0000-4000-8000-000000000000")).toBeNull();
+        host.stop(SESSION_ID, "stopped");
+        expect(host.checkout(SESSION_ID)).toBeNull();
     });
 
     it("queues a prompt until the agent has drawn, then types it as a paste", async () => {

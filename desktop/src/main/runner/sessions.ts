@@ -15,6 +15,7 @@
 
 import * as launch from "./launch";
 import { randomUUID } from "node:crypto";
+import type { Checkout } from "./workspace";
 import type { RunnerFrame, ServerFrame } from "./connection";
 import { RUNNER_LIMITS } from "../../../../dashboard/packages/core/src/runner-protocol";
 
@@ -73,6 +74,8 @@ interface Held {
     ready: boolean;
     settle: unknown;
     stopped: boolean;
+    /** The checkout and the toolchain's environment, once in place. */
+    checkout: Checkout | null;
 }
 
 export class SessionHost {
@@ -85,6 +88,12 @@ export class SessionHost {
 
     ids(): string[] {
         return [...this.#held.keys()];
+    }
+
+    /** Where a held session works, for `workspace.read`. Null for a session
+     *  this computer does not hold or that is not in place yet. */
+    checkout(sessionId: string): Checkout | null {
+        return this.#held.get(sessionId)?.checkout ?? null;
     }
 
     /** One server frame about a session. Answers false for a frame that is not
@@ -176,7 +185,8 @@ export class SessionHost {
             queue: [],
             ready: false,
             settle: null,
-            stopped: false
+            stopped: false,
+            checkout: null
         };
         this.#held.set(start.sessionId, held);
         const fail = (detail: string) => this.stop(start.sessionId, "failed", detail);
@@ -200,6 +210,7 @@ export class SessionHost {
                 if (code !== 0) return fail(`git:${step.args[0]}`);
             }
 
+            held.checkout = { workdir: plan.workspace.workdir, env: prepared.env };
             const stateDir = `${deps.root}/state/${start.sessionId}`;
             await deps.mkdir(stateDir);
             const settingsFile = `${stateDir}/claude-settings.json`;

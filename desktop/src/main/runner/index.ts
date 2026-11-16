@@ -23,8 +23,10 @@ import { app, safeStorage } from "electron";
 import { version } from "../../../package.json";
 import { ChatHost, type ClaudeSdk } from "./chat";
 import { Folders } from "./folders";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { RunnerConnection, type RunnerSocket, type RunnerState } from "./connection";
+import { createReadStream } from "node:fs";
+import * as workspace from "./workspace";
+import { lstat, mkdir, open, readFile, realpath, writeFile } from "node:fs/promises";
+import { RunnerConnection, type RunnerSocket, type RunnerState, type ServerFrame } from "./connection";
 import { SessionHost, type SpawnTerminal, type Terminal, type ToolchainProgressFrame } from "./sessions";
 
 export type { RunnerState } from "./connection";
@@ -132,6 +134,77 @@ function git(args: string[], options: { cwd: string; env: Record<string, string>
     });
 }
 
+/** How long one git read may run before it is stopped; under the server's
+ *  wait, so an answer still arrives. */
+const GIT_READ_TIMEOUT_MS = 12_000;
+
+/** Git with an argument array and no shell, its stdout kept up to `maxBytes`
+ *  and the rest counted, stopped past `GIT_READ_TIMEOUT_MS`. */
+function gitRead(args: string[], options: workspace.GitReadOptions): Promise<workspace.GitOutput> {
+    return new Promise((resolve) => {
+        const command = findOnPath("git", options.env, process.platform, existsSync) ?? "git";
+        const child = spawn(command, args, { cwd: options.cwd, env: options.env, windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+        const chunks: Buffer[] = [];
+        let kept = 0;
+        let total = 0;
+        const timer = setTimeout(() => child.kill(), GIT_READ_TIMEOUT_MS);
+        child.stdout.on("data", (chunk: Buffer) => {
+            total += chunk.length;
+            if (kept >= options.maxBytes) return;
+            const piece = chunk.subarray(0, options.maxBytes - kept);
+            chunks.push(piece);
+            kept += piece.length;
+        });
+        const done = (code: number) => {
+            clearTimeout(timer);
+            resolve({ code, stdout: Buffer.concat(chunks), total });
+        };
+        child.once("error", () => done(127));
+        child.once("close", (code) => done(code ?? 1));
+    });
+}
+
+/** Newlines in a file, read as a stream; null when a NUL shows up in the
+ *  first bytes, as git calls a file binary. */
+function countLines(path: string): Promise<number | null> {
+    return new Promise((resolve, reject) => {
+        let seen = 0;
+        let lines = 0;
+        const stream = createReadStream(path);
+        stream.on("data", (chunk: Buffer | string) => {
+            const bytes = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+            if (seen < workspace.BINARY_PROBE_BYTES && bytes.subarray(0, workspace.BINARY_PROBE_BYTES - seen).includes(0)) {
+                stream.destroy();
+                return resolve(null);
+            }
+            seen += bytes.length;
+            for (let index = bytes.indexOf(10); index !== -1; index = bytes.indexOf(10, index + 1)) lines++;
+        });
+        stream.once("error", reject);
+        stream.once("end", () => resolve(lines));
+    });
+}
+
+const workspaceDeps: workspace.WorkspaceDeps = {
+    gitRead,
+    realpath: (path) => realpath(path),
+    lstat: async (path) => {
+        const stat = await lstat(path).catch(() => null);
+        return stat ? { size: stat.size, file: stat.isFile() } : null;
+    },
+    readHead: async (path, maxBytes) => {
+        const handle = await open(path, "r");
+        try {
+            const buffer = Buffer.alloc(maxBytes);
+            const { bytesRead } = await handle.read(buffer, 0, maxBytes, 0);
+            return buffer.subarray(0, bytesRead);
+        } finally {
+            await handle.close();
+        }
+    },
+    countLines
+};
+
 class RunnerService {
     #server: string | null = null;
     #connection: RunnerConnection | null = null;
@@ -216,6 +289,7 @@ class RunnerService {
             onCommand: (frame) => {
                 if (this.#sessions.handle(frame) || this.#chat.handle(frame)) return;
                 if (frame.type === "toolchain.prepare") void this.#prepareRequested(frame.requestId, frame.agents);
+                if (frame.type === "workspace.read") void this.#readWorkspace(frame);
             },
             onState: (state) => {
                 this.#state = state;
@@ -298,6 +372,14 @@ class RunnerService {
         return result.ok;
     }
 
+    async #readWorkspace(frame: Extract<ServerFrame, { type: "workspace.read"; }>): Promise<void> {
+        const answer = await workspace.readWorkspace(this.#sessions.checkout(frame.sessionId), frame.query, workspaceDeps).catch((error: unknown) => {
+            console.warn(`runner: workspace read for ${frame.sessionId} failed: ${String(error)}`);
+            return { kind: "nocheckout" } as const;
+        });
+        this.#connection?.send({ type: "workspace.answer", requestId: frame.requestId, sessionId: frame.sessionId, answer });
+    }
+
     async #prepareRequested(requestId: string, agents: string[]): Promise<void> {
         await this.#prepare(agents, (progress) => this.#connection?.send({ type: "toolchain.progress", requestId, ...progress }));
     }
@@ -355,7 +437,7 @@ class RunnerService {
             shells: [],
             clis: ready.filter((item) => agentSet.has(item.tool)).map((item) => ({ id: item.tool, version: item.version, signedIn: "unknown" as const })),
             maxSessions: MAX_SESSIONS,
-            features: ["toolchain", "claude-chat"],
+            features: ["toolchain", "claude-chat", "workspace-read"],
             toolchain: ready
         };
     }
