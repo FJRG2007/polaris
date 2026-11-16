@@ -34,6 +34,7 @@ import { agentFor } from "@/lib/polar/agents/store";
 import { agentTaskPrompt } from "@/lib/polar/agents/shared";
 import { codeComposerFor, type CodeComposer } from "@/lib/polar/agents/composer-agents";
 import { resolvedStart } from "@/lib/polar/agents/resolve-start";
+import { liveSourceFor } from "@/lib/polar/agents/code-sources";
 import { listComputers } from "@/lib/computers/computer-service";
 import { placeOf } from "@/lib/polar/code-place";
 import { codeStartersSchema, starterPrompt, type StarterSkill } from "@/lib/polar/code-starters";
@@ -764,6 +765,88 @@ export async function polarCodeModel(user: SessionUser, input: unknown): Promise
     if ((await accessOf(user)) !== "manage")
         return { error: (await getTranslations("polar"))("code.noAccess") };
     return setSessionModelAction(input);
+}
+
+/** The models a running session can switch to, as its thread's picker offers
+ *  them: those of the source it already signs in with, for a tool that changes
+ *  model mid-session (Claude Code). `id` is what `polarCodeModel` takes;
+ *  "default" is the account's own. Null when the session is not this person's
+ *  to read. */
+export async function polarCodeModels(
+    user: SessionUser,
+    sessionId: string
+): Promise<{
+    title: string;
+    current: string;
+    switchable: boolean;
+    models: Array<{ id: string; name: string; provider: string }>;
+} | null> {
+    const thread = await polarCodeThread(user, sessionId);
+    if (!thread) return null;
+    const view = thread.view;
+    const current = view.modelChoice?.model ?? "default";
+    const switchable = thread.canManage && thread.session.live && core.takesPermissionMode(view.cli);
+    if (!switchable) return { title: thread.session.title, current, switchable, models: [] };
+    const choices = await polarCodeChoices(user);
+    const source = choices ? liveSourceFor(choices.code.sources, view) : null;
+    return {
+        title: thread.session.title,
+        current,
+        switchable,
+        models: (source?.models ?? []).map((model) => ({
+            id: model.model ?? "default",
+            name: model.name,
+            provider: model.provider
+        }))
+    };
+}
+
+/** A repository named aloud, matched to one the person can start in: the full
+ *  name, or the repository's own name without its owner. */
+export function repositoryNamed<T extends { name: string }>(repos: readonly T[], spoken: string): T | null {
+    const wanted = spoken.trim().toLowerCase();
+    if (!wanted) return null;
+    return (
+        repos.find((repo) => repo.name.toLowerCase() === wanted) ??
+        repos.find((repo) => repo.name.toLowerCase().split("/").at(-1) === wanted) ??
+        null
+    );
+}
+
+/**
+ * A new session like `from` - the same tool, account, model and place - in
+ * the same repository or the one named, with no first message: what is to be
+ * done is sent to it next. Starts through `polarCodeStart`, so the same access
+ * checks apply and the tool is resolved again from this person's own sources.
+ */
+export async function polarCodeStartLike(
+    user: SessionUser,
+    input: { from: string; title: string; repository: string | null }
+): Promise<{ id?: string; error?: string }> {
+    const thread = await polarCodeThread(user, input.from);
+    if (!thread) return { error: "not_found" };
+    const view = thread.view;
+    let repoId = view.repoId;
+    if (input.repository) {
+        const choices = await polarCodeChoices(user);
+        if (!choices) return { error: (await getTranslations("polar"))("code.noAccess") };
+        const repo = repositoryNamed(choices.repos, input.repository);
+        if (!repo) return { error: "no_repository" };
+        repoId = repo.id;
+    }
+    return polarCodeStart(user, {
+        repoId,
+        title: input.title,
+        cli: view.cli,
+        ...(view.command ? { command: view.command } : {}),
+        accountId: view.accountId,
+        useMachineLogin: view.useMachineLogin,
+        modelChoice: view.modelChoice,
+        place: view.place,
+        hostId: view.hostId,
+        runnerId: view.runnerId,
+        prompt: ""
+    });
 }
 
 /** Change how hard a running Claude session thinks, from its thread. */

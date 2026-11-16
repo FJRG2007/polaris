@@ -35,7 +35,9 @@ vi.mock("@/lib/polar/code", () => ({
     polarCodeOverview: async () => ({ sessions: [] }),
     polarCodePrompt: async () => ({}),
     polarCodeInterrupt: async () => ({}),
-    polarCodeModel: async () => ({})
+    polarCodeModel: async () => ({}),
+    polarCodeModels: async () => null,
+    polarCodeStartLike: async () => ({})
 }));
 vi.mock("@/lib/polar/models", () => ({
     resolvePolarModel: async () => (state.model ? { model: "fallback" } : "no_model")

@@ -196,6 +196,8 @@ const {
     polarCodeOverview,
     polarCodeQueue,
     polarCodeStart,
+    polarCodeStartLike,
+    repositoryNamed,
     polarCodeThread,
     polarCodeTranscript
 } = await import("@/lib/polar/code");
@@ -477,6 +479,58 @@ describe("polarCodeCancel", () => {
         await polarCodeCancel(USER, { sessionId: "not-an-id" });
         await polarCodeCancel(USER, null);
         expect(state.stopped).toEqual([SESSION, "", ""]);
+    });
+});
+
+describe("polarCodeStartLike", () => {
+    const PLAN = "0190c6a0-0000-7000-8000-0000000000a1";
+    const REPO = "22222222-2222-4222-8222-222222222222";
+    const like = {
+        repoId: REPO,
+        cli: "claude",
+        command: null,
+        accountId: PLAN,
+        useMachineLogin: false,
+        modelChoice: { provider: "anthropic", model: "claude-opus-4-1", payer: null },
+        place: "local",
+        hostId: null,
+        runnerId: null
+    };
+
+    it("starts a session like the one on screen, with no first message", async () => {
+        state.held = new Set(["agents.read", "agents.manage"]);
+        state.startedWith = null;
+        Object.assign(session, like);
+        try {
+            expect(await polarCodeStartLike(USER, { from: SESSION, title: "Fix the docs", repository: null })).toEqual({
+                id: "started"
+            });
+            expect(state.startedWith).toMatchObject({
+                repoId: REPO,
+                title: "Fix the docs",
+                cli: "claude",
+                accountId: PLAN,
+                useMachineLogin: false,
+                modelChoice: { provider: "anthropic", model: "claude-opus-4-1" },
+                prompt: ""
+            });
+            // A repository not among the person's starts nothing.
+            state.startedWith = null;
+            expect(await polarCodeStartLike(USER, { from: SESSION, title: "X", repository: "acme/nowhere" })).toEqual({
+                error: "no_repository"
+            });
+            expect(state.startedWith).toBeNull();
+        } finally {
+            for (const key of Object.keys(like)) delete (session as Record<string, unknown>)[key];
+        }
+    });
+
+    it("matches a spoken repository by its full name or its own name", () => {
+        const repos = [{ name: "acme/web" }, { name: "acme/api" }];
+        expect(repositoryNamed(repos, " Acme/API ")).toBe(repos[1]);
+        expect(repositoryNamed(repos, "web")).toBe(repos[0]);
+        expect(repositoryNamed(repos, "acme")).toBeNull();
+        expect(repositoryNamed(repos, "")).toBeNull();
     });
 });
 

@@ -21,8 +21,10 @@ import { voiceDelegateBodySchema, type VoiceDelegateAnswer } from "@/lib/polar/v
 import {
     polarCodeInterrupt,
     polarCodeModel,
+    polarCodeModels,
     polarCodeOverview,
     polarCodePrompt,
+    polarCodeStartLike,
     polarCodeThread
 } from "@/lib/polar/code";
 import {
@@ -93,6 +95,8 @@ export async function POST(request: Request): Promise<Response> {
         prompt: (sessionId, text) => polarCodePrompt(user, { sessionId, text, attachments: [] }),
         interrupt: (sessionId) => polarCodeInterrupt(user, { sessionId }),
         model: (sessionId, model) => polarCodeModel(user, { sessionId, model }),
+        models: (sessionId) => polarCodeModels(user, sessionId),
+        create: (input) => polarCodeStartLike(user, input),
         sleep
     };
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(TIMEOUT_MS)]);

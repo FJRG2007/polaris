@@ -64,6 +64,23 @@ function fakeDeps(threads: Record<string, PolarCodeThread>, rows: PolarCodeRow[]
             calls.push(`model:${id}:${model}`);
             return {};
         },
+        models: async (id) =>
+            threads[id]
+                ? {
+                      title: threads[id]!.session.title,
+                      current: "default",
+                      switchable: true,
+                      models: [
+                          { id: "default", name: "Default model", provider: "anthropic" },
+                          { id: "claude-opus-4-1", name: "Claude Opus 4.1", provider: "anthropic" },
+                          { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", provider: "anthropic" }
+                      ]
+                  }
+                : null,
+        create: async (input) => {
+            calls.push(`create:${input.from}:${input.title}:${input.repository ?? ""}`);
+            return input.repository === "nowhere" ? { error: "no_repository" } : { id: B };
+        },
         sleep: async () => undefined
     };
     return { deps, calls, prompts };
@@ -170,6 +187,40 @@ describe("voice delegator tools", () => {
         expect(await run(s.tools, "switch_model", { model: "Default" })).toEqual({ switched: "default" });
         expect(await run(s.tools, "switch_model", { model: "opus; rm -rf /" })).toHaveProperty("error");
         expect(s.calls).toEqual([`model:${A}:opus`, `model:${A}:null`]);
+    });
+
+    it("lists the models a session can switch to, best match first, the current one marked", async () => {
+        const s = setup({ [A]: thread(row(A, "Login"), []) }, []);
+        const all = await run(s.tools, "list_models", {});
+        expect(all.session).toBe("Login");
+        expect(all.matches).toBe(3);
+        expect(all.models[0]).toEqual({ id: "default", name: "Default model", provider: "anthropic", current: true });
+        const opus = await run(s.tools, "list_models", { query: "opus" });
+        expect(opus.models.map((model: { id: string }) => model.id)).toEqual(["claude-opus-4-1"]);
+        expect((await run(s.tools, "list_models", { query: "sonnet 4.5" })).models[0].id).toBe("claude-sonnet-4-5");
+        expect(await run(s.tools, "list_models", { session_id: B })).toHaveProperty("error");
+    });
+
+    it("says when a session's tool cannot change model as it runs", async () => {
+        const s = setup({}, []);
+        s.deps.models = async () => ({ title: "Login", current: "default", switchable: false, models: [] });
+        expect(await run(voiceTools(s.deps, s.request, s.outcome), "list_models", {})).toEqual({
+            session: "Login",
+            error: "This session cannot change model while it runs."
+        });
+    });
+
+    it("creates a session like the viewed one without moving the screen", async () => {
+        const s = setup({}, []);
+        expect(await run(s.tools, "create_session", { title: "Fix the docs" })).toEqual({ session_id: B });
+        expect(await run(s.tools, "create_session", { title: "Other", repository: "acme/api" })).toEqual({
+            session_id: B
+        });
+        expect(await run(s.tools, "create_session", { title: "X", repository: "nowhere" })).toEqual({
+            error: "No repository by that name. No session was created."
+        });
+        expect(s.calls).toEqual([`create:${A}:Fix the docs:`, `create:${A}:Other:acme/api`, `create:${A}:X:nowhere`]);
+        expect(s.outcome.open).toBeNull();
     });
 
     it("searches best match first and marks the session on screen", async () => {

@@ -6,7 +6,8 @@
  * a Code session comes here, not to the session: a small model with session
  * tools decides what it means - send work to a session, read how one is
  * doing, stop its turn, switch its model, show another one - acts, and answers
- * in one to three sentences the call reads aloud. A session is only ever told
+ * in one to three sentences the call reads aloud. It can also start a new
+ * session like the one on screen and list the models a session can switch to. A session is only ever told
  * something through `send_message`, which wraps the words in the voice
  * handoff (`voice-handoff.ts`) so its agent knows they were spoken.
  *
@@ -38,6 +39,18 @@ export interface DelegateDeps {
     prompt(sessionId: string, text: string): Promise<{ error?: string; queued?: boolean }>;
     interrupt(sessionId: string): Promise<{ error?: string }>;
     model(sessionId: string, model: string | null): Promise<{ error?: string }>;
+    /** The models a session can switch to (`polarCodeModels`); null when it is not readable. */
+    models(sessionId: string): Promise<{
+        title: string;
+        current: string;
+        switchable: boolean;
+        models: ReadonlyArray<{ id: string; name: string; provider: string }>;
+    } | null>;
+    /** A new session like `from`, with no first message (`polarCodeStartLike`). */
+    create(input: { from: string; title: string; repository: string | null }): Promise<{
+        id?: string;
+        error?: string;
+    }>;
     /** Waits, unless aborted. Injected so a test does not wait. */
     sleep(ms: number, signal: AbortSignal): Promise<void>;
 }
@@ -59,6 +72,8 @@ const READ_MOST = 12;
 /** How long `wait_for_session` waits, and how often it looks. */
 const WAIT_MS = 60_000;
 const WAIT_EVERY_MS = 2_000;
+/** Most models one `list_models` returns. */
+const MODELS_MOST = 50;
 /** Most tool rounds before the delegator has to answer. */
 const STEPS_MOST = 6;
 
@@ -68,7 +83,8 @@ You manage sessions; you never write code yourself. Coding work happens by sendi
 - To switch what the user sees, call open_session. Do NOT call open_session just to message, read, or check another session: pass session_id to send_message or read_session so the user's view stays put unless they asked to switch.
 - To find a session by name, use search_sessions. Use the exact session IDs returned by tools.
 - A message sent while the agent is working waits for its current turn. When the user wants it to stop what it is doing and do something else instead, use delivery "steer": that stops the current turn first.
-- To change a session's model ("use Opus", "switch to Sonnet"), call switch_model with the short model name the agent's tool takes (opus, sonnet, haiku, or a full model id); "default" goes back to the account's default. Switch only when the user asks.
+- To change a session's model ("use Opus", "switch to Sonnet"), call list_models with a query to get its id, then switch_model with that id (no session_id means the one on screen); "default" goes back to the account's default. Switch only when the user asks; if several models fit what they said, ask which one.
+- To start a new session, search_sessions first so you do not duplicate one, then create_session (it does not move the screen and starts with no task), then send_message the work to the new session's id.
 - To start work, send_message to the right session (usually the viewed one), then answer right away that it started; Polar reads the session's reply aloud when it lands. Only wait_for_session when the user asked for the result now or the work is a quick lookup.
 - For any status or "did it respond?" question, always call read_session (or list_sessions) in this turn rather than answering from earlier turns.
 - What a session already wrote, you read; never ask it to restate it. Reads hold text excerpts of at most ${EXCERPT_CHARS} characters per message.
@@ -94,6 +110,32 @@ function schema<T extends z.ZodType>(input: T): FlexibleSchema<z.infer<T>> {
 
 const sessionId = z.string().trim().uuid().optional().describe("Omit for the viewed session");
 const limit = z.number().int().min(1).max(20).optional();
+
+/** Ported from packages/app/src/voice/search.ts (`matchModels`): models whose
+ *  name, provider or id hold most of the spoken words, best first; all of them
+ *  for no words. */
+export function matchModels<T extends { id: string; name: string; provider: string }>(
+    models: readonly T[],
+    query: string | undefined
+): T[] {
+    const words = (text: string) =>
+        text
+            .normalize("NFD")
+            .replace(/\p{Diacritic}/gu, "")
+            .toLowerCase()
+            .split(/[^\p{L}\p{N}.]+/u)
+            .filter(Boolean);
+    const terms = words(query ?? "");
+    if (terms.length === 0) return [...models];
+    return models
+        .map((model, index) => {
+            const haystack = words(`${model.name} ${model.provider}/${model.id}`);
+            return { model, index, hits: terms.filter((term) => haystack.some((word) => word.startsWith(term))).length };
+        })
+        .filter((item) => item.hits > 0)
+        .sort((a, b) => b.hits - a.hits || a.index - b.index)
+        .map((item) => item.model);
+}
 
 /** A session as the model reads it. */
 function row(session: PolarCodeRow, viewed: string) {
@@ -234,6 +276,57 @@ export function voiceTools(
                         return { error: "That is not a model name the agent takes." };
                     const answer = await deps.model(target(session_id), next);
                     return answer.error ? { error: answer.error } : { switched: next ?? "default" };
+                })
+        }),
+        list_models: tool({
+            description:
+                "Models a session can switch to (defaults to the viewed one). Each has id (pass it to switch_model), name, provider, and current.",
+            inputSchema: schema(
+                z.object({
+                    session_id: sessionId,
+                    query: z.string().trim().max(200).optional().describe("Words from the model's name, id, or provider"),
+                    limit: z.number().int().min(1).max(MODELS_MOST).optional()
+                })
+            ),
+            execute: ({ session_id, query, limit: most }) =>
+                guard(async () => {
+                    const listed = await deps.models(target(session_id));
+                    if (!listed) return { error: "No session with that ID. Nothing was listed." };
+                    if (!listed.switchable)
+                        return { session: listed.title, error: "This session cannot change model while it runs." };
+                    const models = matchModels(listed.models, query);
+                    return {
+                        session: listed.title,
+                        matches: models.length,
+                        models: models.slice(0, most ?? 20).map((model) => ({
+                            ...model,
+                            current: model.id === listed.current
+                        }))
+                    };
+                })
+        }),
+        create_session: tool({
+            description:
+                "Start a new session with the viewed session's agent, account and model, in its repository or the one named. Starts with no task and does not move the screen.",
+            inputSchema: schema(
+                z.object({
+                    title: z.string().trim().min(1).max(80),
+                    repository: z
+                        .string()
+                        .trim()
+                        .min(1)
+                        .max(200)
+                        .optional()
+                        .describe("owner/name or name; omit for the viewed session's repository")
+                })
+            ),
+            execute: ({ title, repository }) =>
+                guard(async () => {
+                    const created = await deps.create({ from: request.viewed, title, repository: repository ?? null });
+                    if (created.error === "no_repository")
+                        return { error: "No repository by that name. No session was created." };
+                    if (created.error || !created.id) return { error: created.error ?? "No session was created." };
+                    return { session_id: created.id };
                 })
         }),
         open_session: tool({
