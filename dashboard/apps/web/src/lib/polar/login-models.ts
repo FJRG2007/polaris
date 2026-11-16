@@ -4,12 +4,17 @@
  * nothing here - its access token is a bearer on the endpoint an xAI key uses.
  */
 
-import type { LanguageModel } from "ai";
+import { wrapLanguageModel, type LanguageModel, type LanguageModelMiddleware } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { ChatCredential } from "@/lib/agents/model-keys";
-import { copilotBaseUrl, copilotChatHeaders } from "@/lib/agents/signin-copilot";
+import {
+    copilotBaseUrl,
+    copilotChatHeaders,
+    copilotEndpoint,
+    copilotListsModel
+} from "@/lib/agents/signin-copilot";
 import { loginRequest, type LoginRequest } from "@/lib/agents/provider-login-http";
 import {
     DIRECT_ACCESS_TTL_MS,
@@ -20,13 +25,44 @@ import {
     type DirectAccess
 } from "@/lib/agents/signin-gitlab";
 
+/**
+ * Nothing is kept on Copilot's side between turns: every turn sends the whole
+ * conversation, with reasoning carried encrypted instead of by a stored id
+ * Copilot may not hold (OpenCode's `openai-compatible-responses.ts` defaults).
+ */
+const STATELESS_RESPONSES: LanguageModelMiddleware = {
+    transformParams: async ({ params }) => ({
+        ...params,
+        providerOptions: {
+            ...params.providerOptions,
+            openai: {
+                store: false,
+                include: ["reasoning.encrypted_content"],
+                ...params.providerOptions?.openai
+            }
+        }
+    })
+};
+
+/** A Copilot model on the API that answers it: `/responses` for the models
+ *  served only there, `/chat/completions` for the rest (`copilotEndpoint`). */
+/**
+ * Whether a catalogue model is offered on a login provider. Copilot drops one
+ * alias; every other provider lists what the catalogue carries. Pure.
+ */
+export function loginListsModel(provider: string, model: string): boolean {
+    if (provider === "github-copilot") return copilotListsModel(model);
+    return true;
+}
+
 export function copilotModel(credential: ChatCredential, model: string): LanguageModel {
-    return createOpenAICompatible({
-        name: "github-copilot",
-        baseURL: copilotBaseUrl(credential.oauth?.apiEndpoint),
-        apiKey: credential.secret,
-        headers: copilotChatHeaders()
-    })(model);
+    const baseURL = copilotBaseUrl(credential.oauth?.apiEndpoint);
+    const headers = copilotChatHeaders();
+    if (copilotEndpoint(model) === "responses") {
+        const client = createOpenAI({ name: "github-copilot", baseURL, apiKey: credential.secret, headers });
+        return wrapLanguageModel({ model: client.responses(model), middleware: STATELESS_RESPONSES });
+    }
+    return createOpenAICompatible({ name: "github-copilot", baseURL, apiKey: credential.secret, headers })(model);
 }
 
 /** Gateway tokens by the GitLab access token they were issued for, shared by

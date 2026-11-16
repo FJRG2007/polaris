@@ -14,7 +14,7 @@
  * Server-only.
  */
 
-import { copilotModel, gitlabModel } from "@/lib/polar/login-models";
+import { copilotModel, gitlabModel, loginListsModel } from "@/lib/polar/login-models";
 import { wrapLanguageModel, type LanguageModel } from "ai";
 import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
@@ -209,6 +209,7 @@ async function keyedModelOptions(
         } else {
             models = catalogue
                 .filter((model) => prefixes.get(model.provider) === slug)
+                .filter((model) => loginListsModel(slug, model.modelId))
                 .map((model) =>
                     catalogueOption(
                         slug,

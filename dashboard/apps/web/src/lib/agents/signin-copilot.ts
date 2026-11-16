@@ -156,3 +156,26 @@ export function copilotChatHeaders(): Record<string, string> {
         "x-initiator": "user"
     };
 }
+
+/** The Copilot API a model answers on. */
+export type CopilotEndpoint = "responses" | "chat";
+
+/**
+ * Which Copilot API serves a model, by its id. Copilot serves GPT-5 and later
+ * (GPT-5 mini aside), Grok and MAI Code only on `/responses`, and the rest on
+ * `/chat/completions` (OpenCode's `github-copilot/models.ts` `fallbackEndpoint`).
+ * Pure.
+ */
+export function copilotEndpoint(model: string): CopilotEndpoint {
+    const gpt = /^gpt-(\d+)/.exec(model);
+    if (gpt && Number(gpt[1]) >= 5 && !model.startsWith("gpt-5-mini")) return "responses";
+    if (model.startsWith("grok-") || model.startsWith("mai-code-")) return "responses";
+    return "chat";
+}
+
+/** Whether a catalogue model is offered on Copilot. `gpt-5-chat-latest` is a
+ *  chat-only alias that collides with GPT-5's `/responses` route, so it is left
+ *  out for Copilot alone, as OpenCode does. Pure. */
+export function copilotListsModel(model: string): boolean {
+    return model !== "gpt-5-chat-latest";
+}
