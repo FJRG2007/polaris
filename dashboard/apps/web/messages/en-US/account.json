@@ -1304,7 +1304,18 @@
             "noCopilot": "This GitHub account has no Copilot access. It needs a Copilot plan or a seat from an organization.",
             "noCopilotFree": "This GitHub account isn't signed up for Copilot. Sign up for Copilot Free on GitHub, then sign in again.",
             "noDuo": "Signed in, but GitLab Duo isn't available to this account.",
-            "failed": "The sign-in didn't finish. Try again in a moment."
+            "failed": "The sign-in didn't finish. Try again in a moment.",
+            "go": {
+                "title": "OpenCode Go allowance",
+                "refresh": "Read the allowance again",
+                "rolling": "5 hours",
+                "weekly": "Week",
+                "monthly": "Month",
+                "used": "{percent}% used",
+                "resets": "Starts over {when}",
+                "none": "This workspace has no Go subscription.",
+                "failed": "OpenCode didn't answer. Try again in a moment."
+            }
         }
     },
     "dns": {

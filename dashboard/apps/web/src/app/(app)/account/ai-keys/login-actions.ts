@@ -17,6 +17,7 @@ import {
     type LoginStart,
     type LoginState
 } from "@/lib/agents/provider-logins";
+import { goUsageFor, type GoUsageRow } from "@/lib/agents/go-usage";
 
 const providerSchema = z.enum(PROVIDER_LOGINS);
 const idSchema = z.string().uuid();
@@ -46,4 +47,10 @@ export async function finishGitlabLoginAction(input: unknown): Promise<LoginStat
     const state = await finishGitlabLogin(user.id, id, pasted);
     if (state.state === "done") revalidatePath("/account/ai-keys");
     return state;
+}
+
+/** The OpenCode Go allowance of each of this person's Console sign-ins. */
+export async function goUsageAction(): Promise<GoUsageRow[]> {
+    const user = await requireUser();
+    return goUsageFor(user.id);
 }

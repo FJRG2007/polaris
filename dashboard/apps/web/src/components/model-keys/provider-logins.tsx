@@ -2,14 +2,15 @@
 
 /**
  * Sign in with a subscription instead of pasting a key: SuperGrok, GitHub
- * Copilot and GitLab Duo, plus a pointer for Poe, whose sign-in cannot return
+ * Copilot, GitLab Duo and an OpenCode Console account (Zen or Go, whose Go
+ * allowance is shown here once signed in), plus a pointer for Poe, whose sign-in cannot return
  * to a self-hosted server. What a login ends with is an ordinary key row in the
  * table below, named after the subscription.
  */
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import {
     Button,
     Card,
@@ -27,9 +28,12 @@ import {
 import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useDisplayFormat } from "@/components/display-format";
+import type { GoUsageRow } from "@/lib/agents/go-usage";
 import type { LoginStart, LoginState, ProviderLogin } from "@/lib/agents/provider-logins";
 import {
     finishGitlabLoginAction,
+    goUsageAction,
     pollProviderLoginAction,
     startProviderLoginAction
 } from "@/app/(app)/account/ai-keys/login-actions";
@@ -37,7 +41,9 @@ import {
 const LOGINS: readonly { provider: ProviderLogin; name: string }[] = [
     { provider: "xai", name: "SuperGrok" }, // i18n-ignore: product name
     { provider: "github-copilot", name: "GitHub Copilot" }, // i18n-ignore: product name
-    { provider: "gitlab", name: "GitLab Duo" } // i18n-ignore: product name
+    { provider: "gitlab", name: "GitLab Duo" }, // i18n-ignore: product name
+    { provider: "opencode", name: "OpenCode Zen" }, // i18n-ignore: product name
+    { provider: "opencode-go", name: "OpenCode Go" } // i18n-ignore: product name
 ];
 
 const POE_DOCS = "https://creator.poe.com/docs/external-applications/openai-compatible-api";
@@ -62,6 +68,7 @@ export function ProviderLogins() {
                         </Button>
                     ))}
                 </div>
+                <GoUsageList />
                 <p className="text-muted-foreground text-xs">
                     {t("aiKeys.logins.poe")}{" "}
                     <a className="underline" href={POE_DOCS} target="_blank" rel="noreferrer noopener">
@@ -77,6 +84,93 @@ export function ProviderLogins() {
                 />
             ) : null}
         </Card>
+    );
+}
+
+const METERS = ["rolling", "weekly", "monthly"] as const;
+
+/**
+ * Each Console sign-in's Go allowance: how much is used and when it starts
+ * over, read when the card opens and on request (the server keeps a reading
+ * for a minute). Renders nothing for somebody with no Console sign-in.
+ */
+function GoUsageList() {
+    const t = useTranslations("account");
+    const format = useDisplayFormat();
+    const [rows, setRows] = useState<GoUsageRow[] | null>(null);
+    const [loading, setLoading] = useState(true);
+    const load = () => {
+        setLoading(true);
+        void goUsageAction()
+            .then(setRows)
+            .catch(() => setRows((current) => current ?? []))
+            .finally(() => setLoading(false));
+    };
+    useEffect(load, []);
+    if (!rows || rows.length === 0) return null;
+    return (
+        <div className="flex flex-col gap-2 border-t pt-2">
+            <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium">{t("aiKeys.logins.go.title")}</p>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={load}
+                    disabled={loading}
+                    aria-label={t("aiKeys.logins.go.refresh")}
+                >
+                    <RefreshCw className={loading ? "size-4 shrink-0 animate-spin" : "size-4 shrink-0"} />
+                </Button>
+            </div>
+            {rows.map((row) => {
+                const label = row.workspace ? `${row.name} - ${row.workspace}` : row.name;
+                return (
+                    <div key={row.keyId} className="flex min-w-0 flex-col gap-1">
+                        <p className="truncate text-xs font-medium" title={label}>
+                            {label}
+                        </p>
+                        {row.failed ? (
+                            <p className="text-muted-foreground text-xs">{t("aiKeys.logins.go.failed")}</p>
+                        ) : !row.usage ? (
+                            <p className="text-muted-foreground text-xs">{t("aiKeys.logins.go.none")}</p>
+                        ) : (
+                            <ul className="grid gap-2 sm:grid-cols-3">
+                                {METERS.map((name) => {
+                                    const meter = row.usage![name];
+                                    const used = Math.min(100, Math.max(0, Math.round(meter.percent)));
+                                    return (
+                                        <li key={name} className="flex min-w-0 flex-col gap-0.5 text-xs">
+                                            <span className="flex justify-between gap-2">
+                                                <span className="truncate">{t(`aiKeys.logins.go.${name}`)}</span>
+                                                <span className={meter.limited ? "text-destructive shrink-0" : "shrink-0"}>
+                                                    {t("aiKeys.logins.go.used", { percent: used })}
+                                                </span>
+                                            </span>
+                                            <span
+                                                className="bg-muted block h-1.5 overflow-hidden rounded-full"
+                                                role="meter"
+                                                aria-valuemin={0}
+                                                aria-valuemax={100}
+                                                aria-valuenow={used}
+                                                aria-label={t(`aiKeys.logins.go.${name}`)}
+                                            >
+                                                <span
+                                                    className={meter.limited ? "bg-destructive block h-full" : "bg-primary block h-full"}
+                                                    style={{ width: `${used}%` }}
+                                                />
+                                            </span>
+                                            <span className="text-muted-foreground truncate">
+                                                {t("aiKeys.logins.go.resets", { when: format.dateTime(meter.resetsAt) })}
+                                            </span>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
     );
 }
 

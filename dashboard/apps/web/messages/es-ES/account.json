@@ -1304,7 +1304,18 @@
             "noCopilot": "Esta cuenta de GitHub no tiene Copilot. Necesita un plan o un puesto de una organización.",
             "noCopilotFree": "Esta cuenta no está dada de alta en Copilot. Activa Copilot Free en GitHub y vuelve a entrar.",
             "noDuo": "Acceso listo, pero GitLab Duo no está disponible para esta cuenta.",
-            "failed": "El acceso no terminó. Prueba de nuevo en un momento."
+            "failed": "El acceso no terminó. Prueba de nuevo en un momento.",
+            "go": {
+                "title": "Cuota de OpenCode Go",
+                "refresh": "Leer la cuota de nuevo",
+                "rolling": "5 horas",
+                "weekly": "Semana",
+                "monthly": "Mes",
+                "used": "{percent}% usado",
+                "resets": "Se renueva {when}",
+                "none": "Este espacio no tiene suscripción a Go.",
+                "failed": "OpenCode no respondió. Prueba en un momento."
+            }
         }
     },
     "dns": {

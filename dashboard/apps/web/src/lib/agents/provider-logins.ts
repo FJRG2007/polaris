@@ -1,6 +1,6 @@
 /**
- * Subscription logins for Polar: SuperGrok (xAI), GitHub Copilot and GitLab
- * Duo, run from the server and stored as the person's own model key on the
+ * Subscription logins for Polar: SuperGrok (xAI), GitHub Copilot, GitLab Duo
+ * and an OpenCode Console account (Zen or Go), run from the server and stored as the person's own model key on the
  * provider's slug (`provider-oauth.ts` is the stored shape).
  *
  * An attempt in flight lives in server memory only, keyed by an id the screen
@@ -12,25 +12,32 @@ import { randomUUID } from "node:crypto";
 import * as xai from "@/lib/agents/signin-xai";
 import * as gitlab from "@/lib/agents/signin-gitlab";
 import * as copilot from "@/lib/agents/signin-copilot";
+import * as opencode from "@/lib/agents/signin-opencode";
 import { DirectSigninError } from "@/lib/agents/signin-direct";
 import { writeOAuthSecret } from "@/lib/agents/provider-oauth";
 import { createModelKey, ownerHasModelKeyName } from "@/lib/agents/model-keys";
 import { asDirectPost, loginRequest, type LoginRequest } from "@/lib/agents/provider-login-http";
 
-export const PROVIDER_LOGINS = ["xai", "github-copilot", "gitlab"] as const;
+export const PROVIDER_LOGINS = ["xai", "github-copilot", "gitlab", "opencode", "opencode-go"] as const;
 export type ProviderLogin = (typeof PROVIDER_LOGINS)[number];
 
 /** The key's name in the table, before a number is added to keep it unique. */
 const KEY_NAME: Record<ProviderLogin, string> = {
     xai: "SuperGrok", // i18n-ignore: product name
     "github-copilot": "GitHub Copilot", // i18n-ignore: product name
-    gitlab: "GitLab Duo" // i18n-ignore: product name
+    gitlab: "GitLab Duo", // i18n-ignore: product name
+    opencode: "OpenCode Zen", // i18n-ignore: product name
+    "opencode-go": "OpenCode Go" // i18n-ignore: product name
 };
+
+/** The Console sign-in serves both: one account, stored on the slug chosen. */
+type ConsoleSlug = "opencode" | "opencode-go";
 
 type Pending =
     | { kind: "xai"; device: xai.XaiDevice }
     | { kind: "github-copilot"; device: copilot.CopilotDevice }
-    | { kind: "gitlab"; authorization: gitlab.GitlabAuthorization };
+    | { kind: "gitlab"; authorization: gitlab.GitlabAuthorization }
+    | { kind: "opencode"; slug: ConsoleSlug; device: opencode.OpencodeDevice };
 
 interface Attempt {
     userId: string;
@@ -91,6 +98,11 @@ export async function startProviderLogin(
         pending = { kind: "github-copilot", device };
         intervalMs = device.intervalMs;
         start = { url: device.verificationUrl, userCode: device.userCode, paste: false };
+    } else if (provider === "opencode" || provider === "opencode-go") {
+        const device = await opencode.requestOpencodeDevice(request, now);
+        pending = { kind: "opencode", slug: provider, device };
+        intervalMs = device.intervalMs;
+        start = { url: device.verificationUrl, userCode: device.userCode, paste: false };
     } else {
         const authorization = gitlab.startGitlabAuthorization();
         pending = { kind: "gitlab", authorization };
@@ -128,6 +140,15 @@ export async function pollProviderLogin(
             if (poll.state === "done") {
                 attempts.delete(id);
                 return { state: "done", keyId: await store(userId, "xai", writeOAuthSecret(poll.tokens)) };
+            }
+            return settle(id, attempt, poll.state);
+        }
+        if (attempt.pending.kind === "opencode") {
+            const { slug } = attempt.pending;
+            const poll = await opencode.pollOpencodeDevice(request, attempt.pending.device, now);
+            if (poll.state === "done") {
+                attempts.delete(id);
+                return { state: "done", keyId: await store(userId, slug, writeOAuthSecret(poll.login)) };
             }
             return settle(id, attempt, poll.state);
         }

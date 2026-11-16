@@ -12,6 +12,7 @@
 
 import { refreshXaiTokens } from "@/lib/agents/signin-xai";
 import { refreshGitlabTokens } from "@/lib/agents/signin-gitlab";
+import { refreshOpencodeTokens } from "@/lib/agents/signin-opencode";
 import { asDirectPost, loginRequest, type LoginRequest } from "@/lib/agents/provider-login-http";
 import { oauthNeedsRefresh, writeOAuthSecret, type StoredOAuth } from "@/lib/agents/provider-oauth";
 
@@ -24,6 +25,10 @@ async function renew(provider: string, login: StoredOAuth, request: LoginRequest
     }
     if (provider === "gitlab") {
         const tokens = await refreshGitlabTokens(request, login, now);
+        return { ...login, ...tokens };
+    }
+    if (provider === "opencode" || provider === "opencode-go") {
+        const tokens = await refreshOpencodeTokens(request, login, now);
         return { ...login, ...tokens };
     }
     // Copilot's GitHub token does not expire; nothing else is a login.
