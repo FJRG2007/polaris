@@ -41,6 +41,9 @@ model User {
     translateGlossaries TranslateGlossary[]
     translateKeepList TranslateKeepList?
     polarToolGrants   PolarToolGrant[]
+    polarCustomTools  PolarCustomTool[]
+    polarPlugins      PolarPlugin[]
+    polarProjectToolApprovals PolarProjectToolApproval[]
     polarConnectors   PolarConnector[]
     polarSkills       PolarSkill[]
     polarSkillOverrides PolarSkillOverride[]
@@ -17009,6 +17012,59 @@ model PolarToolGrant {
     createdAt  DateTime @default(now())
 
     @@unique([ownerId, tool, target])
+}
+
+// A custom tool one person wrote: a script the model may call, with the input
+// it takes (a JSON-schema subset, `lib/polar/custom-tools/shared.ts`). It runs
+// only inside the person's own session sandbox, never on this server.
+// `permission` is "ask", "allow" or "deny".
+model PolarCustomTool {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    ownerId        String   @db.Uuid
+    owner          User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    name           String
+    description    String
+    input          Json     @default("{}")
+    runtime        String   @default("shell")
+    script         String
+    timeoutSeconds Int      @default(60)
+    permission     String   @default("ask")
+    enabled        Boolean  @default(true)
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    @@unique([ownerId, name])
+}
+
+// A plugin one person configured: the events it hears and what it does then,
+// a webhook POST or one of their custom tools (`action`, validated where it is
+// written).
+model PolarPlugin {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    ownerId   String   @db.Uuid
+    owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    name      String
+    events    Json     @default("[]")
+    action    Json
+    enabled   Boolean  @default(true)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([ownerId])
+}
+
+// A person's yes to a repository's own tools (`.polaris/tools`), for the exact
+// set of tool files they reviewed: `digest` hashes them, so a revision that
+// changes any of them needs a new yes.
+model PolarProjectToolApproval {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    ownerId    String   @db.Uuid
+    owner      User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    repository String
+    digest     String
+    createdAt  DateTime @default(now())
+
+    @@unique([ownerId, repository, digest])
 }
 
 // A remote MCP server one person connected to Polar. Its secret (a bearer token,

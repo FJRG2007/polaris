@@ -151,7 +151,7 @@ export function taskToolStandIn(): ToolSet {
         [shared.TASK_TOOL]: tool({
             description: DESCRIPTION,
             inputSchema: polarInputSchema(shared.taskInputSchema),
-            toModelOutput: ({ output }) => ({
+            toModelOutput: ({ output }: { output: unknown }) => ({
                 type: "text",
                 value: taskModelText(shared.readTaskOutput(output) ?? refusedOutput("invalid"))
             })

@@ -19,6 +19,8 @@
  * it only while the goal has turns and time left.
  */
 
+import { polarCustomTools } from "@/lib/polar/custom-tools/runtime";
+import { dispatchPluginEvent } from "@/lib/polar/custom-tools/plugins";
 import { z } from "zod";
 import { NextResponse } from "next/server";
 import {
@@ -274,10 +276,12 @@ export async function POST(request: Request): Promise<Response> {
     if (!body.success) return refuse("invalid", 400);
 
     const access = await polarAccessFor(user.id);
+    // The person's plugins hear the message; they never hold the turn up.
+    void dispatchPluginEvent(user.id, "message.sent", { threadId: body.data.threadId }).catch(() => undefined);
     // The chat's custom agent (`lib/polar/agents`): the one it was started with,
     // read again on every turn so an edit to the agent reaches it at once.
     const agent = await polarThreadAgent(user.id, body.data.threadId, body.data.agentId);
-    const [toolset, connectorSet] = await Promise.all([
+    const [toolset, connectorSet, customSet] = await Promise.all([
         polarTools(user, body.data.code, {
             tools: body.data.off,
             servers: body.data.serversOff
@@ -286,7 +290,12 @@ export async function POST(request: Request): Promise<Response> {
             user,
             access,
             agent && agent.connectorIds.length > 0 ? new Set(agent.connectorIds) : null
-        )
+        ),
+        // The person's own scripts, run in their own session sandbox.
+        polarCustomTools(user.id).catch((error: unknown) => {
+            console.error("polar: could not read the custom tools", error);
+            return { tools: {}, approval: {}, described: {} };
+        })
     ]);
     // Tools the person switched off in Polar's settings: never offered, and
     // never turned up by find_tools either.
@@ -334,6 +343,7 @@ export async function POST(request: Request): Promise<Response> {
             ...polarWebTools("", ""),
             ...connectorSet.tools,
             ...connectorStandIns(body.data.messages, connectorSet.tools),
+            ...customSet.tools,
             ...polarSkillTools([]),
             ...subagentTasks.taskToolStandIn()
         } as never
@@ -540,6 +550,7 @@ export async function POST(request: Request): Promise<Response> {
         ...(web ? repoTools : {}),
         ...(web ? browserTools : {}),
         ...Object.fromEntries(offeredConnectors.map((name) => [name, connectorSet.tools[name]!])),
+        ...Object.fromEntries(Object.entries(customSet.tools).filter(([name]) => !off.has(name))),
         ...skillTools
     }, agentRules);
     // Subagents (`lib/polar/subagents`): a child run of this loop with a subset
@@ -549,6 +560,7 @@ export async function POST(request: Request): Promise<Response> {
     const approvalRules = agentApproval(
         {
             ...toolset.approval,
+            ...customSet.approval,
             ...(body.data.connectors ? connectorSet.approval : {}),
             ...(remembers ? MEMORY_APPROVAL : {}),
             ...(web ? WEB_APPROVAL : {}),

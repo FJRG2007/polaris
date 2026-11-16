@@ -89,6 +89,10 @@ vi.mock("@/lib/polar/access", async () => ({
     ...(await (await import("./fixtures/open-polar-access")).openPolarAccess()),
     polarAccessFor: async () => ({ use: true, spend: true, web: state.web, connectors: true })
 }));
+vi.mock("@/lib/polar/custom-tools/runtime", () => ({
+    polarCustomTools: async () => ({ tools: {}, approval: {}, described: {} })
+}));
+vi.mock("@/lib/polar/custom-tools/plugins", () => ({ dispatchPluginEvent: async () => 0 }));
 vi.mock("@/lib/polar/connectors/store", () => ({
     ownConnectors: async () => state.connectors,
     connectorPolicy: async () => ({ who: "everyone", hosts: [], privateNetwork: false }),
