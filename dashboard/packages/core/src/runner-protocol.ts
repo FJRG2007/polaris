@@ -139,8 +139,36 @@ export const runnerCapabilitiesSchema = frame("capabilities", {
         )
         .max(40),
     /** How many sessions this runner will hold at once. */
-    maxSessions: z.number().int().min(0).max(RUNNER_LIMITS.sessions)
+    maxSessions: z.number().int().min(0).max(RUNNER_LIMITS.sessions),
+    /** What this runner can do beyond protocol 1's sessions (`RUNNER_FEATURES`).
+     *  Absent on an older runner, which means none: the server never sends a
+     *  frame a runner did not say it understands. Unknown names are kept. */
+    features: z.array(shortText(40)).max(20).optional(),
+    /** The tools Polaris installed on this machine itself (`toolchain/`), so
+     *  the screen can tell "ready" from "will be prepared on first use". */
+    toolchain: z
+        .array(z.object({ tool: cliId, version: shortText(60) }))
+        .max(20)
+        .optional()
 });
+
+/**
+ * Optional abilities a runner announces in `capabilities.features`. Additive on
+ * protocol 1: a desktop that predates one simply never lists it.
+ *
+ * - `toolchain`: installs git, Node, gh, Enigma and the agent CLIs itself
+ *   (`toolchain.prepare`, `toolchain.progress`), so a computer with nothing
+ *   installed still runs sessions.
+ * - `claude-chat`: runs a Polar Chat turn on the person's own Claude
+ *   subscription through the Claude Agent SDK (`chat.turn`, `chat.event`).
+ */
+export const RUNNER_FEATURES = ["toolchain", "claude-chat"] as const;
+export type RunnerFeature = (typeof RUNNER_FEATURES)[number];
+
+/** Whether a runner's capabilities announce `feature`. */
+export function runnerHasFeature(capabilities: Pick<RunnerCapabilities, "features"> | null | undefined, feature: RunnerFeature): boolean {
+    return capabilities?.features?.includes(feature) ?? false;
+}
 
 export const runnerHeartbeatSchema = frame("heartbeat", {
     /** Sessions the runner is holding right now, so a session the server thinks
@@ -199,6 +227,67 @@ export const runnerTerminalOutputSchema = frame("terminal.output", {
     data: base64Chunk
 });
 
+/** Where preparing the toolchain stands, one frame per change. `code` is a
+ *  machine word the dashboard turns into a translated sentence; the runner
+ *  never sends prose for this, so every language reads it in its own words. */
+export const TOOLCHAIN_STEPS = ["download", "verify", "install", "ready", "failed"] as const;
+export const TOOLCHAIN_FAILURES = ["offline", "checksum", "disk", "unsupported", "blocked", "install"] as const;
+
+export const runnerToolchainProgressSchema = frame("toolchain.progress", {
+    /** The `toolchain.prepare` this answers, or a session being prepared. */
+    requestId: id,
+    sessionId: id.optional(),
+    tool: cliId,
+    step: z.enum(TOOLCHAIN_STEPS),
+    /** Bytes so far and in all, while downloading. */
+    received: z.number().int().min(0).optional(),
+    total: z.number().int().min(0).optional(),
+    code: z.enum(TOOLCHAIN_FAILURES).optional()
+});
+
+/** One piece of a chat turn's stream, already in Polar's vocabulary. */
+export const runnerChatEventSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("text"), text: z.string().max(64_000) }),
+    z.object({ kind: z.literal("reasoning"), text: z.string().max(64_000) }),
+    z.object({
+        kind: z.literal("tool-call"),
+        callId: shortText(200),
+        name: shortText(200),
+        input: z.record(z.unknown())
+    }),
+    z.object({
+        kind: z.literal("tool-result"),
+        callId: shortText(200),
+        output: z.string().max(256_000),
+        isError: z.boolean()
+    }),
+    /** A tool waiting on the person. Answered with `chat.approval`. */
+    z.object({
+        kind: z.literal("approval"),
+        approvalId: id,
+        callId: shortText(200),
+        name: shortText(200),
+        input: z.record(z.unknown())
+    }),
+    z.object({
+        kind: z.literal("finish"),
+        reason: z.enum(["stop", "length", "cancelled", "tool-calls"]),
+        usage: z
+            .object({ input: z.number().int().min(0), output: z.number().int().min(0) })
+            .optional()
+    }),
+    /** `code` only, for the same reason as `toolchain.progress`. */
+    z.object({ kind: z.literal("error"), code: z.enum(["signed-out", "rate-limited", "not-installed", "failed"]) })
+]);
+export type RunnerChatEvent = z.infer<typeof runnerChatEventSchema>;
+
+export const runnerChatFrameSchema = frame("chat.event", {
+    turnId: id,
+    /** Increases by one per event per turn, so a gap or a replay is visible. */
+    seq: z.number().int().min(0),
+    event: runnerChatEventSchema
+});
+
 export const runnerErrorSchema = frame("error", {
     code: shortText(60),
     message: shortText(500),
@@ -215,6 +304,8 @@ export const runnerMessageSchema = z.discriminatedUnion("type", [
     runnerEventSchema,
     runnerPermissionRequestSchema,
     runnerTerminalOutputSchema,
+    runnerToolchainProgressSchema,
+    runnerChatFrameSchema,
     runnerErrorSchema
 ]);
 export type RunnerMessage = z.infer<typeof runnerMessageSchema>;
@@ -327,6 +418,38 @@ export const serverTerminalResizeSchema = frame("terminal.resize", {
     rows: dimension
 });
 
+/** Install (or check) the toolchain for these agents now, before a session
+ *  asks for it. Only sent to a runner announcing `toolchain`. */
+export const serverToolchainPrepareSchema = frame("toolchain.prepare", {
+    requestId: id,
+    agents: z.array(cliId).max(10)
+});
+
+/** One Polar Chat turn on the person's Claude subscription. Only sent to a
+ *  runner announcing `claude-chat`. Polaris's tools reach the agent as the
+ *  MCP server at `mcp.url`, authenticated with a token that lives as long as
+ *  the turn; nothing else of the account is handed over. */
+export const serverChatTurnSchema = frame("chat.turn", {
+    turnId: id,
+    model: shortText(200).nullable(),
+    system: z.string().max(RUNNER_LIMITS.promptChars),
+    /** The conversation so far, oldest first, as plain text turns. */
+    messages: z
+        .array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().max(RUNNER_LIMITS.promptChars) }))
+        .min(1)
+        .max(200),
+    effort: z.enum(AGENT_EFFORT_LEVELS).nullable(),
+    mcp: z.object({ url: z.string().url().max(500), token: shortText(400) }).nullable()
+});
+
+export const serverChatCancelSchema = frame("chat.cancel", { turnId: id });
+
+export const serverChatApprovalSchema = frame("chat.approval", {
+    turnId: id,
+    approvalId: id,
+    allow: z.boolean()
+});
+
 export const serverErrorSchema = frame("error", {
     code: shortText(60),
     message: shortText(500)
@@ -345,6 +468,10 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     serverTerminalDetachSchema,
     serverTerminalInputSchema,
     serverTerminalResizeSchema,
+    serverToolchainPrepareSchema,
+    serverChatTurnSchema,
+    serverChatCancelSchema,
+    serverChatApprovalSchema,
     serverErrorSchema
 ]);
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
@@ -368,8 +495,21 @@ export const RELAYED_SERVER_TYPES = [
     "terminal.attach",
     "terminal.detach",
     "terminal.input",
-    "terminal.resize"
+    "terminal.resize",
+    "toolchain.prepare",
+    "chat.turn",
+    "chat.cancel",
+    "chat.approval"
 ] as const;
+
+/** The frames a runner must have announced a feature for before it is sent
+ *  one. Everything else is protocol 1 and goes to every runner. */
+export const SERVER_FRAME_FEATURE: Partial<Record<ServerMessage["type"], RunnerFeature>> = {
+    "toolchain.prepare": "toolchain",
+    "chat.turn": "claude-chat",
+    "chat.cancel": "claude-chat",
+    "chat.approval": "claude-chat"
+};
 
 /** Whether a runner speaking `range` can talk to this server. */
 export function protocolCompatible(range: { min: number; max: number }): boolean {
