@@ -161,8 +161,11 @@ export const runnerCapabilitiesSchema = frame("capabilities", {
  *   installed still runs sessions.
  * - `claude-chat`: runs a Polar Chat turn on the person's own Claude
  *   subscription through the Claude Agent SDK (`chat.turn`, `chat.event`).
+ * - `workspace-read`: answers what a session screen reads from the checkout -
+ *   its files, one file, the changes and one diff (`workspace.read`,
+ *   `workspace.answer`).
  */
-export const RUNNER_FEATURES = ["toolchain", "claude-chat"] as const;
+export const RUNNER_FEATURES = ["toolchain", "claude-chat", "workspace-read"] as const;
 export type RunnerFeature = (typeof RUNNER_FEATURES)[number];
 
 /** Whether a runner's capabilities announce `feature`. */
@@ -288,6 +291,59 @@ export const runnerChatFrameSchema = frame("chat.event", {
     event: runnerChatEventSchema
 });
 
+/** What `workspace.answer` may carry at most, so it fits the runner bus
+ *  (`computer-bus.ts`) after JSON escaping. */
+export const WORKSPACE_LIMITS = {
+    /** Paths in a file list. */
+    files: 20_000,
+    /** Bytes of path names in a file list; past it the list says it was cut. */
+    listBytes: 192 * 1024,
+    /** Bytes of one file's text. A larger file is named, not sent. */
+    fileBytes: 192 * 1024,
+    /** Changed files in one page of the changes. */
+    changesPage: 500,
+    /** Bytes of one file's diff. A larger one is named with its size. */
+    diffBytes: 160_000
+} as const;
+
+const workspacePath = z.string().min(1).max(4096);
+const changeCount = z.number().int().min(0).nullable();
+
+/** What a runner found, one variant per `workspace.read` query. `missing` is
+ *  a session or a checkout the runner does not have. */
+export const workspaceAnswerSchema = z.discriminatedUnion("kind", [
+    z.object({
+        kind: z.literal("files"),
+        paths: z.array(workspacePath).max(WORKSPACE_LIMITS.files),
+        truncated: z.boolean()
+    }),
+    z.object({ kind: z.literal("text"), path: workspacePath, text: z.string().max(WORKSPACE_LIMITS.fileBytes) }),
+    z.object({ kind: z.literal("binary"), path: workspacePath }),
+    z.object({ kind: z.literal("tooLarge"), path: workspacePath, bytes: z.number().int().min(0) }),
+    z.object({ kind: z.literal("gone"), path: workspacePath }),
+    z.object({
+        kind: z.literal("changes"),
+        base: z.string().regex(/^[0-9a-f]{7,64}$/),
+        total: z.number().int().min(0),
+        files: z
+            .array(z.object({ path: workspacePath, added: changeCount, removed: changeCount }))
+            .max(WORKSPACE_LIMITS.changesPage),
+        next: z.number().int().min(0).nullable()
+    }),
+    z.object({ kind: z.literal("diff"), text: z.string().max(WORKSPACE_LIMITS.diffBytes) }),
+    z.object({ kind: z.literal("diffLarge"), size: z.number().int().min(0) }),
+    z.object({ kind: z.literal("nocheckout") }),
+    z.object({ kind: z.literal("nobase") }),
+    z.object({ kind: z.literal("missing") })
+]);
+export type WorkspaceAnswer = z.infer<typeof workspaceAnswerSchema>;
+
+export const runnerWorkspaceAnswerSchema = frame("workspace.answer", {
+    requestId: id,
+    sessionId: id,
+    answer: workspaceAnswerSchema
+});
+
 export const runnerErrorSchema = frame("error", {
     code: shortText(60),
     message: shortText(500),
@@ -306,6 +362,7 @@ export const runnerMessageSchema = z.discriminatedUnion("type", [
     runnerTerminalOutputSchema,
     runnerToolchainProgressSchema,
     runnerChatFrameSchema,
+    runnerWorkspaceAnswerSchema,
     runnerErrorSchema
 ]);
 export type RunnerMessage = z.infer<typeof runnerMessageSchema>;
@@ -450,6 +507,22 @@ export const serverChatApprovalSchema = frame("chat.approval", {
     allow: z.boolean()
 });
 
+/** One read of a session's checkout on the computer (`workspace-read`).
+ *  Paths are relative to the checkout; the runner refuses any other. */
+export const workspaceQuerySchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("files") }),
+    z.object({ kind: z.literal("file"), path: workspacePath }),
+    z.object({ kind: z.literal("changes"), baseRef: z.string().max(200), offset: z.number().int().min(0).max(1_000_000) }),
+    z.object({ kind: z.literal("diff"), baseRef: z.string().max(200), path: workspacePath })
+]);
+export type WorkspaceQuery = z.infer<typeof workspaceQuerySchema>;
+
+export const serverWorkspaceReadSchema = frame("workspace.read", {
+    requestId: id,
+    sessionId: id,
+    query: workspaceQuerySchema
+});
+
 export const serverErrorSchema = frame("error", {
     code: shortText(60),
     message: shortText(500)
@@ -472,6 +545,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     serverChatTurnSchema,
     serverChatCancelSchema,
     serverChatApprovalSchema,
+    serverWorkspaceReadSchema,
     serverErrorSchema
 ]);
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
@@ -499,7 +573,8 @@ export const RELAYED_SERVER_TYPES = [
     "toolchain.prepare",
     "chat.turn",
     "chat.cancel",
-    "chat.approval"
+    "chat.approval",
+    "workspace.read"
 ] as const;
 
 /** The frames a runner must have announced a feature for before it is sent
@@ -508,7 +583,8 @@ export const SERVER_FRAME_FEATURE: Partial<Record<ServerMessage["type"], RunnerF
     "toolchain.prepare": "toolchain",
     "chat.turn": "claude-chat",
     "chat.cancel": "claude-chat",
-    "chat.approval": "claude-chat"
+    "chat.approval": "claude-chat",
+    "workspace.read": "workspace-read"
 };
 
 /** Whether a runner speaking `range` can talk to this server. */

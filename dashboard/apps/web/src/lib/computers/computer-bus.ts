@@ -1,6 +1,7 @@
 /**
  * What a runner reports that another node may be the one showing: a chat
- * turn's events and a session's setup progress.
+ * turn's events, a session's setup progress, and what it read from a
+ * session's checkout.
  *
  * A runner's socket reaches one node; the chat request or the session screen
  * waiting on it is often on another. The node that holds the socket publishes
@@ -45,7 +46,13 @@ export const liveNoticeSchema = z.discriminatedUnion("k", [
         runnerId: z.string().uuid(),
         frame: z.object({ turnId: z.string().min(1).max(200), seq: z.number().int().min(0), event: core.runnerChatEventSchema })
     }),
-    z.object({ k: z.literal("progress"), sessionId: z.string().uuid(), progress: progressSchema })
+    z.object({ k: z.literal("progress"), sessionId: z.string().uuid(), progress: progressSchema }),
+    z.object({
+        k: z.literal("workspace"),
+        runnerId: z.string().uuid(),
+        requestId: z.string().uuid(),
+        answer: core.workspaceAnswerSchema
+    })
 ]);
 export type LiveNotice = z.infer<typeof liveNoticeSchema>;
 

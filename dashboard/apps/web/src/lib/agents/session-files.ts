@@ -6,8 +6,9 @@
  * (`readFile`) rather than through `runIn`, whose output is a capped string:
  * a repository's file list passes that cap long before it is large.
  *
- * Only a container session has these. One on somebody's own server is that
- * server's files, and its shell is the way to them.
+ * A container session has these, and so does one on the person's own computer
+ * whose desktop answers workspace reads (`computer-workspace.ts`). One on
+ * somebody's own server is that server's files, and its shell is the way to them.
  *
  * The one file outside the checkout read here is a subagent's own transcript,
  * at the exact place Claude Code writes it (`subagentTranscriptPath`), and from
@@ -21,6 +22,7 @@ import { sessionPlacement } from "./session-service";
 import { runInSession } from "./session-runtime";
 import { readTranscript } from "./session-transcript";
 import { decodeClaudeSubagentLine, type HistoryRow } from "./transcript-decoders";
+import { computerSessionRunner, readComputerWorkspace } from "@/lib/computers/computer-workspace";
 
 /** The most files a list holds. Past this the list says it was cut. */
 export const MAX_FILES = 20_000;
@@ -87,6 +89,13 @@ async function containerOf(sessionId: string) {
 
 /** Every tracked and new file, ignored ones left out, as git sees them. */
 export async function listSessionFiles(sessionId: string): Promise<FilesAnswer> {
+    const runnerId = await computerSessionRunner(sessionId);
+    if (runnerId) {
+        const answer = await readComputerWorkspace({ id: sessionId, runnerId }, { kind: "files" });
+        return answer?.kind === "files"
+            ? { kind: "files", paths: [...answer.paths].sort(), truncated: answer.truncated }
+            : { kind: "unavailable" };
+    }
     const container = await containerOf(sessionId);
     if (!container) return { kind: "unavailable" };
     const listing = `/tmp/polaris-files-${sessionId}.txt`;
@@ -123,6 +132,8 @@ export async function listSessionFiles(sessionId: string): Promise<FilesAnswer> 
 export async function readSessionFile(sessionId: string, rawPath: string): Promise<FileAnswer> {
     const path = checkoutPath(rawPath);
     if (!path) return { kind: "missing", path: rawPath };
+    const runnerId = await computerSessionRunner(sessionId);
+    if (runnerId) return computerFile(await readComputerWorkspace({ id: sessionId, runnerId }, { kind: "file", path }), path);
     const container = await containerOf(sessionId);
     if (!container) return { kind: "unavailable" };
     try {
@@ -152,6 +163,22 @@ export async function readSessionFile(sessionId: string, rawPath: string): Promi
     } catch (error) {
         console.error(`[agent-session] ${sessionId}: could not read ${path}:`, error);
         return { kind: "unavailable" };
+    }
+}
+
+/** A computer's answer to a file read, in this module's words. Pure. */
+export function computerFile(answer: core.WorkspaceAnswer | null, path: string): FileAnswer {
+    switch (answer?.kind) {
+        case "text":
+            return { kind: "text", path, text: answer.text };
+        case "binary":
+            return { kind: "binary", path };
+        case "tooLarge":
+            return { kind: "tooLarge", path, bytes: answer.bytes };
+        case "gone":
+            return { kind: "missing", path };
+        default:
+            return { kind: "unavailable" };
     }
 }
 

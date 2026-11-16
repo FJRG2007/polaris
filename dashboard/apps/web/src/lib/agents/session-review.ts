@@ -19,6 +19,7 @@ import * as prFacts from "./session-pr-facts";
 import * as timelines from "./session-pr-timeline";
 import { githubTokenForUser } from "@/lib/github-access";
 import type { SessionView, SessionWorkReason } from "./session-service";
+import { readComputerWorkspace } from "@/lib/computers/computer-workspace";
 
 /** Why a session's checkout cannot be read right now. */
 export type ChangesUnavailable = "workspace" | "ended" | "starting";
@@ -58,6 +59,11 @@ export async function listSessionChanges(
     session: SessionView,
     offset: number
 ): Promise<ChangesAnswer> {
+    const computer = computerCheckout(session);
+    if (computer) {
+        const answer = await readComputerWorkspace(computer, { kind: "changes", baseRef: session.baseRef, offset });
+        return computerChanges(answer);
+    }
     const machine = await machineOf(session.id);
     const unavailable = changesUnavailable(session, machine.hasMachine);
     if (unavailable) return { kind: "unavailable", reason: unavailable };
@@ -84,6 +90,11 @@ export type DiffAnswer =
 
 /** One file's diff against the session's base. */
 export async function sessionFileDiff(session: SessionView, path: string): Promise<DiffAnswer> {
+    const computer = computerCheckout(session);
+    if (computer) {
+        const answer = await readComputerWorkspace(computer, { kind: "diff", baseRef: session.baseRef, path });
+        return computerDiff(answer);
+    }
     const machine = await machineOf(session.id);
     const unavailable = changesUnavailable(session, machine.hasMachine);
     if (unavailable) return { kind: "unavailable", reason: unavailable };
@@ -101,6 +112,51 @@ export async function sessionFileDiff(session: SessionView, path: string): Promi
     } catch (error) {
         console.error(`polaris: could not read a diff of session ${session.id}:`, error);
         return { kind: "unreachable" };
+    }
+}
+
+/** A live session on a computer that has a checkout to read: a clone of its
+ *  repository or a folder chosen there. Null for any other session. */
+function computerCheckout(
+    session: Pick<SessionView, "id" | "place" | "runnerId" | "state" | "repoFullName" | "localFolder">
+): { id: string; runnerId: string } | null {
+    if (session.place !== "computer" || !session.runnerId) return null;
+    if (core.isSessionOver(session.state)) return null;
+    if (!session.repoFullName && !session.localFolder) return null;
+    return { id: session.id, runnerId: session.runnerId };
+}
+
+/** A computer's answer to a changes read, in this module's words. Pure. */
+export function computerChanges(answer: core.WorkspaceAnswer | null): ChangesAnswer {
+    switch (answer?.kind) {
+        case "changes":
+            return {
+                kind: "listing",
+                listing: { kind: "ok", base: answer.base, total: answer.total, files: answer.files, next: answer.next }
+            };
+        case "nocheckout":
+        case "nobase":
+            return { kind: "listing", listing: { kind: answer.kind } };
+        default:
+            return { kind: "unreachable" };
+    }
+}
+
+/** A computer's answer to a diff read, in this module's words. Pure. */
+export function computerDiff(answer: core.WorkspaceAnswer | null): DiffAnswer {
+    switch (answer?.kind) {
+        case "diff":
+            return { kind: "diff", diff: { kind: "diff", text: answer.text } };
+        case "diffLarge":
+            return { kind: "diff", diff: { kind: "large", size: answer.size } };
+        case "binary":
+            return { kind: "diff", diff: { kind: "binary" } };
+        case "gone":
+        case "nocheckout":
+        case "nobase":
+            return { kind: "diff", diff: { kind: answer.kind } };
+        default:
+            return { kind: "unreachable" };
     }
 }
 
