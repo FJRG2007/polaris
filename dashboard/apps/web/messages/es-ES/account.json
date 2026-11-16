@@ -1266,8 +1266,10 @@
             "adding": "La cuenta con la que una sesión inicia la sesión de un agente. Una suscripción no cuesta nada más; una clave de API se factura por uso."
         },
         "fallback": {
-            "title": "A qué recurre una ejecución",
-            "shared": "Para un proveedor del que no tienes clave propia, las ejecuciones usan la del despliegue.",
+            "title": "Claves compartidas",
+            "shared": "Donde no tienes clave, tus ejecuciones usan la del despliegue.",
+            "usingDeployment": "Se usa la del despliegue",
+            "usingYours": "Se usa la tuya",
             "noKeys": "Este despliegue no tiene claves de proveedor, así que una ejecución solo puede usar una que añadas aquí.",
             "notShared": "Este despliegue no comparte sus propias claves de proveedor, así que una ejecución solo puede usar una que añadas aquí."
         },

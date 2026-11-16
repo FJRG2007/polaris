@@ -1266,8 +1266,10 @@
             "adding": "The account a session signs an agent in with. A subscription costs nothing extra; an API key is metered."
         },
         "fallback": {
-            "title": "What a run falls back to",
-            "shared": "For a provider you have no key of your own for, runs use the deployment's.",
+            "title": "Deployment keys",
+            "shared": "Where you have no key, your runs use the deployment's.",
+            "usingDeployment": "Deployment's key in use",
+            "usingYours": "Your key is used",
             "noKeys": "This deployment holds no provider keys, so a run can only use one you add here.",
             "notShared": "This deployment does not share its own provider keys, so a run can only use one you add here."
         },

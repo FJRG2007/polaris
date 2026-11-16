@@ -5,7 +5,8 @@
  */
 
 import { getTranslations } from "@/lib/i18n/request";
-import { Badge, Card, CardBody } from "@polaris/ui";
+import { Badge } from "@polaris/ui";
+import { IntegrationLogo } from "@/components/logos";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { assistedSignins } from "@/lib/agents/signin-runtime";
 import { isSigninRow, signinProviderRows } from "@/lib/agents/agent-signins";
@@ -15,6 +16,7 @@ import { ensureProviderCatalog } from "@/lib/integrations/provider-catalog";
 import { searchKeyProvidersAction } from "@/app/(app)/model-key-provider-actions";
 import { modelProviderName, providerRowsFor } from "@/lib/agents/model-key-providers";
 import {
+    connectedProviders,
     instanceKeysAreShared,
     keySourcesFor,
     listModelKeys,
@@ -51,10 +53,13 @@ export async function AiKeysPanel({
     // One read, split below: agent sign-ins live in the same table as provider
     // keys and would otherwise be drawn as a credential for a provider that
     // does not exist. Read once so any missing hint is filled once.
-    const [rows, sources, shared, fromPlatform] = await Promise.all([
+    const [rows, sources, shared, deployment, fromPlatform] = await Promise.all([
         listModelKeys(userId),
         keySourcesFor(userId),
         instanceKeysAreShared(),
+        // The providers the deployment holds a key for, each listed with whose
+        // key a run of this person's actually spends.
+        connectedProviders(),
         // What the deployment holds, asked as the deployment rather than as this
         // person, so a row it covers can say so instead of reading as missing.
         // Empty when sharing is off - the resolver checks that itself, which is
@@ -70,6 +75,11 @@ export async function AiKeysPanel({
     const covered = [...sources.entries()]
         .filter(([, source]) => source === "instance")
         .map(([slug]) => modelProviderName(slug));
+    const deploymentRows = deployment.map((slug) => ({
+        slug,
+        name: modelProviderName(slug),
+        yours: sources.get(slug) === "own"
+    }));
 
     return (
         <div className="flex flex-col gap-4">
@@ -97,7 +107,7 @@ export async function AiKeysPanel({
                             : t("aiKeys.keys.empty"),
                     adding: t("aiKeys.keys.adding")
                 }}
-                footer={<FallbackCard providers={covered} shared={shared} t={t} />}
+                footer={<FallbackCard providers={deploymentRows} shared={shared} t={t} />}
             />
 
             {/* The same table, for the accounts an agent signs in with. A second
@@ -146,39 +156,48 @@ export async function AiKeysPanel({
     );
 }
 
-/** What happens for a provider this account has brought no key for. */
+/**
+ * The providers the deployment holds a key for, under the account's own keys:
+ * each by name, with whose key a run of this account spends - its own where it
+ * added one, the deployment's otherwise. Read-only; who may spend the
+ * deployment's keys is set under /admin.
+ */
 function FallbackCard({
     providers,
     shared,
     t
 }: {
-    providers: string[];
+    providers: Array<{ slug: string; name: string; yours: boolean }>;
     shared: boolean;
     t: NamespaceTranslator<"account">;
 }) {
     return (
-        <Card>
-            <CardBody className="flex flex-col gap-1">
+        <section className="flex flex-col gap-2">
+            <div className="min-w-0">
                 <h2 className="text-sm font-medium">{t("aiKeys.fallback.title")}</h2>
-                {shared && providers.length > 0 ? (
-                    <>
-                        <p className="text-muted-foreground text-xs">
-                            {t("aiKeys.fallback.shared")}
-                        </p>
-                        <div className="mt-1 flex flex-wrap gap-1">
-                            {providers.map((name) => (
-                                <Badge key={name} variant="neutral">
-                                    {name}
-                                </Badge>
-                            ))}
-                        </div>
-                    </>
-                ) : (
-                    <p className="text-muted-foreground text-xs">
-                        {shared ? t("aiKeys.fallback.noKeys") : t("aiKeys.fallback.notShared")}
-                    </p>
-                )}
-            </CardBody>
-        </Card>
+                <p className="text-muted-foreground text-xs">
+                    {!shared
+                        ? t("aiKeys.fallback.notShared")
+                        : providers.length > 0
+                          ? t("aiKeys.fallback.shared")
+                          : t("aiKeys.fallback.noKeys")}
+                </p>
+            </div>
+            {shared && providers.length > 0 ? (
+                <ul className="divide-y divide-border rounded-lg border border-border">
+                    {providers.map((provider) => (
+                        <li key={provider.slug} className="flex items-center gap-2 px-3 py-2">
+                            <IntegrationLogo slug={provider.slug} name={provider.name} className="size-4 shrink-0" />
+                            <span className="min-w-0 flex-1 truncate text-sm" title={provider.name}>
+                                {provider.name}
+                            </span>
+                            <Badge variant={provider.yours ? "neutral" : "primary"} className="min-w-0 shrink truncate">
+                                {provider.yours ? t("aiKeys.fallback.usingYours") : t("aiKeys.fallback.usingDeployment")}
+                            </Badge>
+                        </li>
+                    ))}
+                </ul>
+            ) : null}
+        </section>
     );
 }
