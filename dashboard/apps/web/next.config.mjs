@@ -153,7 +153,12 @@ const nextConfig = {
         // Baileys loads a WebAssembly module of its own, so both load from
         // node_modules at runtime.
         "discord.js",
-        "@whiskeysockets/baileys"
+        "@whiskeysockets/baileys",
+        // One yjs per process. Bundled, every server chunk that reaches it carried
+        // its own copy: yjs warns "already imported" and a Y.Doc made by one copy
+        // fails `instanceof` in another. y-protocols and y-prosemirror stay
+        // bundled and import this single copy.
+        "yjs"
     ],
     // Trace from the monorepo root so the standalone server lands at the path the
     // Docker image expects (apps/web/.next/standalone/apps/web/server.js).
