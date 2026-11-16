@@ -11,7 +11,9 @@
 
 import { requireUser } from "@/lib/session";
 import { polarAccessFor } from "@/lib/polar/access";
+import * as core from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
+import { codeUsageFor, type CodeUsage } from "@/lib/agents/limit-history";
 import { setOwnRouting } from "@/lib/polar/router/store";
 import { checkRouting, pinnedKeyIds } from "@/lib/polar/routing-keys";
 import {
@@ -37,6 +39,20 @@ export async function loadRoutingUsageAction(): Promise<{ usage?: RoutingUsage; 
     const found = await caller();
     if (!found) return { error: (await getTranslations("polar"))("routing.errors.noAccess") };
     return { usage: await routingUsageFor(found.user.id) };
+}
+
+/** An agent's name as the catalogue gives it, else its id. */
+export type LabelledCodeUsage = CodeUsage & { readonly labels: Readonly<Record<string, string>> };
+
+/** What this person's Code sessions spent this month and the limits they hit. */
+export async function loadCodeUsageAction(): Promise<{ usage?: LabelledCodeUsage; error?: string }> {
+    const found = await caller();
+    if (!found) return { error: (await getTranslations("polar"))("routing.errors.noAccess") };
+    const usage = await codeUsageFor(found.user.id);
+    const labels: Record<string, string> = {};
+    for (const cli of new Set([...usage.byAgent.map((row) => row.cli), ...usage.limits.map((row) => row.cli)]))
+        labels[cli] = core.agentCliById(cli)?.label ?? cli;
+    return { usage: { ...usage, labels } };
 }
 
 /** Save this person's own routing, held to the keys they may spend. */

@@ -35,6 +35,7 @@ import {
 } from "./session-transcript";
 import { claudeLineUsage, recordSessionUsage, type TurnUsage } from "./session-usage";
 import { noteCodexTurnEnd } from "./codex-turn-failures";
+import { hasUsageReader, readCliUsage } from "./cli-usage";
 
 /** The shortest gap between two reads of one transcript. One second: the end of
  *  a turn usually lands within a few seconds of its last tool, and at three the
@@ -108,10 +109,21 @@ export async function syncSessionHistory(
 ): Promise<SyncOutcome> {
     const row = await prisma.agentSession.findUnique({
         where: { id: sessionId },
-        select: { cli: true, state: true, transcriptPath: true, place: true, runnerId: true }
+        select: { cli: true, state: true, transcriptPath: true, place: true, runnerId: true, sharedHome: true }
     });
     if (!row) return "skipped";
     if (!final && core.isSessionOver(row.state as core.AgentSessionState)) return "skipped";
+    // Agents that keep their usage apart from any transcript (OpenCode's
+    // database, Qwen's log...) are read on the side; it never holds up the
+    // history, except the last read, which has to land before the machine goes.
+    if (hasUsageReader(row.cli)) {
+        const usage = readCliUsage(sessionId, run ?? (final ? runEvenIfFinished : runInSession), {
+            final,
+            now,
+            row
+        }).catch((error) => console.error(`[agent-session] ${sessionId}: could not read usage`, error));
+        if (final) await usage;
+    }
     const path = row.transcriptPath;
     const decode = transcriptDecoder(row.cli);
     // A session on the person's own computer runs no script: its transcript is

@@ -2324,5 +2324,21 @@
             "not-allowed": "Your computer no longer allows this address. Add it again under Local models.",
             "failed": "{server} stopped before answering. Try again."
         }
+    },
+    "codeUsage": {
+        "title": "Code sessions",
+        "intro": "What each coding agent spent this month, and the usage limits hit in the last 14 days.",
+        "byAgent": "By agent",
+        "agent": "Agent",
+        "sessions": "Sessions",
+        "empty": "No Code sessions this month.",
+        "limits": "Usage limits",
+        "noLimits": "No usage limits hit in the last 14 days.",
+        "outcome": {
+            "rotated": "{agent} hit a limit and moved to another account",
+            "waiting": "{agent} hit a limit and waited for an account"
+        },
+        "resets": "Lifts",
+        "error": "Couldn't load Code session usage. Reload the page to try again."
     }
 }

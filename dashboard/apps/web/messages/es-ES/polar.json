@@ -2324,5 +2324,21 @@
             "not-allowed": "Tu equipo ya no permite esta dirección. Añádela otra vez en Modelos locales.",
             "failed": "{server} se detuvo antes de responder. Vuelve a probar."
         }
+    },
+    "codeUsage": {
+        "title": "Sesiones de Code",
+        "intro": "Lo que gastó cada agente este mes y los límites de uso alcanzados en 14 días.",
+        "byAgent": "Por agente",
+        "agent": "Agente",
+        "sessions": "Sesiones",
+        "empty": "Sin sesiones de Code este mes.",
+        "limits": "Límites de uso",
+        "noLimits": "Ningún límite de uso en los últimos 14 días.",
+        "outcome": {
+            "rotated": "{agent} llegó al límite y pasó a otra cuenta",
+            "waiting": "{agent} llegó al límite y esperó una cuenta"
+        },
+        "resets": "Libre",
+        "error": "No se pudo cargar el uso de Code. Recarga la página."
     }
 }

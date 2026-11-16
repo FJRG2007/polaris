@@ -38,6 +38,7 @@ model User {
     polarCommands     PolarCommand[]
     polarUsage        PolarUsage[]
     polarToolUses     PolarToolUse[]
+    agentLimitHits    AgentLimitHit[]
     translateHistory  TranslateHistory[]
     translateGlossaries TranslateGlossary[]
     translateKeepList TranslateKeepList?
@@ -9569,6 +9570,9 @@ model AgentSession {
     // How many times in a row a turn was sent again because the provider was
     // overloaded. Back to 0 when a turn finishes.
     limitRetries   Int       @default(0)
+    // When the usage a CLI keeps of its own (OpenCode's database, Qwen's
+    // monthly log, Pi's session files...) was last read into the totals above.
+    usageReadAt    DateTime?
     createdAt   DateTime  @default(now())
     updatedAt   DateTime  @updatedAt
 
@@ -17539,6 +17543,25 @@ model PolarUsage {
 
 // How often one answer called one tool, for the usage screen's tool counts.
 // One row per tool per answer; read only as sums per person and month.
+// A Code session's agent reached a usage limit: what it hit and what
+// Polaris did about it. Kept 30 days (`lib/agents/limit-history.ts`).
+model AgentLimitHit {
+    id        String    @id @default(uuid(7)) @db.Uuid
+    userId    String    @db.Uuid
+    user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    sessionId String    @db.Uuid
+    cli       String
+    // The account that hit it, by id: it can be removed and the hit still read.
+    accountId String?   @db.Uuid
+    // When the tool said the limit lifts, or null when it did not say.
+    resetAt   DateTime?
+    // rotated | waiting
+    outcome   String
+    createdAt DateTime  @default(now())
+
+    @@index([userId, createdAt])
+}
+
 model PolarToolUse {
     id        String   @id @default(uuid(7)) @db.Uuid
     userId    String   @db.Uuid

@@ -19,11 +19,107 @@ import type { RoutingUsage } from "@/lib/polar/routing-screen";
 import { useSettingsModels } from "@/components/polar/settings-models";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import type { ModelSelectorProvider } from "@/components/polar/elements/model-selector";
-import { loadRoutingUsageAction } from "./routing-actions";
+import Link from "next/link";
+import { loadCodeUsageAction, loadRoutingUsageAction, type LabelledCodeUsage } from "./routing-actions";
 
 export function PolarUsageSettings() {
     const { answer } = useSettingsModels();
-    return <UsageCard providers={answer?.providers ?? null} />;
+    return (
+        <div className="flex min-w-0 flex-col gap-8">
+            <UsageCard providers={answer?.providers ?? null} />
+            <CodeUsageCard />
+        </div>
+    );
+}
+
+/** Code sessions: what each agent spent this month and the limits hit. */
+function CodeUsageCard() {
+    const t = useTranslations("polar");
+    const locale = useLocale();
+    const [usage, setUsage] = useState<LabelledCodeUsage | null>(null);
+    const [failed, setFailed] = useState(false);
+    useEffect(() => {
+        let live = true;
+        void loadCodeUsageAction()
+            .then((result) => {
+                if (!live) return;
+                if (result.usage) setUsage(result.usage);
+                else setFailed(true);
+            })
+            .catch(() => (live ? setFailed(true) : undefined));
+        return () => {
+            live = false;
+        };
+    }, []);
+    const label = (cli: string) => usage?.labels[cli] ?? cli;
+    return (
+        <section className="flex min-w-0 flex-col gap-4">
+            <div className="min-w-0">
+                <h2 className="text-sm font-medium text-foreground">{t("codeUsage.title")}</h2>
+                <p className="text-xs text-muted-foreground">{t("codeUsage.intro")}</p>
+            </div>
+            {usage ? (
+                <>
+                    <UsageTable
+                        caption={t("codeUsage.byAgent")}
+                        first={t("codeUsage.agent")}
+                        requestsLabel={t("codeUsage.sessions")}
+                        empty={t("codeUsage.empty")}
+                        rows={usage.byAgent.map((row) => ({
+                            id: row.cli,
+                            logo: null,
+                            name: label(row.cli),
+                            hint: null,
+                            detail: null,
+                            badge: null,
+                            requests: row.sessions,
+                            tokens: formatTokens(row.tokens, locale),
+                            cost: row.costUsd === null ? "-" : formatUsd(row.costUsd, locale)
+                        }))}
+                    />
+                    <div className="flex min-w-0 flex-col gap-2">
+                        <h3 className="text-xs font-medium text-foreground">{t("codeUsage.limits")}</h3>
+                        {usage.limits.length === 0 ? (
+                            <p className="rounded-md border border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                                {t("codeUsage.noLimits")}
+                            </p>
+                        ) : (
+                            <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
+                                {usage.limits.map((row) => (
+                                    <li key={row.id} className="flex min-w-0 flex-col gap-0.5 px-3 py-2">
+                                        <Link
+                                            href={`/polar?session=${encodeURIComponent(row.sessionId)}`}
+                                            className="min-w-0 truncate text-sm text-foreground hover:underline"
+                                        >
+                                            {t(`codeUsage.outcome.${row.outcome}`, { agent: label(row.cli) })}
+                                        </Link>
+                                        <p className="flex flex-wrap gap-x-2 text-xs text-muted-foreground">
+                                            <RelativeTime iso={row.at} />
+                                            {row.resetAt ? (
+                                                <span className="inline-flex gap-1">
+                                                    {t("codeUsage.resets")}
+                                                    <RelativeTime iso={row.resetAt} tense="future" />
+                                                </span>
+                                            ) : null}
+                                        </p>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </>
+            ) : failed ? (
+                <p className="text-xs text-muted-foreground" role="alert">
+                    {t("codeUsage.error")}
+                </p>
+            ) : (
+                <div className="flex flex-col gap-2" aria-hidden>
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                </div>
+            )}
+        </section>
+    );
 }
 
 const SURFACES = ["chat", "helper", "api", "voice", "translate"] as const;
@@ -161,11 +257,14 @@ function UsageTable({
     caption,
     first,
     empty,
-    rows
+    rows,
+    requestsLabel
 }: {
     caption: string;
     first: string;
     empty: string;
+    /** What the count column counts, when it is not requests. */
+    requestsLabel?: string;
     rows: Array<{
         id: string;
         /** The provider whose logo leads the row, if any. */
@@ -191,7 +290,7 @@ function UsageTable({
                         <tr>
                             <th className="w-full max-w-0 px-3 py-2 font-medium">{first}</th>
                             <th className="whitespace-nowrap px-3 py-2 text-end font-medium">
-                                {t("routing.usage.requests")}
+                                {requestsLabel ?? t("routing.usage.requests")}
                             </th>
                             <th className="whitespace-nowrap px-3 py-2 text-end font-medium">
                                 {t("routing.usage.tokens")}

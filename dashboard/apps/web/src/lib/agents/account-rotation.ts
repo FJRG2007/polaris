@@ -36,6 +36,7 @@ import { instanceKeysAreShared } from "@/lib/agents/model-keys";
 import { refusedAccountName } from "@/lib/agents/signin-refusal";
 import { addSessionMessage } from "@/lib/agents/session-service";
 import { agentSignins, signinSlug } from "@/lib/agents/agent-signins";
+import { noteLimitHit } from "@/lib/agents/limit-history";
 
 const SECOND = 1_000;
 const MINUTE = 60 * SECOND;
@@ -595,6 +596,15 @@ export async function handleTurnFailure(
             },
             data: { coolingUntil: new Date(until), coolingReason: "rate" }
         });
+        if (row.startedById)
+            await noteLimitHit({
+                userId: row.startedById,
+                sessionId,
+                cli: row.cli,
+                accountId: currentId,
+                resetAt: reading.resetAt,
+                outcome: next ? "rotated" : "waiting"
+            });
         const from = current?.name ?? (await refusedAccountName(currentId)) ?? "an account";
         if (next) {
             await ports.notice(sessionId, switchedNotice(next.name, from, until, reading.resetAt !== null));
