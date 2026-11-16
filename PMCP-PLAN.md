@@ -33,7 +33,7 @@ Branch `feat/polar-polaris-mcp`.
    - `notifications/tools/list_changed`: connector sessions are per call, so no
      live notification is received; the list refreshes on Check only. Needs a
      long-lived client or refresh-on-call-miss.
-   - embedded `resource` content (`type: "resource"` with `resource.text`) is
+   - (done) embedded `resource` content now shows its text.
      shown as `[resource]` in `connectorOutputText`; show its text.
 2. Rebase onto origin/main before handing over (fix/polar-mcp-connectors had no
    commits beyond main when checked).

@@ -134,3 +134,16 @@ describe("untrusted output", () => {
         expect(policy.connectorOutputText({ content: [], isError: true }).isError).toBe(true);
     });
 });
+
+describe("embedded resources in a connector's answer", () => {
+    it("reads an embedded text resource, and names one without text by its address", () => {
+        const { text } = policy.connectorOutputText({
+            content: [
+                { type: "resource", resource: { uri: "file:///a.txt", text: "hello" } },
+                { type: "resource", resource: { uri: "file:///b.png", blob: "AAAA" } },
+                { type: "image", data: "AAAA", mimeType: "image/png" }
+            ]
+        });
+        expect(text).toBe("hello\n[resource: file:///b.png]\n[image]");
+    });
+});

@@ -390,6 +390,11 @@ export function connectorOutputText(result: unknown): { text: string; isError: b
         if (part.type === "text" && typeof part.text === "string") pieces.push(part.text);
         else if (part.type === "resource_link" && typeof part.uri === "string") {
             pieces.push(`[${part.type}: ${part.uri}]`);
+        } else if (part.type === "resource" && part.resource && typeof part.resource === "object") {
+            // An embedded resource: its text when it has one, else its address.
+            const resource = part.resource as { uri?: unknown; text?: unknown };
+            if (typeof resource.text === "string") pieces.push(resource.text);
+            else pieces.push(`[resource${typeof resource.uri === "string" ? `: ${resource.uri}` : ""}]`);
         } else pieces.push(`[${part.type}]`);
     }
     if (pieces.length === 0 && parsed.data.structuredContent !== undefined) {
