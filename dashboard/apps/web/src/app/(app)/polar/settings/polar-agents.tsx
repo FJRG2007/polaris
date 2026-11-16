@@ -393,7 +393,7 @@ export function PolarAgents({
                                             )}
                                         </Button>
                                         ) : null}
-                                        {!readOnly && row.mine ? (
+                                        {!readOnly && row.mine !== false ? (
                                             <>
                                                 <Button
                                                     type="button"
@@ -564,7 +564,8 @@ function valuesOf(editing: Editing | null): AgentInput {
     if (!editing || editing === "new") return EMPTY;
     if ("draft" in editing) return editing.draft;
     const { id: _id, mine: _mine, ...values } = editing;
-    return values;
+    // A view from before a field existed reads as its default.
+    return { ...EMPTY, ...values };
 }
 
 /** The stored agent the editor changes, or null for a new one. */
