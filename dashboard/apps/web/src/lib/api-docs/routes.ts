@@ -17,6 +17,7 @@ import { z, type ZodTypeAny } from "zod";
 import { clientConnectSchema } from "@/lib/vpn/wireguard";
 import * as schemas from "@/lib/deploy/api/schemas";
 import { nativeAlertSchema } from "@/lib/alerts/parse";
+import * as sdk from "@polaris/sdk";
 
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
 
@@ -89,6 +90,7 @@ const formatQuery = z.object({
 });
 const redeployQuery = formatQuery.merge(schemas.redeployQuerySchema);
 const redeployed = z.boolean().describe("Whether the change is being redeployed");
+const sessionParam = { id: z.string().uuid().describe("A session id") };
 
 const variableRoutes = (
     prefix: string,
@@ -617,6 +619,86 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
         responses: {
             200: ok(z.object({ data: z.array(z.object({ id: z.string() }).passthrough()) }).passthrough(), false)
         }
+    },
+    {
+        method: "GET",
+        path: "/api/v1/sessions",
+        file: "api/v1/sessions/route.ts",
+        tag: "Polar",
+        summary: "List agent sessions",
+        description: "Newest first, 50 to a page. Needs agents.read.",
+        changes: false,
+        query: sdk.listSessionsQuery,
+        responses: { 200: ok(sdk.sessionListSchema, false) }
+    },
+    {
+        method: "POST",
+        path: "/api/v1/sessions",
+        file: "api/v1/sessions/route.ts",
+        tag: "Polar",
+        summary: "Start an agent session",
+        description:
+            "The prompt is its first turn. When every slot is taken it waits in line, and queuedAt is its place. Needs agents.manage.",
+        changes: true,
+        body: sdk.createSessionBody,
+        responses: { 201: { description: "Created", schema: sdk.startedSessionSchema } }
+    },
+    {
+        method: "GET",
+        path: "/api/v1/sessions/{id}",
+        file: "api/v1/sessions/[id]/route.ts",
+        tag: "Polar",
+        summary: "Read an agent session",
+        description: "cursor is where its event stream is now: pass it as after to follow only what comes next.",
+        changes: false,
+        params: sessionParam,
+        responses: { 200: ok(sdk.sessionDetailSchema, false) }
+    },
+    {
+        method: "POST",
+        path: "/api/v1/sessions/{id}/prompt",
+        file: "api/v1/sessions/[id]/prompt/route.ts",
+        tag: "Polar",
+        summary: "Prompt an agent session",
+        changes: true,
+        params: sessionParam,
+        body: sdk.promptSessionBody,
+        responses: { 200: ok(sdk.promptedSchema, false) }
+    },
+    {
+        method: "POST",
+        path: "/api/v1/sessions/{id}/abort",
+        file: "api/v1/sessions/[id]/abort/route.ts",
+        tag: "Polar",
+        summary: "Stop the turn an agent is on",
+        description: "The session stays up for the next prompt.",
+        changes: true,
+        params: sessionParam,
+        responses: { 200: ok(sdk.abortedSchema, false) }
+    },
+    {
+        method: "POST",
+        path: "/api/v1/sessions/{id}/stop",
+        file: "api/v1/sessions/[id]/stop/route.ts",
+        tag: "Polar",
+        summary: "End an agent session",
+        description: "Its work is kept the way Stop on the screen keeps it.",
+        changes: true,
+        params: sessionParam,
+        responses: { 200: ok(sdk.stoppedSchema, false) }
+    },
+    {
+        method: "GET",
+        path: "/api/v1/sessions/{id}/events",
+        file: "api/v1/sessions/[id]/events/route.ts",
+        tag: "Polar",
+        summary: "Follow an agent session",
+        description:
+            "Server-Sent Events: session, event, message and, once it ends, end. Every frame's id is a cursor; reconnect with Last-Event-ID and nothing is sent twice.",
+        changes: false,
+        params: sessionParam,
+        query: sdk.sessionEventsQuery,
+        responses: { 200: { description: "OK", text: true } }
     },
     {
         method: "POST",

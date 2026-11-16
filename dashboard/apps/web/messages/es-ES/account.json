@@ -553,6 +553,48 @@
                         "filters": "Lista JSON de filtros, como la lleva la dirección de Analítica",
                         "breakdown": "Lista de desgloses separada por comas; todos si se omite"
                     }
+                },
+                "getSessions": {
+                    "summary": "Listar sesiones",
+                    "description": "Las más nuevas primero, 50 por página. Pide agents.read."
+                },
+                "postSessions": {
+                    "summary": "Iniciar una sesión de agente",
+                    "description": "El prompt es su primer turno. Si no hay hueco libre espera en cola y queuedAt es su puesto. Pide agents.manage."
+                },
+                "getSessionsById": {
+                    "summary": "Leer una sesión de agente",
+                    "description": "cursor es dónde va su flujo de eventos: pásalo como after para seguir solo lo que venga.",
+                    "params": {
+                        "id": "Id de sesión"
+                    }
+                },
+                "postSessionsByIdPrompt": {
+                    "summary": "Enviar un prompt a una sesión",
+                    "params": {
+                        "id": "Id de sesión"
+                    }
+                },
+                "postSessionsByIdAbort": {
+                    "summary": "Parar el turno de un agente",
+                    "description": "La sesión sigue lista para el siguiente prompt.",
+                    "params": {
+                        "id": "Id de sesión"
+                    }
+                },
+                "postSessionsByIdStop": {
+                    "summary": "Terminar una sesión",
+                    "description": "Su trabajo se guarda como lo guarda Detener en pantalla.",
+                    "params": {
+                        "id": "Id de sesión"
+                    }
+                },
+                "getSessionsByIdEvents": {
+                    "summary": "Seguir una sesión de agente",
+                    "description": "Server-Sent Events: session, event, message y, al terminar, end. El id de cada frame es un cursor; reconecta con Last-Event-ID y nada llega dos veces.",
+                    "params": {
+                        "id": "Id de sesión"
+                    }
                 }
             }
         },

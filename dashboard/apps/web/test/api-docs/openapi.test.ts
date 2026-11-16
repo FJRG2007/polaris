@@ -14,7 +14,7 @@ const APP = join(__dirname, "../../src/app");
 /** What a route file does to accept a key: authenticate one itself, or go through a wrapper that does. */
 // The compatible Polar routes hand the request to `lib/polar/compat`, whose
 // every handler starts with `compatCaller` (an API key with polar.use).
-const KEYED = /requireApiKey\(|authenticateApiKey\(|deployRoute\(|variableRoutes\(|importRoute\(|@\/lib\/polar\/compat\/|@\/lib\/alerts\/http/;
+const KEYED = /requireApiKey\(|authenticateApiKey\(|deployRoute\(|variableRoutes\(|importRoute\(|sessionApiRoute\(|@\/lib\/polar\/compat\/|@\/lib\/alerts\/http/;
 
 function routeFiles(dir: string): string[] {
     return readdirSync(dir).flatMap((name) => {

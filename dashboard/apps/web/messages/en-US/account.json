@@ -553,6 +553,48 @@
                         "filters": "JSON list of filters, as the Analytics address carries them",
                         "breakdown": "Comma list of breakdowns; all when omitted"
                     }
+                },
+                "getSessions": {
+                    "summary": "List agent sessions",
+                    "description": "Newest first, 50 to a page. Needs agents.read."
+                },
+                "postSessions": {
+                    "summary": "Start an agent session",
+                    "description": "The prompt is its first turn. When every slot is taken it waits in line, and queuedAt is its place. Needs agents.manage."
+                },
+                "getSessionsById": {
+                    "summary": "Read an agent session",
+                    "description": "cursor is where its event stream is now: pass it as after to follow only what comes next.",
+                    "params": {
+                        "id": "A session id"
+                    }
+                },
+                "postSessionsByIdPrompt": {
+                    "summary": "Prompt an agent session",
+                    "params": {
+                        "id": "A session id"
+                    }
+                },
+                "postSessionsByIdAbort": {
+                    "summary": "Stop the turn an agent is on",
+                    "description": "The session stays up for the next prompt.",
+                    "params": {
+                        "id": "A session id"
+                    }
+                },
+                "postSessionsByIdStop": {
+                    "summary": "End an agent session",
+                    "description": "Its work is kept the way Stop on the screen keeps it.",
+                    "params": {
+                        "id": "A session id"
+                    }
+                },
+                "getSessionsByIdEvents": {
+                    "summary": "Follow an agent session",
+                    "description": "Server-Sent Events: session, event, message and, once it ends, end. Every frame's id is a cursor; reconnect with Last-Event-ID and nothing is sent twice.",
+                    "params": {
+                        "id": "A session id"
+                    }
                 }
             }
         },
