@@ -11,7 +11,7 @@
  * seen to print: a field that did not parse is null, never a guess.
  */
 
-import { firstUrlIn } from "./session-commands";
+import { SIGNIN_COLS } from "./session-commands";
 
 /** Written by the boot script once the tmux session exists. Until it does the
  *  screen is not read at all: tmux is still being installed, or the login has
@@ -176,6 +176,77 @@ export function pendingAutoAnswer(
     return answers.find((answer) => last.endsWith(answer.prompt))?.reply ?? null;
 }
 
+/** An address in a terminal: http(s), up to the first character no address
+ *  carries unencoded, or a border a box-drawing tool put around it. */
+const URL_RUN = /https?:\/\/[^\s"'<>`│┃║|]+/g;
+/** What a sentence leaves stuck to the end of an address. */
+const TRAILING = /[.,;:!?)\]}]+$/;
+/** A box's side, and the room inside it, on either edge of a row. */
+const BORDER_END = /\s*[│┃║|]?\s*$/;
+const BORDER_START = /^\s*[│┃║|]?\s*/;
+/** The start of a continuation row: nothing but address characters. */
+const URL_PIECE = /^[^\s"'<>`│┃║|]+/;
+/** How close to the right edge a row has to end for its address to have been
+ *  broken there: a box's border and padding take the last few columns. */
+const EDGE_SLACK = 4;
+/** Words in an address that make it the one a login is asking to be opened,
+ *  rather than a documentation or status link printed beside it. */
+const SIGNIN_HINT = /log-?in|sign-?in|oauth|auth|device|challenge|authori[sz]e|verify|code=|token/i;
+
+/**
+ * Every address on a sign-in's screen, whole.
+ *
+ * tmux's joined capture already mends a line the terminal itself wrapped. What
+ * it cannot mend is a tool that breaks its own text at the width it was given
+ * (a TUI wrapping a paragraph, a box drawn around it): those rows end in a hard
+ * line break, so a three-hundred-character sign-in address arrives as four
+ * pieces and the first piece alone is a page that answers with an error. An
+ * address that runs to the right edge of its row is continued with the next
+ * row's leading run of address characters, row after row, while each row is
+ * full.
+ */
+export function urlsIn(screen: string, cols = SIGNIN_COLS): string[] {
+    const lines = screen.split("\n");
+    const found: string[] = [];
+    for (let index = 0; index < lines.length; index++) {
+        const line = lines[index]!;
+        for (const match of line.matchAll(URL_RUN)) {
+            let url = match[0];
+            let content = line.replace(BORDER_END, "");
+            let end = match.index + match[0].length;
+            let next = index + 1;
+            // Continued only from the last thing on a row that reaches its edge.
+            while (end === content.length && content.length >= cols - EDGE_SLACK && next < lines.length) {
+                const row = lines[next]!;
+                const rest = row.replace(BORDER_START, "");
+                const piece = URL_PIECE.exec(rest)?.[0];
+                if (!piece) break;
+                url += piece;
+                content = row.replace(BORDER_END, "");
+                end = row.length - rest.length + piece.length;
+                next += 1;
+            }
+            const trimmed = url.replace(TRAILING, "");
+            if (trimmed.length > "https://".length) found.push(trimmed);
+        }
+    }
+    return found;
+}
+
+/**
+ * The address a login wants opened, or null.
+ *
+ * Not per vendor: of the addresses on the screen, the latest one that reads like
+ * a sign-in, else the latest one. Latest because the screen is read top to
+ * bottom as the login goes, and a login that printed a second address - a fresh
+ * code, a retry - wants the second; sign-in-like because a tool may print its
+ * documentation or status page next to the one that matters.
+ */
+export function signinUrlIn(screen: string, cols = SIGNIN_COLS): string | null {
+    const urls = urlsIn(screen, cols);
+    return urls.filter((url) => SIGNIN_HINT.test(url)).pop() ?? urls.pop() ?? null;
+}
+
 /** How far a login has got, from its screen. */
 export interface SigninProgress {
     readonly screen: string;
@@ -192,7 +263,7 @@ export function readSigninScreen(raw: string): SigninProgress {
     const signedInAs = signedInAsIn(screen);
     return {
         screen,
-        url: firstUrlIn(screen),
+        url: signinUrlIn(screen),
         code: deviceCodeIn(screen),
         signedInAs,
         exitCode,
