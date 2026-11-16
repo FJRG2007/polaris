@@ -34,6 +34,18 @@ export async function dmRuleMode(): Promise<rules.DmRuleMode> {
 
 export async function setDmRuleMode(mode: rules.DmRuleMode): Promise<void> {
     await setSetting(MODE_KEY, mode === "agreement" ? "agreement" : null);
+    // A proposal belongs to the mode it was made in. Left pending, it would
+    // come back answerable the day the instance returns to agreement, about
+    // rules nobody is discussing any more.
+    if (mode === "open") await withdrawProposals({});
+}
+
+/** Close every proposal still waiting, in one conversation or everywhere. */
+async function withdrawProposals(where: { channelId?: string }): Promise<void> {
+    await prisma.chatRuleProposal.updateMany({
+        where: { ...where, status: "pending" },
+        data: { status: "withdrawn", decidedAt: new Date() }
+    });
 }
 
 /** Whether deleting a chat for everybody leaves a line saying who did. On
@@ -205,6 +217,9 @@ export async function setVanishTimer(
     }
     await requireNotTooFast(actor);
     if (rules.effectiveRules(mode, channel).vanishAfter === seconds) return;
+    // The rules changed under anything still proposed, so nothing proposed
+    // before now may be accepted later.
+    await withdrawProposals({ channelId });
     await prisma.chatChannel.update({
         where: { id: channelId },
         // A change nobody agreed to is not an agreement: the agreement mode, if
@@ -235,10 +250,14 @@ export async function proposeRules(
         throw new ChatRuleError({ key: "errors.vanishNoAgreement" });
     }
     await requireNotTooFast(actor);
+    // Proposing is accepting, so a conversation with nobody else left in it
+    // agrees at once.
+    const done = rules.proposalAccepted([actor.id], await memberIds(channelId));
+    const now = new Date();
     await prisma.$transaction([
         prisma.chatRuleProposal.updateMany({
             where: { channelId, status: "pending" },
-            data: { status: "replaced", decidedAt: new Date() }
+            data: { status: "replaced", decidedAt: now }
         }),
         prisma.chatRuleProposal.create({
             data: {
@@ -246,11 +265,28 @@ export async function proposeRules(
                 proposedById: actor.id,
                 vanishAfter: proposed.vanishAfter,
                 deleteForAll: proposed.deleteForAll,
-                acceptedBy: [actor.id]
+                acceptedBy: [actor.id],
+                ...(done ? { status: "accepted", decidedAt: now } : {})
             }
-        })
+        }),
+        ...(done
+            ? [
+                  prisma.chatChannel.update({
+                      where: { id: channelId },
+                      data: {
+                          vanishAfter: proposed.vanishAfter,
+                          deleteForAll: proposed.deleteForAll,
+                          rulesAgreedAt: now
+                      }
+                  })
+              ]
+            : [])
     ]);
     const who = await mentionOf(actor.id);
+    if (done) {
+        await postNoticeBody(channelId, acceptedLine(who, proposed.vanishAfter), actor.id);
+        return;
+    }
     const timer =
         proposed.vanishAfter === 0
             ? "no disappearing messages"
@@ -299,15 +335,28 @@ export async function answerProposal(
         await postNoticeBody(proposal.channelId, `${who} declined the proposed chat rules`, actor.id);
         return;
     }
-    const acceptedBy = [...proposal.acceptedBy, actor.id];
-    const done = rules.proposalAccepted(acceptedBy, members);
     const now = new Date();
+    // The vote is appended in SQL rather than written back as the list read
+    // above, and the update holds the row until the transaction ends: two
+    // people accepting at once are serialised, and whoever goes second sees
+    // the first one's vote when deciding whether everybody has agreed.
     const settled = await prisma.$transaction(async (tx) => {
         const moved = await tx.chatRuleProposal.updateMany({
-            where: { id: proposal.id, status: "pending" },
-            data: { acceptedBy, ...(done ? { status: "accepted", decidedAt: now } : {}) }
+            where: { id: proposal.id, status: "pending", NOT: { acceptedBy: { has: actor.id } } },
+            data: { acceptedBy: { push: actor.id } }
         });
-        if (moved.count === 0) return false;
+        if (moved.count === 0) return null;
+        const fresh = await tx.chatRuleProposal.findUnique({
+            where: { id: proposal.id },
+            select: { acceptedBy: true }
+        });
+        if (!rules.proposalAccepted(fresh?.acceptedBy ?? [], members)) return { done: false };
+        // Only the one that moves it to accepted applies it.
+        const closed = await tx.chatRuleProposal.updateMany({
+            where: { id: proposal.id, status: "pending" },
+            data: { status: "accepted", decidedAt: now }
+        });
+        const done = closed.count > 0;
         if (done) {
             await tx.chatChannel.update({
                 where: { id: proposal.channelId },
@@ -318,20 +367,20 @@ export async function answerProposal(
                 }
             });
         }
-        return true;
+        return { done };
     });
     if (!settled) throw new ChatRuleError({ key: "errors.proposalGone" });
     await postNoticeBody(
         proposal.channelId,
-        done
-            ? `${who} accepted the chat rules: ${
-                  proposal.vanishAfter === 0
-                      ? "messages no longer disappear"
-                      : `messages disappear after ${rules.spokenVanish(proposal.vanishAfter)}`
-              }`
-            : `${who} accepted the proposed chat rules`,
+        settled.done ? acceptedLine(who, proposal.vanishAfter) : `${who} accepted the proposed chat rules`,
         actor.id
     );
+}
+
+function acceptedLine(who: string, seconds: number): string {
+    return `${who} accepted the chat rules: ${
+        seconds === 0 ? "messages no longer disappear" : `messages disappear after ${rules.spokenVanish(seconds)}`
+    }`;
 }
 
 /** Delete one message for this reader only. Anybody's, mine or not. */

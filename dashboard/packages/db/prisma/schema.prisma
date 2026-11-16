@@ -10848,7 +10848,7 @@ model ChatRuleProposal {
     vanishAfter  Int       @default(0)
     deleteForAll Boolean   @default(false)
     acceptedBy   String[]  @db.Uuid
-    // pending | accepted | declined | replaced
+    // pending | accepted | declined | replaced | withdrawn
     status       String    @default("pending")
     createdAt    DateTime  @default(now())
     decidedAt    DateTime?

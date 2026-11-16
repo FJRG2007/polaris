@@ -24,6 +24,8 @@ import { chatWordsFor } from "./text";
 import { channelAccess } from "./access";
 import { publishChatChange } from "./live";
 import { unhideOnMessage } from "./chat-lock";
+import { expiryForChannel } from "./vanish";
+import * as history from "./history-visibility";
 import { polarMentioned } from "@/components/rich-text/markdown";
 
 export const POLAR_AGENT = "polar";
@@ -202,13 +204,17 @@ async function conversationBefore(
         select: { createdAt: true }
     });
     if (!asked) return [];
+    // Only what the one asking can still read: nothing that disappeared, that
+    // they deleted for themselves, or that came before they cleared the chat.
+    const floor = await history.readableSince({ id: mention.authorId }, mention.channelId);
     const rows = await prisma.chatMessage.findMany({
         where: {
             channelId: mention.channelId,
             parentId: mention.parentId,
             deletedAt: null,
             kind: "text",
-            createdAt: { lt: asked.createdAt }
+            createdAt: { lt: asked.createdAt },
+            AND: [history.sinceClause(floor, mention.authorId)]
         },
         orderBy: { createdAt: "desc" },
         take: HISTORY,
@@ -232,6 +238,8 @@ async function conversationBefore(
 
 /** Posts Polar's message, quoting the one that asked, in the same thread. */
 export async function postPolarMessage(mention: PolarMention, body: string): Promise<string> {
+    // An answer in a chat with a timer disappears like everything else in it.
+    const expiresAt = await expiryForChannel(mention.channelId, new Date());
     const id = await prisma.$transaction(async (tx) => {
         const message = await tx.chatMessage.create({
             data: {
@@ -242,7 +250,8 @@ export async function postPolarMessage(mention: PolarMention, body: string): Pro
                 agent: POLAR_AGENT,
                 authorLabel: POLAR_LABEL,
                 replyToId: mention.messageId,
-                parentId: mention.parentId
+                parentId: mention.parentId,
+                ...(expiresAt ? { expiresAt } : {})
             },
             select: { id: true, createdAt: true }
         });

@@ -23,6 +23,7 @@ import { useChat } from "./chat-context";
 import { threadDraftKey } from "./drafts";
 import { MessageList } from "./message-list";
 import { useMessageDelete } from "./delete-message";
+import { useDropExpired } from "./vanish-controls";
 import { runAction } from "@/lib/run-action";
 import { useChatPane } from "./use-chat-pane";
 import type { PollDraft } from "./poll-dialog";
@@ -119,6 +120,9 @@ export function ThreadPanel({
         setMessages(null);
         void load();
     }, [load]);
+
+    // A reply leaves the thread at its expiry, as it leaves the conversation.
+    useDropExpired(messages, setMessages);
 
     // A thread opened from a link to one of its replies. The panel draws the
     // whole thread, so on a long one the reply somebody followed can be well

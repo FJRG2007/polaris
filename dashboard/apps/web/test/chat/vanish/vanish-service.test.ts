@@ -18,9 +18,26 @@ const discarded: string[] = [];
 
 const tx = {
     chatMessage: { deleteMany: vi.fn(), updateMany: vi.fn() },
-    chatRuleProposal: { updateMany: vi.fn(async () => ({ count: 1 })) },
+    // Answers the way the database would against the one proposal row: a
+    // guarded update that appends a vote in place, and a read of what is there.
+    chatRuleProposal: {
+        updateMany: vi.fn(async (args: { where: ProposalWhere; data: ProposalData }) => {
+            if (!proposal) return { count: 0 };
+            const row = proposal as { status: string; acceptedBy: string[] };
+            if (args.where.status && row.status !== args.where.status) return { count: 0 };
+            if (args.where.NOT && row.acceptedBy.includes(args.where.NOT.acceptedBy.has)) {
+                return { count: 0 };
+            }
+            if (args.data.acceptedBy) row.acceptedBy = [...row.acceptedBy, args.data.acceptedBy.push];
+            if (args.data.status) row.status = args.data.status;
+            return { count: 1 };
+        }),
+        findUnique: vi.fn(async () => proposal)
+    },
     chatChannel: { update: vi.fn() }
 };
+type ProposalWhere = { status?: string; NOT?: { acceptedBy: { has: string } } };
+type ProposalData = { acceptedBy?: { push: string }; status?: string };
 const prisma = {
     chatChannel: {
         findUnique: vi.fn(async () => ({ ...channel, ruleProposals: [] })),
@@ -208,6 +225,67 @@ describe("permissions", () => {
         proposal = pending();
         await vanish.answerProposal(other, "p1", true);
         expect(tx.chatChannel.update).not.toHaveBeenCalled();
+    });
+
+    it("two members accepting at once both count, and the last one settles it", async () => {
+        settings.set("chat.dmRules", "agreement");
+        channel.kind = "group";
+        members = ["me", "other", "third"];
+        proposal = pending();
+        // Both read the proposal before either vote lands.
+        prisma.chatRuleProposal.findUnique.mockImplementation(async () =>
+            proposal ? { ...proposal, acceptedBy: ["me"] } : null
+        );
+        await Promise.all([
+            vanish.answerProposal(other, "p1", true),
+            vanish.answerProposal({ id: "third" }, "p1", true)
+        ]);
+        prisma.chatRuleProposal.findUnique.mockImplementation(async () => proposal);
+        expect(proposal?.acceptedBy).toEqual(["me", "other", "third"]);
+        expect(proposal?.status).toBe("accepted");
+        expect(tx.chatChannel.update).toHaveBeenCalledTimes(1);
+    });
+
+    it("a vote already counted is not counted again", async () => {
+        settings.set("chat.dmRules", "agreement");
+        proposal = pending({ acceptedBy: ["me"] });
+        prisma.chatRuleProposal.findUnique.mockImplementationOnce(async () => ({
+            ...pending(),
+            acceptedBy: []
+        }));
+        await expect(vanish.answerProposal(me, "p1", true)).rejects.toThrow("errors.proposalGone");
+        expect(proposal?.acceptedBy).toEqual(["me"]);
+    });
+
+    it("a group with nobody else in it agrees as soon as it proposes", async () => {
+        settings.set("chat.dmRules", "agreement");
+        channel.kind = "group";
+        members = ["me"];
+        await vanish.proposeRules(me, "c1", { vanishAfter: 604_800, deleteForAll: true });
+        expect(prisma.chatRuleProposal.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({ status: "accepted" })
+        });
+        expect(prisma.chatChannel.update).toHaveBeenCalledWith({
+            where: { id: "c1" },
+            data: expect.objectContaining({ vanishAfter: 604_800, deleteForAll: true })
+        });
+        expect(notices[0]).toContain("accepted the chat rules");
+    });
+
+    it("going back to the open mode closes every proposal still waiting", async () => {
+        await vanish.setDmRuleMode("open");
+        expect(prisma.chatRuleProposal.updateMany).toHaveBeenCalledWith({
+            where: { status: "pending" },
+            data: expect.objectContaining({ status: "withdrawn" })
+        });
+    });
+
+    it("an open-mode timer change closes what was proposed before it", async () => {
+        await vanish.setVanishTimer(me, "c1", 86_400);
+        expect(prisma.chatRuleProposal.updateMany).toHaveBeenCalledWith({
+            where: { channelId: "c1", status: "pending" },
+            data: expect.objectContaining({ status: "withdrawn" })
+        });
     });
 
     it("a proposal cannot be answered in the open mode", async () => {

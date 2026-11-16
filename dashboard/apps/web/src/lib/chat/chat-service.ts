@@ -2137,6 +2137,8 @@ async function createGroup(
         actorId: actor.id,
         audience: everyone
     });
+    // A group starts with its starter's default timer, as a one-to-one does.
+    await applyDefaultTimer(actor, channel.id);
     return channel.id;
 }
 

@@ -45,6 +45,13 @@ vi.mock("@/lib/chat/access", async (importOriginal) => ({
     messageable: async (ids: readonly string[]) => new Set(ids)
 }));
 
+/** The starter's default disappearing timer, applied to whatever they create. */
+const applyDefaultTimer = vi.fn(async () => undefined);
+vi.mock("@/lib/chat/vanish", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@/lib/chat/vanish")>()),
+    applyDefaultTimer
+}));
+
 vi.mock("@polaris/db", () => ({
     prisma: {
         user: {
@@ -95,6 +102,7 @@ beforeEach(() => {
     existingGroup = null;
     strangersAsked = [];
     written = {};
+    applyDefaultTimer.mockClear();
 });
 
 describe("adding people to a one-to-one conversation", () => {
@@ -108,6 +116,17 @@ describe("adding people to a one-to-one conversation", () => {
         });
         // Nobody was put into the one-to-one itself.
         expect(written.addedToDm).toBeUndefined();
+    });
+
+    it("starts the new group with its starter's default disappearing timer", async () => {
+        await chat.groupFromDirect(ada, "dm-1", ["alan"]);
+        expect(applyDefaultTimer).toHaveBeenCalledWith(ada, "new-group");
+    });
+
+    it("leaves a group that already existed with the rules it has", async () => {
+        existingGroup = "old-group";
+        await chat.groupFromDirect(ada, "dm-1", ["alan"]);
+        expect(applyDefaultTimer).not.toHaveBeenCalled();
     });
 
     it("asks the friends-and-colleagues rule only about the newcomers", async () => {

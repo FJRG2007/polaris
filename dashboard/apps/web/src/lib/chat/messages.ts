@@ -351,14 +351,14 @@ export async function readThread(
 
     // A reply passed in place of the root opens the thread it is in, which is
     // what somebody clicking a reply in a search result means.
+    // The head is checked whether or not there is a floor: a root that expired
+    // or that this reader deleted for themselves takes its thread with it.
     const rootId = root.parentId ?? root.id;
-    if (floor) {
-        const head = await prisma.chatMessage.findUnique({
-            where: { id: rootId },
-            select: { createdAt: true }
-        });
-        if (!head || !history.isReadable(floor, head.createdAt)) return [];
-    }
+    const head = await prisma.chatMessage.findFirst({
+        where: { id: rootId, AND: [history.notHiddenClause(actor.id)] },
+        select: { createdAt: true, expiresAt: true }
+    });
+    if (!head || !history.isReadable(floor, head.createdAt, head.expiresAt)) return [];
     const rows = await prisma.chatMessage.findMany({
         where: { OR: [{ id: rootId }, { parentId: rootId }], AND: [history.sinceClause(floor, actor.id)] },
         orderBy: { createdAt: "asc" },
@@ -1869,7 +1869,11 @@ export async function starred(
     const stars = await prisma.chatStar.findMany({
         where: {
             userId: actor.id,
-            message: { ...(channelId ? { channelId } : {}), ...ageClearedWhere(actor.id) }
+            message: {
+                ...(channelId ? { channelId } : {}),
+                ...ageClearedWhere(actor.id),
+                AND: [history.notExpiredClause(), history.notHiddenClause(actor.id)]
+            }
         },
         orderBy: { createdAt: "desc" },
         take: limit,
@@ -1877,9 +1881,13 @@ export async function starred(
     });
     if (stars.length === 0) return [];
 
-    const [reachable, concealed] = await Promise.all([
+    // A star outlives what it points at being deleted for this reader - by the
+    // timer, by them, or by clearing the chat - so each is checked against the
+    // floor of its conversation like any other read.
+    const [reachable, concealed, floors] = await Promise.all([
         reachableChannelIds(actor),
-        channelId ? null : concealedFor(actor.id)
+        channelId ? null : concealedFor(actor.id),
+        history.historyFloors(actor.id, [...new Set(stars.map((entry) => entry.message.channelId))])
     ]);
     const rows = stars
         .map((entry) => entry.message)
@@ -1887,7 +1895,8 @@ export async function starred(
             (row) =>
                 reachable.has(row.channelId) &&
                 row.deletedAt === null &&
-                !concealed?.locked.has(row.channelId)
+                !concealed?.locked.has(row.channelId) &&
+                history.isReadable(floors.get(row.channelId), row.createdAt, row.expiresAt)
         );
     return decorateMessages(actor, rows);
 }

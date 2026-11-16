@@ -10,14 +10,15 @@ import { MessagesWrapper } from "../../setup/i18n";
 import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 
 vi.mock("@/app/(app)/chat/vanish-actions", () => ({
     directRulesAction: vi.fn(),
     hideMessageAction: vi.fn()
 }));
 
-const { DeleteChatDialog, ProposalBar, durationName, nextExpiry, withoutExpired } = await import(
+const { DeleteChatDialog, ProposalBar, durationName, nextExpiry, useDropExpired, withoutExpired } = await import(
     "@/app/(app)/chat/vanish-controls"
 );
 
@@ -70,6 +71,24 @@ describe("expiry on screen", () => {
             "month",
             "quarter"
         ]);
+    });
+});
+
+describe("a list that drops what expires", () => {
+    afterEach(() => vi.useRealTimers());
+    it("takes a message out at its expiry, without a reload", () => {
+        vi.useFakeTimers({ now: NOW });
+        const { result } = renderHook(() => {
+            const [list, setList] = useState<readonly ChatMessageView[] | null>([
+                message("kept"),
+                message("soon", "2026-11-16T12:00:05Z")
+            ]);
+            useDropExpired(list, setList);
+            return list;
+        });
+        expect(result.current?.map((one) => one.id)).toEqual(["kept", "soon"]);
+        act(() => vi.advanceTimersByTime(5_000));
+        expect(result.current?.map((one) => one.id)).toEqual(["kept"]);
     });
 });
 
