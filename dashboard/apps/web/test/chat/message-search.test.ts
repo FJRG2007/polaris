@@ -48,6 +48,10 @@ vi.mock("@/lib/chat/messages", () => ({
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // The disappearing-messages mode, read on every send: never set here.
+        setting: { findUnique: async () => null },
+        // Nobody here has deleted a chat for themselves.
+        chatChannelMember: { findMany: async () => [] },
         chatMessage: {
             findMany: async (query: { where: Record<string, unknown> }) => {
                 asked = query;
@@ -96,19 +100,23 @@ describe("what somebody who joined later finds", () => {
     it("is only what was said since they joined, where earlier history is hidden", async () => {
         joinedMine = new Date("2026-10-10T00:00:00Z");
         await searchMessages(actor, query({ term: "release" }));
-        expect(asked?.where.AND).toEqual([
-            {
-                OR: [
-                    { channelId: { notIn: [MINE] } },
-                    { channelId: MINE, createdAt: { gte: joinedMine } }
-                ]
-            }
-        ]);
+        const [readable] = (asked?.where.AND ?? []) as { AND: unknown[] }[];
+        expect(readable?.AND[0]).toEqual({
+            OR: [
+                { channelId: { notIn: [MINE] } },
+                { channelId: MINE, createdAt: { gte: joinedMine } }
+            ]
+        });
     });
 
     it("is everything they can reach, where it is shown", async () => {
         await searchMessages(actor, query({ term: "release" }));
-        expect(asked?.where.AND).toEqual([{}]);
+        const [readable] = (asked?.where.AND ?? []) as { AND: unknown[] }[];
+        expect(readable?.AND[0]).toEqual({});
+        // Never what has disappeared, whatever the floor.
+        expect(readable?.AND[1]).toEqual({
+            OR: [{ expiresAt: null }, { expiresAt: { gt: expect.any(Date) } }]
+        });
     });
 });
 

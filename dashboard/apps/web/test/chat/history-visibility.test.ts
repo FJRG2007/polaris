@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
     chatChannel: { findMany: vi.fn() },
-    chatMessage: { findUnique: vi.fn() }
+    chatChannelMember: { findMany: vi.fn(async () => []) },
+    chatMessage: { findFirst: vi.fn() }
 }));
 vi.mock("@polaris/db", () => ({ prisma: db }));
 
@@ -86,14 +87,28 @@ describe("historyFloor", () => {
 });
 
 describe("where clauses", () => {
-    it("adds nothing when nothing is hidden", () => {
-        expect(history.sinceClause(null)).toEqual({});
-        expect(history.readableWhere(new Map())).toEqual({});
+    it("adds only the expiry when nothing else is hidden", () => {
+        const now = new Date();
+        vi.useFakeTimers({ now });
+        try {
+            const expiry = history.notExpiredClause(now);
+            expect(history.sinceClause(null)).toEqual({ AND: [{}, expiry, {}] });
+            expect(history.readableWhere(new Map())).toEqual({ AND: [{}, expiry, {}] });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+    it("leaves out what the reader deleted for themselves when they are named", () => {
+        expect(history.sinceClause(null, "user-1").AND).toContainEqual({
+            hiddenFor: { none: { userId: "user-1" } }
+        });
     });
     it("bounds only the conversations with a floor", () => {
-        expect(history.readableWhere(new Map([["c1", joined]]))).toEqual({
+        expect(history.readableWhere(new Map([["c1", joined]])).AND).toContainEqual({
             OR: [{ channelId: { notIn: ["c1"] } }, { channelId: "c1", createdAt: { gte: joined } }]
         });
+        expect(history.isReadable(null, new Date(0), new Date(Date.now() - 1000))).toBe(false);
+        expect(history.isReadable(null, new Date(0), new Date(Date.now() + 60_000))).toBe(true);
         expect(history.isReadable(joined, new Date("2026-10-09T00:00:00Z"))).toBe(false);
         expect(history.isReadable(joined, joined)).toBe(true);
         expect(history.isReadable(null, new Date(0))).toBe(true);
@@ -116,12 +131,14 @@ describe("a late joiner", () => {
             }
         ]);
         expect(await history.readableSince(actor, "c1")).toEqual(joined);
-        db.chatMessage.findUnique.mockResolvedValue({
-            createdAt: new Date("2026-10-01T00:00:00Z")
+        db.chatMessage.findFirst.mockResolvedValue({
+            createdAt: new Date("2026-10-01T00:00:00Z"),
+            expiresAt: null
         });
         await expect(history.requireReadable(actor, "c1", "m-old")).rejects.toThrow();
-        db.chatMessage.findUnique.mockResolvedValue({
-            createdAt: new Date("2026-10-11T00:00:00Z")
+        db.chatMessage.findFirst.mockResolvedValue({
+            createdAt: new Date("2026-10-11T00:00:00Z"),
+            expiresAt: null
         });
         await expect(history.requireReadable(actor, "c1", "m-new")).resolves.toBeUndefined();
     });
@@ -129,7 +146,24 @@ describe("a late joiner", () => {
     it("reads everything when the setting is on", async () => {
         db.chatChannel.findMany.mockResolvedValue([]);
         expect(await history.readableSince(actor, "c1")).toBeNull();
+        db.chatMessage.findFirst.mockResolvedValue({ createdAt: new Date(0), expiresAt: null });
         await expect(history.requireReadable(actor, "c1", "m-old")).resolves.toBeUndefined();
-        expect(db.chatMessage.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("reads nothing deleted for themselves, gone, or past its expiry", async () => {
+        db.chatChannel.findMany.mockResolvedValue([]);
+        db.chatMessage.findFirst.mockResolvedValue(null);
+        await expect(history.requireReadable(actor, "c1", "m-hidden")).rejects.toThrow();
+        db.chatMessage.findFirst.mockResolvedValue({
+            createdAt: new Date(0),
+            expiresAt: new Date(Date.now() - 1000)
+        });
+        await expect(history.requireReadable(actor, "c1", "m-expired")).rejects.toThrow();
+    });
+
+    it("starts again where the reader cleared the chat for themselves", async () => {
+        db.chatChannel.findMany.mockResolvedValue([]);
+        db.chatChannelMember.findMany.mockResolvedValueOnce([{ channelId: "c1", clearedAt: joined }]);
+        expect(await history.readableSince(actor, "c1")).toEqual(joined);
     });
 });

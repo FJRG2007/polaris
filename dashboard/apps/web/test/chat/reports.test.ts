@@ -52,7 +52,10 @@ const deleteReportFiles = vi.fn();
 
 vi.mock("@polaris/db", () => ({
     prisma: {
-        chatMessage: { findUnique: findMessage },
+        // Nobody here has deleted a chat for themselves.
+        chatChannelMember: { findMany: async () => [] },
+        // The readable check looks the message up with findFirst.
+        chatMessage: { findUnique: findMessage, findFirst: findMessage },
         chatReport: {
             findUnique: findReport,
             create: createReport,

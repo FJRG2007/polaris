@@ -68,6 +68,8 @@ vi.mock("@polaris/db", () => {
             findMany: async () => [],
             upsert: async () => undefined
         },
+        // The disappearing-messages mode, read on every send: never set here.
+        setting: { findUnique: async () => null },
         chatMessage: {
             findUnique: async () => ({
                 id: "message-1",
@@ -79,7 +81,13 @@ vi.mock("@polaris/db", () => {
                 deletedAt: null,
                 createdAt: SENT
             }),
-            findFirst: async () => null,
+            // The readable check looks the message up by id; nothing else asked
+            // here finds one.
+            findFirst(args: { where?: { id?: unknown } } = {}) {
+                return typeof args.where?.id === "string"
+                    ? this.findUnique(args as never)
+                    : Promise.resolve(null);
+            },
             findMany: async () => [],
             count: async () => 0,
             create: async ({ data }: { data: { body: string } }) => {

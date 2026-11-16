@@ -21,6 +21,10 @@ const db = vi.hoisted(() => ({
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // The disappearing-messages mode, read on every send: never set here.
+        setting: { findUnique: async () => null },
+        // Nobody here has deleted a chat for themselves.
+        chatChannelMember: { findMany: async () => [] },
         chatMessage: {
             findUnique: async () => db.message,
             count: async () => db.pinned,

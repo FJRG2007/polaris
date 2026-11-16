@@ -47,8 +47,17 @@ type Where = {
     id?: { in: string[] };
     createdAt?: { lt?: Date; gt?: Date };
     OR?: ({ id: string } | { parentId: string })[];
-    AND?: { createdAt?: { gte: Date } }[];
+    AND?: Clause[];
 };
+
+/** The reader's clause: a floor, possibly nested inside the expiry and
+ *  hidden-for-me clauses, which nothing here trips. */
+type Clause = { createdAt?: { gte: Date }; AND?: Clause[] };
+
+function passes(clause: Clause, createdAt: Date): boolean {
+    if (clause.createdAt && createdAt < clause.createdAt.gte) return false;
+    return (clause.AND ?? []).every((inner) => passes(inner, createdAt));
+}
 
 /** The parts of a message query these readers use, answered the way the
  *  database would. */
@@ -67,9 +76,7 @@ function findMany(args: { where: Where; orderBy?: { createdAt: "asc" | "desc" };
         ) {
             return false;
         }
-        return (where.AND ?? []).every(
-            (clause) => !clause.createdAt || message.createdAt >= clause.createdAt.gte
-        );
+        return (where.AND ?? []).every((clause) => passes(clause, message.createdAt));
     });
     if (args.orderBy?.createdAt === "desc") rows = [...rows].reverse();
     return args.take === undefined ? rows : rows.slice(0, args.take);
@@ -82,6 +89,8 @@ const written: { channel?: unknown; space?: unknown } = {};
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // The disappearing-messages mode, read on every send: never set here.
+        setting: { findUnique: async () => null },
         chatMessage: {
             findMany: async (args: Parameters<typeof findMany>[0]) => findMany(args),
             findFirst: async ({ where }: { where: { id: string } }) =>

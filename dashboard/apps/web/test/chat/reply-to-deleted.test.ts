@@ -64,7 +64,13 @@ vi.mock("@/lib/privacy-service", () => ({
 vi.mock("@/lib/contact-names", () => ({ nicknamesFor: async () => new Map() }));
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // The disappearing-messages mode, read on every send: never set here.
+        setting: { findUnique: async () => null },
         chatMessage: {
+            // The readable check looks the message up by id.
+            findFirst(args: { where: { id: string } }) {
+                return this.findUnique(args);
+            },
             findUnique: async ({ where }: { where: { id: string } }) =>
                 messages.find((row) => row.id === where.id) ?? null,
             findMany: async () => [],

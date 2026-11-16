@@ -90,7 +90,15 @@ function optionsOf(ids: readonly string[]): OptionRow[] {
 const store = {
     // Nobody here joined too late to read.
     chatChannel: { findMany: async () => [] },
+    // The disappearing-messages mode, read on every send: never set here.
+    setting: { findUnique: async () => null },
+    // Nobody here has deleted a chat for themselves.
+    chatChannelMember: { findMany: async () => [] },
     chatMessage: {
+        // The readable check looks the message up by id.
+        findFirst(args: { where: { id: string } }) {
+            return this.findUnique(args);
+        },
         findUnique: async ({ where }: { where: { id: string } }) => {
             const message = messages.find((row) => row.id === where.id);
             if (!message) return null;

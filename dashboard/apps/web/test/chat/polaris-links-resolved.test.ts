@@ -79,6 +79,10 @@ vi.mock("@polaris/db", () => ({
                     ? []
                     : channels.filter((channel) => where.id.in.includes(channel.id))
         },
+        // The disappearing-messages mode, read on every send: never set here.
+        setting: { findUnique: async () => null },
+        // Nobody here has deleted a chat for themselves.
+        chatChannelMember: { findMany: async () => [] },
         chatMessage: {
             findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
                 messages.filter((message) => where.id.in.includes(message.id))
