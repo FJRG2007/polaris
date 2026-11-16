@@ -8605,6 +8605,8 @@ model AnalyticsDay {
 
     @@unique([siteId, day, dimension, value])
     @@index([siteId, day])
+    // The rollup asks whether a day was rolled up yet across every site.
+    @@index([day, dimension])
 }
 
 /// A question about one site, saved to be asked again: a funnel, a goal, a
@@ -14737,6 +14739,8 @@ model CalendarObject {
     @@index([calendarId, endsAt])
     @@index([deletedAt])
     @@index([pendingPush])
+    // A pull matches each remote object by its address first.
+    @@index([calendarId, href])
 }
 
 // The next time one alarm of one object fires for one person.
