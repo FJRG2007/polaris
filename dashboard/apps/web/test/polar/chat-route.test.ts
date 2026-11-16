@@ -106,6 +106,7 @@ vi.mock("@/lib/polar/usage", () => ({
         costUsd: null
     }),
     stepContext: () => ({}),
+    recordPolarToolUse: async () => undefined,
     polarLimitReached: async () => state.hit,
     recordPolarUsage: async (entry: unknown) => void state.recorded.push(entry)
 }));

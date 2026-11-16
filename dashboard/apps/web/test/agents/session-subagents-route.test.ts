@@ -35,6 +35,8 @@ vi.mock("@/lib/agents/account-rotation", () => ({
 }));
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/lib/agents/session-goal", () => ({ judgeSessionGoal: async () => null }));
+vi.mock("@/lib/agents/session-runtime", () => ({ snapshotTypedPrompt: async () => undefined }));
+vi.mock("@/lib/polar/custom-tools/plugins", () => ({ dispatchSessionHook: async () => undefined }));
 vi.mock("@/lib/agents/session-prompt-queue", () => ({ deliverNextQueued: async () => false }));
 
 const { POST } = await import("@/app/api/agents/sessions/[id]/events/route");
