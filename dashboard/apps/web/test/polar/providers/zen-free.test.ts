@@ -180,3 +180,20 @@ describe("the catalogue with no keys", () => {
         expect(calls).toEqual(["https://opencode.ai/inference/openai/v1/chat/completions Bearer public"]);
     });
 });
+
+describe("the plan", () => {
+    it("ends on Zen after a person's own model", async () => {
+        state.sources = new Map([["openai", "own"]]);
+        const { resolvePolarModel } = await import("@/lib/polar/models");
+        const resolved = await resolvePolarModel(
+            "u1",
+            { kind: "language", provider: "openai", model: "mini", intelligence: "balanced", payer: null },
+            undefined,
+            ACCESS
+        );
+        if (typeof resolved === "string") throw new Error(resolved);
+        const steps = resolved.routed?.steps ?? [];
+        expect(steps.at(-1)?.option.provider).toBe(ZEN_FREE_SLUG);
+        expect(steps[0]?.option.provider).toBe("openai");
+    });
+});

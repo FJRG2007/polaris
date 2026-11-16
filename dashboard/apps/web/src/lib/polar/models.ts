@@ -44,6 +44,7 @@ import {
     type Payer
 } from "@/lib/polar/shared";
 import { zenBaseUrl, zenFreeModels, zenProviderOption } from "@/lib/polar/zen-free";
+import { zenLastStep } from "@/lib/polar/zen-stand-in";
 import {
     autoRoute,
     automaticCandidates,
@@ -499,8 +500,26 @@ export async function resolvePolarModel(
     if (routing.pinnedFallsBack || options.fallBack) {
         entries.push(...(await fallbackEntries(userId, routing.fallbacks, catalogue, keysOf)));
     }
+    await endOnZen(entries, userId, granted, signals);
     const steps = await planSteps(entries, async () => !(await polarLimitReached(userId)));
     return resolvedOf(steps, (kind, slug) => rememberRefusal(userId, slug, kind));
+}
+
+/** OpenCode Zen's free tier as the last step of a plan (`zen-stand-in.ts`). */
+async function endOnZen(
+    entries: PlanEntry[],
+    userId: string,
+    access: PolarAccess,
+    signals: TurnSignals
+): Promise<void> {
+    const last = entries.at(-1)?.option.provider ?? null;
+    try {
+        const step = await zenLastStep(access, last, signals.files > 0);
+        if (step) entries.push(entryOf(userId, step.option, [step.credential], []));
+    } catch (error) {
+        // The free tier is a last resort; failing to read it never fails a turn.
+        console.warn("polar: could not add the free stand-in", error);
+    }
 }
 
 /** What a caller outside the composer may ask of a resolution. */
@@ -786,6 +805,7 @@ async function resolveAutomatic(
             if (keys.length === 0) continue;
             entries.push(entryOf(userId, entry, keys, options));
         }
+        await endOnZen(entries, userId, access, signals);
         const steps = await planSteps(entries, async () => !(await polarLimitReached(userId)));
         return {
             ...resolvedOf(steps, (kind, slug) => rememberRefusal(userId, slug, kind), true),
