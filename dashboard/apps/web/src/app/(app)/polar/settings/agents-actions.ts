@@ -76,9 +76,10 @@ const importSchema = z.object({
         .max(20)
 });
 
-export async function readAgentFilesAction(
-    input: unknown
-): Promise<Result<{ path: string; agent: AgentFile | null }[]>> {
+/** One file read: the agent, or null when it does not read. */
+export type ReadAgentFile = { path: string; agent: AgentFile | null };
+
+export async function readAgentFilesAction(input: unknown): Promise<Result<ReadAgentFile[]>> {
     const who = await caller(false);
     if ("error" in who) return { ok: false, error: who.error };
     const parsed = importSchema.safeParse(input);
@@ -86,13 +87,14 @@ export async function readAgentFilesAction(
         const t = await getTranslations("polar");
         return { ok: false, error: t("settings.agents.errors.failed") };
     }
-    return {
-        ok: true,
-        value: parsed.data.files.map((file) => {
-            const read = parseAgentFile(file.path, file.content);
-            return { path: file.path, agent: typeof read === "string" ? null : read };
-        })
-    };
+    return { ok: true, value: readFiles(parsed.data.files) };
+}
+
+function readFiles(files: readonly { path: string; content: string }[]): ReadAgentFile[] {
+    return files.map((file) => {
+        const read = parseAgentFile(file.path, file.content);
+        return { path: file.path, agent: typeof read === "string" ? null : read };
+    });
 }
 
 export async function deleteAgentAction(input: unknown): Promise<Result<null>> {

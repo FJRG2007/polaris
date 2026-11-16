@@ -820,7 +820,20 @@
                 "connectors": "Connectors",
                 "picksHint": "None chosen uses your usual ones.",
                 "noSkills": "You have no skills yet.",
-                "noConnectors": "You have no connectors yet."
+                "noConnectors": "You have no connectors yet.",
+                "mode": "Started from",
+                "modes": {
+                    "primary": "Chat and Code",
+                    "subagent": "Other agents",
+                    "all": "Anywhere"
+                },
+                "modeHints": {
+                    "primary": "Picked to talk to. Other agents can't start it.",
+                    "subagent": "Only other agents start it, for a task of their own.",
+                    "all": "Picked to talk to, or started by another agent."
+                },
+                "shared": "Offer to everyone",
+                "sharedHint": "Everyone on this Polaris can use it. Only you can edit it."
             },
             "work": {
                 "body": "The account it signs in with and the models it may use.",
@@ -855,6 +868,45 @@
                 "noAccess": "Polar isn't available to you.",
                 "viewingAs": "You're viewing as someone else.",
                 "not_found": "That agent no longer exists."
+            },
+            "subagentOnly": "Started by other agents",
+            "sharedBadge": "Everyone",
+            "sharedMine": "You offer it to everyone here.",
+            "sharedOther": "An admin offers it to everyone here.",
+            "import": {
+                "open": "Import",
+                "title": "Import an agent",
+                "body": "An agent file from OpenCode, Claude Code or a repository's .polaris/agents.",
+                "paste": "Paste a file",
+                "read": "Read",
+                "files": "Choose files",
+                "use": "Use",
+                "unreadable": "This file couldn't be read as an agent.",
+                "none": "No agent files found.",
+                "repo": "From a repository",
+                "repoPick": "Pick a repository",
+                "repoSearch": "Search repositories",
+                "repoNone": "No connected repositories.",
+                "repoRead": "Read agents"
+            },
+            "rules": {
+                "title": "Permissions",
+                "hint": "Checked top to bottom: the last rule that matches wins.",
+                "empty": "None: Polar's usual approvals apply.",
+                "action": "Tool of rule {index}",
+                "pattern": "Pattern of rule {index}",
+                "effect": "Effect of rule {index}",
+                "actionPlaceholder": "shell, edit, read...",
+                "effects": {
+                    "allow": "Allow",
+                    "ask": "Ask first",
+                    "deny": "Deny"
+                },
+                "up": "Move up",
+                "down": "Move down",
+                "remove": "Remove rule",
+                "add": "Add rule",
+                "invalid": "Name a tool, with a pattern up to 500 characters."
             }
         },
         "writing": {

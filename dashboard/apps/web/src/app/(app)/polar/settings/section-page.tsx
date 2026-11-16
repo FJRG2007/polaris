@@ -136,10 +136,12 @@ async function WritingSection({ userId, readOnly }: { userId: string; readOnly: 
 async function AgentsSection({
     userId,
     readOnly,
+    admin,
     part
 }: {
     userId: string;
     readOnly: boolean;
+    admin: boolean;
     part: "agents" | "tools";
 }) {
     const access = await polarAccessFor(userId);
@@ -169,6 +171,7 @@ async function AgentsSection({
             initial={agents}
             defaults={[...defaults.values()]}
             readOnly={readOnly}
+            admin={admin}
             picks={{
                 skills: skills.map((skill) => skill.name),
                 connectors: connectors.map((entry) => ({ id: entry.id, name: entry.name })),
@@ -286,7 +289,7 @@ export async function SettingsSectionPage({
         case "agents":
             return (
                 <Suspense fallback={<ListSkeleton />}>
-                    <AgentsSection userId={user.id} readOnly={Boolean(user.viewingAs)} part="agents" />
+                    <AgentsSection userId={user.id} readOnly={Boolean(user.viewingAs)} admin={user.isAdmin && !user.viewingAs} part="agents" />
                 </Suspense>
             );
         case "display":
@@ -308,7 +311,7 @@ export async function SettingsSectionPage({
                         <SessionEngineSection userId={user.id} readOnly={Boolean(user.viewingAs)} />
                     </Suspense>
                     <Suspense fallback={<ListSkeleton />}>
-                        <AgentsSection userId={user.id} readOnly={Boolean(user.viewingAs)} part="tools" />
+                        <AgentsSection userId={user.id} readOnly={Boolean(user.viewingAs)} admin={user.isAdmin && !user.viewingAs} part="tools" />
                     </Suspense>
                     <PolarRoutingSettings part="tools" />
                 </div>

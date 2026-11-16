@@ -13,7 +13,7 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { Bot, Code2, MessageSquarePlus, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Bot, Code2, MessageSquarePlus, Pencil, Plus, Sparkles, Trash2, Upload, Users } from "lucide-react";
 import {
     Button,
     Card,
@@ -34,9 +34,11 @@ import { MarkdownDocumentField } from "@/components/rich-text/markdown-document-
 import { AgentLogo } from "@/components/logos";
 import { writeStored } from "@/lib/polar/stored";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import type { AgentFile } from "@/lib/polar/agents/agent-files";
 import type { AgentEngine } from "@/lib/polar/agents/composer-agents";
 import {
     AGENT_DESCRIPTION_MAX,
+    AGENT_MODES,
     AGENT_NAME_MAX,
     agentFieldError,
     agentInputSchema,
@@ -56,6 +58,8 @@ import {
     type AgentModelOption
 } from "./agent-work-fields";
 import { deleteAgentAction, saveAgentAction, saveAgentDefaultAction } from "./agents-actions";
+import { AgentImportDialog } from "./agent-import-dialog";
+import { PermissionRulesEditor } from "./permission-rules-editor";
 
 export type { AgentModelOption } from "./agent-work-fields";
 
@@ -81,6 +85,31 @@ export function agentChatHref(id: string): string {
 const CODE_TASK_HREF = "/polar?session=new";
 
 type Translate = ReturnType<typeof useTranslations>;
+
+/** What the editor is open on: an agent, a blank one, or one read from a file. */
+type Editing = AgentView | "new" | { draft: AgentInput };
+
+/** An imported file as an agent to check and save. Its model is kept only
+ *  where Polar offers that exact one; the rest is the person's to pick. */
+function draftOf(file: AgentFile, models: readonly AgentModelOption[]): AgentInput {
+    const slash = file.model ? file.model.indexOf("/") : -1;
+    const model =
+        file.model && slash > 0
+            ? { provider: file.model.slice(0, slash), model: file.model.slice(slash + 1) }
+            : null;
+    const offered =
+        model !== null &&
+        models.some((entry) => entry.provider === model.provider && entry.model === model.model);
+    return {
+        ...EMPTY,
+        name: file.name,
+        description: file.description,
+        instructions: file.instructions,
+        mode: file.mode,
+        permission: file.permission,
+        models: offered && model ? [model] : []
+    };
+}
 
 /** One line on what an agent works with: its account and preferred model. */
 function workSummary(
@@ -141,6 +170,7 @@ export function PolarAgents({
     defaults,
     picks,
     readOnly,
+    admin,
     part
 }: {
     /**
@@ -155,12 +185,15 @@ export function PolarAgents({
     defaults: AgentWork[];
     picks: AgentPicks;
     readOnly: boolean;
+    /** An administrator may offer an agent to everybody on the instance. */
+    admin: boolean;
 }) {
     const t = useTranslations("polar");
     const [rows, setRows] = useState(initial);
+    const [importing, setImporting] = useState(false);
     const [works, setWorks] = useState(defaults);
     const [error, setError] = useState<string | null>(null);
-    const [editing, setEditing] = useState<AgentView | "new" | null>(null);
+    const [editing, setEditing] = useState<Editing | null>(null);
     const [tuning, setTuning] = useState<{ engine: string; name: string } | null>(null);
     const [allTools, setAllTools] = useState(false);
     const [removing, setRemoving] = useState<AgentView | null>(null);
@@ -258,16 +291,16 @@ export function PolarAgents({
                         <p className="text-sm text-muted-foreground">{t("settings.agents.intro")}</p>
                     </div>
                     {!readOnly ? (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="shrink-0"
-                            onClick={() => setEditing("new")}
-                        >
-                            <Plus className="h-3.5 w-3.5 shrink-0" />
-                            {t("settings.agents.create")}
-                        </Button>
+                        <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                            <Button type="button" size="sm" variant="ghost" onClick={() => setImporting(true)}>
+                                <Upload className="h-3.5 w-3.5 shrink-0" />
+                                {t("settings.agents.import.open")}
+                            </Button>
+                            <Button type="button" size="sm" variant="outline" onClick={() => setEditing("new")}>
+                                <Plus className="h-3.5 w-3.5 shrink-0" />
+                                {t("settings.agents.create")}
+                            </Button>
+                        </div>
                     ) : null}
                 </div>
                 {error ? (
@@ -304,7 +337,21 @@ export function PolarAgents({
                                             >
                                                 {row.description || row.instructions}
                                             </p>
-                                            <p className="truncate text-xs text-muted-foreground">
+                                            <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                                                {row.shared ? (
+                                                    <span
+                                                        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 text-[11px]"
+                                                        title={
+                                                            row.mine
+                                                                ? t("settings.agents.sharedMine")
+                                                                : t("settings.agents.sharedOther")
+                                                        }
+                                                    >
+                                                        <Users className="size-3 shrink-0" aria-hidden="true" />
+                                                        {t("settings.agents.sharedBadge")}
+                                                    </span>
+                                                ) : null}
+                                                <span className="min-w-0 truncate">
                                                 {[
                                                     // Only worth saying when it is not the usual: an
                                                     // agent on Polar is what anybody expects.
@@ -313,12 +360,17 @@ export function PolarAgents({
                                                         : t("settings.agents.runsOn", {
                                                               engine: engineName(row.engine)
                                                           }),
-                                                    workSummary(row, picks.engines, picks.models, t)
+                                                    workSummary(row, picks.engines, picks.models, t),
+                                                    row.mode === "subagent"
+                                                        ? t("settings.agents.subagentOnly")
+                                                        : null
                                                 ]
                                                     .filter(Boolean)
                                                     .join(" - ")}
+                                                </span>
                                             </p>
                                         </div>
+                                        {row.mode !== "subagent" ? (
                                         <Button asChild size="sm" variant="outline" className="shrink-0">
                                             {onPolar ? (
                                                 <Link href={agentChatHref(row.id)}>
@@ -340,7 +392,8 @@ export function PolarAgents({
                                                 </Link>
                                             )}
                                         </Button>
-                                        {!readOnly ? (
+                                        ) : null}
+                                        {!readOnly && row.mine ? (
                                             <>
                                                 <Button
                                                     type="button"
@@ -379,8 +432,14 @@ export function PolarAgents({
                 onClose={() => setTuning(null)}
                 onSave={saveWork}
             />
+            <AgentImportDialog
+                open={importing}
+                onClose={() => setImporting(false)}
+                onUse={(file) => setEditing({ draft: draftOf(file, picks.models) })}
+            />
             <AgentEditor
                 editing={editing}
+                admin={admin}
                 picks={picks}
                 engineName={engineName}
                 onClose={() => setEditing(null)}
@@ -501,10 +560,16 @@ const EMPTY: AgentInput = {
     modelPolicy: "preferred"
 };
 
-function valuesOf(editing: AgentView | "new" | null): AgentInput {
+function valuesOf(editing: Editing | null): AgentInput {
     if (!editing || editing === "new") return EMPTY;
-    const { id: _id, ...values } = editing;
+    if ("draft" in editing) return editing.draft;
+    const { id: _id, mine: _mine, ...values } = editing;
     return values;
+}
+
+/** The stored agent the editor changes, or null for a new one. */
+function savedOf(editing: Editing | null): AgentView | null {
+    return editing && editing !== "new" && !("draft" in editing) ? editing : null;
 }
 
 /** The fields that are the agent's, without `choice`, which the server
@@ -517,12 +582,14 @@ function same(a: AgentInput, b: AgentInput): boolean {
 
 function AgentEditor({
     editing,
+    admin,
     picks,
     engineName,
     onClose,
     onSaved
 }: {
-    editing: AgentView | "new" | null;
+    editing: Editing | null;
+    admin: boolean;
     picks: AgentPicks;
     engineName: (engine: string) => string;
     onClose: () => void;
@@ -530,7 +597,7 @@ function AgentEditor({
 }) {
     const t = useTranslations("polar");
     const [values, setValues] = useState<AgentInput>(EMPTY);
-    const [loadedFor, setLoadedFor] = useState<AgentView | "new" | null>(null);
+    const [loadedFor, setLoadedFor] = useState<Editing | null>(null);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [advanced, setAdvanced] = useState(false);
@@ -546,7 +613,8 @@ function AgentEditor({
     }
 
     const checked = agentInputSchema.safeParse(values);
-    const unchanged = editing !== null && editing !== "new" && same(values, valuesOf(editing));
+    const saved = savedOf(editing);
+    const unchanged = saved !== null && same(values, valuesOf(saved));
     const complete = checked.success && !unchanged;
     const onPolar = values.engine === POLAR_ENGINE;
     const set = <K extends keyof AgentInput>(field: K, value: AgentInput[K]) =>
@@ -560,7 +628,7 @@ function AgentEditor({
         setPending(true);
         setError(null);
         const answer = await saveAgentAction({
-            id: editing && editing !== "new" ? editing.id : null,
+            id: saved?.id ?? null,
             agent: checked.data
         });
         setPending(false);
@@ -605,9 +673,7 @@ function AgentEditor({
             <DialogContent className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>
-                        {editing === "new"
-                            ? t("settings.agents.editor.titleNew")
-                            : t("settings.agents.editor.titleEdit")}
+                        {saved ? t("settings.agents.editor.titleEdit") : t("settings.agents.editor.titleNew")}
                     </DialogTitle>
                     <DialogDescription>{t("settings.agents.editor.body")}</DialogDescription>
                 </DialogHeader>
@@ -738,6 +804,40 @@ function AgentEditor({
                                 onToggle={(item, on) => toggleIn("connectorIds", item, on)}
                             />
                         </>
+                    ) : null}
+                    <div className="flex flex-col gap-1 text-sm">
+                        <label htmlFor="agent-mode">{t("settings.agents.editor.mode")}</label>
+                        <Select
+                            id="agent-mode"
+                            value={values.mode}
+                            options={AGENT_MODES.map((mode) => ({
+                                value: mode,
+                                label: t(`settings.agents.editor.modes.${mode}`)
+                            }))}
+                            onValueChange={(mode) => set("mode", mode as AgentInput["mode"])}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                            {t(`settings.agents.editor.modeHints.${values.mode}`)}
+                        </span>
+                    </div>
+                    <PermissionRulesEditor
+                        value={values.permission}
+                        onChange={(permission) => set("permission", permission)}
+                    />
+                    {admin ? (
+                        <label className="flex items-center justify-between gap-3 text-sm">
+                            <span className="min-w-0">
+                                <span className="block">{t("settings.agents.editor.shared")}</span>
+                                <span className="block text-xs text-muted-foreground">
+                                    {t("settings.agents.editor.sharedHint")}
+                                </span>
+                            </span>
+                            <Switch
+                                checked={values.shared}
+                                aria-label={t("settings.agents.editor.shared")}
+                                onChange={(on) => set("shared", on)}
+                            />
+                        </label>
                     ) : null}
                     {error ? (
                         <p role="alert" className="text-sm text-danger">
