@@ -639,6 +639,58 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         docsUrl: "https://creator.poe.com/docs/external-applications/openai-compatible-api",
         defaultModel: { label: "Grok 4 Fast (Poe)", slug: "poe/xai/grok-4-fast-reasoning" } // i18n-ignore
     },
+    // -----------------------------------------------------------------------
+    // Cloud accounts: more than a key, added from the cloud accounts card
+    // (`agents/cloud-credentials.ts`) rather than pasted
+    // -----------------------------------------------------------------------
+    {
+        slug: "amazon-bedrock",
+        name: "Amazon Bedrock",
+        kind: "host",
+        envVar: "AWS_BEARER_TOKEN_BEDROCK",
+        summary: "The labs' models on an AWS account, billed by AWS.",
+        docsUrl: "https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html",
+        defaultModel: { label: "Claude Sonnet 4.6 (Bedrock)", slug: "amazon-bedrock/eu.anthropic.claude-sonnet-4-6" } // i18n-ignore
+    },
+    {
+        slug: "azure",
+        name: "Azure OpenAI",
+        kind: "host",
+        envVar: "AZURE_API_KEY",
+        summary: "OpenAI's models deployed in your own Azure resource.",
+        docsUrl: "https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models",
+        defaultModel: { label: "GPT-5.4 (Azure)", slug: "azure/gpt-5.4" } // i18n-ignore
+    },
+    {
+        slug: "google-vertex",
+        name: "Google Vertex AI",
+        kind: "host",
+        envVar: "GOOGLE_VERTEX_API_KEY",
+        summary: "Gemini on a Google Cloud project, billed by Google Cloud.",
+        docsUrl: "https://cloud.google.com/vertex-ai/generative-ai/docs/models",
+        defaultModel: { label: "Gemini 3.1 Pro (Vertex)", slug: "google-vertex/gemini-3.1-pro-preview" } // i18n-ignore
+    },
+    {
+        slug: "snowflake-cortex",
+        name: "Snowflake Cortex",
+        kind: "host",
+        envVar: "SNOWFLAKE_CORTEX_PAT",
+        summary: "Models that run inside your Snowflake account.",
+        docsUrl: "https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-rest-api",
+        defaultModel: { label: "Claude Sonnet 4.6 (Snowflake)", slug: "snowflake-cortex/claude-sonnet-4-6" } // i18n-ignore
+    },
+    {
+        slug: "digitalocean",
+        name: "DigitalOcean",
+        kind: "host",
+        envVar: "DIGITALOCEAN_ACCESS_TOKEN",
+        summary: "Serverless inference on a DigitalOcean account.",
+        docsUrl: "https://docs.digitalocean.com/products/gradient-ai-platform/details/models/",
+        defaultModel: {
+            label: "Claude 4.5 Sonnet (DigitalOcean)", // i18n-ignore
+            slug: "digitalocean/anthropic-claude-4.5-sonnet"
+        }
+    },
     {
         slug: "helicone",
         name: "Helicone",

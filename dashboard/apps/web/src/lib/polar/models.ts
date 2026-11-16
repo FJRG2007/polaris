@@ -15,6 +15,8 @@
  */
 
 import { copilotModel, gitlabModel, loginListsModel } from "@/lib/polar/login-models";
+import { cloudLanguageModel, cloudListsModel } from "@/lib/polar/cloud-models";
+import { isCloudProvider, readCloudSecret } from "@/lib/agents/cloud-credentials";
 import { wrapLanguageModel, type LanguageModel } from "ai";
 import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
@@ -111,6 +113,7 @@ export function polarServesProvider(slug: string): boolean {
         slug === ZEN_FREE_SLUG ||
         slug === "github-copilot" ||
         slug === "gitlab" ||
+        isCloudProvider(slug) ||
         slug in OPENAI_COMPATIBLE_BASES ||
         slug in PROVIDER_ENDPOINTS ||
         catalogEndpoint(slug) !== null
@@ -271,6 +274,12 @@ async function keyedModelOptions(
             const model = outside.defaultModel.slug.slice(slug.length + 1);
             const named = model && !listed.some((entry) => entry.model === model);
             models = named ? [...listed, gatewayOption(slug, name, model)] : listed;
+        } else if (slug === "azure") {
+            // An Azure resource serves its deployments, named by whoever made
+            // them; the ones listed when the account was added are its models.
+            const credential = await polarCredentialFor(userId, slug, null, granted);
+            const cloud = credential ? readCloudSecret(credential.secret) : null;
+            models = cloud?.provider === "azure" ? cloud.deployments.map((entry) => gatewayOption(slug, name, entry)) : [];
         } else if (slug === GATEWAY_SLUG) {
             const credential = await polarCredentialFor(userId, slug, null, granted);
             models = credential?.gatewayModel
@@ -280,6 +289,7 @@ async function keyedModelOptions(
             models = catalogue
                 .filter((model) => prefixes.get(model.provider) === slug)
                 .filter((model) => loginListsModel(slug, model.modelId))
+                .filter((model) => !isCloudProvider(slug) || cloudListsModel(slug, model.modelId))
                 .map((model) =>
                     catalogueOption(
                         slug,
@@ -709,6 +719,12 @@ export function languageModel(
             return copilotModel(credential, model);
         case "gitlab":
             return gitlabModel(credential, model);
+        case "amazon-bedrock":
+        case "azure":
+        case "google-vertex":
+        case "snowflake-cortex":
+        case "digitalocean":
+            return cloudLanguageModel(apiKey, model);
         case ZEN_FREE_SLUG:
             return createOpenAICompatible({
                 name: "opencode",

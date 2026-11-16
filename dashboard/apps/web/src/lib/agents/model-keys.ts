@@ -47,6 +47,7 @@ import {
 import { keyLimitsOf, type KeyLimits } from "@/lib/agents/key-limits";
 import { keyHint } from "@/lib/agents/key-hint";
 import { readOAuthSecret, spendableSecret } from "@/lib/agents/provider-oauth";
+import { cloudBearer, readCloudSecret } from "@/lib/agents/cloud-credentials";
 import { freshLogin } from "@/lib/agents/provider-login-refresh";
 
 /** Whose keys a call is about: an account, or the deployment itself. */
@@ -715,7 +716,16 @@ export async function runSecretsFor(userId: string | null): Promise<Record<strin
             // A stored login hands a run its access token, renewed first when
             // it is about to end: a CLI cannot renew a token it was handed, so
             // one that lapses minutes into the session fails every turn after.
-            secrets[provider.envVar] = (await unwrapLogin(picked.row, picked.secret)).secret;
+            // A cloud account hands a run only a key its CLI can read from
+            // that variable; AWS keys and service accounts are not one.
+            const cloud = readCloudSecret(picked.secret);
+            if (cloud) {
+                const bearer = cloudBearer(cloud);
+                if (!bearer) continue;
+                secrets[provider.envVar] = bearer;
+            } else {
+                secrets[provider.envVar] = (await unwrapLogin(picked.row, picked.secret)).secret;
+            }
             used.push(picked.row.id);
             if (provider.slug === "anthropic") applyWorkspace(secrets, picked.row);
         }

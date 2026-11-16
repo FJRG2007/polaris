@@ -1382,6 +1382,81 @@
                 "domain": "Dominio Enterprise",
                 "badDomain": "Escribe un dominio como empresa.ghe.com, sin ruta ni puerto."
             }
+        },
+        "cloud": {
+            "title": "Cuentas en la nube",
+            "hint": "Usa modelos con tu cuenta en la nube. Se guarda como clave abajo.",
+            "add": "Añadir {name}",
+            "method": "Cómo conectar",
+            "methods": {
+                "keys": "Clave acceso",
+                "api-key": "Clave Bedrock",
+                "key": "Clave API",
+                "entra": "App Entra ID",
+                "service-account": "Cuenta servicio",
+                "pat": "Token acceso",
+                "oauth": "Entrar"
+            },
+            "about": {
+                "amazon-bedrock": "Una clave de acceso IAM o una clave de Bedrock, y la región con tus modelos.",
+                "azure": "Tu recurso de Azure OpenAI o AI Foundry, con su clave o una app de Entra ID.",
+                "google-vertex": "El archivo de clave de una cuenta de servicio con Vertex AI, y dónde usarlo.",
+                "snowflake-cortex": "El identificador de tu cuenta y un token de acceso programático.",
+                "digitalocean": "Entra en DigitalOcean o pega una clave de acceso a modelos."
+            },
+            "docs": "Cómo obtenerlos",
+            "fields": {
+                "accessKeyId": "ID de clave",
+                "secretAccessKey": "Clave secreta",
+                "sessionToken": "Token de sesión",
+                "region": "Región",
+                "apiKey": "Clave API",
+                "endpoint": "Nombre o dirección",
+                "deployments": "Implementaciones",
+                "tenantId": "ID inquilino",
+                "clientId": "ID cliente",
+                "clientSecret": "Secreto cliente",
+                "serviceAccount": "Clave de cuenta (JSON)",
+                "project": "ID proyecto",
+                "location": "Ubicación",
+                "account": "Identificador",
+                "token": "Token"
+            },
+            "fieldInvalid": {
+                "accessKeyId": "Empieza por AKIA o ASIA.",
+                "secretAccessKey": "Revisa el secreto.",
+                "sessionToken": "Revisa el token.",
+                "region": "Una región como us-east-1.",
+                "apiKey": "Revisa la clave.",
+                "endpoint": "Un nombre de recurso o su dirección https.",
+                "deployments": "Letras, cifras, puntos, guiones.",
+                "tenantId": "Un ID o dominio.",
+                "clientId": "Un ID de cliente (GUID).",
+                "clientSecret": "Revisa el secreto.",
+                "serviceAccount": "Pega el archivo entero.",
+                "project": "Un ID como my-project.",
+                "location": "global, us, eu o región.",
+                "account": "Como myorg-myaccount.",
+                "token": "Revisa el token."
+            },
+            "optional": "opcional",
+            "deploymentsHint": "Separa con comas. Se leen del recurso si lo permite.",
+            "serviceAccountPlaceholder": "Pega el archivo o elígelo abajo",
+            "digitalocean": {
+                "steps": "Entra, aprueba, copia la dirección de la página que no abre y pégala aquí.",
+                "open": "Abrir DigitalOcean",
+                "again": "Reabrir",
+                "paste": "Dirección final"
+            },
+            "save": "Guardar",
+            "cancel": "Cancelar",
+            "refused": "{name} rechazó estos datos. Revísalos e inténtalo.",
+            "unreachable": "No se pudo contactar con {name}. Prueba en un momento.",
+            "noDeployments": "Sin implementaciones. Escribe sus nombres.",
+            "badPaste": "No es la dirección que dio DigitalOcean. Entra otra vez.",
+            "denied": "Se canceló el acceso.",
+            "gone": "El acceso caducó. Empieza de nuevo.",
+            "invalid": "Faltan datos o no son válidos."
         }
     },
     "dns": {

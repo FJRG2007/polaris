@@ -13,6 +13,7 @@ import { requireUser } from "@/lib/session";
 import { CardSkeleton } from "@/app/(app)/admin/region-skeletons";
 import { AiKeysPanel } from "./ai-keys-panel";
 import { ProviderLogins } from "@/components/model-keys/provider-logins";
+import { CloudAccounts } from "@/components/model-keys/cloud-accounts";
 import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export default async function AiKeysPage() {
                 <p className="text-muted-foreground text-sm">{t("aiKeys.page.intro")}</p>
             </div>
             <ProviderLogins />
+            <CloudAccounts />
             {/* Streamed: the listing decrypts older keys once to fill their
                 hints and asks the router how each one stands, and the heading
                 has no reason to wait for either. */}

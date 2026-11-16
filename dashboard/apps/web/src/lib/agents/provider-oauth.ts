@@ -12,6 +12,7 @@
  */
 
 import { z } from "zod";
+import { cloudHintSource, readCloudSecret } from "@/lib/agents/cloud-credentials";
 
 const storedSchema = z.object({
     kind: z.literal("oauth"),
@@ -43,8 +44,11 @@ export function writeOAuthSecret(login: Omit<StoredOAuth, "kind">): string {
 }
 
 /** What the key hint and anything handed to a run reads: the access token for a
- *  login, the secret itself for a key. */
+ *  login, the value naming a cloud account (`cloudHintSource`), the secret
+ *  itself for a key. */
 export function spendableSecret(secret: string): string {
+    const cloud = readCloudSecret(secret);
+    if (cloud) return cloudHintSource(cloud);
     return readOAuthSecret(secret)?.access ?? secret;
 }
 

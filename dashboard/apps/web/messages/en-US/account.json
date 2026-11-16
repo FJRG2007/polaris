@@ -1382,6 +1382,81 @@
                 "domain": "Enterprise domain",
                 "badDomain": "Enter a domain like company.ghe.com, without a path or port."
             }
+        },
+        "cloud": {
+            "title": "Cloud accounts",
+            "hint": "Use models through your own cloud account. Saved as a key below.",
+            "add": "Add {name}",
+            "method": "How to connect",
+            "methods": {
+                "keys": "Access key",
+                "api-key": "Bedrock API key",
+                "key": "API key",
+                "entra": "Entra ID app",
+                "service-account": "Service account",
+                "pat": "Access token",
+                "oauth": "Sign in"
+            },
+            "about": {
+                "amazon-bedrock": "An IAM access key, or a Bedrock API key, and the region your models are enabled in.",
+                "azure": "Your Azure OpenAI or AI Foundry resource, with its key or an Entra ID app registration.",
+                "google-vertex": "A service account key file with access to Vertex AI, and where to run.",
+                "snowflake-cortex": "Your account identifier and a programmatic access token.",
+                "digitalocean": "Sign in to DigitalOcean, or paste a model access key."
+            },
+            "docs": "How to get these",
+            "fields": {
+                "accessKeyId": "Access key ID",
+                "secretAccessKey": "Secret access key",
+                "sessionToken": "Session token",
+                "region": "Region",
+                "apiKey": "API key",
+                "endpoint": "Resource name or endpoint",
+                "deployments": "Deployment names",
+                "tenantId": "Tenant ID",
+                "clientId": "Client ID",
+                "clientSecret": "Client secret",
+                "serviceAccount": "Service account key (JSON)",
+                "project": "Project ID",
+                "location": "Location",
+                "account": "Account identifier",
+                "token": "Token"
+            },
+            "fieldInvalid": {
+                "accessKeyId": "Starts with AKIA or ASIA.",
+                "secretAccessKey": "Check the secret.",
+                "sessionToken": "Check the token.",
+                "region": "A region like us-east-1.",
+                "apiKey": "Check the key.",
+                "endpoint": "An Azure resource name or its https address.",
+                "deployments": "Letters, digits, dots, dashes.",
+                "tenantId": "A tenant ID or domain.",
+                "clientId": "A client ID (GUID).",
+                "clientSecret": "Check the secret.",
+                "serviceAccount": "Paste the whole key file.",
+                "project": "A project ID like my-project.",
+                "location": "global, us, eu or a region.",
+                "account": "Like myorg-myaccount.",
+                "token": "Check the token."
+            },
+            "optional": "optional",
+            "deploymentsHint": "Separate with commas. Listed from the resource when it allows it.",
+            "serviceAccountPlaceholder": "Paste the key file, or choose it below",
+            "digitalocean": {
+                "steps": "Sign in, approve, then copy the address of the page that fails to open and paste it here.",
+                "open": "Open DigitalOcean",
+                "again": "Open again",
+                "paste": "Address you landed on"
+            },
+            "save": "Save",
+            "cancel": "Cancel",
+            "refused": "{name} refused these details. Check them and try again.",
+            "unreachable": "Could not reach {name}. Try again in a moment.",
+            "noDeployments": "No deployments found. Type their names to add them.",
+            "badPaste": "That isn't the address DigitalOcean returned to. Sign in again.",
+            "denied": "The sign-in was cancelled.",
+            "gone": "That sign-in has expired. Start again.",
+            "invalid": "Some details are missing or not valid."
         }
     },
     "dns": {

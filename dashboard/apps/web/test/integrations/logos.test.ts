@@ -57,6 +57,12 @@ describe("integration logos", () => {
  * stops being wired - or one added without leaving this list - fails here.
  */
 const MONOGRAM_PROVIDERS = [
+    // Cloud accounts: no official mark sourced yet.
+    "amazon-bedrock",
+    "azure",
+    "google-vertex",
+    "snowflake-cortex",
+    "digitalocean",
     "coarena",
     "venice",
     "sarvam",

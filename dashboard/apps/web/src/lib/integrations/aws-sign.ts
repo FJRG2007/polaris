@@ -96,6 +96,9 @@ export function signAwsRequest(input: {
     readonly host: string;
     readonly method?: string;
     readonly path?: string;
+    /** The path as it is signed, when that differs from the one sent: every
+     *  service but S3 signs each segment encoded once more (`%3A` -> `%253A`). */
+    readonly canonicalPath?: string;
     readonly query?: string;
     readonly body?: string;
     /** The operation, for the JSON-protocol services that name it in a header. */
@@ -109,6 +112,7 @@ export function signAwsRequest(input: {
         host,
         method = "POST",
         path = "/",
+        canonicalPath = path,
         query = "",
         body = "",
         target,
@@ -128,7 +132,7 @@ export function signAwsRequest(input: {
     };
 
     const { canonical, signed } = canonicalHeaders(headers);
-    const canonicalRequest = [method, path, query, canonical, signed, payloadHash].join("\n");
+    const canonicalRequest = [method, canonicalPath, query, canonical, signed, payloadHash].join("\n");
     const scope = `${day}/${credentials.region}/${service}/aws4_request`;
     const stringToSign = ["AWS4-HMAC-SHA256", full, scope, sha256(canonicalRequest)].join("\n");
 
@@ -156,7 +160,7 @@ export function signAwsRequest(input: {
  * `encodeURIComponent` leaves `!'()*` alone, which AWS does not - a key with a
  * parenthesis would sign one string and send another.
  */
-function awsEncode(value: string, keepSlash = false): string {
+export function awsEncode(value: string, keepSlash = false): string {
     return Array.from(Buffer.from(value, "utf8"))
         .map((byte) => {
             const char = String.fromCharCode(byte);
