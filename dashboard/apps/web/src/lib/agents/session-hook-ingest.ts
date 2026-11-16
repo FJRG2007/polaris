@@ -82,7 +82,7 @@ export async function ingestHookPayload(session: HookSession, payload: unknown, 
         seq
     );
     // The owner's plugins hear it after it is recorded, never in its way.
-    after(() => dispatchSessionHook(id, kind, { tool: event.subject, detail: event.detail }));
+    after(() => dispatchSessionHook(id, kind, { tool: event.subject, detail: event.detail }).catch(() => undefined));
     if (kind === "turn.failed" && isSignInRefusal(event.detail)) after(() => noteRefusedSignIn(id));
     else if (kind === "turn.failed") after(() => handleTurnFailure(id, payload, seq));
     else if (kind === "turn.end")
