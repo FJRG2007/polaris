@@ -205,7 +205,7 @@ export function SkillDetailDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto [&>*]:shrink-0">
+                <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain [&>*]:shrink-0">
                     {failed !== null ? (
                         <div role="alert" className="flex flex-col items-start gap-2 text-sm">
                             <p className="text-danger">{failed || t("settings.skills.upstream.loadFailed")}</p>
