@@ -538,35 +538,60 @@ export function ModelKeysView({
                         </tbody>
                     </table>
                 </div>
-            </section>
 
-            {homeSignins.length > 0 && assist ? (
-                <section className="flex flex-col gap-3">
-                    <div className="min-w-0">
-                        <h2 className="text-sm font-medium">{t("modelKeys.homeTitle")}</h2>
+                {/* The agents whose login stays on the sessions' machine sit with
+                    the accounts, one row per agent: they answer the same question
+                    - which account signs this agent in - and a section of their
+                    own read as a category nobody could place. One action per row;
+                    the vendor's sign-out, where there is one, is in its menu. */}
+                {homeSignins.length > 0 && assist ? (
+                    <div className="flex flex-col gap-2">
                         <p className="text-muted-foreground text-xs">{t("modelKeys.homeHint")}</p>
+                        <ul className="divide-y divide-border rounded-lg border border-border">
+                            {homeSignins.map((signin) => {
+                                const tool = signin.serves[0]?.label ?? signin.label;
+                                return (
+                                    <li key={signin.env} className="flex items-center gap-2 px-3 py-2">
+                                        <span className="min-w-0 flex-1 truncate text-sm" title={tool}>
+                                            {tool}
+                                        </span>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="shrink-0"
+                                            onClick={() => setRunning({ signin, mode: "login" })}
+                                        >
+                                            <LogIn className="size-4 shrink-0" />
+                                            <span className="truncate">{t("modelKeys.homeSignin")}</span>
+                                        </Button>
+                                        {canSignOut(signin) ? (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button
+                                                        size="icon-sm"
+                                                        variant="ghost"
+                                                        className="shrink-0"
+                                                        aria-label={t("modelKeys.moreNamed", { name: tool })}
+                                                        title={t("modelKeys.more")}
+                                                    >
+                                                        <MoreHorizontal className="size-4 shrink-0" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onSelect={() => void signOut(signin)}>
+                                                        <LogOut className="size-4 shrink-0" />
+                                                        {t("modelKeys.signout")}
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        ) : null}
+                                    </li>
+                                );
+                            })}
+                        </ul>
                     </div>
-                    <ul className="divide-y divide-border rounded-lg border border-border">
-                        {homeSignins.map((signin) => (
-                            <li key={signin.env} className="flex flex-wrap items-center gap-2 px-3 py-2">
-                                <span className="min-w-0 flex-1 truncate text-sm" title={signin.label}>
-                                    {signin.label}
-                                </span>
-                                {canSignOut(signin) ? (
-                                    <Button size="sm" variant="ghost" onClick={() => void signOut(signin)}>
-                                        <LogOut className="size-4 shrink-0" />
-                                        {t("modelKeys.signout")}
-                                    </Button>
-                                ) : null}
-                                <Button size="sm" variant="outline" onClick={() => setRunning({ signin, mode: "login" })}>
-                                    <LogIn className="size-4 shrink-0" />
-                                    {t("modelKeys.homeSignin")}
-                                </Button>
-                            </li>
-                        ))}
-                    </ul>
-                </section>
-            ) : null}
+                ) : null}
+            </section>
 
             {running && assist ? (
                 <SigninDialog

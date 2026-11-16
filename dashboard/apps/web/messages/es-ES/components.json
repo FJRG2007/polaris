@@ -1123,8 +1123,7 @@
         "signoutBody": "Ejecuta el cierre de sesión de {tool} en la máquina de tus sesiones. Dejan de tener sesión hasta que vuelvas a entrar.",
         "signoutOffer": "Eliminada. {tool} puede seguir con sesión en la máquina de tus sesiones.",
         "signoutKeep": "Dejarla",
-        "homeTitle": "Con sesión en la máquina de tus sesiones",
-        "homeHint": "Estas herramientas guardan su propio acceso. Polaris lo hace en la máquina de tus sesiones y no guarda nada.",
+        "homeHint": "Estos agentes guardan su acceso en la máquina de tus sesiones.",
         "homeSignin": "Entrar"
     },
     "signinDialog": {
