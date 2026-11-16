@@ -23,7 +23,9 @@ const node = {
     platform: "node",
     target: "node24",
     format: "cjs",
-    external: ["electron"],
+    // node-pty is a native module: it ships as itself in node_modules (see
+    // forge.config.js) and is loaded at run time by the runner.
+    external: ["electron", "node-pty"],
     logLevel: "info",
     legalComments: "none"
 };

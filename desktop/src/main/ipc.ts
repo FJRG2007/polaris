@@ -27,12 +27,14 @@ import { FolderRefusal, zipFolder } from "./folder-zip";
 import { cancelApiKey, keyFormState, submitApiKey } from "./key-flow";
 import { kindOf, openPolarisWindow, type WindowKind } from "./windows";
 import { installTool } from "./install-tool";
+import { runner } from "./runner";
 import * as vpn from "./vpn";
 import { openTvInstall, registerTvInstall } from "./tv-install";
 import { browserFromName, installRequestSchema, type InstallResult } from "@/shared/install-tools";
 import {
     type AddressCheck,
     CHANNELS,
+    type ComputerPairOutcome,
     PREFERENCE_TOGGLES,
     type CustomGameInput,
     type GameActivity,
@@ -459,6 +461,23 @@ export function registerIpc(host: IpcHost): void {
         if (!fromPolaris(event)) return false;
         openTvInstall();
         return true;
+    });
+
+    ipcMain.handle(CHANNELS.computerState, (event) => (fromPolaris(event) ? runner().snapshot() : null));
+    ipcMain.handle(CHANNELS.computerPair, async (event, raw: unknown): Promise<ComputerPairOutcome> => {
+        const code = z.string().trim().min(4).max(20).safeParse(raw);
+        if (!fromPolaris(event) || !code.success) return { ok: false, reason: "refused" };
+        return runner().pair(code.data);
+    });
+    ipcMain.handle(CHANNELS.computerForget, async (event) => {
+        if (!fromPolaris(event)) return false;
+        await runner().forget();
+        return true;
+    });
+    ipcMain.handle(CHANNELS.computerPrepare, (event) => (fromPolaris(event) ? runner().prepareNow() : false));
+    runner().listen((state) => {
+        for (const window of BrowserWindow.getAllWindows())
+            if (!window.isDestroyed() && kindOf(window.webContents) === "polaris") window.webContents.send(CHANNELS.computerEvent, state);
     });
 
     ipcMain.handle(CHANNELS.installTool, async (event, raw: unknown): Promise<InstallResult> => {

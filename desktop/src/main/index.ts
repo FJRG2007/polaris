@@ -20,6 +20,7 @@
 
 import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
+import { runner } from "./runner";
 import { holdsCall, releaseCallHotkeys } from "./call-hotkeys";
 import { closeVoiceWidget, refreshVoiceWidget, setVoiceWidgetGame } from "./voice-widget";
 import { DEEP_LINK_SCHEME, deepLinkIn, readDeepLink } from "@/shared/deep-link";
@@ -612,6 +613,7 @@ function openServer(origin: string): void {
     stopReconnecting();
     dropAlternate();
     current = origin;
+    void runner().use(origin);
     loadError = null;
     refreshMenu();
     showPolaris();
@@ -700,6 +702,7 @@ function removeServer(origin: string): Outcome {
         const listOpen = Boolean(sheet);
         setServerAddress(null);
         current = null;
+        void runner().use(null);
         dropAlternate();
         leaveServer();
         if (listOpen) openConnect();
@@ -741,6 +744,8 @@ function start(): void {
     });
 
     app.whenReady().then(() => {
+        // This computer runs Polar Code sessions for the Polaris in use, once paired.
+        void runner().use(current);
         // Something that may mean the server can be reached now: ask at once rather
         // than waiting out the backoff.
         powerMonitor.on("resume", () => reconnector.nudge());
@@ -972,6 +977,7 @@ function start(): void {
 
     // Keys held system-wide are the operating system's until let go.
     app.on("will-quit", () => {
+        void runner().use(null);
         releaseCallHotkeys();
         closeVoiceWidget();
     });

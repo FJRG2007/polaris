@@ -68,18 +68,24 @@ module.exports = {
             NSCameraUsageDescription: "Polaris uses the camera for video calls in Chat."
         },
         icon: ICON,
-        asar: true,
+        // node-pty's native binaries cannot be loaded from inside the archive.
+        asar: { unpack: "**/node_modules/node-pty/**" },
         // The VPN service, built by CI (vpn-helper/stage.mjs). A package made
         // without it still runs: only connecting the VPN says it cannot.
         ...(existsSync(path.join(__dirname, "vpn-helper", "stage", "vpn-helper"))
             ? { extraResource: [path.join(__dirname, "vpn-helper", "stage", "vpn-helper")] }
             : {}),
         // The main process and preloads are bundled into dist/ (build/bundle.mjs),
-        // so the app needs no node_modules: ship dist/ and package.json only.
+        // so the app needs no node_modules: ship dist/ and package.json, plus
+        // node-pty, the one native module (the runner's terminals), which
+        // cannot be bundled.
         prune: false,
         ignore: (/** @type {string} */ file) => {
             if (!file) return false;
             const relative = file.replace(/^[\\/]/, "").replaceAll("\\", "/");
+            if (relative === "node_modules" || relative === "node_modules/node-pty") return false;
+            if (relative.startsWith("node_modules/node-pty/"))
+                return !/^node_modules\/node-pty\/(package\.json$|lib(\/|$)|prebuilds(\/|$)|build(\/|$))/.test(relative) || relative.endsWith(".pdb");
             return !(relative === "package.json" || relative === "dist" || relative.startsWith("dist/"));
         },
         ...(windowsCertificate ? { windowsSign: windowsCertificate } : {}),

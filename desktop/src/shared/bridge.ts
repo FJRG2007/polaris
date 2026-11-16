@@ -191,6 +191,35 @@ export interface PolarisDesktop {
         status(): Promise<{ readonly nodeId: string | null }>;
         joinNetwork(input: { readonly server: string; readonly key: string }): Promise<Outcome>;
     };
+    /** This computer as a runner for Polar Code sessions and the Claude
+     *  subscription chat. Absent on a desktop that predates it. */
+    readonly computer?: ComputerBridge;
+}
+
+/** Where this computer's runner stands. `preparing` is the tool being
+ *  installed now, or the failure that stopped it (`code`). */
+export interface ComputerState {
+    readonly paired: boolean;
+    readonly state: "connecting" | "online" | "offline" | "unpaired" | "outdated" | "replaced" | "stopped";
+    readonly preparing: {
+        readonly tool: string;
+        readonly step: "download" | "verify" | "install" | "ready" | "failed";
+        readonly received?: number;
+        readonly total?: number;
+        readonly code?: "offline" | "checksum" | "disk" | "unsupported" | "blocked" | "install";
+    } | null;
+}
+
+export type ComputerPairOutcome = { readonly ok: true } | { readonly ok: false; readonly reason: "code" | "offline" | "storage" | "limited" | "refused" };
+
+export interface ComputerBridge {
+    state(): Promise<ComputerState>;
+    /** Pair with a code from Your computers, for the Polaris open here. */
+    pair(code: string): Promise<ComputerPairOutcome>;
+    forget(): Promise<boolean>;
+    /** Prepare the tools now (Try again). */
+    prepare(): Promise<boolean>;
+    onState(listener: (state: ComputerState) => void): () => void;
 }
 
 /** What the tunnel needs, as Polaris answered it. */
@@ -528,6 +557,11 @@ export const CHANNELS = {
     gameCustom: "desktop:game-custom",
     gamePrograms: "desktop:game-programs",
     installTool: "desktop:install-tool",
+    computerState: "desktop:computer-state",
+    computerPair: "desktop:computer-pair",
+    computerForget: "desktop:computer-forget",
+    computerPrepare: "desktop:computer-prepare",
+    computerEvent: "desktop:computer-event",
     defaultBrowser: "desktop:default-browser",
     systemIdle: "desktop:system-idle",
     windowShown: "desktop:window-shown",

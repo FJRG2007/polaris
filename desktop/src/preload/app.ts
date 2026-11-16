@@ -17,6 +17,7 @@ import type { VoiceAction } from "@/shared/voice-widget";
 import {
     CHANNELS,
     VERSION_ARGUMENT,
+    type ComputerState,
     type GameActivity,
     type NoticeAction,
     type NoticeReply,
@@ -135,6 +136,17 @@ const bridge: PolarisDesktop = {
         down: () => ipcRenderer.invoke(CHANNELS.vpnDown),
         status: () => ipcRenderer.invoke(CHANNELS.vpnStatus),
         joinNetwork: (input) => ipcRenderer.invoke(CHANNELS.vpnJoin, input)
+    },
+    computer: {
+        state: () => ipcRenderer.invoke(CHANNELS.computerState),
+        pair: (code) => ipcRenderer.invoke(CHANNELS.computerPair, code),
+        forget: () => ipcRenderer.invoke(CHANNELS.computerForget),
+        prepare: () => ipcRenderer.invoke(CHANNELS.computerPrepare),
+        onState: (listener) => {
+            const heard = (_event: unknown, state: ComputerState) => listener(state);
+            ipcRenderer.on(CHANNELS.computerEvent, heard);
+            return () => ipcRenderer.removeListener(CHANNELS.computerEvent, heard);
+        }
     }
 };
 

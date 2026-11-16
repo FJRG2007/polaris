@@ -201,7 +201,7 @@ export const runnerHookSchema = frame("hook", {
     sessionId: id,
     /** The hook's sequence number, decimal, so a late duplicate is dropped. */
     seq: z.string().regex(/^\d{1,19}$/).optional(),
-    payload: z.record(z.unknown())
+    payload: z.record(z.string(), z.unknown())
 });
 
 /** An event the runner observed itself, for a CLI without hooks: already in
@@ -217,7 +217,7 @@ export const runnerEventSchema = frame("event", {
 export const runnerPermissionRequestSchema = frame("permission.request", {
     requestId: id,
     sessionId: id,
-    payload: z.record(z.unknown())
+    payload: z.record(z.string(), z.unknown())
 });
 
 export const runnerTerminalOutputSchema = frame("terminal.output", {
@@ -253,7 +253,7 @@ export const runnerChatEventSchema = z.discriminatedUnion("kind", [
         kind: z.literal("tool-call"),
         callId: shortText(200),
         name: shortText(200),
-        input: z.record(z.unknown())
+        input: z.record(z.string(), z.unknown())
     }),
     z.object({
         kind: z.literal("tool-result"),
@@ -267,7 +267,7 @@ export const runnerChatEventSchema = z.discriminatedUnion("kind", [
         approvalId: id,
         callId: shortText(200),
         name: shortText(200),
-        input: z.record(z.unknown())
+        input: z.record(z.string(), z.unknown())
     }),
     z.object({
         kind: z.literal("finish"),
@@ -396,7 +396,7 @@ export const serverSessionSettingsSchema = frame("session.settings", {
 export const serverPermissionDecisionSchema = frame("permission.decision", {
     requestId: id,
     sessionId: id,
-    decision: z.record(z.unknown())
+    decision: z.record(z.string(), z.unknown())
 });
 
 export const serverTerminalAttachSchema = frame("terminal.attach", {
