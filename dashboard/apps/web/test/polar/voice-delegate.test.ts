@@ -7,7 +7,7 @@
 import type { ToolSet } from "ai";
 import { describe, expect, it, vi } from "vitest";
 import type { PolarCodeRow, PolarCodeThread } from "@/lib/polar/code";
-import { callTail, landedReply, replyLead } from "@/components/polar/code-voice-call";
+import { callTail, landedReply, replyLead, saidTitle, settle, watchNews } from "@/components/polar/code-voice-call";
 import { callReducer, INITIAL_CALL, voiceDelegateBodySchema } from "@/lib/polar/voice-call";
 import { voiceTools, sessionExcerpts, delegatorInstructions, type DelegateDeps } from "@/lib/polar/voice-delegate";
 import {
@@ -258,6 +258,34 @@ describe("announcing a session's reply", () => {
         expect(landedReply(thread(row(A, "L", "", "working"), entries), since)).toBeNull();
         expect(landedReply(thread(row(A, "L"), entries), since)?.text).toBe("Fixed the test.\n\nDetails follow.");
         expect(landedReply(thread(row(A, "L"), entries.slice(0, 1)), since)).toBeNull();
+    });
+
+    it("tells a reply, a question and an ended session apart, each settling its own watches", () => {
+        const since = "2026-11-16T10:00:30.000Z";
+        const entries = [{ role: "assistant", text: "Done.", at: "2026-11-16T10:01:00.000Z" }];
+        const news = watchNews(thread(row(B, "Other"), entries), since);
+        expect(news).toEqual({ kind: "reply", at: "2026-11-16T10:01:00.000Z", text: "Done." });
+        expect(watchNews(thread(row(B, "Other", "", "working"), entries), since)).toBeNull();
+        const ended = { ...row(B, "Other", "", "stopped"), live: false };
+        expect(watchNews(thread(ended, []), since)).toEqual({ kind: "gone" });
+        const asks = thread(row(B, "Other", "", "waiting"), [], { permission: {} as never });
+        expect(watchNews(asks, since)).toEqual({ kind: "asks" });
+
+        const watches = [
+            { sessionId: B, since },
+            // Sent after the reply landed: still waited for.
+            { sessionId: B, since: "2026-11-16T10:02:00.000Z" },
+            { sessionId: A, since }
+        ];
+        expect(settle(watches, B, news!)).toEqual([watches[1], watches[2]]);
+        expect(settle(watches, B, { kind: "gone" })).toEqual([watches[2]]);
+    });
+
+    it("says a short, one-line title before another session's reply", () => {
+        expect(saidTitle("  Fix\n the   login ")).toBe("Fix the login");
+        const long = saidTitle("x".repeat(100));
+        expect(long).toHaveLength(60);
+        expect(long.endsWith("...")).toBe(true);
     });
 
     it("reads the lead paragraph, and sends the call's last lines, cut short", () => {

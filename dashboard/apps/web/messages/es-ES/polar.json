@@ -430,7 +430,9 @@
             "done": "Hecho.",
             "failed": "No se ha podido. Inténtalo de nuevo.",
             "noModel": "Polar necesita la clave de un modelo para tus sesiones.",
-            "needsYou": "El agente espera tu respuesta en pantalla."
+            "needsYou": "El agente espera tu respuesta en pantalla.",
+            "needsYouFrom": "{title} espera tu respuesta.",
+            "from": "De {title}: {text}"
         },
         "phase": {
             "listening": "Escuchando",

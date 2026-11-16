@@ -81,7 +81,7 @@ import {
     type ModelSelectorProvider
 } from "@/components/polar/elements/model-selector";
 import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
-import { CodeVoiceCall } from "@/components/polar/code-voice-call";
+import { CodeVoiceCall, type VoiceWatch } from "@/components/polar/code-voice-call";
 import { parseVoiceDelegation } from "@/lib/polar/voice-handoff";
 import { useCodeSlash } from "@/components/polar/polar-code-slash";
 import * as codeCommands from "@/lib/polar/code-commands";
@@ -712,6 +712,8 @@ export function PolarCodeView({
 /** A voice call open on Code: what it says first when it moved to a session. */
 interface CodeCall {
     readonly greeting: string | null;
+    /** Replies it was waiting for when it moved. */
+    readonly watching: readonly VoiceWatch[];
 }
 
 /** Code's commands in the composer that starts a task. */
@@ -1343,7 +1345,7 @@ function CodeThread({
     const parts = useCodeComposerParts(
         busy,
         thread?.canManage && thread.session.live
-            ? { disabled: busy || call !== null, onOpen: () => onCall({ greeting: null }) }
+            ? { disabled: busy || call !== null, onOpen: () => onCall({ greeting: null, watching: [] }) }
             : null
     );
     const signal = useUnmountSignal();
@@ -1819,8 +1821,9 @@ function CodeThread({
                     thread={thread}
                     kit={voiceKit}
                     greeting={call.greeting}
-                    onOpen={(next, say) => {
-                        onCall({ greeting: say });
+                    watching={call.watching}
+                    onOpen={(next, say, watching) => {
+                        onCall({ greeting: say, watching: [...watching] });
                         onOpen(next);
                     }}
                     onEnd={() => onCall(null)}

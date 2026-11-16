@@ -430,7 +430,9 @@
             "done": "Done.",
             "failed": "That didn't go through. Try again.",
             "noModel": "Polar needs a model key to act on your sessions.",
-            "needsYou": "The agent is waiting for your answer on screen."
+            "needsYou": "The agent is waiting for your answer on screen.",
+            "needsYouFrom": "{title} is waiting for your answer.",
+            "from": "From {title}: {text}"
         },
         "phase": {
             "listening": "Listening",

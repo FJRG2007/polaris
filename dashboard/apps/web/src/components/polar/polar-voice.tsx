@@ -482,6 +482,9 @@ export interface VoiceCallProps {
      *  just asked for it - a Code session's reply landing. Read only into a
      *  quiet call; one that arrives while you talk stays on screen. */
     announced?: string | null;
+    /** Told whether the call is quiet - listening, not muted, not over - so a
+     *  caller holding things to say hands them over one at a time. */
+    onQuiet?: (quiet: boolean) => void;
 }
 
 /** One sentence ready to be said: audio from a key here, or text for the
@@ -752,6 +755,9 @@ export function VoiceCall(props: VoiceCallProps) {
         baseline.current = null;
         latest.current.onStop();
     }, [state.interruptions, silence]);
+
+    const quiet = state.phase === "listening" && !state.muted && !state.ended;
+    useEffect(() => latest.current.onQuiet?.(quiet), [quiet]);
 
     const dropRecording = useCallback(() => {
         const current = recorder.current;

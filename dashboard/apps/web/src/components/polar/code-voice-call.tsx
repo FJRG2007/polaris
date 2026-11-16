@@ -7,14 +7,17 @@
  * delegator acts on the person's sessions and answers in a sentence or three,
  * which the call says; when it sent a session work, the session's reply is read
  * aloud once its turn ends, the way OpenCode's voice announces a session's
- * answer. Talking over it stops the voice and the turn of the call, never the
- * agent's work.
+ * answer - a session not on screen is named first ("From <title>"). What is to
+ * be said waits its turn: one thing at a time, and only into a quiet call.
+ * Talking over it stops the voice and the turn of the call, never the agent's
+ * work.
  */
 
 import type { ChatStatus, UIMessage } from "ai";
 import type { PolarCodeThread } from "@/lib/polar/code";
 import { VoiceCall } from "@/components/polar/polar-voice";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { readPoll } from "@/lib/poll-fetch";
 import { parseVoiceDelegation } from "@/lib/polar/voice-handoff";
 import type { PolarVoiceKit } from "@/components/polar/polar-composer";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -62,11 +65,64 @@ export function landedReply(
     return last && last.text.trim() ? { at: last.at, text: last.text } : null;
 }
 
+/** Work the call sent a session, whose reply it is waiting to read aloud. */
+export interface VoiceWatch {
+    readonly sessionId: string;
+    /** When it was sent: the reply is what the session wrote after. */
+    readonly since: string;
+}
+
+/** How long a reply is waited for before the call lets it go. */
+const WATCH_MS = 30 * 60_000;
+/** How often a session not on screen is read for its reply. */
+const WATCH_POLL_MS = 4000;
+/** Sessions not on screen read at once; the oldest beyond this are let go. */
+const WATCH_MOST = 4;
+/** How much of a session's title is said before its reply. */
+const TITLE_SAID = 60;
+
+/** What a watched session has for the call: its reply, its question, that it
+ *  ended without one, or nothing yet. */
+export type WatchNews =
+    | { readonly kind: "reply"; readonly at: string; readonly text: string }
+    | { readonly kind: "asks" }
+    | { readonly kind: "gone" }
+    | null;
+
+export function watchNews(
+    thread: Pick<PolarCodeThread, "entries" | "session" | "permission">,
+    since: string
+): WatchNews {
+    if (thread.permission) return { kind: "asks" };
+    const reply = landedReply(thread, since);
+    if (reply) return { kind: "reply", ...reply };
+    return thread.session.live ? null : { kind: "gone" };
+}
+
+/** The watches a session's news settles: a reply answers everything sent
+ *  before it, a question or an end everything sent to it. */
+export function settle(
+    watches: readonly VoiceWatch[],
+    sessionId: string,
+    news: Exclude<WatchNews, null>
+): VoiceWatch[] {
+    return watches.filter(
+        (watch) => watch.sessionId !== sessionId || (news.kind === "reply" && watch.since > news.at)
+    );
+}
+
+/** A session's title as said before its reply. */
+export function saidTitle(title: string): string {
+    const clean = title.replace(/\s+/g, " ").trim();
+    return clean.length > TITLE_SAID ? `${clean.slice(0, TITLE_SAID - 3).trimEnd()}...` : clean;
+}
+
 export function CodeVoiceCall({
     sessionId,
     thread,
     kit,
     greeting,
+    watching = [],
     onOpen,
     onEnd
 }: {
@@ -75,8 +131,11 @@ export function CodeVoiceCall({
     kit: PolarVoiceKit;
     /** What the call says first: the answer that moved it here. */
     greeting: string | null;
-    /** The delegator showed another session; the call follows it there. */
-    onOpen: (sessionId: string, say: string) => void;
+    /** Replies the call was waiting for when it moved here. */
+    watching?: readonly VoiceWatch[];
+    /** The delegator showed another session; the call follows it there, still
+     *  waiting for what it was waiting for. */
+    onOpen: (sessionId: string, say: string, watching: readonly VoiceWatch[]) => void;
     onEnd: () => void;
 }) {
     const t = useTranslations("polar");
@@ -87,8 +146,15 @@ export function CodeVoiceCall({
     const [status, setStatus] = useState<ChatStatus>("ready");
     const [announced, setAnnounced] = useState<string | null>(greeting ? "greeting" : null);
     const explained = useRef<Record<string, number>>({});
-    /** Work sent to the session on screen, waiting for its reply. */
-    const waiting = useRef<string[]>([]);
+    /** Work sent to sessions, waiting for their replies. */
+    const waiting = useRef<VoiceWatch[]>([...watching]);
+    const [watched, setWatched] = useState(() => watching.length);
+    /** Things to say, in the order they came, each said once the call is quiet. */
+    const [due, setDue] = useState<string[]>([]);
+    const [quiet, setQuiet] = useState(false);
+    /** Handed to the call and not yet taken up: nothing else is handed over. */
+    const handing = useRef(false);
+    const gaveUp = useRef(Date.now() + WATCH_MS);
     const turn = useRef<AbortController | null>(null);
     const counter = useRef(0);
     const latest = useRef(messages);
@@ -132,13 +198,15 @@ export function CodeVoiceCall({
                 .then((answer) => {
                     if (controller.signal.aborted) return;
                     explained.current = answer.explained;
-                    for (const sent of answer.sent) {
-                        if (sent.sessionId === sessionId) waiting.current.push(sent.at);
+                    if (answer.sent.length > 0) {
+                        waiting.current.push(...answer.sent.map(({ sessionId: id, at }) => ({ sessionId: id, since: at })));
+                        gaveUp.current = Date.now() + WATCH_MS;
+                        setWatched(waiting.current.length);
                     }
                     const say = answer.say || t("voice.code.done");
                     if (answer.open && answer.open !== sessionId) {
                         setStatus("ready");
-                        onOpen(answer.open, say);
+                        onOpen(answer.open, say, waiting.current);
                         return;
                     }
                     add("assistant", say);
@@ -164,22 +232,82 @@ export function CodeVoiceCall({
         [add, kit.payer, locale, onOpen, sessionId, t]
     );
 
-    // A session's reply, read aloud once its turn ends; its question, when it
-    // stopped to ask one.
+    /** A session's news, queued to be said; the watches it settles let go. */
+    const heard = useCallback(
+        (id: string, title: string | null, news: WatchNews) => {
+            if (!news) return;
+            waiting.current = settle(waiting.current, id, news);
+            setWatched(waiting.current.length);
+            if (news.kind === "gone") return;
+            const named = title ? saidTitle(title) : null;
+            const text =
+                news.kind === "asks"
+                    ? named
+                        ? t("voice.code.needsYouFrom", { title: named })
+                        : t("voice.code.needsYou")
+                    : named
+                      ? t("voice.code.from", { title: named, text: replyLead(parseVoiceDelegation(news.text) ?? news.text) })
+                      : replyLead(parseVoiceDelegation(news.text) ?? news.text);
+            setDue((list) => [...list, text]);
+        },
+        [t]
+    );
+
+    // The session on screen, read as its thread is.
     useEffect(() => {
-        if (!thread || waiting.current.length === 0) return;
-        if (thread.permission) {
-            waiting.current = [];
-            setAnnounced(add("assistant", t("voice.code.needsYou")));
-            return;
-        }
-        const since = waiting.current[0]!;
-        const reply = landedReply(thread, since);
-        if (!reply) return;
-        waiting.current = waiting.current.filter((at) => at > reply.at);
-        const text = replyLead(parseVoiceDelegation(reply.text) ?? reply.text);
-        setAnnounced(add("assistant", text));
-    }, [thread, add, t]);
+        if (!thread) return;
+        const since = waiting.current.find((watch) => watch.sessionId === sessionId)?.since;
+        if (since) heard(sessionId, null, watchNews(thread, since));
+    }, [thread, sessionId, heard]);
+
+    // Sessions not on screen, read here while their replies are awaited.
+    const others = watched > 0;
+    useEffect(() => {
+        if (!others) return;
+        const controller = new AbortController();
+        const timer = setInterval(() => {
+            if (Date.now() > gaveUp.current) {
+                waiting.current = waiting.current.filter((watch) => watch.sessionId === sessionId);
+                setWatched(waiting.current.length);
+                return;
+            }
+            const ids: string[] = [];
+            for (const watch of waiting.current) {
+                if (watch.sessionId !== sessionId && !ids.includes(watch.sessionId)) ids.push(watch.sessionId);
+            }
+            // The most recent few; older ones are let go rather than read forever.
+            const dropped = ids.slice(0, Math.max(0, ids.length - WATCH_MOST));
+            if (dropped.length > 0) {
+                waiting.current = waiting.current.filter((watch) => !dropped.includes(watch.sessionId));
+                setWatched(waiting.current.length);
+            }
+            for (const id of ids.slice(-WATCH_MOST)) {
+                readPoll<PolarCodeThread | null>("/api/polar/code/thread", { sessionId: id }, controller.signal)
+                    .then((other) => {
+                        if (!waiting.current.some((watch) => watch.sessionId === id)) return;
+                        const since = waiting.current.find((watch) => watch.sessionId === id)!.since;
+                        // Gone, or no longer the person's to read: nothing will come.
+                        if (!other) return heard(id, null, { kind: "gone" });
+                        heard(id, other.session.title, watchNews(other, since));
+                    })
+                    // A read that failed is tried again on the next tick.
+                    .catch(() => undefined);
+            }
+        }, WATCH_POLL_MS);
+        return () => {
+            clearInterval(timer);
+            controller.abort();
+        };
+    }, [others, sessionId, heard]);
+
+    // One thing at a time, into a quiet call that is not waiting on a turn.
+    useEffect(() => {
+        if (!quiet) handing.current = false;
+        if (!quiet || handing.current || status !== "ready" || due.length === 0) return;
+        handing.current = true;
+        setDue((list) => list.slice(1));
+        setAnnounced(add("assistant", due[0]!));
+    }, [quiet, status, due, add]);
 
     useEffect(() => () => turn.current?.abort(), []);
 
@@ -204,6 +332,7 @@ export function CodeVoiceCall({
                 onApprove={() => undefined}
                 onEnd={onEnd}
                 announced={announced}
+                onQuiet={setQuiet}
             />
             {said ? (
                 <p aria-live="polite" className="min-w-0 break-words px-1 text-center text-xs text-muted-foreground">
