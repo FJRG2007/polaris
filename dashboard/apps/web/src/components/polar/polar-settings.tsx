@@ -9,6 +9,7 @@
 
 import { Check, ChevronRight, Download, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { settingsSection } from "@/lib/polar/settings-path";
+import { MCP_CATEGORIES, type McpCategory } from "@/lib/mcp/scope-table";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
     Button,
@@ -449,6 +450,36 @@ function ServerMark({ group }: { group: ToolServerGroup }) {
     );
 }
 
+/** The label of one of Polaris's tool categories, the consent screen's own;
+ *  anything else is shown as it came. */
+function useCategoryLabel(): (category: string) => string {
+    const t = useTranslations("mcp");
+    return (category) =>
+        (MCP_CATEGORIES as readonly string[]).includes(category)
+            ? t(`categories.${category as McpCategory}`)
+            : category;
+}
+
+/** A server's tools under their categories, in the categories' own order;
+ *  tools with none (a connector's) as one unheaded list. */
+function byCategory(
+    tools: ToolServerGroup["tools"]
+): { category: string | null; tools: ToolServerGroup["tools"] }[] {
+    const order = MCP_CATEGORIES as readonly string[];
+    const groups = new Map<string | null, ToolServerGroup["tools"]>();
+    for (const tool of tools) {
+        const key = tool.category ?? null;
+        groups.set(key, [...(groups.get(key) ?? []), tool]);
+    }
+    const rank = (category: string | null) => {
+        const index = category === null ? -1 : order.indexOf(category);
+        return index === -1 ? order.length : index;
+    };
+    return [...groups]
+        .sort(([a], [b]) => rank(a) - rank(b))
+        .map(([category, list]) => ({ category, tools: list }));
+}
+
 /** One MCP server: its switch, and its tools behind a disclosure. */
 function ServerRow({
     group,
@@ -470,6 +501,7 @@ function ServerRow({
     onTool: (name: string, on: boolean) => void;
 }) {
     const t = useTranslations("polar");
+    const categoryLabel = useCategoryLabel();
     const [opened, setOpen] = useState(false);
     const [folded, setFolded] = useState(false);
     if (folded && !searching) setFolded(false);
@@ -523,17 +555,26 @@ function ServerRow({
                             {t("settings.tools.offNote", { server: name })}
                         </p>
                     ) : null}
-                    <ul className="flex flex-col divide-y divide-border">
-                        {shown.map((tool) => (
-                            <ToolRow
-                                key={tool.name}
-                                label={tool.title}
-                                checked={!off.includes(tool.name)}
-                                disabled={!on}
-                                onChange={(next) => onTool(tool.name, next)}
-                            />
-                        ))}
-                    </ul>
+                    {byCategory(shown).map(({ category, tools }) => (
+                        <div key={category ?? ""} className="min-w-0">
+                            {category ? (
+                                <p className="truncate pt-2 text-xs font-medium text-muted-foreground" title={categoryLabel(category)}>
+                                    {categoryLabel(category)}
+                                </p>
+                            ) : null}
+                            <ul className="flex flex-col divide-y divide-border">
+                                {tools.map((tool) => (
+                                    <ToolRow
+                                        key={tool.name}
+                                        label={tool.title}
+                                        checked={!off.includes(tool.name)}
+                                        disabled={!on}
+                                        onChange={(next) => onTool(tool.name, next)}
+                                    />
+                                ))}
+                            </ul>
+                        </div>
+                    ))}
                 </div>
             ) : null}
         </li>
@@ -572,6 +613,7 @@ export function ToolSettings({
     onServer: (server: string, on: boolean) => void;
 }) {
     const t = useTranslations("polar");
+    const categoryLabel = useCategoryLabel();
     const serversOff = serversOffOf(prefs, tools);
     const [query, setQuery] = useState("");
     const wanted = query.trim().toLowerCase();
@@ -582,7 +624,12 @@ export function ToolSettings({
     const found = groups.flatMap((group) => {
         const name = group.kind === "polaris" ? t("settings.tools.polaris") : group.name;
         if (!wanted || matches(name)) return [{ group, shown: group.tools }];
-        const hits = group.tools.filter((tool) => matches(tool.title) || matches(tool.name));
+        const hits = group.tools.filter(
+            (tool) =>
+                matches(tool.title) ||
+                matches(tool.name) ||
+                (tool.category !== undefined && matches(categoryLabel(tool.category)))
+        );
         return hits.length > 0 ? [{ group, shown: hits }] : [];
     });
     const showWeb = matches(t("web.toggle"));

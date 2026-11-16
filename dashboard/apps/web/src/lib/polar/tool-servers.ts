@@ -20,6 +20,8 @@ export function connectorServer(connector: string): string {
 /** What the grouping needs to know about a tool. */
 export interface ServedTool {
     title?: string;
+    /** For one of Polaris's tools: the category the MCP server lists it under. */
+    category?: string;
     /** The connector's name, for a tool of a remote MCP server. */
     connector?: string;
 }
@@ -52,7 +54,7 @@ export interface ToolServerGroup {
     kind: "polaris" | "connector";
     /** The connector's name; empty for Polaris, which the screen names itself. */
     name: string;
-    tools: { name: string; title: string }[];
+    tools: { name: string; title: string; category?: string }[];
 }
 
 /** The tools as servers, Polaris first and the connectors after by name, each
@@ -73,7 +75,8 @@ export function groupToolsByServer(tools: Record<string, ServedTool>): ToolServe
         const prefix = tool.connector ? `${tool.connector}: ` : "";
         group.tools.push({
             name,
-            title: prefix && title.startsWith(prefix) ? title.slice(prefix.length) : title
+            title: prefix && title.startsWith(prefix) ? title.slice(prefix.length) : title,
+            ...(tool.category ? { category: tool.category } : {})
         });
     }
     for (const group of groups.values()) {
