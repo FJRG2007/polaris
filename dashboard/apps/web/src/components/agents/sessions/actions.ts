@@ -369,15 +369,23 @@ async function startParsed(
     return { id: session.id, queuedAt: admission.queuedAt };
 }
 
+/** Where a fork runs instead of its parent's machine. */
+export interface SessionPlace {
+    place: core.AgentSessionPlace;
+    hostId: string | null;
+    runnerId: string | null;
+}
+
 /**
  * A new session on the same work as another: its branch once that reached
- * GitHub, the same agent, account and machine, and - where the agent can fork a
+ * GitHub, the same agent, account and machine (or `moveTo`, another one), and - where the agent can fork a
  * conversation and the transcript is in the home the new one opens on - the
  * conversation so far, as a copy the parent never sees. Goes through every check
  * a start does, so a fork is never a way round one.
  */
 export async function forkSessionAction(
-    sessionId: string
+    sessionId: string,
+    moveTo?: SessionPlace
 ): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap; queuedAt?: number | null }> {
     const t = await getTranslations("agents");
     const id = sessionIdSchema.safeParse(sessionId);
@@ -391,10 +399,10 @@ export async function forkSessionAction(
         repoId: parent.repoId,
         cli: parent.cli,
         command: parent.command ?? undefined,
-        place: parent.place,
-        hostId: parent.hostId,
-        runnerId: parent.runnerId,
-        sharedHome: parent.sharedHome,
+        ...(moveTo ?? { place: parent.place, hostId: parent.hostId, runnerId: parent.runnerId }),
+        // The shared machine is a home on Polaris; a session moved anywhere
+        // else opens in its own.
+        sharedHome: moveTo && moveTo.place !== parent.place ? false : parent.sharedHome,
         unattended: parent.unattended,
         permissionMode: parent.permissionMode,
         effort: parent.effort,

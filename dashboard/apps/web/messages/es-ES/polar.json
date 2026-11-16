@@ -1634,7 +1634,10 @@
             "online": "En línea",
             "offline": "Apagado",
             "pair": "Vincular un equipo",
-            "manage": "Tus equipos"
+            "manage": "Tus equipos",
+            "server": "Tu servidor",
+            "serverOffline": "Servidor apagado",
+            "continueOn": "Seguir en"
         }
     },
     "compare": {

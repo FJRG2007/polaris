@@ -73,6 +73,7 @@ import type { GithubAppGap } from "@/lib/github-app-reach";
 import type { VoiceNotice } from "@/components/polar/polar-voice";
 import { GithubAppGapNotice } from "@/components/github-app-gap";
 import * as core from "@polaris/core";
+import { codePlaceTarget, placeOf, type CodePlaceTarget } from "@/lib/polar/code-place";
 import { automaticChoice, type ModelChoice } from "@/lib/polar/shared";
 import { usePolarUploads } from "@/components/polar/polar-uploads";
 import { POLAR_ATTACHMENT_MOST, POLAR_ATTACHMENT_TYPES } from "@/lib/polar/shared";
@@ -1053,10 +1054,8 @@ function CodeStart({
                             // lead the task (`polarCodeStart`).
                             agentId: persona?.id ?? null,
                             attachments: parts.uploads.ids,
-                            place: computerId ? "computer" : "local",
-                            runnerId: computerId,
+                            ...placeOf(codePlaceTarget(computers, computerId)),
                             sharedHome: false,
-                            hostId: null,
                             baseRef: workspace ? "" : baseRef.trim(),
                             prompt: text,
                             taskId: null,
@@ -1568,6 +1567,8 @@ function CodeThread({
 
     const session = thread?.session;
     const blocks = useMemo(() => codeBlocks(thread?.entries ?? []), [thread]);
+    // The places a stopped session can be continued on, read once it stopped.
+    const places = useCodeComputers(!live && !!thread?.canManage && canPrompt);
     // The agent mid-turn draws its steps moving; a message on its way to it
     // draws the indicator under it. A session that is only open - waiting,
     // idle - draws nothing that moves.
@@ -1576,12 +1577,17 @@ function CodeThread({
         live && (pending || (turning && blocks.length > 0 && blocks.at(-1)?.kind !== "work"));
 
     /** Carry on in a new session on the same branch, with the conversation so
-     *  far where the agent can take it, and open it here. */
-    const carryOn = () => {
+     *  far where the agent can take it, and open it here. `target` moves it to
+     *  another place; absent, it stays where it ran. */
+    const carryOn = (target?: CodePlaceTarget) => {
         setError(null);
         startTransition(() => {
             void runAction(
-                () => postCode<{ id?: string; error?: string }>("/api/polar/code/continue", { sessionId }),
+                () =>
+                    postCode<{ id?: string; error?: string }>("/api/polar/code/continue", {
+                        sessionId,
+                        ...(target ? { target } : {})
+                    }),
                 setError
             ).then((result) => {
                 if (!result) return;
@@ -1644,9 +1650,18 @@ function CodeThread({
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                 <Notice>{t("code.ended")}</Notice>
                 {thread.canManage && canPrompt ? (
-                    <Button type="button" size="sm" variant="outline" onClick={carryOn} disabled={busy}>
-                        {t("code.continue")}
-                    </Button>
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <Button type="button" size="sm" variant="outline" onClick={() => carryOn()} disabled={busy}>
+                            {t("code.continue")}
+                        </Button>
+                        <span className="text-muted-foreground text-xs">{t("code.place.continueOn")}</span>
+                        <CodePlacePicker
+                            computers={places}
+                            value={thread.view.runnerId ?? thread.view.hostId ?? null}
+                            onChange={(id) => carryOn(codePlaceTarget(places, id))}
+                            disabled={busy}
+                        />
+                    </div>
                 ) : null}
             </div>
             {error ? <Notice error>{error}</Notice> : null}

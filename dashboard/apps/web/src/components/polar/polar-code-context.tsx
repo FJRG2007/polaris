@@ -26,6 +26,7 @@ import {
     ChevronDown,
     ExternalLink,
     FolderGit2,
+    HardDrive,
     Laptop,
     Server,
     CircleDot,
@@ -602,8 +603,8 @@ export function CodeEffortPill({
     );
 }
 
-/** Where the picked place is kept (a computer's id, or empty for Polaris), so
- *  the next task starts there. */
+/** Where the picked place is kept (a computer's or server's id, or empty for
+ *  Polaris), so the next task starts there. */
 export const CODE_PLACE_KEY = "polar.code.place";
 
 /** The computers last read, so the picker opens on them without a wait. */
@@ -627,9 +628,9 @@ export function useCodeComputers(enabled: boolean): PolarCodeComputer[] | null {
 }
 
 /**
- * Where a new task runs: on Polaris, or on one of the person's own computers
- * through its runner. Offline computers are listed, disabled, with why; a
- * person with none is pointed at pairing one.
+ * Where a new task runs: on Polaris, on one of the person's own computers
+ * through its runner, or on one of their servers. Offline ones are listed,
+ * disabled, with why; a person with no computer is pointed at pairing one.
  */
 export function CodePlacePicker({
     computers,
@@ -646,7 +647,7 @@ export function CodePlacePicker({
     const t = useTranslations("polar");
     const picked = value ? (computers?.find((computer) => computer.id === value) ?? null) : null;
     const label = picked ? picked.name : t("code.place.polaris");
-    const Icon = picked ? Laptop : Server;
+    const Icon = picked?.kind === "server" ? HardDrive : picked ? Laptop : Server;
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild disabled={disabled}>
@@ -682,13 +683,23 @@ export function CodePlacePicker({
                             onSelect={() => onChange(computer.id)}
                             className="items-start"
                         >
-                            <Laptop className="mt-0.5 size-4 shrink-0" aria-hidden />
+                            {computer.kind === "server" ? (
+                                <HardDrive className="mt-0.5 size-4 shrink-0" aria-hidden />
+                            ) : (
+                                <Laptop className="mt-0.5 size-4 shrink-0" aria-hidden />
+                            )}
                             <span className="flex min-w-0 flex-col">
                                 <span className="truncate" title={computer.name}>
                                     {computer.name}
                                 </span>
                                 <span className="text-xs text-muted-foreground">
-                                    {computer.online ? t("code.place.online") : t("code.place.offline")}
+                                    {computer.kind === "server"
+                                        ? computer.online
+                                            ? t("code.place.server")
+                                            : t("code.place.serverOffline")
+                                        : computer.online
+                                          ? t("code.place.online")
+                                          : t("code.place.offline")}
                                 </span>
                             </span>
                             <Mark on={computer.id === value} />

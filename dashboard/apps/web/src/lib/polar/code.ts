@@ -35,6 +35,7 @@ import { agentTaskPrompt } from "@/lib/polar/agents/shared";
 import { codeComposerFor, type CodeComposer } from "@/lib/polar/agents/composer-agents";
 import { resolvedStart } from "@/lib/polar/agents/resolve-start";
 import { listComputers } from "@/lib/computers/computer-service";
+import { placeOf } from "@/lib/polar/code-place";
 import { codeStartersSchema, starterPrompt, type StarterSkill } from "@/lib/polar/code-starters";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { userHasManage, type SessionUser } from "@/lib/session";
@@ -409,20 +410,51 @@ export async function polarCodeChoices(user: SessionUser): Promise<PolarCodeChoi
     };
 }
 
-/** A paired computer as the composer's place picker shows it. */
+/** A place the composer's picker offers besides Polaris: a paired computer
+ *  (through its runner) or one of the person's own servers. */
 export interface PolarCodeComputer {
     readonly id: string;
     readonly name: string;
     readonly online: boolean;
+    /** Absent on an answer from before servers were listed: a computer. */
+    readonly kind?: "computer" | "server";
 }
+
+/** How many of the person's servers the picker lists. */
+const PICKER_SERVERS = 50;
 
 /** The person's own computers a session can be placed on. Empty for somebody
  *  who could not start a session anyway. */
 export async function polarCodeComputers(user: SessionUser): Promise<PolarCodeComputer[]> {
     if ((await accessOf(user)) !== "manage") return [];
-    const computers = await listComputers(user.id);
-    return computers.map(({ id, name, online }) => ({ id, name, online }));
+    const [computers, servers] = await Promise.all([
+        listComputers(user.id),
+        prisma.host.findMany({
+            where: { ownerId: user.id },
+            select: { id: true, name: true, status: true, offlineSince: true },
+            orderBy: [{ name: "asc" }, { id: "asc" }],
+            take: PICKER_SERVERS
+        })
+    ]);
+    return [
+        ...computers.map(({ id, name, online }) => ({ id, name, online, kind: "computer" as const })),
+        ...servers.map((host) => ({
+            id: host.id,
+            name: host.name,
+            online: host.status === "active" && host.offlineSince === null,
+            kind: "server" as const
+        }))
+    ];
 }
+
+/** Where a continued session runs, when the person moved it. */
+const continueSchema = z.object({
+    sessionId: z.string(),
+    target: z
+        .object({ kind: z.enum(["polaris", "computer", "server"]), id: z.string().uuid().nullable() })
+        .refine((target) => (target.kind === "polaris") === (target.id === null))
+        .optional()
+});
 
 /**
  * The prompt a task on one of the person's own agents starts with: its
@@ -774,6 +806,7 @@ export async function polarCodeCancel(
  * Carry on with a session that has ended, in a new one on the same work: its
  * branch, agent, account and machine, and the conversation so far where the
  * agent can take it. The Agents app's own fork, with every check a start makes.
+ * A `target` moves it: to Polaris, one of the person's computers or servers.
  */
 export async function polarCodeContinue(
     user: SessionUser,
@@ -781,8 +814,10 @@ export async function polarCodeContinue(
 ): Promise<{ id?: string; error?: string }> {
     if ((await accessOf(user)) !== "manage")
         return { error: (await getTranslations("polar"))("code.noAccess") };
-    const sessionId = (input as { sessionId?: unknown } | null)?.sessionId;
-    const answer = await forkSessionAction(typeof sessionId === "string" ? sessionId : "");
+    const parsed = continueSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("polar"))("code.continueFailed") };
+    const { sessionId, target } = parsed.data;
+    const answer = await forkSessionAction(sessionId, target ? placeOf(target) : undefined);
     return answer.id ? { id: answer.id } : { error: answer.error };
 }
 

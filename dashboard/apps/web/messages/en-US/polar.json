@@ -1634,7 +1634,10 @@
             "online": "Online",
             "offline": "Offline",
             "pair": "Pair a computer",
-            "manage": "Your computers"
+            "manage": "Your computers",
+            "server": "Your server",
+            "serverOffline": "Server offline",
+            "continueOn": "Continue on"
         }
     },
     "compare": {
