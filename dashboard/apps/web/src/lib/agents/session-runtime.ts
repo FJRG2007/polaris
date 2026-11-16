@@ -27,6 +27,10 @@ import * as commands from "./session-commands";
 import * as accountHomes from "./account-homes";
 import * as acpPipe from "./acp/pipe-commands";
 import * as acpTransport from "./acp/transport";
+import * as acpProviders from "./acp/providers";
+import * as acpDrivers from "./acp/session-drivers";
+import { AcpRefusal } from "./acp/session-driver";
+import { touchSession } from "./session-live";
 import { borrowSsh } from "@/lib/connection-pool";
 import { appBaseUrl } from "@/lib/domain-service";
 import { containerState, withContainerPorts } from "./session-ports";
@@ -1183,6 +1187,7 @@ export async function promptSession(sessionId: string, text: string): Promise<vo
     // queue: nothing typed, nothing that has to look ready first.
     if (!placement) throw new Error("That session no longer exists.");
     if (placement.place === "computer") return computer.promptOnComputer(sessionId, text);
+    if (acpProviders.usesAcp(placement)) return acpPrompt(sessionId, text);
     const queued = await runInSession(
         sessionId,
         commands.queuePromptCommand(stateDirFor(placement), text)
@@ -1266,6 +1271,7 @@ export async function changeSessionMode(
     const args = core.permissionModeArgs(cliId, to);
     const placement = await sessionPlacement(sessionId);
     if (placement?.place === "computer") return computer.settingsOnComputer(sessionId, { permissionMode: to });
+    if (placement && acpProviders.usesAcp(placement)) return acpCall(() => acpDrivers.acpDriver(sessionId).setMode(to));
     if (!args || !placement) throw new Error("That session no longer exists.");
     await steer(
         sessionId,
@@ -1314,6 +1320,7 @@ export async function changeSessionEffort(
 export async function interruptSession(sessionId: string): Promise<void> {
     const placement = await sessionPlacement(sessionId);
     if (placement?.place === "computer") return computer.interruptOnComputer(sessionId);
+    if (placement && acpProviders.usesAcp(placement)) return acpCall(() => acpDrivers.acpDriver(sessionId).cancel());
     if (placement) {
         const stopped = await runInSession(
             sessionId,
@@ -1377,6 +1384,44 @@ export async function startAcpAgent(sessionId: string, argv: readonly string[]):
         acpPipe.acpLaunchCommand(stateDirFor(placement), argv),
         "The session's machine did not start the agent"
     );
+}
+
+/** A prompt over ACP; see `acp/session-driver`. */
+async function acpPrompt(sessionId: string, text: string): Promise<void> {
+    return acpCall(() => acpDrivers.acpDriver(sessionId).prompt(text));
+}
+
+/** An ACP call whose refusal is a sentence for the person, and whose other
+ *  failures (the agent's own words, a machine's) stay in the log. */
+async function acpCall(work: () => Promise<void>): Promise<void> {
+    try {
+        await work();
+    } catch (error) {
+        if (error instanceof AcpRefusal) throw new SessionRefusal(error.message);
+        throw error;
+    }
+}
+
+/**
+ * Hold the session's conversation in its terminal or in Chat. Leaving Chat
+ * closes the connection and takes the protocol agent's window down; entering
+ * it starts nothing until the next message, which starts the agent and reopens
+ * its conversation.
+ */
+export async function switchSessionSurface(
+    sessionId: string,
+    surface: acpProviders.SessionSurface
+): Promise<void> {
+    const placement = await sessionPlacement(sessionId);
+    if (!placement) throw new Error("That session no longer exists.");
+    if (surface === "chat" && !acpProviders.chatAvailable(placement.cli, placement.place))
+        throw new SessionRefusal("This agent cannot be used in Chat here.");
+    if (surface === "terminal") {
+        acpDrivers.closeAcpDriver(sessionId);
+        await runInSession(sessionId, acpPipe.acpStopCommand(stateDirFor(placement))).catch(() => undefined);
+    }
+    await prisma.agentSession.update({ where: { id: sessionId }, data: { surface }, select: { id: true } });
+    touchSession(sessionId);
 }
 
 /** The session's protocol pipe, for `acp/transport`'s `pipeStream`. */
@@ -1490,6 +1535,7 @@ export async function stopSession(sessionId: string): Promise<SaveOutcome | null
     // swallowed either way, so this changes when the person is answered rather
     // than whether the machine goes.
     await finishSession(sessionId, "stopped");
+    acpDrivers.closeAcpDriver(sessionId);
     // Whoever pressed Stop has answered whatever it was waiting on.
     await clearSessionWaiting(sessionId);
     await syncFinalSessionHistory(sessionId);

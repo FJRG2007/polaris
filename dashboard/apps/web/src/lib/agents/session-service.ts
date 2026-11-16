@@ -18,6 +18,7 @@ import { touchSession } from "./session-live";
 import { createdSessionBranch } from "./session-branch";
 import { expirePermissions, settlesPermissions } from "./session-permissions";
 import * as core from "@polaris/core";
+import * as acpProviders from "./acp/providers";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { readSessionCursor } from "./session-cursor";
 import { NATIVE_ENGINE } from "@/lib/polar/native/engine-choice";
@@ -110,6 +111,8 @@ export interface SessionView {
     readonly unattended: boolean | null;
     /** How the agent asks before it acts, or null for the place's own rule. */
     readonly permissionMode: core.SessionPermissionMode | null;
+    /** Terminal (the agent's own interface) or Chat (over ACP). */
+    readonly surface: acpProviders.SessionSurface;
     /** How hard the agent thinks, or null for the tool's own default. */
     readonly effort: core.AgentEffortLevel | null;
     /** The account picked when the session was started, or null. */
@@ -208,6 +211,7 @@ const VIEW_SELECT = {
     sharedHome: true,
     unattended: true,
     permissionMode: true,
+    surface: true,
     effort: true,
     accountId: true,
     useMachineLogin: true,
@@ -255,6 +259,7 @@ type SessionRecord = {
     sharedHome: boolean;
     unattended: boolean | null;
     permissionMode: string | null;
+    surface: string;
     effort: string | null;
     accountId: string | null;
     useMachineLogin: boolean;
@@ -311,6 +316,7 @@ function toView(record: SessionRecord): SessionView {
         sharedHome: record.sharedHome,
         unattended: record.unattended,
         permissionMode: core.sessionPermissionMode(record.permissionMode),
+        surface: acpProviders.readSurface(record.surface),
         effort: core.isAgentEffortLevel(record.effort) ? record.effort : null,
         accountId: record.accountId,
         useMachineLogin: record.useMachineLogin,
@@ -1035,11 +1041,15 @@ export async function sessionPlacement(sessionId: string): Promise<{
     containerId: string | null;
     workdir: string;
     state: core.AgentSessionState;
+    cli: string;
+    surface: acpProviders.SessionSurface;
 } | null> {
     const record = await prisma.agentSession.findUnique({
         where: { id: sessionId },
         select: {
             id: true,
+            cli: true,
+            surface: true,
             place: true,
             hostId: true,
             containerId: true,
@@ -1054,7 +1064,9 @@ export async function sessionPlacement(sessionId: string): Promise<{
         hostId: record.hostId,
         containerId: record.containerId,
         workdir: record.workdir,
-        state: readState(record.state)
+        state: readState(record.state),
+        cli: record.cli,
+        surface: acpProviders.readSurface(record.surface)
     };
 }
 

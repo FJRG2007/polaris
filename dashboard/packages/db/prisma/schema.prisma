@@ -9409,6 +9409,10 @@ model AgentSession {
     // ahead), "plan" (reads and plans, changes nothing) or "full". Null leaves
     // it to the place and to Enigma, as every session before this did.
     permissionMode String?
+    // How the conversation is held: "terminal" (the agent's own interface in
+    // tmux, every session before this) or "chat" (Polaris over the Agent Client
+    // Protocol, lib/agents/acp). Anything else reads as terminal.
+    surface        String    @default("terminal")
     // How hard Claude Code thinks: one of AGENT_EFFORT_LEVELS, from the start
     // and from a change mid-session. Null leaves it to the tool's own default,
     // as every session before this did.

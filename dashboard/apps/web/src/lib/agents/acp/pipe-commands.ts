@@ -129,6 +129,15 @@ export function acpLaunchCommand(
     ].join("\n");
 }
 
+/** Take the protocol agent's window down, for a session switched back to its
+ *  terminal. The pipe files stay; the next launch truncates them. */
+export function acpStopCommand(stateDir: string, session = commands.TMUX_SESSION): string {
+    return [
+        `rm -f "${pipeDir(stateDir)}/generation"`,
+        `tmux kill-window -t ${shellQuote(`${session}:${ACP_WINDOW}`)} 2>/dev/null || true`
+    ].join("\n");
+}
+
 /**
  * Read what the agent wrote after `offset` bytes, at most `ACP_READ_BYTES`.
  * Answers three lines: the generation, the exit code or `-` while it runs, and
