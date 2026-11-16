@@ -653,7 +653,8 @@ export async function recordSessionEvents(
                     lastEventAt: new Date(),
                     ...(spoken ? { detail: spoken.detail } : {}),
                     ...(core.isSessionOver(next.state) && !core.isSessionOver(before)
-                        ? { finishedAt: new Date() }
+                        ? // Its token goes with it, as `finishSession` clears it.
+                          { finishedAt: new Date(), tokenHash: null }
                         : {})
                 }
             });

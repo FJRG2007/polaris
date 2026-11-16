@@ -35,7 +35,7 @@ import { tooManyCalls } from "@/lib/deploy/api/http";
 import { auditToolChange, spendToolBudget, viaOf } from "@/lib/mcp/call-guard";
 import { sessionForToken, sessionOwner } from "@/lib/agents/session-service";
 import { sessionRole } from "@/lib/agents/orchestration-service";
-import { heldSessionScopes } from "@/lib/mcp/session-scopes";
+import { sessionScopes } from "@/lib/mcp/session-scopes";
 import { clientIp } from "@/lib/request-context";
 import { mcpScopes } from "@/lib/mcp/oauth/scopes";
 import { originOf } from "@/lib/mcp/oauth/origin";
@@ -238,17 +238,21 @@ async function callerFor(
     // A session in an orchestration run gets exactly the scope its part in it
     // needs, and nothing that starts sessions of its own choosing.
     const role = await sessionRole(session.id).catch(() => ({ coordinates: false, works: false }));
-    const scopes: McpScope[] = [
+    const fixed: McpScope[] = [
         ...SESSION_SCOPES,
         // A session on its own may start and message other sessions of its
         // person (agent_session_start / agent_session_prompt), as several
         // agents on one project do. A worker in a run may not: its run decides.
         ...(role.works || role.coordinates ? [] : (["agents.manage"] as const)),
         ...(role.coordinates ? (["agents.coordinate"] as const) : []),
-        ...(role.works ? (["agents.report"] as const) : []),
-        // The devices in the person's places, when they hold them (`session-scopes.ts`).
-        ...(await heldSessionScopes(owner).catch(() => []))
+        ...(role.works ? (["agents.report"] as const) : [])
     ];
+    // Cut to what the person holds right now, plus the devices in their places
+    // when they hold those (`session-scopes.ts`); nothing at all once they are
+    // banned or switched off. The token was minted when the session started, and
+    // what its person may do can have changed since.
+    const scopes = await sessionScopes(owner, fixed);
+    if (!scopes) return null;
     return { userId: owner, isAdmin: false, scopes, sessionId: session.id };
 }
 

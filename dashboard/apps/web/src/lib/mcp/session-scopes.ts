@@ -30,3 +30,25 @@ export async function heldSessionScopes(ownerId: string): Promise<McpScope[]> {
     );
     return SESSION_HELD_SCOPES.filter((_, index) => held[index]);
 }
+
+/**
+ * Every scope a session's token carries on this call: the fixed ones its part
+ * in a run decides, and the lendable ones above, each kept only while its
+ * person holds the permission behind it right now. Read on every call, so a
+ * ban or a role that loses `agents.manage` reaches a session already running
+ * at once - a token never outlives the permission behind it, as an API key's
+ * and a connected app's do not.
+ *
+ * Null for an account nothing should be done in the name of (banned, switched
+ * off, on its way out, or gone): the token then answers nothing at all.
+ */
+export async function sessionScopes(
+    ownerId: string,
+    fixed: readonly McpScope[]
+): Promise<McpScope[] | null> {
+    const user = await actingUser(ownerId);
+    if (!user) return null;
+    const wanted = [...fixed, ...SESSION_HELD_SCOPES];
+    const held = await Promise.all(wanted.map((scope) => sessionCan(user, scopeRequires(scope))));
+    return wanted.filter((_, index) => held[index]);
+}

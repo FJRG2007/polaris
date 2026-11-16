@@ -289,6 +289,19 @@ async function dropSessions(userId: string): Promise<number> {
     return count + extensions + terminals;
 }
 
+/** End the agent sessions working for somebody being banned. Loaded on demand:
+ *  the session machinery is heavy and nothing else here needs it. A failure is
+ *  logged rather than undoing the ban - their tokens are refused on every call
+ *  anyway, from the ban itself. */
+async function endAgentSessions(userId: string): Promise<void> {
+    try {
+        const { endSessionsOf } = await import("@/lib/agents/session-queue");
+        await endSessionsOf(userId);
+    } catch (error) {
+        console.error("polaris: could not end a banned user's agent sessions", error);
+    }
+}
+
 /** The longest a suspension can run before it is simply a ban. A year, so a
  *  season-long exclusion is expressible and a typo is not permanent. */
 export const MAX_SUSPENSION_MINUTES = 365 * 24 * 60;
@@ -330,6 +343,10 @@ export async function banUser(
     });
     // Immediate, rather than only on their next sign-in.
     await dropSessions(userId);
+    // Their agent sessions too: a running one holds a token that acted on
+    // `/api/mcp` as them. Only here, not in every sign-out-everywhere, because
+    // ending somebody's running work is what a ban means and a sign-out is not.
+    await endAgentSessions(userId);
     // And their devices off the VPN, which a session ending does not reach.
     refreshVpnAccessLater();
     await recordAudit({

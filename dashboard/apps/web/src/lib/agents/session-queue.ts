@@ -382,5 +382,42 @@ export async function cancelQueued(sessionId: string): Promise<boolean> {
     return moved.count === 1;
 }
 
+/** The most live sessions one person's ban ends in one go. */
+const MAX_ENDED_ON_BAN = 500;
+
+/**
+ * End every live session a person started or that works in one of their
+ * repositories - what banning them does.
+ *
+ * Their tokens stop working first, in one statement, so the ban holds before
+ * any machine is touched: a running session's token otherwise went on acting
+ * on `/api/mcp`. Each one is then ended the ordinary way - a
+ * queued one taken out of the queue, a running one stopped with its work
+ * saved - without holding up the person who pressed Ban. Answers how many.
+ */
+export async function endSessionsOf(userId: string): Promise<number> {
+    const rows = await prisma.agentSession.findMany({
+        where: {
+            state: { notIn: ["stopped", "failed"] },
+            OR: [{ startedById: userId }, { repo: { ownerId: userId } }]
+        },
+        select: { id: true },
+        take: MAX_ENDED_ON_BAN
+    });
+    if (rows.length === 0) return 0;
+    const ids = rows.map((row) => row.id);
+    await prisma.agentSession.updateMany({ where: { id: { in: ids } }, data: { tokenHash: null } });
+    void (async () => {
+        for (const id of ids) {
+            try {
+                if (!(await cancelQueued(id))) await runtime.stopSession(id);
+            } catch (error) {
+                console.error(`[agent-session] ${id}: could not end it on its owner's ban`, error);
+            }
+        }
+    })();
+    return ids.length;
+}
+
 /** Whether a state is one the queue owns, re-exported for screens. */
 export const isQueued = core.isSessionQueued;

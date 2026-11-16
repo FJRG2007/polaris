@@ -78,11 +78,20 @@ vi.mock("@polaris/auth", () => ({
     updateEnforcedRules: async () => undefined
 }));
 
+const ended = vi.hoisted(() => [] as string[]);
+vi.mock("@/lib/agents/session-queue", () => ({
+    endSessionsOf: async (userId: string) => {
+        ended.push(userId);
+        return 1;
+    }
+}));
+
 const admin = await import("@/lib/user-admin-service");
 
 beforeEach(() => {
     rows = [{ id: "ada", bannedAt: null, banReason: null, bannedUntil: null }];
     updated = [];
+    ended.length = 0;
 });
 
 describe("banUser", () => {
@@ -94,6 +103,11 @@ describe("banUser", () => {
         // The column everything else reads is still set: a suspension is a ban
         // with a note, not a third state nothing knows about.
         expect(data.bannedUntil!.getTime() - data.bannedAt.getTime()).toBe(60 * 60_000);
+    });
+
+    it("ends the agent sessions working for them, whose tokens acted as them", async () => {
+        await admin.banUser("root", "ada", "", 0);
+        expect(ended).toEqual(["ada"]);
     });
 
     it("writes no end for a ban", async () => {

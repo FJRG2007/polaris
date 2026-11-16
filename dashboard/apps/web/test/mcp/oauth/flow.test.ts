@@ -121,7 +121,11 @@ vi.mock("@/lib/mcp/oauth/origin", () => ({
     originOf: () => state.origin,
     currentOrigin: async () => state.origin
 }));
-vi.mock("@/lib/session", () => ({ requireUser: async () => state.user }));
+vi.mock("@/lib/session", () => ({
+    requireUser: async () => state.user,
+    sessionCan: async (user: { isAdmin: boolean }, permission: string) =>
+        user.isAdmin || state.permissions.has(permission)
+}));
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 vi.mock("@/lib/device-grace", () => ({ newDeviceRefusal: async () => null }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
@@ -867,6 +871,29 @@ describe("calling /api/mcp with the token", () => {
         expect(state.buckets).toContain("mcp-call:session:one");
         expect(state.buckets).toContain("mcp-call:session:two");
         expect(state.buckets.some((bucket) => bucket.includes("user:"))).toBe(false);
+    });
+
+    it("refuses an agent session's token once its person is banned", async () => {
+        const list = { method: "tools/list" };
+        expect((await mcpCall("session-token-one", list)).status).toBe(200);
+        ADA.bannedAt = new Date();
+        expect((await mcpCall("session-token-one", list)).status).toBe(401);
+    });
+
+    it("cuts an agent session's tools to what its person holds now", async () => {
+        const names = async () =>
+            (
+                (await mcpCall("session-token-one", { method: "tools/list" })).body?.result
+                    .tools as { name: string }[]
+            ).map((tool) => tool.name);
+        state.permissions = new Set(["tasks.read", "tasks.manage", "agents.read", "agents.manage"]);
+        expect(await names()).toContain("agent_session_start");
+        // The role lost `agents.manage` while the session ran.
+        state.permissions.delete("agents.manage");
+        expect(await names()).not.toContain("agent_session_start");
+        state.permissions = new Set(["agents.read"]);
+        const left = await names();
+        expect(left.some((name) => name.startsWith("task"))).toBe(false);
     });
 
     it("still accepts an API key, as before", async () => {
