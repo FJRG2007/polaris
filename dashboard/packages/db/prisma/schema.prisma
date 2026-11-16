@@ -9438,6 +9438,9 @@ model AgentSession {
     // The same last turn split the way the transcript reports it: fresh input,
     // cache reads, cache writes and output, for "/context". Null before one.
     contextUsage  Json?
+    // The rules of the Polar agent it was started as, read where its tool asks
+    // (lib/polar/agents/permissions.ts); null for none.
+    agentPermission Json?
     // When the person who started it took it out of Polar's Code history. The
     // session stays, listed in Agents: it is a record of work that happened.
     polarHiddenAt DateTime?
@@ -17052,11 +17055,19 @@ model PolarAgent {
     models       Json?
     // "preferred" lets the composer pick another; "required" keeps to `models`.
     modelPolicy  String        @default("preferred")
+    // Allow / ask / deny per tool and pattern, last match wins, as
+    // [{ action, resource, effect }] (lib/polar/agents/permissions.ts).
+    permission   Json?
+    // OpenCode's mode: "primary", "subagent" or "all".
+    mode         String        @default("all")
+    // Offered to everybody on the instance; set by an administrator.
+    shared       Boolean       @default(false)
     createdAt    DateTime      @default(now())
     updatedAt    DateTime      @updatedAt
     threads      PolarThread[]
 
     @@unique([ownerId, name])
+    @@index([shared])
 }
 
 // A subagent a Polar chat turn started (`lib/polar/subagents`): a child run of

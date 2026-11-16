@@ -18,6 +18,7 @@
  * anything able to list processes can read.
  */
 
+import { claudePermissionSettings, configFromRules, rulesOf, type PermissionRule } from "@/lib/polar/agents/permissions";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { execCommand } from "@polaris/ssh";
@@ -391,7 +392,12 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
             { memorySync: memoryDir !== "" }
         ),
         hookSettings: JSON.stringify(
-            claudeHookSettings(`${stateDirFor(session)}/hook.sh`, { headless: headless !== "", memoryDir })
+            claudeHookSettings(`${stateDirFor(session)}/hook.sh`, {
+                headless: headless !== "",
+                memoryDir,
+                permissions:
+                    agent.cli.id === "claude" ? claudePermissionSettings(await agentRulesFor(session.id)) : null
+            })
         ),
         // The script that restores the repository's memory before the agent
         // starts and carries it back after each turn. Empty where none is kept.
@@ -473,8 +479,36 @@ async function credentialEnvFor(
     return {
         ...sessionCredentials(cli, available, chosen, session.useMachineLogin),
         // The provider and model picked on the form, last, so they win.
-        ...(await modelEnvFor(session))
+        ...withOpencodePermission(cli.id, await modelEnvFor(session), await agentRulesFor(session.id))
     };
+}
+
+/** The Polar agent's rules a session was started with; none when unreadable. */
+async function agentRulesFor(sessionId: string): Promise<PermissionRule[]> {
+    const row = await prisma.agentSession
+        .findUnique({ where: { id: sessionId }, select: { agentPermission: true } })
+        .catch(() => null);
+    return rulesOf(row?.agentPermission);
+}
+
+/**
+ * OpenCode reads the rules as its own `permission` config, in
+ * `OPENCODE_CONFIG_CONTENT` beside the model when there is one. Other tools'
+ * variables pass through untouched.
+ */
+export function withOpencodePermission(
+    cli: string,
+    env: Record<string, string>,
+    rules: readonly PermissionRule[]
+): Record<string, string> {
+    if (cli !== "opencode" || rules.length === 0) return env;
+    let config: Record<string, unknown> = { $schema: "https://opencode.ai/config.json" };
+    try {
+        if (env.OPENCODE_CONFIG_CONTENT) config = JSON.parse(env.OPENCODE_CONFIG_CONTENT) as Record<string, unknown>;
+    } catch {
+        // Ours, and always JSON; a broken one is replaced whole.
+    }
+    return { ...env, OPENCODE_CONFIG_CONTENT: JSON.stringify({ ...config, permission: configFromRules(rules) }) };
 }
 
 /**

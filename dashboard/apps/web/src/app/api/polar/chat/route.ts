@@ -56,6 +56,7 @@ import {
 import { POLAR_REFINES, polarSystemPrompt, refineLine } from "@/lib/polar/prompt";
 import { agentSkills, enabledSkills } from "@/lib/polar/skills/store";
 import { listAgents, polarThreadAgent } from "@/lib/polar/agents/store";
+import { agentApproval, withAgentRules } from "@/lib/polar/agents/chat-permissions";
 import * as subagentTasks from "@/lib/polar/subagents/task-tool";
 import { subagentTypes } from "@/lib/polar/subagents/types";
 import { takeFinishedBackground } from "@/lib/polar/subagents/store";
@@ -524,7 +525,10 @@ export async function POST(request: Request): Promise<Response> {
     // turn, so Polar never answers that it has no way to scroll a page. With
     // no extension connected it answers with the step that connects one.
     const browserOffered = web;
-    const tools = {
+    // The agent's allow / ask / deny rules (`lib/polar/agents/chat-permissions`):
+    // a tool it denies whole is not offered, a denied call is refused.
+    const agentRules = agent?.permission ?? [];
+    const tools = withAgentRules({
         ...screenTools,
         ...Object.fromEntries(Object.entries(toolset.tools).filter(([name]) => !off.has(name))),
         ...(remembers ? memoryTools : {}),
@@ -536,18 +540,22 @@ export async function POST(request: Request): Promise<Response> {
         ...(web ? browserTools : {}),
         ...Object.fromEntries(offeredConnectors.map((name) => [name, connectorSet.tools[name]!])),
         ...skillTools
-    };
+    }, agentRules);
     // Subagents (`lib/polar/subagents`): a child run of this loop with a subset
     // of `tools` above. Foreground ones stop with this turn; `parentStop` is
     // tied to the run's own stop switch once the run exists.
     const parentStop = new AbortController();
-    const approvalRules = {
-        ...toolset.approval,
-        ...(body.data.connectors ? connectorSet.approval : {}),
-        ...(remembers ? MEMORY_APPROVAL : {}),
-        ...(web ? WEB_APPROVAL : {}),
-        ...(web ? browserApprovalFor(user.id) : {})
-    };
+    const approvalRules = agentApproval(
+        {
+            ...toolset.approval,
+            ...(body.data.connectors ? connectorSet.approval : {}),
+            ...(remembers ? MEMORY_APPROVAL : {}),
+            ...(web ? WEB_APPROVAL : {}),
+            ...(web ? browserApprovalFor(user.id) : {})
+        },
+        Object.keys(tools),
+        agentRules
+    );
     const ownAgents = await listAgents(user.id).catch((error: unknown) => {
         console.error("polar: could not read the agents for subagents", error);
         return [];

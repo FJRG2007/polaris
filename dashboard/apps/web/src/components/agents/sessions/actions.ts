@@ -10,6 +10,7 @@
  * itself may have ended.
  */
 
+import { permissionRulesSchema, type PermissionRule } from "@/lib/polar/agents/permissions";
 import { z } from "zod";
 import { computerFor } from "@/lib/computers/computer-service";
 import { sendToRunner } from "@/lib/computers/computer-commands";
@@ -148,7 +149,10 @@ export async function sessionDetailAction(sessionId: string): Promise<{
  * click that produced an error toast and no trace of what was attempted.
  */
 export async function startSessionAction(
-    input: unknown
+    input: unknown,
+    /** The rules of the Polar agent the task runs as (`lib/polar/agents/permissions`).
+     *  Only ever narrows or settles the person's own session's prompts. */
+    rules: unknown = []
 ): Promise<{
     id?: string;
     error?: string;
@@ -165,7 +169,7 @@ export async function startSessionAction(
             error: (message ? knownAgentText(t, message) : null) ?? t("sessions.errors.checkForm")
         };
     }
-    return startParsed(user.id, parsed.data, t, null);
+    return startParsed(user.id, parsed.data, t, null, permissionRulesSchema.catch([]).parse(rules));
 }
 
 /** Everything a start checks and does once the form has parsed. `fork` names
@@ -175,7 +179,8 @@ async function startParsed(
     userId: string,
     value: core.StartAgentSessionInput,
     t: Awaited<ReturnType<typeof getTranslations>>,
-    fork: { parentId: string; enigma: core.EnigmaSettings | null } | null
+    fork: { parentId: string; enigma: core.EnigmaSettings | null } | null,
+    agentPermission: PermissionRule[] = []
 ): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap; queuedAt?: number | null }> {
     const user = { id: userId };
 
@@ -303,6 +308,7 @@ async function startParsed(
             {
         repoId: value.repoId,
         startedById: user.id,
+        agentPermission,
         title: value.title,
         cli: value.cli,
         command: value.cli === core.CUSTOM_AGENT_CLI ? (value.command ?? null) : null,

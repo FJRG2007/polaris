@@ -11,6 +11,7 @@
  * second answer to "may I" here that could drift from the first.
  */
 
+import type { PermissionRule } from "@/lib/polar/agents/permissions";
 import { prisma, type Prisma } from "@polaris/db";
 import { applyTaskTool, storedTodos } from "@/lib/agents/session-asks";
 import { touchSession } from "./session-live";
@@ -481,6 +482,8 @@ export interface SessionCreateInput {
     readonly baseRef: string;
     readonly taskId: string | null;
     readonly enigma: core.EnigmaSettings | null;
+    /** The Polar agent's allow / ask / deny rules, applied where the tool asks. */
+    readonly agentPermission?: PermissionRule[] | null;
     /** Created waiting for a free slot rather than starting (`session-queue`). */
     readonly queued?: boolean;
     /** The GitHub issue an automation opened it for. */
@@ -531,6 +534,9 @@ export async function createSession(
             branch: createdSessionBranch(id, input.repoId, input.title),
             taskId: input.taskId,
             enigma: input.enigma ? JSON.stringify(input.enigma) : null,
+            ...(input.agentPermission?.length
+                ? { agentPermission: input.agentPermission as unknown as Prisma.InputJsonValue }
+                : {}),
             issueNumber: input.issueNumber ?? null,
             parentId: input.parentId ?? null,
             tokenHash: hashToken(token),

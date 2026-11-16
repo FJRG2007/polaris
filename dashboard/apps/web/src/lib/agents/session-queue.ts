@@ -352,7 +352,9 @@ export async function admitSession(
     }
     // The spare this person's Code started while they typed, when the session
     // can be it: created under its id and on its server. See `session-spares`.
-    const spare = await takeSpare(input.startedById, input);
+    // A spare booted before anybody picked an agent, so its tool carries no
+    // agent's rules: a session with rules boots fresh.
+    const spare = input.agentPermission?.length ? null : await takeSpare(input.startedById, input);
     const { session, token } = await sessions.createSession(
         spare ? { ...input, id: spare.id, hostId: spare.hostId } : input
     );

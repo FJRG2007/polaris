@@ -10,10 +10,12 @@ import { z } from "zod";
 import * as core from "@polaris/core";
 import { Prisma, prisma } from "@polaris/db";
 import { modelChoiceSchema, type ModelChoice } from "@/lib/polar/shared";
+import { rulesOf } from "@/lib/polar/agents/permissions";
 import {
     AGENT_LIMIT,
     agentInputSchema,
     agentModelSchema,
+    AGENT_MODES,
     MODEL_POLICIES,
     POLAR_ENGINE,
     type AgentModel,
@@ -32,7 +34,11 @@ const SELECT = {
     engine: true,
     account: true,
     models: true,
-    modelPolicy: true
+    modelPolicy: true,
+    permission: true,
+    mode: true,
+    shared: true,
+    ownerId: true
 } as const;
 
 const uuidSchema = z.string().uuid();
@@ -65,7 +71,10 @@ export function isAgentEngine(engine: string): boolean {
     return engine === POLAR_ENGINE || (engine !== core.CUSTOM_AGENT_CLI && core.isKnownAgentCli(engine));
 }
 
-function viewOf(row: Prisma.PolarAgentGetPayload<{ select: typeof SELECT }>): AgentView {
+function viewOf(
+    { ownerId, permission, mode, ...row }: Prisma.PolarAgentGetPayload<{ select: typeof SELECT }>,
+    viewer: string
+): AgentView {
     const choice = modelChoiceSchema
         .nullable()
         .catch(null)
@@ -78,25 +87,38 @@ function viewOf(row: Prisma.PolarAgentGetPayload<{ select: typeof SELECT }>): Ag
         // An agent saved before it had a list answered on its one model.
         models:
             models.length > 0 || !choice ? models : [{ provider: choice.provider, model: choice.model }],
-        modelPolicy: policyOf(row.modelPolicy)
+        modelPolicy: policyOf(row.modelPolicy),
+        permission: rulesOf(permission),
+        mode: AGENT_MODES.includes(mode as AgentView["mode"]) ? (mode as AgentView["mode"]) : "all",
+        mine: ownerId === viewer
     };
+}
+
+/** The agents a person may use: their own, and the instance-wide ones. */
+function visibleTo(viewer: string): Prisma.PolarAgentWhereInput {
+    return { OR: [{ ownerId: viewer }, { shared: true }] };
 }
 
 export async function listAgents(ownerId: string): Promise<AgentView[]> {
     const rows = await prisma.polarAgent.findMany({
-        where: { ownerId },
+        where: visibleTo(ownerId),
         select: SELECT,
-        orderBy: { createdAt: "asc" },
-        take: AGENT_LIMIT
+        // Their own first, then the instance's.
+        orderBy: [{ shared: "asc" }, { createdAt: "asc" }],
+        take: AGENT_LIMIT * 2
     });
-    return rows.map(viewOf);
+    return rows.map((row) => viewOf(row, ownerId));
 }
 
-/** One of the person's agents, or null when it is not theirs or is gone. */
+/** An agent the person may use (their own or an instance-wide one), or null
+ *  when it is neither or is gone. */
 export async function agentFor(ownerId: string, id: string): Promise<AgentView | null> {
     if (!uuidSchema.safeParse(id).success) return null;
-    const row = await prisma.polarAgent.findFirst({ where: { id, ownerId }, select: SELECT });
-    return row ? viewOf(row) : null;
+    const row = await prisma.polarAgent.findFirst({
+        where: { id, ...visibleTo(ownerId) },
+        select: SELECT
+    });
+    return row ? viewOf(row, ownerId) : null;
 }
 
 /**
@@ -117,7 +139,7 @@ export async function polarThreadAgent(
     return id ? agentFor(ownerId, id) : null;
 }
 
-function dataOf(input: z.infer<typeof agentInputSchema>) {
+function dataOf(input: z.infer<typeof agentInputSchema>, admin: boolean) {
     // What reads an agent's one model reads the first of the list, on Polar.
     const first = input.models[0];
     // An emptied list is "any model", not the one it had before.
@@ -128,13 +150,17 @@ function dataOf(input: z.infer<typeof agentInputSchema>) {
     return {
         ...input,
         choice: choice ? (choice as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
-        models: input.models as unknown as Prisma.InputJsonValue
+        models: input.models as unknown as Prisma.InputJsonValue,
+        permission: input.permission as unknown as Prisma.InputJsonValue,
+        // Only an administrator offers an agent to the whole instance.
+        shared: admin && input.shared
     };
 }
 
 export async function createAgent(
     ownerId: string,
-    raw: unknown
+    raw: unknown,
+    admin = false
 ): Promise<AgentView | AgentRefusal> {
     const input = agentInputSchema.safeParse(raw);
     if (!input.success || !isAgentEngine(input.data.engine)) return "invalid";
@@ -143,9 +169,10 @@ export async function createAgent(
     try {
         return viewOf(
             await prisma.polarAgent.create({
-                data: { ownerId, ...dataOf(input.data) },
+                data: { ownerId, ...dataOf(input.data, admin) },
                 select: SELECT
-            })
+            }),
+            ownerId
         );
     } catch (error) {
         if (isUniqueViolation(error)) return "duplicate";
@@ -156,7 +183,8 @@ export async function createAgent(
 export async function updateAgent(
     ownerId: string,
     id: string,
-    raw: unknown
+    raw: unknown,
+    admin = false
 ): Promise<AgentView | AgentRefusal> {
     if (!uuidSchema.safeParse(id).success) return "not_found";
     const input = agentInputSchema.safeParse(raw);
@@ -164,7 +192,7 @@ export async function updateAgent(
     try {
         const { count } = await prisma.polarAgent.updateMany({
             where: { id, ownerId },
-            data: dataOf(input.data)
+            data: dataOf(input.data, admin)
         });
         if (count === 0) return "not_found";
     } catch (error) {

@@ -13,6 +13,7 @@
  * Called inside a request: the follow-up work is scheduled with `after()`.
  */
 
+import { claudeCallResource, matchingRule, rulesOf } from "@/lib/polar/agents/permissions";
 import { sessionEndIsSwap } from "@/lib/agents/hook-activity";
 import { isTaskTool, readTodos, reportedPermissionMode } from "@/lib/agents/session-asks";
 import { hookConversation, hookEventFailed, normalizeHookEvent } from "@/lib/agents/session-hooks";
@@ -25,7 +26,7 @@ import {
     recordReportedMode
 } from "@/lib/agents/session-service";
 import { isSessionOver } from "@polaris/core";
-import type { Prisma } from "@polaris/db";
+import { prisma, type Prisma } from "@polaris/db";
 import { after } from "next/server";
 import * as history from "@/lib/agents/session-history";
 import { deliverNextQueued } from "@/lib/agents/session-prompt-queue";
@@ -121,6 +122,10 @@ export async function decidePermissionHook(
     }
     const asked = permissions.readPermissionRequest(payload);
     if (!asked || asks.isAskTool(asked.tool)) return {};
+    // The Polar agent's rules settle what they name, as OpenCode's would,
+    // before anybody is asked (`lib/polar/agents/permissions`).
+    const ruled = await agentRuleDecision(id, payload).catch(() => null);
+    if (ruled) return permissions.hookDecision(ruled, asked.tool, null) as Record<string, unknown>;
 
     try {
         const requestId = await permissions.openPermissionRequest(id, asked);
@@ -131,6 +136,22 @@ export async function decidePermissionHook(
         console.error(`[agent-session] ${id}: permission prompt could not be relayed:`, error);
         return {};
     }
+}
+
+/** "allow" or "deny" when the session's agent rules settle this request. */
+async function agentRuleDecision(id: string, payload: unknown): Promise<"allow" | "deny" | null> {
+    const row = await prisma.agentSession.findUnique({ where: { id }, select: { agentPermission: true } });
+    const rules = rulesOf(row?.agentPermission);
+    if (rules.length === 0) return null;
+    const body = (payload ?? {}) as { tool_name?: unknown; tool_input?: unknown };
+    if (typeof body.tool_name !== "string") return null;
+    const input =
+        body.tool_input && typeof body.tool_input === "object"
+            ? (body.tool_input as Record<string, unknown>)
+            : null;
+    const call = claudeCallResource(body.tool_name, input);
+    const effect = matchingRule(call.action, call.resource, rules)?.effect;
+    return effect === "allow" || effect === "deny" ? effect : null;
 }
 
 /** The bearer token a hook request carries, or empty. */

@@ -84,7 +84,16 @@ const PERMISSION_CURL_SECONDS = 125;
  */
 export function claudeHookSettings(
     scriptPath: string,
-    { headless = false, memoryDir = "" }: { headless?: boolean; memoryDir?: string } = {}
+    {
+        headless = false,
+        memoryDir = "",
+        permissions = null
+    }: {
+        headless?: boolean;
+        memoryDir?: string;
+        /** A Polar agent's rules as Claude Code's `permissions` lists. */
+        permissions?: { allow: string[]; ask: string[]; deny: string[] } | null;
+    } = {}
 ): Record<string, unknown> {
     const hooks: Record<string, unknown[]> = {};
     for (const { event, matcher } of CLAUDE_HOOK_EVENTS) {
@@ -113,7 +122,10 @@ export function claudeHookSettings(
     return {
         hooks,
         skipDangerousModePermissionPrompt: true,
-        ...(memoryDir ? { autoMemoryDirectory: memoryDir } : {})
+        ...(memoryDir ? { autoMemoryDirectory: memoryDir } : {}),
+        ...(permissions && permissions.allow.length + permissions.ask.length + permissions.deny.length > 0
+            ? { permissions }
+            : {})
     };
 }
 

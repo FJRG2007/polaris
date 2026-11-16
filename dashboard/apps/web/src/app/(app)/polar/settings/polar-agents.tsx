@@ -485,6 +485,9 @@ function WorkEditor({
 }
 
 const EMPTY: AgentInput = {
+    permission: [],
+    mode: "all",
+    shared: false,
     name: "",
     description: "",
     instructions: "",

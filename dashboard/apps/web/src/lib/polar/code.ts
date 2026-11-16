@@ -32,6 +32,7 @@ import {
 import { agentSkills, listSkills } from "@/lib/polar/skills/store";
 import { agentFor } from "@/lib/polar/agents/store";
 import { agentTaskPrompt } from "@/lib/polar/agents/shared";
+import type { PermissionRule } from "@/lib/polar/agents/permissions";
 import { codeComposerFor, type CodeComposer } from "@/lib/polar/agents/composer-agents";
 import { resolvedStart } from "@/lib/polar/agents/resolve-start";
 import { liveSourceFor } from "@/lib/polar/agents/code-sources";
@@ -476,7 +477,7 @@ async function promptWithAgent(
     user: SessionUser,
     input: unknown,
     prompt: string
-): Promise<{ prompt: string } | { error: string } | null> {
+): Promise<{ prompt: string; rules: PermissionRule[] } | { error: string } | null> {
     const body = input as { agentId?: unknown; cli?: unknown } | null;
     if (body?.agentId === undefined || body.agentId === null) return null;
     const agent = typeof body.agentId === "string" ? await agentFor(user.id, body.agentId) : null;
@@ -485,7 +486,7 @@ async function promptWithAgent(
     if (!agent) {
         return { error: (await getTranslations("polar"))("code.agentGone") };
     }
-    return { prompt: agentTaskPrompt(agent, prompt) };
+    return { prompt: agentTaskPrompt(agent, prompt), rules: agent.permission };
 }
 
 /** A page of the person's connected repositories for the composer's repository
@@ -658,14 +659,17 @@ export async function polarCodeStart(
         if (!credential) return { error: (await getTranslations("agents"))("sessions.errors.noModelKey") };
         // Pinned to the key Polar resolved, so the session spends that one.
         return withGoal(
-            await startSessionAction({
-                ...(input as object),
-                modelChoice: { ...choice.data, payer: credential.source }
-            }),
+            await startSessionAction(
+                {
+                    ...(input as object),
+                    modelChoice: { ...choice.data, payer: credential.source }
+                },
+                asAgent?.rules ?? []
+            ),
             goal.data
         );
     }
-    return withGoal(await startSessionAction(input), goal.data);
+    return withGoal(await startSessionAction(input, asAgent?.rules ?? []), goal.data);
 }
 
 const startGoalSchema = z.string().trim().min(1).max(GOAL_CONDITION_MAX).nullable();

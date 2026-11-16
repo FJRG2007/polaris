@@ -20,7 +20,8 @@ vi.mock("@polaris/db", () => ({
         polarAgent: {
             findFirst: async ({ where }: any) => {
                 const row = agents.get(where.id);
-                return row && row.ownerId === where.ownerId ? row : null;
+                const owner = where.ownerId ?? where.OR?.[0]?.ownerId;
+                return row && (row.ownerId === owner || (where.OR && row.shared === true)) ? row : null;
             }
         },
         polarThread: {

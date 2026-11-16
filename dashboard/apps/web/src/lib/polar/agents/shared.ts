@@ -19,6 +19,7 @@
 
 import { z } from "zod";
 import { isAutomatic, modelChoiceSchema, type ModelChoice } from "@/lib/polar/shared";
+import { permissionRulesSchema, type PermissionRule } from "@/lib/polar/agents/permissions";
 
 export const AGENT_NAME_MAX = 80;
 export const AGENT_DESCRIPTION_MAX = 500;
@@ -53,6 +54,10 @@ export const toolAgentKey = (cli: string) => `tool:${cli}`;
 /** Models one agent lists. */
 export const AGENT_MODELS_MAX = 20;
 export const MODEL_POLICIES = ["preferred", "required"] as const;
+/** OpenCode's agent modes: picked to talk to ("primary"), started by another
+ *  agent for a task ("subagent"), or both ("all", OpenCode's default). */
+export const AGENT_MODES = ["primary", "subagent", "all"] as const;
+export type AgentMode = (typeof AGENT_MODES)[number];
 export type ModelPolicy = (typeof MODEL_POLICIES)[number];
 
 /** One model an agent may use: a provider and its model id. For Polar the
@@ -94,7 +99,13 @@ export const agentInputSchema = z
         web: z.boolean().default(true),
         /** Kept for what reads an agent's one model (automations, older
          *  clients); written from `models[0]` when that is sent. */
-        choice: modelChoiceSchema.nullable().default(null)
+        choice: modelChoiceSchema.nullable().default(null),
+        /** Allow, ask or deny per tool and pattern, last match wins
+         *  (`permissions.ts`); empty is Polar's own rules. */
+        permission: permissionRulesSchema.default([]),
+        mode: z.enum(AGENT_MODES).default("all"),
+        /** Offered to everybody on the instance; only an administrator sets it. */
+        shared: z.boolean().default(false)
     })
     .merge(agentWorkSchema);
 export type AgentInput = z.infer<typeof agentInputSchema>;
@@ -121,6 +132,11 @@ export interface AgentView {
     account: string | null;
     models: AgentModel[];
     modelPolicy: ModelPolicy;
+    permission: PermissionRule[];
+    mode: AgentMode;
+    shared: boolean;
+    /** False for an instance-wide agent somebody else keeps. */
+    mine: boolean;
 }
 
 /** The text an agent puts in front of the model, after Polar's own rules. */

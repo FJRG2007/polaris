@@ -14,16 +14,17 @@ import { polarAccessFor } from "@/lib/polar/access";
 import { getTranslations } from "@/lib/i18n/request";
 import { setAgentDefault } from "@/lib/polar/agents/defaults";
 import { agentInputSchema, type AgentView, type AgentWork } from "@/lib/polar/agents/shared";
+import { AGENT_FILE_MAX, parseAgentFile, type AgentFile } from "@/lib/polar/agents/agent-files";
 
 type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
-async function caller(write: boolean): Promise<{ id: string } | { error: string }> {
+async function caller(write: boolean): Promise<{ id: string; admin: boolean } | { error: string }> {
     const t = await getTranslations("polar");
     const user = await requireUser();
     const access = await polarAccessFor(user.id);
     if (!access.use) return { error: t("settings.agents.errors.noAccess") };
     if (write && user.viewingAs) return { error: t("settings.agents.errors.viewingAs") };
-    return { id: user.id };
+    return { id: user.id, admin: user.isAdmin && !user.viewingAs };
 }
 
 async function answer(result: AgentView | store.AgentRefusal): Promise<Result<AgentView>> {
@@ -60,8 +61,38 @@ export async function saveAgentAction(input: unknown): Promise<Result<AgentView>
     if (!parsed.success) return answer("invalid");
     const { id, agent } = parsed.data;
     return answer(
-        id ? await store.updateAgent(who.id, id, agent) : await store.createAgent(who.id, agent)
+        id
+            ? await store.updateAgent(who.id, id, agent, who.admin)
+            : await store.createAgent(who.id, agent, who.admin)
     );
+}
+
+/** Agent files pasted or read from a repository (`.polaris/agents`,
+ *  `.opencode/agent`, `.claude/agents`), read into agents the editor can save. */
+const importSchema = z.object({
+    files: z
+        .array(z.object({ path: z.string().trim().min(1).max(300), content: z.string().max(AGENT_FILE_MAX) }))
+        .min(1)
+        .max(20)
+});
+
+export async function readAgentFilesAction(
+    input: unknown
+): Promise<Result<{ path: string; agent: AgentFile | null }[]>> {
+    const who = await caller(false);
+    if ("error" in who) return { ok: false, error: who.error };
+    const parsed = importSchema.safeParse(input);
+    if (!parsed.success) {
+        const t = await getTranslations("polar");
+        return { ok: false, error: t("settings.agents.errors.failed") };
+    }
+    return {
+        ok: true,
+        value: parsed.data.files.map((file) => {
+            const read = parseAgentFile(file.path, file.content);
+            return { path: file.path, agent: typeof read === "string" ? null : read };
+        })
+    };
 }
 
 export async function deleteAgentAction(input: unknown): Promise<Result<null>> {
