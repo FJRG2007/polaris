@@ -15,6 +15,8 @@ import * as core from "@polaris/core";
 import * as computers from "./computer-service";
 import { touchSession } from "@/lib/agents/session-live";
 import { listenForRunnerCommands } from "./computer-commands";
+import * as progress from "./computer-progress";
+import { readerWords } from "@/lib/i18n/reader-words";
 import { deliverChatEvent } from "@/lib/polar/claude-subscription/turns";
 import { finishSession, recordSessionEvents } from "@/lib/agents/session-service";
 import { decidePermissionHook, ingestHookPayload } from "@/lib/agents/session-hook-ingest";
@@ -44,9 +46,22 @@ export async function handleRunnerMessage(
             deliverChatEvent(identity.runnerId, message);
             return null;
         case "toolchain.progress":
-            // enigma: logged only until the runner's progress reaches the
-            // session screen; see TOOLCHAIN-PLAN.md.
             if (message.step === "failed") console.error(`[runner] ${identity.runnerId}: preparing ${message.tool} failed: ${message.code ?? "unknown"}`);
+            // Only a session's own progress is kept, and only for a session on
+            // this runner: the frame names it, the row must agree.
+            if (message.sessionId) {
+                const owned = await prisma.agentSession.count({
+                    where: { id: message.sessionId, runnerId: identity.runnerId, place: "computer" }
+                });
+                if (owned)
+                    progress.recordComputerProgress(message.sessionId, {
+                        tool: message.tool,
+                        step: message.step,
+                        ...(message.received !== undefined ? { received: message.received } : {}),
+                        ...(message.total !== undefined ? { total: message.total } : {}),
+                        ...(message.code ? { code: message.code } : {})
+                    });
+            }
             return null;
         case "terminal.output":
             // Never relayed here; the sidecar fans it out itself.
@@ -64,20 +79,26 @@ export async function handleRunnerMessage(
 
     switch (message.type) {
         case "session.started":
+            progress.forgetComputerProgress(session.id);
             await prisma.agentSession.updateMany({
                 where: { id: session.id },
                 data: { workdir: message.workdir }
             });
             touchSession(session.id);
             return null;
-        case "session.ended":
-            if (!over)
-                await finishSession(
-                    session.id,
-                    message.reason === "failed" ? "failed" : "stopped",
-                    message.reason === "failed" ? (message.detail ?? null) : null
-                );
+        case "session.ended": {
+            if (over) return null;
+            const t = await readerWords("polar");
+            const detail =
+                message.reason === "failed"
+                    ? progress.toolchainEndDetail(message.detail, {
+                          failure: (code) => t(`toolchain.failures.${code}`),
+                          other: t("toolchain.startFailed")
+                      })
+                    : null;
+            await finishSession(session.id, message.reason === "failed" ? "failed" : "stopped", detail);
             return null;
+        }
         case "hook":
             if (!over) await ingestHookPayload(session, message.payload, core.parseHookSequence(message.seq));
             return null;

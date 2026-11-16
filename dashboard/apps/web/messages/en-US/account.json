@@ -2041,6 +2041,27 @@
             "pair": "A code could not be made. Try again.",
             "gone": "That computer is no longer paired.",
             "name": "Use a name of 1 to 60 characters."
+        },
+        "here": {
+            "title": "This computer",
+            "unpaired": "Not paired yet",
+            "use": "Use this computer",
+            "state": {
+                "connecting": "Connecting",
+                "online": "Ready for sessions",
+                "offline": "Reconnecting",
+                "unpaired": "Pair it again",
+                "outdated": "Update Polaris on this computer",
+                "replaced": "Open in another window",
+                "stopped": "Not connected"
+            },
+            "errors": {
+                "code": "That pairing code did not work. Try again.",
+                "offline": "Polaris could not be reached. Try again.",
+                "storage": "This computer cannot keep the sign-in safely.",
+                "limited": "Too many tries. Wait a few minutes.",
+                "refused": "This window cannot pair the computer."
+            }
         }
     }
 }

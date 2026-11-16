@@ -14,7 +14,9 @@ import { agentText } from "@/lib/agents/words";
 import { useUnmountSignal } from "@/lib/poll-fetch";
 import { bootProgress } from "@/lib/agents/boot-progress";
 import { useEffect, useState, type ReactNode } from "react";
+import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { Button, useToast } from "@polaris/ui";
 import { sessionScreen } from "@/components/agents/sessions/sessions-polls";
 
 /** As often as the thread itself is read while a session is live. */
@@ -27,8 +29,12 @@ export function bootStepLabel(screen: string): string | null {
 
 export function CodeBootLine({ sessionId, fallback }: { sessionId: string; fallback: ReactNode }) {
     const t = useTranslations("agents");
+    const tp = useTranslations("polar");
     const signal = useUnmountSignal();
     const [label, setLabel] = useState<string | null>(null);
+    const [preparing, setPreparing] = useState<Preparing | null>(null);
+    const [retrying, setRetrying] = useState(false);
+    const toast = useToast();
 
     useEffect(() => {
         let stopped = false;
@@ -37,6 +43,7 @@ export function CodeBootLine({ sessionId, fallback }: { sessionId: string; fallb
             sessionScreen(sessionId, signal())
                 .then((answer) => {
                     if (stopped || !answer || answer.error) return;
+                    setPreparing(answer.preparing ?? null);
                     setLabel(bootStepLabel(answer.screen ?? ""));
                 })
                 .catch(() => undefined);
@@ -49,5 +56,47 @@ export function CodeBootLine({ sessionId, fallback }: { sessionId: string; fallb
         };
     }, [sessionId, signal]);
 
+    if (preparing && preparing.step !== "ready") {
+        const tool = toolLabel(tp, preparing.tool);
+        if (preparing.step === "failed")
+            return (
+                <span className="inline-flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="min-w-0">{tp(`toolchain.failures.${preparing.code ?? "install"}`)}</span>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={retrying}
+                        onClick={() => {
+                            setRetrying(true);
+                            void fetch("/api/agents/sessions/computer-retry", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ sessionId })
+                            })
+                                .then(async (res) => (await res.json().catch(() => ({ error: tp("toolchain.failures.install") }))) as { error?: string })
+                                .catch(() => ({ error: tp("toolchain.failures.offline") }))
+                                .then((answer) => {
+                                    if (answer.error) toast.show({ title: answer.error });
+                                    else setPreparing({ tool: preparing.tool, step: "download" });
+                                })
+                                .finally(() => setRetrying(false));
+                        }}
+                    >
+                        {tp("toolchain.retry")}
+                    </Button>
+                </span>
+            );
+        const percent = preparing.total ? Math.min(100, Math.floor(((preparing.received ?? 0) / preparing.total) * 100)) : null;
+        return <>{tp("toolchain.preparing", { tools: percent === null ? tool : tp("toolchain.preparingStep", { tool, percent }) })}</>;
+    }
     return <>{label ? agentText(t, label) : fallback}</>;
+}
+
+type Preparing = NonNullable<NonNullable<Awaited<ReturnType<typeof sessionScreen>>>["preparing"]>;
+
+const TOOL_NAMES = ["git", "node", "gh", "enigma", "claude", "codex", "opencode"] as const;
+
+/** A tool's name in the reader's words; an unknown one as the runner sent it. */
+function toolLabel(tp: NamespaceTranslator<"polar">, tool: string): string {
+    return (TOOL_NAMES as readonly string[]).includes(tool) ? tp(`toolchain.tools.${tool as (typeof TOOL_NAMES)[number]}`) : tool;
 }

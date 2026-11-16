@@ -12,6 +12,8 @@
 
 import { z } from "zod";
 import { computerFor } from "@/lib/computers/computer-service";
+import { sendToRunner } from "@/lib/computers/computer-commands";
+import * as computerProgress from "@/lib/computers/computer-progress";
 import { after } from "next/server";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
@@ -671,17 +673,36 @@ export async function discardSessionWorkAction(sessionId: string): Promise<{ err
  *  show the last few lines than open a full terminal to every session. */
 export async function sessionScreenAction(
     sessionId: string
-): Promise<{ screen?: string; error?: string }> {
+): Promise<{ screen?: string; preparing?: computerProgress.ComputerProgress | null; error?: string }> {
     const user = await requirePermission("agents.read");
     const t = await getTranslations("agents");
     const session = await sessions.getSession(sessionId, user.id);
     if (!session) return { error: t("sessions.errors.gone") };
+    // A session on somebody's computer has no screen to read here; what it
+    // shows while starting is the runner preparing the tools.
+    if (session.place === "computer") return { screen: "", preparing: computerProgress.computerProgress(sessionId) };
     if (core.isSessionOver(session.state)) return { screen: "" };
     try {
         return { screen: await runtime.captureSession(sessionId) };
     } catch {
         return { error: t("sessions.errors.noAnswer") };
     }
+}
+
+/** Try again, for a computer whose tools could not be prepared: the runner
+ *  prepares them again, keeping whatever already finished. */
+export async function retryComputerToolchainAction(sessionId: unknown): Promise<{ error?: string }> {
+    const t = await getTranslations("agents");
+    const id = z.string().trim().uuid().safeParse(sessionId);
+    if (!id.success) return { error: t("sessions.errors.gone") };
+    const user = await requirePermission("agents.manage");
+    const session = await sessions.getSession(id.data, user.id);
+    if (!session || session.place !== "computer" || !session.runnerId) return { error: t("sessions.errors.gone") };
+    const computer = await computerFor(user.id, session.runnerId);
+    if (!computer?.online) return { error: t("text.computerOffline", { name: computer?.name ?? "" }) };
+    const agents = core.TOOLCHAIN_AGENTS.includes(session.cli as (typeof core.TOOLCHAIN_AGENTS)[number]) ? [session.cli] : [];
+    const sent = await sendToRunner(session.runnerId, { type: "toolchain.prepare", requestId: crypto.randomUUID(), agents });
+    return sent ? {} : { error: t("text.computerOffline", { name: computer.name }) };
 }
 
 // ---------------------------------------------------------------------------

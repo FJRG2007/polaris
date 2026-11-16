@@ -130,8 +130,31 @@ export interface DesktopVoiceState {
     readonly selfDeafened: boolean;
 }
 
+/** This computer's runner, as the desktop reports it (`desktop/src/shared/bridge.ts`). */
+export interface DesktopComputerState {
+    readonly paired: boolean;
+    readonly state: "connecting" | "online" | "offline" | "unpaired" | "outdated" | "replaced" | "stopped";
+    readonly preparing: {
+        readonly tool: string;
+        readonly step: "download" | "verify" | "install" | "ready" | "failed";
+        readonly received?: number;
+        readonly total?: number;
+        readonly code?: "offline" | "checksum" | "disk" | "unsupported" | "blocked" | "install";
+    } | null;
+}
+
+export interface DesktopComputer {
+    state(): Promise<DesktopComputerState | null>;
+    pair(code: string): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: "code" | "offline" | "storage" | "limited" | "refused" }>;
+    forget(): Promise<boolean>;
+    prepare(): Promise<boolean>;
+    onState(listener: (state: DesktopComputerState) => void): () => void;
+}
+
 export interface PolarisDesktop {
     readonly version: string;
+    /** This computer as a runner for Polar Code. Absent on an app older than it. */
+    readonly computer?: DesktopComputer;
     /** Absent on an app older than Polaris TV. */
     openTvInstall?(): Promise<boolean>;
     /** The install driven from a dialog. Absent on an app older than that. */

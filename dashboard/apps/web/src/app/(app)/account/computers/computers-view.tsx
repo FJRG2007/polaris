@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { desktopBridge, type DesktopComputer, type DesktopComputerState } from "@/lib/desktop-bridge";
 import type { ComputerView } from "@/lib/computers/computer-service";
 import { Laptop, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import {
@@ -85,6 +86,7 @@ export function ComputersView({ initial }: { initial: ComputerView[] }) {
 
     return (
         <div className="flex min-w-0 flex-col gap-3">
+            <ThisComputer onPaired={reload} />
             <div>
                 <Button onClick={() => setPairing(true)}>
                     <Plus className="size-4" aria-hidden />
@@ -345,5 +347,84 @@ function RenameDialog({
                 </form>
             </DialogContent>
         </Dialog>
+    );
+}
+
+const TOOL_NAMES = ["git", "node", "gh", "enigma", "claude", "codex", "opencode"] as const;
+
+/**
+ * The computer this page is open on, when it is the Polaris desktop app: pair
+ * it in one press (a code is opened and handed straight to the app), and see
+ * it prepare the tools sessions need, with Try again when that failed.
+ */
+function ThisComputer({ onPaired }: { onPaired: () => void }) {
+    const t = useTranslations("account");
+    const tp = useTranslations("polar");
+    const [bridge, setBridge] = useState<DesktopComputer | null>(null);
+    const [state, setState] = useState<DesktopComputerState | null>(null);
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const computer = desktopBridge()?.computer ?? null;
+        setBridge(computer);
+        if (!computer) return;
+        void computer.state().then(setState).catch(() => undefined);
+        return computer.onState(setState);
+    }, []);
+
+    if (!bridge) return null;
+
+    const pair = () => {
+        setBusy(true);
+        setError(null);
+        void openPairingAction()
+            .then(async (code) => {
+                if ("error" in code) return setError(code.error);
+                const answer = await bridge.pair(code.code);
+                if (answer.ok) onPaired();
+                else setError(t(`computers.here.errors.${answer.reason}`));
+            })
+            .catch(() => setError(t("computers.here.errors.offline")))
+            .finally(() => setBusy(false));
+    };
+
+    const preparing = state?.preparing ?? null;
+    const tool = preparing ? ((TOOL_NAMES as readonly string[]).includes(preparing.tool) ? tp(`toolchain.tools.${preparing.tool as (typeof TOOL_NAMES)[number]}`) : preparing.tool) : "";
+    const percent = preparing?.total ? Math.min(100, Math.floor(((preparing.received ?? 0) / preparing.total) * 100)) : null;
+    const status = !state?.paired ? t("computers.here.unpaired") : t(`computers.here.state.${state.state}`);
+
+    return (
+        <section className="flex min-w-0 flex-col gap-2 rounded-md border border-border px-3 py-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <Laptop className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <span className="min-w-0 truncate font-medium">{t("computers.here.title")}</span>
+                <span className="min-w-0 truncate text-sm text-muted-foreground">{status}</span>
+            </div>
+            {preparing && preparing.step !== "ready" ? (
+                <p className="text-sm text-muted-foreground" aria-live="polite">
+                    {preparing.step === "failed"
+                        ? tp(`toolchain.failures.${preparing.code ?? "install"}`)
+                        : tp("toolchain.preparing", { tools: percent === null ? tool : tp("toolchain.preparingStep", { tool, percent }) })}
+                </p>
+            ) : null}
+            {error ? (
+                <p role="alert" className="text-sm text-destructive">
+                    {error}
+                </p>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+                {!state?.paired ? (
+                    <Button size="sm" disabled={busy} onClick={pair}>
+                        {t("computers.here.use")}
+                    </Button>
+                ) : null}
+                {state?.paired && preparing?.step === "failed" ? (
+                    <Button size="sm" variant="outline" disabled={busy} onClick={() => void bridge.prepare()}>
+                        {tp("toolchain.retry")}
+                    </Button>
+                ) : null}
+            </div>
+        </section>
     );
 }

@@ -2041,6 +2041,27 @@
             "pair": "No se pudo crear un código. Reinténtalo.",
             "gone": "Ese equipo ya no está vinculado.",
             "name": "Usa un nombre de 1 a 60 caracteres."
+        },
+        "here": {
+            "title": "Este equipo",
+            "unpaired": "Aún sin vincular",
+            "use": "Usar este equipo",
+            "state": {
+                "connecting": "Conectando",
+                "online": "Listo para sesiones",
+                "offline": "Reconectando",
+                "unpaired": "Revincúlalo",
+                "outdated": "Actualiza Polaris en este equipo",
+                "replaced": "Abierto en otra ventana",
+                "stopped": "Sin conexión"
+            },
+            "errors": {
+                "code": "Ese código no funcionó. Inténtalo de nuevo.",
+                "offline": "No se pudo contactar con Polaris. Reintenta.",
+                "storage": "Este equipo no puede guardar el acceso seguro.",
+                "limited": "Demasiados intentos. Espera unos minutos.",
+                "refused": "Esta ventana no puede vincular el equipo."
+            }
         }
     }
 }

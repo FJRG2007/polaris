@@ -2077,6 +2077,8 @@
             "unsupported": "This computer's system is not supported yet.",
             "blocked": "Something on this computer, often an antivirus, blocked a file.",
             "install": "A tool could not be set up on this computer."
-        }
+        },
+        "startFailed": "The session could not start on this computer.",
+        "preparingStep": "{tool}: {percent}%"
     }
 }
