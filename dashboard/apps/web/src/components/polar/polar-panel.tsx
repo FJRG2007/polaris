@@ -2879,6 +2879,11 @@ export function PolarChat({
                             providers={providers}
                             onPolarTask={startCodeChat}
                             onHistory={() => setShowHistory(true)}
+                            onToggleHistory={() => {
+                                if (!fullPage) setShowHistory((shown) => !shown);
+                                else if (wide) setSidebarHidden(!collapsed);
+                                else setDrawer((open) => !open);
+                            }}
                         />
                     </div>
                 )}

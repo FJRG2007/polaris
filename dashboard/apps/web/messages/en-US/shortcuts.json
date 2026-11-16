@@ -223,6 +223,18 @@
                 "duplicate": "Duplicate the slide",
                 "delete": "Delete the slide"
             }
+        },
+        "code": {
+            "newSession": "Start a new task",
+            "nextSession": "Go to the next session",
+            "previousSession": "Go to the previous session",
+            "interrupt": "Stop the agent (press twice)",
+            "focusComposer": "Write a reply",
+            "commands": "Open the commands",
+            "modelPicker": "Choose the model",
+            "toggleHistory": "Show or hide your sessions",
+            "toggleWorkspace": "Show or hide files and changes",
+            "help": "Show the shortcuts"
         }
     },
     "groups": {
@@ -252,7 +264,10 @@
         "databasesQuery": "Queries",
         "vaultItems": "Entries",
         "officeSlides": "Presentations",
-        "officeSlideList": "Slide list"
+        "officeSlideList": "Slide list",
+        "codeSessions": "Sessions",
+        "codeComposer": "Writing",
+        "codePanels": "Panels"
     },
     "apps": {
         "general": "Everywhere",
@@ -265,6 +280,7 @@
         "places": "Places",
         "databases": "Databases",
         "vault": "Vault",
-        "office": "Office"
+        "office": "Office",
+        "code": "Polar Code"
     }
 }

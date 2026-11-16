@@ -223,6 +223,18 @@
                 "duplicate": "Duplicar la diapositiva",
                 "delete": "Borrar diapositiva"
             }
+        },
+        "code": {
+            "newSession": "Nueva tarea",
+            "nextSession": "Ir a la sesión siguiente",
+            "previousSession": "Ir a la sesión anterior",
+            "interrupt": "Parar al agente (pulsa dos veces)",
+            "focusComposer": "Responder",
+            "commands": "Abrir los comandos",
+            "modelPicker": "Elegir el modelo",
+            "toggleHistory": "Mostrar u ocultar tus sesiones",
+            "toggleWorkspace": "Mostrar u ocultar archivos y cambios",
+            "help": "Ver los atajos"
         }
     },
     "groups": {
@@ -252,7 +264,10 @@
         "databasesQuery": "Consultas",
         "vaultItems": "Entradas",
         "officeSlides": "Presentaciones",
-        "officeSlideList": "Diapositivas"
+        "officeSlideList": "Diapositivas",
+        "codeSessions": "Sesiones",
+        "codeComposer": "Escribir",
+        "codePanels": "Paneles"
     },
     "apps": {
         "general": "En todas",
@@ -265,6 +280,7 @@
         "places": "Lugares",
         "databases": "Bases",
         "vault": "Vault",
-        "office": "Office"
+        "office": "Office",
+        "code": "Polar Code"
     }
 }

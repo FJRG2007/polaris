@@ -17,6 +17,7 @@ import { CodeSurface } from "@/components/code-surface";
 import type { SessionView } from "@/lib/agents/session-service";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useCodeTheme } from "@/components/polar/polar-display";
 import { ClientMessages } from "@/components/i18n/client-namespaces";
 import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import * as polls from "@/components/agents/sessions/sessions-polls";
@@ -94,6 +95,7 @@ export function PolarCodeWorkspace({
     onPick?: (element: PickedElement) => void;
 }) {
     const t = useTranslations("polar");
+    const theme = useCodeTheme();
     const [pane, setPane] = useState<Pane>("files");
     const wake = useCheckoutWake({ sessionId: session.id, active: open && live, lastEdit, lastTool });
     // Whether the person picked a pane since the workspace opened: until they
@@ -124,7 +126,7 @@ export function PolarCodeWorkspace({
     }, [open, live, pane, session.id]);
     return (
         <ui.Dialog open={open} onOpenChange={onOpenChange}>
-            <ui.SheetContent className="sm:w-[min(72rem,calc(100vw-1rem))]">
+            <ui.SheetContent data-code-theme={theme} className="sm:w-[min(72rem,calc(100vw-1rem))]">
                 <div className="flex min-h-0 flex-1 flex-col gap-3 p-4">
                     <ui.DialogHeader className="pe-10">
                         <ui.DialogTitle className="truncate" title={session.title}>

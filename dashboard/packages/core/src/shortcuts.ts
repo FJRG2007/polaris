@@ -183,9 +183,11 @@ export function bindingOfEvent(event: {
     readonly altKey: boolean;
     readonly shiftKey: boolean;
 }): string | null {
-    if (MODIFIER_KEYS.has(event.key)) return null;
-    // With Alt held a Mac types a different character (Alt+D is "∂"), so the
-    // physical key is what was meant for letters and digits.
+    // With Alt held a Mac types a different character (Alt+D is "∂"), or starts
+    // one (Alt+N is a dead key for "˜"), so the physical key is what was meant
+    // for letters and digits.
+    const physical = event.altKey && event.code !== undefined && /^(Key[A-Z]|Digit[0-9])$/.test(event.code);
+    if (MODIFIER_KEYS.has(event.key) && !(event.key === "Dead" && physical)) return null;
     let key = event.key;
     if (event.altKey && event.code) {
         const letter = /^Key([A-Z])$/.exec(event.code)?.[1];
@@ -239,7 +241,8 @@ export const SHORTCUT_APPS = [
     "places",
     "databases",
     "vault",
-    "office"
+    "office",
+    "code"
 ] as const;
 
 export type ShortcutApp = (typeof SHORTCUT_APPS)[number];
@@ -468,6 +471,22 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
         ["slideList.moveDown", "officeSlideList", "office.slideList", ["Mod+ArrowDown"]],
         ["slideList.duplicate", "officeSlideList", "office.slideList", ["Mod+d"]],
         ["slideList.delete", "officeSlideList", "office.slideList", [], ["Delete", "Backspace"]]
+    ]),
+    // Polar Code. OpenCode's keybinds (`session_new`, `session_list`,
+    // `sidebar_toggle`, `model_list`, `command_list`, `session_interrupt`) sit
+    // behind a Ctrl+X leader in a terminal; a browser keeps Ctrl+N/W/T/P, so
+    // these take Alt instead, and Escape stops a turn only when pressed twice.
+    ...app("code", [
+        ["newSession", "codeSessions", "polar.code", ["Alt+n"]],
+        ["nextSession", "codeSessions", "polar.code", ["Alt+ArrowDown"]],
+        ["previousSession", "codeSessions", "polar.code", ["Alt+ArrowUp"]],
+        ["interrupt", "codeSessions", "polar.code", ["Escape"]],
+        ["focusComposer", "codeComposer", "polar.code", ["i"]],
+        ["commands", "codeComposer", "polar.code", ["Mod+/"]],
+        ["modelPicker", "codeComposer", "polar.code", ["Alt+m"]],
+        ["toggleHistory", "codePanels", "polar.code", ["Alt+b"]],
+        ["toggleWorkspace", "codePanels", "polar.code", ["Alt+w"]],
+        ["help", "codePanels", "polar.code", ["?"]]
     ])
 ];
 

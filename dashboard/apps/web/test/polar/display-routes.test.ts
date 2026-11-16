@@ -91,7 +91,8 @@ describe("chat display settings", () => {
             improveModel: null,
             writingContext: "",
             writingSkills: [],
-            sessionEngine: null
+            sessionEngine: null,
+            codeTheme: "polaris"
         });
     });
 
@@ -109,7 +110,8 @@ describe("chat display settings", () => {
             improveModel: { provider: "groq", model: "llama-small", payer: null },
             writingContext: "I sign as Ana.",
             writingSkills: ["Tone"],
-            sessionEngine: "opencode"
+            sessionEngine: "opencode",
+            codeTheme: "nord"
         };
         expect(await (await preferences.GET()).json()).toEqual(state.preference);
     });
@@ -164,6 +166,14 @@ describe("chat display settings", () => {
         expect((await patch({ sessionEngine: "Not An Engine" })).status).toBe(400);
         expect((await patch({ sessionEngine: 3 })).status).toBe(400);
         expect(state.upserts).toHaveLength(2);
+    });
+
+    it("store Code's theme and refuse one that is not a theme", async () => {
+        expect((await patch({ codeTheme: "gruvbox" })).status).toBe(200);
+        expect(state.upserts.map((entry) => entry.update)).toEqual([{ codeTheme: "gruvbox" }]);
+        expect((await patch({ codeTheme: "matrix" })).status).toBe(400);
+        expect((await patch({ codeTheme: null })).status).toBe(400);
+        expect(state.upserts).toHaveLength(1);
     });
 
     it("refuse an empty change, an unknown key and a value that is not a switch", async () => {

@@ -220,6 +220,151 @@ body {
     }
 }
 
+/*
+ * Polar Code's color themes (`lib/polar/code-theme.ts`), set on the Code view
+ * with `data-code-theme`. Each redefines the syntax palette above and the diff
+ * line tints, dark first and light for a light page, so a theme follows the
+ * light/dark switch like the tokens it replaces. "polaris" redefines nothing.
+ */
+/* nord: nordtheme.com palette (Polar Night, Frost, Aurora); light is the same hues at reading depth. */
+[data-code-theme="nord"] {
+    --code-comment: 220 17% 46%;
+    --code-keyword: 210 34% 63%;
+    --code-string: 92 28% 65%;
+    --code-number: 311 20% 63%;
+    --code-function: 193 43% 67%;
+    --code-type: 179 25% 65%;
+    --code-attr: 14 51% 63%;
+    --code-diff-add: hsl(92 28% 65% / 0.16);
+    --code-diff-remove: hsl(354 42% 56% / 0.16);
+}
+/* gruvbox: morhetz/gruvbox palette, dark and light. */
+[data-code-theme="gruvbox"] {
+    --code-comment: 30 12% 51%;
+    --code-keyword: 6 96% 59%;
+    --code-string: 61 66% 44%;
+    --code-number: 344 47% 68%;
+    --code-function: 42 95% 58%;
+    --code-type: 104 35% 62%;
+    --code-attr: 157 16% 58%;
+    --code-diff-add: hsl(61 66% 44% / 0.16);
+    --code-diff-remove: hsl(6 96% 59% / 0.16);
+}
+/* solarized: Solarized accents (ethanschoonover.com/solarized), shared by both modes. */
+[data-code-theme="solarized"] {
+    --code-comment: 194 14% 40%;
+    --code-keyword: 68 100% 30%;
+    --code-string: 175 59% 40%;
+    --code-number: 331 64% 52%;
+    --code-function: 205 69% 49%;
+    --code-type: 45 100% 35%;
+    --code-attr: 18 80% 44%;
+    --code-diff-add: hsl(68 100% 30% / 0.16);
+    --code-diff-remove: hsl(1 71% 52% / 0.16);
+}
+/* tokyonight: folke/tokyonight.nvim, Night and Day. */
+[data-code-theme="tokyonight"] {
+    --code-comment: 229 23% 44%;
+    --code-keyword: 261 85% 79%;
+    --code-string: 89 51% 61%;
+    --code-number: 22 100% 70%;
+    --code-function: 221 89% 72%;
+    --code-type: 189 73% 52%;
+    --code-attr: 171 58% 65%;
+    --code-diff-add: hsl(89 51% 61% / 0.16);
+    --code-diff-remove: hsl(349 89% 72% / 0.16);
+}
+:root.light [data-code-theme="nord"] {
+    --code-comment: 220 17% 46%;
+    --code-keyword: 210 34% 36%;
+    --code-string: 92 28% 36%;
+    --code-number: 311 20% 36%;
+    --code-function: 193 43% 36%;
+    --code-type: 179 25% 36%;
+    --code-attr: 14 51% 36%;
+    --code-diff-add: hsl(92 28% 36% / 0.14);
+    --code-diff-remove: hsl(354 42% 42% / 0.14);
+}
+:root.light [data-code-theme="gruvbox"] {
+    --code-comment: 30 12% 51%;
+    --code-keyword: 358 100% 31%;
+    --code-string: 57 79% 26%;
+    --code-number: 322 39% 40%;
+    --code-function: 37 80% 39%;
+    --code-type: 143 30% 37%;
+    --code-attr: 190 89% 25%;
+    --code-diff-add: hsl(57 79% 26% / 0.14);
+    --code-diff-remove: hsl(358 100% 31% / 0.14);
+}
+:root.light [data-code-theme="solarized"] {
+    --code-comment: 180 7% 60%;
+    --code-keyword: 68 100% 30%;
+    --code-string: 175 59% 40%;
+    --code-number: 331 64% 52%;
+    --code-function: 205 69% 49%;
+    --code-type: 45 100% 35%;
+    --code-attr: 18 80% 44%;
+    --code-diff-add: hsl(68 100% 30% / 0.14);
+    --code-diff-remove: hsl(1 71% 52% / 0.14);
+}
+:root.light [data-code-theme="tokyonight"] {
+    --code-comment: 230 25% 61%;
+    --code-keyword: 266 85% 64%;
+    --code-string: 89 34% 34%;
+    --code-number: 31 100% 35%;
+    --code-function: 215 81% 55%;
+    --code-type: 195 100% 30%;
+    --code-attr: 35 39% 40%;
+    --code-diff-add: hsl(89 34% 34% / 0.14);
+    --code-diff-remove: hsl(343 91% 56% / 0.14);
+}
+@media (prefers-color-scheme: light) {
+    :root.system [data-code-theme="nord"] {
+        --code-comment: 220 17% 46%;
+        --code-keyword: 210 34% 36%;
+        --code-string: 92 28% 36%;
+        --code-number: 311 20% 36%;
+        --code-function: 193 43% 36%;
+        --code-type: 179 25% 36%;
+        --code-attr: 14 51% 36%;
+        --code-diff-add: hsl(92 28% 36% / 0.14);
+        --code-diff-remove: hsl(354 42% 42% / 0.14);
+    }
+    :root.system [data-code-theme="gruvbox"] {
+        --code-comment: 30 12% 51%;
+        --code-keyword: 358 100% 31%;
+        --code-string: 57 79% 26%;
+        --code-number: 322 39% 40%;
+        --code-function: 37 80% 39%;
+        --code-type: 143 30% 37%;
+        --code-attr: 190 89% 25%;
+        --code-diff-add: hsl(57 79% 26% / 0.14);
+        --code-diff-remove: hsl(358 100% 31% / 0.14);
+    }
+    :root.system [data-code-theme="solarized"] {
+        --code-comment: 180 7% 60%;
+        --code-keyword: 68 100% 30%;
+        --code-string: 175 59% 40%;
+        --code-number: 331 64% 52%;
+        --code-function: 205 69% 49%;
+        --code-type: 45 100% 35%;
+        --code-attr: 18 80% 44%;
+        --code-diff-add: hsl(68 100% 30% / 0.14);
+        --code-diff-remove: hsl(1 71% 52% / 0.14);
+    }
+    :root.system [data-code-theme="tokyonight"] {
+        --code-comment: 230 25% 61%;
+        --code-keyword: 266 85% 64%;
+        --code-string: 89 34% 34%;
+        --code-number: 31 100% 35%;
+        --code-function: 215 81% 55%;
+        --code-type: 195 100% 30%;
+        --code-attr: 35 39% 40%;
+        --code-diff-add: hsl(89 34% 34% / 0.14);
+        --code-diff-remove: hsl(343 91% 56% / 0.14);
+    }
+}
+
 .hljs-comment,
 .hljs-quote {
     color: hsl(var(--code-comment));

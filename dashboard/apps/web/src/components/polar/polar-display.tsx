@@ -9,7 +9,7 @@
  */
 
 import { useSyncExternalStore } from "react";
-import { Switch, useToast } from "@polaris/ui";
+import { Select, Switch, useToast } from "@polaris/ui";
 import { formatTokens, formatUsd } from "@/lib/polar/usage-format";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -19,6 +19,7 @@ import {
     type PolarDisplay,
     type PolarDisplayKey
 } from "@/lib/polar/display";
+import { CODE_THEMES, codeThemeOf, DEFAULT_CODE_THEME, type CodeTheme } from "@/lib/polar/code-theme";
 
 const CACHE_KEY = "polar.display";
 
@@ -56,7 +57,11 @@ export const polarDisplayStore = {
     load(): Promise<PolarDisplay> {
         request ??= fetch("/api/polar/preferences")
             .then((response) => (response.ok ? response.json() : null))
-            .then((data: unknown) => (data ? polarDisplayStore.set(displayOf(data)) : undefined))
+            .then((data: unknown) => {
+                if (!data) return;
+                polarDisplayStore.set(displayOf(data));
+                codeThemeStore.set(codeThemeOf((data as { codeTheme?: unknown }).codeTheme));
+            })
             .catch(() => undefined);
         return request.then(() => polarDisplayStore.get());
     },
@@ -77,6 +82,60 @@ export function usePolarDisplay(): PolarDisplay {
         polarDisplayStore.get,
         () => POLAR_DISPLAY_DEFAULTS
     );
+}
+
+const THEME_CACHE_KEY = "polar.codeTheme";
+let theme: CodeTheme | null = null;
+const themeListeners = new Set<() => void>();
+
+/** Polar Code's color theme, read with the rest of Polar's settings: the
+ *  device's last known one at once, the server's when it answers. */
+export const codeThemeStore = {
+    get(): CodeTheme {
+        if (theme === null) {
+            if (typeof window === "undefined") return DEFAULT_CODE_THEME;
+            try {
+                theme = codeThemeOf(window.localStorage.getItem(THEME_CACHE_KEY));
+            } catch {
+                theme = DEFAULT_CODE_THEME;
+            }
+        }
+        return theme;
+    },
+    set(next: CodeTheme): void {
+        if (codeThemeStore.get() === next) return;
+        theme = next;
+        try {
+            window.localStorage.setItem(THEME_CACHE_KEY, next);
+        } catch {
+            // Not kept on this device; the server still has it.
+        }
+        for (const listener of themeListeners) listener();
+    },
+    subscribe(listener: () => void): () => void {
+        themeListeners.add(listener);
+        void polarDisplayStore.load();
+        return () => themeListeners.delete(listener);
+    }
+};
+
+export function useCodeTheme(): CodeTheme {
+    return useSyncExternalStore(codeThemeStore.subscribe, codeThemeStore.get, () => DEFAULT_CODE_THEME);
+}
+
+/** Changes the theme at once, and puts the old one back when the server says no. */
+export async function changeCodeTheme(next: CodeTheme): Promise<boolean> {
+    const before = codeThemeStore.get();
+    if (before === next) return true;
+    codeThemeStore.set(next);
+    const response = await fetch("/api/polar/preferences", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ codeTheme: next })
+    }).catch(() => null);
+    if (response?.ok) return true;
+    codeThemeStore.set(before);
+    return false;
 }
 
 /** Turns one switch, at once, and back again when the server says no. */
@@ -108,8 +167,65 @@ const ROWS: readonly {
     { key: "reopenLastChat", hint: "settings.display.reopenLastChatHint" }
 ];
 
-/** The "Chat display" section of Polar's settings. */
+/** A theme's colors in a row of dots, painted by the theme itself. */
+function ThemeSwatch({ theme }: { theme: CodeTheme }) {
+    return (
+        <span data-code-theme={theme} aria-hidden className="flex shrink-0 items-center gap-0.5">
+            {(["keyword", "string", "function", "number"] as const).map((token) => (
+                <span
+                    key={token}
+                    className="size-2 rounded-full"
+                    style={{ backgroundColor: `hsl(var(--code-${token}))` }}
+                />
+            ))}
+        </span>
+    );
+}
+
+/** The "Code color theme" section of Polar's settings. */
+function CodeThemeSettings() {
+    const t = useTranslations("polar");
+    const toast = useToast();
+    const theme = useCodeTheme();
+    return (
+        <section className="flex flex-col gap-2">
+            <div className="min-w-0">
+                <h2 className="text-sm font-medium text-foreground">{t("settings.codeTheme.title")}</h2>
+                <p className="text-xs text-muted-foreground">{t("settings.codeTheme.intro")}</p>
+            </div>
+            <div className="flex min-w-0 items-center gap-3 rounded-md border border-border px-3 py-2">
+                <p className="min-w-0 flex-1 truncate text-sm text-foreground">{t("settings.codeTheme.label")}</p>
+                <Select
+                    value={theme}
+                    aria-label={t("settings.codeTheme.label")}
+                    className="w-44"
+                    onValueChange={(value) =>
+                        void changeCodeTheme(codeThemeOf(value)).then((saved) =>
+                            saved ? undefined : toast.show({ title: t("settings.codeTheme.failed") })
+                        )
+                    }
+                    options={CODE_THEMES.map((name) => ({
+                        value: name,
+                        label: t(`settings.codeTheme.names.${name}`),
+                        icon: <ThemeSwatch theme={name} />
+                    }))}
+                />
+            </div>
+        </section>
+    );
+}
+
+/** The "Chat display" section of Polar's settings, and Code's theme under it. */
 export function DisplaySettings() {
+    return (
+        <div className="flex flex-col gap-6">
+            <ChatDisplaySettings />
+            <CodeThemeSettings />
+        </div>
+    );
+}
+
+function ChatDisplaySettings() {
     const t = useTranslations("polar");
     const toast = useToast();
     const display = usePolarDisplay();

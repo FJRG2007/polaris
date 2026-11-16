@@ -159,3 +159,38 @@ describe("moving keys", () => {
         });
     });
 });
+
+describe("Polar Code's keys", () => {
+    const resolved = keys.resolveShortcuts();
+    const code = keys.SHORTCUTS.filter((definition) => definition.app === "code");
+
+    it("lists every action under Code, movable, on keys a browser hands a page", () => {
+        expect(code.map((definition) => definition.id)).toContain("code.interrupt");
+        for (const definition of code) {
+            expect(keys.isRebindable(definition), definition.id).toBe(true);
+            for (const binding of definition.defaults) expect(keys.isBindable(binding), binding).toBe(true);
+        }
+    });
+
+    it("reads an Alt press by the physical key, a Mac dead key included", () => {
+        // Option+N on a Mac starts a tilde instead of typing a letter.
+        expect(keys.shortcutMatching(resolved, press("Dead", { alt: true }, "KeyN"), ["code.newSession"])).toBe(
+            "code.newSession"
+        );
+        expect(keys.shortcutMatching(resolved, press("µ", { alt: true }, "KeyM"), ["code.modelPicker"])).toBe(
+            "code.modelPicker"
+        );
+        // A dead key with no Alt is still nothing (an accent being typed).
+        expect(keys.bindingOfEvent(press("Dead", {}, "Quote"))).toBeNull();
+    });
+
+    it("answers the symbol typed, whatever the layout put it under", () => {
+        // A Spanish keyboard types "/" with Shift+7 and "?" with Shift+'.
+        expect(keys.shortcutMatching(resolved, press("/", { ctrl: true, shift: true }, "Digit7"), ["code.commands"])).toBe(
+            "code.commands"
+        );
+        expect(keys.shortcutMatching(resolved, press("?", { shift: true }, "Minus"), ["code.help"])).toBe("code.help");
+        // AltGr is Ctrl+Alt on Windows: never one of Code's Alt keys.
+        expect(keys.shortcutMatching(resolved, press("@", { ctrl: true, alt: true }, "Digit2"), code.map((d) => d.id))).toBeNull();
+    });
+});

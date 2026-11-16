@@ -17258,6 +17258,9 @@ model PolarPreference {
     // The engine Polar Code sessions run on: a coding CLI's catalogue id, or
     // "polaris-native". Null is Automatic (lib/polar/native/engine-choice.ts).
     sessionEngine  String?
+    // The colors Polar Code paints code and diffs in: one of CODE_THEMES
+    // (apps/web/src/lib/polar/code-theme.ts). Null is the design system's own.
+    codeTheme      String?
     updatedAt      DateTime @updatedAt
 }
 

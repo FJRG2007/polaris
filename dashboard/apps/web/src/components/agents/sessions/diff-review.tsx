@@ -25,9 +25,11 @@ function anchorOf(line: DiffLine): { side: "new" | "old"; line: number } | null 
     return null;
 }
 
+// A Polar Code theme tints added and removed lines its own way
+// (`[data-code-theme]` in globals.css); anywhere else these are the tokens.
 const LINE_TONE: Record<DiffLine["kind"], string> = {
-    add: "bg-success-soft",
-    remove: "bg-danger-soft",
+    add: "bg-[var(--code-diff-add,var(--success-soft))]",
+    remove: "bg-[var(--code-diff-remove,var(--danger-soft))]",
     context: "",
     hunk: "bg-muted text-muted-foreground",
     meta: "text-muted-foreground"

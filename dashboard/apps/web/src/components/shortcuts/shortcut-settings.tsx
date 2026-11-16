@@ -71,7 +71,8 @@ const SHORTCUT_APP_IDS: Partial<Record<core.ShortcutApp, string>> = {
     chat: "chat",
     places: "home",
     vault: "vault",
-    office: "office"
+    office: "office",
+    code: "polar"
 };
 
 function appIcon(app: string) {

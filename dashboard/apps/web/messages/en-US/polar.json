@@ -1025,6 +1025,19 @@
             "search": "Search engines",
             "noMatch": "No engine matches.",
             "failed": "Couldn't save that setting. Try again."
+        },
+        "codeTheme": {
+            "title": "Code color theme",
+            "intro": "Colors for code, diffs and terminal output in Polar Code.",
+            "label": "Theme",
+            "failed": "Couldn't save the theme. Try again.",
+            "names": {
+                "polaris": "Polaris",
+                "nord": "Nord",
+                "gruvbox": "Gruvbox",
+                "solarized": "Solarized",
+                "tokyonight": "Tokyo Night"
+            }
         }
     },
     "temporary": {
@@ -1742,6 +1755,10 @@
             "list": "Elements for your next message",
             "remove": "Remove {tag}",
             "tooLong": "The message and the picked elements are too long together. Remove an element or shorten the message."
+        },
+        "keys": {
+            "shortcuts": "Keyboard shortcuts",
+            "stopAgain": "Press Esc again to stop the agent."
         }
     },
     "compare": {

@@ -1025,6 +1025,19 @@
             "search": "Buscar motores",
             "noMatch": "Ningún motor coincide.",
             "failed": "No se pudo guardar. Inténtalo de nuevo."
+        },
+        "codeTheme": {
+            "title": "Tema de código",
+            "intro": "Colores del código, los cambios y la terminal en Polar Code.",
+            "label": "Tema",
+            "failed": "No se guardó el tema. Inténtalo otra vez.",
+            "names": {
+                "polaris": "Polaris",
+                "nord": "Nord",
+                "gruvbox": "Gruvbox",
+                "solarized": "Solarized",
+                "tokyonight": "Tokyo Night"
+            }
         }
     },
     "temporary": {
@@ -1742,6 +1755,10 @@
             "list": "Elementos para tu próximo mensaje",
             "remove": "Quitar {tag}",
             "tooLong": "El mensaje y los elementos elegidos son demasiado largos. Quita un elemento o acorta el mensaje."
+        },
+        "keys": {
+            "shortcuts": "Atajos de teclado",
+            "stopAgain": "Pulsa Esc otra vez para parar al agente."
         }
     },
     "compare": {

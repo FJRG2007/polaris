@@ -43,6 +43,8 @@ import {
     type CodeSource
 } from "@/lib/polar/agents/code-sources";
 import { CodeModelPicker } from "@/components/polar/code-model-picker";
+import { neighbourSession, useCodeKeys, useStopTwice } from "@/components/polar/polar-code-keys";
+import { useCodeTheme } from "@/components/polar/polar-display";
 import { CodeAccountSwitch } from "@/components/polar/code-account-switch";
 import { CodeEnginePill, KNOWN_ENGINES } from "@/components/polar/session-engine";
 import { engineOptions, NATIVE_ENGINE } from "@/lib/polar/native/engine-choice";
@@ -67,7 +69,8 @@ import {
     useRef,
     useState,
     useTransition,
-    type ReactNode
+    type ReactNode,
+    type RefObject
 } from "react";
 import type { GithubAppGap } from "@/lib/github-app-reach";
 import type { VoiceNotice } from "@/components/polar/polar-voice";
@@ -137,7 +140,7 @@ import type {
     PolarCodeThread
 } from "@/lib/polar/code";
 import type { SessionView } from "@/lib/agents/session-service";
-import { Code2, MessageSquare, PanelRight, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { Code2, Keyboard, MessageSquare, PanelRight, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import { pickedContext, PICKS_MAX, type PickedElement } from "@/lib/agents/preview-picker";
 import { PickedChips } from "@/components/preview/picked-chips";
 import dynamic from "next/dynamic";
@@ -148,6 +151,12 @@ const RepoMemorySection = dynamic(
         import("@/app/(app)/automations/code-review/repo-memory-section").then(
             (module) => module.RepoMemorySection
         ),
+    { ssr: false }
+);
+
+/** Loaded when somebody asks for the shortcuts: the settings are not needed to read a thread. */
+const ShortcutsDialog = dynamic(
+    () => import("@/components/shortcuts/shortcuts-dialog").then((module) => module.ShortcutsDialog),
     { ssr: false }
 );
 
@@ -624,7 +633,8 @@ export function PolarCodeView({
     voiceKit,
     providers,
     onPolarTask,
-    onHistory
+    onHistory,
+    onToggleHistory
 }: {
     code: PolarCodeState;
     fullPage: boolean;
@@ -638,9 +648,33 @@ export function PolarCodeView({
     onPolarTask: (task: PolarTask) => void;
     /** Shows the history, for "/resume". */
     onHistory: () => void;
+    /** Shows or hides the history, for its shortcut; "/resume" when not given. */
+    onToggleHistory?: () => void;
 }) {
     const t = useTranslations("polar");
     const canStart = code.access === "manage";
+    const keysRoot = useRef<HTMLDivElement>(null);
+    const theme = useCodeTheme();
+    const [keysHelp, setKeysHelp] = useState(false);
+    const sessionIds = (code.history.rows ?? []).map((row) => row.id);
+    const step = (direction: 1 | -1) => () => {
+        const next = neighbourSession(sessionIds, code.selected, direction);
+        if (next === null) return false;
+        code.open(next);
+    };
+    useCodeKeys(keysRoot, fullPage, {
+        "code.newSession": () => code.open(null),
+        "code.nextSession": step(1),
+        "code.previousSession": step(-1),
+        "code.toggleHistory": () => (onToggleHistory ?? onHistory)(),
+        "code.help": () => setKeysHelp(true)
+    });
+    const frame = (children: ReactNode) => (
+        <div ref={keysRoot} data-code-theme={theme} className="contents">
+            {children}
+            {keysHelp ? <ShortcutsDialog app="code" open onOpenChange={setKeysHelp} /> : null}
+        </div>
+    );
     const picks = useCodeChoices(canStart);
     const [baseRef, setBaseRef] = useState("");
     // The words a task was started with, for the session they started: they are
@@ -662,9 +696,11 @@ export function PolarCodeView({
     };
 
     if (code.selected)
-        return (
+        return frame(
             <CodeThread
                 key={code.selected}
+                keysRoot={keysRoot}
+                onKeysHelp={() => setKeysHelp(true)}
                 sessionId={code.selected}
                 firstPrompt={opening?.id === code.selected ? opening.text : null}
                 canPrompt={canStart}
@@ -681,6 +717,8 @@ export function PolarCodeView({
 
     const composer = (
         <CodeStart
+            keysRoot={keysRoot}
+            fullPage={fullPage}
             canStart={canStart}
             pending={code.access === null}
             choices={picks.choices}
@@ -707,16 +745,24 @@ export function PolarCodeView({
         />
     );
     if (fullPage)
-        return (
+        return frame(
             <PolarWelcome avatar={avatar} title={t("code.heading")}>
                 {composer}
             </PolarWelcome>
         );
-    return (
+    return frame(
         <PolarThreadFrame fullPage={false} dock={composer}>
             <ConversationEmptyState icon={avatar} description={t("code.heading")} />
         </PolarThreadFrame>
     );
+}
+
+/** Puts the cursor in a composer, at the end of what is written. */
+function focusInput(id: string): void {
+    const box = document.getElementById(id);
+    if (!(box instanceof HTMLTextAreaElement)) return;
+    box.focus();
+    box.setSelectionRange(box.value.length, box.value.length);
 }
 
 /** A voice call open on Code: what it says first when it moved to a session. */
@@ -827,6 +873,8 @@ function narrowProviders(
 
 /** A new task: Chat's composer, with one model picker where Chat has its own. */
 function CodeStart({
+    keysRoot,
+    fullPage,
     canStart,
     pending,
     choices,
@@ -867,11 +915,25 @@ function CodeStart({
     onStarted: (id: string, text: string) => void;
     onPolarTask: (task: PolarTask) => void;
     onHistory: () => void;
+    /** The Code view, where its keys are listened for. */
+    keysRoot: RefObject<HTMLDivElement | null>;
+    fullPage: boolean;
 }) {
     const t = useTranslations("polar");
     const inputId = useId();
     const [prompt, setPrompt] = useState("");
     const [modelOpen, setModelOpen] = useState(false);
+    useCodeKeys(keysRoot, fullPage, {
+        "code.focusComposer": () => focusInput(inputId),
+        "code.commands": () => {
+            setPrompt("/");
+            focusInput(inputId);
+        },
+        "code.modelPicker": () => {
+            if (!canStart) return false;
+            setModelOpen(true);
+        }
+    });
     // The engine for this task only; null follows the person's setting.
     const [engine, setEngine] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -1315,6 +1377,8 @@ function CodeStart({
 
 /** One session, followed while it runs, drawn as a chat thread. */
 function CodeThread({
+    keysRoot,
+    onKeysHelp,
     sessionId,
     firstPrompt,
     canPrompt,
@@ -1345,9 +1409,15 @@ function CodeThread({
     /** The voice call open on Code, or null. */
     call: CodeCall | null;
     onCall: (call: CodeCall | null) => void;
+    /** The Code view, where its keys are listened for. */
+    keysRoot: RefObject<HTMLDivElement | null>;
+    /** Opens the keyboard shortcuts. */
+    onKeysHelp: () => void;
 }) {
     const t = useTranslations("polar");
     const inputId = useId();
+    const [modelOpen, setModelOpen] = useState(false);
+    const stopKey = useStopTwice();
     // Undefined while the first answer is on its way; null when it is not there.
     const [thread, setThread] = useState<PolarCodeThread | null | undefined>(undefined);
     // The files, the changes and the terminal, beside the thread.
@@ -1576,6 +1646,28 @@ function CodeThread({
         const text = cli ? codeCommands.forwardedText(command, rest, cli) : null;
         if (text) sendText(text);
     };
+
+    const canStop = live && (thread?.canManage ?? false) && canPrompt;
+    useCodeKeys(keysRoot, fullPage, {
+        "code.interrupt": () => {
+            if (!canStop) return false;
+            if (stopKey.press()) stopTurn();
+        },
+        "code.focusComposer": () => focusInput(inputId),
+        "code.commands": () => {
+            setReply("/");
+            focusInput(inputId);
+        },
+        "code.toggleWorkspace": () => {
+            if (!thread?.canManage) return false;
+            setWorkspace((open) => !open);
+        }
+    });
+    // A turn that ended on its own needs no second Escape.
+    const { disarm } = stopKey;
+    useEffect(() => {
+        if (!canStop) disarm();
+    }, [canStop, disarm]);
 
     // The mode the agent is in, changeable while it runs: only for a tool that
     // takes one, on a session that picked one (otherwise the place and Enigma
@@ -1909,6 +2001,8 @@ function CodeThread({
                                     onChange={changeModel}
                                     automatic={false}
                                     disabled={busy}
+                                    open={modelOpen}
+                                    onOpenChange={setModelOpen}
                                 />
                             ) : null}
                             {liveEffort && cli ? (
@@ -1945,7 +2039,13 @@ function CodeThread({
             />
             </div>
             <CodeStatusLine parts={statusParts} />
-            {error ? <Notice error>{error}</Notice> : info ? <Notice>{info}</Notice> : null}
+            {error ? (
+                <Notice error>{error}</Notice>
+            ) : stopKey.armed ? (
+                <Notice>{t("code.keys.stopAgain")}</Notice>
+            ) : info ? (
+                <Notice>{info}</Notice>
+            ) : null}
         </div>
     );
 
@@ -1973,6 +2073,15 @@ function CodeThread({
                         <PanelRight className="size-4" />
                     </button>
                 ) : null}
+                <button
+                    type="button"
+                    onClick={onKeysHelp}
+                    aria-label={t("code.keys.shortcuts")}
+                    title={t("code.keys.shortcuts")}
+                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:size-11"
+                >
+                    <Keyboard className="size-4" />
+                </button>
                 {thread ? <CodeExportMenu sessionId={sessionId} /> : null}
                 {thread?.canManage ? <SessionTools session={thread.view} /> : null}
             </CodeSessionBar>
