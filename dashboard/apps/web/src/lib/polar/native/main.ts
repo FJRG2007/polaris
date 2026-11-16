@@ -11,6 +11,8 @@
  *   `/model <id>` switches the model and `/compact` compacts.
  *
  * Ctrl-C interrupts the turn in progress; a second one while idle exits.
+ * - `acp`: an Agent Client Protocol agent an editor runs (`acp-agent.ts`).
+ *
  * Flags: `--resume <id>`, `--fork-session` (continue a copy of the resumed
  * conversation under a new id), `--permission-mode <mode>`, `--model <id>`.
  *
@@ -25,6 +27,7 @@ import * as readline from "node:readline";
 import { discoverRules } from "@/lib/polar/native/rules";
 import { CONVERSATION_ID, replayTranscript } from "@/lib/polar/native/resume";
 import { PERMISSION_MODES, type PermissionMode } from "@/lib/polar/native/tools";
+import { runAcp } from "@/lib/polar/native/acp-agent";
 import { fetchCustomTools } from "@/lib/polar/native/custom-tools";
 import { launchModel, launchSession, readLaunchEnv, sessionRoutes, transcriptDir, transcriptPathOf, type LaunchConfig } from "@/lib/polar/native/launch";
 
@@ -83,6 +86,8 @@ export function pasteState(line: string, inPaste: boolean): { text: string; inPa
 }
 
 async function main(): Promise<number> {
+    // `polaris-agent acp`: an editor's agent over standard input and output.
+    if (process.argv[2] === "acp" && process.argv.length === 3) return runAcp(process.env);
     const args = parseArgs(process.argv.slice(2));
     if ("error" in args) {
         process.stderr.write(`polaris-agent: ${args.error}\n`);

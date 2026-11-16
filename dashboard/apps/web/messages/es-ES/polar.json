@@ -2068,6 +2068,29 @@
             "variables": "Claude Code lee:",
             "key": "Crea la clave en <link>Claves API</link>, con el permiso de Polar."
         },
+        "editors": {
+            "title": "Usa Polar en tu editor",
+            "intro": "Polar funciona como agente en editores con Agent Client Protocol, con tus modelos y ajustes.",
+            "pick": "Editor",
+            "zed": {
+                "name": "Zed",
+                "where": "Abre el archivo de ajustes de Zed y fusiona este bloque."
+            },
+            "jetbrains": {
+                "name": "JetBrains",
+                "where": "En AI Chat, abre el menú de agentes y elige Add Custom Agent. Pega esto en el archivo."
+            },
+            "other": {
+                "name": "Otros editores",
+                "where": "Para VS Code y otros clientes ACP: indica este comando, sus argumentos y su entorno."
+            },
+            "createKey": "Crear una clave",
+            "keyName": "Polar en un editor",
+            "keyFailed": "No se pudo crear la clave.",
+            "keyMade": "Tu nueva clave está en el bloque. Cópiala ahora: no se volverá a mostrar.",
+            "keyHint": "O usa una de <link>Claves de API</link> con el permiso de Polar.",
+            "node": "Requiere Node.js 20 o posterior en este equipo. Polar se actualiza al iniciarlo el editor."
+        },
         "usage": {
             "title": "Uso por clave",
             "intro": "Tus llamadas de este mes.",

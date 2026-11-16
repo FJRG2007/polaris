@@ -12,6 +12,7 @@
  */
 
 import Link from "next/link";
+import { EditorsCard } from "./polar-editors";
 import { useEffect, useState } from "react";
 import { useAppUrl } from "@/components/app-url";
 import type { PolarRouting } from "@/lib/polar/routing";
@@ -157,6 +158,7 @@ export function PolarRoutingSettings({ part }: { part: "fallbacks" | "tools" }) 
                 <EditorSkeleton />
             )}
             {part === "tools" ? <ConnectCard /> : null}
+            {part === "tools" ? <EditorsCard /> : null}
             {confirmElement}
         </section>
     );
