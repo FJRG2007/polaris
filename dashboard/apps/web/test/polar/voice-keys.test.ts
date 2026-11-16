@@ -200,9 +200,20 @@ describe("the model Polar hears with", () => {
             dictation: false,
             speech: false,
             transcribers: [],
-            transcriber: null
+            transcriber: null,
+            realtime: false
         });
         expect(await voice.polarTranscriber(`user-${user}`)).toBeNull();
+    });
+
+    it("offers a realtime call only on an OpenAI key of the person's own", async () => {
+        state.sources = new Map([["openai", "own"]]);
+        expect((await voice.polarVoiceAvailability(`user-${user}`)).realtime).toBe(true);
+        // The deployment's key is never handed to a browser, not even minted.
+        state.sources = new Map([["openai", "instance"]]);
+        expect((await voice.polarVoiceAvailability(`user-${user}`)).realtime).toBe(false);
+        state.sources = new Map([["groq", "own"]]);
+        expect((await voice.polarVoiceAvailability(`user-${user}`)).realtime).toBe(false);
     });
 });
 

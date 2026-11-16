@@ -15,18 +15,11 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { resolvePolarModel } from "@/lib/polar/models";
 import { polarPreferences } from "@/lib/polar/preferences";
 import { polarAccessFor, polarCaller } from "@/lib/polar/access";
-import { runVoiceDelegation, type DelegateDeps } from "@/lib/polar/voice-delegate";
+import { runVoiceDelegation } from "@/lib/polar/voice-delegate";
 import { classifyProviderFailure, failureLogLine } from "@/lib/polar/provider-failure";
 import { voiceDelegateBodySchema, type VoiceDelegateAnswer } from "@/lib/polar/voice-call";
-import {
-    polarCodeInterrupt,
-    polarCodeModel,
-    polarCodeModels,
-    polarCodeOverview,
-    polarCodePrompt,
-    polarCodeStartLike,
-    polarCodeThread
-} from "@/lib/polar/code";
+import { polarCodeThread } from "@/lib/polar/code";
+import { delegateDeps } from "@/lib/polar/voice-deps";
 import {
     helperMaySpend,
     helperReasoning,
@@ -44,20 +37,6 @@ const TIMEOUT_MS = 90_000;
 
 function refuse(code: string, status: number): NextResponse {
     return NextResponse.json({ error: code }, { status });
-}
-
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const timer = setTimeout(resolve, ms);
-        signal.addEventListener(
-            "abort",
-            () => {
-                clearTimeout(timer);
-                reject(signal.reason);
-            },
-            { once: true }
-        );
-    });
 }
 
 export async function POST(request: Request): Promise<Response> {
@@ -89,16 +68,7 @@ export async function POST(request: Request): Promise<Response> {
     const helper = await polarHelperModel(user.id, fallback, settings?.helperModel ?? null, access);
     if (!(await helperMaySpend(user.id, helper))) return refuse("limit", 409);
 
-    const deps: DelegateDeps = {
-        list: async () => (await polarCodeOverview(user)).sessions,
-        thread: (sessionId) => polarCodeThread(user, sessionId),
-        prompt: (sessionId, text) => polarCodePrompt(user, { sessionId, text, attachments: [] }),
-        interrupt: (sessionId) => polarCodeInterrupt(user, { sessionId }),
-        model: (sessionId, model) => polarCodeModel(user, { sessionId, model }),
-        models: (sessionId) => polarCodeModels(user, sessionId),
-        create: (input) => polarCodeStartLike(user, input),
-        sleep
-    };
+    const deps = delegateDeps(user);
     const signal = AbortSignal.any([request.signal, AbortSignal.timeout(TIMEOUT_MS)]);
     try {
         const { say, outcome, usage } = await runVoiceDelegation({

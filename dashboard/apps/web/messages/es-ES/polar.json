@@ -434,6 +434,16 @@
             "needsYouFrom": "{title} espera tu respuesta.",
             "from": "De {title}: {text}"
         },
+        "realtime": {
+            "on": "Voz en directo",
+            "off": "Voz estándar",
+            "onHint": "Responde mientras hablas, con tu clave de OpenAI",
+            "connecting": "Conectando",
+            "working": "En ello",
+            "description": "Voz en directo con tu clave de OpenAI. Háblale encima para pararla.",
+            "noKey": "La voz en directo necesita tu propia clave de OpenAI.",
+            "failed": "La voz en directo no conectó. Reinténtalo o usa la voz estándar."
+        },
         "phase": {
             "listening": "Escuchando",
             "hearing": "Te escucho",

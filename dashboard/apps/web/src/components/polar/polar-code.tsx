@@ -82,6 +82,7 @@ import {
 } from "@/components/polar/elements/model-selector";
 import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
 import { CodeVoiceCall, type VoiceWatch } from "@/components/polar/code-voice-call";
+import type { RealtimeLink } from "@/lib/polar/realtime-link";
 import { parseVoiceDelegation } from "@/lib/polar/voice-handoff";
 import { useCodeSlash } from "@/components/polar/polar-code-slash";
 import * as codeCommands from "@/lib/polar/code-commands";
@@ -645,6 +646,9 @@ export function PolarCodeView({
     useEffect(() => {
         if (!code.selected) setCall(null);
     }, [code.selected]);
+    // A realtime link ends with the call, or when the call goes back to standard voice.
+    const realtime = call?.realtime ?? null;
+    useEffect(() => () => realtime?.close(), [realtime]);
     const started = (id: string, text: string) => {
         setOpening({ id, text });
         code.open(id);
@@ -714,6 +718,8 @@ interface CodeCall {
     readonly greeting: string | null;
     /** Replies it was waiting for when it moved. */
     readonly watching: readonly VoiceWatch[];
+    /** Realtime voice, kept here so showing another session does not drop it. */
+    readonly realtime?: RealtimeLink | null;
 }
 
 /** Code's commands in the composer that starts a task. */
@@ -1822,8 +1828,10 @@ function CodeThread({
                     kit={voiceKit}
                     greeting={call.greeting}
                     watching={call.watching}
+                    realtime={call.realtime ?? null}
+                    onRealtime={(link) => onCall({ greeting: null, watching: [], realtime: link })}
                     onOpen={(next, say, watching) => {
-                        onCall({ greeting: say, watching: [...watching] });
+                        onCall({ ...call, greeting: say || null, watching: [...watching] });
                         onOpen(next);
                     }}
                     onEnd={() => onCall(null)}

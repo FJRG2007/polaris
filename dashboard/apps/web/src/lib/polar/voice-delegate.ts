@@ -245,7 +245,12 @@ export function voiceTools(
                     const full = last === undefined || Date.now() - last > VOICE_HEADER_LAPSE_MS;
                     const body = formatHandoff({
                         instruction: text,
-                        transcript: [...request.tail, `user: ${request.instruction}`],
+                        // A realtime call has no transcript of what was said: its
+                        // tail is the call's own lines, and the instruction is the
+                        // message itself.
+                        transcript: request.instruction
+                            ? [...request.tail, `user: ${request.instruction}`]
+                            : [...request.tail],
                         full
                     });
                     const answer = await deps.prompt(id, body);

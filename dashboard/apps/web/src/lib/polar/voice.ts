@@ -199,10 +199,13 @@ export async function polarVoiceAvailability(
             dictation: transcribers.length > 0,
             speech: speechCandidates(sources).length > 0,
             transcribers,
-            transcriber: pickTranscription(transcribers, chosen)?.id ?? null
+            transcriber: pickTranscription(transcribers, chosen)?.id ?? null,
+            // A realtime call spends the person's own key only: the deployment's
+            // is never handed to a browser, even as a short-lived secret.
+            realtime: sources.get("openai") === "own"
         };
     } catch {
-        return { dictation: false, speech: false, transcribers: [], transcriber: null };
+        return { dictation: false, speech: false, transcribers: [], transcriber: null, realtime: false };
     }
 }
 

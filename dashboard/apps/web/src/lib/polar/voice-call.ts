@@ -106,6 +106,45 @@ export interface VoiceDelegateAnswer {
     explained: Record<string, number>;
 }
 
+/** Opening a realtime call on a Code session (`/api/polar/voice/realtime`). */
+export const realtimeBodySchema = z
+    .object({
+        sessionId: z.string().trim().uuid(),
+        lang: langTag.nullable().default(null)
+    })
+    .strict();
+
+/** What a realtime call is opened with: a secret that lasts a minute, never the key. */
+export interface RealtimeGrant {
+    value: string;
+    /** Unix seconds. */
+    expiresAt: number;
+}
+
+/** Longest arguments a realtime tool call carries. */
+export const REALTIME_ARGUMENTS_MAX = 16 * 1024;
+
+/** One tool call of a realtime call (`/api/polar/voice/realtime/tool`). */
+export const realtimeToolBodySchema = z
+    .object({
+        /** The session on screen: tools default to it. */
+        sessionId: z.string().trim().uuid(),
+        name: z.string().regex(/^[a-z_]{1,40}$/),
+        arguments: z.string().max(REALTIME_ARGUMENTS_MAX),
+        tail: z.array(z.string().max(VOICE_TAIL_LINE_MAX)).max(VOICE_TAIL_MOST).default([]),
+        explained: z
+            .record(z.string().uuid(), z.number().int().nonnegative())
+            .refine((value) => Object.keys(value).length <= 50)
+            .default({})
+    })
+    .strict();
+
+/** What a realtime tool call answers: the output for the model, and what changed. */
+export interface RealtimeToolAnswer extends Omit<VoiceDelegateAnswer, "say"> {
+    /** JSON, handed back to the model as the call's output. */
+    output: string;
+}
+
 /** What this person can do with their voice, carried on `/api/polar/models`. */
 export interface VoiceAvailability {
     /** Speech to text: dictation, and hearing you in a call. */
@@ -116,13 +155,16 @@ export interface VoiceAvailability {
     transcribers: TranscriptionOption[];
     /** The one in use: the pick, or the fastest held. */
     transcriber: string | null;
+    /** A realtime call is on offer: the person holds an OpenAI key of their own. */
+    realtime?: boolean;
 }
 
 export const NO_VOICE: VoiceAvailability = {
     dictation: false,
     speech: false,
     transcribers: [],
-    transcriber: null
+    transcriber: null,
+    realtime: false
 };
 
 /** Markdown that reads badly out loud: code, links, emphasis, list markers. */

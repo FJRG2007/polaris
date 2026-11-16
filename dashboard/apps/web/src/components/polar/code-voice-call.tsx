@@ -11,12 +11,23 @@
  * be said waits its turn: one thing at a time, and only into a quiet call.
  * Talking over it stops the voice and the turn of the call, never the agent's
  * work.
+ *
+ * With an OpenAI key of their own, the person can switch the call to realtime
+ * voice from inside it (`realtime-link.ts`): the same delegator tools, spoken
+ * to by OpenAI's realtime model over WebRTC. The link lives on Polar Code's
+ * call state, above the session view, so showing another session keeps it.
+ * Replies of sessions are not read aloud in that mode; the model reads them
+ * when asked.
  */
 
 import type { ChatStatus, UIMessage } from "ai";
 import type { PolarCodeThread } from "@/lib/polar/code";
+import { Button } from "@polaris/ui";
+import { AudioLines, Mic, MicOff, PhoneOff } from "lucide-react";
 import { VoiceCall } from "@/components/polar/polar-voice";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { VoiceOrb, type OrbState } from "@/components/polar/voice-orb";
+import { openRealtimeLink, type RealtimeLink } from "@/lib/polar/realtime-link";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { readPoll } from "@/lib/poll-fetch";
 import { parseVoiceDelegation } from "@/lib/polar/voice-handoff";
 import type { PolarVoiceKit } from "@/components/polar/polar-composer";
@@ -124,6 +135,8 @@ export function CodeVoiceCall({
     kit,
     greeting,
     watching = [],
+    realtime = null,
+    onRealtime,
     onOpen,
     onEnd
 }: {
@@ -137,6 +150,10 @@ export function CodeVoiceCall({
     /** The delegator showed another session; the call follows it there, still
      *  waiting for what it was waiting for. */
     onOpen: (sessionId: string, say: string, watching: readonly VoiceWatch[]) => void;
+    /** The realtime link the call runs on, or null for the standard call. */
+    realtime?: RealtimeLink | null;
+    /** Switches the call to realtime voice (a new link) or back (null). */
+    onRealtime?: (link: RealtimeLink | null) => void;
     onEnd: () => void;
 }) {
     const t = useTranslations("polar");
@@ -260,13 +277,13 @@ export function CodeVoiceCall({
 
     // The session on screen, read as its thread is.
     useEffect(() => {
-        if (!thread) return;
+        if (!thread || realtime) return;
         const since = waiting.current.find((watch) => watch.sessionId === sessionId)?.since;
         if (since) heard(sessionId, null, watchNews(thread, since));
-    }, [thread, sessionId, heard]);
+    }, [thread, sessionId, heard, realtime]);
 
     // Sessions not on screen, read here while their replies are awaited.
-    const others = watched > 0;
+    const others = watched > 0 && !realtime;
     useEffect(() => {
         if (!others) return;
         const controller = new AbortController();
@@ -319,6 +336,24 @@ export function CodeVoiceCall({
 
     useEffect(() => () => turn.current?.abort(), []);
 
+    // The realtime link follows the session on screen.
+    useEffect(() => {
+        realtime?.bind({ sessionId, onOpen: (next) => onOpen(next, "", []) });
+    }, [realtime, sessionId, onOpen]);
+
+    const goRealtime = () => {
+        turn.current?.abort();
+        // What was waiting is let go: realtime voice reads sessions when asked.
+        waiting.current = [];
+        setWatched(0);
+        setDue([]);
+        onRealtime?.(
+            openRealtimeLink({ binding: { sessionId, onOpen: (next) => onOpen(next, "", []) }, lang: locale })
+        );
+    };
+
+    if (realtime) return <RealtimeCall link={realtime} onStandard={() => onRealtime?.(null)} onEnd={onEnd} />;
+
     const said = [...messages].reverse().find((message) => message.role === "assistant");
     return (
         <div className="flex min-w-0 flex-col gap-1">
@@ -345,6 +380,126 @@ export function CodeVoiceCall({
             {said ? (
                 <p aria-live="polite" className="min-w-0 break-words px-1 text-center text-xs text-muted-foreground">
                     {textOf(said)}
+                </p>
+            ) : null}
+            {kit.voice.realtime && onRealtime ? (
+                <div className="flex min-w-0 justify-center">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="min-w-0 max-w-full"
+                        title={t("voice.realtime.onHint")}
+                        onClick={goRealtime}
+                    >
+                        <AudioLines />
+                        <span className="truncate">{t("voice.realtime.on")}</span>
+                    </Button>
+                </div>
+            ) : null}
+        </div>
+    );
+}
+
+/** The call on realtime voice: its state, what the model said last, and its controls. */
+function RealtimeCall({
+    link,
+    onStandard,
+    onEnd
+}: {
+    link: RealtimeLink;
+    onStandard: () => void;
+    onEnd: () => void;
+}) {
+    const t = useTranslations("polar");
+    const state = useSyncExternalStore(link.subscribe, link.snapshot, link.snapshot);
+    // Keyboard users land in the call, on its first control.
+    const first = useRef<HTMLButtonElement>(null);
+    useEffect(() => first.current?.focus(), []);
+    const orb: OrbState = state.muted
+        ? "muted"
+        : state.phase === "failed"
+          ? "error"
+          : state.phase === "connecting" || state.busy
+            ? "thinking"
+            : "listening";
+    const status = state.muted
+        ? t("voice.muted")
+        : state.phase === "connecting"
+          ? t("voice.realtime.connecting")
+          : state.busy
+            ? t("voice.realtime.working")
+            : state.phase === "live"
+              ? t("voice.phase.listening")
+              : null;
+    const errorText =
+        state.error === "no_key"
+            ? t("voice.realtime.noKey")
+            : state.error === "mic_denied"
+              ? t("voice.micDenied")
+              : state.error === "rate_limited"
+                ? t("voice.errors.rate_limited")
+                : state.error
+                  ? t("voice.realtime.failed")
+                  : null;
+    return (
+        <div className="flex min-w-0 flex-col gap-1">
+            <section
+                aria-label={t("voice.callTitle")}
+                data-voice-call=""
+                data-realtime=""
+                className="mb-2 flex w-full min-w-0 flex-col items-center gap-3 rounded-xl border border-border bg-card px-3 py-4 shadow-sm"
+            >
+                <VoiceOrb state={orb} level={link.level} className="size-20 sm:size-24" />
+                <div className="flex w-full min-w-0 flex-col items-center gap-1 text-center">
+                    {status ? (
+                        <p aria-live="polite" className="text-sm font-medium text-foreground">
+                            {status}
+                        </p>
+                    ) : null}
+                    {errorText ? (
+                        <p role="alert" className="max-w-full break-words text-xs text-danger-ink">
+                            {errorText}
+                        </p>
+                    ) : (
+                        <p className="max-w-full truncate text-xs text-muted-foreground">
+                            {t("voice.realtime.description")}
+                        </p>
+                    )}
+                </div>
+                <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
+                    <Button
+                        ref={first}
+                        type="button"
+                        variant="secondary"
+                        size="icon"
+                        disabled={state.phase === "failed"}
+                        aria-pressed={state.muted}
+                        aria-label={state.muted ? t("voice.unmute") : t("voice.mute")}
+                        title={state.muted ? t("voice.unmute") : t("voice.mute")}
+                        onClick={() => link.setMuted(!state.muted)}
+                    >
+                        {state.muted ? <MicOff /> : <Mic />}
+                    </Button>
+                    <Button type="button" variant="secondary" className="min-w-0 max-w-full" onClick={onStandard}>
+                        <AudioLines />
+                        <span className="truncate">{t("voice.realtime.off")}</span>
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="hangUp"
+                        size="icon"
+                        aria-label={t("voice.end")}
+                        title={t("voice.end")}
+                        onClick={onEnd}
+                    >
+                        <PhoneOff />
+                    </Button>
+                </div>
+            </section>
+            {state.caption ? (
+                <p aria-live="polite" className="min-w-0 break-words px-1 text-center text-xs text-muted-foreground">
+                    {state.caption}
                 </p>
             ) : null}
         </div>

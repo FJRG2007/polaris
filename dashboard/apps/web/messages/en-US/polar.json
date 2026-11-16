@@ -434,6 +434,16 @@
             "needsYouFrom": "{title} is waiting for your answer.",
             "from": "From {title}: {text}"
         },
+        "realtime": {
+            "on": "Realtime voice",
+            "off": "Standard voice",
+            "onHint": "Answers as you speak, on your OpenAI key",
+            "connecting": "Connecting",
+            "working": "Working on it",
+            "description": "Realtime voice on your OpenAI key. Talk over it to stop it.",
+            "noKey": "Realtime voice needs an OpenAI key of your own.",
+            "failed": "Realtime voice didn't connect. Try again or use standard voice."
+        },
         "phase": {
             "listening": "Listening",
             "hearing": "Hearing you",
