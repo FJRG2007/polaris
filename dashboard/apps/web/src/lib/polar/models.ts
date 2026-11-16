@@ -14,6 +14,7 @@
  * Server-only.
  */
 
+import { copilotModel, gitlabModel } from "@/lib/polar/login-models";
 import { wrapLanguageModel, type LanguageModel } from "ai";
 import { createGoogle } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
@@ -105,6 +106,8 @@ export function polarServesProvider(slug: string): boolean {
         slug === "google-ai" ||
         slug === GATEWAY_SLUG ||
         slug === ZEN_FREE_SLUG ||
+        slug === "github-copilot" ||
+        slug === "gitlab" ||
         slug in OPENAI_COMPATIBLE_BASES ||
         slug in PROVIDER_ENDPOINTS ||
         catalogEndpoint(slug) !== null
@@ -616,6 +619,10 @@ export function languageModel(
             return createOpenAI({ apiKey })(model);
         case "google-ai":
             return createGoogle({ apiKey })(model);
+        case "github-copilot":
+            return copilotModel(credential, model);
+        case "gitlab":
+            return gitlabModel(credential, model);
         case ZEN_FREE_SLUG:
             return createOpenAICompatible({
                 name: "opencode",

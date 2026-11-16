@@ -726,6 +726,32 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         defaultModel: { label: "Kimi K3 (Go)", slug: "opencode-go/kimi-k3" } // i18n-ignore
     },
     {
+        // Signed in from AI provider keys (`provider-logins.ts`), never pasted:
+        // the stored secret is the login, and Polar unwraps its token. The
+        // index names GITHUB_TOKEN, which is the sessions' git credential, so
+        // the Copilot CLI's own first-choice variable is used instead (GitHub's
+        // Copilot CLI docs, "Authenticating with a personal access token").
+        slug: "github-copilot",
+        name: "GitHub Copilot",
+        kind: "gateway",
+        envVar: "COPILOT_GITHUB_TOKEN",
+        summary: "Chats on the models a Copilot plan already includes.",
+        docsUrl: "https://docs.github.com/en/copilot",
+        defaultModel: { label: "GPT-5 mini (Copilot)", slug: "github-copilot/gpt-5-mini" } // i18n-ignore
+    },
+    {
+        // Signed in like Copilot. The index names GITLAB_TOKEN, the sessions'
+        // git credential, so this login gets a name of its own that nothing
+        // else reads; Polar calls GitLab's AI gateway itself (`login-models.ts`).
+        slug: "gitlab",
+        name: "GitLab Duo",
+        kind: "gateway",
+        envVar: "GITLAB_DUO_TOKEN",
+        summary: "Chats on the models a GitLab Duo seat already includes.",
+        docsUrl: "https://docs.gitlab.com/user/gitlab_duo/",
+        defaultModel: { label: "Claude Sonnet 4.5 (Duo)", slug: "gitlab/duo-chat-sonnet-4-5" } // i18n-ignore
+    },
+    {
         slug: "cortecs",
         name: "Cortecs",
         kind: "gateway",

@@ -120,6 +120,8 @@ function PetkitMark({ className }: { className?: string }) {
  */
 const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     github: brand.GitHubMark,
+    // As the Copilot CLI's own mark below: GitHub's, which follows the theme.
+    "github-copilot": brand.GitHubMark,
     google: brand.GoogleMark,
     microsoft: brand.MicrosoftMark,
     dropbox: brand.DropboxMark,
@@ -173,6 +175,8 @@ const SERVICE_IMAGES: Record<string, string> = {
     minecraft: "/logos/minecraft.webp",
     tenor: "/logos/tenor.webp",
     criminalip: "/logos/criminalip.webp",
+    // Simple Icons 13.21.0 `gitlab.svg` (CC0), in GitLab's own orange.
+    gitlab: "/logos/gitlab.svg",
     // Tuya publish no vector mark anywhere that is theirs to take one from, so
     // this is their own icon file. One flat brand orange on nothing, which is why
     // it reads on both surfaces without being touched.

@@ -1280,6 +1280,31 @@
             "notOpen": "That sign-in is no longer open.",
             "notSignedInYet": "The sign-in has not finished yet. Finish it in the terminal above, then try again.",
             "typeSomething": "Type something"
+        },
+        "logins": {
+            "title": "Sign in with a subscription",
+            "hint": "Uses a plan you already pay for instead of a key. The sign-in is saved as a key below.",
+            "signIn": "Sign in with {name}",
+            "poe": "Poe's sign-in can't return to a self-hosted server, so Poe uses an API key: add one below.",
+            "poeLink": "Where to get a Poe key",
+            "starting": "Getting a code...",
+            "deviceStep": "Open the page and enter this code. This window updates by itself.",
+            "gitlabStep": "Approve on GitLab. Your browser then opens a page that does not load: copy its whole address and paste it here.",
+            "open": "Open {name}",
+            "pasteLabel": "Address the browser landed on",
+            "badPaste": "That address has no code from this sign-in. Paste the whole address, or start again.",
+            "gitlabSelfManaged": "Works with gitlab.com. A self-managed GitLab needs its own OAuth application ID, which this can't take yet.",
+            "waiting": "Waiting for you to approve...",
+            "finish": "Finish",
+            "close": "Close",
+            "cancel": "Cancel",
+            "done": "Signed in. It's in your keys below, ready for chats.",
+            "denied": "The sign-in was declined.",
+            "expired": "The code expired. Start again.",
+            "noCopilot": "This GitHub account has no Copilot access. It needs a Copilot plan or a seat from an organization.",
+            "noCopilotFree": "This GitHub account isn't signed up for Copilot. Sign up for Copilot Free on GitHub, then sign in again.",
+            "noDuo": "Signed in, but GitLab Duo isn't available to this account.",
+            "failed": "The sign-in didn't finish. Try again in a moment."
         }
     },
     "dns": {

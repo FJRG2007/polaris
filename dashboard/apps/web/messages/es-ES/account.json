@@ -1280,6 +1280,31 @@
             "notOpen": "Ese inicio de sesión ya no está abierto.",
             "notSignedInYet": "El inicio de sesión aún no ha terminado. Termínalo en el terminal de arriba y vuelve a probar.",
             "typeSomething": "Escribe algo"
+        },
+        "logins": {
+            "title": "Entrar con una suscripción",
+            "hint": "Usa un plan que ya pagas en vez de una clave. El acceso se guarda como clave abajo.",
+            "signIn": "Entrar con {name}",
+            "poe": "El acceso de Poe no puede volver a un servidor propio; Poe usa una clave de API: añádela abajo.",
+            "poeLink": "Clave de Poe: dónde",
+            "starting": "Pidiendo un código...",
+            "deviceStep": "Abre la página e introduce este código. Esta ventana se actualiza sola.",
+            "gitlabStep": "Aprueba en GitLab. Luego se abre una página que no carga: copia su dirección completa y pégala aquí.",
+            "open": "Abrir {name}",
+            "pasteLabel": "Dirección a la que llegó el navegador",
+            "badPaste": "Esa dirección no trae un código de este acceso. Pega la dirección completa o empieza de nuevo.",
+            "gitlabSelfManaged": "Funciona con gitlab.com. Un GitLab propio necesita su ID de aplicación OAuth, que aún no se puede indicar.",
+            "waiting": "Esperando tu aprobación...",
+            "finish": "Terminar",
+            "close": "Cerrar",
+            "cancel": "Cancelar",
+            "done": "Acceso listo. Está en tus claves, listo para chatear.",
+            "denied": "Se rechazó el acceso.",
+            "expired": "El código caducó. Empieza de nuevo.",
+            "noCopilot": "Esta cuenta de GitHub no tiene Copilot. Necesita un plan o un puesto de una organización.",
+            "noCopilotFree": "Esta cuenta no está dada de alta en Copilot. Activa Copilot Free en GitHub y vuelve a entrar.",
+            "noDuo": "Acceso listo, pero GitLab Duo no está disponible para esta cuenta.",
+            "failed": "El acceso no terminó. Prueba de nuevo en un momento."
         }
     },
     "dns": {

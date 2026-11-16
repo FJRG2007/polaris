@@ -1,0 +1,49 @@
+"use server";
+
+/**
+ * The subscription logins on AI provider keys: start one, check on it, and for
+ * GitLab hand back the address the browser landed on. Every login is the
+ * signed-in person's own; the key it ends with is theirs.
+ */
+
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { requireUser } from "@/lib/session";
+import {
+    PROVIDER_LOGINS,
+    finishGitlabLogin,
+    pollProviderLogin,
+    startProviderLogin,
+    type LoginStart,
+    type LoginState
+} from "@/lib/agents/provider-logins";
+
+const providerSchema = z.enum(PROVIDER_LOGINS);
+const idSchema = z.string().uuid();
+const pasteSchema = z.string().trim().min(1).max(4096);
+
+export async function startProviderLoginAction(input: unknown): Promise<LoginStart | { error: "failed" }> {
+    const user = await requireUser();
+    const provider = providerSchema.parse(input);
+    try {
+        return await startProviderLogin(user.id, provider);
+    } catch (caught) {
+        console.warn("[provider-login] start failed:", caught instanceof Error ? caught.message : "error");
+        return { error: "failed" };
+    }
+}
+
+export async function pollProviderLoginAction(input: unknown): Promise<LoginState> {
+    const user = await requireUser();
+    const state = await pollProviderLogin(user.id, idSchema.parse(input));
+    if (state.state === "done") revalidatePath("/account/ai-keys");
+    return state;
+}
+
+export async function finishGitlabLoginAction(input: unknown): Promise<LoginState> {
+    const user = await requireUser();
+    const { id, pasted } = z.object({ id: idSchema, pasted: pasteSchema }).parse(input);
+    const state = await finishGitlabLogin(user.id, id, pasted);
+    if (state.state === "done") revalidatePath("/account/ai-keys");
+    return state;
+}

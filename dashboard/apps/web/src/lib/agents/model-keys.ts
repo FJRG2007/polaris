@@ -46,6 +46,8 @@ import {
 } from "@polaris/storage";
 import { keyLimitsOf, type KeyLimits } from "@/lib/agents/key-limits";
 import { keyHint } from "@/lib/agents/key-hint";
+import { readOAuthSecret, spendableSecret } from "@/lib/agents/provider-oauth";
+import { freshLogin } from "@/lib/agents/provider-login-refresh";
 
 /** Whose keys a call is about: an account, or the deployment itself. */
 export type KeyOwner = string | null;
@@ -226,7 +228,7 @@ async function backfillKeyHints(ids: string[]): Promise<Map<string, string>> {
     for (const row of rows) {
         const secret = readSecret(row);
         if (secret === null) continue;
-        filled.set(row.id, keyHint(secret));
+        filled.set(row.id, keyHint(spendableSecret(secret)));
     }
     await Promise.all(
         [...filled].map(([id, hint]) =>
@@ -265,7 +267,8 @@ export async function heldModelKey(
         }
     });
     if (!row) return null;
-    return { secret: readSecret(row), workspaceId: workspaceOf(row.config) };
+    const secret = readSecret(row);
+    return { secret: secret === null ? null : spendableSecret(secret), workspaceId: workspaceOf(row.config) };
 }
 
 /**
@@ -301,7 +304,7 @@ function envelope(secret: string, provider: string, config?: Record<string, unkn
             fingerprintScope(provider, config),
             master
         ),
-        keyHint: keyHint(secret),
+        keyHint: keyHint(spendableSecret(secret.trim())),
         expiryNotice: ""
     };
 }
@@ -709,7 +712,9 @@ export async function runSecretsFor(userId: string | null): Promise<Record<strin
         for (const provider of modelProviders()) {
             const picked = firstUsable(own, provider.slug) ?? firstUsable(instance, provider.slug);
             if (!picked || !picked.secret) continue;
-            secrets[provider.envVar] = picked.secret;
+            // A stored login hands a run its access token; a run outlives a
+            // renewal anyway, so it is handed as it stands.
+            secrets[provider.envVar] = spendableSecret(picked.secret);
             used.push(picked.row.id);
             if (provider.slug === "anthropic") applyWorkspace(secrets, picked.row);
         }
@@ -757,6 +762,9 @@ export interface ChatCredential {
     /** Until when the router steps over it, when a provider refused it lately. */
     coolingUntil?: Date | null;
     coolingReason?: string | null;
+    /** Set for a subscription login: what the vendor said at sign-in (an API
+     *  address, an instance). */
+    oauth?: Record<string, string>;
 }
 
 /**
@@ -799,9 +807,10 @@ export async function chatCredentialsFor(
             for (const row of await storedKeys(owner)) {
                 if (found.length >= most) return found;
                 if (row.provider !== provider) continue;
-                const secret = readSecret(row);
-                if (secret === null) continue;
-                const credential = credentialOf(row, source, secret);
+                const read = readSecret(row);
+                if (read === null) continue;
+                const { secret, oauth } = await unwrapLogin(row, read);
+                const credential = credentialOf(row, source, secret, oauth);
                 if (credential) found.push(credential);
             }
         }
@@ -813,7 +822,12 @@ export async function chatCredentialsFor(
 
 /** One stored row as a chat credential, or null when it cannot serve a chat:
  *  a gateway with no endpoint, or a provider key with no secret. */
-function credentialOf(row: StoredKey, source: KeySource, secret: string): ChatCredential | null {
+function credentialOf(
+    row: StoredKey,
+    source: KeySource,
+    secret: string,
+    oauth: Record<string, string> | null = null
+): ChatCredential | null {
     const tracked = {
         keyId: row.id,
         keyName: row.name ?? "",
@@ -841,8 +855,29 @@ function credentialOf(row: StoredKey, source: KeySource, secret: string): ChatCr
         baseUrl: null,
         gatewayModel: null,
         workspaceId: row.provider === "anthropic" ? workspaceOf(row.config) : null,
+        ...(oauth ? { oauth } : {}),
         ...tracked
     };
+}
+
+/**
+ * A stored subscription login as the token a chat spends now: renewed first
+ * when it is about to end, with the rotated login written back to its row.
+ * A plain key passes through untouched.
+ */
+async function unwrapLogin(
+    row: StoredKey,
+    secret: string
+): Promise<{ secret: string; oauth: Record<string, string> | null }> {
+    const login = readOAuthSecret(secret);
+    if (!login) return { secret, oauth: null };
+    const fresh = await freshLogin(row.id, row.provider, login, async (rotated) => {
+        await prisma.userModelKey.update({
+            where: { id: row.id },
+            data: envelope(rotated, row.provider, parseConfig(row.config))
+        });
+    });
+    return { secret: fresh.access, oauth: fresh.metadata ?? {} };
 }
 
 /** Best-effort, and after the fact: it is a note on a screen, not something a run
