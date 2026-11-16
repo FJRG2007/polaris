@@ -83,6 +83,23 @@ export function meetsFloor(found: string | null, floor: string): boolean {
 
 const sleepFor = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/** A just-launched agent's pipe answers "not running" until its script has
+ *  written the new generation. Shared with the Codex app-server driver. */
+export async function waitForAgent(
+    io: PipeIo,
+    options: { startWaitMs?: number; sleep?: (ms: number) => Promise<void> }
+): Promise<void> {
+    const sleep = options.sleep ?? sleepFor;
+    const deadline = Date.now() + (options.startWaitMs ?? 30_000);
+    for (;;) {
+        const read = await io.read(0).catch(() => null);
+        if (read && read.exitCode === null) return;
+        if (read && read.exitCode !== null) throw new AcpRefusal("The agent exited as soon as it started.");
+        if (Date.now() >= deadline) throw new AcpRefusal("The agent did not start in time.");
+        await sleep(250);
+    }
+}
+
 interface Connection {
     client: AcpClient;
     acpSessionId: string;
@@ -174,7 +191,7 @@ export class AcpSessionDriver {
         }
         await this.deps.start(this.sessionId, session.binding.argv);
         const io = await this.deps.pipe(this.sessionId);
-        await this.waitForAgent(io);
+        await waitForAgent(io, this.deps);
 
         let connection: Connection | null = null;
         const client = connectAcp(pipeStream(io, this.deps.pipeOptions), {
@@ -243,20 +260,6 @@ export class AcpSessionDriver {
             if (!this.closedByUs) this.deps.log(`${this.sessionId}: the connection to the agent ended`);
         });
         return ready;
-    }
-
-    /** A just-launched agent's pipe answers "not running" until its script
-     *  has written the new generation. */
-    private async waitForAgent(io: PipeIo): Promise<void> {
-        const sleep = this.deps.sleep ?? sleepFor;
-        const deadline = Date.now() + (this.deps.startWaitMs ?? 30_000);
-        for (;;) {
-            const read = await io.read(0).catch(() => null);
-            if (read && read.exitCode === null) return;
-            if (read && read.exitCode !== null) throw new AcpRefusal("The agent exited as soon as it started.");
-            if (Date.now() >= deadline) throw new AcpRefusal("The agent did not start in time.");
-            await sleep(250);
-        }
     }
 
     private store(rows: readonly HistoryRow[]): void {

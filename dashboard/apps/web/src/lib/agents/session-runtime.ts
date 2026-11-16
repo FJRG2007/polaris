@@ -30,6 +30,7 @@ import * as acpTransport from "./acp/transport";
 import * as acpProviders from "./acp/providers";
 import * as acpDrivers from "./acp/session-drivers";
 import { AcpRefusal } from "./acp/session-driver";
+import { CodexAppServerMissing } from "./codex/session-driver";
 import { touchSession } from "./session-live";
 import { borrowSsh } from "@/lib/connection-pool";
 import { appBaseUrl } from "@/lib/domain-service";
@@ -1187,7 +1188,7 @@ export async function promptSession(sessionId: string, text: string): Promise<vo
     // queue: nothing typed, nothing that has to look ready first.
     if (!placement) throw new Error("That session no longer exists.");
     if (placement.place === "computer") return computer.promptOnComputer(sessionId, text);
-    if (acpProviders.usesAcp(placement)) return acpPrompt(sessionId, text);
+    if (acpProviders.usesAcp(placement)) return acpPrompt(sessionId, placement.cli, text);
     const queued = await runInSession(
         sessionId,
         commands.queuePromptCommand(stateDirFor(placement), text)
@@ -1271,7 +1272,8 @@ export async function changeSessionMode(
     const args = core.permissionModeArgs(cliId, to);
     const placement = await sessionPlacement(sessionId);
     if (placement?.place === "computer") return computer.settingsOnComputer(sessionId, { permissionMode: to });
-    if (placement && acpProviders.usesAcp(placement)) return acpCall(() => acpDrivers.acpDriver(sessionId).setMode(to));
+    if (placement && acpProviders.usesAcp(placement))
+        return acpCall(() => acpDrivers.acpDriver(sessionId, placement.cli).setMode(to));
     if (!args || !placement) throw new Error("That session no longer exists.");
     await steer(
         sessionId,
@@ -1320,7 +1322,8 @@ export async function changeSessionEffort(
 export async function interruptSession(sessionId: string): Promise<void> {
     const placement = await sessionPlacement(sessionId);
     if (placement?.place === "computer") return computer.interruptOnComputer(sessionId);
-    if (placement && acpProviders.usesAcp(placement)) return acpCall(() => acpDrivers.acpDriver(sessionId).cancel());
+    if (placement && acpProviders.usesAcp(placement))
+        return acpCall(() => acpDrivers.acpDriver(sessionId, placement.cli).cancel());
     if (placement) {
         const stopped = await runInSession(
             sessionId,
@@ -1389,9 +1392,20 @@ export async function startAcpAgent(sessionId: string, argv: readonly string[]):
     );
 }
 
-/** A prompt over ACP; see `acp/session-driver`. */
-async function acpPrompt(sessionId: string, text: string): Promise<void> {
-    return acpCall(() => acpDrivers.acpDriver(sessionId).prompt(text));
+/**
+ * A prompt in Chat; see `acp/session-driver` and `codex/session-driver`. A
+ * Codex too old to have an app-server sends the session back to its terminal,
+ * the way it ran before Chat, and the message goes there instead of failing.
+ */
+async function acpPrompt(sessionId: string, cli: string, text: string): Promise<void> {
+    try {
+        return await acpCall(() => acpDrivers.acpDriver(sessionId, cli).prompt(text));
+    } catch (error) {
+        if (!(error instanceof CodexAppServerMissing)) throw error;
+        console.error(`[agent-session] ${sessionId}: this Codex has no app-server, back to the terminal`);
+        await switchSessionSurface(sessionId, "terminal");
+        return promptSession(sessionId, text);
+    }
 }
 
 /** An ACP call whose refusal is a sentence for the person, and whose other

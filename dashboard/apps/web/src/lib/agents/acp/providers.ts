@@ -134,10 +134,19 @@ export function acpBinding(cli: string): AcpBinding | null {
     return BINDINGS.find((binding) => binding.cli === cli) ?? null;
 }
 
+/** The agents whose Chat is their own app-server protocol rather than ACP:
+ *  Codex (`codex app-server`, driven by `codex/session-driver.ts`). */
+const APP_SERVER_AGENTS: readonly string[] = ["codex"];
+
+/** Whether Chat with this agent goes through its app-server. */
+export function usesAppServer(cli: string): boolean {
+    return APP_SERVER_AGENTS.includes(cli);
+}
+
 /** Whether a session of this agent, placed here, can be switched to Chat.
  *  A session on somebody's computer runs through its runner, not tmux. */
 export function chatAvailable(cli: string, place: core.AgentSessionPlace): boolean {
-    return place !== "computer" && acpBinding(cli) !== null;
+    return place !== "computer" && (acpBinding(cli) !== null || usesAppServer(cli));
 }
 
 /** Whether a session talks to its agent over ACP right now. */
