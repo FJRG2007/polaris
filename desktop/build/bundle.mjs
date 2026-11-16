@@ -26,6 +26,9 @@ const node = {
     // node-pty is a native module: it ships as itself in node_modules (see
     // forge.config.js) and is loaded at run time by the runner.
     external: ["electron", "node-pty"],
+    // Shared modules under dashboard/packages/core import zod, and CI installs
+    // only this folder's packages, so resolve it from here as tsconfig does.
+    alias: { zod: join(ROOT, "node_modules/zod") },
     logLevel: "info",
     legalComments: "none"
 };
