@@ -19,7 +19,7 @@ import { rulesForChannel } from "./rules";
 import { commandIn } from "./chat-command";
 import { publishChatChange } from "./live";
 import { nicknamesFor } from "@/lib/contact-names";
-import { clearFriendNoticeAbout } from "@/lib/friends-service";
+import { clearFriendNoticeAbout, clearFriendNoticesAbout } from "@/lib/friends-service";
 import { referenceFromUrl } from "@/components/rich-text/references";
 import {
     anyAbsolute,
@@ -44,13 +44,14 @@ import { checkLinksLater, flaggedLinksFor, type FlaggedLink } from "./link-safet
 import {
     ChatAccessError,
     ChatRuleError,
-    channelAccess,
     reachableChannelIds,
+    reachableChannels,
     requireChannel,
     requirePostable,
     type ChannelAccess,
     type ChatActor,
-    type ChatErrorText
+    type ChatErrorText,
+    type ReachableChannel
 } from "./access";
 import { spokenEditWindow, spokenWait } from "./durations";
 import { ageClearedWhere, requireAgeCleared } from "./age-gate";
@@ -1305,14 +1306,107 @@ export async function markChannelsRead(
     actor: ChatActor,
     input: core.ChatMarkChannelsReadInput
 ): Promise<void> {
-    for (const channelId of new Set(input.channelIds)) {
-        if (!(await channelAccess(actor, channelId))) continue;
-        const newest = await prisma.chatMessage.findFirst({
-            where: { channelId, parentId: null },
-            orderBy: { createdAt: "desc" },
-            select: { id: true }
+    // `markRead` for each, set-based: a heading holds up to `MAX_CHAT_RECEIPTS`
+    // conversations, and one at a time it was about ten round trips each.
+    const reached = await reachableChannels(actor, input.channelIds);
+    if (reached.size === 0) return;
+    const ids = [...reached.keys()];
+    const [newest, marks] = await Promise.all([
+        // The newest top-level message of each, one index probe per channel.
+        prisma.$queryRaw<{ channelId: string; id: string; createdAt: Date }[]>`
+            SELECT c."id" AS "channelId", m."id", m."createdAt"
+            FROM unnest(${ids}::uuid[]) AS c("id")
+            CROSS JOIN LATERAL (
+                SELECT "id", "createdAt" FROM "ChatMessage"
+                WHERE "channelId" = c."id" AND "parentId" IS NULL
+                ORDER BY "createdAt" DESC
+                LIMIT 1
+            ) AS m`,
+        prisma.chatChannelMember.findMany({
+            where: { userId: actor.id, channelId: { in: ids } },
+            select: { channelId: true, lastReadAt: true }
+        })
+    ]);
+    const held = new Map(marks.map((row) => [row.channelId, row]));
+    // Never backwards, as `markRead`: only where the mark is behind.
+    const moves = newest.flatMap((row) => {
+        const current = held.get(row.channelId);
+        if (current?.lastReadAt && current.lastReadAt >= row.createdAt) return [];
+        return [{ ...row, before: current?.lastReadAt ?? null, exists: Boolean(current) }];
+    });
+    if (moves.length === 0) return;
+    const dms = moves.filter((move) => reached.get(move.channelId)?.kind === "dm");
+
+    await prisma.$transaction([
+        // A public room read for the first time has no row yet.
+        prisma.chatChannelMember.createMany({
+            data: moves
+                .filter((move) => !move.exists)
+                .map((move) => ({
+                    channelId: move.channelId,
+                    userId: actor.id,
+                    lastReadMessageId: move.id,
+                    lastReadAt: move.createdAt,
+                    lastSeenAt: move.createdAt
+                })),
+            skipDuplicates: true
+        }),
+        // Every other row moved forward in one statement, guarded as `markRead`
+        // is so a tab that read further in the meantime is never un-read, and
+        // `lastSeenAt` only ever moving forward. The moments travel as ISO text:
+        // the columns are UTC timestamps without a zone, which is what the cast
+        // of a `Z` string gives.
+        prisma.$executeRaw`
+            UPDATE "ChatChannelMember" AS m
+            SET "lastReadMessageId" = v."messageId",
+                "lastReadAt" = v."at",
+                "lastSeenAt" = GREATEST(m."lastSeenAt", v."at")
+            FROM unnest(
+                ${moves.map((move) => move.channelId)}::uuid[],
+                ${moves.map((move) => move.id)}::uuid[],
+                ${moves.map((move) => move.createdAt.toISOString())}::timestamp(3)[]
+            ) AS v("channelId", "messageId", "at")
+            WHERE m."channelId" = v."channelId"
+              AND m."userId" = ${actor.id}::uuid
+              AND (m."lastReadAt" IS NULL OR m."lastReadAt" < v."at")`,
+        // The second tick, on everything each one-to-one crossed since its last mark.
+        ...(dms.length > 0
+            ? [
+                  prisma.chatMessage.updateMany({
+                      where: {
+                          authorId: { not: actor.id },
+                          readAt: null,
+                          OR: dms.map((move) => ({
+                              channelId: move.channelId,
+                              createdAt: {
+                                  lte: move.createdAt,
+                                  ...(move.before ? { gt: move.before } : {})
+                              }
+                          }))
+                      },
+                      data: { readAt: new Date() }
+                  })
+              ]
+            : [])
+    ]);
+
+    const channels = moves.flatMap((move) => {
+        const channel = reached.get(move.channelId);
+        return channel ? [channel] : [];
+    });
+    const audiences = await readAudiences(actor, channels);
+    // A one-to-one is proof you know who the other person is (see `markRead`).
+    await clearFriendNoticesAbout(
+        actor.id,
+        dms.flatMap((move) => audiences.others.get(move.channelId)?.slice(0, 1) ?? [])
+    );
+    for (const channel of channels) {
+        publishChatChange({
+            channelId: channel.channelId,
+            kind: "read",
+            actorId: actor.id,
+            audience: audiences.audience.get(channel.channelId) ?? [actor.id]
         });
-        if (newest) await markRead(actor, { channelId, messageId: newest.id });
     }
 }
 
@@ -1498,25 +1592,53 @@ export async function markUnread(actor: ChatActor, input: core.ChatMarkUnreadInp
  * per pair per message for nothing.
  */
 async function readAudience(actor: ChatActor, channel: ChannelAccess): Promise<string[]> {
-    if (channel.spaceId) return [actor.id];
-    if (channel.kind !== "dm" && channel.kind !== "group") return [actor.id];
+    return (await readAudiences(actor, [channel])).audience.get(channel.channelId) ?? [actor.id];
+}
 
-    const others = await prisma.chatChannelMember.findMany({
-        where: { channelId: channel.channelId, userId: { not: actor.id } },
-        select: { userId: true },
-        take: groupReceipts.GROUP_RECEIPT_MAX_MEMBERS
+/**
+ * `readAudience` for several channels at once, in two queries whatever their
+ * number: the other people of every direct message and group, then whose
+ * receipts the reader may show, asked once for all of them. Also answers who
+ * the others are, which a one-to-one's friend notice needs.
+ */
+async function readAudiences(
+    actor: ChatActor,
+    channels: readonly ReachableChannel[]
+): Promise<{ audience: Map<string, string[]>; others: Map<string, string[]> }> {
+    const audience = new Map<string, string[]>();
+    const others = new Map<string, string[]>();
+    const max = groupReceipts.GROUP_RECEIPT_MAX_MEMBERS;
+    for (const channel of channels) audience.set(channel.channelId, [actor.id]);
+    const conversations = channels.filter(
+        (channel) => !channel.spaceId && (channel.kind === "dm" || channel.kind === "group")
+    );
+    if (conversations.length === 0) return { audience, others };
+
+    const rows = await prisma.chatChannelMember.findMany({
+        where: {
+            channelId: { in: conversations.map((channel) => channel.channelId) },
+            userId: { not: actor.id }
+        },
+        select: { channelId: true, userId: true },
+        // Up to the receipt limit for each, as one channel alone was read.
+        take: conversations.length * max
     });
-    if (others.length === 0 || others.length > groupReceipts.GROUP_RECEIPT_MAX_MEMBERS - 1)
-        return [actor.id];
-
+    for (const row of rows) {
+        const list = others.get(row.channelId) ?? [];
+        list.push(row.userId);
+        others.set(row.channelId, list);
+    }
+    const shown = [...others.values()].filter((list) => list.length <= max - 1).flat();
+    if (shown.length === 0) return { audience, others };
     // Not resolved as an administrator, for the same reason `receiptStateIn` is
     // not: these are the ticks under somebody's own messages, and the admin
     // exception is about reading somebody else's.
-    const allowed = await receiptsAmong(
-        { id: actor.id, isAdmin: false },
-        others.map((other) => other.userId)
-    );
-    return [actor.id, ...allowed];
+    const allowed = await receiptsAmong({ id: actor.id, isAdmin: false }, shown);
+    for (const [channelId, list] of others) {
+        if (list.length > max - 1) continue;
+        audience.set(channelId, [actor.id, ...list.filter((id) => allowed.has(id))]);
+    }
+    return { audience, others };
 }
 
 /**

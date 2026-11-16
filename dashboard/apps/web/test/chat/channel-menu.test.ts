@@ -26,6 +26,7 @@ let created: Row = {};
 let copiedGrants: Row[] = [];
 let reachable = new Set<string>();
 let marked: string[] = [];
+let queries = 0;
 
 vi.mock("@/lib/chat/live", () => ({ publishChatChange: () => undefined }));
 
@@ -45,6 +46,12 @@ vi.mock("@/lib/chat/access", async (importOriginal) => {
         requireChannel: async (_actor: unknown, channelId: string) => access(channelId),
         channelAccess: async (_actor: unknown, channelId: string) =>
             reachable.has(channelId) ? access(channelId) : null,
+        reachableChannels: async (_actor: unknown, ids: string[]) =>
+            new Map(
+                [...new Set(ids)]
+                    .filter((id) => reachable.has(id))
+                    .map((id) => [id, { channelId: id, spaceId: spaceOf, kind: "text" }])
+            ),
         requireSpace: async () => {
             if (!administers) throw new real.ChatAccessError({ key: "errors.spaceAdminOnly" });
             return "admin";
@@ -78,21 +85,46 @@ vi.mock("@polaris/db", () => ({
             }
         },
         chatMessage: {
-            findFirst: async ({ where }: { where: { channelId: string; id?: string } }) =>
-                where.id
+            findFirst: async ({ where }: { where: { channelId: string; id?: string } }) => {
+                queries += 1;
+                return where.id
                     ? { createdAt: new Date("2026-09-29T10:00:00Z") }
-                    : { id: `${where.channelId}-newest` },
+                    : { id: `${where.channelId}-newest` };
+            },
             updateMany: async () => ({ count: 0 })
         },
         chatChannelMember: {
+            findMany: async () => {
+                queries += 1;
+                return [];
+            },
+            createMany: async ({ data }: { data: Row[] }) => {
+                queries += 1;
+                return { count: data.length };
+            },
             findUnique: async () => null,
             findFirst: async () => null,
             upsert: async ({ update }: { update: { lastReadMessageId: string } }) => {
+                queries += 1;
                 marked.push(update.lastReadMessageId);
                 return {};
             }
         },
-        $transaction: async (run: (client: typeof tx) => Promise<unknown>) => run(tx)
+        $queryRaw: async (_parts: TemplateStringsArray, ids: string[]) => {
+            queries += 1;
+            return ids.map((channelId) => ({
+                channelId,
+                id: `${channelId}-newest`,
+                createdAt: new Date("2026-09-29T10:00:00Z")
+            }));
+        },
+        $executeRaw: (_parts: TemplateStringsArray, channelIds: string[], messageIds: string[]) => {
+            queries += 1;
+            marked.push(...messageIds);
+            return Promise.resolve(channelIds.length);
+        },
+        $transaction: async (run: unknown) =>
+            Array.isArray(run) ? Promise.all(run) : (run as (client: typeof tx) => unknown)(tx)
     }
 }));
 
@@ -112,6 +144,7 @@ beforeEach(() => {
     copiedGrants = [];
     reachable = new Set();
     marked = [];
+    queries = 0;
     source = {
         spaceId: "space-1",
         categoryId: "category-1",
@@ -233,5 +266,13 @@ describe("marking conversations read from the list", () => {
             channelIds: ["channel-1", "channel-2", "channel-3", "channel-1"]
         });
         expect(marked).toEqual(["channel-1-newest", "channel-3-newest"]);
+    });
+
+    it("takes a bounded number of queries however many conversations the heading holds", async () => {
+        const ids = Array.from({ length: 200 }, (_, index) => `channel-${index}`);
+        reachable = new Set(ids);
+        await messages.markChannelsRead(ada, { channelIds: ids });
+        expect(marked).toHaveLength(200);
+        expect(queries).toBeLessThanOrEqual(5);
     });
 });

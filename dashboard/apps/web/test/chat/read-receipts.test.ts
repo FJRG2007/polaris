@@ -92,7 +92,18 @@ vi.mock("@polaris/db", () => ({
         chatChannelMember: {
             findUnique: async () => mark,
             findFirst: async () => others[0] ?? null,
-            findMany: async ({ take }: { take?: number }) => others.slice(0, take),
+            findMany: async ({
+                take,
+                where
+            }: {
+                take?: number;
+                where: { channelId: string | { in: string[] } };
+            }) =>
+                others.slice(0, take).map((row) => ({
+                    ...row,
+                    channelId:
+                        typeof where.channelId === "string" ? where.channelId : where.channelId.in[0]
+                })),
             upsert: async () => undefined,
             updateMany: async () => undefined
         },

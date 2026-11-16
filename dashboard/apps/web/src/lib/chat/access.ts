@@ -409,6 +409,64 @@ export async function channelAccess(
     };
 }
 
+/** A channel somebody can open, as much of it as a read mark needs. */
+export interface ReachableChannel {
+    readonly channelId: string;
+    readonly spaceId: string | null;
+    readonly kind: string;
+}
+
+/**
+ * Which of these channels the actor can open: the answer `channelAccess` gives
+ * each one, for a batch ("mark all read" on a heading of up to
+ * `MAX_CHAT_RECEIPTS` conversations) in a bounded number of queries instead of
+ * three or more per channel.
+ *
+ * The channels and the actor's rows on them are read once, and each distinct
+ * space's standing once (`spaceAccess`). A direct message or group is reached by
+ * its row; a channel in a space the actor reaches, by the space unless it is
+ * private and they have no row. Only what is left - an answer that turns on a
+ * grant naming the channel itself - is asked about alone, through
+ * `channelAccess`, so the rule stays in one place.
+ */
+export async function reachableChannels(
+    actor: ChatActor,
+    channelIds: readonly string[]
+): Promise<Map<string, ReachableChannel>> {
+    const ids = [...new Set(channelIds)];
+    const reached = new Map<string, ReachableChannel>();
+    if (ids.length === 0) return reached;
+    const [channels, rows] = await Promise.all([
+        prisma.chatChannel.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, kind: true, spaceId: true, private: true }
+        }),
+        prisma.chatChannelMember.findMany({
+            where: { userId: actor.id, channelId: { in: ids } },
+            select: { channelId: true }
+        })
+    ]);
+    const member = new Set(rows.map((row) => row.channelId));
+    const spaceIds = [
+        ...new Set(channels.flatMap((channel) => (channel.spaceId ? [channel.spaceId] : [])))
+    ];
+    const standings = new Map(
+        await Promise.all(
+            spaceIds.map(async (spaceId) => [spaceId, await spaceAccess(actor, spaceId)] as const)
+        )
+    );
+    for (const channel of channels) {
+        const view = { channelId: channel.id, spaceId: channel.spaceId, kind: channel.kind };
+        const reachedOrdinarily = channel.spaceId
+            ? Boolean(standings.get(channel.spaceId)) && (!channel.private || member.has(channel.id))
+            : member.has(channel.id);
+        // A direct message or group has nothing past its row to ask about.
+        if (reachedOrdinarily || (channel.spaceId && (await channelAccess(actor, channel.id))))
+            reached.set(channel.id, view);
+    }
+    return reached;
+}
+
 /** The later of two moments, either of which may be absent. */
 function latest(one: Date | null, two: Date | null): Date | null {
     if (!one) return two;

@@ -680,13 +680,23 @@ function personIdOf(metadata: string | null): string | null {
  * Best effort, and never the reason a message fails to send.
  */
 export async function clearFriendNoticeAbout(userId: string, personId: string): Promise<void> {
+    await clearFriendNoticesAbout(userId, [personId]);
+}
+
+/** The same for several people at once - catching up on a list of one-to-ones -
+ *  in the same two queries one person costs. */
+export async function clearFriendNoticesAbout(
+    userId: string,
+    personIds: readonly string[]
+): Promise<void> {
+    if (personIds.length === 0) return;
     try {
         const unread = await prisma.notification.findMany({
             where: { userId, type: "account.friend", readAt: null, actionRequired: false },
             select: { id: true, metadata: true }
         });
         const mine = unread
-            .filter((row) => notificationIsAbout(row.metadata, personId))
+            .filter((row) => personIds.some((personId) => notificationIsAbout(row.metadata, personId)))
             .map((row) => row.id);
         if (mine.length === 0) return;
         await prisma.notification.updateMany({
