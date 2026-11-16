@@ -426,6 +426,12 @@
         "callTitle": "Modo de voz",
         "callDescription": "Habla y Polar te responde en voz alta. Háblale encima para pararlo.",
         "browserVoice": "{clientKind, select, desktop {Hablando con la voz del sistema} other {Hablando con la voz del navegador}}",
+        "code": {
+            "done": "Hecho.",
+            "failed": "No se ha podido. Inténtalo de nuevo.",
+            "noModel": "Polar necesita la clave de un modelo para tus sesiones.",
+            "needsYou": "El agente espera tu respuesta en pantalla."
+        },
         "phase": {
             "listening": "Escuchando",
             "hearing": "Te escucho",
@@ -1477,7 +1483,7 @@
         "connectInAgents": "Conectar repositorio",
         "refresh": "Recargar lista",
         "notSignedIn": "Sin conectar",
-        "noVoice": "La voz va al chat de Polar, no a un agente",
+        "voiceNeedsSession": "Empieza la tarea y luego háblale",
         "noModel": "Añade una clave de IA para elegir modelo.",
         "addKey": "Añadir",
         "searchBranches": "Buscar ramas",

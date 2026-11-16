@@ -81,6 +81,8 @@ import {
     type ModelSelectorProvider
 } from "@/components/polar/elements/model-selector";
 import { PolarComposer, type PolarVoiceKit } from "@/components/polar/polar-composer";
+import { CodeVoiceCall } from "@/components/polar/code-voice-call";
+import { parseVoiceDelegation } from "@/lib/polar/voice-handoff";
 import { useCodeSlash } from "@/components/polar/polar-code-slash";
 import * as codeCommands from "@/lib/polar/code-commands";
 import * as goals from "@/lib/polar/goals";
@@ -638,6 +640,11 @@ export function PolarCodeView({
     // stored on it only once the agent is up, and until then its thread would
     // otherwise open empty.
     const [opening, setOpening] = useState<{ id: string; text: string } | null>(null);
+    // A voice call, kept here so it follows the person from session to session.
+    const [call, setCall] = useState<CodeCall | null>(null);
+    useEffect(() => {
+        if (!code.selected) setCall(null);
+    }, [code.selected]);
     const started = (id: string, text: string) => {
         setOpening({ id, text });
         code.open(id);
@@ -653,6 +660,8 @@ export function PolarCodeView({
                 canPrompt={canStart}
                 fullPage={fullPage}
                 voiceKit={voiceKit}
+                call={call}
+                onCall={setCall}
                 onOpen={code.open}
                 onNew={() => code.open(null)}
                 onHistory={onHistory}
@@ -698,6 +707,11 @@ export function PolarCodeView({
             <ConversationEmptyState icon={avatar} description={t("code.heading")} />
         </PolarThreadFrame>
     );
+}
+
+/** A voice call open on Code: what it says first when it moved to a session. */
+interface CodeCall {
+    readonly greeting: string | null;
 }
 
 /** Code's commands in the composer that starts a task. */
@@ -750,9 +764,12 @@ export function SignInRefusedNotice({ account }: { account: string | null }) {
 }
 
 /** Chat's composer as Code takes it: the same files (copied into the session's
- *  working directory) and the same microphone; no voice conversation for an
- *  agent session (said on the button). */
-function useCodeComposerParts(busy: boolean) {
+ *  working directory) and the same microphone. A voice call needs a session to
+ *  talk to, so a task that has not started says so on the button. */
+function useCodeComposerParts(
+    busy: boolean,
+    call: { readonly disabled: boolean; readonly onOpen: () => void } | null = null
+) {
     const t = useTranslations("polar");
     const [notice, setNotice] = useState<VoiceNotice | null>(null);
     const uploads = usePolarUploads();
@@ -770,7 +787,7 @@ function useCodeComposerParts(busy: boolean) {
             onRemove: uploads.remove,
             onRetry: uploads.retry
         },
-        voiceMode: { refusal: t("code.noVoice") }
+        voiceMode: call ?? { refusal: t("code.voiceNeedsSession") }
     };
 }
 
@@ -1280,7 +1297,9 @@ function CodeThread({
     onOpen,
     onNew,
     onHistory,
-    onRename
+    onRename,
+    call,
+    onCall
 }: {
     sessionId: string;
     /** What the task was started with here, shown until the session has it. */
@@ -1297,6 +1316,9 @@ function CodeThread({
     onHistory: () => void;
     /** Renames the session, for "/rename"; false when it was not renamed. */
     onRename: (sessionId: string, title: string) => Promise<boolean>;
+    /** The voice call open on Code, or null. */
+    call: CodeCall | null;
+    onCall: (call: CodeCall | null) => void;
 }) {
     const t = useTranslations("polar");
     const inputId = useId();
@@ -1317,7 +1339,13 @@ function CodeThread({
     const [busy, startTransition] = useTransition();
     // Elements picked in the preview, carried ahead of the next message.
     const [picks, setPicks] = useState<readonly PickedElement[]>([]);
-    const parts = useCodeComposerParts(busy);
+    // A call talks to sessions the person may steer, through one that is up.
+    const parts = useCodeComposerParts(
+        busy,
+        thread?.canManage && thread.session.live
+            ? { disabled: busy || call !== null, onOpen: () => onCall({ greeting: null }) }
+            : null
+    );
     const signal = useUnmountSignal();
     // The handed-over commands follow the CLI the session runs.
     const cli = thread?.view?.cli ?? null;
@@ -1784,12 +1812,27 @@ function CodeThread({
                     onCompact={null}
                 />
             ) : null}
+            {call ? (
+                // Above the box, which stays in use under it, as in Chat.
+                <CodeVoiceCall
+                    sessionId={sessionId}
+                    thread={thread}
+                    kit={voiceKit}
+                    greeting={call.greeting}
+                    onOpen={(next, say) => {
+                        onCall({ greeting: say });
+                        onOpen(next);
+                    }}
+                    onEnd={() => onCall(null)}
+                />
+            ) : null}
             <PickedChips picks={picks} onRemove={(index) => setPicks((list) => list.filter((_, at) => at !== index))} />
             <div className="relative">
             {slash.list}
             <PolarComposer
                 textareaProps={slash.textareaProps}
                 kit={voiceKit}
+                inCall={call !== null}
                 notice={parts.notice}
                 onNotice={parts.setNotice}
                 inputId={inputId}
@@ -2104,7 +2147,8 @@ function CodeMessage({ entry }: { entry: PolarCodeEntry }) {
         <Message from={from}>
             <MessageContent from={from}>
                 {from === "user" ? (
-                    <p className="whitespace-pre-wrap">{entry.text}</p>
+                    // Words said in a voice call show as said, not in their envelope.
+                    <p className="whitespace-pre-wrap">{parseVoiceDelegation(entry.text) ?? entry.text}</p>
                 ) : (
                     <MessageResponse>{entry.text}</MessageResponse>
                 )}

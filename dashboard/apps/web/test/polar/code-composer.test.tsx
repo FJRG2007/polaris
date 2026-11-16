@@ -176,7 +176,8 @@ describe("Code's composer is Chat's", () => {
 
         const box = await openCode();
         const codeButtons = composerButtons(box);
-        // The microphone and attach are the very same; voice stays, refused.
+        // The microphone and attach are the very same; a call needs a session, so
+        // on a task not yet started it stays, refused.
         expect(codeButtons).toEqual([
             "Attach files",
             "Dictate",
@@ -191,14 +192,14 @@ describe("Code's composer is Chat's", () => {
             "Permissions: Full access",
             // Where the session runs: Polaris, or one of the person's paired computers.
             "Runs on: Polaris",
-            "Voice talks to Polar's chat, not to an agent"
+            "Start the task first, then talk to it"
         ]);
         const form = box.closest("form") as HTMLFormElement;
         const dictate = within(form).getByRole("button", { name: "Dictate" });
         expect((dictate as HTMLButtonElement).disabled).toBe(false);
         const attach = within(form).getByRole("button", { name: "Attach files" });
         expect(attach.getAttribute("aria-disabled")).not.toBe("true");
-        const voice = within(form).getByRole("button", { name: /not to an agent/ });
+        const voice = within(form).getByRole("button", { name: /then talk to it/ });
         expect(voice.getAttribute("aria-disabled")).toBe("true");
         // The picker sits in the composer once, no tool is named, and the
         // repository is not in it.

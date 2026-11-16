@@ -426,6 +426,12 @@
         "callTitle": "Voice mode",
         "callDescription": "Speak, and Polar answers out loud. Talk over it to stop it.",
         "browserVoice": "{clientKind, select, desktop {Speaking with the system's voice} other {Speaking with your browser's voice}}",
+        "code": {
+            "done": "Done.",
+            "failed": "That didn't go through. Try again.",
+            "noModel": "Polar needs a model key to act on your sessions.",
+            "needsYou": "The agent is waiting for your answer on screen."
+        },
         "phase": {
             "listening": "Listening",
             "hearing": "Hearing you",
@@ -1477,7 +1483,7 @@
         "connectInAgents": "Connect a repository",
         "refresh": "Refresh the list",
         "notSignedIn": "Not signed in",
-        "noVoice": "Voice talks to Polar's chat, not to an agent",
+        "voiceNeedsSession": "Start the task first, then talk to it",
         "noModel": "Add an AI key to pick a model for OpenCode.",
         "addKey": "Add a key",
         "searchBranches": "Search branches",

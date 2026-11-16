@@ -478,6 +478,10 @@ export interface VoiceCallProps {
     onStop: () => void;
     onApprove: (id: string, approved: boolean) => void;
     onEnd: () => void;
+    /** An assistant message, last in `messages`, to read aloud though nobody
+     *  just asked for it - a Code session's reply landing. Read only into a
+     *  quiet call; one that arrives while you talk stays on screen. */
+    announced?: string | null;
 }
 
 /** One sentence ready to be said: audio from a key here, or text for the
@@ -511,6 +515,8 @@ export function VoiceCall(props: VoiceCallProps) {
     /** The answer being read out. One to something typed during the call
      *  stays on screen only: it was not asked out loud. */
     const spokenId = useRef<string | null>(null);
+    /** The last announcement taken, read or let go, so it is never read twice. */
+    const lastAnnounced = useRef<string | null>(null);
     /** Sentences fetched ahead, in the order they are to be said. */
     const queue = useRef<Array<Promise<Spoken>>>([]);
     const playing = useRef(false);
@@ -704,7 +710,19 @@ export function VoiceCall(props: VoiceCallProps) {
 
     // The answer as it streams: approvals, and each finished sentence.
     useEffect(() => {
-        const phase = live.current.phase;
+        let phase = live.current.phase;
+        const announced = props.announced ?? null;
+        if (announced && announced !== lastAnnounced.current) {
+            lastAnnounced.current = announced;
+            const at = props.messages.findIndex((message) => message.id === announced);
+            if (at >= 0 && phase === "listening" && !live.current.muted && !live.current.ended) {
+                baseline.current = at;
+                spokenUpTo.current = 0;
+                spokenId.current = announced;
+                dispatch({ type: "announce" });
+                phase = "thinking";
+            }
+        }
         if (baseline.current === null) return;
         if (phase !== "thinking" && phase !== "speaking" && phase !== "approval") return;
         const last = props.messages.at(-1);
@@ -725,7 +743,7 @@ export function VoiceCall(props: VoiceCallProps) {
             for (const sentence of sentences) say(sentence);
         }
         finishIfDone();
-    }, [props.messages, props.status, say, finishIfDone]);
+    }, [props.messages, props.status, props.announced, say, finishIfDone]);
 
     // Talked over: stop the voice, the fetches and the turn.
     useEffect(() => {
