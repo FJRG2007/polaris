@@ -1379,9 +1379,12 @@ export async function startAcpAgent(sessionId: string, argv: readonly string[]):
     const placement = await sessionPlacement(sessionId);
     if (!placement) throw new Error("That session no longer exists.");
     await refreshCredentials(sessionId);
+    const stateDir = stateDirFor(placement);
+    // In Chat the terminal holds no agent of its own: one a boot or a resume
+    // started there would work the same checkout as this one.
     await steer(
         sessionId,
-        acpPipe.acpLaunchCommand(stateDirFor(placement), argv),
+        `(\n${acpPipe.terminalAgentStopCommand(stateDir)}\n)\n${acpPipe.acpLaunchCommand(stateDir, argv)}`,
         "The session's machine did not start the agent"
     );
 }

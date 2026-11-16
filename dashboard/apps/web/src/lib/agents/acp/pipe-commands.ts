@@ -154,6 +154,9 @@ export function terminalAgentStopCommand(stateDir: string, session = commands.TM
         `  tmux kill-window -t ${shellQuote(`${session}:${commands.INTERFACE_WINDOW}`)} 2>/dev/null || true`,
         "  exit 0",
         "fi",
+        // Not while the setup is still cloning and installing in that window:
+        // its processes are not an agent. The flag is written just before one.
+        `test -f ${commands.AGENT_READY_FLAG} || exit 0`,
         // The main window: the first one that is not the protocol agent's.
         `p="$(tmux list-panes -s -t ${shellQuote(session)} -F '#{window_name} #{pane_pid}' 2>/dev/null | grep -v '^${ACP_WINDOW} ' | head -n 1 | cut -d' ' -f2)"`,
         'case "$p" in ""|*[!0-9]*) exit 0 ;; esac',

@@ -19,6 +19,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { GOAL_CONDITION_MAX, readGoal, type PolarGoal } from "@/lib/polar/goals";
 import { clearSessionGoal, setSessionGoal } from "@/lib/agents/session-goal";
 import { prisma } from "@polaris/db";
+import * as acpProviders from "@/lib/agents/acp/providers";
 import { polarCredentialFor } from "@/lib/polar/access";
 import {
     githubApiToken,
@@ -644,10 +645,13 @@ export async function polarCodeStart(
     const asAgent = await promptWithAgent(user, raw, typed);
     if (asAgent && "error" in asAgent) return { error: asAgent.error };
     const prompt = asAgent?.prompt ?? started?.prompt;
-    const { agentId: _agentId, goal: rawGoal, ...body } = (raw ?? {}) as {
+    const { agentId: _agentId, goal: rawGoal, surface: rawSurface, ...body } = (raw ?? {}) as {
         agentId?: unknown;
         goal?: unknown;
+        surface?: unknown;
     } & Record<string, unknown>;
+    const surface = startSurfaceSchema.safeParse(rawSurface ?? "terminal");
+    if (!surface.success) return { error: (await getTranslations("agents"))("sessions.errors.checkForm") };
     // `/goal` typed at the start: kept on the session from its creation, so its
     // first turn is judged (`lib/agents/session-goal.ts`).
     const goal = startGoalSchema.safeParse(rawGoal ?? null);
@@ -673,18 +677,37 @@ export async function polarCodeStart(
         );
         if (!credential) return { error: (await getTranslations("agents"))("sessions.errors.noModelKey") };
         // Pinned to the key Polar resolved, so the session spends that one.
-        return withGoal(
-            await startSessionAction(
-                {
-                    ...(input as object),
-                    modelChoice: { ...choice.data, payer: credential.source }
-                },
-                asAgent?.rules ?? []
+        return withSurface(
+            await withGoal(
+                await startSessionAction(
+                    {
+                        ...(input as object),
+                        modelChoice: { ...choice.data, payer: credential.source }
+                    },
+                    asAgent?.rules ?? []
+                ),
+                goal.data
             ),
-            goal.data
+            surface.data
         );
     }
-    return withGoal(await startSessionAction(input, asAgent?.rules ?? []), goal.data);
+    return withSurface(await withGoal(await startSessionAction(input, asAgent?.rules ?? []), goal.data), surface.data);
+}
+
+const startSurfaceSchema = z.enum(acpProviders.SESSION_SURFACES);
+
+/**
+ * Holds the session just created in Chat when that was asked for and its agent
+ * can be driven there. Before its first prompt, which waits for the machine:
+ * that prompt then opens the Chat connection rather than the terminal's turn.
+ */
+async function withSurface<T extends { id?: string }>(started: T, surface: acpProviders.SessionSurface): Promise<T> {
+    if (!started.id || surface !== "chat") return started;
+    const row = await prisma.agentSession.findUnique({ where: { id: started.id }, select: { cli: true, place: true } });
+    const place = core.AGENT_SESSION_PLACES.find((known) => known === row?.place);
+    if (!row || !place || !acpProviders.chatAvailable(row.cli, place)) return started;
+    await prisma.agentSession.update({ where: { id: started.id }, data: { surface }, select: { id: true } });
+    return started;
 }
 
 const startGoalSchema = z.string().trim().min(1).max(GOAL_CONDITION_MAX).nullable();

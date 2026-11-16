@@ -834,6 +834,9 @@ export function CodeFolderChip({
     );
 }
 
+/** Where the picked surface is kept, so the next task starts on it. */
+export const SURFACE_KEY = "polar.code.surface";
+
 /** Where the picked permission mode is kept, so the next task starts on it. */
 export const PERMISSION_MODE_KEY = "polar.code.permissionMode";
 

@@ -111,6 +111,7 @@ import {
     CODE_EFFORT_KEY,
     CodeEffortPill,
     PERMISSION_MODE_KEY,
+    SURFACE_KEY,
     CODE_PLACE_KEY,
     CodePlacePicker,
     CodeFolderChip,
@@ -884,6 +885,13 @@ function CodeStart({
         setMode(next);
         writeStored(PERMISSION_MODE_KEY, next);
     };
+    // Terminal or Chat, picked last; read after mount for the same reason.
+    const [surface, setSurface] = useState<acpProviders.SessionSurface>("terminal");
+    useEffect(() => setSurface(acpProviders.readSurface(readStored(SURFACE_KEY))), []);
+    const chooseSurface = (next: acpProviders.SessionSurface) => {
+        setSurface(next);
+        writeStored(SURFACE_KEY, next);
+    };
     // Where the task runs: Polaris, or one of the person's own computers. The
     // stored pick counts only while that computer is still listed and online.
     const computers = useCodeComputers(canStart);
@@ -1003,6 +1011,7 @@ function CodeStart({
             : null;
     // Only a tool whose questions are answered from here is given a mode.
     const asksMode = tool !== null && core.takesPermissionMode(tool);
+    const offersChat = tool !== null && acpProviders.chatAvailable(tool, computerId ? "computer" : "local");
     const model: ModelChoice | null = polar
         ? auto
             ? automaticChoice()
@@ -1108,6 +1117,7 @@ function CodeStart({
                             taskId: null,
                             unattended: null,
                             permissionMode: asksMode ? mode : null,
+                            surface: offersChat ? surface : "terminal",
                             effort: tool && core.agentEffortLevels(tool).length > 0 ? effort : null,
                             issueNumber: workspace || localFolder ? null : (started.issue?.number ?? null),
                             skill: started.skill,
@@ -1201,6 +1211,9 @@ function CodeStart({
                                     onChange={chooseMode}
                                     disabled={busy}
                                 />
+                            ) : null}
+                            {offersChat ? (
+                                <SessionSurfacePicker value={surface} onChange={chooseSurface} disabled={busy} />
                             ) : null}
                             {!polar ? (
                                 <CodePlacePicker
