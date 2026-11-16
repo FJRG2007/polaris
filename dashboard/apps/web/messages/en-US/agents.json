@@ -403,7 +403,23 @@
             "errors": {
                 "invalid": "That request could not be read. Refresh the page."
             },
-            "justChanged": "Just changed"
+            "justChanged": "Just changed",
+            "accept": "Accept",
+            "accepted": "Accepted",
+            "acceptFile": "Accept this file",
+            "acceptHunk": "Accept this change",
+            "revert": "Revert",
+            "revertFile": "Revert this file",
+            "revertHunk": "Revert this change",
+            "hunk": "Change {number}",
+            "revertFileTitle": "Revert {path}?",
+            "revertFileDescription": "The file goes back to how it was when the branch started. What the agent wrote in it is lost.",
+            "revertHunkTitle": "Revert this change?",
+            "revertHunkDescription": "These lines of {path} go back to how they were. The rest of the file stays.",
+            "revertStale": "The file changed since it was shown. Look at it again and retry.",
+            "revertLarge": "This change is too large to revert alone. Revert the whole file instead.",
+            "revertFailed": "Could not revert it. Try again.",
+            "revertOver": "The session has ended, so its files can no longer be changed."
         },
         "ship": {
             "open": "Open a pull request",

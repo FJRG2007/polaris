@@ -296,3 +296,120 @@ export async function readFileDiff(run: (offset: number) => Promise<string>): Pr
     if (/^Binary files .* differ$/m.test(text) && !/^@@ /m.test(text)) return { kind: "binary" };
     return { kind: "diff", text };
 }
+
+// ---------------------------------------------------------------------------
+// Reverting
+// ---------------------------------------------------------------------------
+
+/** A diff cut into its file header and its hunks, each with the `@@` line it
+ *  starts on. A diff with no hunks (a mode change, a binary file) has none. */
+export interface DiffHunks {
+    readonly header: string;
+    readonly hunks: readonly { readonly id: string; readonly text: string }[];
+}
+
+/** A short name for a hunk's text, so a revert can say which hunk it meant and
+ *  the server can tell when the diff moved under it. Not a secret: the server
+ *  reads the diff again and checks it. FNV-1a, 32 bits. */
+export function hunkId(text: string): string {
+    let hash = 0x811c9dc5;
+    for (let index = 0; index < text.length; index++) {
+        hash ^= text.charCodeAt(index);
+        hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return hash.toString(16).padStart(8, "0");
+}
+
+export function splitHunks(text: string): DiffHunks {
+    const lines = text.split("\n");
+    // The last element of a text ending in a newline is empty, not a line.
+    if (lines.at(-1) === "") lines.pop();
+    const first = lines.findIndex((line) => line.startsWith("@@ "));
+    if (first < 0) return { header: text, hunks: [] };
+    const header = lines.slice(0, first).map((line) => `${line}\n`).join("");
+    const hunks: { id: string; text: string }[] = [];
+    let current: string[] = [];
+    const close = () => {
+        if (current.length === 0) return;
+        const body = current.map((line) => `${line}\n`).join("");
+        hunks.push({ id: hunkId(body), text: body });
+        current = [];
+    };
+    for (const line of lines.slice(first)) {
+        if (line.startsWith("@@ ")) close();
+        current.push(line);
+    }
+    close();
+    return { header, hunks };
+}
+
+/** The largest patch a hunk revert sends: it travels inside the command, and a
+ *  container's command is one argument, which Linux caps at 128 KiB. */
+export const MAX_HUNK_PATCH_BYTES = 64 * 1024;
+
+/** One command line of git from its arguments, each quoted on its own: what
+ *  the session's machine runs is a shell script, so an argument array is
+ *  turned into words here, never pasted into the line. */
+function gitLine(args: readonly string[]): string {
+    return `g ${args.map(shellQuote).join(" ")}`;
+}
+
+/**
+ * The script that puts one file back the way it was where the branch started.
+ *
+ * A file the base had is checked out from it. One the base did not have is
+ * removed: from the index when the branch tracks it, and from the disk either
+ * way - but only a path git itself lists as tracked or untracked, never any
+ * other path that happened to be sent.
+ */
+export function revertFileScript(input: { workdir: string; baseRef: string; path: string }): string {
+    const path = input.path;
+    return [
+        ...preamble(input.workdir, input.baseRef),
+        `f=${shellQuote(path)}`,
+        'if g cat-file -e "$base:$f" 2>/dev/null; then',
+        `  ${gitLine(["checkout"])} "$base" -- "$f" >/dev/null 2>&1 || { echo "${MARK} failed"; exit 0; }`,
+        'elif g ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then',
+        `  ${gitLine(["rm", "-q", "-f", "--"])} "$f" >/dev/null 2>&1 || { echo "${MARK} failed"; exit 0; }`,
+        'elif g ls-files --others --exclude-standard -- "$f" 2>/dev/null | grep -qxF -- "$f"; then',
+        `  rm -f -- "$f" || { echo "${MARK} failed"; exit 0; }`,
+        "else",
+        `  echo "${MARK} gone"; exit 0`,
+        "fi",
+        `echo "${MARK} reverted"`
+    ].join("\n");
+}
+
+/**
+ * The script that takes one hunk back out of the working tree: the hunk, under
+ * its file's header, applied in reverse. git checks every context line against
+ * the file as it is now, so a file that moved since the diff was read refuses
+ * the patch rather than taking it somewhere else.
+ */
+export function revertHunkScript(input: { workdir: string; baseRef: string; patch: string }): string {
+    const encoded = Buffer.from(input.patch, "utf8").toString("base64");
+    return [
+        ...preamble(input.workdir, input.baseRef),
+        "tmp=$(mktemp 2>/dev/null || echo /tmp/polaris-revert-$$)",
+        "trap 'rm -f \"$tmp\"' EXIT",
+        `printf '%s' ${shellQuote(encoded)} | base64 -d > "$tmp" 2>/dev/null || { echo "${MARK} failed"; exit 0; }`,
+        `${gitLine(["apply", "-R", "--whitespace=nowarn"])} "$tmp" >/dev/null 2>&1 || { echo "${MARK} stale"; exit 0; }`,
+        `echo "${MARK} reverted"`
+    ].join("\n");
+}
+
+export type RevertResult = "reverted" | "gone" | "stale" | "failed" | "nocheckout" | "nobase";
+
+/** What a revert script said, or null when it never got as far as saying. */
+export function parseRevert(output: string): RevertResult | null {
+    const line = output.split("\n").find((row) => row.startsWith(MARK));
+    const word = line?.slice(MARK.length).trim().split(/\s+/)[0];
+    return word === "reverted" ||
+        word === "gone" ||
+        word === "stale" ||
+        word === "failed" ||
+        word === "nocheckout" ||
+        word === "nobase"
+        ? word
+        : null;
+}

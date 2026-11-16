@@ -160,6 +160,66 @@ export function computerDiff(answer: core.WorkspaceAnswer | null): DiffAnswer {
     }
 }
 
+export type RevertAnswer =
+    | { kind: "done"; result: changes.RevertResult | "large" }
+    | { kind: "unavailable"; reason: ChangesUnavailable | "over" }
+    | { kind: "unreachable" };
+
+/**
+ * Put back one file, or one hunk of it, the way it was where the branch
+ * started. Only while the session runs: a finished container has no checkout,
+ * and a finished server session's worktree is what was kept of its work.
+ *
+ * A hunk is named by its place and its `hunkId`, and the diff is read again
+ * here rather than taken from the browser: the patch that is applied is always
+ * one this server read from that file, and a diff that moved since the page
+ * drew it answers `stale` instead of reverting something else.
+ */
+export async function revertSessionChange(
+    session: SessionView,
+    input: { path: string; hunk?: { index: number; id: string } }
+): Promise<RevertAnswer> {
+    if (core.isSessionOver(session.state)) return { kind: "unavailable", reason: "over" };
+    const machine = await machineOf(session.id);
+    const unavailable = changesUnavailable(session, machine.hasMachine);
+    if (unavailable) return { kind: "unavailable", reason: unavailable };
+    const run = async (script: string) =>
+        (await runInSession(session.id, script, { evenIfFinished: true })).output;
+    try {
+        if (!input.hunk) {
+            const said = changes.parseRevert(
+                await run(changes.revertFileScript({ workdir: machine.workdir, baseRef: session.baseRef, path: input.path }))
+            );
+            return said ? { kind: "done", result: said } : { kind: "unreachable" };
+        }
+        const diff = await changes.readFileDiff((offset) =>
+            run(
+                changes.fileDiffScript({
+                    workdir: machine.workdir,
+                    baseRef: session.baseRef,
+                    path: input.path,
+                    offset
+                })
+            )
+        );
+        if (diff.kind === "gone" || diff.kind === "nocheckout" || diff.kind === "nobase" || diff.kind === "failed")
+            return { kind: "done", result: diff.kind };
+        if (diff.kind !== "diff") return { kind: "done", result: "stale" };
+        const { header, hunks } = changes.splitHunks(diff.text);
+        const hunk = hunks[input.hunk.index];
+        if (!hunk || hunk.id !== input.hunk.id) return { kind: "done", result: "stale" };
+        const patch = header + hunk.text;
+        if (Buffer.byteLength(patch, "utf8") > changes.MAX_HUNK_PATCH_BYTES) return { kind: "done", result: "large" };
+        const said = changes.parseRevert(
+            await run(changes.revertHunkScript({ workdir: machine.workdir, baseRef: session.baseRef, patch }))
+        );
+        return said ? { kind: "done", result: said } : { kind: "unreachable" };
+    } catch (error) {
+        console.error(`polaris: could not revert a change of session ${session.id}:`, error);
+        return { kind: "unreachable" };
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Pull requests
 // ---------------------------------------------------------------------------

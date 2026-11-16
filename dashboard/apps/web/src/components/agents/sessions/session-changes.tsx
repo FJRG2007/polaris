@@ -16,17 +16,20 @@ import { CopyButton } from "@/components/copy-button";
 import { CodeSurface } from "@/components/code-surface";
 import type { SessionView } from "@/lib/agents/session-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { ChangedFile, FileDiff } from "@/lib/agents/session-changes";
+import { useConfirm } from "@/components/confirm-dialog";
+import { splitHunks, type ChangedFile, type FileDiff } from "@/lib/agents/session-changes";
 import type { ChangesAnswer, DiffAnswer } from "@/lib/agents/session-review";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import {
+    Check,
     ExternalLink,
     FileDiff as FileDiffIcon,
     GitPullRequest,
     Loader2,
     MessageSquare,
     RefreshCw,
-    Send
+    Send,
+    Undo2
 } from "lucide-react";
 import {
     Badge,
@@ -47,6 +50,7 @@ import {
 } from "@polaris/ui";
 import {
     openSessionPullRequestAction,
+    revertSessionChangeAction,
     sendReviewCommentsAction,
     sessionFileDiffAction,
     sessionShipAction,
@@ -72,6 +76,21 @@ export function movedFiles(before: readonly ChangedFile[] | null, after: readonl
     return new Set(
         after.filter((file) => was.get(file.path) !== `${file.added}:${file.removed}`).map((file) => file.path)
     );
+}
+
+/** A file's counts, which an acceptance is held against: a file the agent
+ *  changes again after it was accepted is shown as changed again. */
+const countsOf = (file: ChangedFile) => `${file.added}:${file.removed}`;
+
+/** What accepting and reverting need from the list, for the open file. */
+interface FileActions {
+    accepted: boolean;
+    toggleFile: () => void;
+    revertFile: () => void;
+    acceptedHunks: ReadonlySet<string>;
+    toggleHunk: (id: string) => void;
+    revertHunk: (index: number, id: string) => void;
+    busy: boolean;
 }
 
 interface ReadDiff {
@@ -116,6 +135,12 @@ export function SessionChanges({
     const [reviewNote, setReviewNote] = useState<{ tone: "ok" | "error"; text: string } | null>(
         null
     );
+    // Files and hunks somebody accepted: kept in the checkout, marked, and
+    // folded out of the way. A file is held to the counts it was accepted at.
+    const [acceptedFiles, setAcceptedFiles] = useState<ReadonlyMap<string, string>>(() => new Map());
+    const [acceptedHunks, setAcceptedHunks] = useState<ReadonlySet<string>>(() => new Set());
+    const [reverting, setReverting] = useState(false);
+    const [confirm, confirmElement] = useConfirm();
     const reads = useRef(0);
     // The list as it was last read, to tell what the agent just changed.
     const last = useRef<ChangedFile[] | null>(null);
@@ -266,6 +291,64 @@ export function SessionChanges({
         void load();
     };
 
+    const isAccepted = (file: ChangedFile) => acceptedFiles.get(file.path) === countsOf(file);
+    const toggleFile = (file: ChangedFile) =>
+        setAcceptedFiles((current) => {
+            const next = new Map(current);
+            if (next.get(file.path) === countsOf(file)) next.delete(file.path);
+            else next.set(file.path, countsOf(file));
+            return next;
+        });
+    const toggleHunk = (path: string, id: string) =>
+        setAcceptedHunks((current) => {
+            const next = new Set(current);
+            const key = `${path}\n${id}`;
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+
+    /** Put a file, or one hunk of it, back as the branch started - after asking,
+     *  because what the agent wrote there is gone once it is done. */
+    const revert = async (path: string, hunk?: { index: number; id: string }) => {
+        if (reverting) return;
+        const ok = await confirm({
+            title: hunk ? t("session.changes.revertHunkTitle") : t("session.changes.revertFileTitle", { path }),
+            description: hunk
+                ? t("session.changes.revertHunkDescription", { path })
+                : t("session.changes.revertFileDescription"),
+            confirmLabel: t("session.changes.revert"),
+            danger: true
+        });
+        if (!ok) return;
+        setReverting(true);
+        const result = await runAction(
+            () => revertSessionChangeAction({ sessionId: session.id, path, hunk }),
+            setProblem
+        );
+        setReverting(false);
+        if (!result) return;
+        const answer = result.answer;
+        if (result.error || !answer) return setProblem(result.error ?? t("session.changes.unreachable"));
+        if (answer.kind === "unavailable")
+            return setProblem(
+                answer.reason === "over"
+                    ? t("session.changes.revertOver")
+                    : t(`session.changes.unavailable.${answer.reason}`, { branch: session.branch })
+            );
+        if (answer.kind === "unreachable") return setProblem(t("session.changes.unreachable"));
+        setProblem(
+            answer.result === "reverted" || answer.result === "gone"
+                ? null
+                : answer.result === "stale"
+                  ? t("session.changes.revertStale")
+                  : answer.result === "large"
+                    ? t("session.changes.revertLarge")
+                    : t("session.changes.revertFailed")
+        );
+        await load();
+    };
+
     const addComment = (comment: LineComment) => {
         setReviewNote(null);
         setComments((list) => [
@@ -374,9 +457,17 @@ export function SessionChanges({
                                         title={file.path}
                                         className={cn(
                                             "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-start text-xs hover:bg-muted",
-                                            selected === file.path && "bg-muted"
+                                            selected === file.path && "bg-muted",
+                                            isAccepted(file) && "text-muted-foreground"
                                         )}
                                     >
+                                        {isAccepted(file) ? (
+                                            <Check
+                                                className="size-3.5 shrink-0 text-success"
+                                                role="img"
+                                                aria-label={t("session.changes.accepted")}
+                                            />
+                                        ) : null}
                                         {moved.has(file.path) ? (
                                             <span
                                                 className="size-1.5 shrink-0 animate-pulse rounded-full bg-primary"
@@ -427,6 +518,24 @@ export function SessionChanges({
                             diff={selected ? diffs[selected]?.diff : undefined}
                             loading={selected ? pending.has(selected) : false}
                             retry={() => selected && void open(selected)}
+                            actions={(() => {
+                                const file = listing.files.find((row) => row.path === selected);
+                                if (over || !file) return null;
+                                const prefix = `${file.path}\n`;
+                                return {
+                                    accepted: isAccepted(file),
+                                    toggleFile: () => toggleFile(file),
+                                    revertFile: () => void revert(file.path),
+                                    acceptedHunks: new Set(
+                                        [...acceptedHunks]
+                                            .filter((key) => key.startsWith(prefix))
+                                            .map((key) => key.slice(prefix.length))
+                                    ),
+                                    toggleHunk: (id: string) => toggleHunk(file.path, id),
+                                    revertHunk: (index: number, id: string) => void revert(file.path, { index, id }),
+                                    busy: reverting
+                                };
+                            })()}
                             review={
                                 over
                                     ? null
@@ -442,6 +551,7 @@ export function SessionChanges({
                     </div>
                 ) : null}
                 {problem && listing ? <p className="text-xs text-danger">{problem}</p> : null}
+                {confirmElement}
             </CardBody>
         </Card>
     );
@@ -452,12 +562,15 @@ function DiffPane({
     diff,
     loading,
     retry,
+    actions = null,
     review
 }: {
     path: string | null;
     diff: FileDiff | "unreachable" | undefined;
     loading: boolean;
     retry: () => void;
+    /** Accepting and reverting, or null where nothing can be changed. */
+    actions?: FileActions | null;
     /** Commenting on lines, or null once the agent can no longer read them. */
     review: {
         on: boolean;
@@ -488,6 +601,38 @@ function DiffPane({
                     {path}
                 </span>
                 <CopyButton value={path} />
+                {actions && diff !== undefined && diff !== "unreachable" && diff.kind !== "gone" ? (
+                    <>
+                        <Button
+                            size="sm"
+                            variant={actions.accepted ? "secondary" : "ghost"}
+                            onClick={actions.toggleFile}
+                            aria-pressed={actions.accepted}
+                            title={t("session.changes.acceptFile")}
+                            aria-label={t("session.changes.acceptFile")}
+                        >
+                            <Check className="size-4 shrink-0" />
+                            <span className="hidden sm:inline">
+                                {actions.accepted ? t("session.changes.accepted") : t("session.changes.accept")}
+                            </span>
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={actions.revertFile}
+                            disabled={actions.busy}
+                            title={t("session.changes.revertFile")}
+                            aria-label={t("session.changes.revertFile")}
+                        >
+                            {actions.busy ? (
+                                <Loader2 className="size-4 shrink-0 animate-spin" />
+                            ) : (
+                                <Undo2 className="size-4 shrink-0" />
+                            )}
+                            <span className="hidden sm:inline">{t("session.changes.revert")}</span>
+                        </Button>
+                    </>
+                ) : null}
                 {review && diff !== undefined && diff !== "unreachable" && diff.kind === "diff" ? (
                     <Button
                         size="sm"
@@ -518,6 +663,8 @@ function DiffPane({
                         onAdd={review.add}
                         onRemove={review.remove}
                     />
+                ) : diff.kind === "diff" && actions ? (
+                    <HunkList path={path} text={diff.text} actions={actions} />
                 ) : diff.kind === "diff" ? (
                     <CodeSurface
                         code={diff.text.replace(/\n$/, "")}
@@ -538,6 +685,80 @@ function DiffPane({
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+/**
+ * A diff hunk by hunk, each with its own Accept and Revert, the way OpenCode
+ * and the editors with an agent in them offer it. An accepted hunk folds down
+ * to its `@@` line; it stays in the checkout either way.
+ */
+function HunkList({ path, text, actions }: { path: string; text: string; actions: FileActions }) {
+    const t = useTranslations("agents");
+    const { hunks } = splitHunks(text);
+    if (hunks.length === 0)
+        return (
+            <CodeSurface
+                code={text.replace(/\n$/, "")}
+                language="diff"
+                ariaLabel={t("session.changes.diffOf", { path })}
+            />
+        );
+    return (
+        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain">
+            {hunks.map((hunk, index) => {
+                const accepted = actions.acceptedHunks.has(hunk.id);
+                const head = hunk.text.slice(0, hunk.text.indexOf("\n"));
+                return (
+                    <section
+                        key={`${index}:${hunk.id}`}
+                        aria-label={t("session.changes.hunk", { number: index + 1 })}
+                        className="border-b border-border last:border-b-0"
+                    >
+                        <div className="flex min-w-0 items-center gap-1 bg-muted px-2 py-0.5">
+                            {accepted ? <Check className="size-3.5 shrink-0 text-success" /> : null}
+                            <span
+                                className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground"
+                                title={head}
+                            >
+                                {head}
+                            </span>
+                            <Button
+                                size="sm"
+                                variant={accepted ? "secondary" : "ghost"}
+                                onClick={() => actions.toggleHunk(hunk.id)}
+                                aria-pressed={accepted}
+                                title={t("session.changes.acceptHunk")}
+                                aria-label={t("session.changes.acceptHunk")}
+                            >
+                                <Check className="size-4 shrink-0" />
+                                <span className="hidden sm:inline">
+                                    {accepted ? t("session.changes.accepted") : t("session.changes.accept")}
+                                </span>
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => actions.revertHunk(index, hunk.id)}
+                                disabled={actions.busy}
+                                title={t("session.changes.revertHunk")}
+                                aria-label={t("session.changes.revertHunk")}
+                            >
+                                <Undo2 className="size-4 shrink-0" />
+                                <span className="hidden sm:inline">{t("session.changes.revert")}</span>
+                            </Button>
+                        </div>
+                        {accepted ? null : (
+                            <CodeSurface
+                                code={hunk.text.replace(/\n$/, "")}
+                                language="diff"
+                                ariaLabel={t("session.changes.diffOf", { path })}
+                            />
+                        )}
+                    </section>
+                );
+            })}
         </div>
     );
 }

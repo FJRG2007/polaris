@@ -736,6 +736,17 @@ const fileDiffInputSchema = z.object({
     path: z.string().min(1).max(4096).refine(safeChangePath)
 });
 
+const revertInputSchema = z.object({
+    sessionId: sessionIdSchema,
+    path: z.string().min(1).max(4096).refine(safeChangePath),
+    hunk: z
+        .object({
+            index: z.number().int().min(0).max(100_000),
+            id: z.string().regex(/^[0-9a-f]{8}$/)
+        })
+        .optional()
+});
+
 const openPullInputSchema = z.object({
     sessionId: sessionIdSchema,
     title: z.string().trim().min(1).max(256),
@@ -768,6 +779,21 @@ export async function sessionFileDiffAction(
     const session = await controlledSession(parsed.data.sessionId);
     if (!session) return { error: t("sessions.errors.gone") };
     return { answer: await review.sessionFileDiff(session, parsed.data.path) };
+}
+
+/** Put one changed file, or one hunk of it, back the way the branch started.
+ *  Destructive: the screen asks first. */
+export async function revertSessionChangeAction(
+    input: unknown
+): Promise<{ answer?: review.RevertAnswer; error?: string }> {
+    const t = await getTranslations("agents");
+    const parsed = revertInputSchema.safeParse(input);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await controlledSession(parsed.data.sessionId);
+    if (!session) return { error: t("sessions.errors.gone") };
+    return {
+        answer: await review.revertSessionChange(session, { path: parsed.data.path, hunk: parsed.data.hunk })
+    };
 }
 
 /** The files in a running session's checkout, for the workspace beside it. */

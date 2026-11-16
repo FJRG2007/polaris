@@ -403,7 +403,23 @@
             "errors": {
                 "invalid": "No se pudo leer esa petición. Recarga la página."
             },
-            "justChanged": "Recién cambiado"
+            "justChanged": "Recién cambiado",
+            "accept": "Aceptar",
+            "accepted": "Aceptado",
+            "acceptFile": "Aceptar archivo",
+            "acceptHunk": "Aceptar cambio",
+            "revert": "Revertir",
+            "revertFile": "Revertir archivo",
+            "revertHunk": "Revertir cambio",
+            "hunk": "Cambio {number}",
+            "revertFileTitle": "¿Revertir {path}?",
+            "revertFileDescription": "El archivo vuelve a como estaba al crear la rama. Se pierde lo que escribió el agente.",
+            "revertHunkTitle": "¿Revertir este cambio?",
+            "revertHunkDescription": "Estas líneas de {path} vuelven a como estaban. El resto del archivo se queda.",
+            "revertStale": "El archivo cambió desde que se mostró. Míralo de nuevo y reintenta.",
+            "revertLarge": "Este cambio es muy grande para revertirlo solo. Revierte el archivo entero.",
+            "revertFailed": "No se pudo revertir. Inténtalo de nuevo.",
+            "revertOver": "La sesión terminó, así que ya no se pueden cambiar sus archivos."
         },
         "ship": {
             "open": "Abrir una pull request",
