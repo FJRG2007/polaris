@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { FakePipe, noSleep } from "./fake-pipe";
 import { describe, expect, it, vi } from "vitest";
+import * as core from "@polaris/core";
 import { acpLaunchCommand } from "@/lib/agents/acp/pipe-commands";
 import type { HistoryRow } from "@/lib/agents/transcript-decoders";
 import { AcpRefusal, AcpSessionDriver, meetsFloor, TOO_OLD, type DriverDeps } from "@/lib/agents/acp/session-driver";
@@ -16,7 +17,23 @@ import {
 
 type Frame = Record<string, unknown>;
 
-const AGENTS = ["claude", "gemini", "qwen", "kimi", "cursor"] as const;
+const AGENTS = [
+    "claude",
+    "gemini",
+    "qwen",
+    "kimi",
+    "cursor",
+    "droid",
+    "grok",
+    "opencode",
+    "omp",
+    "kimchi",
+    "hermes",
+    "command-code",
+    "deepseek-harness",
+    "copilot",
+    "agy"
+] as const;
 
 function recorded(cli: string): Frame[] {
     return readFileSync(join(__dirname, "fixtures", "agents", `${cli}.jsonl`), "utf8")
@@ -73,7 +90,8 @@ function harness(cli: string, pipe: FakePipe, vendorSessionId: string | null = n
     const binding = acpBinding(cli)!;
     const deps: DriverDeps = {
         session: async () => ({ binding, workdir: "/work/repo", vendorSessionId }),
-        version: async () => "0.16.2",
+        // Above every binding's floor.
+        version: async () => "99.0.0",
         start: async (_id, argv) => {
             starts.push(argv);
         },
@@ -103,6 +121,18 @@ describe("ACP provider bindings", () => {
         expect(acpBinding("qwen")?.minVersion).toBe("0.16.0");
         expect(acpBinding("kimi")?.argv).toEqual(["kimi", "acp"]);
         expect(acpBinding("cursor")?.argv).toEqual(["cursor-agent", "acp"]);
+        expect(acpBinding("droid")?.argv).toEqual(["droid", "exec", "--output-format", "acp"]);
+        expect(acpBinding("grok")?.argv).toEqual(["grok", "agent", "stdio"]);
+        expect(acpBinding("opencode")?.argv).toEqual(["opencode", "acp"]);
+        expect(acpBinding("omp")?.argv).toEqual(["omp", "acp"]);
+        expect(acpBinding("omp")?.minVersion).toBe("15.0.0");
+        expect(acpBinding("kimchi")?.argv).toEqual(["kimchi", "--mode", "acp"]);
+        expect(acpBinding("kimchi")?.minVersion).toBe("0.0.7");
+        expect(acpBinding("hermes")?.argv).toEqual(["hermes", "acp"]);
+        expect(acpBinding("command-code")?.argv).toEqual(["command-code", "acp"]);
+        expect(acpBinding("deepseek-harness")?.argv).toEqual(["dsh", "--profile", "acp"]);
+        expect(acpBinding("copilot")?.argv).toEqual(["copilot", "--acp"]);
+        expect(acpBinding("agy")?.argv).toEqual(["agy", "acp"]);
         const claude = acpBinding("claude")!.argv;
         expect(claude.slice(0, 2)).toEqual(["sh", "-c"]);
         expect(claude[2]).toContain(`exec npx -y ${CLAUDE_ACP_ADAPTER}`);
@@ -117,8 +147,17 @@ describe("ACP provider bindings", () => {
         for (const cli of AGENTS) expect(() => acpLaunchCommand("/state", acpBinding(cli)!.argv)).not.toThrow();
     });
 
+    it("starts each one with a binary its catalogue entry names", () => {
+        for (const cli of AGENTS) {
+            if (cli === "claude") continue;
+            expect(core.agentCliById(cli)?.binaries).toContain(acpBinding(cli)!.argv[0]);
+        }
+    });
+
     it("has no binding for an agent not covered yet", () => {
         expect(acpBinding("codex")).toBeNull();
+        // Pi has no ACP mode of its own, only third-party adapters.
+        expect(acpBinding("pi")).toBeNull();
         expect(chatAvailable("codex", "local")).toBe(false);
     });
 
@@ -137,6 +176,17 @@ describe("ACP provider bindings", () => {
         expect(acpModeFor(claude, "full", [{ id: "default" }])).toBeNull();
         expect(acpModeFor(acpBinding("gemini")!, "plan", [{ id: "plan" }])).toBeNull();
         expect(acpModeFor(acpBinding("cursor")!, "plan", [{ id: "agent" }, { id: "plan" }])).toBe("plan");
+        const commandCode = acpBinding("command-code")!;
+        const offered = (recorded("command-code")[1]!.result as { modes: { availableModes: { id: string }[] } }).modes
+            .availableModes;
+        expect(acpModeFor(commandCode, "ask", offered)).toBe("default");
+        expect(acpModeFor(commandCode, "edits", offered)).toBe("auto-accept");
+        expect(acpModeFor(commandCode, "plan", offered)).toBe("plan");
+        expect(acpModeFor(commandCode, "full", offered)).toBe("bypass");
+        const kimchi = acpBinding("kimchi")!;
+        const kimchiModes = [{ id: "default" }, { id: "plan" }, { id: "auto" }, { id: "yolo" }];
+        expect(acpModeFor(kimchi, "full", kimchiModes)).toBe("yolo");
+        expect(acpModeFor(kimchi, "edits", kimchiModes)).toBeNull();
     });
 });
 
@@ -320,7 +370,7 @@ describe("frames captured from the real agents", () => {
     });
 
     it("reads each captured initialize answer as an agent that can reopen a conversation", () => {
-        for (const cli of ["claude", "gemini", "qwen"]) {
+        for (const cli of ["claude", "gemini", "qwen", "command-code", "droid", "opencode", "copilot"]) {
             const init = recorded(cli)[0]!.result as { agentCapabilities?: { loadSession?: boolean }; agentInfo?: { version?: string } };
             expect(init.agentCapabilities?.loadSession).toBe(true);
             expect(init.agentInfo?.version).not.toContain("fixture");

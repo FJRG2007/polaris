@@ -56,10 +56,31 @@
    0.26.5 all answered `initialize`; line 1 of claude/gemini/qwen fixtures is
    now the real frame. Not exercised: session/new and a prompt (needs sign-in),
    kimi and cursor.
-5. NOT STARTED - U14b: bindings for droid, grok (`agent stdio`), opencode,
-   opencode-v2, pi, omp 15+, kimchi, hermes, command-code, deepseek-harness,
-   copilot, agy, docker-agent - each only with a flag sourced from the vendor's
-   own docs (core's `acp` field is AO's list, not a source). Add each to
-   `BINDINGS` in `acp/providers.ts`, a composed fixture in
-   `test/agents/acp/fixtures/agents/<cli>.jsonl`, and the cli to `AGENTS` in
-   `session-driver.test.ts`.
+5. DONE - U14b: bindings in `acp/providers.ts`, each from the vendor's own
+   docs (source named in the file header):
+
+   | Agent | Launch | Floor | Modes |
+   | --- | --- | --- | --- |
+   | droid | `droid exec --output-format acp` | - | - |
+   | grok | `grok agent stdio` | - | - |
+   | opencode | `opencode acp` | - | - (1.19.5 offers build/plan as a `mode` config option, not ACP modes) |
+   | omp | `omp acp` | 15.0.0 (release "Add ACP conformance support") | - |
+   | kimchi | `kimchi --mode acp` | 0.0.7 | default / plan / yolo |
+   | hermes | `hermes acp` (needs Hermes's `acp` extra) | - | - |
+   | command-code | `command-code acp` (docs: `cmd acp`, same npm entry) | - | default / auto-accept / plan / bypass |
+   | deepseek-harness | `dsh --profile acp` | - | none (README: modes, session/load unsupported) |
+   | copilot | `copilot --acp` | - | - |
+   | agy | `agy acp` | - | - |
+
+   No binding: pi (no vendor ACP mode, only third-party pi-acp adapters),
+   opencode-v2 and docker-agent (not in core's catalogue, so no session can
+   carry them; Docker Agent also has no terminal mode).
+   Real `initialize` captured on lirio-0 (`polaris-acp-test-u14b`, node:24, no
+   credentials, removed) for command-code 1.88.2, droid 1.1.0, opencode 1.19.5,
+   copilot 1.0.105: line 1 of their fixtures. Composed: grok, omp, kimchi,
+   hermes, dsh (no stable npm release two weeks old), agy.
+   Gaps: grok's docs advise `--no-auto-update` in automation but not its
+   position in `agent stdio`, so it is not passed; Hermes without the `acp`
+   extra fails as "exited as soon as it started"; agy's ACP arrived in 1.5.0
+   per third-party release notes only, so no floor.
+6. NOT STARTED - U14c, Codex `app-server` driver.

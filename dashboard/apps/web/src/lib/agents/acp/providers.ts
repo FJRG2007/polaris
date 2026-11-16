@@ -16,6 +16,24 @@
  * - Cursor: `agent acp` (cursor.com/docs/cli/acp). The catalogue's binary is
  *   `cursor-agent`, the name the Cursor installer keeps beside `agent`, so the
  *   one Polaris already resolves is the one started.
+ * - Factory Droid: `droid exec --output-format acp` (docs.factory.com,
+ *   integrations/zed and JetBrains).
+ * - Grok Build: `grok agent stdio` (docs.x.ai, build/cli/headless-scripting).
+ * - OpenCode: `opencode acp` (opencode.ai/docs/acp).
+ * - Oh My Pi: `omp acp` (the oh-my-pi README); 15.0.0 or later, the release
+ *   that added ACP conformance.
+ * - Kimchi: `kimchi --mode acp` (docs.kimchi.dev, coding-acp); 0.0.7 or later.
+ * - Hermes Agent: `hermes acp` (hermes-agent.nousresearch.com, features/acp).
+ *   It needs Hermes's `acp` extra; without it the agent exits at start.
+ * - Command Code: `cmd acp` (commandcode.ai/docs/acp). `command-code` is the
+ *   same entry file in the npm package, and the catalogue's first binary.
+ * - DeepSeek Harness: `dsh --profile acp` (the harness's apps/cli README).
+ * - GitHub Copilot CLI: `copilot --acp`, stdio by default (docs.github.com,
+ *   copilot/reference/acp-server).
+ * - Antigravity: `agy acp` (antigravity.google/docs/cli/acp).
+ *
+ * Pi has no ACP mode of its own (only third-party adapters), and OpenCode 2
+ * and Docker Agent are not in the catalogue, so none of them has a binding.
  *
  * Nothing here is typed by a person: the launch line is quoted word by word by
  * `acpLaunchCommand`, and a mode is only ever one the agent itself offered.
@@ -83,7 +101,32 @@ const BINDINGS: readonly AcpBinding[] = [
         // Cursor's documented ACP modes: agent (asks before it acts), plan
         // (read-only). Its `ask` is read-only Q&A, not Polaris's "ask first".
         modes: { ask: ["agent"], plan: ["plan"] }
-    }
+    },
+    { cli: "droid", argv: ["droid", "exec", "--output-format", "acp"], minVersion: null, modes: {} },
+    { cli: "grok", argv: ["grok", "agent", "stdio"], minVersion: null, modes: {} },
+    { cli: "opencode", argv: ["opencode", "acp"], minVersion: null, modes: {} },
+    { cli: "omp", argv: ["omp", "acp"], minVersion: "15.0.0", modes: {} },
+    {
+        cli: "kimchi",
+        argv: ["kimchi", "--mode", "acp"],
+        minVersion: "0.0.7",
+        // Kimchi's documented ACP modes: default (asks before writes), plan
+        // (read-only), auto (asks only before destructive steps), yolo.
+        // `auto` is not "accept edits", so edits has no candidate.
+        modes: { ask: ["default"], plan: ["plan"], full: ["yolo"] }
+    },
+    { cli: "hermes", argv: ["hermes", "acp"], minVersion: null, modes: {} },
+    {
+        cli: "command-code",
+        argv: ["command-code", "acp"],
+        minVersion: null,
+        // Command Code's documented ACP modes: default, auto-accept, plan,
+        // dont-ask, bypass.
+        modes: { ask: ["default"], edits: ["auto-accept"], plan: ["plan"], full: ["bypass"] }
+    },
+    { cli: "deepseek-harness", argv: ["dsh", "--profile", "acp"], minVersion: null, modes: {} },
+    { cli: "copilot", argv: ["copilot", "--acp"], minVersion: null, modes: {} },
+    { cli: "agy", argv: ["agy", "acp"], minVersion: null, modes: {} }
 ];
 
 /** The binding for a catalogue id, or null for an agent that has none yet. */
