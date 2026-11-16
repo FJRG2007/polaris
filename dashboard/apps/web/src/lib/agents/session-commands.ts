@@ -374,6 +374,12 @@ const PREPARE_WORKTREE = [
     '  printf %s "$POLARIS_MEMORY_SYNC" | base64 -d > "$POLARIS_STATE_DIR/memory-sync.sh"',
     '  chmod 0700 "$POLARIS_STATE_DIR/memory-sync.sh"',
     "fi",
+    // The script that fetches the person's Polar skills (`skillsSyncScript`).
+    // It holds the session's token too. Absent where the home is not theirs.
+    'if [ -n "$POLARIS_SKILLS_SYNC" ]; then',
+    '  printf %s "$POLARIS_SKILLS_SYNC" | base64 -d > "$POLARIS_STATE_DIR/skills-sync.sh"',
+    '  chmod 0700 "$POLARIS_STATE_DIR/skills-sync.sh"',
+    "fi",
     // A hook configuration of the session's own, for a tool pointed at one
     // through a variable (`sessionHookConfig`). Private like the hook script:
     // Codewhale's names the session's address, token and all. Only ever inside
@@ -1109,7 +1115,7 @@ const RUNNER_SCRIPT_BASE64 = Buffer.from(RUNNER_SCRIPT, "utf8").toString("base64
 /** What the setup cleared before the agent started, cleared again by anything
  *  that starts it later from tmux's own environment, which is the boot's. */
 const CLEAR_BOOT_ENV: readonly string[] = [
-    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_AGENT_HOOK_FILE",
+    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_AGENT_HOOK_FILE",
     'for pair in $POLARIS_CREDENTIAL_FILES; do unset "$(printf %s "$pair" | cut -d= -f1)"; done'
 ];
 
@@ -1449,8 +1455,14 @@ const START_AGENT = [
     'if [ -f "$POLARIS_STATE_DIR/memory-sync.sh" ]; then',
     '  as_agent "sh \\"$POLARIS_STATE_DIR/memory-sync.sh\\" restore" || true',
     "fi",
+    // The person's skills as they set them up in Polar - their own, the
+    // built-ins they switched on, and their edits of Enigma's - written over
+    // what Enigma installed, so after it. Best effort, like the memory.
+    'if [ -f "$POLARIS_STATE_DIR/skills-sync.sh" ] && [ -n "$POLARIS_HOME" ]; then',
+    '  as_agent "sh \\"$POLARIS_STATE_DIR/skills-sync.sh\\" \\"$POLARIS_HOME\\"" || true',
+    "fi",
     "unset GIT_AUTH_HEADER",
-    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_AGENT_HOOK_FILE",
+    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_AGENT_HOOK_FILE",
     // Said once, in the terminal the person is looking at, because on a machine
     // they cannot see "please sign in" with no way to and no reason given is the
     // whole of what was wrong with this. Only when Polaris is carrying no

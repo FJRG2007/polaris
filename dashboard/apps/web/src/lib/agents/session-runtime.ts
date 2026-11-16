@@ -49,6 +49,7 @@ import {
 } from "./session-hooks";
 import * as fork from "./session-fork";
 import * as memory from "./session-memory";
+import { skillsSyncScript } from "./session-skills";
 import { endContainerSession, type SaveOutcome } from "./session-work";
 import { clearSessionWaiting, noticeSessionEnded } from "./agent-notices";
 import { syncFinalSessionHistory } from "./session-history";
@@ -166,6 +167,10 @@ interface Bootstrap {
     readonly hookScript: string;
     readonly hookSettings: string;
     readonly memorySync: string;
+    /** The script that fetches the person's Polar skills into the home before
+     *  the agent starts (`session-skills.ts`). Empty where the home is not one
+     *  person's for Polaris to write into. */
+    readonly skillsSync: string;
     /** `ENV=relative/path` pairs, space separated: which of `credentials` are
      *  a file the tool keeps, and where. Names and paths from the catalogue. */
     readonly credentialFiles: string;
@@ -397,6 +402,13 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
                   handoffDir: memory.HANDOFF_DIR
               })
             : "",
+        // The person's skills as set up in Polar, edits included. Only where
+        // Polaris owns the home and it is one person's, as with memory; must
+        // agree with the endpoint, which authorises by the same rule.
+        skillsSync:
+            session.place === "local" && !session.sharedHome && session.ownerId
+                ? skillsSyncScript({ url: `${base}/api/agents/sessions/${session.id}/skills`, token })
+                : "",
         mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
         // Empty for a workspace, which clones nothing. A header built around an
         // empty token is a header git would send.
@@ -743,6 +755,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_HOOK_SCRIPT: asFile(boot.hookScript),
         POLARIS_HOOK_SETTINGS: asFile(boot.hookSettings),
         POLARIS_MEMORY_SYNC: boot.memorySync ? asFile(boot.memorySync) : "",
+        POLARIS_SKILLS_SYNC: boot.skillsSync ? asFile(boot.skillsSync) : "",
         POLARIS_CREDENTIAL_FILES: boot.credentialFiles,
         POLARIS_MCP_CONFIG: asFile(boot.mcpConfig),
         POLARIS_GIT_CREDENTIAL: boot.gitCredential ? asFile(boot.gitCredential) : "",
