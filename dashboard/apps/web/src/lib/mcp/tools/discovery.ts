@@ -22,14 +22,15 @@ import { z } from "zod";
 import { refLine } from "../search";
 import * as core from "@polaris/core";
 import { MCP_CATEGORIES, type McpCategory } from "../scope-table";
-import { toolCategory, toolScopes, type McpTool } from "../protocol";
+import { offeredTo, toolCategory, toolScopes, type McpCaller, type McpTool } from "../protocol";
 
-/** The catalogue as the caller sees it, and every app's search provider -
- *  loaded when a call runs: the catalogue module imports this one. */
-async function catalogue() {
+/** The catalogue as the caller sees it - never a tool it switched off - and
+ *  every app's search provider, loaded when a call runs: the catalogue module
+ *  imports this one. */
+async function catalogue(caller: McpCaller) {
     const { mcpSearchProviders, mcpTools } = await import("../catalog");
     const [tools, providers] = await Promise.all([mcpTools(), mcpSearchProviders()]);
-    return { tools, providers };
+    return { tools: tools.filter((tool) => offeredTo(tool, caller)), providers };
 }
 
 const searchInput = z.object({
@@ -57,7 +58,7 @@ const searchTool: McpTool<z.infer<typeof searchInput>> = {
     readOnly: true,
     async run(input, caller) {
         const { searchEverywhere } = await import("../search");
-        const { tools, providers } = await catalogue();
+        const { tools, providers } = await catalogue(caller);
         const answer = await searchEverywhere({
             query: input.query,
             caller,
@@ -131,7 +132,7 @@ const toolsTool: McpTool<z.infer<typeof toolsInput>> = {
     scope: null,
     readOnly: true,
     async run(input, caller) {
-        const { tools } = await catalogue();
+        const { tools } = await catalogue(caller);
         const rows = tools
             .map(
                 (tool): ToolRow => ({

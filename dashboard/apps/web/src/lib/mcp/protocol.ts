@@ -62,6 +62,17 @@ export interface McpCaller {
      *  database tools reach. Null or absent is every one the person can open,
      *  which is what a key and a session's own token reach. */
     readonly databaseIds?: readonly string[] | null;
+    /** Tools this caller is never offered: the ones its person switched off for
+     *  the client calling (Polar's own tool switches). Left off `tools/list`,
+     *  refused on `tools/call` as if they did not exist, and never named by the
+     *  discovery tools. Absent for a key or a grant, which see every tool their
+     *  scopes reach. */
+    readonly hidden?: ReadonlySet<string> | null;
+}
+
+/** Whether a tool is offered to this caller at all: not one it switched off. */
+export function offeredTo(tool: Pick<McpTool<never>, "name">, caller: McpCaller): boolean {
+    return !caller.hidden?.has(tool.name);
 }
 
 /** What a tool gives back. Text because that is what a model reads; `structured`
@@ -340,7 +351,9 @@ export async function handleMcpMessage(
             // list a model then has to choose from on every turn; the rest are
             // still named, with the scope each needs, by `polaris_tools`.
             return ok(id, {
-                tools: tools.filter((tool) => callerMayUse(tool, caller)).map(describeTool)
+                tools: tools
+                    .filter((tool) => offeredTo(tool, caller) && callerMayUse(tool, caller))
+                    .map(describeTool)
             });
         case "tools/call":
             return callTool(id, params ?? {}, tools, caller);
@@ -356,7 +369,9 @@ async function callTool(
     caller: McpCaller
 ): Promise<JsonRpcResponse> {
     const name = typeof params.name === "string" ? params.name : "";
-    const tool = tools.find((candidate) => candidate.name === name);
+    const tool = tools.find(
+        (candidate) => candidate.name === name && offeredTo(candidate, caller)
+    );
     if (!tool)
         return fail(id, RPC_INVALID_PARAMS, `There is no tool called ${name || "(unnamed)"}`);
 
