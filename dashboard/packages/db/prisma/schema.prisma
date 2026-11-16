@@ -43,6 +43,7 @@ model User {
     polarToolGrants   PolarToolGrant[]
     polarConnectors   PolarConnector[]
     polarSkills       PolarSkill[]
+    polarSkillOverrides PolarSkillOverride[]
     polarAgents       PolarAgent[]
     polarAgentDefaults PolarAgentDefault[]
     polarAttachments  PolarAttachment[]
@@ -16879,6 +16880,31 @@ model PolarSkill {
     updatedAt    DateTime @updatedAt
 
     @@unique([ownerId, name])
+}
+
+// An edit layered over a skill Polaris does not own the text of - a built-in
+// (`builtin:<id>`) or one of Enigma's (`enigma:<name>`) - for one person
+// (`owner` is their id) or for everybody on this Polaris (`owner` is
+// "instance", written by an administrator). Null text means not edited; the
+// base columns hold the upstream text the edit was made against, so a newer
+// upstream is noticed instead of silently hidden. `enabled` is a person's own
+// switch for a built-in (null: off). See lib/polar/skills/overrides.ts.
+model PolarSkillOverride {
+    id               String   @id @default(uuid(7)) @db.Uuid
+    owner            String
+    userId           String?  @db.Uuid
+    user             User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+    skill            String
+    description      String?
+    instructions     String?
+    baseDescription  String?
+    baseInstructions String?
+    enabled          Boolean?
+    createdAt        DateTime @default(now())
+    updatedAt        DateTime @updatedAt
+
+    @@unique([owner, skill])
+    @@index([userId])
 }
 
 // A custom agent one person made, as ChatGPT's GPTs: a name, the instructions

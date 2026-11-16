@@ -65,6 +65,7 @@ import { polarAgentDefault } from "@/lib/polar/agents/defaults";
 import { trialSkillSchema } from "@/lib/polar/skills/shared";
 import { ownEnigma } from "@/lib/agents/agent-defaults-service";
 import { enigmaCatalogue } from "@/lib/polar/skills/enigma-catalogue";
+import { effectiveUpstreamSkills } from "@/lib/polar/skills/override-store";
 import { chatCommandSkills } from "@/lib/polar/skills/enigma-commands";
 import {
     USE_SKILL,
@@ -440,11 +441,12 @@ export async function POST(request: Request): Promise<Response> {
             await savePolarGoal(user.id, body.data.threadId, goal);
         }
     }
-    const [instructions, remembers, savedSkills, enigma] = await Promise.all([
+    const pickedSkills = Boolean(agent && agent.skills.length > 0);
+    const [instructions, remembers, savedSkills, enigma, builtinSkills] = await Promise.all([
         polarThreadInstructions(user.id, body.data.threadId),
         temporary ? Promise.resolve(false) : polarMemoryEnabled(user.id),
         // A chat still answers when the skills cannot be read; it just lists none.
-        (agent && agent.skills.length > 0
+        (pickedSkills && agent
             ? agentSkills(user.id, agent.skills)
             : enabledSkills(user.id)
         ).catch((error: unknown) => {
@@ -458,7 +460,13 @@ export async function POST(request: Request): Promise<Response> {
                 if (!resolved.enabled) return null;
                 const off = new Set(resolved.skillsOff);
                 const { skills, commands } = await enigmaCatalogue();
-                const own = skills.filter((skill) => !off.has(skill.name));
+                // With the person's and the instance's edits applied.
+                const own = (
+                    await effectiveUpstreamSkills(
+                        user.id,
+                        skills.filter((skill) => !off.has(skill.name))
+                    )
+                ).enigma;
                 // Its "/" commands a chat can run load like skills; a skill of
                 // the same name keeps it.
                 return [
@@ -471,11 +479,25 @@ export async function POST(request: Request): Promise<Response> {
             .catch((error: unknown) => {
                 console.error("polar: could not read the Enigma settings", error);
                 return null;
-            })
+            }),
+        // The built-ins the person switched on, edits applied. An agent that
+        // names its skills gets those alone.
+        pickedSkills
+            ? Promise.resolve([])
+            : effectiveUpstreamSkills(user.id, [])
+                  .then((found) => found.builtins)
+                  .catch((error: unknown) => {
+                      console.error("polar: could not read the built-in skills", error);
+                      return [];
+                  })
     ]);
     // The person's enabled skills, and the one a temporary chat is trying -
     // read again from the request on every turn, never stored.
-    const skills = chatSkills(savedSkills, temporary ? readTrialSkill(body.data.trialSkill) : null);
+    // A person's own skill keeps its name; a built-in of the same name steps aside.
+    const skills = chatSkills(
+        [...savedSkills, ...builtinSkills.filter((skill) => !savedSkills.some((own) => own.name === skill.name))],
+        temporary ? readTrialSkill(body.data.trialSkill) : null
+    );
     // A person's own skill keeps its name; Enigma's of the same name steps aside.
     const enigmaSkills = (enigma ?? []).filter(
         (skill) => !skills.some((own) => own.name === skill.name)
