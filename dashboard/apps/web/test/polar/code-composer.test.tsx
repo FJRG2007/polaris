@@ -190,6 +190,7 @@ describe("Code's composer is Chat's", () => {
             "Effort: Default",
             // A Claude source runs on Claude Code, whose questions are answered here.
             "Permissions: Full access",
+            "Conversation: Terminal",
             // Where the session runs: Polaris, or one of the person's paired computers.
             "Runs on: Polaris",
             "Start the task first, then talk to it"
