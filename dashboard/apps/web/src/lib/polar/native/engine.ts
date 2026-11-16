@@ -63,6 +63,8 @@ export interface NativeSessionOptions {
     readonly maxOutputTokens?: number;
     /** For a subagent: its tools, its sidechain transcript, no further Task. */
     readonly child?: { readonly tools: readonly NativeTool<never>[]; readonly agentId: string };
+    /** The person's custom tools (`custom-tools.ts`), beside the built-in ones. */
+    readonly customTools?: readonly NativeTool<never>[];
 }
 
 export interface TurnResult {
@@ -112,7 +114,7 @@ export class NativeSession {
     }
 
     private tools(): readonly NativeTool<never>[] {
-        return this.options.child?.tools ?? NATIVE_TOOLS;
+        return this.options.child?.tools ?? [...NATIVE_TOOLS, ...(this.options.customTools ?? [])];
     }
 
     private toolSet(): ToolSet {

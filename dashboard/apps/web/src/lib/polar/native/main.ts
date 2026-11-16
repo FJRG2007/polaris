@@ -25,7 +25,8 @@ import * as readline from "node:readline";
 import { discoverRules } from "@/lib/polar/native/rules";
 import { CONVERSATION_ID, replayTranscript } from "@/lib/polar/native/resume";
 import { PERMISSION_MODES, type PermissionMode } from "@/lib/polar/native/tools";
-import { launchModel, launchSession, readLaunchEnv, transcriptDir, transcriptPathOf, type LaunchConfig } from "@/lib/polar/native/launch";
+import { fetchCustomTools } from "@/lib/polar/native/custom-tools";
+import { launchModel, launchSession, readLaunchEnv, sessionRoutes, transcriptDir, transcriptPathOf, type LaunchConfig } from "@/lib/polar/native/launch";
 
 /** The command line, parsed; anything unknown is refused by name. */
 export interface AgentArgs {
@@ -93,6 +94,7 @@ async function main(): Promise<number> {
         return 2;
     }
     let config: LaunchConfig = args.model ? { ...read.config, POLARIS_MODEL: args.model } : read.config;
+    const customTools = await fetchCustomTools(sessionRoutes(config).tools, config.POLARIS_SESSION_TOKEN);
     // The token is this process's own; nothing the agent runs inherits it.
     delete process.env.POLARIS_SESSION_TOKEN;
 
@@ -115,7 +117,8 @@ async function main(): Promise<number> {
     const session = launchSession(config, {
         writeTranscript: (line) => fs.appendFileSync(transcriptPath, `${line}\n`),
         memory: rules.map(({ file, text }) => ({ file, text })),
-        conversationId: conversation.id
+        conversationId: conversation.id,
+        customTools
     });
     if (args.mode) session.setMode(args.mode);
     if (previous) session.restore(replayTranscript(previous));

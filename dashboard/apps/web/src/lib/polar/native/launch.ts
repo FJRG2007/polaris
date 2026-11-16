@@ -55,6 +55,7 @@ export function sessionRoutes(config: Pick<LaunchConfig, "POLARIS_URL" | "POLARI
     return {
         events: `${base}/events`,
         permission: `${base}/permission`,
+        tools: `${base}/tools`,
         models: `${config.POLARIS_URL}/api/v1`
     };
 }
@@ -90,6 +91,8 @@ export interface LaunchParts {
     readonly task?: string | null;
     /** The conversation's own id, as hooks report it; the session's when absent. */
     readonly conversationId?: string;
+    /** The person's custom tools (`fetchCustomTools`). */
+    readonly customTools?: NativeSessionOptions["customTools"];
 }
 
 /** A session ready to `start()`, from a validated config. */
@@ -110,6 +113,7 @@ export function launchSession(config: LaunchConfig, parts: LaunchParts): NativeS
                 ...(parts.fetchImpl ? { fetchImpl: parts.fetchImpl } : {})
             }),
         writeTranscript: parts.writeTranscript,
+        ...(parts.customTools ? { customTools: parts.customTools } : {}),
         transcriptPath: transcriptPathOf(config, conversationId),
         environment: {
             platform: process.platform,

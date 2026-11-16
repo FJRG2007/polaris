@@ -32,6 +32,7 @@ describe("the session's routes and transcript", () => {
         expect(sessionRoutes({ POLARIS_URL: "https://polaris.test", POLARIS_SESSION_ID: "s_123" })).toEqual({
             events: "https://polaris.test/api/agents/sessions/s_123/events",
             permission: "https://polaris.test/api/agents/sessions/s_123/permission",
+            tools: "https://polaris.test/api/agents/sessions/s_123/tools",
             models: "https://polaris.test/api/v1"
         });
     });
