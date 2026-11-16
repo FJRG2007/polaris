@@ -246,7 +246,14 @@ const findToolsInput = z.object({
         .string()
         .max(200)
         .optional()
-        .describe("An area from an earlier answer: lists every tool in it, without loading.")
+        .describe("An area from an earlier answer: lists its tools, without loading."),
+    page: z
+        .number()
+        .int()
+        .min(0)
+        .max(1000)
+        .optional()
+        .describe("Which page of an area's tools, from 0.")
 });
 
 /** A description's first sentence, capped: what a tool is for. */
@@ -264,21 +271,30 @@ export function findToolsTool(catalog: readonly SearchEntry[]): ToolSet {
             inputSchema: findToolsInput as unknown as FlexibleSchema<
                 z.infer<typeof findToolsInput>
             >,
-            async execute({ query, names, area }) {
+            async execute({ query, names, area, page }) {
                 // Browsing one area reads no words at all, so it works whatever
                 // language the person asked in. It lists; it does not load,
                 // since an area can hold hundreds of tools.
                 if (area && !query?.trim() && !names?.length) {
                     const listed = catalog.filter((entry) => entry.category === area);
                     if (listed.length > 0) {
+                        const pages = Math.ceil(listed.length / AREA_LIST_MAX);
+                        const at = Math.min(page ?? 0, pages - 1);
                         return {
                             tools: [],
                             area,
-                            listed: listed.slice(0, AREA_LIST_MAX).map((entry) => ({
-                                name: entry.name,
-                                description: firstSentence(entry.description, 120)
-                            })),
-                            note: "Listed, not loaded: call find_tools with the names you need."
+                            page: at,
+                            pages,
+                            listed: listed
+                                .slice(at * AREA_LIST_MAX, (at + 1) * AREA_LIST_MAX)
+                                .map((entry) => ({
+                                    name: entry.name,
+                                    description: firstSentence(entry.description, 120)
+                                })),
+                            note:
+                                at + 1 < pages
+                                    ? `Listed, not loaded: call find_tools with the names you need, or with page ${at + 1} for more.`
+                                    : "Listed, not loaded: call find_tools with the names you need."
                         };
                     }
                 }
@@ -314,6 +330,12 @@ export function findToolsTool(catalog: readonly SearchEntry[]): ToolSet {
                     tools: found.map((entry) => ({
                         name: entry.name,
                         description: firstSentence(entry.description, 200)
+                    })),
+                    // A match in another language can be a near miss: every
+                    // area stays one call away.
+                    areas: toolAreas(catalog).map(({ area: name, count }) => ({
+                        area: name,
+                        count
                     })),
                     ...unavailable
                 };

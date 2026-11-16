@@ -126,7 +126,7 @@ describe("find_tools", () => {
         const output = await run(relevance.findToolsTool(catalog), relevance.FIND_TOOLS, {
             query: "players"
         });
-        expect(output).toEqual({
+        expect(output).toMatchObject({
             tools: [{ name: "games_players", description: "Players online on a game server." }]
         });
         const found = relevance.foundInSteps([
