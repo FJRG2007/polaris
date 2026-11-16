@@ -261,6 +261,19 @@ export function PolarAccessCard({
                         aria-label={t("agents.polarAccess.web.label")}
                     />
                 </div>
+                <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                        <p className="text-sm font-medium">{t("agents.polarAccess.freeModels.label")}</p>
+                        <p className="text-muted-foreground text-xs">
+                            {t("agents.polarAccess.freeModels.hint")}
+                        </p>
+                    </div>
+                    <Switch
+                        checked={current.freeModels}
+                        onChange={(freeModels) => save({ ...current, freeModels })}
+                        aria-label={t("agents.polarAccess.freeModels.label")}
+                    />
+                </div>
                 <div className="space-y-2">
                     <div className="min-w-0 space-y-1">
                         <p className="text-sm font-medium">

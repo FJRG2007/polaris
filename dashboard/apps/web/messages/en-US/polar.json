@@ -317,7 +317,9 @@
         "orderDone": "Done",
         "orderFailed": "Couldn't save the order. Try again.",
         "moveUp": "Move {name} up",
-        "moveDown": "Move {name} down"
+        "moveDown": "Move {name} down",
+        "zenFree": "Free, no account (OpenCode Zen)",
+        "zenFreeNote": "These free models may keep your prompts to improve the model."
     },
     "intelligence": {
         "fast": "Fast",

@@ -39,6 +39,7 @@ import { SourceOrderList } from "@/components/polar/elements/source-order";
 import {
     automaticChoice,
     isAutomatic,
+    ZEN_FREE_SLUG,
     type ModelChoice,
     type Payer
 } from "@/lib/polar/shared";
@@ -54,6 +55,11 @@ export interface ModelSelectorProvider {
         reasoning: boolean;
         attachment?: boolean;
     }>;
+}
+
+/** The mark a provider draws: the free tier is OpenCode Zen's. */
+function logoSlug(provider: string): string {
+    return provider === ZEN_FREE_SLUG ? "opencode" : provider;
 }
 
 /** The first model on offer, for an agent that needs one and has none yet. */
@@ -261,7 +267,7 @@ export function ModelSelector({
                     className={triggerClassName ?? MODEL_TRIGGER}
                 >
                     {!triggerContent && provider && !automatic ? (
-                        <IntegrationLogo slug={provider.provider} name={provider.name} className="size-3.5 shrink-0" />
+                        <IntegrationLogo slug={logoSlug(provider.provider)} name={provider.name} className="size-3.5 shrink-0" />
                     ) : null}
                     {triggerContent ?? (
                         <span className="min-w-0 truncate text-foreground">
@@ -371,9 +377,14 @@ export function ModelSelector({
                 {(ordering ? [] : shown).map((entry) => (
                     <div key={entry.provider}>
                         <DropdownMenuLabel className="flex min-w-0 items-center gap-1.5">
-                            <IntegrationLogo slug={entry.provider} name={entry.name} className="size-3.5 shrink-0" />
-                            <span className="min-w-0 truncate">{entry.name}</span>
+                            <IntegrationLogo slug={logoSlug(entry.provider)} name={entry.name} className="size-3.5 shrink-0" />
+                            <span className="min-w-0 truncate">
+                                {entry.provider === ZEN_FREE_SLUG ? t("picker.zenFree") : entry.name}
+                            </span>
                         </DropdownMenuLabel>
+                        {entry.provider === ZEN_FREE_SLUG ? (
+                            <p className="text-muted-foreground px-2 pb-1 text-xs">{t("picker.zenFreeNote")}</p>
+                        ) : null}
                         {entry.models.map((option) => (
                             <DropdownMenuItem
                                 key={option.model}
@@ -388,7 +399,7 @@ export function ModelSelector({
                                 }
                             >
                                 <IntegrationLogo
-                                    slug={option.provider}
+                                    slug={logoSlug(option.provider)}
                                     className="size-3.5 shrink-0"
                                 />
                                 <span className="min-w-0 truncate" title={option.name}>
@@ -418,7 +429,7 @@ export function ModelSelector({
                                 <DropdownMenuLabel>{t("picker.payer")}</DropdownMenuLabel>
                             </>
                         )}
-                        {(provider?.payers ?? []).map((payer) => (
+                        {(provider?.provider === ZEN_FREE_SLUG ? [] : (provider?.payers ?? [])).map((payer) => (
                             <DropdownMenuItem
                                 key={payer}
                                 onSelect={() => onChoice({ ...choice, payer })}

@@ -150,6 +150,10 @@
                 "hostsPlaceholder": "Cualquiera, p. ej. mcp.linear.app",
                 "hostsHint": "Separa con comas. Cada host permite los nombres bajo él. Vacío permite cualquier host público.",
                 "privateNetwork": "Permitir servidores de esta red"
+            },
+            "freeModels": {
+                "label": "Modelos gratis sin cuenta",
+                "hint": "Quien no tiene clave propia usa los modelos gratis de OpenCode Zen, que pueden guardar los mensajes para mejorar."
             }
         }
     },

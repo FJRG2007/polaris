@@ -22,6 +22,13 @@ export const PAYERS = ["own", "instance"] as const;
 export type Payer = (typeof PAYERS)[number];
 
 /**
+ * The provider slug of OpenCode Zen's free models, reached with no account at
+ * all (`zen-free.ts`). Its own slug rather than `opencode`, so a person's own
+ * Zen key and the anonymous tier are never mistaken for each other.
+ */
+export const ZEN_FREE_SLUG = "opencode-free";
+
+/**
  * What kind of thing a model makes. Only `language` is served today; the
  * others are named so a later phase adds a provider factory for them without
  * reshaping the choice every message carries.

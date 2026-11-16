@@ -317,7 +317,9 @@
         "orderDone": "Listo",
         "orderFailed": "No se guardó el orden. Reinténtalo.",
         "moveUp": "Subir {name}",
-        "moveDown": "Bajar {name}"
+        "moveDown": "Bajar {name}",
+        "zenFree": "Gratis, sin cuenta (OpenCode Zen)",
+        "zenFreeNote": "Estos modelos gratis pueden guardar tus mensajes para mejorar el modelo."
     },
     "intelligence": {
         "fast": "Rápido",

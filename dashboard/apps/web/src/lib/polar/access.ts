@@ -31,6 +31,8 @@ import { apiUser } from "@/lib/api-session";
 import type { SessionUser } from "@/lib/session";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { CONNECTOR_AUDIENCES, DEFAULT_CONNECTOR_POLICY } from "@/lib/polar/connectors/shared";
+import { ZEN_FREE_SLUG } from "@/lib/polar/shared";
+import { zenCredential } from "@/lib/polar/zen-free";
 import {
     chatCredentialFor,
     chatCredentialsFor,
@@ -75,7 +77,11 @@ export const polarPolicySchema = z.object({
     /** Whether Polar may search and read the web. On unless an administrator
      *  turned it off, so a policy saved before this existed keeps it on. */
     web: z.boolean().default(true),
-    connectors: connectorPolicySchema.default(DEFAULT_CONNECTOR_POLICY)
+    connectors: connectorPolicySchema.default(DEFAULT_CONNECTOR_POLICY),
+    /** Whether an account with no usable key gets OpenCode Zen's free models
+     *  (`zen-free.ts`). On unless an administrator turned it off, so a policy
+     *  saved before this existed keeps it on. */
+    freeModels: z.boolean().default(true)
 });
 export type PolarPolicy = z.infer<typeof polarPolicySchema>;
 
@@ -93,7 +99,8 @@ export const DEFAULT_POLAR_POLICY: PolarPolicy = {
     use: { who: "everyone", userIds: [], groupIds: [], guests: false },
     spend: { who: "admins", userIds: [], groupIds: [], guests: false },
     web: true,
-    connectors: DEFAULT_CONNECTOR_POLICY
+    connectors: DEFAULT_CONNECTOR_POLICY,
+    freeModels: true
 };
 
 /**
@@ -331,6 +338,33 @@ export async function polarKeySources(
     return new Map([...sources].filter(([, source]) => source === "own"));
 }
 
+/**
+ * Whether this account may be offered OpenCode Zen's free models: it may use
+ * Polar and no administrator switched the free tier off. A policy that cannot
+ * be read answers no - nothing is sent to an outside service on a guess.
+ */
+export async function zenFreeAllowed(access: PolarAccess): Promise<boolean> {
+    if (!access.use) return false;
+    try {
+        return (await readPolarPolicy()).freeModels;
+    } catch (error) {
+        console.error("polar: could not read the access policy", error);
+        return false;
+    }
+}
+
+/** The free tier's credential when it is allowed, for the two readers below.
+ *  It is nobody's key, so a payer of "own" never reaches it. */
+async function zenCredentials(
+    userId: string,
+    payer: KeySource | null,
+    access?: PolarAccess
+): Promise<ChatCredential[]> {
+    if (payer === "own") return [];
+    const granted = access ?? (await polarAccessFor(userId));
+    return (await zenFreeAllowed(granted)) ? [zenCredential()] : [];
+}
+
 /** The credential a Polar call spends, held to the same rule. */
 export async function polarCredentialFor(
     userId: string,
@@ -338,6 +372,7 @@ export async function polarCredentialFor(
     payer: KeySource | null = null,
     access?: PolarAccess
 ): Promise<ChatCredential | null> {
+    if (provider === ZEN_FREE_SLUG) return (await zenCredentials(userId, payer, access))[0] ?? null;
     if ((access ?? (await polarAccessFor(userId))).spend)
         return chatCredentialFor(userId, provider, payer);
     if (payer === "instance") return null;
@@ -352,6 +387,7 @@ export async function polarCredentialsFor(
     payer: KeySource | null = null,
     access?: PolarAccess
 ): Promise<ChatCredential[]> {
+    if (provider === ZEN_FREE_SLUG) return zenCredentials(userId, payer, access);
     if ((access ?? (await polarAccessFor(userId))).spend)
         return chatCredentialsFor(userId, provider, payer);
     if (payer === "instance") return [];

@@ -36,7 +36,14 @@ import {
 } from "@/lib/polar/router/plan";
 import type { RouteTarget } from "@/lib/polar/routing";
 import { modelProviderName } from "@/lib/agents/model-key-providers";
-import { isAutomatic, type Intelligence, type ModelChoice, type Payer } from "@/lib/polar/shared";
+import {
+    isAutomatic,
+    ZEN_FREE_SLUG,
+    type Intelligence,
+    type ModelChoice,
+    type Payer
+} from "@/lib/polar/shared";
+import { zenBaseUrl, zenFreeModels, zenProviderOption } from "@/lib/polar/zen-free";
 import {
     autoRoute,
     automaticCandidates,
@@ -66,6 +73,7 @@ import {
     polarCredentialFor,
     polarCredentialsFor,
     polarKeySources,
+    zenFreeAllowed,
     type PolarAccess
 } from "@/lib/polar/access";
 import { polarLimitReached } from "@/lib/polar/usage";
@@ -95,6 +103,7 @@ export function polarServesProvider(slug: string): boolean {
         slug === "openai" ||
         slug === "google-ai" ||
         slug === GATEWAY_SLUG ||
+        slug === ZEN_FREE_SLUG ||
         slug in OPENAI_COMPATIBLE_BASES ||
         slug in PROVIDER_ENDPOINTS ||
         catalogEndpoint(slug) !== null
@@ -145,6 +154,20 @@ export async function polarModelOptions(
     { waitForWindows = false }: { waitForWindows?: boolean } = {}
 ): Promise<PolarProviderOption[]> {
     const granted = access ?? (await polarAccessFor(userId));
+    const options = await keyedModelOptions(userId, granted, waitForWindows);
+    // Nobody with a key of their own is sent to the free tier unasked: it may
+    // keep prompts, so it is the default only when nothing else would answer.
+    if (options.length > 0 || !(await zenFreeAllowed(granted))) return options;
+    const free = await zenFreeModels();
+    return free.length > 0 ? [zenProviderOption(free)] : [];
+}
+
+/** The providers and models this person's keys reach. */
+async function keyedModelOptions(
+    userId: string,
+    granted: PolarAccess,
+    waitForWindows: boolean
+): Promise<PolarProviderOption[]> {
     const sources = await polarKeySources(userId, granted);
     const served = [...sources.keys()].filter(polarServesProvider);
     if (served.length === 0) return [];
@@ -574,6 +597,12 @@ export function languageModel(
             return createOpenAI({ apiKey })(model);
         case "google-ai":
             return createGoogle({ apiKey })(model);
+        case ZEN_FREE_SLUG:
+            return createOpenAICompatible({
+                name: "opencode",
+                baseURL: zenBaseUrl(model),
+                apiKey
+            })(model);
         case GATEWAY_SLUG:
             return createOpenAICompatible({
                 name: "gateway",
