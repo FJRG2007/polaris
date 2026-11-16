@@ -23,7 +23,7 @@ import {
 } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { ProviderSelect } from "@/components/model-keys/provider-select";
+import { EmailProviderSelect } from "../email/email-provider-select";
 import type { MessagingChannelView } from "@/lib/messaging/channel-admin";
 import {
     DEFAULT_MESSAGING_PROVIDER,
@@ -84,8 +84,7 @@ export function MessagingChannelDialog({
             MESSAGING_PROVIDERS.map((entry) => ({
                 slug: entry.id,
                 name: entry.banRisk ? t("messaging.providers.banRiskName", { name: entry.name }) : entry.name,
-                aliases: entry.aliases,
-                freeTier: null
+                aliases: entry.aliases
             })),
         [t]
     );
@@ -222,7 +221,7 @@ export function MessagingChannelDialog({
                     <div className="flex flex-col gap-4">
                         <label className="flex flex-col gap-1 text-sm">
                             <span className="font-medium">{t("messaging.add.provider")}</span>
-                            <ProviderSelect
+                            <EmailProviderSelect
                                 options={options}
                                 value={rowId}
                                 onChange={changeProvider}
