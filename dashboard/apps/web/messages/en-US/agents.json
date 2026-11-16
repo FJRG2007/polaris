@@ -113,6 +113,7 @@
         "acpNoMode": "This agent has no such mode in Chat.",
         "acpExited": "The agent exited as soon as it started.",
         "acpSlow": "The agent did not start in time.",
+        "acpTooOld": "This agent's version here is too old for Chat. Use Terminal for this session.",
         "acpUnavailable": "This agent cannot be used in Chat here.",
         "acpTurnFailed": "The agent stopped before it answered.",
         "acpRefused": "The agent declined to carry on.",

@@ -4,7 +4,7 @@ import { FakePipe, noSleep } from "./fake-pipe";
 import { describe, expect, it, vi } from "vitest";
 import { acpLaunchCommand } from "@/lib/agents/acp/pipe-commands";
 import type { HistoryRow } from "@/lib/agents/transcript-decoders";
-import { AcpRefusal, AcpSessionDriver, type DriverDeps } from "@/lib/agents/acp/session-driver";
+import { AcpRefusal, AcpSessionDriver, meetsFloor, TOO_OLD, type DriverDeps } from "@/lib/agents/acp/session-driver";
 import {
     acpBinding,
     acpModeFor,
@@ -73,6 +73,7 @@ function harness(cli: string, pipe: FakePipe, vendorSessionId: string | null = n
     const binding = acpBinding(cli)!;
     const deps: DriverDeps = {
         session: async () => ({ binding, workdir: "/work/repo", vendorSessionId }),
+        version: async () => "0.16.2",
         start: async (_id, argv) => {
             starts.push(argv);
         },
@@ -254,5 +255,45 @@ describe("AcpSessionDriver", () => {
         const { driver } = harness("gemini", pipe);
         (driver as unknown as { deps: DriverDeps }).deps.startWaitMs = 0;
         await expect(driver.prompt("x")).rejects.toThrow("The agent did not start in time.");
+    });
+});
+
+describe("an agent's version floor", () => {
+    it("compares the first version on the line, and lets an unreadable one through", () => {
+        expect(meetsFloor("0.16.0", "0.16.0")).toBe(true);
+        expect(meetsFloor("qwen 0.17.1 (build x)", "0.16.0")).toBe(true);
+        expect(meetsFloor("1.0.0", "0.16.0")).toBe(true);
+        expect(meetsFloor("0.15.9", "0.16.0")).toBe(false);
+        expect(meetsFloor("0.9.40", "0.16.0")).toBe(false);
+        expect(meetsFloor("", "0.16.0")).toBe(true);
+        expect(meetsFloor(null, "0.16.0")).toBe(true);
+    });
+
+    it("refuses Chat on a Qwen older than 0.16 before starting anything", async () => {
+        const pipe = new FakePipe(agentFor("qwen"));
+        const { driver, starts } = harness("qwen", pipe);
+        const versions: string[] = [];
+        (driver as unknown as { deps: DriverDeps }).deps.version = async (_id, binary) => {
+            versions.push(binary);
+            return "0.15.3";
+        };
+        await expect(driver.prompt("x")).rejects.toThrow(AcpRefusal);
+        await expect(driver.prompt("x")).rejects.toThrow(TOO_OLD);
+        expect(versions[0]).toBe("qwen");
+        expect(starts).toHaveLength(0);
+    });
+
+    it("never asks an agent with no floor for its version", async () => {
+        const pipe = new FakePipe(agentFor("gemini"));
+        const { driver } = harness("gemini", pipe);
+        let asked = false;
+        (driver as unknown as { deps: DriverDeps }).deps.version = async () => {
+            asked = true;
+            return null;
+        };
+        await driver.prompt("hi");
+        await driver.settled();
+        expect(asked).toBe(false);
+        driver.close();
     });
 });

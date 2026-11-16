@@ -73,6 +73,7 @@ const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
     "This agent has no such mode in Chat.": "text.acpNoMode",
     "The agent exited as soon as it started.": "text.acpExited",
     "The agent did not start in time.": "text.acpSlow",
+    "This agent's version here is too old for Chat. Use Terminal for this session.": "text.acpTooOld",
     "This agent cannot be used in Chat here.": "text.acpUnavailable",
     "The agent stopped before it answered.": "text.acpTurnFailed",
     "The agent declined to carry on.": "text.acpRefused",

@@ -10,7 +10,8 @@ import { acpBinding } from "./providers";
 import { touchSession } from "../session-live";
 import { storeHistoryRows } from "../session-history";
 import { sessionPermissionHandler } from "./approvals";
-import { sessionAcpPipe, startAcpAgent } from "../session-runtime";
+import { shellQuote } from "../session-hooks";
+import { runInSession, sessionAcpPipe, startAcpAgent } from "../session-runtime";
 import { AcpSessionDriver, type DriverDeps } from "./session-driver";
 import { recordSessionConversation, recordSessionEvents } from "../session-service";
 
@@ -27,6 +28,10 @@ const deps: DriverDeps = {
             workdir: row.workdir,
             vendorSessionId: core.isVendorSessionId(row.vendorSessionId) ? row.vendorSessionId : null
         };
+    },
+    async version(sessionId, binary) {
+        const result = await runInSession(sessionId, `${shellQuote(binary)} --version 2>/dev/null | head -c 200`);
+        return result.code === 0 ? result.output : null;
     },
     start: startAcpAgent,
     pipe: sessionAcpPipe,

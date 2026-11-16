@@ -30,6 +30,9 @@ export interface DriverDeps {
         workdir: string;
         vendorSessionId: string | null;
     } | null>;
+    /** What `<binary> --version` printed on the session's machine, or null
+     *  when it printed nothing a version can be read from. */
+    version(sessionId: string, binary: string): Promise<string | null>;
     /** Start (or restart) the agent with this launch line. */
     start(sessionId: string, argv: readonly string[]): Promise<void>;
     pipe(sessionId: string): Promise<PipeIo>;
@@ -55,6 +58,27 @@ export class AcpRefusal extends Error {
         super(message);
         this.name = "AcpRefusal";
     }
+}
+
+/** The sentence for an agent older than its binding's floor. */
+export const TOO_OLD = "This agent's version here is too old for Chat. Use Terminal for this session.";
+
+/** The first `major.minor.patch` in a version line, as numbers. Pure. */
+export function readVersion(text: string | null): [number, number, number] | null {
+    const match = /(\d+)\.(\d+)\.(\d+)/.exec(text ?? "");
+    return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
+}
+
+/** Whether `found` is at least `floor`; an unreadable `found` is not held
+ *  against the agent, whose own start then decides. Pure. */
+export function meetsFloor(found: string | null, floor: string): boolean {
+    const have = readVersion(found);
+    const need = readVersion(floor);
+    if (!have || !need) return true;
+    for (let i = 0; i < 3; i++) {
+        if (have[i]! !== need[i]!) return have[i]! > need[i]!;
+    }
+    return true;
 }
 
 const sleepFor = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -142,6 +166,12 @@ export class AcpSessionDriver {
     private async open(): Promise<Connection> {
         const session = await this.deps.session(this.sessionId);
         if (!session) throw new AcpRefusal("That session no longer exists.");
+        // An older release has no ACP mode and exits at once, which would read
+        // as "exited as soon as it started" instead of the reason.
+        if (session.binding.minVersion) {
+            const found = await this.deps.version(this.sessionId, session.binding.argv[0]!).catch(() => null);
+            if (!meetsFloor(found, session.binding.minVersion)) throw new AcpRefusal(TOO_OLD);
+        }
         await this.deps.start(this.sessionId, session.binding.argv);
         const io = await this.deps.pipe(this.sessionId);
         await this.waitForAgent(io);

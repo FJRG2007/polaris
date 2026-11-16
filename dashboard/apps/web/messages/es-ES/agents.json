@@ -113,6 +113,7 @@
         "acpNoMode": "Este agente no tiene ese modo en Chat.",
         "acpExited": "El agente se cerró nada más empezar.",
         "acpSlow": "El agente no arrancó a tiempo.",
+        "acpTooOld": "La versión de este agente es antigua para Chat. Usa Terminal en esta sesión.",
         "acpUnavailable": "Este agente no puede usarse en Chat aquí.",
         "acpTurnFailed": "El agente se detuvo antes de responder.",
         "acpRefused": "El agente se negó a continuar.",
