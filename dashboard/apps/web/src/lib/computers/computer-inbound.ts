@@ -15,6 +15,7 @@ import * as core from "@polaris/core";
 import * as computers from "./computer-service";
 import { touchSession } from "@/lib/agents/session-live";
 import { listenForRunnerCommands } from "./computer-commands";
+import { deliverChatEvent } from "@/lib/polar/claude-subscription/turns";
 import { finishSession, recordSessionEvents } from "@/lib/agents/session-service";
 import { decidePermissionHook, ingestHookPayload } from "@/lib/agents/session-hook-ingest";
 
@@ -38,6 +39,14 @@ export async function handleRunnerMessage(
             return null;
         case "error":
             console.error(`[runner] ${identity.runnerId}: ${message.code}: ${message.message}`);
+            return null;
+        case "chat.event":
+            deliverChatEvent(identity.runnerId, message);
+            return null;
+        case "toolchain.progress":
+            // enigma: logged only until the runner's progress reaches the
+            // session screen; see TOOLCHAIN-PLAN.md.
+            if (message.step === "failed") console.error(`[runner] ${identity.runnerId}: preparing ${message.tool} failed: ${message.code ?? "unknown"}`);
             return null;
         case "terminal.output":
             // Never relayed here; the sidecar fans it out itself.

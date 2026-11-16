@@ -2045,5 +2045,38 @@
             "terminated": "Ended",
             "no_signal": "No signal"
         }
+    },
+    "claudeSubscription": {
+        "label": "Claude (your subscription)",
+        "note": "Anthropic does not officially support using your subscription in other apps.",
+        "needsComputer": "Open Polaris on your computer to use your Claude subscription here.",
+        "errors": {
+            "signed-out": "Claude is signed out on your computer. Sign in again from Polar Code.",
+            "rate-limited": "Your Claude plan has reached its limit for now. Try again later.",
+            "not-installed": "Claude is not ready on your computer yet. Try again in a moment.",
+            "failed": "Claude stopped before answering. Try again."
+        }
+    },
+    "toolchain": {
+        "preparing": "Preparing this computer: {tools}",
+        "tools": {
+            "git": "Git",
+            "node": "Node",
+            "gh": "GitHub CLI",
+            "enigma": "Enigma",
+            "claude": "Claude Code",
+            "codex": "Codex",
+            "opencode": "OpenCode"
+        },
+        "ready": "This computer is ready.",
+        "retry": "Try again",
+        "failures": {
+            "offline": "A download could not finish. Check this computer's internet connection.",
+            "checksum": "A download arrived damaged, so it was thrown away.",
+            "disk": "This computer is out of disk space.",
+            "unsupported": "This computer's system is not supported yet.",
+            "blocked": "Something on this computer, often an antivirus, blocked a file.",
+            "install": "A tool could not be set up on this computer."
+        }
     }
 }

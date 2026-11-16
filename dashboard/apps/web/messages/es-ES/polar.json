@@ -2045,5 +2045,38 @@
             "terminated": "Acabada",
             "no_signal": "Sin señal"
         }
+    },
+    "claudeSubscription": {
+        "label": "Claude (tu suscripción)",
+        "note": "Anthropic no admite oficialmente usar tu suscripción en otras apps.",
+        "needsComputer": "Abre Polaris en tu ordenador para usar aquí tu suscripción de Claude.",
+        "errors": {
+            "signed-out": "Claude cerró sesión en tu ordenador. Inicia sesión desde Polar Code.",
+            "rate-limited": "Tu plan de Claude llegó a su límite. Inténtalo más tarde.",
+            "not-installed": "Claude aún no está listo en tu ordenador. Prueba en un momento.",
+            "failed": "Claude se detuvo antes de responder. Inténtalo de nuevo."
+        }
+    },
+    "toolchain": {
+        "preparing": "Preparando este equipo: {tools}",
+        "tools": {
+            "git": "Git",
+            "node": "Node",
+            "gh": "GitHub CLI",
+            "enigma": "Enigma",
+            "claude": "Claude Code",
+            "codex": "Codex",
+            "opencode": "OpenCode"
+        },
+        "ready": "Este equipo está listo.",
+        "retry": "Reintentar",
+        "failures": {
+            "offline": "Una descarga no terminó. Revisa la conexión a internet del equipo.",
+            "checksum": "Una descarga llegó dañada y se descartó.",
+            "disk": "Este equipo se quedó sin espacio en disco.",
+            "unsupported": "El sistema de este equipo aún no es compatible.",
+            "blocked": "Algo en este equipo, a menudo un antivirus, bloqueó un archivo.",
+            "install": "No se pudo preparar una herramienta en este equipo."
+        }
     }
 }
