@@ -170,6 +170,16 @@ describe("a preview served from a running server", () => {
                 response.writeHead(404).end("not here");
                 return;
             }
+            if (local === "/page" || local === "/zipped") {
+                response
+                    .writeHead(200, {
+                        "content-type": "text/html; charset=utf-8",
+                        "content-length": "52",
+                        ...(local === "/zipped" ? { "content-encoding": "gzip" } : {})
+                    })
+                    .end("<html><head><title>t</title></head><body></body></html>".slice(0, 52));
+                return;
+            }
             if (local === "/go") {
                 response.writeHead(302, { location: "/landed" }).end();
                 return;
@@ -234,6 +244,20 @@ describe("a preview served from a running server", () => {
         expect(response.status).toBe(200);
         expect(await response.text()).toBe("page /app");
         expect(seen.map((one) => one.url)).toEqual(["/app", `${basePath}app`]);
+    });
+
+    it("puts the element picker into an HTML page", async () => {
+        const response = await ask("/page", {}, 30_000_000);
+        const text = await response.text();
+        expect(text.startsWith("<html><head><script data-polaris-picker>")).toBe(true);
+        expect(text).toContain("<title>t</title>");
+        expect(response.headers.get("content-length")).toBeNull();
+        expect(response.headers.get("content-security-policy")).toBe(preview.PREVIEW_SANDBOX);
+    });
+
+    it("passes a compressed page on as it is", async () => {
+        const response = await ask("/zipped", {}, 40_000_000);
+        expect(await response.text()).not.toContain("data-polaris-picker");
     });
 
     it("keeps a redirect inside the preview", async () => {

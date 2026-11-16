@@ -131,7 +131,8 @@ import type {
     PolarCodeThread
 } from "@/lib/polar/code";
 import type { SessionView } from "@/lib/agents/session-service";
-import { Code2, MessageSquare, PanelRight, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { Code2, Crosshair, MessageSquare, PanelRight, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { pickedContext, PICKS_MAX, type PickedElement } from "@/lib/agents/preview-picker";
 import dynamic from "next/dynamic";
 
 /** `/memory`'s panel: loaded when it is opened, with the server actions it calls. */
@@ -234,6 +235,48 @@ function useSpareWarmup(enabled: boolean): void {
             document.removeEventListener("visibilitychange", ask);
         };
     }, [enabled]);
+}
+
+/** The elements picked in the preview, waiting for the next message: each
+ *  named by its tag and selector, the full selector on hover. */
+function PickedChips({
+    picks,
+    onRemove
+}: {
+    picks: readonly PickedElement[];
+    onRemove: (index: number) => void;
+}) {
+    const t = useTranslations("polar");
+    if (picks.length === 0) return null;
+    return (
+        <ul aria-label={t("code.pick.list")} className="flex min-w-0 flex-wrap gap-1.5">
+            {picks.map((pick, index) => {
+                const where = pick.source
+                    ? `${pick.source.file}${pick.source.line ? `:${pick.source.line}` : ""}`
+                    : pick.selector;
+                return (
+                    <li
+                        key={`${index}:${pick.selector}`}
+                        className="flex min-w-0 max-w-full items-center gap-1 rounded-md bg-muted py-0.5 ps-2 pe-0.5 text-xs"
+                    >
+                        <Crosshair className="size-3.5 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 truncate font-mono" title={`${pick.selector}\n${where}`}>
+                            {`<${pick.tag}> ${where}`}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => onRemove(index)}
+                            aria-label={t("code.pick.remove", { tag: `<${pick.tag}>` })}
+                            title={t("code.pick.remove", { tag: `<${pick.tag}>` })}
+                            className="inline-flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:size-9"
+                        >
+                            <X className="size-3.5" />
+                        </button>
+                    </li>
+                );
+            })}
+        </ul>
+    );
 }
 
 /** A title for a session started from a prompt: its first line, cut to fit. */
@@ -1313,6 +1356,8 @@ function CodeThread({
     // `/memory`: what the agent remembers of this session's repository.
     const [memoryOpen, setMemoryOpen] = useState(false);
     const [busy, startTransition] = useTransition();
+    // Elements picked in the preview, carried ahead of the next message.
+    const [picks, setPicks] = useState<readonly PickedElement[]>([]);
     const parts = useCodeComposerParts(busy);
     const signal = useUnmountSignal();
     // The handed-over commands follow the CLI the session runs.
@@ -1375,10 +1420,15 @@ function CodeThread({
     const sendText = (text: string, { goal = false }: { goal?: boolean } = {}) => {
         if (!text || busy || parts.uploads.uploading || parts.uploads.failed) return;
         const attachments = parts.uploads.ids;
+        // The picked elements go with a message, never with a goal.
+        const carried = goal ? [] : picks;
+        const prompt = carried.length > 0 ? `${pickedContext(carried)}\n\n${text}` : text;
+        if (prompt.length > PROMPT_MAX) return setError(t("code.pick.tooLong"));
         setError(null);
         setInfo(null);
         setSent({ text, said });
         setReply("");
+        if (carried.length > 0) setPicks([]);
         startTransition(() => {
             void runAction(
                 () =>
@@ -1390,7 +1440,7 @@ function CodeThread({
                           })
                         : postCode<{ error?: string; queued?: boolean }>("/api/polar/code/prompt", {
                               sessionId,
-                              text,
+                              text: prompt,
                               attachments
                           }),
                 setError
@@ -1399,6 +1449,7 @@ function CodeThread({
                 if (!result || result.error) {
                     setSent(null);
                     setReply(goal ? `/goal ${text}` : text);
+                    if (carried.length > 0) setPicks(carried);
                     if (result?.error) setError(result.error);
                     return;
                 }
@@ -1774,6 +1825,7 @@ function CodeThread({
                     onCompact={null}
                 />
             ) : null}
+            <PickedChips picks={picks} onRemove={(index) => setPicks((list) => list.filter((_, at) => at !== index))} />
             <div className="relative">
             {slash.list}
             <PolarComposer
@@ -1986,6 +2038,12 @@ function CodeThread({
                     branch={thread.session.branch}
                     live={live}
                     lastEdit={thread.lastEdit ?? null}
+                    onPick={(element) => {
+                        setPicks((list) => [...list, element].slice(-PICKS_MAX));
+                        // What comes next is saying what to do with it.
+                        setWorkspace(false);
+                        window.setTimeout(() => document.getElementById(inputId)?.focus(), 0);
+                    }}
                 />
             ) : null}
         </>

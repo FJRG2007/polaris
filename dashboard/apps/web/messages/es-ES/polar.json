@@ -1537,7 +1537,9 @@
             "phone": "Móvil",
             "tablet": "Tableta",
             "full": "Ancho total",
-            "follow": "Recargar al cambiar el agente un archivo"
+            "follow": "Recargar al cambiar el agente un archivo",
+            "pick": "Elegir un elemento para tu mensaje",
+            "picking": "Haz clic en un elemento. Esc para salir."
         },
         "noSource": "Ese modelo ya no está disponible. Elige otro.",
         "sources": {
@@ -1647,6 +1649,11 @@
             "label": "Carpeta en este equipo",
             "none": "Sin carpeta",
             "choose": "Elegir una carpeta de este equipo"
+        },
+        "pick": {
+            "list": "Elementos para tu próximo mensaje",
+            "remove": "Quitar {tag}",
+            "tooLong": "El mensaje y los elementos elegidos son demasiado largos. Quita un elemento o acorta el mensaje."
         }
     },
     "compare": {

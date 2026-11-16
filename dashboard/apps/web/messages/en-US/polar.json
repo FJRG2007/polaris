@@ -1537,7 +1537,9 @@
             "phone": "Phone",
             "tablet": "Tablet",
             "full": "Full width",
-            "follow": "Reload when the agent changes a file"
+            "follow": "Reload when the agent changes a file",
+            "pick": "Pick an element for your message",
+            "picking": "Click an element in the page. Esc stops."
         },
         "noSource": "That model isn't available any more. Pick another one.",
         "sources": {
@@ -1647,6 +1649,11 @@
             "label": "Folder on this computer",
             "none": "No folder",
             "choose": "Choose a folder on this computer"
+        },
+        "pick": {
+            "list": "Elements for your next message",
+            "remove": "Remove {tag}",
+            "tooLong": "The message and the picked elements are too long together. Remove an element or shorten the message."
         }
     },
     "compare": {

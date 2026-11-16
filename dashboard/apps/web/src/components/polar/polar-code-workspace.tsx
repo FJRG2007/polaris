@@ -22,10 +22,12 @@ import { TerminalPanel } from "@/app/(app)/apps/deploy/terminal-panel";
 import * as polls from "@/components/agents/sessions/sessions-polls";
 import type { FileAnswer, FilesAnswer } from "@/lib/agents/session-files";
 import type { PreviewPortsAnswer } from "@/lib/agents/session-preview";
+import { PICKER_CHANNEL, readPickerMessage, type PickedElement } from "@/lib/agents/preview-picker";
 import { SessionChanges } from "@/components/agents/sessions/session-changes";
 import { SessionPullTab } from "@/components/agents/sessions/session-pr-tab";
 import { openAgentInterfaceAction } from "@/components/agents/sessions/actions";
 import {
+    Crosshair,
     ExternalLink,
     FileCode2,
     FolderTree,
@@ -69,7 +71,8 @@ export function PolarCodeWorkspace({
     session,
     branch,
     live,
-    lastEdit = null
+    lastEdit = null,
+    onPick
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -80,6 +83,9 @@ export function PolarCodeWorkspace({
     /** When the agent last finished writing a file: the preview reloads and
      *  the changes are read again when it moves. */
     lastEdit?: string | null;
+    /** Takes an element picked in the preview to the composer; without it
+     *  the preview offers no picker. */
+    onPick?: (element: PickedElement) => void;
 }) {
     const t = useTranslations("polar");
     const [pane, setPane] = useState<Pane>("files");
@@ -189,7 +195,7 @@ export function PolarCodeWorkspace({
                         {pane === "files" ? (
                             <FilesPane sessionId={session.id} live={live} />
                         ) : pane === "preview" ? (
-                            <PreviewPane sessionId={session.id} live={live} lastEdit={lastEdit} />
+                            <PreviewPane sessionId={session.id} live={live} lastEdit={lastEdit} onPick={onPick} />
                         ) : pane === "changes" ? (
                             <div className="h-full overflow-y-auto overscroll-contain">
                                 {/* Code lives under Polar, whose routes hand down no Agents catalog. */}
@@ -399,11 +405,13 @@ function FilesPane({ sessionId, live }: { sessionId: string; live: boolean }) {
 function PreviewPane({
     sessionId,
     live,
-    lastEdit
+    lastEdit,
+    onPick
 }: {
     sessionId: string;
     live: boolean;
     lastEdit: string | null;
+    onPick?: (element: PickedElement) => void;
 }) {
     const t = useTranslations("polar");
     const [answer, setAnswer] = useState<PreviewPortsAnswer | null>(null);
@@ -414,6 +422,32 @@ function PreviewPane({
     const [version, setVersion] = useState(0);
     const [device, setDevice] = useState<PreviewDevice>("full");
     const [follow, setFollow] = useState(true);
+    const [picking, setPicking] = useState(false);
+    const frame = useRef<HTMLIFrameElement | null>(null);
+
+    // The page is the agent's: a message counts only when it comes from this
+    // frame, from the opaque origin the sandbox gives it, and reads as the
+    // picker's. What it says is cut to size before anything uses it.
+    const tell = useCallback((action: "start" | "stop") => {
+        frame.current?.contentWindow?.postMessage({ type: PICKER_CHANNEL, action }, "*");
+    }, []);
+    useEffect(() => {
+        if (!onPick) return;
+        const listen = (event: MessageEvent) => {
+            if (!frame.current || event.source !== frame.current.contentWindow || event.origin !== "null") return;
+            const message = readPickerMessage(event.data);
+            if (!message) return;
+            if (message.action === "picked") {
+                setPicking(false);
+                onPick(message.element);
+            } else if (message.action === "stopped") setPicking(false);
+            // A page that reloaded while picking picks again.
+            else if (picking) tell("start");
+        };
+        window.addEventListener("message", listen);
+        return () => window.removeEventListener("message", listen);
+    }, [onPick, picking, tell]);
+    useEffect(() => tell(picking ? "start" : "stop"), [picking, tell]);
 
     // The agent's writes reload the page, once a burst of them settles. The
     // edit already on screen when the pane opened is not one.
@@ -521,6 +555,18 @@ function PreviewPane({
                         </ui.Button>
                     ))}
                 </div>
+                {onPick ? (
+                    <ui.Button
+                        variant={picking ? "secondary" : "ghost"}
+                        size="icon"
+                        onClick={() => setPicking((on) => !on)}
+                        aria-pressed={picking}
+                        aria-label={t("code.preview.pick")}
+                        title={t("code.preview.pick")}
+                    >
+                        <Crosshair className="size-4" />
+                    </ui.Button>
+                ) : null}
                 <ui.Button
                     variant="ghost"
                     size="icon"
@@ -560,8 +606,14 @@ function PreviewPane({
                     <ExternalLink className="size-4" />
                 </a>
             </div>
+            {picking ? (
+                <p role="status" className="text-xs text-muted-foreground">
+                    {t("code.preview.picking")}
+                </p>
+            ) : null}
             <div className="flex min-h-0 min-w-0 flex-1 justify-center overflow-auto overscroll-contain">
                 <iframe
+                    ref={frame}
                     key={`${port}:${version}`}
                     src={path}
                     title={t("code.preview.frame", { port })}

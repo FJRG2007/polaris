@@ -39,6 +39,11 @@
  * answers 404 (a server given a base path answers 404 at the root). Whichever
  * answered is remembered for a short while.
  *
+ * An HTML page gets the element picker (`preview-picker.ts`) in its head, so
+ * the workspace can point at something on it. A page is asked for
+ * uncompressed so the script can go in; one that comes back compressed, or too
+ * big to hold, is passed on as it is, without a picker.
+ *
  * Not carried: WebSockets, so a dev server's hot reload does not reach the
  * page. The workspace reloads it instead.
  *
@@ -53,6 +58,7 @@ import { withContainerPorts } from "./session-ports";
 import { sessionPlacement } from "./session-service";
 import { sessionNetwork } from "./session-network";
 import { previewBase } from "./session-preview-link";
+import { canInject, injectPicker, INJECT_MAX_BYTES } from "./preview-picker";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
 import { request as httpRequest, type IncomingHttpHeaders, type IncomingMessage } from "node:http";
 
@@ -424,6 +430,8 @@ export async function proxyPreview(input: PreviewRequest, now = Date.now()): Pro
     const prefix = `${previewBase(input.sessionId)}/${input.port}`;
     const headers = upstreamHeaders(input.headers, input.port, prefix, input.proto);
     const safe = input.method === "GET" || input.method === "HEAD";
+    // A page the picker goes into has to come back as text it can edit.
+    if (input.method === "GET" && /text\/html/i.test(headers.accept ?? "")) headers["accept-encoding"] = "identity";
     const key = `${input.sessionId}:${input.port}`;
     const known = recall(modes, key, MODE_TTL_MS, now);
 
@@ -468,9 +476,67 @@ export async function proxyPreview(input: PreviewRequest, now = Date.now()): Pro
         response.resume();
         sent.done();
     }
+    const out = downstreamHeaders(response.headers, prefix, mode);
+    const page =
+        !bodyless &&
+        canInject({
+            method: input.method,
+            status,
+            contentType: response.headers["content-type"],
+            contentEncoding: response.headers["content-encoding"],
+            contentLength: response.headers["content-length"]
+        });
+    if (page) {
+        const held = await holdPage(response);
+        if (held.kind === "whole") {
+            sent.done();
+            out.delete("content-length");
+            out.delete("etag");
+            out.set("cache-control", "no-store");
+            return new Response(injectPicker(held.body.toString("utf8")), {
+                status,
+                statusText: response.statusMessage,
+                headers: out
+            });
+        }
+        // Too big to hold: what was read, then the rest, untouched.
+        return new Response(held.stream, { status, statusText: response.statusMessage, headers: out });
+    }
     return new Response(bodyless ? null : (Readable.toWeb(response) as ReadableStream<Uint8Array>), {
         status,
         statusText: response.statusMessage,
-        headers: downstreamHeaders(response.headers, prefix, mode)
+        headers: out
     });
+}
+
+type Held = { kind: "whole"; body: Buffer } | { kind: "stream"; stream: ReadableStream<Uint8Array> };
+
+/** A page read whole, or - past `INJECT_MAX_BYTES` - a stream of what was
+ *  read and then the rest. */
+async function holdPage(response: IncomingMessage): Promise<Held> {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    const iterator = response[Symbol.asyncIterator]() as AsyncIterator<Buffer>;
+    for (;;) {
+        const next = await iterator.next();
+        if (next.done) return { kind: "whole", body: Buffer.concat(chunks) };
+        const chunk = Buffer.isBuffer(next.value) ? next.value : Buffer.from(next.value);
+        chunks.push(chunk);
+        size += chunk.length;
+        if (size > INJECT_MAX_BYTES) break;
+    }
+    const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+            for (const chunk of chunks) controller.enqueue(new Uint8Array(chunk));
+        },
+        async pull(controller) {
+            const next = await iterator.next();
+            if (next.done) controller.close();
+            else controller.enqueue(new Uint8Array(next.value));
+        },
+        cancel() {
+            response.destroy();
+        }
+    });
+    return { kind: "stream", stream };
 }

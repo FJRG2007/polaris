@@ -27,11 +27,32 @@ const { PolarCodeWorkspace } = await import("@/components/polar/polar-code-works
 
 const SESSION = { id: "s-1", title: "Fixture task", repoFullName: "", state: "working" } as unknown as SessionView;
 
-function draw(lastEdit: string | null) {
+function draw(lastEdit: string | null, onPick?: (element: unknown) => void) {
     return withMessages(
-        <PolarCodeWorkspace open onOpenChange={() => undefined} session={SESSION} branch="" live lastEdit={lastEdit} />
+        <PolarCodeWorkspace
+            open
+            onOpenChange={() => undefined}
+            session={SESSION}
+            branch=""
+            live
+            lastEdit={lastEdit}
+            onPick={onPick}
+        />
     );
 }
+
+const PICKED = {
+    type: "polaris-picker",
+    action: "picked",
+    element: {
+        tag: "h1",
+        selector: "main > h1",
+        html: "<h1>Hi</h1>",
+        url: "/",
+        box: { x: 0, y: 0, width: 100, height: 40 },
+        source: null
+    }
+};
 
 beforeEach(() => {
     ports.open = [];
@@ -93,5 +114,37 @@ describe("PolarCodeWorkspace preview", () => {
         expect(frame.style.width).toBe("");
         fireEvent.click(screen.getByRole("radio", { name: "Phone" }));
         expect(screen.getByTitle("Preview of port 3000").style.width).toBe("375px");
+    });
+
+    it("takes a picked element from the preview's frame only, cleaned", async () => {
+        ports.open = [3000];
+        const picked: unknown[] = [];
+        render(draw(null, (element) => picked.push(element)));
+        const frame = (await screen.findByTitle("Preview of port 3000")) as HTMLIFrameElement;
+        const told: unknown[] = [];
+        frame.contentWindow!.postMessage = ((message: unknown) => told.push(message)) as never;
+        fireEvent.click(screen.getByRole("button", { name: "Pick an element for your message" }));
+        expect(told).toContainEqual({ type: "polaris-picker", action: "start" });
+        expect(screen.getByRole("status").textContent).toContain("Click an element");
+
+        // Not the frame, or not its opaque origin: ignored.
+        window.dispatchEvent(new MessageEvent("message", { data: PICKED, origin: "null", source: window }));
+        window.dispatchEvent(
+            new MessageEvent("message", { data: PICKED, origin: "https://elsewhere.test", source: frame.contentWindow })
+        );
+        expect(picked).toEqual([]);
+
+        await act(async () => {
+            window.dispatchEvent(new MessageEvent("message", { data: PICKED, origin: "null", source: frame.contentWindow }));
+        });
+        expect(picked).toEqual([{ ...PICKED.element, html: "<h1>Hi</h1>" }]);
+        expect(screen.queryByRole("status")).toBeNull();
+    });
+
+    it("offers no picker without somewhere to send what it picks", async () => {
+        ports.open = [3000];
+        render(draw(null));
+        await screen.findByTitle("Preview of port 3000");
+        expect(screen.queryByRole("button", { name: "Pick an element for your message" })).toBeNull();
     });
 });
