@@ -137,6 +137,12 @@ export const startAgentSessionSchema = z
         hostId: z.string().uuid().nullable().default(null),
         /** The paired computer, for `computer`. Checked against the place below. */
         runnerId: z.string().uuid().nullable().default(null),
+        /**
+         * A folder on that computer to work in, instead of a clone. Empty for
+         * none. The runner only works in a folder the person chose there, so
+         * this is checked again on the computer itself.
+         */
+        localFolder: z.string().trim().max(1000).default(""),
         /** What the worktree branches from. Empty takes the repository's default. */
         baseRef: z
             .string()
@@ -209,6 +215,11 @@ export const startAgentSessionSchema = z
     .refine((value) => value.place !== "computer" || Boolean(value.runnerId), {
         message: "Pick the computer it runs on",
         path: ["runnerId"]
+    })
+    // A folder is on one computer, so it means nothing anywhere else.
+    .refine((value) => !value.localFolder || (value.place === "computer" && Boolean(value.runnerId)), {
+        message: "A folder on a computer needs a session on that computer",
+        path: ["localFolder"]
     })
     // A branch is a thing a checkout has. Asking for one without a repository is
     // a form filled in wrong rather than a value to quietly drop, and dropping it

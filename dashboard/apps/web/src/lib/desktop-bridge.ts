@@ -140,7 +140,8 @@ export interface DesktopComputerState {
         readonly received?: number;
         readonly total?: number;
         readonly code?: "offline" | "checksum" | "disk" | "unsupported" | "blocked" | "install";
-    } | null;
+    } | null;    /** This computer's id on the Polaris open here, once paired. Absent on an older app. */
+    readonly runnerId?: string;
 }
 
 export interface DesktopComputer {

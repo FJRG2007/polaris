@@ -9366,6 +9366,10 @@ model AgentSession {
     // The runner, for `computer`. No relation: a revoked runner leaves its
     // finished sessions readable.
     runnerId    String?   @db.Uuid
+    /// A folder on the runner's own computer the session works in, one the
+    /// person chose there (`desktop/src/main/runner/folders.ts`). Empty for a
+    /// clone or an empty workspace.
+    localFolder String    @default("")
     // Whether it runs on the machine everybody shares rather than on this
     // account's own.
     //

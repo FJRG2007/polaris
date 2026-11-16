@@ -17,6 +17,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useState, type ReactNode } from "react";
 import type { PolarCodeBranches, PolarCodeComputer } from "@/lib/polar/code";
 import { readPoll } from "@/lib/poll-fetch";
+import { desktopBridge } from "@/lib/desktop-bridge";
 import { MODEL_TRIGGER } from "@/components/polar/elements/model-selector";
 import { EffortPill } from "@/components/polar/elements/effort-pill";
 import * as core from "@polaris/core";
@@ -25,8 +26,10 @@ import {
     Check,
     ChevronDown,
     ExternalLink,
+    Folder,
     FolderGit2,
     HardDrive,
+    FolderPlus,
     Laptop,
     Server,
     CircleDot,
@@ -714,6 +717,114 @@ export function CodePlacePicker({
                             {computers && computers.length > 0 ? t("code.place.manage") : t("code.place.pair")}
                         </span>
                     </Link>
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+/** This computer, when Polaris is open in the desktop app and the app is
+ *  paired here as a runner that can pick folders: its runner id and the
+ *  folders chosen on it. Null in a browser, on an older app, or unpaired. */
+export interface ThisComputer {
+    readonly runnerId: string;
+    readonly folders: readonly string[];
+}
+
+export function useThisComputer(): {
+    computer: ThisComputer | null;
+    pick: () => Promise<string | null>;
+} {
+    const [runnerId, setRunnerId] = useState<string | null>(null);
+    const [folders, setFolders] = useState<readonly string[]>([]);
+    useEffect(() => {
+        const bridge = desktopBridge()?.computer;
+        if (!bridge?.pickFolder) return;
+        let live = true;
+        const apply = (state: { paired: boolean; runnerId?: string } | null) => {
+            if (live) setRunnerId(state?.paired && state.runnerId ? state.runnerId : null);
+        };
+        bridge.state().then(apply, () => apply(null));
+        bridge.folders?.().then((list) => live && setFolders(list), () => undefined);
+        const stop = bridge.onState(apply);
+        return () => {
+            live = false;
+            stop();
+        };
+    }, []);
+    const pick = async (): Promise<string | null> => {
+        const outcome = await desktopBridge()?.computer?.pickFolder?.().catch(() => null);
+        if (!outcome || !outcome.ok) return null;
+        setFolders(outcome.folders);
+        return outcome.folder;
+    };
+    return { computer: runnerId ? { runnerId, folders } : null, pick };
+}
+
+/** The last part of a folder's path, for a chip too narrow for all of it. */
+function folderName(folder: string): string {
+    return folder.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || folder;
+}
+
+/**
+ * Work in a folder on this computer instead of a clone. Drawn only inside the
+ * desktop app paired here (`useThisComputer`); picking a folder also moves the
+ * task onto this computer.
+ */
+export function CodeFolderChip({
+    computer,
+    value,
+    onChange,
+    onPick,
+    disabled
+}: {
+    computer: ThisComputer;
+    /** The folder in use, or null for none. */
+    value: string | null;
+    onChange: (folder: string | null) => void;
+    onPick: () => Promise<string | null>;
+    disabled: boolean;
+}) {
+    const t = useTranslations("polar");
+    const label = value ? folderName(value) : t("code.folder.none");
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild disabled={disabled}>
+                <button
+                    type="button"
+                    title={value ?? t("code.folder.label")}
+                    aria-label={`${t("code.folder.label")}: ${value ?? label}`}
+                    className={cn(MODEL_TRIGGER, "max-w-56 disabled:opacity-60")}
+                >
+                    <Folder className="size-3.5 shrink-0" aria-hidden />
+                    <span className="min-w-0 truncate text-foreground">{label}</span>
+                    <ChevronDown className="size-3 shrink-0 opacity-60" aria-hidden />
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-80 max-w-[calc(100vw-2rem)]">
+                <DropdownMenuLabel>{t("code.folder.label")}</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={() => onChange(null)}>
+                    <X className="size-4 shrink-0" aria-hidden />
+                    <span className="truncate">{t("code.folder.none")}</span>
+                    <Mark on={value === null} />
+                </DropdownMenuItem>
+                {computer.folders.map((folder) => (
+                    <DropdownMenuItem key={folder} onSelect={() => onChange(folder)}>
+                        <Folder className="size-4 shrink-0" aria-hidden />
+                        <span className="min-w-0 truncate" title={folder}>
+                            {folder}
+                        </span>
+                        <Mark on={folder === value} />
+                    </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                    onSelect={() => {
+                        void onPick().then((folder) => folder && onChange(folder));
+                    }}
+                >
+                    <FolderPlus className="size-4 shrink-0" aria-hidden />
+                    <span className="truncate">{t("code.folder.choose")}</span>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

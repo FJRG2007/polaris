@@ -115,6 +115,18 @@ describe("startFrame", () => {
         expect(frame).toMatchObject({ repository: { kind: "none" }, worktree: false, branch: "" });
         expect((frame as { prompt: string }).prompt).toHaveLength(core.RUNNER_LIMITS.promptChars);
     });
+
+    it("works in a folder on the computer, with no clone and no worktree", () => {
+        const folder = "C:\\Users\\fixture\\projects\\widgets";
+        const frame = startFrame({ ...session, localFolder: folder }, "tok", "https://p.example", null);
+        expect(frame).toMatchObject({ repository: { kind: "path", path: folder }, worktree: false });
+        expect(() => core.encodeServerFrame(frame)).not.toThrow();
+    });
+
+    it("clones as before when the folder is empty", () => {
+        const frame = startFrame({ ...session, localFolder: "" }, "tok", "https://p.example", null);
+        expect(frame).toMatchObject({ repository: { kind: "clone" }, worktree: true });
+    });
 });
 
 describe("handleRunnerMessage", () => {

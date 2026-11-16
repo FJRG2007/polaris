@@ -127,6 +127,8 @@ export interface SessionView {
     readonly detail: string;
     readonly branch: string;
     readonly baseRef: string;
+    /** A folder the person chose on their own computer, for a session there; empty otherwise. */
+    readonly localFolder: string;
     readonly taskId: string | null;
     readonly error: string | null;
     readonly lastEventAt: string | null;
@@ -217,6 +219,7 @@ const VIEW_SELECT = {
     detail: true,
     branch: true,
     baseRef: true,
+    localFolder: true,
     taskId: true,
     error: true,
     lastEventAt: true,
@@ -263,6 +266,7 @@ type SessionRecord = {
     detail: string;
     branch: string;
     baseRef: string;
+    localFolder: string;
     taskId: string | null;
     error: string | null;
     lastEventAt: Date | null;
@@ -327,6 +331,7 @@ function toView(record: SessionRecord): SessionView {
         detail: record.detail,
         branch: record.branch,
         baseRef: record.baseRef,
+        localFolder: record.localFolder,
         taskId: record.taskId,
         error: record.error,
         lastEventAt: record.lastEventAt?.toISOString() ?? null,
@@ -471,6 +476,8 @@ export interface SessionCreateInput {
     readonly hostId: string | null;
     /** The paired computer, for `computer`. */
     readonly runnerId?: string | null;
+    /** A folder on that computer to work in, for `computer`; empty or absent for none. */
+    readonly localFolder?: string;
     readonly baseRef: string;
     readonly taskId: string | null;
     readonly enigma: core.EnigmaSettings | null;
@@ -519,6 +526,7 @@ export async function createSession(
             modelPayer: input.modelChoice?.payer ?? null,
             hostId: input.hostId,
             runnerId: input.place === "computer" ? (input.runnerId ?? null) : null,
+            localFolder: input.place === "computer" && input.runnerId ? (input.localFolder ?? "").slice(0, 1000) : "",
             baseRef: input.baseRef,
             branch: createdSessionBranch(id, input.repoId, input.title),
             taskId: input.taskId,

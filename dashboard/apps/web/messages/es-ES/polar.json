@@ -1638,6 +1638,11 @@
             "server": "Tu servidor",
             "serverOffline": "Servidor apagado",
             "continueOn": "Seguir en"
+        },
+        "folder": {
+            "label": "Carpeta en este equipo",
+            "none": "Sin carpeta",
+            "choose": "Elegir una carpeta de este equipo"
         }
     },
     "compare": {

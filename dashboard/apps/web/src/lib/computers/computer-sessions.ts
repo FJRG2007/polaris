@@ -53,7 +53,7 @@ export function startFrame(
     session: Pick<
         SessionView,
         "id" | "cli" | "command" | "modelChoice" | "effort" | "permissionMode" | "repoFullName" | "branch" | "baseRef"
-    >,
+    > & { readonly localFolder?: string },
     token: string,
     base: string,
     prompt: string | null
@@ -66,7 +66,11 @@ export function startFrame(
         model: session.modelChoice?.model ?? null,
         effort: session.effort,
         permissionMode: session.permissionMode,
-        repository: session.repoFullName
+        // A folder the person chose on that computer wins: the runner checks
+        // it against its own list before it works there.
+        repository: session.localFolder
+            ? { kind: "path", path: session.localFolder.slice(0, 1000) }
+            : session.repoFullName
             ? {
                   kind: "clone",
                   url: `https://github.com/${session.repoFullName}.git`,
@@ -75,7 +79,7 @@ export function startFrame(
             : { kind: "none" },
         branch: session.repoFullName ? session.branch : "",
         baseRef: session.baseRef,
-        worktree: Boolean(session.repoFullName),
+        worktree: Boolean(session.repoFullName) && !session.localFolder,
         prompt: prompt ? prompt.slice(0, core.RUNNER_LIMITS.promptChars) : null,
         report: {
             url: `${base.replace(/\/+$/, "")}/api/agents/sessions/${session.id}/events`,

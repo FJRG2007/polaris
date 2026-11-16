@@ -137,6 +137,8 @@ class RunnerService {
     #connection: RunnerConnection | null = null;
     #state: RunnerState = "stopped";
     #paired = false;
+    /** This computer's id on the Polaris in use, once paired there. */
+    #runnerId: string | null = null;
     #preparing: ToolchainProgressFrame | null = null;
     readonly #listeners = new Set<(state: ComputerState) => void>();
     readonly #root = () => join(app.getPath("userData"), "runner");
@@ -163,7 +165,12 @@ class RunnerService {
     });
 
     snapshot(): ComputerState {
-        return { paired: this.#paired, state: this.#state, preparing: this.#preparing };
+        return {
+            paired: this.#paired,
+            state: this.#state,
+            preparing: this.#preparing,
+            ...(this.#paired && this.#runnerId ? { runnerId: this.#runnerId } : {})
+        };
     }
 
     listen(listener: (state: ComputerState) => void): () => void {
@@ -185,6 +192,7 @@ class RunnerService {
         await folders.load();
         const credential = (await loadCredentials())[server];
         this.#paired = Boolean(credential);
+        this.#runnerId = credential?.runnerId ?? null;
         if (credential && this.#server === server) this.#connect(server, credential);
         this.#changed();
     }
@@ -242,6 +250,7 @@ class RunnerService {
         await saveCredentials({ ...(await loadCredentials()), [server]: { runnerId: answer.data.runnerId, token: answer.data.token } });
         this.#disconnect();
         this.#paired = true;
+        this.#runnerId = answer.data.runnerId;
         this.#connect(server, answer.data);
         this.#changed();
         return { ok: true };
@@ -276,7 +285,10 @@ class RunnerService {
         const all = await loadCredentials();
         delete all[server];
         await saveCredentials(all).catch(() => undefined);
-        if (server === this.#server) this.#paired = false;
+        if (server === this.#server) {
+            this.#paired = false;
+            this.#runnerId = null;
+        }
     }
 
     /** Prepare the base tools and Claude Code now, from the desktop's own

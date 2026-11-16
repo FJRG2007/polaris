@@ -109,7 +109,9 @@ import {
     PERMISSION_MODE_KEY,
     CODE_PLACE_KEY,
     CodePlacePicker,
+    CodeFolderChip,
     useCodeComputers,
+    useThisComputer,
     readCodeEffort,
     PermissionModePicker,
     readPermissionMode,
@@ -863,6 +865,16 @@ function CodeStart({
         placePick && computers?.some((computer) => computer.id === placePick && computer.online)
             ? placePick
             : null;
+    // A folder on this computer, inside the desktop app paired here. It counts
+    // only while the task runs on this computer, and picking one moves it there.
+    const thisComputer = useThisComputer();
+    const here = thisComputer.computer;
+    const hereOnline = Boolean(here && computers?.some((computer) => computer.id === here.runnerId && computer.online));
+    const [folderPick, setFolderPick] = useState<string | null>(null);
+    const chooseFolder = (next: string | null) => {
+        setFolderPick(next);
+        if (next && here) choosePlace(here.runnerId);
+    };
     // How hard the tool thinks, for one with an effort flag: the level picked
     // last, read after mount for the same reason as the mode.
     const [effort, setEffort] = useState<core.AgentEffortLevel | null>(null);
@@ -942,6 +954,7 @@ function CodeStart({
           ? { cli: POLAR_RUNTIME, accountId: null, useMachineLogin: false, modelChoice: null }
           : null;
     const polar = resolved?.cli === POLAR_RUNTIME;
+    const localFolder = !polar && hereOnline && here && computerId === here.runnerId ? folderPick : null;
     // This task's engine override, when one is picked and can run the model;
     // the server resolves it again with the person's own setting.
     const engineOverride =
@@ -1037,7 +1050,8 @@ function CodeStart({
                     postCode<{ id?: string; error?: string; githubGap?: GithubAppGap }>(
                         "/api/polar/code/start",
                         {
-                            repoId: workspace ? null : repoId,
+                            // A folder on this computer is the checkout itself.
+                            repoId: workspace || localFolder ? null : repoId,
                             title: titleFromPrompt(
                                 text || (issue ? `#${issue.number} ${issue.title}` : "")
                             ),
@@ -1055,14 +1069,15 @@ function CodeStart({
                             agentId: persona?.id ?? null,
                             attachments: parts.uploads.ids,
                             ...placeOf(codePlaceTarget(computers, computerId)),
+                            localFolder: localFolder ?? "",
                             sharedHome: false,
-                            baseRef: workspace ? "" : baseRef.trim(),
+                            baseRef: workspace || localFolder ? "" : baseRef.trim(),
                             prompt: text,
                             taskId: null,
                             unattended: null,
                             permissionMode: asksMode ? mode : null,
                             effort: tool && core.agentEffortLevels(tool).length > 0 ? effort : null,
-                            issueNumber: workspace ? null : (started.issue?.number ?? null),
+                            issueNumber: workspace || localFolder ? null : (started.issue?.number ?? null),
                             skill: started.skill,
                             // Code in Polar is the harness's work: Enigma on, the
                             // rest following the repository and the instance.
@@ -1198,6 +1213,15 @@ function CodeStart({
                             issue={issue}
                             onIssue={(next) => setIssue(next ? { repoId, issue: next } : null)}
                             disabled={busy || repoId === ""}
+                        />
+                    ) : null}
+                    {!polar && here && hereOnline ? (
+                        <CodeFolderChip
+                            computer={here}
+                            value={localFolder}
+                            onChange={chooseFolder}
+                            onPick={thisComputer.pick}
+                            disabled={busy || pending}
                         />
                     ) : null}
                     <CodeSkillChip

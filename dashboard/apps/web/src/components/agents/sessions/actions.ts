@@ -316,6 +316,7 @@ async function startParsed(
         modelChoice: value.modelChoice,
         hostId: value.place === "host" ? value.hostId : null,
         runnerId: value.place === "computer" ? value.runnerId : null,
+        localFolder: value.place === "computer" ? value.localFolder : "",
         baseRef: value.baseRef,
         taskId: value.taskId,
         parentId: fork?.parentId ?? null,
@@ -406,6 +407,11 @@ export async function forkSessionAction(
         // The shared machine is a home on Polaris; a session moved anywhere
         // else opens in its own.
         sharedHome: moveTo && moveTo.place !== parent.place ? false : parent.sharedHome,
+        // A folder chosen on one computer means nothing on another.
+        localFolder:
+            moveTo && (moveTo.place !== parent.place || moveTo.runnerId !== parent.runnerId)
+                ? ""
+                : parent.localFolder,
         unattended: parent.unattended,
         permissionMode: parent.permissionMode,
         effort: parent.effort,

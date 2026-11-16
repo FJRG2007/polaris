@@ -1638,6 +1638,11 @@
             "server": "Your server",
             "serverOffline": "Server offline",
             "continueOn": "Continue on"
+        },
+        "folder": {
+            "label": "Folder on this computer",
+            "none": "No folder",
+            "choose": "Choose a folder on this computer"
         }
     },
     "compare": {
