@@ -309,7 +309,12 @@
         "viewGone": "Esa vista ya no existe",
         "taskGone": "Esa tarea ya no existe",
         "loadReminders": "No se cargaron tus avisos",
-        "cancelReminder": "No se pudo anular el aviso"
+        "cancelReminder": "No se pudo anular el aviso",
+        "agentRunNotAllowed": "Tu cuenta no puede iniciar agentes. Pide acceso a Agentes a un admin.",
+        "agentRunInvalid": "Revisa la selección y el modelo, y reinténtalo.",
+        "agentRunNoAccess": "No puedes cambiar algunas de estas tareas. Elige solo las que puedes editar.",
+        "agentRunNoRepo": "Ese repositorio ya no está conectado a tu cuenta. Elige otro.",
+        "agentRunFailed": "No se pudieron iniciar los agentes. Inténtalo de nuevo."
     },
     "schema": {
         "nameRequired": "Falta el nombre",

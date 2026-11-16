@@ -2120,5 +2120,102 @@ export async function handTaskToAgentAction(
     if (!body.success) return startSessionAction(input);
     const resolved = await resolvedStart(user, body.data);
     if ("error" in resolved) return { error: resolved.error };
-    return startSessionAction(resolved.input);
+    const started = await startSessionAction(resolved.input);
+    const taskId = body.data.taskId;
+    if (started.id && typeof taskId === "string" && isUuid(taskId)) {
+        // From here the task's status follows the session. Best effort: the
+        // session is what was asked for, and it exists.
+        try {
+            const items = await import("@/lib/agents/task-items");
+            await items.linkItem({ ownerId: user.id, itemId: taskId, sessionId: started.id });
+        } catch (caught) {
+            console.error("[tasks] could not link a task to its session", caught);
+        }
+    }
+    return started;
+}
+
+/** The most tasks one run takes: `RUN_BOUNDS.maxTasks` in orchestration-plan. */
+const RUN_ITEMS_MAX = 20;
+
+const runFromTasksSchema = z
+    .object({
+        taskIds: z.array(z.string().uuid()).min(1).max(RUN_ITEMS_MAX),
+        mode: z.enum(["coordinator", "workers"]),
+        repoId: z.string().uuid(),
+        // Checked by `resolvedStart`, as a single handoff's is.
+        pick: z.unknown(),
+        brief: z.string().trim().max(4000).default("")
+    })
+    .strict();
+
+/**
+ * Start agents on a selection of tasks: one coordinator that takes them as its
+ * plan, or one worker per task. Every task's status then follows the session
+ * working on it (`lib/agents/task-items.ts`).
+ *
+ * Refused whole rather than started on part of the selection: a run over half
+ * of what somebody picked is not what they asked for, and nobody would notice
+ * which half.
+ */
+export async function startRunFromTasksAction(
+    input: unknown
+): Promise<{ runId?: string; sessionId?: string | null; error?: string }> {
+    const user = await requirePermission("tasks.manage");
+    if (!(await sessionCan(user, "agents.manage"))) return { error: await errorText("errors.agentRunNotAllowed") };
+    const parsed = runFromTasksSchema.safeParse(input ?? {});
+    if (!parsed.success) return { error: await errorText("errors.agentRunInvalid") };
+    const ids = [...new Set(parsed.data.taskIds)];
+    // The writes the run makes are writes to these tasks, so editing them is
+    // what is asked - the same rule a bulk edit applies.
+    const writable = await access.writableTasks({ id: user.id, isAdmin: user.isAdmin }, ids, "member");
+    if (writable.length !== ids.length) return { error: await errorText("errors.agentRunNoAccess") };
+    const repo = await prisma.agentRepo.findFirst({
+        where: { id: parsed.data.repoId, ownerId: user.id },
+        select: { id: true }
+    });
+    if (!repo) return { error: await errorText("errors.agentRunNoRepo") };
+    const resolved = await resolvedStart(user, { pick: parsed.data.pick });
+    if ("error" in resolved) return { error: resolved.error };
+    const cli = core.agentCliIdSchema.safeParse(resolved.input.cli);
+    if (!cli.success) return { error: await errorText("errors.agentRunInvalid") };
+    const choice = core.sessionModelChoiceSchema.safeParse(resolved.input.modelChoice);
+    const rows = await prisma.task.findMany({
+        where: { id: { in: ids }, archived: false },
+        select: { id: true, name: true, description: true, number: true, listId: true, space: { select: { prefix: true } } },
+        take: RUN_ITEMS_MAX
+    });
+    if (rows.length !== ids.length) return { error: await errorText("errors.agentRunNoAccess") };
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const items = ids.map((id) => {
+        const row = byId.get(id)!;
+        return {
+            id,
+            reference: `${row.space.prefix}-${row.number}`,
+            name: row.name,
+            description: row.description,
+            listId: row.listId
+        };
+    });
+    const orchestration = await import("@/lib/agents/orchestration-service");
+    try {
+        const run = await orchestration.startRunFromItems({
+            ownerId: user.id,
+            repoId: repo.id,
+            cli: cli.data,
+            model: choice.success ? `${choice.data.provider}/${choice.data.model}` : null,
+            mode: parsed.data.mode,
+            items,
+            brief: parsed.data.brief
+        });
+        revalidatePath(TASKS_PATH);
+        return { runId: run.id, sessionId: run.sessionId };
+    } catch (caught) {
+        if (caught instanceof orchestration.OrchestrationRefusal) {
+            const { agentText } = await import("@/lib/agents/words");
+            return { error: agentText(await getTranslations("agents"), caught.message) };
+        }
+        console.error(caught);
+        return { error: await errorText("errors.agentRunFailed") };
+    }
 }

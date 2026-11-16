@@ -69,6 +69,7 @@ import { sweepSessionQueue } from "@/lib/agents/session-queue";
 import { resumeLimitedSessions } from "@/lib/agents/account-rotation";
 import { sweepCodexTurnEnds } from "@/lib/agents/codex-turn-failures";
 import { advanceActiveRuns } from "@/lib/agents/orchestration-service";
+import { syncTaskItems } from "@/lib/agents/task-items";
 import { reapLeftoverContainers, reapPoolLeftovers } from "@/lib/agents/leftover-containers";
 import { sweepSpares } from "@/lib/agents/session-spares";
 import { pollPullFacts } from "@/lib/agents/session-pr-facts";
@@ -1190,6 +1191,8 @@ export async function runJobBody(job: ScheduledJob): Promise<unknown> {
 async function sweepAgentQueue(): Promise<void> {
     await sweepSessionQueue().catch(() => 0);
     await advanceActiveRuns().catch(() => 0);
+    // Tasks items following those sessions, moved to where the sessions are.
+    await syncTaskItems().catch(() => 0);
     // Codex turns that failed on a limit or were stopped, which fire no hook:
     // read from the rollout.
     await sweepCodexTurnEnds().catch(() => 0);

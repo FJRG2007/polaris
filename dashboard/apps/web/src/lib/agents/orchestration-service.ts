@@ -19,6 +19,8 @@ import * as plan from "@/lib/agents/orchestration-plan";
 import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
 import * as roles from "@/lib/agents/agent-roles";
+import * as taskItems from "@/lib/agents/task-items";
+import * as itemRules from "@/lib/agents/task-item-status";
 import { startModel } from "@/lib/agents/session-api";
 
 /** A refusal whose sentence is meant for whoever asked. */
@@ -32,6 +34,11 @@ export interface RunInput {
     readonly cli: string;
     /** Start a coordinator session to plan it. Off for a run planned by hand. */
     readonly coordinator: boolean;
+    /** The Tasks list its workers are written into as items. Absent: none. */
+    readonly taskListId?: string | null;
+    /** Tasks items the run is started on: its plan, each followed by the
+     *  worker that takes it. Linked before the coordinator starts. */
+    readonly planItemIds?: readonly string[];
 }
 
 export interface TaskInput {
@@ -47,6 +54,8 @@ export interface TaskInput {
     /** The caller's own key: a second add with the same one in the same run
      *  answers the task the first made instead of adding another. */
     readonly clientKey?: string | null;
+    /** One of the run's plan items this task takes, when it names one. */
+    readonly itemId?: string | null;
 }
 
 const TASK_SELECT = {
@@ -141,9 +150,15 @@ export async function createRun(input: RunInput): Promise<{ id: string }> {
             cli: input.cli,
             maxTasks: plan.RUN_BOUNDS.maxTasks,
             maxDepth: plan.RUN_BOUNDS.maxDepth,
-            maxConcurrent: plan.RUN_BOUNDS.maxConcurrent
+            maxConcurrent: plan.RUN_BOUNDS.maxConcurrent,
+            taskListId: input.taskListId ?? null
         }
     });
+    for (const itemId of input.planItemIds ?? []) {
+        await taskItems
+            .linkItem({ ownerId: run.ownerId, itemId, runId: run.id })
+            .catch((error) => console.error("[orchestration] could not link a plan item", error));
+    }
     if (input.coordinator) {
         // The coordinator runs on the agent the person picked, and on the model
         // the repository keeps for its coordinator when that is the same agent.
@@ -174,14 +189,14 @@ export async function addTasks(
     inputs: readonly TaskInput[],
     groupId: string | null = null
 ): Promise<string[]> {
-    const ids = await prisma.$transaction(async (tx) => {
+    const { ids, owner } = await prisma.$transaction(async (tx) => {
         await tx.$executeRawUnsafe(
             "SELECT pg_advisory_xact_lock(hashtext($1))",
             `polaris.agents.orchestration:${runId}`
         );
         const run = await tx.agentOrchestrationRun.findUnique({
             where: { id: runId },
-            select: { status: true, maxTasks: true, maxDepth: true }
+            select: { status: true, maxTasks: true, maxDepth: true, ownerId: true, taskListId: true }
         });
         if (!run || run.status !== "active") {
             throw new OrchestrationRefusal("That run is not going any more.");
@@ -225,10 +240,39 @@ export async function addTasks(
             created.push(row.id);
             tasks.push({ id: row.id, depth: placed.depth });
         }
-        return created;
+        return { ids: created, owner: { ownerId: run.ownerId, taskListId: run.taskListId } };
     });
+    // Variants of one piece of work share whatever item it has; only a task of
+    // its own is written into Tasks.
+    if (groupId === null) await writeItems({ id: runId, ...owner }, ids, inputs);
     await advanceRun(runId);
     return ids;
+}
+
+/** Give new tasks their Tasks items (`task-items.ts`). Never fails the add. */
+async function writeItems(
+    run: { id: string; ownerId: string; taskListId: string | null },
+    ids: readonly string[],
+    inputs: readonly TaskInput[]
+): Promise<void> {
+    // A run that was never started from Tasks has neither a list nor a plan:
+    // only a task that names an item can need the second read.
+    if (!run.taskListId && !inputs.some((input) => input.itemId)) return;
+    try {
+        const hasPlan = await prisma.taskAgentLink.count({ where: { runId: run.id } });
+        if (!run.taskListId && hasPlan === 0) return;
+        await taskItems.writeRunItems(
+            run,
+            ids.map((id, index) => ({
+                id,
+                title: inputs[index]?.title ?? "",
+                spec: inputs[index]?.spec ?? "",
+                itemId: inputs[index]?.itemId ?? null
+            }))
+        );
+    } catch (error) {
+        console.error("[orchestration] could not write a run's Tasks items", error);
+    }
 }
 
 /**
@@ -733,6 +777,8 @@ export interface SpawnInput {
     readonly role: "worker" | "reviewer";
     readonly agent: string | null;
     readonly model: string | null;
+    /** The plan item it is for, from the run's objective. */
+    readonly itemId?: string | null;
 }
 
 /**
@@ -770,7 +816,8 @@ export async function spawnWorker(
             gateQuestion: null,
             role: input.role,
             model: input.model,
-            clientKey: input.clientKey
+            clientKey: input.clientKey,
+            itemId: input.itemId ?? null
         }
     ]);
     const task = await prisma.agentOrchestrationTask.findUnique({
@@ -884,4 +931,64 @@ export async function runChildren(runId: string, now = new Date()): Promise<RunC
             review: own?.review ?? null
         };
     });
+}
+
+// ---------------------------------------------------------------------------
+// A run started from a Tasks selection
+// ---------------------------------------------------------------------------
+
+export interface ItemRunInput {
+    readonly ownerId: string;
+    readonly repoId: string;
+    readonly cli: string;
+    /** provider/model for the workers, or null for the role default. */
+    readonly model: string | null;
+    /** One coordinator that plans over the items, or one worker per item. */
+    readonly mode: "coordinator" | "workers";
+    readonly items: readonly (itemRules.PlanItem & { listId: string })[];
+    /** The person's own words for the whole run. */
+    readonly brief: string;
+}
+
+/**
+ * Start a run on Tasks items. Every item is linked to the run before anything
+ * starts, so the first worker's card moves with it; a worker the coordinator
+ * spawns beyond them is written into the first item's list. The caller has
+ * already checked the person may change every item and owns the repository.
+ */
+export async function startRunFromItems(input: ItemRunInput): Promise<{ id: string; sessionId: string | null }> {
+    if (input.items.length === 0 || input.items.length > plan.RUN_BOUNDS.maxTasks) {
+        throw new OrchestrationRefusal(`A run takes from 1 to ${plan.RUN_BOUNDS.maxTasks} tasks.`);
+    }
+    const coordinator = input.mode === "coordinator";
+    const { id } = await createRun({
+        ownerId: input.ownerId,
+        objective: itemRules.planObjective(input.items, input.brief),
+        repoId: input.repoId,
+        baseRef: "",
+        cli: input.cli,
+        coordinator,
+        taskListId: input.items[0]!.listId,
+        planItemIds: input.items.map((item) => item.id)
+    });
+    if (!coordinator) {
+        await addTasks(
+            id,
+            input.items.map((item) => ({
+                title: `${item.reference} ${item.name}`.slice(0, 80),
+                spec: itemRules.itemBrief(item, input.brief),
+                dependsOn: [],
+                cli: null,
+                gateQuestion: null,
+                model: input.model,
+                clientKey: `item:${item.id}`,
+                itemId: item.id
+            }))
+        );
+    }
+    const run = await prisma.agentOrchestrationRun.findUnique({
+        where: { id },
+        select: { coordinatorSessionId: true }
+    });
+    return { id, sessionId: run?.coordinatorSessionId ?? null };
 }

@@ -11,7 +11,17 @@
         "repoEmpty": "Ningún repositorio coincide",
         "agent": "Modelo",
         "prompt": "Lo que se le pide",
-        "start": "Empezar"
+        "start": "Empezar",
+        "runTitle": "{count, plural, one {Dar una tarea a agentes} other {Dar # tareas a agentes}}",
+        "mode": "Cómo se reparte",
+        "modeCoordinator": "Un coordinador",
+        "modeWorkers": "Un agente por tarea",
+        "modeCoordinatorHint": "Un coordinador planifica estas tareas y lanza un agente para cada una.",
+        "modeWorkersHint": "{count, plural, one {Un agente empieza la tarea.} other {Empiezan # agentes, uno por tarea.}}",
+        "brief": "Algo que añadir",
+        "briefPlaceholder": "Contexto para todos los agentes",
+        "follows": "El estado de cada tarea sigue a su agente hasta que alguien lo cambie a mano.",
+        "tooMany": "Una ejecución admite hasta {count} tareas. Elige menos."
     },
     "files": {
         "uploadFailed": "No se pudo subir ese archivo",

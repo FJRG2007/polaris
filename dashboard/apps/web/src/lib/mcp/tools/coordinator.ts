@@ -87,7 +87,14 @@ const spawnInput = z
         agent: core.agentCliIdSchema.optional().describe("The agent to run it on. Default: the repository's for the role."),
         model: roleModelSchema
             .optional()
-            .describe("The model as provider/model. Default: the repository's for the role, or the agent's own.")
+            .describe("The model as provider/model. Default: the repository's for the role, or the agent's own."),
+        item: z
+            .string()
+            .uuid()
+            .optional()
+            .describe(
+                "The id of the Tasks item from your objective this worker is for, so its card follows the worker. Only the run's own items are taken; leave it out for any other worker."
+            )
     })
     .strict();
 
@@ -121,7 +128,8 @@ const spawnTool: McpTool<z.infer<typeof spawnInput>> = {
                 prompt: input.prompt,
                 role: input.role,
                 agent: input.agent ?? null,
-                model: input.model || null
+                model: input.model || null,
+                itemId: input.item ?? null
             });
         } catch (error) {
             if (error instanceof orchestration.OrchestrationRefusal) throw new McpRefusal(error.message);

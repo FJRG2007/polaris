@@ -112,7 +112,8 @@ describe("coordinator tools", () => {
             prompt: "Do it",
             role: "worker",
             agent: null,
-            model: null
+            model: null,
+            itemId: null
         });
         expect(result.structured).toEqual({ taskId: TASK, sessionId: CHILD, status: "dispatched" });
         expect(mocks.rateLimit).toHaveBeenCalledWith(`coordinator-spawn:${COORD}`, expect.any(Number), 60_000);

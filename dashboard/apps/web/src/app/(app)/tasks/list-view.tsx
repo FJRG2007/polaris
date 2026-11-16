@@ -30,6 +30,7 @@ import { ListView, TableView } from "./views/rows";
 import { TaskCreateDialog } from "./task-create-dialog";
 import { affected, undoSteps } from "./bulk-edits";
 import { BarButton, SelectionBar } from "./selection-bar";
+import { HandSelectionDialog } from "./hand-to-agent";
 import { downloadCsv, tasksToCsv } from "./export-csv";
 import { AssigneePicker, dayZone, PriorityPicker, StatusPicker } from "./pickers";
 import type { SavedView } from "@/lib/tasks/view-service";
@@ -63,6 +64,7 @@ import { readViewPreferences, viewScopeKey, writeViewPreferences } from "./view-
 import {
     Archive,
     ArrowDownWideNarrow,
+    Bot,
     ArrowUpNarrowWide,
     CalendarDays,
     CircleDot,
@@ -183,6 +185,9 @@ export function ListScreen({
     // The create dialog, and what was already known when it was asked for.
     const [creating, setCreating] = useState<{ name: string; dueDate: string | null } | null>(null);
     const [deleting, setDeleting] = useState<readonly TaskRow[]>([]);
+    // The selection being handed to agents, held apart from the live selection
+    // so a row that scrolls away mid-dialog is still in it.
+    const [handing, setHanding] = useState<readonly TaskRow[]>([]);
     const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
     // The task a shift-click reaches back to: the last one clicked on its own.
     const [anchor, setAnchor] = useState<string | null>(null);
@@ -1279,6 +1284,13 @@ export function ListScreen({
                         />
                     </>
                 )}
+                {context.canEdit && (
+                    <BarButton
+                        label={t("bulk.agents")}
+                        icon={<Bot />}
+                        onClick={() => setHanding(selected)}
+                    />
+                )}
                 <BarButton
                     label={t("bulk.export")}
                     icon={<FileSpreadsheet />}
@@ -1394,6 +1406,10 @@ export function ListScreen({
                 onClose={() => setOpenTaskId(null)}
                 onChanged={refresh}
             />
+
+            {handing.length > 0 ? (
+                <HandSelectionDialog tasks={handing} onClose={() => setHanding([])} />
+            ) : null}
 
             <ConfirmDeleteDialog
                 open={deleting.length > 0}

@@ -52,7 +52,8 @@
         "nothingToChange": "Every selected task already has that.",
         "undo": "Undo change",
         "undoFailed": "Could not undo it.",
-        "selectionLimit": "A selection holds {held} tasks at a time, so {count, plural, one {one was} other {# were}} left out."
+        "selectionLimit": "A selection holds {held} tasks at a time, so {count, plural, one {one was} other {# were}} left out.",
+        "agents": "Give to agents"
     },
     "paste": {
         "aStatus": "a status",

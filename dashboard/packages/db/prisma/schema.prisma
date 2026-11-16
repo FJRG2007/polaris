@@ -18081,6 +18081,9 @@ model AgentOrchestrationRun {
     cli                  String    @default("claude")
     // The session that plans the run. Null for a run driven from the screen.
     coordinatorSessionId String?   @db.Uuid
+    // The Tasks list a run's workers are written into as items, when it was
+    // started from Tasks. Null: the run makes no items.
+    taskListId           String?   @db.Uuid
     // active | completed | cancelled
     status               String    @default("active")
     maxTasks             Int       @default(20)
@@ -18150,6 +18153,38 @@ model AgentOrchestrationTask {
     @@index([runId, createdAt])
     @@index([sessionId])
     @@index([status])
+}
+
+// A Tasks item whose status follows an agent session's derived status
+// (lib/agents/task-items.ts). The session is named directly for a single
+// handoff, or through the orchestration task for a run's worker; a link with
+// neither is a plan item a coordinator has not put a worker on yet. No
+// relations, the same way a session's taskId is not one: Tasks never learns
+// the Agents app exists, and a link whose item is gone is dropped by the sweep.
+model TaskAgentLink {
+    id                  String   @id @default(uuid(7)) @db.Uuid
+    itemId              String   @db.Uuid
+    // Whose Tasks permissions every write is made under.
+    ownerId             String   @db.Uuid
+    sessionId           String?  @db.Uuid
+    runId               String?  @db.Uuid
+    orchestrationTaskId String?  @unique @db.Uuid
+    // The status the link last wrote, or the item's when it was linked. A
+    // different status on the item means a person moved it: the link holds.
+    appliedStatusId     String?  @db.Uuid
+    // The derived session status the link last applied.
+    lastStatus          String?
+    // A person set the status by hand after the link was made; never moved again.
+    held                Boolean  @default(false)
+    // The session is over and its last status applied; never read again.
+    settled             Boolean  @default(false)
+    createdAt           DateTime @default(now())
+    updatedAt           DateTime @updatedAt
+
+    @@index([settled, updatedAt])
+    @@index([itemId])
+    @@index([sessionId])
+    @@index([runId])
 }
 
 // Mail in a run's inbox: what a worker reported, or what the coordinator said.

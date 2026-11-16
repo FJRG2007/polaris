@@ -309,7 +309,12 @@
         "viewGone": "That view no longer exists",
         "taskGone": "That task no longer exists",
         "loadReminders": "Could not load your reminders",
-        "cancelReminder": "Could not call off the reminder"
+        "cancelReminder": "Could not call off the reminder",
+        "agentRunNotAllowed": "Your account cannot start agents. Ask an administrator for access to Agents.",
+        "agentRunInvalid": "Check the selection and the model, then try again.",
+        "agentRunNoAccess": "Some of these tasks are not yours to change. Select only tasks you can edit.",
+        "agentRunNoRepo": "That repository is not connected to your account any more. Pick another.",
+        "agentRunFailed": "The agents could not be started. Try again."
     },
     "schema": {
         "nameRequired": "A name is required",

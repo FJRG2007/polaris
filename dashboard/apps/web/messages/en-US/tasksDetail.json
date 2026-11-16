@@ -11,7 +11,17 @@
         "repoEmpty": "No repository matches",
         "agent": "Model",
         "prompt": "What it is being asked",
-        "start": "Start"
+        "start": "Start",
+        "runTitle": "{count, plural, one {Give one task to agents} other {Give # tasks to agents}}",
+        "mode": "How the work is split",
+        "modeCoordinator": "One coordinator",
+        "modeWorkers": "One agent per task",
+        "modeCoordinatorHint": "A coordinator plans over these tasks and starts a worker for each.",
+        "modeWorkersHint": "{count, plural, one {One agent starts on the task.} other {# agents start, one on each task.}}",
+        "brief": "Anything to add",
+        "briefPlaceholder": "Context every agent should have",
+        "follows": "Each task's status follows its agent until someone changes it by hand.",
+        "tooMany": "One run takes up to {count} tasks. Select fewer."
     },
     "files": {
         "uploadFailed": "Could not upload that file",
