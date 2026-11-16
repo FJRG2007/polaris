@@ -24,6 +24,7 @@ import type { FileAnswer, FilesAnswer } from "@/lib/agents/session-files";
 import type { PreviewPortsAnswer } from "@/lib/agents/session-preview";
 import { PICKER_CHANNEL, readPickerMessage, type PickedElement } from "@/lib/agents/preview-picker";
 import { SessionChanges } from "@/components/agents/sessions/session-changes";
+import { useCheckoutWake } from "@/components/polar/use-checkout-wake";
 import { SessionPullTab } from "@/components/agents/sessions/session-pr-tab";
 import { openAgentInterfaceAction } from "@/components/agents/sessions/actions";
 import {
@@ -72,6 +73,7 @@ export function PolarCodeWorkspace({
     branch,
     live,
     lastEdit = null,
+    lastTool = null,
     onPick
 }: {
     open: boolean;
@@ -83,12 +85,16 @@ export function PolarCodeWorkspace({
     /** When the agent last finished writing a file: the preview reloads and
      *  the changes are read again when it moves. */
     lastEdit?: string | null;
+    /** When the agent last finished any other tool: the checkout is looked at
+     *  then, and a write a shell command made wakes the same two. */
+    lastTool?: string | null;
     /** Takes an element picked in the preview to the composer; without it
      *  the preview offers no picker. */
     onPick?: (element: PickedElement) => void;
 }) {
     const t = useTranslations("polar");
     const [pane, setPane] = useState<Pane>("files");
+    const wake = useCheckoutWake({ sessionId: session.id, active: open && live, lastEdit, lastTool });
     // Whether the person picked a pane since the workspace opened: until they
     // do, the first web server the session runs brings the preview forward.
     const chosen = useRef(false);
@@ -195,7 +201,7 @@ export function PolarCodeWorkspace({
                         {pane === "files" ? (
                             <FilesPane sessionId={session.id} live={live} />
                         ) : pane === "preview" ? (
-                            <PreviewPane sessionId={session.id} live={live} lastEdit={lastEdit} onPick={onPick} />
+                            <PreviewPane sessionId={session.id} live={live} lastEdit={wake} onPick={onPick} />
                         ) : pane === "changes" ? (
                             <div className="h-full overflow-y-auto overscroll-contain">
                                 {/* Code lives under Polar, whose routes hand down no Agents catalog. */}
@@ -203,7 +209,7 @@ export function PolarCodeWorkspace({
                                     namespaces={["agents"]}
                                     fallback={<ui.Skeleton className="h-24 w-full" />}
                                 >
-                                    <SessionChanges session={session} wake={lastEdit} />
+                                    <SessionChanges session={session} wake={wake} />
                                 </ClientMessages>
                             </div>
                         ) : pane === "pull" ? (

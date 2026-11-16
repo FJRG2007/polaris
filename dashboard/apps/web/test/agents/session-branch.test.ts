@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createdSessionBranch, isChangeEvent, lastChangeAt, shownSessionBranch } from "@/lib/agents/session-branch";
+import { createdSessionBranch, isChangeEvent, lastChangeAt, lastToolAt, shownSessionBranch } from "@/lib/agents/session-branch";
 
 const ID = "6364280b-0000-4000-8000-000000000000";
 
@@ -83,5 +83,21 @@ describe("lastChangeAt", () => {
                 at("tool.end", "Read", "2026-11-16T10:00:06.000Z")
             ])
         ).toBe("2026-11-16T10:00:03.000Z");
+    });
+});
+
+describe("lastToolAt", () => {
+    it("is the newest finished tool that is not a named edit", () => {
+        const at = (kind: string, subject: string, when: string) => ({ kind, subject, detail: "", at: when });
+        expect(lastToolAt([])).toBeNull();
+        expect(
+            lastToolAt([
+                at("tool.end", "Bash", "2026-11-16T10:00:01.000Z"),
+                at("tool.end", "Read", "2026-11-16T10:00:02.000Z"),
+                // A named edit wakes on its own.
+                at("tool.end", "Edit", "2026-11-16T10:00:04.000Z"),
+                at("tool.start", "Bash", "2026-11-16T10:00:05.000Z")
+            ])
+        ).toBe("2026-11-16T10:00:02.000Z");
     });
 });

@@ -54,7 +54,7 @@ import {
     threadEvents
 } from "@/lib/polar/code-history";
 import { agentText, SESSION_EVENT_KEYS, sessionStateWord } from "@/lib/agents/words";
-import { lastChangeAt, shownSessionBranch } from "@/lib/agents/session-branch";
+import { lastChangeAt, lastToolAt, shownSessionBranch } from "@/lib/agents/session-branch";
 import * as repoOptions from "@/lib/agents/repo-options";
 import {
     getSession,
@@ -168,6 +168,9 @@ export interface PolarCodeThread {
     /** When the agent last finished writing into its checkout, or null: the
      *  workspace re-reads its diffs and reloads its preview when this moves. */
     readonly lastEdit?: string | null;
+    /** When the agent last finished any other tool, or null: the workspace
+     *  looks at the checkout then, for writes a shell command made. */
+    readonly lastTool?: string | null;
 }
 
 /** A subagent as the thread shows it. Without its transcript path, which names
@@ -375,7 +378,8 @@ export async function polarCodeThread(
         todos,
         subagents,
         goal,
-        lastEdit: lastChangeAt(detail.events)
+        lastEdit: lastChangeAt(detail.events),
+        lastTool: lastToolAt(detail.events)
     };
 }
 

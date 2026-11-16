@@ -50,6 +50,24 @@ export function lastChangeAt(
     return last;
 }
 
+/**
+ * When the session last finished a tool that is not one of the named edits,
+ * or null when it has not. A shell command can write as much as an edit tool
+ * can, and no name says which ones did, so this is only a cue to look: the
+ * workspace reads the checkout's fingerprint when it moves and wakes the
+ * preview and the diffs only when that changed.
+ */
+export function lastToolAt(
+    events: readonly { kind: string; subject: string; detail: string; at: string }[]
+): string | null {
+    let last: string | null = null;
+    for (const event of events) {
+        if (event.kind !== "tool.end" || EDITING_TOOLS.has(event.subject)) continue;
+        if (last === null || event.at > last) last = event.at;
+    }
+    return last;
+}
+
 /** The branch to show for a session, or empty when it has none worth naming. */
 export function shownSessionBranch(
     session: {

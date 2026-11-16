@@ -2038,6 +2038,7 @@ function CodeThread({
                     branch={thread.session.branch}
                     live={live}
                     lastEdit={thread.lastEdit ?? null}
+                    lastTool={thread.lastTool ?? null}
                     onPick={(element) => {
                         setPicks((list) => [...list, element].slice(-PICKS_MAX));
                         // What comes next is saying what to do with it.

@@ -93,7 +93,12 @@ export function listChangesScript(input: {
         "trap 'rm -f \"$tmp\"' EXIT",
         'list > "$tmp"',
         'total=$(wc -l < "$tmp" | tr -d " ")',
-        `echo "${MARK} ok $base $total"`,
+        // The checkout's fingerprint: its commit, the counts, and each changed
+        // file's size and modification time. It moves whenever a write lands,
+        // whoever made it - a shell command as much as an edit tool - so the
+        // workspace can tell a write happened without reading every diff.
+        "print=$({ g rev-parse HEAD 2>/dev/null; cat \"$tmp\"; cut -f3- \"$tmp\" | while IFS= read -r f; do stat -c '%s %Y' -- \"$f\" 2>/dev/null || echo -; done; } | cksum | awk '{ print $1 \".\" $2 }')",
+        `echo "${MARK} ok $base $total $print"`,
         `tail -n +${offset + 1} "$tmp" | LC_ALL=C awk -v cap=${LIST_PAGE_BYTES} -v start=${offset} '{ size += length($0) + 1; if (size > cap) { print "${MARK} more " (start + NR - 1); exit } print }'`
     ].join("\n");
 }
@@ -106,7 +111,16 @@ export interface ChangedFile {
 }
 
 export type ChangesListing =
-    | { kind: "ok"; base: string; total: number; files: ChangedFile[]; next: number | null }
+    | {
+          kind: "ok";
+          base: string;
+          total: number;
+          files: ChangedFile[];
+          next: number | null;
+          /** What the checkout looks like, as one value that moves with every
+           *  write to it; absent from a script that predates it. */
+          print?: string;
+      }
     | { kind: "nocheckout" }
     | { kind: "nobase" };
 
@@ -115,7 +129,7 @@ export function parseChangesList(output: string): ChangesListing | null {
     const lines = output.split("\n");
     const start = lines.findIndex((line) => line.startsWith(MARK));
     if (start < 0) return null;
-    const [status, base, total] = lines[start]!.slice(MARK.length).trim().split(/\s+/);
+    const [status, base, total, print] = lines[start]!.slice(MARK.length).trim().split(/\s+/);
     if (status === "nocheckout") return { kind: "nocheckout" };
     if (status === "nobase") return { kind: "nobase" };
     if (status !== "ok" || !base) return null;
@@ -136,7 +150,8 @@ export function parseChangesList(output: string): ChangesListing | null {
         base,
         total: Math.max(0, Number.parseInt(total ?? "0", 10) || 0),
         files,
-        next
+        next,
+        ...(print && /^\d+\.\d+$/.test(print) ? { print } : {})
     };
 }
 

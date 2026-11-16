@@ -82,6 +82,12 @@ describe("parsing", () => {
             ],
             next: 2
         });
+        // The checkout's fingerprint rides on the status line when the script
+        // prints one, and anything that is not one is dropped.
+        const printed = parseChangesList("polaris-changes: ok abc123 0 4021.118");
+        expect(printed && printed.kind === "ok" ? printed.print : null).toBe("4021.118");
+        const odd = parseChangesList("polaris-changes: ok abc123 0 $(x)");
+        expect(odd && odd.kind === "ok" ? odd.print : "missing").toBeUndefined();
         expect(parseChangesList("polaris-changes: nocheckout")).toEqual({ kind: "nocheckout" });
         expect(parseChangesList("polaris-changes: nobase")).toEqual({ kind: "nobase" });
         expect(parseChangesList("nothing at all")).toBeNull();
@@ -264,6 +270,23 @@ describe("against a real checkout", { timeout: 120_000 }, () => {
 
     it("refuses a path that is neither tracked nor untracked", async () => {
         expect(await diffOf("missing.txt")).toEqual({ kind: "gone" });
+    });
+
+    it("moves its fingerprint when a file is written outside an edit tool, and only then", () => {
+        const printOf = () => {
+            const listing = parseChangesList(
+                run(listChangesScript({ workdir: work, baseRef: "main", offset: 0 }))
+            );
+            return listing?.kind === "ok" ? listing.print : undefined;
+        };
+        const first = printOf();
+        expect(first).toMatch(/^\d+\.\d+$/);
+        expect(printOf()).toBe(first);
+        // What a shell command leaves behind: a file no edit tool named.
+        writeFileSync(join(work, "shell-out.txt"), "written by a command\n");
+        const second = printOf();
+        expect(second).toMatch(/^\d+\.\d+$/);
+        expect(second).not.toBe(first);
     });
 
     it("says so when there is no checkout", () => {
