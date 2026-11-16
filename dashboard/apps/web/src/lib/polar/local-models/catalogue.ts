@@ -109,15 +109,22 @@ export async function localModelRunners(userId: string, now = Date.now()): Promi
     return rows.filter((row) => isOnline(row, now) && servedBy(row.capabilities).length > 0);
 }
 
-/** Whether `ref` names a server one of this person's online computers still
- *  announces: a stale pick fails here, before a frame is sent. */
-export async function localModelReady(userId: string, ref: LocalModelRef): Promise<boolean> {
-    const rows = await localModelRunners(userId);
-    const row = rows.find((one) => one.id === ref.runnerId);
-    return Boolean(
-        row &&
-            servedBy(row.capabilities).some(
-                (served) => served.server === ref.server && served.host === ref.host && served.models.some((entry) => entry.id === ref.model)
-            )
-    );
+/** The server's display name. Pure. */
+export function localServerName(server: core.LocalModelServer): string {
+    return SERVER_NAMES[server];
+}
+
+/** Whether `ref` names a model one of this person's online computers still
+ *  announces: a stale pick fails here, before a frame is sent - `offline`
+ *  when that computer is not connected, `unreachable` when it no longer finds
+ *  that server, `model-missing` when the server no longer lists the model. */
+export async function localModelState(userId: string, ref: LocalModelRef, now = Date.now()): Promise<"ready" | "offline" | "unreachable" | "model-missing"> {
+    const row = await prisma.agentRunner.findFirst({
+        where: { id: ref.runnerId, userId, relayNode: { not: null } },
+        select: { relayNode: true, lastSeenAt: true, capabilities: true }
+    });
+    if (!row || !isOnline(row, now)) return "offline";
+    const server = servedBy(row.capabilities).find((served) => served.server === ref.server && served.host === ref.host);
+    if (!server) return "unreachable";
+    return server.models.some((entry) => entry.id === ref.model) ? "ready" : "model-missing";
 }

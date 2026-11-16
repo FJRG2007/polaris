@@ -89,6 +89,8 @@ export function PolarFailureNotice({
                     ? stored.reason === "offline"
                         ? t("claudeSubscription.needsComputer")
                         : t(`claudeSubscription.errors.${stored.reason}`)
+                  : stored?.code === "local"
+                    ? t(`localModels.errors.${stored.reason}`, { server: stored.server })
                   : failure?.tried && failure.tried.length > 1
                     ? t("errors.provider.allTried", { count: failure.tried.length })
                     : failure

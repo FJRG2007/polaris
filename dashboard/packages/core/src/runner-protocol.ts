@@ -111,7 +111,7 @@ export const RUNNER_SIGNED_IN = ["yes", "no", "unknown"] as const;
 /** The local model servers a runner looks for, and how much it reports. */
 export const LOCAL_MODEL_SERVERS = ["ollama", "lmstudio", "vllm", "llamacpp"] as const;
 export type LocalModelServer = (typeof LOCAL_MODEL_SERVERS)[number];
-export const LOCAL_MODEL_LIMITS = { servers: 24, models: 100, lanHosts: 8 } as const;
+export const LOCAL_MODEL_LIMITS = { servers: 24, models: 100, lanHosts: 8, tools: 128 } as const;
 
 export const runnerCapabilitiesSchema = frame("capabilities", {
     os: z.object({
@@ -307,8 +307,13 @@ export const runnerChatEventSchema = z.discriminatedUnion("kind", [
             .object({ input: z.number().int().min(0), output: z.number().int().min(0) })
             .optional()
     }),
-    /** `code` only, for the same reason as `toolchain.progress`. */
-    z.object({ kind: z.literal("error"), code: z.enum(["signed-out", "rate-limited", "not-installed", "failed"]) })
+    /** `code` only, for the same reason as `toolchain.progress`. A turn on a
+     *  local model server adds `unreachable` (nothing answers at its port)
+     *  and `model-missing` (the server does not have that model loaded). */
+    z.object({
+        kind: z.literal("error"),
+        code: z.enum(["signed-out", "rate-limited", "not-installed", "failed", "unreachable", "model-missing"])
+    })
 ]);
 export type RunnerChatEvent = z.infer<typeof runnerChatEventSchema>;
 
@@ -565,7 +570,46 @@ export const serverChatTurnSchema = frame("chat.turn", {
      *  Claude. Only sent to a runner announcing `local-models`; an older
      *  runner never sees it. */
     local: z
-        .object({ server: z.enum(LOCAL_MODEL_SERVERS), host: shortText(80), model: shortText(200) })
+        .object({
+            server: z.enum(LOCAL_MODEL_SERVERS),
+            host: shortText(80),
+            model: shortText(200),
+            /** Polaris's tools offered to the model as OpenAI-compatible
+             *  `tools`. The model only asks for a call (`tool-call`, then
+             *  `finish` with `tool-calls`); Polaris runs it and sends the next
+             *  turn with the result in `conversation`. A server that refuses
+             *  tools is asked again without them. */
+            tools: z
+                .array(
+                    z.object({
+                        name: shortText(200),
+                        description: z.string().max(4000).optional(),
+                        parameters: z.record(z.string(), z.unknown())
+                    })
+                )
+                .max(LOCAL_MODEL_LIMITS.tools)
+                .optional(),
+            /** The conversation with its tool calls and results, used instead
+             *  of `messages` when present. */
+            conversation: z
+                .array(
+                    z.discriminatedUnion("role", [
+                        z.object({ role: z.literal("user"), text: z.string().max(RUNNER_LIMITS.promptChars) }),
+                        z.object({
+                            role: z.literal("assistant"),
+                            text: z.string().max(RUNNER_LIMITS.promptChars),
+                            calls: z
+                                .array(z.object({ callId: shortText(200), name: shortText(200), input: z.string().max(RUNNER_LIMITS.promptChars) }))
+                                .max(LOCAL_MODEL_LIMITS.tools)
+                                .optional()
+                        }),
+                        z.object({ role: z.literal("tool"), callId: shortText(200), text: z.string().max(RUNNER_LIMITS.promptChars) })
+                    ])
+                )
+                .min(1)
+                .max(400)
+                .optional()
+        })
         .optional()
 });
 

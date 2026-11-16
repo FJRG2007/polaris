@@ -388,6 +388,34 @@ export function decodeLooseFailure(text: string | undefined): PolarFailure | Run
  * A provider's refusal, the shared key's ceiling, or a file the model could not
  * be handed.
  */
+/** Why a turn on a model served on the person's own computer did not answer:
+ *  `offline` (that computer is not connected), `unreachable` (nothing answers
+ *  at the server's port), `model-missing` (the server no longer has that
+ *  model), `rate-limited` (the server is busy), `not-allowed` (the computer no
+ *  longer allows that address), `failed` (anything else). Each is a
+ *  `polar.localModels.errors` sentence, with the server's name. */
+export const LOCAL_FAILURES = ["offline", "unreachable", "model-missing", "rate-limited", "not-allowed", "failed"] as const;
+export type LocalFailure = (typeof LOCAL_FAILURES)[number];
+
+export const localFailureSchema = z.object({
+    code: z.literal("local"),
+    reason: z.enum(LOCAL_FAILURES),
+    /** The server's display name (Ollama, LM Studio, vLLM, llama.cpp). */
+    server: z.string().max(40)
+});
+export type LocalFailureRecord = z.infer<typeof localFailureSchema>;
+
+/** A local model failure a stream reported, or null for anything else. */
+export function decodeLocalFailure(text: string | undefined): LocalFailureRecord | null {
+    if (!text) return null;
+    try {
+        const parsed = localFailureSchema.safeParse(JSON.parse(text));
+        return parsed.success ? parsed.data : null;
+    } catch {
+        return null;
+    }
+}
+
 export const storedFailureSchema = z.discriminatedUnion("code", [
     polarFailureSchema,
     z.object({
@@ -398,7 +426,8 @@ export const storedFailureSchema = z.discriminatedUnion("code", [
     }),
     z.object({ code: z.literal("file_unreadable"), name: z.string().max(255) }),
     z.object({ code: z.literal("too_many_runs"), max: z.number().int().min(1).max(100) }),
-    subscriptionFailureSchema
+    subscriptionFailureSchema,
+    localFailureSchema
 ]);
 export type StoredFailure = z.infer<typeof storedFailureSchema>;
 

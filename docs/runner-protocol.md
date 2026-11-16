@@ -120,6 +120,38 @@ session's hook script uses. The runner may post the CLI's hooks to
 and `permission.request` frames. Both land in the same code
 (`lib/agents/session-hook-ingest.ts`).
 
+### Local models (`local-models`)
+
+A runner that lists `local-models` in `capabilities.features` looks for model
+servers on its own computer and runs Polar Chat turns on them. Every field
+below is optional, so a server or a runner without the feature ignores it.
+
+- `capabilities.localModels[]`: `{server, host, models[] {id, name?}}`, with
+  `server` one of `ollama` (port 11434, `/api/tags`), `lmstudio` (1234),
+  `vllm` (8000) or `llamacpp` (8080), the last three listed from `/v1/models`.
+  `host` is `loopback` or a private address the person added. Re-sent when
+  the listing changes (checked every 60 s).
+- `capabilities.lanHosts[]`: the private addresses the runner currently
+  allows. Empty or absent means loopback only.
+- `local.config` (server -> runner): `lanHosts[]`, the person's list from Your
+  computers. Only sent to a runner announcing the feature. The runner keeps
+  only private, link-local or unique-local IP literals (never a name, which
+  can resolve anywhere) and answers with a fresh `capabilities`.
+- `chat.turn` with `local: {server, host, model, tools?, conversation?}`: run
+  the turn on that server through its OpenAI-compatible
+  `/v1/chat/completions`, streamed back as `chat.event`. A `host` that is
+  neither loopback nor in the runner's own list is refused without dialing.
+  `tools[] {name, description?, parameters}` are offered as `tools`; the model
+  only asks for a call (`tool-call` events, then `finish` with `tool-calls`),
+  Polaris runs it and sends the next turn with the result in `conversation`
+  (`user`, `assistant` with `calls[] {callId, name, input}`, and `tool` with
+  `callId`). A server that refuses `tools` with a 400 is asked again without
+  them and answers as text.
+- `chat.event` `error` codes on a local turn: `unreachable` (nothing answers
+  at the port), `model-missing` (404, or the server says the model is not
+  loaded), `rate-limited` (429), `not-installed` (host not allowed), `failed`
+  (anything else).
+
 ## How it runs inside Polaris
 
 - `apps/web/ws-server.mjs` routes upgrades by path: `/api/deploy/ws` for

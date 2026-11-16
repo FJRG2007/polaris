@@ -14,7 +14,7 @@
  */
 
 import { randomUUID } from "node:crypto";
-import type * as core from "@polaris/core";
+import * as core from "@polaris/core";
 import type { LanguageModelMiddleware } from "ai";
 import {
     CLAUDE_SUBSCRIPTION_PROVIDER,
@@ -23,12 +23,15 @@ import {
     subscriptionRunnerFor
 } from "@/lib/polar/claude-subscription/turns";
 import { mintTurnToken } from "@/lib/polar/claude-subscription/mcp-token";
-import { LOCAL_MODELS_PROVIDER, localModelReady, type LocalModelRef } from "@/lib/polar/local-models/catalogue";
-import { SUBSCRIPTION_FAILURES, type SubscriptionFailure } from "@/lib/polar/provider-failure";
+import type { z } from "zod";
+import * as localModels from "@/lib/polar/local-models/catalogue";
+import { LOCAL_FAILURES, SUBSCRIPTION_FAILURES, type LocalFailure, type SubscriptionFailure } from "@/lib/polar/provider-failure";
 
 type Model = Parameters<NonNullable<LanguageModelMiddleware["wrapStream"]>>[0]["model"];
 type CallOptions = Parameters<Model["doStream"]>[0];
 type Prompt = CallOptions["prompt"];
+type LocalTurn = NonNullable<z.infer<typeof core.serverChatTurnSchema>["local"]>;
+type ErrorCode = Extract<core.RunnerChatEvent, { kind: "error" }>["code"];
 type StreamPart = Awaited<ReturnType<Model["doStream"]>>["stream"] extends ReadableStream<infer P> ? P : never;
 
 /** Why a subscription turn did not answer, as the reader's own words name it. */
@@ -48,6 +51,54 @@ export function subscriptionFailureOf(error: unknown): SubscriptionFailure | nul
         at = (at as { cause?: unknown }).cause;
     }
     return null;
+}
+
+/** Why a turn on a model served on the person's computer did not answer,
+ *  with the server's name for the sentence. */
+export class LocalTurnError extends Error {
+    constructor(
+        readonly reason: LocalFailure,
+        readonly server: string
+    ) {
+        super(`local model: ${reason}`);
+        this.name = "LocalTurnError";
+    }
+}
+
+/** A local model's reason behind an error, looking through causes; null for
+ *  any other error. */
+export function localFailureOf(error: unknown): { reason: LocalFailure; server: string } | null {
+    for (let at: unknown = error, depth = 0; at && depth < 5; depth++) {
+        const found = at as { name?: unknown; reason?: unknown; server?: unknown };
+        const known = typeof found.reason === "string" && (LOCAL_FAILURES as readonly string[]).includes(found.reason);
+        if (found.name === "LocalTurnError" && known && typeof found.server === "string") return { reason: found.reason as LocalFailure, server: found.server };
+        at = (at as { cause?: unknown }).cause;
+    }
+    return null;
+}
+
+/** A runner's error code, read for a local turn. Pure. */
+export function localFailureFor(code: ErrorCode): LocalFailure {
+    switch (code) {
+        case "unreachable":
+        case "model-missing":
+        case "rate-limited":
+            return code;
+        case "not-installed":
+            return "not-allowed";
+        default:
+            return "failed";
+    }
+}
+
+/** A runner's error code, read for a Claude turn: a code only a local turn
+ *  sends reads as `failed`. Pure. */
+function subscriptionFailureFor(code: ErrorCode): SubscriptionFailure {
+    return (SUBSCRIPTION_FAILURES as readonly string[]).includes(code) ? (code as SubscriptionFailure) : "failed";
+}
+
+function turnError(code: ErrorCode, local: { server: string } | null): Error {
+    return local ? new LocalTurnError(localFailureFor(code), local.server) : new SubscriptionTurnError(subscriptionFailureFor(code));
 }
 
 const APPROVAL_ID = /^cs1\.([0-9a-f-]{36})\.(\d{1,9})\.([0-9a-f-]{36})$/;
@@ -117,7 +168,7 @@ const NO_USAGE = {
 
 /** The runner's events as stream parts, in order. `seq` is where the turn
  *  resumes after the event just mapped, for an approval. Pure but for ids. */
-export function createEventMapper(turnId: string, calls: Set<string>) {
+export function createEventMapper(turnId: string, calls: Set<string>, local: { server: string } | null = null) {
     let open: { kind: "text" | "reasoning"; id: string } | null = null;
     const names = new Map<string, string>();
 
@@ -129,6 +180,13 @@ export function createEventMapper(turnId: string, calls: Set<string>) {
     }
 
     function call(callId: string, name: string, input: Record<string, unknown>): StreamPart[] {
+        if (local) {
+            // A local model only asks: the SDK runs the tool, as for any model.
+            // An id the server reuses from an earlier step is made unique.
+            const unique = calls.has(callId) ? `${callId}.${turnId.slice(0, 8)}.${calls.size}` : callId;
+            calls.add(unique);
+            return [{ type: "tool-call", toolCallId: unique, toolName: name, input: JSON.stringify(input) }];
+        }
         names.set(callId, name);
         if (calls.has(callId)) return [];
         calls.add(callId);
@@ -185,11 +243,94 @@ export function createEventMapper(turnId: string, calls: Set<string>) {
             case "error":
                 return [
                     ...close(),
-                    { type: "error", error: new SubscriptionTurnError(event.code) },
+                    { type: "error", error: turnError(event.code, local) },
                     { type: "finish", usage: NO_USAGE, finishReason: { unified: "error", raw: event.code } }
                 ];
         }
     };
+}
+
+/** The most of Polaris's tools a local turn carries, in characters, so the
+ *  frame stays well under `RUNNER_LIMITS.frameBytes`. */
+const LOCAL_TOOLS_CHARS = 300_000;
+/** The most characters of one message or tool result a local turn carries. */
+const LOCAL_TEXT_CHARS = 100_000;
+
+type FunctionTool = Extract<NonNullable<CallOptions["tools"]>[number], { type: "function" }>;
+
+/** A call's function tools as `local.tools`, or undefined when there are none
+ *  or they would not fit in a frame. Pure. */
+export function localToolsOf(tools: CallOptions["tools"]): LocalTurn["tools"] {
+    const offered = (tools ?? [])
+        .filter((tool): tool is FunctionTool => tool.type === "function")
+        .slice(0, core.LOCAL_MODEL_LIMITS.tools)
+        .map((tool) => ({
+            name: tool.name.slice(0, 200),
+            ...(tool.description ? { description: tool.description.slice(0, 4000) } : {}),
+            parameters: (tool.inputSchema ?? { type: "object" }) as Record<string, unknown>
+        }));
+    if (offered.length === 0 || JSON.stringify(offered).length > LOCAL_TOOLS_CHARS) return undefined;
+    return offered;
+}
+
+/** A tool result as the text a model server reads. Pure. */
+function toolOutputText(output: unknown): string {
+    const value = output as { type?: string; value?: unknown; reason?: string };
+    switch (value?.type) {
+        case "text":
+        case "error-text":
+            return String(value.value ?? "");
+        case "json":
+        case "error-json":
+            return JSON.stringify(value.value ?? null);
+        case "execution-denied":
+            return value.reason ? `Not run: ${value.reason}` : "Not run: the person declined it.";
+        case "content":
+            return Array.isArray(value.value)
+                ? (value.value as { type?: string; text?: string }[])
+                      .map((part) => (part.type === "text" ? (part.text ?? "") : ""))
+                      .filter(Boolean)
+                      .join("\n")
+                : "";
+        default:
+            return "";
+    }
+}
+
+/** The conversation with its tool calls and results, as
+ *  `local.conversation`. Pure. */
+export function localConversationOf(prompt: Prompt): NonNullable<LocalTurn["conversation"]> {
+    const cut = (text: string) => text.slice(0, LOCAL_TEXT_CHARS);
+    const out: NonNullable<LocalTurn["conversation"]> = [];
+    for (const message of prompt) {
+        if (message.role === "system") continue;
+        if (message.role === "tool") {
+            for (const part of message.content) {
+                if (part.type === "tool-result") out.push({ role: "tool", callId: part.toolCallId.slice(0, 200), text: cut(toolOutputText(part.output)) });
+            }
+            continue;
+        }
+        const text = message.content
+            .map((part) => (part.type === "text" ? part.text : ""))
+            .filter(Boolean)
+            .join("\n");
+        if (message.role === "user") {
+            if (text) out.push({ role: "user", text: cut(text) });
+            continue;
+        }
+        const calls = message.content
+            .flatMap((part) =>
+                part.type === "tool-call"
+                    ? [{ callId: part.toolCallId.slice(0, 200), name: part.toolName.slice(0, 200), input: cut(JSON.stringify(part.input ?? {})) }]
+                    : []
+            )
+            .slice(0, core.LOCAL_MODEL_LIMITS.tools);
+        if (text || calls.length > 0) out.push({ role: "assistant", text: cut(text), ...(calls.length > 0 ? { calls } : {}) });
+    }
+    // The conversation has to open on the person's words.
+    const kept = out.slice(-400);
+    while (kept.length > 1 && kept[0]!.role !== "user") kept.shift();
+    return kept;
 }
 
 /** The MCP endpoint and this turn's token for it. */
@@ -202,15 +343,23 @@ async function turnMcp(userId: string, turnId: string): Promise<{ url: string; t
 
 /** Claude on the person's subscription, as `model` (an alias Claude Code
  *  takes: `opus`, `sonnet`, `haiku`) - or, with `local`, a model served on
- *  one of their computers, through the same runner turn. A local turn is plain
- *  text: no Polaris tools are handed to a model server. */
-/** `local: null` is a local pick whose id could not be read: never Claude. */
-export function subscriptionLanguageModel(userId: string, model: string, local?: LocalModelRef | null): Model {
+ *  one of their computers, through the same runner turn. A local turn is
+ *  offered the call's tools as OpenAI-compatible `tools`; the model only asks
+ *  for a call and the SDK runs it, as for any model, and a server that takes
+ *  no tools answers as text. `local: null` is a local pick whose id could not
+ *  be read: never Claude. */
+export function subscriptionLanguageModel(userId: string, model: string, local?: localModels.LocalModelRef | null): Model {
+    const server = local ? { server: localModels.localServerName(local.server) } : null;
     async function doStream(options: CallOptions): Promise<Awaited<ReturnType<Model["doStream"]>>> {
-        const runnerId =
-            local === undefined ? await subscriptionRunnerFor(userId) : local && (await localModelReady(userId, local)) ? local.runnerId : null;
+        if (local !== undefined) {
+            const state = local ? await localModels.localModelState(userId, local) : "model-missing";
+            if (state !== "ready") throw new LocalTurnError(state, server?.server ?? "");
+        }
+        const runnerId = local ? local.runnerId : await subscriptionRunnerFor(userId);
         if (!runnerId) throw new SubscriptionTurnError("offline");
         const read = readPrompt(options.prompt);
+        if (local) read.resume = null;
+        const tools = local ? localToolsOf(options.tools) : undefined;
         const turnId = read.resume?.turnId ?? randomUUID();
         const events = runSubscriptionTurn({
             userId,
@@ -221,16 +370,25 @@ export function subscriptionLanguageModel(userId: string, model: string, local?:
             messages: read.messages,
             effort: null,
             mcp: read.resume || local ? null : await turnMcp(userId, turnId),
-            ...(local ? { local: { server: local.server, host: local.host, model: local.model } } : {}),
+            ...(local
+                ? {
+                      local: {
+                          server: local.server,
+                          host: local.host,
+                          model: local.model,
+                          ...(tools ? { tools, conversation: localConversationOf(options.prompt) } : {})
+                      }
+                  }
+                : {}),
             signal: options.abortSignal,
             ...(read.resume ? { resume: { seq: read.resume.seq, answers: read.resume.answers } } : {})
         });
         // A turn that fails before it says anything is thrown, so the router
         // can hand it to the next step of the plan.
         const first = await events.next();
-        if (first.done) throw new SubscriptionTurnError("failed");
-        if (first.value.kind === "error") throw new SubscriptionTurnError(first.value.code);
-        const map = createEventMapper(turnId, read.calls);
+        if (first.done) throw turnError("failed", server);
+        if (first.value.kind === "error") throw turnError(first.value.code, server);
+        const map = createEventMapper(turnId, read.calls, server);
         let pending: core.RunnerChatEvent | null = first.value;
         const stream = new ReadableStream<StreamPart>({
             start(controller) {
@@ -257,7 +415,7 @@ export function subscriptionLanguageModel(userId: string, model: string, local?:
 
     return {
         specificationVersion: "v4",
-        provider: local !== undefined ? LOCAL_MODELS_PROVIDER : CLAUDE_SUBSCRIPTION_PROVIDER,
+        provider: local !== undefined ? localModels.LOCAL_MODELS_PROVIDER : CLAUDE_SUBSCRIPTION_PROVIDER,
         modelId: model,
         supportedUrls: {},
         doStream,

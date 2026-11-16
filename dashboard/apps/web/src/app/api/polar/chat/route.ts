@@ -144,6 +144,7 @@ import {
     classifyProviderFailure,
     decodePolarFailure,
     decodeSubscriptionFailure,
+    decodeLocalFailure,
     encodePolarFailure,
     failureLogLine,
     withoutFailures,
@@ -158,7 +159,7 @@ import {
     type ModelChoice
 } from "@/lib/polar/shared";
 
-import { subscriptionFailureOf } from "@/lib/polar/claude-subscription/model";
+import { localFailureOf, subscriptionFailureOf } from "@/lib/polar/claude-subscription/model";
 
 export const dynamic = "force-dynamic";
 
@@ -237,7 +238,7 @@ function failureIntoAnswer(): TransformStream<UIMessageChunk, UIMessageChunk> {
     return new TransformStream({
         transform(chunk, controller) {
             if (chunk.type === "error") {
-                const failure = decodePolarFailure(chunk.errorText) ?? decodeSubscriptionFailure(chunk.errorText);
+                const failure = decodePolarFailure(chunk.errorText) ?? decodeSubscriptionFailure(chunk.errorText) ?? decodeLocalFailure(chunk.errorText);
                 if (failure) controller.enqueue({ type: FAILURE_PART, data: failure });
             }
             controller.enqueue(chunk);
@@ -810,6 +811,9 @@ export async function POST(request: Request): Promise<Response> {
             // (`claude-subscription/model.ts`); no provider is held to it.
             const subscription = subscriptionFailureOf(error);
             if (subscription) return JSON.stringify({ code: "subscription", reason: subscription });
+            // A model on the person's own computer, in words about that server.
+            const local = localFailureOf(error);
+            if (local) return JSON.stringify({ code: "local", reason: local.reason, server: local.server });
             // Named for what happened: the model that last answered, else the
             // last one refused, with every refusal listed when the turn asked
             // more than one. Automatic tries that provider last for a few

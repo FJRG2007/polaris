@@ -2168,6 +2168,14 @@
         "preparingStep": "{tool}: {percent} %"
     },
     "localModels": {
-        "label": "Tus equipos"
+        "label": "Tus equipos",
+        "errors": {
+            "offline": "Abre Polaris en ese equipo para usar aquí sus modelos.",
+            "unreachable": "{server} no responde en tu equipo. Inícialo y vuelve a probar.",
+            "model-missing": "{server} no tiene este modelo cargado. Cárgalo allí y vuelve a probar.",
+            "rate-limited": "{server} está ocupado ahora. Vuelve a probar en un momento.",
+            "not-allowed": "Tu equipo ya no permite esta dirección. Añádela otra vez en Modelos locales.",
+            "failed": "{server} se detuvo antes de responder. Vuelve a probar."
+        }
     }
 }

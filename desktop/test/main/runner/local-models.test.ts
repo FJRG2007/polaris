@@ -141,3 +141,102 @@ describe("LocalChat", () => {
         expect(host.handle(claude)).toBe(false);
     });
 });
+
+describe("local tool calls", () => {
+    it("adds up a streamed call and reads its arguments", () => {
+        const first = local.readStreamLine('data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"list_tasks","arguments":"{\\"li"}}]}}]}');
+        const second = local.readStreamLine('data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"mit\\":5}"}}]},"finish_reason":"tool_calls"}]}');
+        expect(first).toMatchObject({ calls: [{ index: 0, id: "c1", name: "list_tasks" }] });
+        expect(second).toMatchObject({ finish: "tool-calls" });
+        const deltas = [...(first as { calls: local.ToolCallDelta[] }).calls, ...(second as { calls: local.ToolCallDelta[] }).calls];
+        expect(local.collectToolCalls(deltas, TURN_ID)).toEqual([{ kind: "tool-call", callId: "c1", name: "list_tasks", input: { limit: 5 } }]);
+    });
+
+    it("gives a call with broken arguments an empty input and an id when it had none", () => {
+        expect(local.collectToolCalls([{ index: 2, name: "x", arguments: "{oops" }], TURN_ID)).toEqual([
+            { kind: "tool-call", callId: `${TURN_ID}-2`, name: "x", input: {} }
+        ]);
+    });
+
+    it("sends the conversation with its calls and results in the OpenAI shape", () => {
+        const base = turn("loopback");
+        const messages = local.chatMessages({
+            ...base,
+            local: {
+                ...base.local,
+                conversation: [
+                    { role: "user", text: "tasks?" },
+                    { role: "assistant", text: "", calls: [{ callId: "c1", name: "list_tasks", input: "{}" }] },
+                    { role: "tool", callId: "c1", text: "[]" }
+                ]
+            }
+        });
+        expect(messages).toEqual([
+            { role: "system", content: "You are Polar." },
+            { role: "user", content: "tasks?" },
+            { role: "assistant", content: null, tool_calls: [{ id: "c1", type: "function", function: { name: "list_tasks", arguments: "{}" } }] },
+            { role: "tool", tool_call_id: "c1", content: "[]" }
+        ]);
+    });
+
+    it("names why a server refused", () => {
+        expect(local.readRefusal(400, '{"error":"llama3 does not support tools"}')).toBe("tools");
+        expect(local.readRefusal(404, '{"error":"model \\"x\\" not found, try pulling it first"}')).toBe("model-missing");
+        expect(local.readRefusal(400, '{"error":{"message":"No models loaded. Please load a model"}}')).toBe("model-missing");
+        expect(local.readRefusal(429, "")).toBe("rate-limited");
+        expect(local.readRefusal(500, "boom")).toBe("failed");
+    });
+
+    it("asks again without tools when the model does not take them, and ends with the calls it asked for", async () => {
+        const sent: RunnerFrame[] = [];
+        const bodies: Record<string, unknown>[] = [];
+        const host = new local.LocalChat({
+            send: (frame) => (sent.push(frame), true),
+            lanHosts: () => [],
+            fetch: (async (_url: string, init: RequestInit) => {
+                bodies.push(JSON.parse(String(init.body)));
+                if (bodies.length === 1) return new Response('{"error":"does not support tools"}', { status: 400 });
+                return streamOf(['data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n']);
+            }) as unknown as typeof fetch
+        });
+        const base = turn("loopback");
+        host.handle({ ...base, local: { ...base.local, tools: [{ name: "list_tasks", parameters: { type: "object" } }] } });
+        await settle(sent, ["finish"]);
+        expect(bodies[0]!.tools).toEqual([{ type: "function", function: { name: "list_tasks", parameters: { type: "object" } } }]);
+        expect(bodies[1]!.tools).toBeUndefined();
+        expect(sent.map((frame) => (frame.type === "chat.event" ? frame.event.kind : null))).toEqual(["text", "finish"]);
+    });
+
+    it("emits the calls a turn asked for and finishes on tool-calls", async () => {
+        const sent: RunnerFrame[] = [];
+        const host = new local.LocalChat({
+            send: (frame) => (sent.push(frame), true),
+            lanHosts: () => [],
+            fetch: (async () =>
+                streamOf([
+                    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"list_tasks","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}\n'
+                ])) as unknown as typeof fetch
+        });
+        const base = turn("loopback");
+        host.handle({ ...base, local: { ...base.local, tools: [{ name: "list_tasks", parameters: {} }] } });
+        await settle(sent, ["finish"]);
+        expect(sent.map((frame) => (frame.type === "chat.event" ? frame.event : null))).toEqual([
+            { kind: "tool-call", callId: "c1", name: "list_tasks", input: {} },
+            { kind: "finish", reason: "tool-calls" }
+        ]);
+    });
+
+    it("says the server is unreachable when nothing answers at its port", async () => {
+        const sent: RunnerFrame[] = [];
+        const host = new local.LocalChat({
+            send: (frame) => (sent.push(frame), true),
+            lanHosts: () => [],
+            fetch: (async () => {
+                throw new TypeError("fetch failed");
+            }) as unknown as typeof fetch
+        });
+        host.handle(turn("loopback"));
+        await settle(sent, ["error"]);
+        expect(sent[0]).toMatchObject({ event: { kind: "error", code: "unreachable" } });
+    });
+});

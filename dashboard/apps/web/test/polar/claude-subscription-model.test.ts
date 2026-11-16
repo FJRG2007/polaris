@@ -151,3 +151,46 @@ describe("turn MCP token", () => {
         expect(body).toBeTruthy();
     });
 });
+
+describe("local model turns", () => {
+    it("maps a local call as one the SDK runs, and makes a reused id unique", () => {
+        const map = model.createEventMapper(TURN, new Set(["c1"]), { server: "Ollama" });
+        const parts = map({ kind: "tool-call", callId: "c1", name: "list_tasks", input: { limit: 2 } }, 1);
+        expect(parts).toHaveLength(1);
+        expect(parts[0]).toMatchObject({ type: "tool-call", toolName: "list_tasks", input: '{"limit":2}' });
+        expect(parts[0]).not.toHaveProperty("providerExecuted");
+        expect((parts[0] as { toolCallId: string }).toolCallId).not.toBe("c1");
+    });
+
+    it("reports a local error in the server's words, never the subscription's", () => {
+        const map = model.createEventMapper(TURN, new Set(), { server: "LM Studio" });
+        const error = map({ kind: "error", code: "unreachable" }, 0).find((part) => part.type === "error");
+        const failure = model.localFailureOf((error as { error: unknown }).error);
+        expect(failure).toEqual({ reason: "unreachable", server: "LM Studio" });
+        expect(model.subscriptionFailureOf((error as { error: unknown }).error)).toBeNull();
+        expect(model.localFailureFor("not-installed")).toBe("not-allowed");
+        expect(model.localFailureFor("signed-out")).toBe("failed");
+    });
+
+    it("offers function tools and drops a list too large for a frame", () => {
+        const tool = { type: "function" as const, name: "list_tasks", description: "List tasks", inputSchema: { type: "object" as const } };
+        expect(model.localToolsOf([tool])).toEqual([{ name: "list_tasks", description: "List tasks", parameters: { type: "object" } }]);
+        expect(model.localToolsOf([])).toBeUndefined();
+        const huge = { ...tool, description: "x".repeat(4000) };
+        expect(model.localToolsOf(Array.from({ length: 100 }, (_, at) => ({ ...huge, name: `t${at}` })))).toBeUndefined();
+    });
+
+    it("carries the conversation with its calls and results", () => {
+        const conversation = model.localConversationOf([
+            { role: "system", content: "sys" },
+            { role: "user", content: [{ type: "text", text: "tasks?" }] },
+            { role: "assistant", content: [{ type: "tool-call", toolCallId: "c1", toolName: "list_tasks", input: { limit: 2 } }] },
+            { role: "tool", content: [{ type: "tool-result", toolCallId: "c1", toolName: "list_tasks", output: { type: "json", value: [] } }] }
+        ] as never);
+        expect(conversation).toEqual([
+            { role: "user", text: "tasks?" },
+            { role: "assistant", text: "", calls: [{ callId: "c1", name: "list_tasks", input: '{"limit":2}' }] },
+            { role: "tool", callId: "c1", text: "[]" }
+        ]);
+    });
+});

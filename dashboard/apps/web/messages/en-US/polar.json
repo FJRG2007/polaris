@@ -2168,6 +2168,14 @@
         "preparingStep": "{tool}: {percent}%"
     },
     "localModels": {
-        "label": "Your computers"
+        "label": "Your computers",
+        "errors": {
+            "offline": "Open Polaris on that computer to use its models here.",
+            "unreachable": "{server} is not answering on your computer. Start it and try again.",
+            "model-missing": "{server} does not have this model loaded. Load it there and try again.",
+            "rate-limited": "{server} is busy right now. Try again in a moment.",
+            "not-allowed": "Your computer no longer allows this address. Add it again under Local models.",
+            "failed": "{server} stopped before answering. Try again."
+        }
     }
 }

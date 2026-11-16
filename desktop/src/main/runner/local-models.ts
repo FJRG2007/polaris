@@ -99,7 +99,13 @@ export async function detectLocalServers(lanHosts: readonly string[], fetcher: t
 }
 
 /** What one streamed `data:` line of an OpenAI-compatible answer adds. Pure. */
-export function readStreamLine(line: string): { text?: string; reasoning?: string; finish?: "stop" | "length"; usage?: { input: number; output: number; }; } | "done" | null {
+export function readStreamLine(line: string): {
+    text?: string;
+    reasoning?: string;
+    calls?: ToolCallDelta[];
+    finish?: "stop" | "length" | "tool-calls";
+    usage?: { input: number; output: number; };
+} | "done" | null {
     if (!line.startsWith("data:")) return null;
     const data = line.slice(5).trim();
     if (data === "[DONE]") return "done";
@@ -113,14 +119,101 @@ export function readStreamLine(line: string): { text?: string; reasoning?: strin
     const delta = choice?.delta ?? {};
     const reasoning = delta.reasoning_content ?? delta.reasoning;
     const usage = (parsed as { usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; }; })?.usage;
+    const calls = readCallDeltas(delta.tool_calls);
     return {
         ...(typeof delta.content === "string" && delta.content ? { text: delta.content } : {}),
         ...(typeof reasoning === "string" && reasoning ? { reasoning } : {}),
-        ...(choice?.finish_reason === "length" ? { finish: "length" as const } : choice?.finish_reason ? { finish: "stop" as const } : {}),
+        ...(calls.length > 0 ? { calls } : {}),
+        ...(choice?.finish_reason === "length"
+            ? { finish: "length" as const }
+            : choice?.finish_reason === "tool_calls"
+                ? { finish: "tool-calls" as const }
+                : choice?.finish_reason
+                    ? { finish: "stop" as const }
+                    : {}),
         ...(usage && typeof usage.prompt_tokens === "number" && typeof usage.completion_tokens === "number"
             ? { usage: { input: Math.max(0, Math.round(usage.prompt_tokens)), output: Math.max(0, Math.round(usage.completion_tokens)) } }
             : {})
     };
+}
+
+/** One piece of a tool call as a stream delta carries it: the first delta of
+ *  a call has its id and name, later ones add to its arguments. */
+export interface ToolCallDelta {
+    readonly index: number;
+    readonly id?: string;
+    readonly name?: string;
+    readonly arguments?: string;
+}
+
+function readCallDeltas(raw: unknown): ToolCallDelta[] {
+    if (!Array.isArray(raw)) return [];
+    return raw.slice(0, protocol.LOCAL_MODEL_LIMITS.tools).map((entry, at) => {
+        const call = entry as { index?: unknown; id?: unknown; function?: { name?: unknown; arguments?: unknown; }; };
+        const index = typeof call?.index === "number" && Number.isInteger(call.index) && call.index >= 0 ? call.index : at;
+        return {
+            index,
+            ...(typeof call?.id === "string" && call.id ? { id: call.id } : {}),
+            ...(typeof call?.function?.name === "string" && call.function.name ? { name: call.function.name } : {}),
+            ...(typeof call?.function?.arguments === "string" ? { arguments: call.function.arguments } : {})
+        };
+    });
+}
+
+/** The calls a stream's deltas add up to, as `tool-call` events in order.
+ *  Arguments that are not a JSON object become an empty input. Pure. */
+export function collectToolCalls(deltas: readonly ToolCallDelta[], turnId: string): ChatEvent[] {
+    const byIndex = new Map<number, { id?: string; name: string; args: string; }>();
+    for (const delta of deltas) {
+        const call = byIndex.get(delta.index) ?? { name: "", args: "" };
+        if (delta.id) call.id = delta.id;
+        // Some servers repeat the name on every delta; it is never split.
+        if (delta.name && call.name !== delta.name) call.name += delta.name;
+        if (delta.arguments) call.args += delta.arguments;
+        byIndex.set(delta.index, call);
+    }
+    const events: ChatEvent[] = [];
+    for (const [index, call] of [...byIndex.entries()].sort((a, b) => a[0] - b[0])) {
+        if (!call.name || events.length >= protocol.LOCAL_MODEL_LIMITS.tools) continue;
+        let input: Record<string, unknown> = {};
+        try {
+            const parsed: unknown = call.args.trim() ? JSON.parse(call.args) : {};
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) input = parsed as Record<string, unknown>;
+        } catch {
+            input = {};
+        }
+        events.push({ kind: "tool-call", callId: (call.id ?? `${turnId}-${index}`).slice(0, 200), name: call.name.slice(0, 200), input });
+    }
+    return events;
+}
+
+/** A turn's conversation in the OpenAI-compatible shape: `local.conversation`
+ *  with its tool calls when the server sent one, else the plain messages. Pure. */
+export function chatMessages(turn: Pick<ChatTurn, "system" | "messages" | "local">): Record<string, unknown>[] {
+    const system = turn.system ? [{ role: "system", content: turn.system }] : [];
+    const conversation = turn.local?.conversation;
+    if (!conversation) return [...system, ...turn.messages.map((message) => ({ role: message.role, content: message.text }))];
+    return [
+        ...system,
+        ...conversation.map((message) => {
+            if (message.role === "tool") return { role: "tool", tool_call_id: message.callId, content: message.text };
+            if (message.role === "user" || !message.calls?.length) return { role: message.role, content: message.text };
+            return {
+                role: "assistant",
+                content: message.text || null,
+                tool_calls: message.calls.map((call) => ({ id: call.callId, type: "function", function: { name: call.name, arguments: call.input } }))
+            };
+        })
+    ];
+}
+
+/** Why a server refused a turn, from its status and body. A 400 that names
+ *  tools is the server or the model not taking them. Pure. */
+export function readRefusal(status: number, body: string): "tools" | "model-missing" | "rate-limited" | "failed" {
+    if (status === 429) return "rate-limited";
+    if (status === 400 && /\btools?\b|function.?call/i.test(body)) return "tools";
+    if (status === 404 || /\bmodel\b.*\b(not found|not loaded|does not exist)\b|\bno models? (is )?loaded\b/i.test(body)) return "model-missing";
+    return "failed";
 }
 
 export interface LocalChatDeps {
@@ -129,8 +222,9 @@ export interface LocalChatDeps {
     readonly fetch?: typeof fetch;
 }
 
-/** Polar Chat turns on a model server here: plain text in and out, the same
- *  `chat.event` stream a Claude turn sends. */
+/** Polar Chat turns on a model server here, the same `chat.event` stream a
+ *  Claude turn sends. With `local.tools` the model may ask for Polaris's
+ *  tools; it never runs one, Polaris does and sends the next turn. */
 export class LocalChat {
     readonly #turns = new Map<string, AbortController>();
 
@@ -161,20 +255,39 @@ export class LocalChat {
         const emit = (event: ChatEvent) => this.deps.send({ type: "chat.event", turnId: turn.turnId, seq: seq++, event });
         try {
             if (!hostAllowed(local.host, this.deps.lanHosts())) return void emit({ kind: "error", code: "not-installed" });
-            const messages = [
-                ...(turn.system ? [{ role: "system", content: turn.system }] : []),
-                ...turn.messages.map((message) => ({ role: message.role, content: message.text }))
-            ];
-            const answer = await (this.deps.fetch ?? fetch)(`${serverUrl(local.server, local.host)}/v1/chat/completions`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ model: local.model, messages, stream: true, stream_options: { include_usage: true } }),
-                signal: abort.signal,
-                redirect: "error"
-            });
-            if (!answer.ok || !answer.body) return void emit({ kind: "error", code: answer.status === 429 ? "rate-limited" : "failed" });
-            let finish: "stop" | "length" = "stop";
+            const messages = chatMessages(turn);
+            const tools = local.tools?.length
+                ? local.tools.map((tool) => ({ type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters } }))
+                : null;
+            const ask = (withTools: boolean) =>
+                (this.deps.fetch ?? fetch)(`${serverUrl(local.server, local.host)}/v1/chat/completions`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        model: local.model,
+                        messages,
+                        stream: true,
+                        stream_options: { include_usage: true },
+                        ...(withTools && tools ? { tools } : {})
+                    }),
+                    signal: abort.signal,
+                    redirect: "error"
+                });
+            let answer: Response;
+            try {
+                answer = await ask(true);
+                // A server or model without tool calls is asked again for text.
+                if (tools && !answer.ok && readRefusal(answer.status, await answer.clone().text().catch(() => "")) === "tools") answer = await ask(false);
+            } catch {
+                return void emit(abort.signal.aborted ? { kind: "finish", reason: "cancelled" } : { kind: "error", code: "unreachable" });
+            }
+            if (!answer.ok || !answer.body) {
+                const refusal = readRefusal(answer.status, await answer.text().catch(() => ""));
+                return void emit({ kind: "error", code: refusal === "tools" ? "failed" : refusal });
+            }
+            let finish: "stop" | "length" | "tool-calls" = "stop";
             let usage: { input: number; output: number; } | undefined;
+            const calls: ToolCallDelta[] = [];
             const decoder = new TextDecoder();
             let buffered = "";
             const reader = answer.body.getReader();
@@ -187,10 +300,15 @@ export class LocalChat {
                     if (!part || part === "done") continue;
                     if (part.text) emit({ kind: "text", text: part.text.slice(0, TEXT_MAX) });
                     if (part.reasoning) emit({ kind: "reasoning", text: part.reasoning.slice(0, TEXT_MAX) });
+                    if (part.calls) calls.push(...part.calls);
                     if (part.finish) finish = part.finish;
                     if (part.usage) usage = part.usage;
                 }
             }
+            const asked = collectToolCalls(calls, turn.turnId);
+            for (const event of asked) emit(event);
+            if (asked.length > 0) finish = "tool-calls";
+            else if (finish === "tool-calls") finish = "stop";
             emit({ kind: "finish", reason: finish, ...(usage ? { usage } : {}) });
         } catch {
             emit(abort.signal.aborted ? { kind: "finish", reason: "cancelled" } : { kind: "error", code: "failed" });
