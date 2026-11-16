@@ -35,6 +35,4 @@ Branch `feat/polar-polaris-mcp`.
      long-lived client or refresh-on-call-miss.
    - (done) embedded `resource` content now shows its text.
      shown as `[resource]` in `connectorOutputText`; show its text.
-2. Rebase onto origin/main before handing over (fix/polar-mcp-connectors had no
-   commits beyond main when checked).
-3. Final verification: tsc, vitest test/polar test/mcp test/i18n.
+2. (done) Rebased onto origin/main (fix/polar-mcp-connectors work included); tsc clean; vitest test/polar test/mcp test/i18n green.

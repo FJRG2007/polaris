@@ -450,13 +450,13 @@ function ServerMark({ group }: { group: ToolServerGroup }) {
     );
 }
 
-/** The label of one of Polaris's tool categories, the consent screen's own;
+/** The label of one of Polaris's tool categories, as the consent screen words them;
  *  anything else is shown as it came. */
 function useCategoryLabel(): (category: string) => string {
-    const t = useTranslations("mcp");
+    const t = useTranslations("polar");
     return (category) =>
         (MCP_CATEGORIES as readonly string[]).includes(category)
-            ? t(`categories.${category as McpCategory}`)
+            ? t(`settings.tools.categories.${category as McpCategory}`)
             : category;
 }
 

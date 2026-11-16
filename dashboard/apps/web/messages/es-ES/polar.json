@@ -481,7 +481,20 @@
             "serverToggle": "Usar {server}",
             "offNote": "Todas sus herramientas siguen apagadas mientras {server} lo esté. Lo que elijas abajo se guarda.",
             "search": "Buscar",
-            "noMatch": "Ninguna herramienta coincide."
+            "noMatch": "Ninguna herramienta coincide.",
+            "categories": {
+                "polaris": "Polaris",
+                "home": "Casa y cámaras",
+                "mail": "Correo",
+                "calendar": "Calendario",
+                "chat": "Chat y bandeja",
+                "productivity": "Productividad",
+                "files": "Archivos y enlaces",
+                "development": "Desarrollo y despliegue",
+                "databases": "BBDD",
+                "games": "Hosting juegos",
+                "account": "Cuenta y administración"
+            }
         },
         "data": {
             "title": "Tus chats",

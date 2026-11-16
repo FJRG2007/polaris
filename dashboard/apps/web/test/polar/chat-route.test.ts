@@ -763,10 +763,35 @@ describe("connector tools", () => {
             .map((model) => (model.doStreamCalls[0]!.tools ?? []).map((entry) => entry.name));
     }
 
-    it("sends a connected connector's tools, and names the service in the prompt", async () => {
+    /** A conversation in which find_tools already loaded the connector's tool. */
+    const loadedConnector = () => [
+        { id: "u0", role: "user", parts: [{ type: "text", text: "Payouts?" }] },
+        {
+            id: "a0",
+            role: "assistant",
+            parts: [
+                {
+                    type: "tool-find_tools",
+                    toolCallId: "find-1",
+                    state: "output-available",
+                    input: { names: [NAME] },
+                    output: { tools: [{ name: NAME, description: "x" }] }
+                }
+            ]
+        },
+        { id: "u1", role: "user", parts: [{ type: "text", text: "Tidy my tasks" }] }
+    ];
+
+    it("sends a connector's tools once discovery loads them, and names the service in the prompt", async () => {
         state.connectors = [STRIPE];
         const [first] = await offeredBy(body());
-        expect(first).toContain(NAME);
+        // Discovery, not the catalogue: a person with hundreds of connector
+        // tools is not sent every schema on every request.
+        expect(first).toContain("find_tools");
+        expect(first).not.toContain(NAME);
+        state.models.length = 0;
+        const [loaded] = await offeredBy(body({ messages: loadedConnector() }));
+        expect(loaded).toContain(NAME);
         const prompt = JSON.stringify(state.prompts.at(-1));
         expect(prompt).toContain("outside services to Polar: Stripe.");
     });
@@ -774,7 +799,7 @@ describe("connector tools", () => {
     it("keeps them when the chosen model refuses and another answers the turn", async () => {
         state.connectors = [STRIPE];
         state.fallback = true;
-        const asked = await offeredBy(body());
+        const asked = await offeredBy(body({ messages: loadedConnector() }));
         expect(asked).toHaveLength(2);
         const [refused, standIn] = asked;
         expect(refused).toContain(NAME);

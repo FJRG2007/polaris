@@ -481,7 +481,20 @@
             "serverToggle": "Use {server}",
             "offNote": "Every tool here stays off while {server} is off. Your choices below are kept.",
             "search": "Search tools",
-            "noMatch": "No tool matches."
+            "noMatch": "No tool matches.",
+            "categories": {
+                "polaris": "Polaris",
+                "home": "Home and cameras",
+                "mail": "Mail",
+                "calendar": "Calendar",
+                "chat": "Chat and inbox",
+                "productivity": "Productivity",
+                "files": "Files and sharing",
+                "development": "Development and deploy",
+                "databases": "Databases",
+                "games": "Game servers",
+                "account": "Account and administration"
+            }
         },
         "data": {
             "title": "Your chats",
