@@ -462,7 +462,10 @@ function RealtimeCall({
                             {errorText}
                         </p>
                     ) : (
-                        <p className="max-w-full truncate text-xs text-muted-foreground">
+                        <p
+                            className="max-w-full truncate text-xs text-muted-foreground"
+                            title={t("voice.realtime.description")}
+                        >
                             {t("voice.realtime.description")}
                         </p>
                     )}
