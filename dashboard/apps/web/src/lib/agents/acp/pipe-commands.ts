@@ -18,6 +18,7 @@
 import { z } from "zod";
 import { shellQuote } from "../session-hooks";
 import * as commands from "../session-commands";
+import { isVendorSessionId } from "@polaris/core";
 
 /** The tmux window the agent runs in, beside the runner. */
 export const ACP_WINDOW = "polaris-acp";
@@ -135,6 +136,50 @@ export function acpStopCommand(stateDir: string, session = commands.TMUX_SESSION
     return [
         `rm -f "${pipeDir(stateDir)}/generation"`,
         `tmux kill-window -t ${shellQuote(`${session}:${ACP_WINDOW}`)} 2>/dev/null || true`
+    ].join("\n");
+}
+
+/**
+ * Stop the agent the session's terminal holds, for a session moving to Chat, so
+ * two agents never work in one checkout. With a runner: the running turn is
+ * stopped as Stop does it (`interruptTurnCommand`) and the interface window,
+ * if a person opened one, is closed. Without one the agent is the main
+ * window's own process: every process under that window's shell is ended, and
+ * the window falls back to the shell the setup leaves there.
+ */
+export function terminalAgentStopCommand(stateDir: string, session = commands.TMUX_SESSION): string {
+    return [
+        `if [ -f "${stateDir}/${commands.RUNNER_READY_FILE}" ]; then`,
+        `  if [ -f "${stateDir}/turn.txt" ]; then : > "${stateDir}/interrupted"; tmux send-keys -t ${shellQuote(`${session}:${commands.RUNNER_WINDOW}`)} C-c; fi`,
+        `  tmux kill-window -t ${shellQuote(`${session}:${commands.INTERFACE_WINDOW}`)} 2>/dev/null || true`,
+        "  exit 0",
+        "fi",
+        // The main window: the first one that is not the protocol agent's.
+        `p="$(tmux list-panes -s -t ${shellQuote(session)} -F '#{window_name} #{pane_pid}' 2>/dev/null | grep -v '^${ACP_WINDOW} ' | head -n 1 | cut -d' ' -f2)"`,
+        'case "$p" in ""|*[!0-9]*) exit 0 ;; esac',
+        // Parent before child, so a child is never re-parented out of reach.
+        'under() { for c in $(ps -o pid= --ppid "$1" 2>/dev/null); do echo "$c"; under "$c"; done; }',
+        'kids="$(under "$p")"',
+        'if [ -n "$kids" ]; then kill -TERM $kids 2>/dev/null || true; fi'
+    ].join("\n");
+}
+
+/** What `conversationHandBackCommand` exits with for a session with no runner. */
+export const HAND_BACK_INTERACTIVE = 3;
+
+/**
+ * Leaving Chat: a runner's next turn continues the conversation Chat was on,
+ * so its id is written where the runner reads it (`LAUNCH_SCRIPT --turn`).
+ * Exits `HAND_BACK_INTERACTIVE` for a session with no runner; that one is
+ * resumed in its terminal instead. The id is checked here because it is about
+ * to be written into a file a launch line reads.
+ */
+export function conversationHandBackCommand(stateDir: string, vendorSessionId: string): string {
+    if (!isVendorSessionId(vendorSessionId))
+        throw new Error("That is not a conversation Polaris can reopen.");
+    return [
+        `[ -f "${stateDir}/${commands.RUNNER_READY_FILE}" ] || exit ${HAND_BACK_INTERACTIVE}`,
+        `printf %s ${shellQuote(vendorSessionId)} > "${stateDir}/agent-session-id"`
     ].join("\n");
 }
 

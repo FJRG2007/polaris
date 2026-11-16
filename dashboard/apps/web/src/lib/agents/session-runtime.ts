@@ -1416,12 +1416,39 @@ export async function switchSessionSurface(
     if (!placement) throw new Error("That session no longer exists.");
     if (surface === "chat" && !acpProviders.chatAvailable(placement.cli, placement.place))
         throw new SessionRefusal("This agent cannot be used in Chat here.");
+    const stateDir = stateDirFor(placement);
+    const moving = placement.surface !== surface;
+    // Two agents in one checkout would write over each other's work, so the
+    // terminal's goes first; a machine that does not answer keeps the session
+    // where it was.
+    if (surface === "chat" && moving)
+        await steer(sessionId, acpPipe.terminalAgentStopCommand(stateDir), "The agent in the session's terminal did not stop");
     if (surface === "terminal") {
         acpDrivers.closeAcpDriver(sessionId);
-        await runInSession(sessionId, acpPipe.acpStopCommand(stateDirFor(placement))).catch(() => undefined);
+        await runInSession(sessionId, acpPipe.acpStopCommand(stateDir)).catch(() => undefined);
     }
     await prisma.agentSession.update({ where: { id: sessionId }, data: { surface }, select: { id: true } });
     touchSession(sessionId);
+    if (surface === "terminal" && moving) await handConversationBack(sessionId, stateDir);
+}
+
+/**
+ * Back from Chat: the terminal carries on with the conversation Chat was on.
+ * A runner's next turn reads its id; an interactive terminal, left at its
+ * shell when Chat began, gets the agent typed back in on it. Best effort - the
+ * switch has happened either way, and Resume is still there.
+ */
+async function handConversationBack(sessionId: string, stateDir: string): Promise<void> {
+    const row = await prisma.agentSession.findUnique({ where: { id: sessionId }, select: { vendorSessionId: true } });
+    const id = row?.vendorSessionId;
+    if (!id || !core.isVendorSessionId(id)) return;
+    try {
+        const handed = await runInSession(sessionId, acpPipe.conversationHandBackCommand(stateDir, id));
+        if (handed.code !== acpPipe.HAND_BACK_INTERACTIVE) return;
+        if (await agentHasExited(sessionId)) await resumeAgent(sessionId, id);
+    } catch (error) {
+        console.error(`[agent-session] ${sessionId}: the terminal did not take the conversation back`, error);
+    }
 }
 
 /** The session's protocol pipe, for `acp/transport`'s `pipeStream`. */

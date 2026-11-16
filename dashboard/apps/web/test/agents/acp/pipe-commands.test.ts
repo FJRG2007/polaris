@@ -7,9 +7,12 @@ import {
     acpLaunchCommand,
     acpReadCommand,
     acpWriteCommand,
-    parseAcpRead
+    conversationHandBackCommand,
+    HAND_BACK_INTERACTIVE,
+    parseAcpRead,
+    terminalAgentStopCommand
 } from "@/lib/agents/acp/pipe-commands";
-import { CAPTURE_BYTES } from "@/lib/agents/session-commands";
+import { CAPTURE_BYTES, INTERFACE_WINDOW, RUNNER_READY_FILE, RUNNER_WINDOW } from "@/lib/agents/session-commands";
 
 const STATE = "/session/polaris";
 
@@ -85,5 +88,44 @@ describe("parseAcpRead", () => {
         expect(parseAcpRead("not a generation\n-\n")).toBeNull();
         expect(parseAcpRead("17-1\nmaybe\n")).toBeNull();
         expect(parseAcpRead("17-1\n-\n***\n")).toBeNull();
+    });
+});
+
+describe("terminalAgentStopCommand", () => {
+    const command = terminalAgentStopCommand(STATE);
+
+    it("stops a runner's turn the way Stop does, then closes the interface window", () => {
+        const runner = command.indexOf(`[ -f "${STATE}/${RUNNER_READY_FILE}" ]`);
+        const interrupted = command.indexOf(`: > "${STATE}/interrupted"`);
+        const ctrlC = command.indexOf(`:${RUNNER_WINDOW}' C-c`);
+        const closed = command.indexOf(`kill-window -t 'polaris-agent:${INTERFACE_WINDOW}'`);
+        expect(runner).toBeGreaterThanOrEqual(0);
+        expect(runner).toBeLessThan(interrupted);
+        // The marker before the keystroke, so the runner reports a stop, not a failure.
+        expect(interrupted).toBeLessThan(ctrlC);
+        expect(ctrlC).toBeLessThan(closed);
+        // A runner session never reaches the process sweep.
+        expect(closed).toBeLessThan(command.indexOf("exit 0"));
+        expect(command.indexOf("exit 0")).toBeLessThan(command.indexOf("kill -TERM"));
+    });
+
+    it("ends the processes under the main window, never the protocol agent's", () => {
+        expect(command).toContain(`grep -v '^${ACP_WINDOW} '`);
+        expect(command).toContain('case "$p" in ""|*[!0-9]*) exit 0 ;; esac');
+        expect(command).toContain('kill -TERM $kids');
+        expect(command).not.toContain("kill -TERM $p");
+    });
+});
+
+describe("conversationHandBackCommand", () => {
+    it("writes the id where the runner reads it, and tells an interactive terminal apart", () => {
+        const command = conversationHandBackCommand(STATE, "abc-123_X");
+        expect(command.indexOf(`exit ${HAND_BACK_INTERACTIVE}`)).toBeLessThan(command.indexOf("agent-session-id"));
+        expect(command).toContain(`printf %s 'abc-123_X' > "${STATE}/agent-session-id"`);
+    });
+
+    it("refuses an id that is not one a launch line may read", () => {
+        expect(() => conversationHandBackCommand(STATE, "a; rm -rf /")).toThrow();
+        expect(() => conversationHandBackCommand(STATE, "")).toThrow();
     });
 });
