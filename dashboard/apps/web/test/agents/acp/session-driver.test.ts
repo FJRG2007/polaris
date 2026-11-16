@@ -297,3 +297,33 @@ describe("an agent's version floor", () => {
         driver.close();
     });
 });
+
+describe("frames captured from the real agents", () => {
+    it("carries on past the Claude adapter's own sign-in notice after initialize", async () => {
+        // Sent by @agentclientprotocol/claude-agent-acp 0.99.1 right after its
+        // initialize answer, captured with no account signed in.
+        const notice = {
+            jsonrpc: "2.0",
+            method: "_auth/status_update",
+            params: { authStatus: { kind: "none", label: "Not logged in" } }
+        };
+        const inner = agentFor("claude");
+        const pipe = new FakePipe((frame, fake) => {
+            inner(frame, fake);
+            if (frame.method === "initialize") fake.emit(notice);
+        });
+        const { driver, events } = harness("claude", pipe);
+        await driver.prompt("hi");
+        await driver.settled();
+        expect(events).toContain("turn.end");
+        driver.close();
+    });
+
+    it("reads each captured initialize answer as an agent that can reopen a conversation", () => {
+        for (const cli of ["claude", "gemini", "qwen"]) {
+            const init = recorded(cli)[0]!.result as { agentCapabilities?: { loadSession?: boolean }; agentInfo?: { version?: string } };
+            expect(init.agentCapabilities?.loadSession).toBe(true);
+            expect(init.agentInfo?.version).not.toContain("fixture");
+        }
+    });
+});

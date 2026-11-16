@@ -16,3 +16,12 @@ permission modes; Cursor documents `agent` / `plan` / `ask` and the
 `allow-once` / `reject-once` options), not captured from a running CLI: no agent
 was run to make them. Line order: initialize (id 0), session/new (id 1), the
 updates, a permission request (id 7), the prompt's result (id 2).
+
+Line 1 (the initialize answer) of `claude.jsonl`, `gemini.jsonl` and
+`qwen.jsonl` is captured, not composed: each agent answered a real
+`initialize` in a throwaway `node:24` container (the session image) with no
+account signed in, on 2026-11-16 - Claude through
+`@agentclientprotocol/claude-agent-acp@0.99.1` (run with `npx -y`), Gemini CLI
+0.66.0 (`gemini --acp`), Qwen Code 0.26.5 (`qwen --acp`). The Claude adapter
+follows its answer with an `_auth/status_update` notification; the driver test
+replays it. The rest of each file is still composed.
