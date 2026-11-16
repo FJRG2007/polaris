@@ -21,13 +21,13 @@ import { release } from "node:os";
 import { textSize } from "./settings";
 import { CHANNELS, TEXT_SIZE_ARGUMENT, VERSION_ARGUMENT } from "@/shared/bridge";
 import { defaultTitleBarColors, foreignPageCss, overlayHeight } from "@/shared/title-bar";
-import { classifyNavigation, isServerUrl, mainFrameStep } from "./navigation";
+import { openExternal } from "./open-external";
+import { isServerUrl, mainFrameStep, openVerdict } from "./navigation";
 import {
     app,
     BrowserWindow,
     WebContentsView,
     nativeTheme,
-    shell,
     type BrowserWindowConstructorOptions,
     type WebContents,
     type WebPreferences
@@ -136,11 +136,11 @@ function contain(contents: WebContents, server: () => string | null): void {
     const guard = (event: { preventDefault: () => void; readonly url: string; readonly isMainFrame: boolean; }) => {
         if (!event.isMainFrame) return;
         const origin = server();
-        const step = origin ? mainFrameStep(event.url, origin, trip) : null;
-        trip = step?.trip ?? false;
-        if (step?.verdict === "allow") return;
+        const step = origin ? mainFrameStep(event.url, origin, trip) : { verdict: openVerdict(event.url, null), trip: false };
+        trip = step.trip;
+        if (step.verdict === "allow") return;
         event.preventDefault();
-        if (step?.verdict === "external") void shell.openExternal(event.url);
+        if (step.verdict === "external") openExternal(event.url);
     };
     contents.on("will-navigate", guard);
     contents.on("will-redirect", guard);
@@ -165,7 +165,7 @@ function contain(contents: WebContents, server: () => string | null): void {
     });
     contents.setWindowOpenHandler(({ url }) => {
         const origin = server();
-        const verdict = origin ? classifyNavigation(url, origin) : "block";
+        const verdict = openVerdict(url, origin);
         if (verdict === "allow") {
             return {
                 action: "allow",
@@ -178,7 +178,7 @@ function contain(contents: WebContents, server: () => string | null): void {
                 })
             };
         }
-        if (verdict === "external") void shell.openExternal(url);
+        if (verdict === "external") openExternal(url);
         return { action: "deny" };
     });
     contents.on("did-create-window", (child) => {

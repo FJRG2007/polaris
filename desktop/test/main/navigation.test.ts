@@ -9,6 +9,7 @@ import {
     backIndex,
     classifyNavigation,
     isSafeExternalUrl,
+    openVerdict,
     isServerUrl,
     mainFrameStep,
     serverPath,
@@ -164,5 +165,30 @@ describe("allowPermission", () => {
         }
         expect(allowPermission("notifications", "https://polaris.example.com/", null)).toBe(false);
         expect(allowPermission("notifications", "not a url", SERVER)).toBe(false);
+    });
+});
+
+describe("outside links from a window on the same Polaris's local address", () => {
+    // The windows are on the proven LAN alternate while the usual address is down.
+    const LAN = "https://192.168.1.20";
+    const DOMAIN = "https://polaris.example.com";
+
+    it("opens an outside link in the system browser whichever origin is active", () => {
+        const signin = "https://cursor.com/loginDeepControl?challenge=abc&uuid=1&mode=login&redirectTarget=cli";
+        expect(openVerdict(signin, LAN)).toBe("external");
+        expect(openVerdict(signin, DOMAIN)).toBe("external");
+        expect(classifyNavigation("https://opencode.ai/auth", LAN)).toBe("external");
+    });
+
+    it("keeps a window on the active origin only", () => {
+        expect(openVerdict(`${LAN}/agents`, LAN)).toBe("allow");
+        expect(openVerdict(`${DOMAIN}/agents`, LAN)).toBe("external");
+    });
+
+    it("still opens an outside link while no server is active", () => {
+        expect(openVerdict("https://cursor.com/login", null)).toBe("external");
+        expect(openVerdict("mailto:a@example.com", null)).toBe("external");
+        expect(openVerdict("file:///C:/Windows/System32/calc.exe", null)).toBe("block");
+        expect(openVerdict("javascript:alert(1)", null)).toBe("block");
     });
 });

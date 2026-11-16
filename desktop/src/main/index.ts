@@ -49,13 +49,14 @@ import * as settings from "./settings";
 import { savedServers, serverAddress, setSavedServers, setServerAddress, setUpdateAttempted, updateAttempted } from "./settings";
 import { backIndex, isServerUrl, serverPath } from "./navigation";
 import { kindOf, openLocalSheet, openLocalWindow, openPolarisWindow, type LocalSheet } from "./windows";
-import { app, autoUpdater, BrowserWindow, dialog, net, powerMonitor, screen, session, shell } from "electron";
+import { app, autoUpdater, BrowserWindow, dialog, net, powerMonitor, screen, session } from "electron";
 import { describeNetError, describeOfflinePage, errorText, finishedLoad, isCertificateError, netErrorCode, RECONNECTS_WORDS } from "./reachability";
 import { createReconnector, RECONNECT_PROBE_MS } from "./reconnect";
 import { sameInstanceAs } from "./same-instance";
 import { addressWords, failoverFor, instanceRecordFor } from "./polaris-api";
 import { AUTHORITY_INVALID, USE_CHROMIUM, pinScope, verifyDecision } from "./local-ca-pin";
 import { activeOrigin, backStep, failedLoadStep, samePlaceOn, titleWith } from "./window-failover";
+import { openExternal } from "./open-external";
 import { DEFAULT_HOLD_MS, UNTRUSTED_WORDS } from "../../../dashboard/packages/core/src/instance-fallback";
 import { createServerCheck, describeVerdict, probeServer, type ServerVerdict } from "@/shared/server-identity";
 
@@ -178,7 +179,7 @@ const deepLinks = new DeepLinks(
         show: showPolaris,
         confirmSwitch,
         switchTo: switchOrSayWhy,
-        openInBrowser: (url) => void shell.openExternal(url)
+        openInBrowser: (url) => openExternal(url)
     },
     startedFor(process.argv)
 );
@@ -875,13 +876,13 @@ function start(): void {
             // in a window of its own when there is not.
             installOnTv: () => (current && !loadError ? showPolaris("/account/downloads?tv=install") : openTvInstall()),
             openInBrowser: () => {
-                if (current) void shell.openExternal(current);
+                if (current) openExternal(current);
             }
         };
         menuActions = menu;
         refreshMenu();
         const announce = (update: Update) => {
-            const open = () => void shell.openExternal(update.page);
+            const open = () => openExternal(update.page);
             // The window in front draws the restart button itself: no notice
             // on top of it. A page that does not (an older Polaris, the address
             // form) gets the notice, as do the other windows' pages through the
@@ -913,7 +914,7 @@ function start(): void {
         const first = (updateWatch = watchForUpdates((update) => {
             menuUpdate = {
                 version: update.version,
-                open: () => void shell.openExternal(update.page),
+                open: () => openExternal(update.page),
                 ...(update.restart ? { restart: update.restart } : {})
             };
             refreshMenu();

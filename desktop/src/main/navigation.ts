@@ -68,6 +68,17 @@ export function classifyNavigation(url: string, serverOrigin: string): Navigatio
     return "block";
 }
 
+/**
+ * The verdict for a link a Polaris page opens in a new window, given the origin
+ * the windows may be on right now - null while no server is set or the app is
+ * between two of them. An outside link is still opened in the system browser
+ * then: it never loads in a window, so it needs no server to be checked against.
+ */
+export function openVerdict(url: string, serverOrigin: string | null): NavigationVerdict {
+    if (serverOrigin) return classifyNavigation(url, serverOrigin);
+    return isSafeExternalUrl(url) ? "external" : "block";
+}
+
 /** Whether a URL is the Polaris sending the window out to a provider. */
 export function startsProviderTrip(url: string, serverOrigin: string): boolean {
     const target = parse(url);

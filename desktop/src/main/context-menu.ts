@@ -8,7 +8,8 @@
  * and Electron then raises no `context-menu` event, so this never covers those.
  */
 
-import { clipboard, Menu, shell, type ContextMenuParams, type MenuItemConstructorOptions, type WebContents } from "electron";
+import { openExternal } from "./open-external";
+import { clipboard, Menu, type ContextMenuParams, type MenuItemConstructorOptions, type WebContents } from "electron";
 
 /** What the menu is built from: the part of Electron's params it reads. */
 export type MenuParams = Pick<ContextMenuParams, "linkURL" | "selectionText" | "isEditable" | "editFlags" | "misspelledWord" | "dictionarySuggestions">;
@@ -29,6 +30,18 @@ export function openableLink(url: string): string | null {
     }
 }
 
+/**
+ * The address a selection is, when the whole selection is one: an address
+ * printed as text (a terminal, a log, a code block) is not a link, so without
+ * this it offered only Copy. Only http and https - a selected word with a colon
+ * in it is not a mail link.
+ */
+export function linkInSelection(text: string): string | null {
+    const trimmed = text.trim();
+    if (!/^https?:\/\/\S+$/i.test(trimmed)) return null;
+    return openableLink(trimmed.replace(/[.,;:!?)\]}>"']+$/, ""));
+}
+
 /** The menu for one right-click; empty when there is nothing to offer. */
 export function contextMenuTemplate(params: MenuParams, actions: ContextMenuActions): MenuItemConstructorOptions[] {
     const groups: MenuItemConstructorOptions[][] = [];
@@ -36,7 +49,7 @@ export function contextMenuTemplate(params: MenuParams, actions: ContextMenuActi
         const suggestions = params.dictionarySuggestions.slice(0, 5);
         if (suggestions.length > 0) groups.push(suggestions.map((word) => ({ label: word, click: () => actions.replaceMisspelling(word) })));
     }
-    const link = params.linkURL ? openableLink(params.linkURL) : null;
+    const link = (params.linkURL ? openableLink(params.linkURL) : null) ?? linkInSelection(params.selectionText);
     if (link) {
         const address = link.startsWith("mailto:") ? link.slice("mailto:".length) : link;
         groups.push([
@@ -65,7 +78,7 @@ export function contextMenuTemplate(params: MenuParams, actions: ContextMenuActi
 export function installContextMenu(contents: WebContents): void {
     contents.on("context-menu", (_event, params) => {
         const template = contextMenuTemplate(params, {
-            openExternal: (url) => void shell.openExternal(url),
+            openExternal: (url) => openExternal(url),
             copyText: (text) => clipboard.writeText(text),
             replaceMisspelling: (word) => contents.replaceMisspelling(word)
         });

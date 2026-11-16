@@ -11,7 +11,7 @@ const openExternal = vi.fn();
 const writeText = vi.fn();
 vi.mock("electron", () => ({ Menu: { buildFromTemplate }, shell: { openExternal }, clipboard: { writeText } }));
 
-const { contextMenuTemplate, installContextMenu, openableLink } = await import("../../src/main/context-menu");
+const { contextMenuTemplate, installContextMenu, linkInSelection, openableLink } = await import("../../src/main/context-menu");
 
 const NO_EDIT = { canUndo: false, canRedo: false, canCut: false, canCopy: false, canPaste: false, canSelectAll: false, canDelete: false, canEditRichly: false };
 const base = { linkURL: "", selectionText: "", isEditable: false, editFlags: NO_EDIT, misspelledWord: "", dictionarySuggestions: [] as string[] };
@@ -81,5 +81,29 @@ describe("installContextMenu", () => {
         expect(writeText).toHaveBeenCalledWith("https://example.com/");
         handler?.({}, base);
         expect(popup).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe("a selected address", () => {
+    it("is offered as a link when the whole selection is one", () => {
+        const spy = actions();
+        const url = "https://cursor.com/loginDeepControl?challenge=abc&uuid=1&mode=login&redirectTarget=cli";
+        const items = contextMenuTemplate({ ...base, selectionText: `  ${url}
+` }, spy);
+        expect(items.map((item) => item.label ?? item.role ?? item.type)).toEqual(["Open link in browser", "Copy link", "separator", "copy"]);
+        items[0]?.click?.({} as never, undefined, {} as never);
+        expect(spy.openExternal).toHaveBeenCalledWith(url);
+    });
+
+    it("drops the punctuation of the sentence it was printed in", () => {
+        expect(linkInSelection("https://example.com/a).")).toBe("https://example.com/a");
+    });
+
+    it("is not a link when it is a sentence, another scheme, or nothing", () => {
+        expect(linkInSelection("open https://example.com now")).toBeNull();
+        expect(linkInSelection("file:///etc/passwd")).toBeNull();
+        expect(linkInSelection("javascript:alert(1)")).toBeNull();
+        expect(linkInSelection("note: done")).toBeNull();
+        expect(linkInSelection("")).toBeNull();
     });
 });
