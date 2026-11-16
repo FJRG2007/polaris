@@ -515,6 +515,18 @@ async fn flood_stays_bounded() {
     let before = resident_bytes();
     let media = pair.media();
     let wire = SocketAddr::from(([127, 0, 0, 1], pair.relay_port));
+    // New sources one at a time until the table refuses one. The flood below
+    // cannot be relied on for that: on Linux its bursts overflow the socket
+    // buffer, and a source whose datagrams the kernel dropped never reaches
+    // the daemon, so under load the table never filled.
+    for _ in 0..1_000 {
+        let s = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        s.send_to(&[1u8; 64], media).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(1)).await;
+        if pair.relay().status.lock().unwrap().counters.dropped_full > 0 {
+            break;
+        }
+    }
     let mut flooders = Vec::new();
     for f in 0..8u8 {
         flooders.push(tokio::task::spawn_blocking(move || {
