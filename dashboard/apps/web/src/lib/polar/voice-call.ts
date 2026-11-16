@@ -187,6 +187,12 @@ export function readySentences(
     return { sentences, upTo: at };
 }
 
+/** Whether any of `text` would be said out loud: a reply that is only code or
+ *  markup has nothing for the voice, so a call never waits on it. */
+export function speaksAnything(text: string): boolean {
+    return readySentences(text, 0, true).sentences.length > 0;
+}
+
 /** What the call is doing. */
 export type CallPhase =
     /** Waiting to hear you. */

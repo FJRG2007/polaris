@@ -25,6 +25,7 @@ import {
     SPEAK_TEXT_MAX,
     VOICE_TAIL_LINE_MAX,
     VOICE_TAIL_MOST,
+    speaksAnything,
     type VoiceDelegateAnswer
 } from "@/lib/polar/voice-call";
 
@@ -240,14 +241,18 @@ export function CodeVoiceCall({
             setWatched(waiting.current.length);
             if (news.kind === "gone") return;
             const named = title ? saidTitle(title) : null;
+            const lead = news.kind === "reply" ? replyLead(parseVoiceDelegation(news.text) ?? news.text) : "";
+            // A reply with nothing to say out loud (only code, say) is let go:
+            // the call never waits on a line it cannot speak.
+            if (news.kind === "reply" && !speaksAnything(lead)) return;
             const text =
                 news.kind === "asks"
                     ? named
                         ? t("voice.code.needsYouFrom", { title: named })
                         : t("voice.code.needsYou")
                     : named
-                      ? t("voice.code.from", { title: named, text: replyLead(parseVoiceDelegation(news.text) ?? news.text) })
-                      : replyLead(parseVoiceDelegation(news.text) ?? news.text);
+                      ? t("voice.code.from", { title: named, text: lead })
+                      : lead;
             setDue((list) => [...list, text]);
         },
         [t]
@@ -304,8 +309,11 @@ export function CodeVoiceCall({
     useEffect(() => {
         if (!quiet) handing.current = false;
         if (!quiet || handing.current || status !== "ready" || due.length === 0) return;
-        handing.current = true;
         setDue((list) => list.slice(1));
+        // Nothing speakable is never handed over: the call would not leave its
+        // quiet for it, and the queue behind it would wait forever.
+        if (!speaksAnything(due[0]!)) return;
+        handing.current = true;
         setAnnounced(add("assistant", due[0]!));
     }, [quiet, status, due, add]);
 

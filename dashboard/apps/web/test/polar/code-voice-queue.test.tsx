@@ -129,4 +129,32 @@ describe("the Code call's announcements", () => {
         await new Promise((resolve) => setTimeout(resolve, 4500));
         expect(probe.messages).toHaveLength(3);
     }, 15_000);
+
+    it("lets go of a reply with nothing to say and reads the next one", async () => {
+        const onScreen = {
+            ...otherThread("```ts\nexport const ok = true;\n```\n\nMore."),
+            session: { ...otherThread("").session, id: A, title: "On screen" }
+        };
+        render(
+            <CodeVoiceCall
+                sessionId={A}
+                thread={onScreen as never}
+                kit={KIT}
+                greeting={null}
+                watching={[
+                    { sessionId: A, since: SENT },
+                    { sessionId: B, since: SENT }
+                ]}
+                onOpen={() => undefined}
+                onEnd={() => undefined}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        act(() => probe.onQuiet!(true));
+        // The code-only reply is never handed over, so the call stays free for
+        // the next one instead of waiting on a line it cannot say.
+        await waitFor(() => expect(probe.announced).not.toBeNull(), { timeout: 6000 });
+        expect(said(probe.announced)).toBe("From Fix the login form: The form takes the code now.");
+        expect(probe.messages).toHaveLength(1);
+    }, 15_000);
 });
