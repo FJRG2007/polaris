@@ -8873,6 +8873,10 @@ model AgentRepo {
     // Whether a setup script that fails stops the session. Off, the failure is
     // shown and the agent starts anyway.
     setupRequired Boolean  @default(false)
+    // The agent and model each orchestration role starts on, as JSON text
+    // (`lib/agents/agent-roles.ts`). Null is nothing set: every role falls to
+    // the defaults in code.
+    roleAgents    String?
     // Why the last dispatch could not be made, shown on the repository rather
     // than left in a log nobody opens.
     error         String?
@@ -17954,6 +17958,13 @@ model AgentOrchestrationTask {
     blockedBy      String?
     // The tool it runs on, or null for the run's.
     cli            String?
+    // worker | reviewer: which repository role default it starts on; a
+    // reviewer session gets no automatic feedback on the pull request it reads.
+    role           String    @default("worker")
+    // The model as provider/model, checked at dispatch; null is the role's.
+    model          String?
+    // The caller's own key for a spawn, so a retried call adds nothing twice.
+    clientKey      String?
     // The session working on it now. Changes when it is dispatched again.
     sessionId      String?   @db.Uuid
     attempts       Int       @default(0)
@@ -17976,6 +17987,7 @@ model AgentOrchestrationTask {
 
     run AgentOrchestrationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
+    @@unique([runId, clientKey])
     @@index([runId, createdAt])
     @@index([sessionId])
     @@index([status])

@@ -752,6 +752,20 @@
         "keep": "Keep it",
         "clearFailed": "The memory could not be cleared. Try again."
     },
+    "repoRoles": {
+        "title": "Agents per role",
+        "intro": "What a coordinator, the workers it starts and a reviewer run on in this repository.",
+        "roles": {
+            "coordinator": "Coordinator",
+            "worker": "Worker",
+            "reviewer": "Reviewer"
+        },
+        "agent": "{role} agent",
+        "model": "{role} model",
+        "inherit": "Default ({agent})",
+        "modelPlaceholder": "provider/model, or empty",
+        "modelInvalid": "Write it as provider/model."
+    },
     "repoDialog": {
         "setupPlaceholder": "npm ci",
         "setup": "Setup script",

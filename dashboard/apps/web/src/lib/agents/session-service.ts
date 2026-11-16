@@ -1178,3 +1178,14 @@ export async function renameSession(
     });
     return count > 0;
 }
+
+/**
+ * Switch a session's automatic pull request feedback (`session-feedback`) on
+ * or off, answering what it was before so a caller can put it back. Unscoped:
+ * the caller has already checked the session is one it may act on.
+ */
+export async function setAutoFeedback(sessionId: string, on: boolean): Promise<boolean> {
+    const before = await prisma.agentSession.findUnique({ where: { id: sessionId }, select: { autoFeedback: true } });
+    await prisma.agentSession.updateMany({ where: { id: sessionId }, data: { autoFeedback: on } });
+    return before?.autoFeedback ?? true;
+}

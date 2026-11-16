@@ -10,6 +10,7 @@
  * public.
  */
 
+import { roleAgentsSchema, storeRoleAgents } from "@/lib/agents/agent-roles";
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
@@ -329,7 +330,9 @@ export async function updateRepoConfigAction(
                     script: z.string().max(REPO_SETUP_MAX).transform((value) => value.trim()),
                     required: z.boolean()
                 })
-                .optional()
+                .optional(),
+            // The agent and model per orchestration role; optional likewise.
+            roles: roleAgentsSchema.optional()
         })
         .safeParse(input);
     if (!parsed.success)
@@ -359,6 +362,12 @@ export async function updateRepoConfigAction(
                     setupScript: parsed.data.setup.script,
                     setupRequired: parsed.data.setup.required
                 }
+            });
+        }
+        if (parsed.data.roles) {
+            await prisma.agentRepo.update({
+                where: { id: existing.id },
+                data: { roleAgents: storeRoleAgents(parsed.data.roles) }
             });
         }
     } catch (caught) {

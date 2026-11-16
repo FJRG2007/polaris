@@ -20,6 +20,7 @@ import { DRIVE_SEARCH, DRIVE_TOOLS } from "./drive";
 import { DEPLOY_SEARCH, DEPLOY_TOOLS } from "./deploy";
 import { SESSION_TOOLS } from "./sessions";
 import { ORCHESTRATION_TOOLS } from "./orchestration";
+import { COORDINATOR_TOOLS } from "./coordinator";
 import type { McpTool } from "../protocol";
 import { MAIL_SEARCH, MAIL_TOOLS } from "./mail";
 import { DATABASE_SEARCH, DATABASE_TOOLS } from "./databases";
@@ -74,6 +75,7 @@ export const MCP_TOOLS: readonly McpTool<never>[] = [
     ...TASK_TOOLS,
     ...SESSION_TOOLS,
     ...ORCHESTRATION_TOOLS,
+    ...COORDINATOR_TOOLS,
     ...DEPLOY_TOOLS,
     ...WATCH_TOOLS,
     ...AUTOMATION_TOOLS,

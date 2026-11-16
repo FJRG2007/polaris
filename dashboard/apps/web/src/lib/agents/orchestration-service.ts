@@ -18,6 +18,8 @@ import * as queue from "@/lib/agents/session-queue";
 import * as plan from "@/lib/agents/orchestration-plan";
 import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
+import * as roles from "@/lib/agents/agent-roles";
+import { startModel } from "@/lib/agents/session-api";
 
 /** A refusal whose sentence is meant for whoever asked. */
 export class OrchestrationRefusal extends Error {}
@@ -38,6 +40,13 @@ export interface TaskInput {
     readonly dependsOn: readonly string[];
     readonly cli: string | null;
     readonly gateQuestion: string | null;
+    /** Which repository role default it starts on. Absent is a worker. */
+    readonly role?: "worker" | "reviewer";
+    /** provider/model; absent or null is the role's default. */
+    readonly model?: string | null;
+    /** The caller's own key: a second add with the same one in the same run
+     *  answers the task the first made instead of adding another. */
+    readonly clientKey?: string | null;
 }
 
 const TASK_SELECT = {
@@ -49,6 +58,8 @@ const TASK_SELECT = {
     dependsOn: true,
     depth: true,
     cli: true,
+    role: true,
+    model: true,
     sessionId: true,
     attempts: true,
     outcome: true,
@@ -86,9 +97,11 @@ function asPlanTask(row: {
 function sessionInput(
     run: { ownerId: string; repoId: string; baseRef: string; cli: string },
     title: string,
-    cli: string | null
+    cli: string | null,
+    modelChoice: core.SessionModelChoice | null = null
 ): sessions.SessionCreateInput {
     return {
+        modelChoice,
         repoId: run.repoId,
         startedById: run.ownerId,
         title: title.slice(0, 80),
@@ -132,8 +145,14 @@ export async function createRun(input: RunInput): Promise<{ id: string }> {
         }
     });
     if (input.coordinator) {
+        // The coordinator runs on the agent the person picked, and on the model
+        // the repository keeps for its coordinator when that is the same agent.
+        const coordinator = roles.pickRoleAgent(await repoRoles(run.repoId), "coordinator", { agent: run.cli });
+        const modelChoice = coordinator.model
+            ? await startModel(run.ownerId, coordinator.agent, coordinator.model).catch(() => null)
+            : null;
         const admission = await queue.admitSession(
-            sessionInput(run, `Coordinate: ${input.objective}`, null),
+            sessionInput(run, `Coordinate: ${input.objective}`, null, modelChoice),
             plan.coordinatorPreamble(run)
         );
         await prisma.agentOrchestrationRun.update({
@@ -173,6 +192,18 @@ export async function addTasks(
         });
         const created: string[] = [];
         for (const input of inputs) {
+            if (input.clientKey) {
+                // Held under the run's lock, so two retries of one spawn arriving
+                // together still make one task; the unique index backs it.
+                const existing = await tx.agentOrchestrationTask.findFirst({
+                    where: { runId, clientKey: input.clientKey },
+                    select: { id: true }
+                });
+                if (existing) {
+                    created.push(existing.id);
+                    continue;
+                }
+            }
             const placed = plan.placeNewTask(run, tasks, input.dependsOn);
             if ("error" in placed) throw new OrchestrationRefusal(placed.error);
             const row = await tx.agentOrchestrationTask.create({
@@ -183,6 +214,9 @@ export async function addTasks(
                     dependsOn: [...input.dependsOn],
                     depth: placed.depth,
                     cli: input.cli,
+                    role: input.role ?? "worker",
+                    model: input.model || null,
+                    clientKey: input.clientKey || null,
                     gateQuestion: input.gateQuestion,
                     groupId
                 },
@@ -303,7 +337,7 @@ export async function advanceRun(runId: string): Promise<void> {
 
 async function dispatchTask(
     run: { id: string; ownerId: string; repoId: string; baseRef: string; cli: string },
-    task: { id: string; title: string; spec: string; cli: string | null }
+    task: { id: string; title: string; spec: string; cli: string | null; role: string; model: string | null }
 ): Promise<void> {
     const claimed = await prisma.agentOrchestrationTask.updateMany({
         where: { id: task.id, status: "ready" },
@@ -312,11 +346,23 @@ async function dispatchTask(
     if (claimed.count !== 1) return;
     const prompt = plan.workerPreamble(task);
     try {
-        const admission = await queue.admitSession(sessionInput(run, task.title, task.cli), prompt);
+        const role = task.role === "reviewer" ? "reviewer" : "worker";
+        const saved = (await repoRoles(run.repoId))[role];
+        // What the task asked for, then the repository's role default, then
+        // the run's own agent - which is what every task before roles ran on.
+        const cli = task.cli ?? saved?.agent ?? run.cli;
+        const model = task.model ?? (saved && saved.agent === cli ? saved.model : "");
+        // Checked again here rather than trusted from the spawn: what a person
+        // may start a model on can have changed while the task waited.
+        const modelChoice = model ? await startModel(run.ownerId, cli, model) : null;
+        const admission = await queue.admitSession(sessionInput(run, task.title, cli, modelChoice), prompt);
         await prisma.agentOrchestrationTask.update({
             where: { id: task.id },
             data: { sessionId: admission.session.id }
         });
+        // A reviewer reads a pull request that is not its own: it is sent none
+        // of its failing checks or review comments (AO's `--review`).
+        if (role === "reviewer") await sessions.setAutoFeedback(admission.session.id, false);
         if (admission.queuedAt === null && !admission.startError) {
             void runtime.deliverFirstPrompt(admission.session.id, prompt).catch(() => undefined);
         }
@@ -667,4 +713,175 @@ export async function variantGroup(groupId: string, ownerId: string) {
         take: plan.RUN_BOUNDS.maxVariants
     });
     return tasks;
+}
+
+// ---------------------------------------------------------------------------
+// The coordinator's verbs (ported from AO's `ao spawn`, `ao send`,
+// `ao session ls`, `ao session claim-pr` and `ao preview`, Apache-2.0)
+// ---------------------------------------------------------------------------
+
+/** The roles a repository keeps; none for a repository that is gone. */
+async function repoRoles(repoId: string): Promise<roles.RoleAgents> {
+    const repo = await prisma.agentRepo.findUnique({ where: { id: repoId }, select: { roleAgents: true } });
+    return roles.parseRoleAgents(repo?.roleAgents);
+}
+
+export interface SpawnInput {
+    readonly clientKey: string;
+    readonly title: string;
+    readonly prompt: string;
+    readonly role: "worker" | "reviewer";
+    readonly agent: string | null;
+    readonly model: string | null;
+}
+
+/**
+ * Spawn a worker in the run: a task that depends on nothing, so it starts at
+ * once when the run has a free slot and queues behind the others when it has
+ * not. Idempotent on the caller's key: the same key answers the same task.
+ * A model is checked here as well as at dispatch, so a bad one is refused to
+ * the coordinator rather than turning up later as a failed task.
+ */
+export async function spawnWorker(
+    run: { id: string; ownerId: string },
+    input: SpawnInput
+): Promise<{ taskId: string; sessionId: string | null; status: string }> {
+    if (input.model) {
+        const row = await prisma.agentOrchestrationRun.findUnique({
+            where: { id: run.id },
+            select: { cli: true, repoId: true }
+        });
+        const saved = row ? await repoRoles(row.repoId) : {};
+        // The same order dispatch resolves the agent in.
+        const cli = input.agent ?? saved[input.role]?.agent ?? row?.cli ?? roles.ROLE_DEFAULTS[input.role].agent;
+        try {
+            await startModel(run.ownerId, cli, input.model);
+        } catch (error) {
+            if (error instanceof sessions.SessionRefusal) throw new OrchestrationRefusal(error.message);
+            throw error;
+        }
+    }
+    const [taskId] = await addTasks(run.id, [
+        {
+            title: input.title,
+            spec: input.prompt,
+            dependsOn: [],
+            cli: input.agent,
+            gateQuestion: null,
+            role: input.role,
+            model: input.model,
+            clientKey: input.clientKey
+        }
+    ]);
+    const task = await prisma.agentOrchestrationTask.findUnique({
+        where: { id: taskId! },
+        select: { sessionId: true, status: true }
+    });
+    return { taskId: taskId!, sessionId: task?.sessionId ?? null, status: task?.status ?? "pending" };
+}
+
+/** The most children one read lists: every task a run may hold. */
+const CHILDREN_CAP = plan.RUN_BOUNDS.maxTasks * plan.RUN_BOUNDS.maxVariants;
+
+/**
+ * A session the run's coordinator may act on: one dispatched for a task of
+ * this run, started for the run's own person. Null for anything else - another
+ * run's worker, the person's own sessions, the coordinator itself - so a
+ * coordinator can never reach past its own children.
+ */
+export async function childSession(
+    run: { id: string; ownerId: string },
+    sessionId: string
+): Promise<{ taskId: string; sessionId: string } | null> {
+    const task = await prisma.agentOrchestrationTask.findFirst({
+        where: { runId: run.id, sessionId },
+        select: { id: true }
+    });
+    if (!task) return null;
+    const owned = await prisma.agentSession.count({ where: { id: sessionId, startedById: run.ownerId } });
+    return owned === 1 ? { taskId: task.id, sessionId } : null;
+}
+
+/** One child as the coordinator reads it. */
+export interface RunChild {
+    taskId: string;
+    title: string;
+    role: string;
+    taskStatus: string;
+    sessionId: string | null;
+    agent: string | null;
+    model: string | null;
+    branch: string | null;
+    /** `deriveSessionStatus`'s word, or null before a session exists. */
+    status: string | null;
+    pullRequest: { number: number; url: string } | null;
+    checks: string | null;
+    review: string | null;
+}
+
+/** Every task of the run with its session and derived status, oldest first. */
+export async function runChildren(runId: string, now = new Date()): Promise<RunChild[]> {
+    const [status, facts] = await Promise.all([
+        import("@/lib/agents/session-status"),
+        import("@/lib/agents/session-pr-facts")
+    ]);
+    const tasks = await prisma.agentOrchestrationTask.findMany({
+        where: { runId },
+        select: { id: true, title: true, role: true, status: true, sessionId: true, cli: true, model: true },
+        orderBy: { createdAt: "asc" },
+        take: CHILDREN_CAP
+    });
+    const ids = tasks.flatMap((task) => (task.sessionId ? [task.sessionId] : []));
+    const [rows, pulls] = await Promise.all([
+        ids.length
+            ? prisma.agentSession.findMany({
+                  where: { id: { in: ids } },
+                  select: {
+                      id: true,
+                      cli: true,
+                      model: true,
+                      modelProvider: true,
+                      branch: true,
+                      state: true,
+                      lastEventAt: true,
+                      startedAt: true,
+                      createdAt: true,
+                      prNumber: true,
+                      prUrl: true
+                  }
+              })
+            : Promise.resolve([]),
+        facts.readSessionPullRows(ids)
+    ]);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return tasks.map((task) => {
+        const row = task.sessionId ? byId.get(task.sessionId) : undefined;
+        const pullRows = row ? (pulls.get(row.id) ?? []) : [];
+        const own = pullRows.find((pull) => pull.number === row?.prNumber) ?? pullRows[0];
+        return {
+            taskId: task.id,
+            title: task.title,
+            role: task.role,
+            taskStatus: task.status,
+            sessionId: task.sessionId,
+            agent: row?.cli ?? task.cli,
+            model: row?.model ? `${row.modelProvider ?? ""}/${row.model}`.replace(/^\//, "") : task.model,
+            branch: row?.branch ?? null,
+            status: row
+                ? status.deriveSessionStatus(
+                      status.sessionFactsFrom({
+                          state: row.state as core.AgentSessionState,
+                          lastEventAt: row.lastEventAt,
+                          startedAt: row.startedAt,
+                          createdAt: row.createdAt
+                      }),
+                      pullRows.map(facts.pullFactsOf),
+                      now
+                  )
+                : null,
+            pullRequest: row?.prNumber && row.prUrl ? { number: row.prNumber, url: row.prUrl } : null,
+            checks: own?.checks ?? null,
+            review: own?.review ?? null
+        };
+    });
 }

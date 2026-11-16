@@ -752,6 +752,20 @@
         "keep": "Conservar",
         "clearFailed": "No se pudo borrar la memoria. Inténtalo de nuevo."
     },
+    "repoRoles": {
+        "title": "Agentes por rol",
+        "intro": "Con qué trabajan aquí el coordinador, sus agentes y el revisor.",
+        "roles": {
+            "coordinator": "Coordinador",
+            "worker": "Ejecutor",
+            "reviewer": "Revisor"
+        },
+        "agent": "Agente: {role}",
+        "model": "Modelo: {role}",
+        "inherit": "Por defecto ({agent})",
+        "modelPlaceholder": "proveedor/modelo o vacío",
+        "modelInvalid": "Escríbelo como proveedor/modelo."
+    },
     "repoDialog": {
         "setupPlaceholder": "npm ci",
         "setup": "Preparación",

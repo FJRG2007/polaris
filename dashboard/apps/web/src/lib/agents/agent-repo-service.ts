@@ -9,6 +9,7 @@
  * container, and whether GitHub could reach us at all.
  */
 
+import { parseRoleAgents, type RoleAgents } from "@/lib/agents/agent-roles";
 import { prisma } from "@polaris/db";
 import { getCapabilities } from "@polaris/config";
 import { appBaseUrl } from "@/lib/domain-service";
@@ -53,6 +54,9 @@ export interface AgentRepoView {
     setupScript: string;
     /** Whether a failing setup script stops the session. */
     setupRequired: boolean;
+    /** The agent and model each orchestration role starts on; a role left out
+     *  takes the code default (`agent-roles`). */
+    roleAgents: RoleAgents;
     workflowInstalledAt: Date | null;
     error: string | null;
     automationCount: number;
@@ -89,6 +93,7 @@ export async function listAgentRepos(ownerId: string): Promise<AgentRepoView[]> 
         learnings: row.learnings ?? "",
         setupScript: row.setupScript,
         setupRequired: row.setupRequired,
+        roleAgents: parseRoleAgents(row.roleAgents),
         workflowInstalledAt: row.workflowInstalledAt,
         error: row.error,
         automationCount: row._count.automations,

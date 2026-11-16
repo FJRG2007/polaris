@@ -199,6 +199,7 @@ export function coordinatorPreamble(run: {
         "",
         "Split it into tasks with orchestration_task_create. Each task becomes its own agent session on its own branch, and starts by itself once the tasks it depends on have completed.",
         "Read what workers report with orchestration_inbox, answer their questions with orchestration_answer, send a worker a follow-up with orchestration_message, and see the whole run with orchestration_tasks.",
+        "To put a worker on something right away, call coordinator_spawn with a clientKey of your own (retry with the same key, never a new one); coordinator_children lists your workers with their pull request and check status, coordinator_send messages one, coordinator_claim_pr attaches an existing pull request to one (review true to only read it), and coordinator_preview gives the address of one's running app.",
         `This run allows ${run.maxTasks} tasks and ${run.maxConcurrent} at once. Do the coordination; leave the implementation to the workers.`,
         "A task with a gate waits for a person to approve it on the run's page."
     ].join("\n");

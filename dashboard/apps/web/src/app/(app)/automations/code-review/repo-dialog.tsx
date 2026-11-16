@@ -5,6 +5,8 @@ import { ExecutionPicker } from "./execution-picker";
 import { useEffect, useState, useTransition } from "react";
 import { RepoSettingsFields } from "./repo-settings-fields";
 import { RepoMemorySection } from "./repo-memory-section";
+import { RepoRoleFields, roleAgentsValid } from "./repo-role-fields";
+import type { RoleAgents } from "@/lib/agents/agent-roles";
 import type { AgentRepoView } from "@/lib/agents/agent-repo-service";
 import { updateRepoConfigAction } from "./actions";
 import {
@@ -59,6 +61,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
     const [learnings, setLearnings] = useState(repo.learnings);
     const [setupScript, setSetupScript] = useState(repo.setupScript);
     const [setupRequired, setSetupRequired] = useState(repo.setupRequired);
+    const [roleAgents, setRoleAgents] = useState<RoleAgents>(repo.roleAgents);
     const [advice, setAdvice] = useState<ExecutionAdvice | null>(null);
     const [pools, setPools] = useState<Array<{ id: string; name: string }>>([]);
     const [allPools, setAllPools] = useState<Array<{ id: string; name: string }>>([]);
@@ -95,7 +98,8 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
             review: repo.review,
             learnings: repo.learnings.trim(),
             setupScript: repo.setupScript.trim(),
-            setupRequired: repo.setupRequired
+            setupRequired: repo.setupRequired,
+            roleAgents: repo.roleAgents
         },
         {
             execution,
@@ -110,9 +114,11 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
             review,
             learnings: learnings.trim(),
             setupScript: setupScript.trim(),
-            setupRequired
+            setupRequired,
+            roleAgents
         }
     );
+    const rolesValid = roleAgentsValid(roleAgents);
 
     const save = () => {
         startTransition(() => {
@@ -137,7 +143,8 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                                 // back notes a run rewrote while this was open.
                                 learnings: learnings.trim() === repo.learnings.trim() ? null : learnings
                             },
-                            setup: { script: setupScript, required: setupRequired }
+                            setup: { script: setupScript, required: setupRequired },
+                            roles: roleAgents
                         }),
                     setError
                 );
@@ -276,6 +283,8 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                         </div>
                     ) : null}
 
+                    <RepoRoleFields value={roleAgents} onChange={setRoleAgents} />
+
                     <RepoMemorySection repoFullName={repo.repoFullName} />
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -285,7 +294,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                     <Button variant="ghost" onClick={onClose}>
                         {tcommon("actions.cancel")}
                     </Button>
-                    <Button onClick={save} disabled={pending || unchanged}>
+                    <Button onClick={save} disabled={pending || unchanged || !rolesValid}>
                         {pending ? t("rules.saving") : t("rules.save")}
                     </Button>
                 </DialogFooter>
