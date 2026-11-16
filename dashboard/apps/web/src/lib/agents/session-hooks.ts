@@ -19,6 +19,7 @@
  * slow one is felt as the agent being slow.
  */
 
+import { TOOLS_SERVER_NAME } from "@/lib/agents/session-tools-mcp";
 import {
     hookGroup,
     isTranscriptPath,
@@ -121,6 +122,10 @@ export function claudeHookSettings(
     // file is where it goes.
     return {
         hooks,
+        // The custom tools ask on the session themselves, by each tool's own
+        // setting (session-tools.ts); a second prompt from the agent would ask
+        // the same question twice.
+        permissions: { allow: [`mcp__${TOOLS_SERVER_NAME}`] },
         skipDangerousModePermissionPrompt: true,
         ...(memoryDir ? { autoMemoryDirectory: memoryDir } : {}),
         ...(permissions && permissions.allow.length + permissions.ask.length + permissions.deny.length > 0
@@ -142,14 +147,31 @@ export function claudeHookSettings(
  * key would: enough to work the board it was pointed at, and not enough to start
  * more sessions.
  */
-export function mcpConfig(url: string, token: string): Record<string, unknown> {
+export function mcpConfig(
+    url: string,
+    token: string,
+    tools?: { script: string; url: string }
+): Record<string, unknown> {
     return {
         mcpServers: {
             polaris: {
                 type: "http",
                 url,
                 headers: { Authorization: `Bearer ${token}` }
-            }
+            },
+            // The person's custom tools, served from inside the sandbox
+            // (session-tools-mcp.ts). Every call is checked, and asked about,
+            // by Polaris before the command it answers runs here.
+            ...(tools
+                ? {
+                      [TOOLS_SERVER_NAME]: {
+                          type: "stdio",
+                          command: "node",
+                          args: [tools.script],
+                          env: { POLARIS_TOOLS_URL: tools.url, POLARIS_TOOLS_TOKEN: token }
+                      }
+                  }
+                : {})
         }
     };
 }

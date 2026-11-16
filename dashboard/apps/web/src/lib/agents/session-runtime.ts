@@ -19,6 +19,7 @@
  */
 
 import { cliPolicyFile, POLICY_PATHS } from "@/lib/polar/agents/cli-policies";
+import * as toolsMcp from "@/lib/agents/session-tools-mcp";
 import { claudePermissionSettings, configFromRules, rulesOf, type PermissionRule } from "@/lib/polar/agents/permissions";
 import { repoAgentFiles, sessionAgentFiles } from "@/lib/polar/agents/repo-agents";
 import { prisma } from "@polaris/db";
@@ -185,6 +186,11 @@ interface Bootstrap {
      *  a file the tool keeps, and where. Names and paths from the catalogue. */
     readonly credentialFiles: string;
     readonly mcpConfig: string;
+    /** `mcpConfig` with the custom tools' server beside Polaris's own. The
+     *  boot writes it instead where the machine has `node` to run it with. */
+    readonly mcpToolsConfig: string;
+    /** The custom tools' stdio MCP server (session-tools-mcp.ts). */
+    readonly toolsServer: string;
     readonly cloneHeader: string;
     /** The credential helper script, or empty for a workspace. */
     readonly gitCredential: string;
@@ -435,6 +441,13 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
                 ? skillsSyncScript({ url: `${base}/api/agents/sessions/${session.id}/skills`, token })
                 : "",
         mcpConfig: JSON.stringify(mcpConfig(mcp, token)),
+        mcpToolsConfig: JSON.stringify(
+            mcpConfig(mcp, token, {
+                script: `${toolsMcp.STATE_DIR_MARK}/${toolsMcp.TOOLS_SERVER_FILE}`,
+                url: `${base}/api/agents/sessions/${session.id}/tools`
+            })
+        ),
+        toolsServer: toolsMcp.toolsMcpScript(),
         // Empty for a workspace, which clones nothing. A header built around an
         // empty token is a header git would send.
         cloneHeader: githubToken ? (cloneAuthHeader(githubToken) ?? "") : "",
@@ -844,6 +857,8 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_SKILLS_SYNC: boot.skillsSync ? asFile(boot.skillsSync) : "",
         POLARIS_CREDENTIAL_FILES: boot.credentialFiles,
         POLARIS_MCP_CONFIG: asFile(boot.mcpConfig),
+        POLARIS_MCP_TOOLS_CONFIG: asFile(boot.mcpToolsConfig),
+        POLARIS_TOOLS_MCP: asFile(boot.toolsServer),
         POLARIS_GIT_CREDENTIAL: boot.gitCredential ? asFile(boot.gitCredential) : "",
         POLARIS_REPO_SETUP: boot.repoSetup,
         POLARIS_REPO_SETUP_REQUIRED: boot.repoSetupRequired ? "yes" : "",
@@ -1124,6 +1139,23 @@ export async function runInSession(
         ports.runIn(containerId, commands.shellArgv(command))
     );
     return { code: result.code, output: result.output };
+}
+
+/**
+ * Whether the boot left the custom tools' server out of a session because its
+ * machine had no `node` to run it with (see PREPARE_WORKTREE). False for a
+ * computer's session, which never gets the server, and wherever the machine
+ * cannot be asked: the tools screen only explains a skip it can see.
+ */
+export async function toolsServerSkipped(
+    sessionId: string,
+    run: typeof runInSession = runInSession
+): Promise<boolean> {
+    const placement = await sessionPlacement(sessionId);
+    if (!placement || placement.place === "computer") return false;
+    const marker = `${stateDirFor({ id: sessionId, place: placement.place })}/${toolsMcp.TOOLS_NO_NODE_FILE}`;
+    const result = await run(sessionId, `if [ -f "${marker}" ]; then echo skipped; fi`).catch(() => null);
+    return (result?.output ?? "").split("\n").some((line) => line.trim() === "skipped");
 }
 
 /**

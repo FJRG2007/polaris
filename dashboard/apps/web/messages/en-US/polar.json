@@ -1112,7 +1112,17 @@
                 "none": "Your newest Code session has no repository tools.",
                 "refused": "Could not read: {files}",
                 "approved": "Approved for this version.",
-                "approve": "Approve"
+                "approve": "Approve",
+                "noNode": "The server your newest Code session runs on has no Node.js, so its agent can't call your tools. Install Node.js there and start a new session.",
+                "module": {
+                    "ready": "Runs in your session",
+                    "pending": "Read after you approve",
+                    "no_bun": "Needs Bun in the session",
+                    "no_zod": "Needs zod 4 in the repository",
+                    "load_failed": "Could not be loaded",
+                    "input": "Takes input Polaris can't pass",
+                    "name": "Its name is taken or invalid"
+                }
             },
             "errors": {
                 "noAccess": "Polar is not available to you.",

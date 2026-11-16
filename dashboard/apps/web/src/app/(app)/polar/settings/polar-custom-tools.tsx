@@ -497,12 +497,14 @@ function PluginDialog({
 function ProjectTools({ readOnly }: { readOnly: boolean }) {
     const t = useTranslations("polar");
     const [review, setReview] = useState<actions.ProjectToolsView | null | "none">(null);
+    const [noNode, setNoNode] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const load = () =>
         startTransition(async () => {
             setError(null);
-            const result = await actions.reviewProjectTools();
+            const [result, skipped] = await Promise.all([actions.reviewProjectTools(), actions.sessionToolsSkipped()]);
+            setNoNode(skipped.ok && skipped.value);
             if (!result.ok) return setError(result.error);
             setReview(result.value ?? "none");
         });
@@ -532,6 +534,11 @@ function ProjectTools({ readOnly }: { readOnly: boolean }) {
                     {error}
                 </p>
             )}
+            {noNode && (
+                <p role="status" className="text-sm text-destructive">
+                    {t("settings.customTools.project.noNode")}
+                </p>
+            )}
             {review === "none" && <p className="text-sm text-muted-foreground">{t("settings.customTools.project.none")}</p>}
             {review && review !== "none" && (
                 <Card>
@@ -547,6 +554,17 @@ function ProjectTools({ readOnly }: { readOnly: boolean }) {
                                 <pre className="mt-1 max-h-60 overflow-auto rounded bg-muted p-2 text-xs">{tool.script}</pre>
                             </details>
                         ))}
+                        {review.modules.map((module) => (
+                            <details key={module.path} className="min-w-0">
+                                <summary className="cursor-pointer truncate text-sm">
+                                    <span className="font-mono">{module.path}</span> -{" "}
+                                    <span className={module.status === "ready" ? "" : "text-muted-foreground"}>
+                                        {t(`settings.customTools.project.module.${module.status}`)}
+                                    </span>
+                                </summary>
+                                <pre className="mt-1 max-h-60 overflow-auto rounded bg-muted p-2 text-xs">{module.source}</pre>
+                            </details>
+                        ))}
                         {review.refused.length > 0 && (
                             <p className="text-xs text-destructive">
                                 {t("settings.customTools.project.refused", { files: review.refused.join(", ") })}
@@ -556,7 +574,7 @@ function ProjectTools({ readOnly }: { readOnly: boolean }) {
                             <p className="text-sm">{t("settings.customTools.project.approved")}</p>
                         ) : (
                             !readOnly &&
-                            review.tools.length > 0 && (
+                            (review.tools.length > 0 || review.modules.length > 0) && (
                                 <div className="flex justify-end">
                                     <Button size="sm" onClick={() => approve(review)} disabled={pending}>
                                         {t("settings.customTools.project.approve")}

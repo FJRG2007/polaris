@@ -28,6 +28,7 @@
 
 import { shellQuote } from "./session-hooks";
 import { POLICY_PATHS } from "@/lib/polar/agents/cli-policies";
+import { STATE_DIR_MARK, TOOLS_NO_NODE_FILE, TOOLS_SERVER_FILE } from "./session-tools-mcp";
 import { INSTALL_GH, PREINSTALL_GH } from "./session-gh";
 import {
     FIRST_RUN_WORKDIR,
@@ -366,7 +367,25 @@ const PREPARE_WORKTREE = [
     'printf %s "$POLARIS_HOOK_SCRIPT" | base64 -d > "$POLARIS_STATE_DIR/hook.sh"',
     'chmod 0700 "$POLARIS_STATE_DIR/hook.sh"',
     'printf %s "$POLARIS_HOOK_SETTINGS" | base64 -d > "$POLARIS_STATE_DIR/settings.json"',
-    'printf %s "$POLARIS_MCP_CONFIG" | base64 -d > "$POLARIS_STATE_DIR/mcp.json"',
+    // The custom tools' MCP server (session-tools-mcp.ts) is a Node script, and
+    // a server need not have Node. Registered only where it can start: an MCP
+    // server that cannot is an error in the agent's terminal on every launch,
+    // so without `node` the plain registration is written and a marker left
+    // for the tools screen to say why. The registration names the server by a
+    // mark the state folder replaces, since on a server that folder is under
+    // `$HOME` and the agent expands nothing there. The script holds no secret
+    // - the token travels in mcp.json - but nothing else writes it.
+    `rm -f "$POLARIS_STATE_DIR/${TOOLS_NO_NODE_FILE}"`,
+    'if [ -n "$POLARIS_TOOLS_MCP" ] && [ -n "$POLARIS_MCP_TOOLS_CONFIG" ] && command -v node >/dev/null 2>&1; then',
+    `  printf %s "$POLARIS_TOOLS_MCP" | base64 -d > "$POLARIS_STATE_DIR/${TOOLS_SERVER_FILE}"`,
+    `  chmod 0600 "$POLARIS_STATE_DIR/${TOOLS_SERVER_FILE}"`,
+    `  printf %s "$POLARIS_MCP_TOOLS_CONFIG" | base64 -d | sed "s|${STATE_DIR_MARK}|$POLARIS_STATE_DIR|g" > "$POLARIS_STATE_DIR/mcp.json"`,
+    "else",
+    '  printf %s "$POLARIS_MCP_CONFIG" | base64 -d > "$POLARIS_STATE_DIR/mcp.json"',
+    '  if [ -n "$POLARIS_TOOLS_MCP" ]; then',
+    `    : > "$POLARIS_STATE_DIR/${TOOLS_NO_NODE_FILE}"`,
+    "  fi",
+    "fi",
     'chmod 0600 "$POLARIS_STATE_DIR/settings.json" "$POLARIS_STATE_DIR/mcp.json"',
     // The script that carries the repository's memory between boxes (see
     // `memorySyncScript`). It holds the session's token, so it is private like
@@ -1151,7 +1170,7 @@ const RUNNER_SCRIPT_BASE64 = Buffer.from(RUNNER_SCRIPT, "utf8").toString("base64
 /** What the setup cleared before the agent started, cleared again by anything
  *  that starts it later from tmux's own environment, which is the boot's. */
 const CLEAR_BOOT_ENV: readonly string[] = [
-    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_REPO_AGENTS POLARIS_AGENT_HOOK_FILE POLARIS_AGENT_POLICY",
+    "unset GIT_AUTH_HEADER POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MCP_TOOLS_CONFIG POLARIS_TOOLS_MCP POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_REPO_AGENTS POLARIS_AGENT_HOOK_FILE POLARIS_AGENT_POLICY",
     'for pair in $POLARIS_CREDENTIAL_FILES; do unset "$(printf %s "$pair" | cut -d= -f1)"; done'
 ];
 
@@ -1539,7 +1558,7 @@ const START_AGENT = [
     '  as_agent "sh \\"$POLARIS_STATE_DIR/skills-sync.sh\\" \\"$POLARIS_HOME\\"" || true',
     "fi",
     "unset GIT_AUTH_HEADER",
-    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_REPO_AGENTS POLARIS_AGENT_HOOK_FILE POLARIS_AGENT_POLICY",
+    "unset POLARIS_HOOK_SCRIPT POLARIS_HOOK_SETTINGS POLARIS_MCP_CONFIG POLARIS_MCP_TOOLS_CONFIG POLARIS_TOOLS_MCP POLARIS_MEMORY_SYNC POLARIS_SKILLS_SYNC POLARIS_GIT_CREDENTIAL POLARIS_ENIGMA_SETUP POLARIS_ENIGMA_CONFIGURE POLARIS_FIRST_RUN POLARIS_REPO_SETUP POLARIS_REPO_AGENTS POLARIS_AGENT_HOOK_FILE POLARIS_AGENT_POLICY",
     // Said once, in the terminal the person is looking at, because on a machine
     // they cannot see "please sign in" with no way to and no reason given is the
     // whole of what was wrong with this. Only when Polaris is carrying no

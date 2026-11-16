@@ -1112,7 +1112,17 @@
                 "none": "Tu sesión de Code más reciente no tiene herramientas.",
                 "refused": "No se pudo leer: {files}",
                 "approved": "Aprobadas para esta versión.",
-                "approve": "Aprobar"
+                "approve": "Aprobar",
+                "noNode": "El servidor de tu última sesión de Code no tiene Node.js, así que su agente no puede usar tus herramientas. Instala Node.js allí y abre otra sesión.",
+                "module": {
+                    "ready": "Se ejecuta en tu sesión",
+                    "pending": "Se lee al aprobar",
+                    "no_bun": "Necesita Bun en la sesión",
+                    "no_zod": "Necesita zod 4 en el repositorio",
+                    "load_failed": "No se pudo cargar",
+                    "input": "Pide datos que Polaris no pasa",
+                    "name": "Su nombre está en uso o no vale"
+                }
             },
             "errors": {
                 "noAccess": "Polar no está disponible para ti.",
