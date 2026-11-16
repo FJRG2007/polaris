@@ -27,6 +27,7 @@ import type { Payer } from "@/lib/polar/shared";
 import type { PolarModelOption } from "@/lib/polar/models";
 import { since, appliesToPerson, roleAndGroupIds } from "@/lib/agents/agent-usage-limits";
 import type { LimitPeriod, LimitSubject } from "@polaris/core";
+import { toolNameOf, type ActivityPart } from "@/components/polar/motion/orb-activity";
 
 /** What one answer spent, as its message metadata carries it. */
 export interface AnswerUsage {
@@ -183,16 +184,54 @@ export interface UsageByModel {
     unpriced: number;
 }
 
+export interface UsageByTool {
+    tool: string;
+    calls: number;
+}
+
 export interface MonthUsage {
     from: string;
     models: UsageByModel[];
+    /** The tools Polar called most this month, most called first. */
+    tools: UsageByTool[];
+    /** The chats that spent anything this month. */
+    chats: number;
+}
+
+/** How many tools the month's listing names at most. */
+export const MONTH_TOOLS_SHOWN = 20;
+/** The longest tool name kept; a longer one is cut. */
+const TOOL_NAME_CHARS = 120;
+
+/** How often an answer called each tool, from its message parts. Pure. */
+export function toolCallCounts(parts: readonly ActivityPart[]): UsageByTool[] {
+    const counts = new Map<string, number>();
+    for (const part of parts) {
+        const tool = toolNameOf(part)?.slice(0, TOOL_NAME_CHARS);
+        if (tool) counts.set(tool, (counts.get(tool) ?? 0) + 1);
+    }
+    return [...counts].map(([tool, calls]) => ({ tool, calls }));
+}
+
+/** Record the tools one answer called. Nothing is written for an answer that
+ *  called none. */
+export async function recordPolarToolUse(input: {
+    userId: string;
+    threadId: string | null;
+    parts: readonly ActivityPart[];
+}): Promise<void> {
+    const counts = toolCallCounts(input.parts);
+    if (counts.length === 0) return;
+    await prisma.polarToolUse.createMany({
+        data: counts.map((count) => ({ userId: input.userId, threadId: input.threadId, ...count }))
+    });
 }
 
 /** This person's Polar spend since the month began, per model and payer. */
 export async function polarMonthUsage(userId: string, now = new Date()): Promise<MonthUsage> {
     const from = monthStart(now);
     const where = { userId, createdAt: { gte: from } };
-    const [rows, unpriced] = await Promise.all([
+    const [rows, unpriced, tools, chats] = await Promise.all([
         prisma.polarUsage.groupBy({
             by: ["provider", "model", "payer"],
             where,
@@ -203,7 +242,16 @@ export async function polarMonthUsage(userId: string, now = new Date()): Promise
             by: ["provider", "model", "payer"],
             where: { ...where, costUsd: null },
             _count: { _all: true }
-        })
+        }),
+        prisma.polarToolUse.groupBy({
+            by: ["tool"],
+            where,
+            _sum: { calls: true },
+            orderBy: { _sum: { calls: "desc" } },
+            take: MONTH_TOOLS_SHOWN
+        }),
+        // One row per chat, grouped in the database.
+        prisma.polarUsage.groupBy({ by: ["threadId"], where: { ...where, threadId: { not: null } } })
     ]);
     const missing = new Map(
         unpriced.map((row) => [
@@ -223,7 +271,12 @@ export async function polarMonthUsage(userId: string, now = new Date()): Promise
             unpriced: missing.get(`${row.provider}\u0000${row.model}\u0000${row.payer}`) ?? 0
         }))
         .sort((a, b) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens));
-    return { from: from.toISOString(), models };
+    return {
+        from: from.toISOString(),
+        models,
+        tools: tools.map((row) => ({ tool: row.tool, calls: row._sum.calls ?? 0 })),
+        chats: chats.length
+    };
 }
 
 /** What one chat has spent, every answer and compaction in it. */

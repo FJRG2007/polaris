@@ -117,6 +117,7 @@ import {
     stepContext,
     polarLimitReached,
     recordPolarUsage,
+    recordPolarToolUse,
     routeRecord
 } from "@/lib/polar/usage";
 import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@/lib/polar/threads";
@@ -902,6 +903,12 @@ export async function POST(request: Request): Promise<Response> {
                     console.error("polar: could not record the turn's usage", error);
                 }
             }
+            if (responseMessage)
+                await recordPolarToolUse({
+                    userId: user.id,
+                    threadId: body.data.threadId,
+                    parts: responseMessage.parts
+                }).catch((error: unknown) => console.error("polar: could not record the turn's tools", error));
             // The small jobs run behind the reply on the helper model the
             // person picked (`helper-model.ts`): a new thread's title once the
             // first answer is in, and the suggested next message after every

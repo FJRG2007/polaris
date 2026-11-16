@@ -1,6 +1,7 @@
 /**
  * Polar's spend: a cost only where the catalogue has both prices, and the
  * administrator's token ceilings stop the shared key for the people they name.
+ * An answer's tool calls are counted per tool, and the month sums them.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,7 +17,11 @@ const state = {
     spent: 0,
     audioSeconds: 0,
     roles: [] as string[],
-    where: null as unknown
+    where: null as unknown,
+    toolRows: [] as unknown[],
+    toolGroups: [] as { tool: string; _sum: { calls: number | null } }[],
+    groups: [] as unknown[][],
+    threads: [] as { threadId: string }[]
 };
 
 vi.mock("@polaris/db", () => ({
@@ -24,7 +29,16 @@ vi.mock("@polaris/db", () => ({
         agentUsageLimit: { findMany: async () => state.rules },
         userRole: { findMany: async () => state.roles.map((roleId) => ({ roleId })) },
         groupMember: { findMany: async () => [] },
+        polarToolUse: {
+            createMany: async ({ data }: { data: unknown[] }) => {
+                state.toolRows.push(...data);
+                return { count: data.length };
+            },
+            groupBy: async () => state.toolGroups
+        },
         polarUsage: {
+            groupBy: async ({ by }: { by: string[] }) =>
+                by[0] === "threadId" ? state.threads : (state.groups.shift() ?? []),
             aggregate: async ({ where }: { where: unknown }) => {
                 state.where = where;
                 return {
@@ -39,8 +53,15 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { answerUsage, monthStart, polarLimitReached, AUDIO_TOKENS_PER_SECOND } =
-    await import("@/lib/polar/usage");
+const {
+    answerUsage,
+    monthStart,
+    toolCallCounts,
+    polarMonthUsage,
+    polarLimitReached,
+    recordPolarToolUse,
+    AUDIO_TOKENS_PER_SECOND
+} = await import("@/lib/polar/usage");
 
 beforeEach(() => {
     state.rules = [];
@@ -48,6 +69,73 @@ beforeEach(() => {
     state.audioSeconds = 0;
     state.roles = [];
     state.where = null;
+    state.toolRows = [];
+    state.toolGroups = [];
+    state.groups = [];
+    state.threads = [];
+});
+
+describe("toolCallCounts", () => {
+    it("counts each tool an answer called, a connector's tool by its own name", () => {
+        expect(
+            toolCallCounts([
+                { type: "text", text: "Looking." },
+                { type: "tool-web_search", state: "output-available" },
+                { type: "tool-web_search", state: "output-available" },
+                { type: "dynamic-tool", toolName: "github__list_issues", state: "output-error" },
+                { type: "reasoning", text: "..." }
+            ])
+        ).toEqual([
+            { tool: "web_search", calls: 2 },
+            { tool: "github__list_issues", calls: 1 }
+        ]);
+    });
+
+    it("is empty for an answer with no tool calls", () => {
+        expect(toolCallCounts([{ type: "text", text: "Hi" }])).toEqual([]);
+    });
+});
+
+describe("recordPolarToolUse", () => {
+    it("writes one row per tool, and nothing for an answer that called none", async () => {
+        await recordPolarToolUse({ userId: "u-1", threadId: "t-1", parts: [{ type: "text", text: "Hi" }] });
+        expect(state.toolRows).toEqual([]);
+        await recordPolarToolUse({
+            userId: "u-1",
+            threadId: "t-1",
+            parts: [{ type: "tool-read_file" }, { type: "tool-read_file" }]
+        });
+        expect(state.toolRows).toEqual([{ userId: "u-1", threadId: "t-1", tool: "read_file", calls: 2 }]);
+    });
+});
+
+describe("polarMonthUsage", () => {
+    it("names the month's tools by their summed calls and counts the chats that spent", async () => {
+        state.groups = [
+            [
+                {
+                    provider: "openai",
+                    model: "gpt-x",
+                    payer: "own",
+                    _count: { _all: 3 },
+                    _sum: { inputTokens: 30, outputTokens: 6, costUsd: 0.01 }
+                }
+            ],
+            []
+        ];
+        state.toolGroups = [
+            { tool: "web_search", _sum: { calls: 7 } },
+            { tool: "read_file", _sum: { calls: null } }
+        ];
+        state.threads = [{ threadId: "t-1" }, { threadId: "t-2" }];
+        const usage = await polarMonthUsage("u-1", new Date("2026-11-16T10:00:00Z"));
+        expect(usage.tools).toEqual([
+            { tool: "web_search", calls: 7 },
+            { tool: "read_file", calls: 0 }
+        ]);
+        expect(usage.chats).toBe(2);
+        expect(usage.models).toHaveLength(1);
+    });
 });
 
 describe("answerUsage", () => {

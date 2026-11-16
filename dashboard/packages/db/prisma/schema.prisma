@@ -37,6 +37,7 @@ model User {
     polarProjects     PolarProject[]
     polarCommands     PolarCommand[]
     polarUsage        PolarUsage[]
+    polarToolUses     PolarToolUse[]
     translateHistory  TranslateHistory[]
     translateGlossaries TranslateGlossary[]
     translateKeepList TranslateKeepList?
@@ -17474,6 +17475,20 @@ model PolarUsage {
     @@index([payer, createdAt])
     @@index([threadId])
     @@index([keyId, createdAt])
+}
+
+// How often one answer called one tool, for the usage screen's tool counts.
+// One row per tool per answer; read only as sums per person and month.
+model PolarToolUse {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    threadId  String?  @db.Uuid
+    tool      String
+    calls     Int      @default(1)
+    createdAt DateTime @default(now())
+
+    @@index([userId, createdAt])
 }
 
 // A picture or file somebody gave Polar. The bytes live on the storage chat
