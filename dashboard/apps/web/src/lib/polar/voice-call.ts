@@ -65,6 +65,47 @@ export const speakBodySchema = z.object({
         .default(null)
 });
 
+/** A BCP 47 language tag, as a call sends the page's. */
+const langTag = z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z]{2,3}(-[A-Za-z0-9]{1,8})*$/);
+
+/** Longest thing said in one turn of a Code call. */
+export const VOICE_DELEGATE_TEXT_MAX = 2_000;
+/** Most lines of the call's own conversation sent with a turn, and their length. */
+export const VOICE_TAIL_MOST = 12;
+export const VOICE_TAIL_LINE_MAX = 400;
+
+/** One turn of a voice call on a Code session (`/api/polar/voice/delegate`). */
+export const voiceDelegateBodySchema = z
+    .object({
+        text: z.string().trim().min(1).max(VOICE_DELEGATE_TEXT_MAX),
+        /** The session on screen. */
+        sessionId: z.string().trim().uuid(),
+        /** The call so far, `user: ...` and `assistant: ...`, oldest first. */
+        tail: z.array(z.string().max(VOICE_TAIL_LINE_MAX)).max(VOICE_TAIL_MOST).default([]),
+        /** When each session last got the full voice header in this call. */
+        explained: z
+            .record(z.string().uuid(), z.number().int().nonnegative())
+            .refine((value) => Object.keys(value).length <= 50)
+            .default({}),
+        payer: z.enum(PAYERS).nullable().default(null),
+        lang: langTag.nullable().default(null)
+    })
+    .strict();
+
+/** What a Code call's turn answers. */
+export interface VoiceDelegateAnswer {
+    /** What to say, one to three sentences. */
+    say: string;
+    /** A session to show instead of the one on screen. */
+    open: string | null;
+    /** Sessions told something, and when: their replies are read aloud. */
+    sent: Array<{ sessionId: string; at: string }>;
+    explained: Record<string, number>;
+}
+
 /** What this person can do with their voice, carried on `/api/polar/models`. */
 export interface VoiceAvailability {
     /** Speech to text: dictation, and hearing you in a call. */
@@ -193,6 +234,8 @@ export type CallEvent =
     | { type: "reply-done" }
     | { type: "approval" }
     | { type: "approved" }
+    /** Something to say that nobody asked for just now: a session's reply. */
+    | { type: "announce" }
     | { type: "mute" }
     | { type: "unmute" }
     | { type: "end" };
@@ -249,6 +292,9 @@ export function callReducer(state: CallState, event: CallEvent): CallState {
                 : state;
         case "approved":
             return state.phase === "approval" ? { ...state, phase: "thinking" } : state;
+        case "announce":
+            // Only into a quiet call: never over you, nor over another answer.
+            return state.phase === "listening" && !state.muted ? { ...state, phase: "thinking" } : state;
         case "mute":
             if (state.muted) return state;
             // Muted mid-sentence: that sentence is dropped, not half-sent.
