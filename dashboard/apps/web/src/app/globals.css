@@ -225,10 +225,17 @@ body {
  * with `data-code-theme`. Each redefines the syntax palette above and the diff
  * line tints, dark first and light for a light page, so a theme follows the
  * light/dark switch like the tokens it replaces. "polaris" redefines nothing.
+ * The hex values are the published palettes, cited per theme, as HSL.
  */
-/* nord: nordtheme.com palette (Polar Night, Frost, Aurora); light is the same hues at reading depth. */
+/*
+ * nord: nordtheme.com/docs/colors-and-palettes: comment nord3 #4c566a, keyword
+ * nord9 #81a1c1, string nord14 #a3be8c, number nord15 #b48ead, function nord8
+ * #88c0d0, type nord7 #8fbcbb, attribute nord12 #d08770, diff nord14 / nord11
+ * #bf616a. Nord publishes no light syntax palette, so light keeps each hue and
+ * saturation at reading depth (comment 46%, the rest 36%).
+ */
 [data-code-theme="nord"] {
-    --code-comment: 220 17% 46%;
+    --code-comment: 220 16% 36%;
     --code-keyword: 210 34% 63%;
     --code-string: 92 28% 65%;
     --code-number: 311 20% 63%;
@@ -238,7 +245,13 @@ body {
     --code-diff-add: hsl(92 28% 65% / 0.16);
     --code-diff-remove: hsl(354 42% 56% / 0.16);
 }
-/* gruvbox: morhetz/gruvbox palette, dark and light. */
+/*
+ * gruvbox: github.com/morhetz/gruvbox colors/gruvbox.vim: dark uses gray_245
+ * #928374 and the bright_ colors (red #fb4934, green #b8bb26, purple #d3869b,
+ * yellow #fabd2f, aqua #8ec07c, blue #83a598); light uses gray_244 #928374 and
+ * the faded_ colors (red #9d0006, green #79740e, purple #8f3f71, yellow
+ * #b57614, aqua #427b58, blue #076678).
+ */
 [data-code-theme="gruvbox"] {
     --code-comment: 30 12% 51%;
     --code-keyword: 6 96% 59%;
@@ -250,7 +263,12 @@ body {
     --code-diff-add: hsl(61 66% 44% / 0.16);
     --code-diff-remove: hsl(6 96% 59% / 0.16);
 }
-/* solarized: Solarized accents (ethanschoonover.com/solarized), shared by both modes. */
+/*
+ * solarized: ethanschoonover.com/solarized: the accents are shared by both
+ * modes (green #859900, cyan #2aa198, magenta #d33682, blue #268bd2, yellow
+ * #b58900, orange #cb4b16, red #dc322f); comments are base01 #586e75 on dark
+ * and base1 #93a1a1 on light, as the page assigns them.
+ */
 [data-code-theme="solarized"] {
     --code-comment: 194 14% 40%;
     --code-keyword: 68 100% 30%;
@@ -262,7 +280,15 @@ body {
     --code-diff-add: hsl(68 100% 30% / 0.16);
     --code-diff-remove: hsl(1 71% 52% / 0.16);
 }
-/* tokyonight: folke/tokyonight.nvim, Night and Day. */
+/*
+ * tokyonight: dark: github.com/folke/tokyonight.nvim
+ * lua/tokyonight/colors/storm.lua (comment #565f89, magenta #bb9af7, green
+ * #9ece6a, orange #ff9e64, blue #7aa2f7, blue1 #2ac3de, green1 #73daca, red
+ * #f7768e); light: github.com/enkia/tokyo-night-vscode-theme themes/tokyo-
+ * night-light-color-theme.json token colors (comment #888b94, keyword #65359d,
+ * string #385f0d, number #965027, function #2959aa, support.class #006c86,
+ * property #0f4b6e, markup.inserted #449dab, markup.deleted #914c54).
+ */
 [data-code-theme="tokyonight"] {
     --code-comment: 229 23% 44%;
     --code-keyword: 261 85% 79%;
@@ -275,7 +301,7 @@ body {
     --code-diff-remove: hsl(349 89% 72% / 0.16);
 }
 :root.light [data-code-theme="nord"] {
-    --code-comment: 220 17% 46%;
+    --code-comment: 220 16% 46%;
     --code-keyword: 210 34% 36%;
     --code-string: 92 28% 36%;
     --code-number: 311 20% 36%;
@@ -308,19 +334,19 @@ body {
     --code-diff-remove: hsl(1 71% 52% / 0.14);
 }
 :root.light [data-code-theme="tokyonight"] {
-    --code-comment: 230 25% 61%;
-    --code-keyword: 266 85% 64%;
-    --code-string: 89 34% 34%;
-    --code-number: 31 100% 35%;
-    --code-function: 215 81% 55%;
-    --code-type: 195 100% 30%;
-    --code-attr: 35 39% 40%;
-    --code-diff-add: hsl(89 34% 34% / 0.14);
-    --code-diff-remove: hsl(343 91% 56% / 0.14);
+    --code-comment: 225 5% 56%;
+    --code-keyword: 268 50% 41%;
+    --code-string: 89 76% 21%;
+    --code-number: 22 59% 37%;
+    --code-function: 218 61% 41%;
+    --code-type: 192 100% 26%;
+    --code-attr: 202 76% 25%;
+    --code-diff-add: hsl(188 43% 47% / 0.14);
+    --code-diff-remove: hsl(353 31% 43% / 0.14);
 }
 @media (prefers-color-scheme: light) {
     :root.system [data-code-theme="nord"] {
-        --code-comment: 220 17% 46%;
+        --code-comment: 220 16% 46%;
         --code-keyword: 210 34% 36%;
         --code-string: 92 28% 36%;
         --code-number: 311 20% 36%;
@@ -353,15 +379,15 @@ body {
         --code-diff-remove: hsl(1 71% 52% / 0.14);
     }
     :root.system [data-code-theme="tokyonight"] {
-        --code-comment: 230 25% 61%;
-        --code-keyword: 266 85% 64%;
-        --code-string: 89 34% 34%;
-        --code-number: 31 100% 35%;
-        --code-function: 215 81% 55%;
-        --code-type: 195 100% 30%;
-        --code-attr: 35 39% 40%;
-        --code-diff-add: hsl(89 34% 34% / 0.14);
-        --code-diff-remove: hsl(343 91% 56% / 0.14);
+        --code-comment: 225 5% 56%;
+        --code-keyword: 268 50% 41%;
+        --code-string: 89 76% 21%;
+        --code-number: 22 59% 37%;
+        --code-function: 218 61% 41%;
+        --code-type: 192 100% 26%;
+        --code-attr: 202 76% 25%;
+        --code-diff-add: hsl(188 43% 47% / 0.14);
+        --code-diff-remove: hsl(353 31% 43% / 0.14);
     }
 }
 

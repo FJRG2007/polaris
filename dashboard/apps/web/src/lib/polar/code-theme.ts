@@ -1,7 +1,9 @@
 /**
  * The color theme Polar Code paints code, diffs and terminal output in, per
  * person. OpenCode ships a list of terminal themes (`content/themes.mdx`); these
- * are the well-known editor palettes that read in both light and dark, each
+ * are four of them, at their published hex values (each cited beside its rule
+ * in `globals.css`: nordtheme.com, morhetz/gruvbox, ethanschoonover.com/solarized,
+ * folke/tokyonight.nvim and enkia/tokyo-night-vscode-theme), each
  * redefining the syntax and diff tokens of `globals.css` under
  * `[data-code-theme]`, so the highlighter and the diff view need no change.
  * "polaris" is the design system's own palette and redefines nothing.
