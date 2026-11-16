@@ -18,14 +18,15 @@ import * as pins from "@toolchain/index";
 import * as toolchain from "../toolchain";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
-import { hostname, release } from "node:os";
+import { homedir, hostname, release } from "node:os";
 import { app, safeStorage } from "electron";
 import { version } from "../../../package.json";
 import { ChatHost, type ClaudeSdk } from "./chat";
 import { Folders } from "./folders";
 import { createReadStream } from "node:fs";
 import * as workspace from "./workspace";
-import { lstat, mkdir, open, readFile, realpath, writeFile } from "node:fs/promises";
+import * as transcript from "./transcript";
+import { lstat, mkdir, open, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { RunnerConnection, type RunnerSocket, type RunnerState, type ServerFrame } from "./connection";
 import { SessionHost, type SpawnTerminal, type Terminal, type ToolchainProgressFrame } from "./sessions";
 
@@ -205,6 +206,24 @@ const workspaceDeps: workspace.WorkspaceDeps = {
     countLines
 };
 
+const transcriptDeps: transcript.TranscriptDeps = {
+    realpath: (path) => realpath(path),
+    stat: async (path) => {
+        const found = await stat(path).catch(() => null);
+        return found ? { size: found.size, file: found.isFile() } : null;
+    },
+    read: async (path, offset, length) => {
+        const handle = await open(path, "r");
+        try {
+            const buffer = Buffer.alloc(length);
+            const { bytesRead } = await handle.read(buffer, 0, length, offset);
+            return buffer.subarray(0, bytesRead);
+        } finally {
+            await handle.close();
+        }
+    }
+};
+
 class RunnerService {
     #server: string | null = null;
     #connection: RunnerConnection | null = null;
@@ -290,6 +309,7 @@ class RunnerService {
                 if (this.#sessions.handle(frame) || this.#chat.handle(frame)) return;
                 if (frame.type === "toolchain.prepare") void this.#prepareRequested(frame.requestId, frame.agents);
                 if (frame.type === "workspace.read") void this.#readWorkspace(frame);
+                if (frame.type === "transcript.read") void this.#readTranscript(frame);
             },
             onState: (state) => {
                 this.#state = state;
@@ -380,6 +400,16 @@ class RunnerService {
         this.#connection?.send({ type: "workspace.answer", requestId: frame.requestId, sessionId: frame.sessionId, answer });
     }
 
+    async #readTranscript(frame: Extract<ServerFrame, { type: "transcript.read"; }>): Promise<void> {
+        const checkout = this.#sessions.checkout(frame.sessionId);
+        const roots = transcript.transcriptRoots({ ...process.env, ...checkout?.env }, homedir());
+        const answer = await transcript.readTranscriptPiece(checkout !== null, frame.path, frame.query, roots, transcriptDeps).catch((error: unknown) => {
+            console.warn(`runner: transcript read for ${frame.sessionId} failed: ${String(error)}`);
+            return { kind: "missing" } as const;
+        });
+        this.#connection?.send({ type: "transcript.answer", requestId: frame.requestId, sessionId: frame.sessionId, answer });
+    }
+
     async #prepareRequested(requestId: string, agents: string[]): Promise<void> {
         await this.#prepare(agents, (progress) => this.#connection?.send({ type: "toolchain.progress", requestId, ...progress }));
     }
@@ -437,7 +467,7 @@ class RunnerService {
             shells: [],
             clis: ready.filter((item) => agentSet.has(item.tool)).map((item) => ({ id: item.tool, version: item.version, signedIn: "unknown" as const })),
             maxSessions: MAX_SESSIONS,
-            features: ["toolchain", "claude-chat", "workspace-read"],
+            features: ["toolchain", "claude-chat", "workspace-read", "transcript-read"],
             toolchain: ready
         };
     }

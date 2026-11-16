@@ -24,7 +24,15 @@ import {
     type HistoryRow,
     type TranscriptDecoder
 } from "./transcript-decoders";
-import { readableTranscriptPath, readTranscript } from "./session-transcript";
+import { readComputerTranscript } from "@/lib/computers/computer-workspace";
+import {
+    readableComputerTranscriptPath,
+    readableTranscriptPath,
+    readTranscript,
+    readTranscriptChunks,
+    type TranscriptAnswer,
+    type TranscriptRead
+} from "./session-transcript";
 import { claudeLineUsage, recordSessionUsage, type TurnUsage } from "./session-usage";
 import { noteCodexTurnEnd } from "./codex-turn-failures";
 
@@ -55,6 +63,30 @@ type Run = (sessionId: string, script: string) => Promise<{ code: number; output
 const runEvenIfFinished: Run = (sessionId, script) =>
     runInSession(sessionId, script, { evenIfFinished: true });
 
+/** One piece of a transcript asked of the computer a session runs on. */
+type ReadComputer = (
+    session: { readonly id: string; readonly runnerId: string },
+    path: string,
+    query: core.TranscriptQuery
+) => Promise<core.TranscriptAnswer | null>;
+
+/** A computer's answer in the shape the chunk reader takes. Pure. */
+export function computerTranscriptAnswer(answer: core.TranscriptAnswer | null): TranscriptAnswer | null {
+    switch (answer?.kind) {
+        case "chunk":
+            return { kind: "chunk", size: answer.size, bytes: Buffer.from(answer.data, "base64") };
+        case "line":
+            return { kind: "line", size: answer.size, length: answer.length };
+        case "missing":
+            return { kind: "missing" };
+        default:
+            return null;
+    }
+}
+
+/** Reads the complete lines from an offset, wherever the transcript is. */
+type Source = (from: number) => Promise<TranscriptRead>;
+
 /**
  * Read whatever the transcript gained since the last read.
  *
@@ -67,17 +99,26 @@ const runEvenIfFinished: Run = (sessionId, script) =>
  */
 export async function syncSessionHistory(
     sessionId: string,
-    { run, now = new Date(), final = false }: { run?: Run; now?: Date; final?: boolean } = {}
+    {
+        run,
+        readComputer = readComputerTranscript,
+        now = new Date(),
+        final = false
+    }: { run?: Run; readComputer?: ReadComputer; now?: Date; final?: boolean } = {}
 ): Promise<SyncOutcome> {
     const row = await prisma.agentSession.findUnique({
         where: { id: sessionId },
-        select: { cli: true, state: true, transcriptPath: true }
+        select: { cli: true, state: true, transcriptPath: true, place: true, runnerId: true }
     });
     if (!row) return "skipped";
     if (!final && core.isSessionOver(row.state as core.AgentSessionState)) return "skipped";
     const path = row.transcriptPath;
     const decode = transcriptDecoder(row.cli);
-    if (!decode || !readableTranscriptPath(path)) return "skipped";
+    // A session on the person's own computer runs no script: its transcript is
+    // asked of the desktop a chunk at a time, and may be a Windows path.
+    const computer = row.place === "computer" && row.runnerId ? { id: sessionId, runnerId: row.runnerId } : null;
+    const readable = computer ? readableComputerTranscriptPath(path) : readableTranscriptPath(path);
+    if (!decode || !readable || !path) return "skipped";
 
     const claimed = await prisma.agentSession.updateMany({
         where: final
@@ -94,10 +135,28 @@ export async function syncSessionHistory(
     if (claimed.count === 0) return "skipped";
 
     const execute = run ?? (final ? runEvenIfFinished : runInSession);
+    const source: Source = computer
+        ? async (from) => {
+              // A computer that never answered (offline, an older desktop) is
+              // a read that failed, not an empty transcript.
+              let answered = false;
+              const read = await readTranscriptChunks(
+                  from,
+                  async (query) => {
+                      const answer = computerTranscriptAnswer(await readComputer(computer, path, query));
+                      answered ||= answer !== null;
+                      return answer;
+                  },
+                  { chunkBytes: core.TRANSCRIPT_LIMITS.chunkBytes }
+              );
+              return answered ? read : { kind: "failed" };
+          }
+        : (from) =>
+              readTranscript(path, from, async (script) => (await execute(sessionId, script)).output);
     const reads = final ? MAX_READS_PER_FINAL_SYNC : MAX_READS_PER_SYNC;
     try {
         for (let attempt = 0; attempt < reads; attempt++) {
-            const step = await readOnce(sessionId, path, decode, execute, now);
+            const step = await readOnce(sessionId, path, decode, source, now);
             if (step === "missing") return attempt === 0 ? "skipped" : "synced";
             if (step === "failed") return attempt === 0 ? "unavailable" : "synced";
             if (step === "done") return "synced";
@@ -114,7 +173,7 @@ async function readOnce(
     sessionId: string,
     path: string,
     decode: TranscriptDecoder,
-    run: Run,
+    source: Source,
     now: Date
 ): Promise<"done" | "more" | "missing" | "failed"> {
     const cursor = await prisma.agentSession.findUnique({
@@ -123,10 +182,7 @@ async function readOnce(
     });
     if (!cursor) return "missing";
     const from = cursor.transcriptFile === path ? Number(cursor.transcriptOffset ?? 0n) : 0;
-    const read = await readTranscript(path, from, async (script) => {
-        const result = await run(sessionId, script);
-        return result.output;
-    });
+    const read = await source(from);
     if (read.kind !== "ok") return read.kind;
 
     const rows: HistoryRow[] = [];

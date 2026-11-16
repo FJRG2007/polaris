@@ -413,13 +413,15 @@ export function isVendorSessionId(value: unknown): value is string {
 /**
  * Where an agent says it keeps a conversation's transcript, as its hooks report it.
  *
- * Only stored, never opened or typed anywhere today, but it is still text from
- * the agent's machine: an absolute path of printable characters with no `..`
- * segment, short enough for a column, or nothing.
+ * Text from the agent's machine, opened only by readers that hold it to a
+ * shape of their own: an absolute path of printable characters with no `..`
+ * segment, short enough for a column, or nothing. A Windows path (`C:\...`)
+ * counts, since a session can run on the person's own computer.
  */
 export function isTranscriptPath(value: unknown): value is string {
-    if (typeof value !== "string" || value.length > 1024 || !value.startsWith("/")) return false;
+    if (typeof value !== "string" || value.length > 1024) return false;
+    if (!value.startsWith("/") && !/^[A-Za-z]:[\\/]/.test(value)) return false;
     // eslint-disable-next-line no-control-regex
     if (/[\u0000-\u001f\u007f]/.test(value)) return false;
-    return !value.split("/").includes("..");
+    return !value.split(/[\\/]/).includes("..");
 }

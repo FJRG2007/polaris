@@ -17,7 +17,7 @@ import { touchSession } from "@/lib/agents/session-live";
 import { listenForRunnerCommands } from "./computer-commands";
 import * as progress from "./computer-progress";
 import { publishRunnerLive } from "./computer-bus";
-import { deliverWorkspaceAnswer } from "./computer-workspace";
+import { deliverTranscriptAnswer, deliverWorkspaceAnswer } from "./computer-workspace";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { deliverChatEvent } from "@/lib/polar/claude-subscription/turns";
 import { finishSession, recordSessionEvents } from "@/lib/agents/session-service";
@@ -107,6 +107,9 @@ export async function handleRunnerMessage(
         }
         case "workspace.answer":
             deliverWorkspaceAnswer(identity.runnerId, message.requestId, message.answer);
+            return null;
+        case "transcript.answer":
+            deliverTranscriptAnswer(identity.runnerId, message.requestId, message.answer);
             return null;
         case "hook":
             if (!over) await ingestHookPayload(session, message.payload, core.parseHookSequence(message.seq));

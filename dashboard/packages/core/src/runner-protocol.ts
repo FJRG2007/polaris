@@ -164,8 +164,11 @@ export const runnerCapabilitiesSchema = frame("capabilities", {
  * - `workspace-read`: answers what a session screen reads from the checkout -
  *   its files, one file, the changes and one diff (`workspace.read`,
  *   `workspace.answer`).
+ * - `transcript-read`: reads the agent's own transcript (Claude Code's JSONL
+ *   under its projects folder) a chunk at a time from an offset, for the
+ *   session's history (`transcript.read`, `transcript.answer`).
  */
-export const RUNNER_FEATURES = ["toolchain", "claude-chat", "workspace-read"] as const;
+export const RUNNER_FEATURES = ["toolchain", "claude-chat", "workspace-read", "transcript-read"] as const;
 export type RunnerFeature = (typeof RUNNER_FEATURES)[number];
 
 /** Whether a runner's capabilities announce `feature`. */
@@ -344,6 +347,41 @@ export const runnerWorkspaceAnswerSchema = frame("workspace.answer", {
     answer: workspaceAnswerSchema
 });
 
+/** What one `transcript.answer` carries at most. */
+export const TRANSCRIPT_LIMITS = {
+    /** Raw bytes of one chunk; base64 makes it four thirds as long. */
+    chunkBytes: 96 * 1024,
+    /** The longest transcript path a runner is asked to open. */
+    pathLength: 1024
+} as const;
+
+const byteCount = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
+
+/** What a runner read of a transcript. `chunk` is the file's size and up to
+ *  `TRANSCRIPT_LIMITS.chunkBytes` from the offset asked, in base64; `line` the
+ *  length of the line starting there, newline included (0 when it has none
+ *  yet); `missing` a file that is not there, a path refused, or a session this
+ *  computer does not hold. */
+export const transcriptAnswerSchema = z.discriminatedUnion("kind", [
+    z.object({
+        kind: z.literal("chunk"),
+        size: byteCount,
+        data: z
+            .string()
+            .max(Math.ceil(TRANSCRIPT_LIMITS.chunkBytes / 3) * 4)
+            .regex(/^[A-Za-z0-9+/]*={0,2}$/)
+    }),
+    z.object({ kind: z.literal("line"), size: byteCount, length: byteCount }),
+    z.object({ kind: z.literal("missing") })
+]);
+export type TranscriptAnswer = z.infer<typeof transcriptAnswerSchema>;
+
+export const runnerTranscriptAnswerSchema = frame("transcript.answer", {
+    requestId: id,
+    sessionId: id,
+    answer: transcriptAnswerSchema
+});
+
 export const runnerErrorSchema = frame("error", {
     code: shortText(60),
     message: shortText(500),
@@ -363,6 +401,7 @@ export const runnerMessageSchema = z.discriminatedUnion("type", [
     runnerToolchainProgressSchema,
     runnerChatFrameSchema,
     runnerWorkspaceAnswerSchema,
+    runnerTranscriptAnswerSchema,
     runnerErrorSchema
 ]);
 export type RunnerMessage = z.infer<typeof runnerMessageSchema>;
@@ -523,6 +562,23 @@ export const serverWorkspaceReadSchema = frame("workspace.read", {
     query: workspaceQuerySchema
 });
 
+/** One read of a session's transcript on the computer (`transcript-read`):
+ *  a chunk from `offset`, or the length of the line starting there. */
+export const transcriptQuerySchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("chunk"), offset: byteCount }),
+    z.object({ kind: z.literal("line"), offset: byteCount })
+]);
+export type TranscriptQuery = z.infer<typeof transcriptQuerySchema>;
+
+export const serverTranscriptReadSchema = frame("transcript.read", {
+    requestId: id,
+    sessionId: id,
+    /** As the agent's hook reported it; the runner opens it only under the
+     *  agent's own transcript folder. */
+    path: z.string().min(1).max(TRANSCRIPT_LIMITS.pathLength),
+    query: transcriptQuerySchema
+});
+
 export const serverErrorSchema = frame("error", {
     code: shortText(60),
     message: shortText(500)
@@ -546,6 +602,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     serverChatCancelSchema,
     serverChatApprovalSchema,
     serverWorkspaceReadSchema,
+    serverTranscriptReadSchema,
     serverErrorSchema
 ]);
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
@@ -574,7 +631,8 @@ export const RELAYED_SERVER_TYPES = [
     "chat.turn",
     "chat.cancel",
     "chat.approval",
-    "workspace.read"
+    "workspace.read",
+    "transcript.read"
 ] as const;
 
 /** The frames a runner must have announced a feature for before it is sent
@@ -584,7 +642,8 @@ export const SERVER_FRAME_FEATURE: Partial<Record<ServerMessage["type"], RunnerF
     "chat.turn": "claude-chat",
     "chat.cancel": "claude-chat",
     "chat.approval": "claude-chat",
-    "workspace.read": "workspace-read"
+    "workspace.read": "workspace-read",
+    "transcript.read": "transcript-read"
 };
 
 /** Whether a runner speaking `range` can talk to this server. */

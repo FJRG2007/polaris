@@ -152,6 +152,23 @@ export type TranscriptRead =
     | { kind: "failed" };
 
 /**
+ * Whether a transcript path a session on the person's own computer reported
+ * is one to ask that computer for: Claude Code's JSONL under a projects
+ * folder inside a `.claude*` config home, as a POSIX or a Windows path
+ * (`C:\Users\me\.claude\projects\C--work\9f.jsonl`). The computer checks it
+ * again against its own folders before it opens anything.
+ */
+export function readableComputerTranscriptPath(path: string | null | undefined): path is string {
+    if (!core.isTranscriptPath(path) || !path.endsWith(".jsonl")) return false;
+    return /\/\.claude[^/]*\/(?:[^/]+\/)*projects\/[^/]+\/[^/]+\.jsonl$/.test(path.replace(/\\/g, "/"));
+}
+
+/** One piece of a transcript wherever it is: a chunk of up to `chunkBytes`
+ *  from `offset`, or the length of the line starting there. Null when the
+ *  answer never arrived or made no sense. */
+export type TranscriptChunkReader = (query: { kind: "chunk" | "line"; offset: number }) => Promise<TranscriptAnswer | null>;
+
+/**
  * Read the complete lines from `offset` on, through `run`.
  *
  * A file shorter than the offset was truncated or replaced, and is read again
@@ -163,10 +180,35 @@ export async function readTranscript(
     path: string,
     offset: number,
     run: (script: string) => Promise<string>,
+    options: { maxChunks?: number; maxLineBytes?: number } = {}
+): Promise<TranscriptRead> {
+    return readTranscriptChunks(
+        offset,
+        async (query) =>
+            parseTranscriptAnswer(
+                await run(
+                    query.kind === "chunk"
+                        ? transcriptChunkScript(path, query.offset)
+                        : transcriptLineScript(path, query.offset)
+                )
+            ),
+        options
+    );
+}
+
+/**
+ * Read the complete lines from `offset` on, one chunk at a time through
+ * `read`: what `readTranscript` does with scripts, for any place that hands
+ * back chunks of `chunkBytes` - a computer answers `transcript.read` with them.
+ */
+export async function readTranscriptChunks(
+    offset: number,
+    read: TranscriptChunkReader,
     {
         maxChunks = MAX_CHUNKS_PER_READ,
-        maxLineBytes = MAX_LINE_BYTES
-    }: { maxChunks?: number; maxLineBytes?: number } = {}
+        maxLineBytes = MAX_LINE_BYTES,
+        chunkBytes = TRANSCRIPT_CHUNK_BYTES
+    }: { maxChunks?: number; maxLineBytes?: number; chunkBytes?: number } = {}
 ): Promise<TranscriptRead> {
     let restarted = false;
     let skipped = 0;
@@ -178,7 +220,7 @@ export async function readTranscript(
     let size = 0;
 
     for (let chunk = 0; chunk < maxChunks; chunk++) {
-        const answer = parseTranscriptAnswer(await run(transcriptChunkScript(path, at)));
+        const answer = await read({ kind: "chunk", offset: at });
         if (!answer || answer.kind === "line") break;
         if (answer.kind === "missing") return chunk === 0 ? { kind: "missing" } : done();
         size = answer.size;
@@ -191,7 +233,7 @@ export async function readTranscript(
             chunk--;
             continue;
         }
-        const expected = Math.min(TRANSCRIPT_CHUNK_BYTES, size - at);
+        const expected = Math.min(chunkBytes, size - at);
         if (answer.bytes.length < expected || answer.bytes.length === 0) break;
         held = held.length ? Buffer.concat([held, answer.bytes]) : answer.bytes;
         at += answer.bytes.length;
@@ -206,7 +248,7 @@ export async function readTranscript(
         heldAt += from;
 
         if (held.length > maxLineBytes) {
-            const line = parseTranscriptAnswer(await run(transcriptLineScript(path, heldAt)));
+            const line = await read({ kind: "line", offset: heldAt });
             if (!line || line.kind !== "line" || line.length <= 0) break;
             // Not finished being written: wait for it rather than skip half.
             if (heldAt + line.length > line.size) break;
