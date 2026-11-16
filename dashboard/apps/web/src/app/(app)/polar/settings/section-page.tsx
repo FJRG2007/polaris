@@ -30,6 +30,8 @@ import { enigmaCatalogue } from "@/lib/polar/skills/enigma-catalogue";
 import { listSkills } from "@/lib/polar/skills/store";
 import { overrideSummaries } from "@/lib/polar/skills/override-store";
 import { PolarAgents } from "./polar-agents";
+import { PolarCustomTools } from "./polar-custom-tools";
+import * as customTools from "@/lib/polar/custom-tools/store";
 import { listAgents } from "@/lib/polar/agents/store";
 import type { AgentWork } from "@/lib/polar/agents/shared";
 import { agentOptionsFor } from "@/lib/agents/agent-readiness";
@@ -225,7 +227,14 @@ export async function SettingsSectionPage({
         case "memory":
             return <MemorySettings />;
         case "tools":
-            return <PolarToolSettings connectorsListed={connectorsListed} />;
+            return (
+                <div className="flex flex-col gap-8">
+                    <PolarToolSettings connectorsListed={connectorsListed} />
+                    <Suspense fallback={<ListSkeleton />}>
+                        <CustomToolsSection userId={user.id} readOnly={Boolean(user.viewingAs)} />
+                    </Suspense>
+                </div>
+            );
         case "permissions": {
             const account = await getTranslations("account");
             return (
@@ -321,4 +330,10 @@ export async function SettingsSectionPage({
         case "data":
             return <DataSettings />;
     }
+}
+
+/** The person's custom tools and plugins, read on the server. */
+async function CustomToolsSection({ userId, readOnly }: { userId: string; readOnly: boolean }) {
+    const [tools, plugins] = await Promise.all([customTools.listTools(userId), customTools.listPlugins(userId)]);
+    return <PolarCustomTools tools={tools} plugins={plugins} readOnly={readOnly} />;
 }

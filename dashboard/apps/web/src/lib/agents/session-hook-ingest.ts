@@ -36,6 +36,7 @@ import { handleTurnFailure, noteTurnFinished, turnAccountName } from "@/lib/agen
 import { pushPermissionRequest } from "@/lib/agents/agent-notices";
 import * as permissions from "@/lib/agents/session-permissions";
 import * as asks from "@/lib/agents/session-asks";
+import { dispatchSessionHook } from "@/lib/polar/custom-tools/plugins";
 
 /** The events after which the transcript is read. */
 const HISTORY_KINDS = new Set(["turn.end", "turn.failed", "tool.end", "tool.failed"]);
@@ -80,6 +81,8 @@ export async function ingestHookPayload(session: HookSession, payload: unknown, 
         [{ kind, detail: event.detail, subject, ...hookSubagentRef(payload) }],
         seq
     );
+    // The owner's plugins hear it after it is recorded, never in its way.
+    after(() => dispatchSessionHook(id, kind, { tool: event.subject, detail: event.detail }));
     if (kind === "turn.failed" && isSignInRefusal(event.detail)) after(() => noteRefusedSignIn(id));
     else if (kind === "turn.failed") after(() => handleTurnFailure(id, payload, seq));
     else if (kind === "turn.end")
@@ -129,6 +132,7 @@ export async function decidePermissionHook(
 
     try {
         const requestId = await permissions.openPermissionRequest(id, asked);
+        void dispatchSessionHook(id, "permission.request", { tool: asked.tool, detail: asked.detail }).catch(() => undefined);
         void pushPermissionRequest(id, requestId, asked.detail);
         const answer = await permissions.awaitPermission(requestId, id, permissions.PERMISSION_WAIT_MS, signal);
         return permissions.hookDecision(answer.status, answer.tool, answer.suggestions) as Record<string, unknown>;

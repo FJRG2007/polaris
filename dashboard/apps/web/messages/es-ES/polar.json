@@ -1038,6 +1038,91 @@
                 "solarized": "Solarized",
                 "tokyonight": "Tokyo Night"
             }
+        },
+        "customTools": {
+            "title": "Tus herramientas",
+            "intro": "Tus scripts que Polar puede usar. Se ejecutan en tu sesión de Code, nunca aquí.",
+            "add": "Añadir",
+            "empty": "Aún no hay herramientas.",
+            "enabled": "Activada",
+            "edit": "Editar",
+            "remove": "Quitar",
+            "kind": "herramienta",
+            "removeHint": "Los chats dejan de ofrecerla ya.",
+            "addTitle": "Nueva herramienta",
+            "editTitle": "Editar herramienta",
+            "sandboxHint": "Se ejecuta en tu sesión de Code más reciente.",
+            "scriptHint": "Tu script recibe las entradas como JSON por su entrada, y en un archivo cuya ruta va en una variable de entorno.",
+            "cancel": "Cancelar",
+            "save": "Guardar",
+            "fields": {
+                "name": "Nombre",
+                "description": "Descripción",
+                "runtime": "Con",
+                "permission": "Antes de usarla",
+                "timeout": "Límite (s)",
+                "input": "Entradas (JSON)",
+                "script": "Script"
+            },
+            "runtime": {
+                "shell": "Shell",
+                "node": "Node.js"
+            },
+            "permission": {
+                "ask": "Preguntar",
+                "allow": "Usar",
+                "deny": "Nunca"
+            },
+            "invalid": {
+                "name": "Minúsculas, cifras y _, empezando por letra.",
+                "description": "Hasta 1024 caracteres.",
+                "timeoutSeconds": "De 1 a 300 segundos.",
+                "input": "JSON válido con propiedades tipadas.",
+                "script": "Hasta 64 KB.",
+                "url": "Una dirección https."
+            },
+            "events": {
+                "tool_before": "Antes de tool",
+                "tool_after": "Tras una tool",
+                "session_start": "Inicia sesión",
+                "session_end": "Fin de sesión",
+                "permission_asked": "Pide permiso",
+                "message_sent": "Mensaje enviado"
+            },
+            "plugins": {
+                "title": "Plugins",
+                "intro": "Reacciona a lo que pasa en tus sesiones y chats.",
+                "add": "Añadir plugin",
+                "empty": "Sin plugins aún.",
+                "kind": "plugin",
+                "addTitle": "Nuevo plugin",
+                "editTitle": "Editar plugin",
+                "hint": "Un plugin nunca cambia lo que hace el agente. Si falla, se omite.",
+                "events": "Cuando",
+                "action": "Luego",
+                "webhook": "Enviar a un webhook",
+                "tool": "Usar una herramienta",
+                "url": "URL del webhook",
+                "noRunnable": "Pon una herramienta en Usar: un plugin no puede preguntar."
+            },
+            "project": {
+                "title": "Del repositorio",
+                "intro": "Herramientas que un repositorio define en .polaris/tools o .opencode/tool. Solo se usan tras aprobar esta versión.",
+                "review": "Revisar",
+                "none": "Tu sesión de Code más reciente no tiene herramientas.",
+                "refused": "No se pudo leer: {files}",
+                "approved": "Aprobadas para esta versión.",
+                "approve": "Aprobar"
+            },
+            "errors": {
+                "noAccess": "Polar no está disponible para ti.",
+                "viewingAs": "Estás viendo como otra persona.",
+                "invalid": "Revisa los campos marcados.",
+                "taken": "Ya tienes una herramienta con ese nombre.",
+                "too_many": "Has llegado al límite.",
+                "not_found": "Ya no existe.",
+                "changed": "Las herramientas del repo cambiaron. Revísalas otra vez."
+            }
         }
     },
     "temporary": {

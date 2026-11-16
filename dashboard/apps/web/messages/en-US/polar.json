@@ -1038,6 +1038,91 @@
                 "solarized": "Solarized",
                 "tokyonight": "Tokyo Night"
             }
+        },
+        "customTools": {
+            "title": "Your custom tools",
+            "intro": "Your own scripts Polar can call. They run in your Code session, never on this server.",
+            "add": "Add tool",
+            "empty": "No custom tools yet.",
+            "enabled": "Enabled",
+            "edit": "Edit",
+            "remove": "Remove",
+            "kind": "custom tool",
+            "removeHint": "Chats stop offering it at once.",
+            "addTitle": "New custom tool",
+            "editTitle": "Edit custom tool",
+            "sandboxHint": "It runs in your newest Code session, from its checkout.",
+            "scriptHint": "Your script gets the inputs as JSON on its input, and as a file whose path is in an environment variable.",
+            "cancel": "Cancel",
+            "save": "Save",
+            "fields": {
+                "name": "Name",
+                "description": "Description",
+                "runtime": "Runs with",
+                "permission": "Before it runs",
+                "timeout": "Time limit (s)",
+                "input": "Inputs (JSON)",
+                "script": "Script"
+            },
+            "runtime": {
+                "shell": "Shell",
+                "node": "Node.js"
+            },
+            "permission": {
+                "ask": "Ask me",
+                "allow": "Run",
+                "deny": "Never"
+            },
+            "invalid": {
+                "name": "Lowercase letters, digits and _, starting with a letter.",
+                "description": "Up to 1024 characters.",
+                "timeoutSeconds": "From 1 to 300 seconds.",
+                "input": "Inputs must be valid JSON with typed properties.",
+                "script": "Up to 64 KB.",
+                "url": "An https address."
+            },
+            "events": {
+                "tool_before": "Before a tool",
+                "tool_after": "After a tool",
+                "session_start": "Session starts",
+                "session_end": "Session ends",
+                "permission_asked": "Permission asked",
+                "message_sent": "Message sent"
+            },
+            "plugins": {
+                "title": "Plugins",
+                "intro": "React to what happens in your sessions and chats.",
+                "add": "Add plugin",
+                "empty": "No plugins yet.",
+                "kind": "plugin",
+                "addTitle": "New plugin",
+                "editTitle": "Edit plugin",
+                "hint": "A plugin never changes what the agent does. A failed one is skipped.",
+                "events": "When",
+                "action": "Then",
+                "webhook": "Send to a webhook",
+                "tool": "Run a custom tool",
+                "url": "Webhook address",
+                "noRunnable": "Set a custom tool to Run first: a plugin has nobody to ask."
+            },
+            "project": {
+                "title": "Repository tools",
+                "intro": "Tools a repository defines in .polaris/tools or .opencode/tool. They run only after you approve this version of them.",
+                "review": "Review",
+                "none": "Your newest Code session has no repository tools.",
+                "refused": "Could not read: {files}",
+                "approved": "Approved for this version.",
+                "approve": "Approve"
+            },
+            "errors": {
+                "noAccess": "Polar is not available to you.",
+                "viewingAs": "You are viewing as someone else.",
+                "invalid": "Check the highlighted fields.",
+                "taken": "You already have a tool with that name.",
+                "too_many": "You have reached the limit.",
+                "not_found": "It no longer exists.",
+                "changed": "The repository's tools changed. Review them again."
+            }
         }
     },
     "temporary": {
