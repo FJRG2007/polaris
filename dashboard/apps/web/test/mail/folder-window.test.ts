@@ -32,11 +32,14 @@ describe("dropping a row", () => {
     });
 
     it("asks the server a second time before deleting", async () => {
-        const source = await sync;
+        const source = await readFile(`${SRC}lib/mailbox/reconcile-deletions.ts`, "utf8");
         const reconcile = source.slice(source.indexOf("async function reconcileDeletions"));
         const body = reconcile.slice(0, reconcile.indexOf("\n}\n"));
-        expect(body.indexOf("client.fetch(")).toBeGreaterThan(-1);
-        expect(body.indexOf("client.fetch(")).toBeLessThan(body.indexOf("deleteMany"));
+        expect(body.indexOf("goneFromPage(")).toBeGreaterThan(-1);
+        expect(body.indexOf("goneFromPage(")).toBeLessThan(body.indexOf("deleteMany"));
+        const page = source.slice(source.indexOf("async function goneFromPage"));
+        expect(page.indexOf("client.search(")).toBeLessThan(page.indexOf("client.fetch("));
+        expect(page.indexOf("client.fetch(")).toBeLessThan(page.indexOf("confirmedGone("));
     });
 });
 

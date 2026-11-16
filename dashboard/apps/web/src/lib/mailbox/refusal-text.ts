@@ -57,6 +57,16 @@ export const MAIL_REFUSALS: Readonly<Record<string, MailKey>> = {
     "That folder has folders inside it. Delete those first.": "refusals.folderHasChildren",
     "The mail server refused this account's credentials.": "refusals.credentialsRefused",
     "Polaris could not reach this mail server.": "refusals.serverUnreachable",
+    // A move or delete the server refused, by its RFC 5530 reason (`action-refusal`).
+    "The mail server refused: this mailbox is full. Nothing was moved.": "refusals.actionQuota",
+    "The mail server refused: that folder is not there any more. Nothing was moved.":
+        "refusals.actionFolderGone",
+    "The mail server refused: this mailbox does not allow changes. Nothing was moved.":
+        "refusals.actionReadOnly",
+    "The mail server refused: too many at once. Try fewer messages.": "refusals.actionLimit",
+    "The mail server refused to do that. Nothing was moved.": "refusals.actionServer",
+    "This mailbox is not signed in, so its mail cannot be changed. Reconnect it from its notice.":
+        "refusals.signedOut",
     "This mailbox can already send as that address.": "refusals.alreadySendsAs",
     "That address is not on this mailbox.": "refusals.addressNotHere",
     "That message is not yours.": "refusals.messageNotYours",

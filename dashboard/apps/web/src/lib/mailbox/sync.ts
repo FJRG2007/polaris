@@ -38,7 +38,8 @@ import { heldFlags } from "./pending-flags";
 import { MailAuthError } from "./credentials";
 import { addressesFrom, asJson } from "./json";
 import { recordAccountAttempt, recordAccountState } from "./accounts";
-import { confirmedGone, missingFromWindow, nextCursor } from "./folder-window";
+import { missingFromWindow, nextCursor } from "./folder-window";
+import { reconcileDeletions } from "./reconcile-deletions";
 import { getSetting } from "@/lib/setting-store";
 import { recordCredentialRefusal } from "./refused";
 import { recordSubscription } from "./subscriptions";
@@ -1606,55 +1607,6 @@ export async function reconcileFlags(
 /** Remember that a folder keeps keywords, so the next pass believes its silence. */
 async function learnKeywords(folderId: string): Promise<void> {
     await prisma.mailFolder.update({ where: { id: folderId }, data: { keywords: true } });
-}
-
-/**
- * Messages that are no longer there.
- *
- * A uid search over the folder is one command and answers with numbers only, so
- * it is cheap enough to run every pass. Without it a message deleted from a
- * phone stays in this list for ever, which is the single most common complaint
- * about a mail client that caches.
- */
-async function reconcileDeletions(client: ImapFlow, folder: FolderRow): Promise<void> {
-    const held = await prisma.mailMessage.findMany({
-        where: { folderId: folder.id },
-        select: { id: true, uid: true },
-        orderBy: { uid: "desc" },
-        take: WINDOW
-    });
-    if (held.length === 0) return;
-
-    const first = held[0];
-    if (!first) return;
-    const lowest = held.reduce((low, row) => (row.uid < low ? row.uid : low), first.uid);
-    let present: number[] | false;
-    try {
-        present = await client.search({ uid: `${lowest}:*` }, { uid: true });
-    } catch {
-        return;
-    }
-    if (present === false) return;
-    const alive = new Set(present);
-    const candidates = held.filter((row) => !alive.has(Number(row.uid)));
-    if (candidates.length === 0) return;
-
-    // A second opinion before anything is dropped: a fetch of exactly those
-    // uids, a different command from the search. A search answered short would
-    // otherwise empty the cache, and a dropped row is behind the cursor - no
-    // later pass fetches it again.
-    const stillThere = new Set<number>();
-    try {
-        const uids = candidates.map((row) => Number(row.uid)).join(",");
-        for await (const message of client.fetch(uids, { uid: true }, { uid: true })) {
-            stillThere.add(message.uid);
-        }
-    } catch {
-        return;
-    }
-    const gone = confirmedGone(candidates, stillThere).map((row) => row.id);
-    if (gone.length === 0) return;
-    await prisma.mailMessage.deleteMany({ where: { id: { in: gone } } });
 }
 
 /**

@@ -48,6 +48,7 @@ import * as templates from "@/lib/mailbox/templates";
 import { scopeOrgIdFor } from "@/lib/workspace-scope";
 import * as attachFrom from "@/lib/mailbox/attach-from";
 import { MailAuthError } from "@/lib/mailbox/credentials";
+import { MailAccountSignedOut, MailActionRefused } from "@/lib/mailbox/action-refusal";
 import { discoverMailbox } from "@/lib/mailbox/autoconfig";
 import { emptyEveryFolderOfRole } from "@/lib/mailbox/trash";
 import * as subscriptions from "@/lib/mailbox/subscriptions";
@@ -75,6 +76,16 @@ async function failure(
 }> {
     const t = await getTranslations("mail");
     const said = (error: Error) => mailRefusalText(t, error.message);
+    // Every refusal leaves a line in the server log, the expected ones included:
+    // a mailbox that would not delete anything and said so only on somebody's
+    // screen left nothing for whoever looks into it afterwards. The class and
+    // the English sentence only - never a subject, an address or a body.
+    if (caught instanceof Error && !(caught instanceof MailAccessError)) {
+        console.warn("polaris: a mail action was refused:", caught.name, caught.message);
+    }
+    if (caught instanceof MailActionRefused || caught instanceof MailAccountSignedOut) {
+        return { error: said(caught) };
+    }
     // The one refusal a screen answers with a question rather than a sentence:
     // this mailbox has no folder for what was asked, and its owner can say which
     // of theirs it is. Carried out structured so the dialog knows what to ask.

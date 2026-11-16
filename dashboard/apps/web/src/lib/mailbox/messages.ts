@@ -32,6 +32,7 @@ import { folderForRole } from "./folder-roles";
 import { recordSubscription } from "./subscriptions";
 import { catchUpFolder, refreshThreads } from "./sync";
 import { forgetTrashOrigins, rememberTrashOrigins, restoreFromTrash } from "./trash";
+import * as refusal from "./action-refusal";
 import { withImap, type MailConnectionSource } from "./imap";
 import { sameFolderSiblings } from "./folder-scope";
 import { addDelta, nudgeFolderUnread, unseenByFolder } from "./folder-counts";
@@ -331,7 +332,7 @@ export async function actOnMessages(
             options.scope === "folder"
                 ? (await widenToFolder(userId, messageIds)).map((message) => message.id)
                 : messageIds;
-        return await restoreFromTrash(userId, named);
+        return await restoreFromTrash(userId, named, { strict: options.strict });
     }
 
     const messages =
@@ -383,9 +384,13 @@ export async function actOnMessages(
      *  Answering "done" over them is what made a deleted message come back: the
      *  row left the screen, the server still had it, and the next list put it
      *  back. */
-    const refused: string[] = [];
+    const refused: refusal.MailRefusalCode[] = [];
     for (const [accountId, mine] of groupByAccount(messages)) {
         const account = await ownedAccount(userId, accountId);
+        // Its sign-in is refused, so the server would refuse this too - and a
+        // list still showing that mailbox's last copy is exactly where somebody
+        // presses Delete. Said before a connection is tried, not after.
+        refusal.refuseWhileSignedOut(account);
         /** Where the messages went, so it can be read again before anybody looks
          *  for them there. */
         const landed = new Set<string>();
@@ -403,6 +408,7 @@ export async function actOnMessages(
                 const lock = await client.getMailboxLock(folder.path);
                 let target = "";
                 try {
+                    refusal.forgetRefusal(client);
                     const outcome = await applyOne(
                         client,
                         account.id,
@@ -414,7 +420,7 @@ export async function actOnMessages(
                     );
                     done += outcome.done;
                     target = outcome.movedTo;
-                    if (outcome.refused) refused.push(folder.path);
+                    if (outcome.refused) refused.push(refusal.lastRefusal(client));
                     // Unread mail leaving is unread mail the folder no longer
                     // has, whether it went to Trash or was destroyed outright.
                     addDelta(deltas, folderId, -outcome.unseen);
@@ -446,7 +452,7 @@ export async function actOnMessages(
         await refreshThreadsFor(messages.map((message) => message.accountId));
     }
     if (options.strict && refused.length > 0) {
-        throw new Error(`the mail server refused to ${action} messages in ${refused.join(", ")}`);
+        throw new refusal.MailActionRefused(refused[0] ?? "server");
     }
     return done;
 }
@@ -737,11 +743,12 @@ export async function moveMessages(
     if (messages.length === 0) return 0;
 
     const account = await ownedAccount(userId, destination.accountId);
+    refusal.refuseWhileSignedOut(account);
     let moved = 0;
     /** Folders whose server refused the move. Answered as an error rather than
      *  as done: the screen has already taken the rows away, and a refusal it is
      *  not told about is mail that comes back on the next list. */
-    const refused: string[] = [];
+    const refused: refusal.MailRefusalCode[] = [];
     /** What the move owes each folder's unread number - see `folder-counts`. */
     const deltas = new Map<string, number>();
     await withImap(account, async (client) => {
@@ -754,13 +761,14 @@ export async function moveMessages(
             if (!source) continue;
             const lock = await client.getMailboxLock(source.path);
             try {
+                refusal.forgetRefusal(client);
                 const ok = await client.messageMove(
                     rows.map((row) => Number(row.uid)),
                     destination.path,
                     { uid: true }
                 );
                 if (!ok) {
-                    refused.push(source.path);
+                    refused.push(refusal.lastRefusal(client));
                     continue;
                 }
                 await prisma.mailMessage.deleteMany({
@@ -778,7 +786,7 @@ export async function moveMessages(
     await refreshThreads(destination.accountId);
     publishMail({ accountId: destination.accountId, kind: "messages", actorId: userId });
     if (options.strict && refused.length > 0) {
-        throw new Error(`the mail server refused to move messages in ${refused.join(", ")}`);
+        throw new refusal.MailActionRefused(refused[0] ?? "server");
     }
     return moved;
 }

@@ -27,6 +27,7 @@ import { publishMail } from "./live";
 import { catchUpFolder } from "./sync";
 import { refreshThreads } from "./sync";
 import { findFolderForRole } from "./folder-roles";
+import * as refusal from "./action-refusal";
 import { ACCOUNT_COLUMNS, MailAccessError, ownedAccount, ownedMessages } from "./access";
 import { addDelta, nudgeFolderUnread, unseenByFolder } from "./folder-counts";
 
@@ -86,15 +87,22 @@ export async function forgetTrashOrigins(
  */
 export async function restoreFromTrash(
     userId: string,
-    messageIds: readonly string[]
+    messageIds: readonly string[],
+    /** `strict` throws when the server refused any of them - see
+     *  `MailActionOptions` in `messages.ts`. */
+    options: { readonly strict?: boolean } = {}
 ): Promise<number> {
     const messages = await ownedMessages(userId, messageIds);
     if (messages.length === 0) return 0;
 
     let moved = 0;
+    /** What each refused move was refused with. A refusal answered as done is a
+     *  message that stays in the trash after somebody put it back. */
+    const refused: refusal.MailRefusalCode[] = [];
     for (const accountId of new Set(messages.map((message) => message.accountId))) {
         const mine = messages.filter((message) => message.accountId === accountId);
         const account = await ownedAccount(userId, accountId);
+        refusal.refuseWhileSignedOut(account);
         const origins = await prisma.mailTrashOrigin.findMany({
             where: {
                 accountId,
@@ -144,12 +152,16 @@ export async function restoreFromTrash(
                         const going = here.filter(
                             (message) => targets.get(message.id)?.path === path
                         );
+                        refusal.forgetRefusal(client);
                         const ok = await client.messageMove(
                             going.map((message) => Number(message.uid)),
                             path,
                             { uid: true }
                         );
-                        if (!ok) continue;
+                        if (!ok) {
+                            refused.push(refusal.lastRefusal(client));
+                            continue;
+                        }
                         // The row goes with the move: the destination decides the
                         // uid, and a guessed one points at somebody else's mail.
                         await prisma.mailMessage.deleteMany({
@@ -175,9 +187,12 @@ export async function restoreFromTrash(
             }
         });
 
+        // Only for what actually left: a refused one is still in the trash, and
+        // its note is what puts it back in the right folder on the next try.
+        const stayed = refused.length > 0 ? await stillHere(accountId, mine) : new Set<string>();
         await forgetTrashOrigins(
             accountId,
-            mine.map((message) => message.messageId)
+            mine.map((message) => message.messageId).filter((id) => !stayed.has(id))
         );
         await nudgeFolderUnread(deltas);
         await refreshThreads(accountId);
@@ -187,7 +202,23 @@ export async function restoreFromTrash(
         // so nothing anybody clicks is queued behind it.
         settleLater(userId, accountId, [...landed]);
     }
+    if (options.strict && refused.length > 0) {
+        throw new refusal.MailActionRefused(refused[0] ?? "server");
+    }
     return moved;
+}
+
+/** The Message-Ids of these messages whose rows are still in place - the ones a
+ *  refused move left where they were. */
+async function stillHere(
+    accountId: string,
+    messages: readonly { id: string; messageId: string }[]
+): Promise<Set<string>> {
+    const rows = await prisma.mailMessage.findMany({
+        where: { accountId, id: { in: messages.map((message) => message.id) } },
+        select: { messageId: true }
+    });
+    return new Set(rows.map((row) => row.messageId));
 }
 
 /**

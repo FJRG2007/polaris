@@ -19,6 +19,7 @@
 
 import { ImapFlow } from "imapflow";
 import { isCredentialRefusal } from "./refusals";
+import { hearRefusal } from "./action-refusal";
 import { mailCredential, MailAuthError, type MailCredentialSource } from "./credentials";
 
 /** Raised when the server could not be reached or would not finish a command.
@@ -79,6 +80,25 @@ const IMAP_LOGGER = {
     warn: (entry: unknown) => console.warn("imap:", describeImapEntry(entry)),
     error: (entry: unknown) => console.warn("imap:", describeImapEntry(entry))
 };
+
+/** The same logger, also keeping what a failed command was refused with on the
+ *  connection, so the action that got `false` back can say why. */
+function heardBy(listener: { client: object | null }): typeof IMAP_LOGGER {
+    const hear = (entry: unknown): void => {
+        if (listener.client) hearRefusal(listener.client, entry);
+    };
+    return {
+        ...IMAP_LOGGER,
+        warn: (entry: unknown) => {
+            IMAP_LOGGER.warn(entry);
+            hear(entry);
+        },
+        error: (entry: unknown) => {
+            IMAP_LOGGER.error(entry);
+            hear(entry);
+        }
+    };
+}
 
 export function describeImapEntry(entry: unknown): string {
     if (!entry || typeof entry !== "object") return String(entry);
@@ -160,6 +180,9 @@ export async function openImap(
     tuning: { readonly maxIdleTime?: number } = {}
 ): Promise<ImapFlow> {
     const credential = await mailCredential(account);
+    // The logger is built before the client it logs for, so it reports to a
+    // holder the client is put in once it exists - see `action-refusal`.
+    const listener: { client: object | null } = { client: null };
     const client = new ImapFlow({
         host: account.imapHost,
         port: account.imapPort,
@@ -176,7 +199,7 @@ export async function openImap(
         // The inbox listener issues its IDLE itself.
         disableAutoIdle: true,
         ...(tuning.maxIdleTime ? { maxIdleTime: tuning.maxIdleTime } : {}),
-        logger: IMAP_LOGGER,
+        logger: heardBy(listener),
         connectionTimeout: CONNECT_TIMEOUT_MS,
         greetingTimeout: GREETING_TIMEOUT_MS,
         socketTimeout: SOCKET_TIMEOUT_MS,
@@ -185,6 +208,7 @@ export async function openImap(
         // never widened to a host that is not a loopback address.
         ...(isLoopback(account.imapHost) ? { tls: { rejectUnauthorized: false } } : {})
     });
+    listener.client = client;
     client.on("error", reportImapError);
 
     try {
