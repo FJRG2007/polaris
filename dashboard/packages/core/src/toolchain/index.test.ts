@@ -74,7 +74,7 @@ describe("toolchainEnv", () => {
             HOME: "C:\\Users\\a"
         });
         expect(Object.keys(env).filter((k) => k.toUpperCase() === "PATH")).toEqual(["Path"]);
-        expect(env.Path.split(";").slice(0, 7)).toEqual([
+        expect((env.Path ?? "").split(";").slice(0, 7)).toEqual([
             `${root}\\git\\2.56.0.4\\cmd`,
             `${root}\\node\\24.22.2`,
             `${root}\\gh\\2.103.3\\bin`,
@@ -91,8 +91,8 @@ describe("toolchainEnv", () => {
     it("points the portable git at its own pieces on Linux, and works with no PATH at all", () => {
         const downloads = toolchain.resolveToolchain("linux", "arm64", []);
         const env = toolchain.toolchainEnv("/home/a/.config/Polaris/toolchain/", "linux", downloads, {});
-        expect(env.PATH.split(":")[0]).toBe("/home/a/.config/Polaris/toolchain/git/2.56.0-2/bin");
-        expect(env.PATH.split(":").at(-1)).toBe("/home/a/.config/Polaris/toolchain/npm-global/bin");
+        expect((env.PATH ?? "").split(":")[0]).toBe("/home/a/.config/Polaris/toolchain/git/2.56.0-2/bin");
+        expect((env.PATH ?? "").split(":").at(-1)).toBe("/home/a/.config/Polaris/toolchain/npm-global/bin");
         expect(env.GIT_EXEC_PATH).toBe("/home/a/.config/Polaris/toolchain/git/2.56.0-2/libexec/git-core");
         expect(env.GIT_SSL_CAINFO).toBe("/home/a/.config/Polaris/toolchain/git/2.56.0-2/ssl/cacert.pem");
     });
@@ -102,8 +102,8 @@ describe("toolchainEnv", () => {
         const root = "/Users/a/Library/Application Support/Polaris/toolchain";
         const ours = `${root}/node/24.22.2/bin`;
         const env = toolchain.toolchainEnv(root, "darwin", downloads, { PATH: `/usr/bin:${ours}`, GIT_CONFIG_SYSTEM: "/etc/mine" });
-        expect(env.PATH.split(":").filter((d) => d === ours)).toHaveLength(1);
-        expect(env.PATH.split(":").at(-1)).toBe("/usr/bin");
+        expect((env.PATH ?? "").split(":").filter((d) => d === ours)).toHaveLength(1);
+        expect((env.PATH ?? "").split(":").at(-1)).toBe("/usr/bin");
         expect(env.GIT_CONFIG_SYSTEM).toBe("/etc/mine");
         expect(env.GIT_SSL_CAINFO).toBeUndefined();
     });
