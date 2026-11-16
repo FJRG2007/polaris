@@ -95,7 +95,7 @@ export function Annotations({
                     {shown.map((note) => (
                         <li
                             key={note.id}
-                            className="flex min-w-0 max-w-full items-center gap-2 rounded-md border border-warning/40 bg-warning/5 px-2 py-1 text-xs"
+                            className="flex min-w-0 max-w-full items-center gap-2 rounded-md border border-warning-edge bg-warning-soft px-2 py-1 text-xs"
                         >
                             <span className="shrink-0 text-muted-foreground">{format.dateTime(note.at)}</span>
                             <span className="min-w-0 truncate" title={note.text}>

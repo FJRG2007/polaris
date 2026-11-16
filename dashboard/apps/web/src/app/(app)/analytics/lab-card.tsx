@@ -212,11 +212,11 @@ export function LabCard({ scope, siteId, canEdit }: { scope: AnalyticsScope; sit
                                 <p className="pb-1 text-xs font-medium text-muted-foreground">{t("lab.history")}</p>
                                 <table className="w-full min-w-[32rem] text-sm">
                                     <thead>
-                                        <tr className="text-left text-xs text-muted-foreground">
-                                            <th className="py-1 pr-3 font-medium">{t("lab.when")}</th>
-                                            <th className="py-1 pr-3 font-medium">{t("lab.device")}</th>
+                                        <tr className="text-start text-xs text-muted-foreground">
+                                            <th className="py-1 pe-3 font-medium">{t("lab.when")}</th>
+                                            <th className="py-1 pe-3 font-medium">{t("lab.device")}</th>
                                             {SCORES.map((key) => (
-                                                <th key={key} className="py-1 pr-3 text-right font-medium">
+                                                <th key={key} className="py-1 pe-3 text-end font-medium">
                                                     {t(`lab.score.${key}`)}
                                                 </th>
                                             ))}
@@ -225,17 +225,17 @@ export function LabCard({ scope, siteId, canEdit }: { scope: AnalyticsScope; sit
                                     <tbody>
                                         {history.map((run) => (
                                             <tr key={run.id} className="border-t border-border">
-                                                <td className="py-1.5 pr-3 whitespace-nowrap" title={t(`lab.trigger.${run.triggeredBy}`)}>
+                                                <td className="py-1.5 pe-3 whitespace-nowrap" title={t(`lab.trigger.${run.triggeredBy}`)}>
                                                     {format.dateTime(run.finishedAt ?? run.createdAt)}
                                                 </td>
-                                                <td className="py-1.5 pr-3">{t(`lab.strategy.${run.strategy}`)}</td>
+                                                <td className="py-1.5 pe-3">{t(`lab.strategy.${run.strategy}`)}</td>
                                                 {run.status === "error" ? (
-                                                    <td colSpan={SCORES.length} className="py-1.5 text-right text-xs text-destructive">
+                                                    <td colSpan={SCORES.length} className="py-1.5 text-end text-xs text-destructive">
                                                         {t(`lab.error.${run.error ?? "failed"}`)}
                                                     </td>
                                                 ) : (
                                                     SCORES.map((key) => (
-                                                        <td key={key} className={cn("py-1.5 pr-3 text-right tabular-nums", scoreInk(run[key]))}>
+                                                        <td key={key} className={cn("py-1.5 pe-3 text-end tabular-nums", scoreInk(run[key]))}>
                                                             {run[key] ?? "-"}
                                                         </td>
                                                     ))
