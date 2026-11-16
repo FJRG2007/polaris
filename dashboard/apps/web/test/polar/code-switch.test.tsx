@@ -3,7 +3,8 @@
  * The Chat / Code switch: Code is switched off, with the reason, for an account
  * that cannot open Agents; a reader follows sessions without starting one; and
  * sending a task starts it through Polar's Code start route, from Chat's own
- * composer, and opens it as a thread.
+ * composer, and opens it as a thread; a voice call opens only on a live session
+ * the person may steer.
  */
 
 import type { ReactNode } from "react";
@@ -57,6 +58,12 @@ vi.mock("next/link", () => ({
             {children}
         </a>
     )
+}));
+
+// The call records from the microphone, which jsdom has none of.
+vi.mock("@/app/(app)/chat/voice-recorder", async (original) => ({
+    ...(await original<Record<string, unknown>>()),
+    canRecord: () => true
 }));
 
 const { codeBlocks, PolarCodeView, PolarModeSwitch, titleFromPrompt, usePolarCode } =
@@ -563,5 +570,83 @@ describe("starting from an issue or a skill", () => {
             issueNumber: 42,
             skill: "tdd"
         });
+    });
+});
+
+describe("the voice call on a Code session", () => {
+    const ROW = {
+        id: "33333333-3333-4333-8333-333333333333",
+        title: "Fix the login form",
+        repo: "acme/web",
+        branch: "",
+        state: "idle",
+        stateLabel: "Waiting for you",
+        live: true,
+        createdAt: "2026-01-01T00:00:00.000Z"
+    };
+    const VIEW = {
+        id: ROW.id,
+        cli: "claude",
+        state: "idle",
+        repoFullName: "acme/web",
+        permissionMode: null,
+        useMachineLogin: true,
+        runnerId: null,
+        hostId: null
+    };
+
+    function serve(session: typeof ROW, canManage: boolean) {
+        thread = { session, entries: [], error: null, view: VIEW, canManage, permission: null };
+        vi.mocked(fetch).mockImplementation(async (url) => {
+            if (String(url).startsWith("/api/polar/code/thread")) return answer(thread);
+            if (String(url).startsWith("/api/polar/code/choices")) return answer(CHOICES);
+            if (String(url).startsWith("/api/polar/code?") || String(url) === "/api/polar/code")
+                return answer({ access, sessions: [session], next: null });
+            return answer({});
+        });
+    }
+
+    async function openSession() {
+        window.localStorage.setItem("polar.mode", "code");
+        render(<Harness />, { wrapper: MessagesWrapper });
+        fireEvent.click(await screen.findByRole("button", { name: /Fix the login form/ }));
+    }
+
+    it("opens the call on a live session the person may steer", async () => {
+        access = "manage";
+        serve(ROW, true);
+        // A microphone still being asked for: the call stays on "listening".
+        Object.defineProperty(navigator, "mediaDevices", {
+            configurable: true,
+            value: { getUserMedia: () => new Promise(() => undefined) }
+        });
+        await openSession();
+        const voice = await screen.findByRole("button", { name: "Voice mode" });
+        await waitFor(() => expect(voice.getAttribute("aria-disabled")).not.toBe("true"));
+        fireEvent.click(voice);
+        // The call's own controls, above the composer; the button is spent while it is open.
+        expect(await screen.findByRole("button", { name: "End call" })).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "End call" }));
+        await waitFor(() => expect(screen.queryByRole("button", { name: "End call" })).toBeNull());
+    });
+
+    it("refuses the call on a session that has stopped", async () => {
+        access = "manage";
+        serve({ ...ROW, state: "stopped", stateLabel: "Stopped", live: false }, true);
+        await openSession();
+        expect(await screen.findByText(/This session has ended/)).toBeTruthy();
+        // An ended session takes no more messages, spoken or typed.
+        expect(screen.queryByRole("button", { name: "Voice mode" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "End call" })).toBeNull();
+    });
+
+    it("refuses the call to somebody who may only read the session", async () => {
+        access = "read";
+        serve(ROW, false);
+        await openSession();
+        await screen.findByRole("button", { name: "Download transcript" });
+        expect(screen.queryByRole("button", { name: "End call" })).toBeNull();
+        // A reader has no composer, so nothing to call from.
+        expect(screen.queryByRole("button", { name: "Voice mode" })).toBeNull();
     });
 });
