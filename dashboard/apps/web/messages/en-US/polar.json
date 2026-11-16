@@ -532,7 +532,20 @@
         "data": {
             "title": "Your chats",
             "intro": "Download every saved chat as Markdown and JSON in one zip.",
-            "exportAll": "Export all chats"
+            "exportAll": "Export all chats",
+            "import": "Import a chat",
+            "importing": "Importing...",
+            "importHint": "Pick a chat's .json file from an export. Only the words come over; nothing in it runs.",
+            "importedTitle": "Imported chat",
+            "importErrors": {
+                "large": "That file is larger than 8 MB.",
+                "json": "That file is not JSON.",
+                "version": "That is not a Polar chat export.",
+                "shape": "That export is damaged or from a newer Polaris.",
+                "empty": "That export has no messages to bring over.",
+                "rate_limited": "Too many imports. Try again in a few minutes.",
+                "failed": "The chat could not be imported. Try again."
+            }
         },
         "display": {
             "title": "Chat display",

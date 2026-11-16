@@ -7,7 +7,8 @@
  * change shows at once and is put back if the server refuses it.
  */
 
-import { Check, ChevronRight, Download, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Check, ChevronRight, Download, Pencil, Plus, Search, Trash2, Upload, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { settingsSection } from "@/lib/polar/settings-path";
 import { MCP_CATEGORIES, type McpCategory } from "@/lib/mcp/scope-table";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
@@ -396,12 +397,43 @@ export function MemorySettings() {
     );
 }
 
-/** Everything the person has with Polar, as a download. */
+/** The largest export file the import sends; the server holds the same cap. */
+const IMPORT_MAX_BYTES = 8 * 1024 * 1024;
+
+/** Everything the person has with Polar, as a download, and a chat export
+ *  read back in as a new chat. */
 export function DataSettings() {
     const t = useTranslations("polar");
+    const router = useRouter();
+    const picker = useRef<HTMLInputElement>(null);
+    const [importing, setImporting] = useState(false);
+    const [problem, setProblem] = useState<string | null>(null);
+
+    const importFile = async (file: File) => {
+        setProblem(null);
+        if (file.size > IMPORT_MAX_BYTES) return setProblem(t("settings.data.importErrors.large"));
+        setImporting(true);
+        try {
+            const response = await fetch("/api/polar/import", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: await file.text()
+            });
+            const answer = (await response.json().catch(() => null)) as { id?: string; error?: string } | null;
+            if (response.ok && answer?.id) return router.push(`/polar?thread=${encodeURIComponent(answer.id)}`);
+            const known = ["large", "json", "version", "shape", "empty", "rate_limited"] as const;
+            const said = known.find((reason) => reason === answer?.error) ?? "failed";
+            setProblem(t(`settings.data.importErrors.${said}`));
+        } catch {
+            setProblem(t("settings.data.importErrors.failed"));
+        } finally {
+            setImporting(false);
+        }
+    };
+
     return (
         <Section title={t("settings.data.title")} description={t("settings.data.intro")}>
-            <div>
+            <div className="flex flex-wrap gap-2">
                 <a
                     href="/api/polar/export"
                     download
@@ -410,7 +442,28 @@ export function DataSettings() {
                     <Download />
                     {t("settings.data.exportAll")}
                 </a>
+                <Button variant="outline" size="sm" disabled={importing} onClick={() => picker.current?.click()}>
+                    <Upload />
+                    {importing ? t("settings.data.importing") : t("settings.data.import")}
+                </Button>
+                <input
+                    ref={picker}
+                    type="file"
+                    accept=".json,application/json"
+                    className="hidden"
+                    onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        event.target.value = "";
+                        if (file) void importFile(file);
+                    }}
+                />
             </div>
+            <p className="text-sm text-muted-foreground">{t("settings.data.importHint")}</p>
+            {problem ? (
+                <p role="alert" className="text-sm text-destructive">
+                    {problem}
+                </p>
+            ) : null}
         </Section>
     );
 }
