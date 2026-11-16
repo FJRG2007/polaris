@@ -33,8 +33,20 @@ const state = {
      *  deployment can no longer decrypt. */
     secrets: new Map<string, string>(),
     shared: true,
-    touched: [] as string[]
+    touched: [] as string[],
+    /** What the token endpoint a renewal reaches is asked, by address. */
+    renewals: [] as string[],
+    /** Rows a renewal wrote back. */
+    written: [] as string[]
 };
+
+vi.mock("@/lib/agents/provider-login-http", async (actual) => ({
+    ...(await actual<typeof import("@/lib/agents/provider-login-http")>()),
+    loginRequest: async (url: string) => {
+        state.renewals.push(url);
+        return { status: 200, json: { access_token: "renewed", refresh_token: "r2", expires_in: 3600 } };
+    }
+}));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -73,7 +85,10 @@ vi.mock("@polaris/db", () => ({
                 return { count: where.id.in.length };
             }),
             create: vi.fn(async () => undefined),
-            update: vi.fn(async () => undefined),
+            update: vi.fn(async ({ where }: { where: { id: string } }) => {
+                state.written.push(where.id);
+                return undefined;
+            }),
             deleteMany: vi.fn(async () => ({ count: 0 }))
         }
     }
@@ -97,7 +112,8 @@ vi.mock("@polaris/storage", () => ({
         if (secret === undefined) throw new FakeDecryptError("wrong master key");
         return secret;
     },
-    CredentialDecryptError: FakeDecryptError
+    CredentialDecryptError: FakeDecryptError,
+    secretFingerprint: (value: string) => `fp-${value.length}`
 }));
 
 vi.mock("@/lib/setting-store", () => ({
@@ -114,6 +130,8 @@ beforeEach(() => {
     state.secrets = new Map();
     state.shared = true;
     state.touched = [];
+    state.renewals = [];
+    state.written = [];
 });
 
 /** Append a key to a list. `secret` of null is a row this deployment can no
@@ -153,6 +171,24 @@ function ownHasUntil(id: string, slug: string, secret: string, days: number): vo
 }
 
 describe("runSecretsFor", () => {
+    /** A stored subscription login, as `writeOAuthSecret` keeps it. */
+    const login = (access: string, expiresInMs: number) =>
+        JSON.stringify({ kind: "oauth", access, refresh: "r1", expires: Date.now() + expiresInMs });
+
+    it("renews a login about to end before handing its token to a run", async () => {
+        ownHas("x1", "xai", login("stale", 60_000));
+        const secrets = await runSecretsFor("user-1");
+        expect(secrets?.XAI_API_KEY).toBe("renewed");
+        expect(state.renewals).toHaveLength(1);
+        expect(state.written).toEqual(["x1"]);
+    });
+
+    it("hands over a login with time left as it stands", async () => {
+        ownHas("x1", "xai", login("live", 60 * 60_000));
+        expect((await runSecretsFor("user-1"))?.XAI_API_KEY).toBe("live");
+        expect(state.renewals).toEqual([]);
+    });
+
     it("prefers the person's own key over the deployment's", async () => {
         ownHas("k1", "anthropic", "sk-mine");
         instanceHas("anthropic", "sk-theirs");

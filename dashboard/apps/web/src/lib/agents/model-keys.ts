@@ -712,9 +712,10 @@ export async function runSecretsFor(userId: string | null): Promise<Record<strin
         for (const provider of modelProviders()) {
             const picked = firstUsable(own, provider.slug) ?? firstUsable(instance, provider.slug);
             if (!picked || !picked.secret) continue;
-            // A stored login hands a run its access token; a run outlives a
-            // renewal anyway, so it is handed as it stands.
-            secrets[provider.envVar] = spendableSecret(picked.secret);
+            // A stored login hands a run its access token, renewed first when
+            // it is about to end: a CLI cannot renew a token it was handed, so
+            // one that lapses minutes into the session fails every turn after.
+            secrets[provider.envVar] = (await unwrapLogin(picked.row, picked.secret)).secret;
             used.push(picked.row.id);
             if (provider.slug === "anthropic") applyWorkspace(secrets, picked.row);
         }
@@ -960,7 +961,7 @@ export async function sessionSecretsFor(
         for (const signin of agentSignins()) {
             const picked = firstUsable(own, signin.slug) ?? firstUsable(instance, signin.slug);
             if (!picked || !picked.secret) continue;
-            secrets[signin.env] = picked.secret;
+            secrets[signin.env] = (await unwrapLogin(picked.row, picked.secret)).secret;
             used.push(picked.row.id);
         }
         await noteUsed(used);
