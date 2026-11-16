@@ -1293,7 +1293,6 @@
             "open": "Open {name}",
             "pasteLabel": "Address the browser landed on",
             "badPaste": "That address has no code from this sign-in. Paste the whole address, or start again.",
-            "gitlabSelfManaged": "Works with gitlab.com. A self-managed GitLab needs its own OAuth application ID, which this can't take yet.",
             "waiting": "Waiting for you to approve...",
             "finish": "Finish",
             "close": "Close",
@@ -1315,6 +1314,21 @@
                 "resets": "Starts over {when}",
                 "none": "This workspace has no Go subscription.",
                 "failed": "OpenCode didn't answer. Try again in a moment."
+            },
+            "gitlab": {
+                "onCom": "Signing in on gitlab.com.",
+                "on": "Signing in on {host}.",
+                "selfManaged": "Use a self-managed GitLab",
+                "change": "Change",
+                "useCom": "Use gitlab.com",
+                "intro": "Your GitLab needs an OAuth application for this. In GitLab, open Applications in your profile and add one with the api scope, Confidential off, and this redirect URI. It must be reachable at a public address.",
+                "register": "Redirect URI",
+                "address": "GitLab address",
+                "badAddress": "Enter the https:// address of your GitLab.",
+                "clientId": "Application ID",
+                "badClientId": "Paste the Application ID GitLab shows for it.",
+                "back": "Back",
+                "use": "Continue"
             }
         }
     },

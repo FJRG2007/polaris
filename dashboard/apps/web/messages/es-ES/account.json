@@ -1293,7 +1293,6 @@
             "open": "Abrir {name}",
             "pasteLabel": "Dirección a la que llegó el navegador",
             "badPaste": "Esa dirección no trae un código de este acceso. Pega la dirección completa o empieza de nuevo.",
-            "gitlabSelfManaged": "Funciona con gitlab.com. Un GitLab propio necesita su ID de aplicación OAuth, que aún no se puede indicar.",
             "waiting": "Esperando tu aprobación...",
             "finish": "Terminar",
             "close": "Cerrar",
@@ -1315,6 +1314,21 @@
                 "resets": "Se renueva {when}",
                 "none": "Este espacio no tiene suscripción a Go.",
                 "failed": "OpenCode no respondió. Prueba en un momento."
+            },
+            "gitlab": {
+                "onCom": "Entrando en gitlab.com.",
+                "on": "Entrando en {host}.",
+                "selfManaged": "Usar un GitLab propio",
+                "change": "Cambiar",
+                "useCom": "Usar gitlab.com",
+                "intro": "Tu GitLab necesita una aplicación OAuth. En GitLab, abre Aplicaciones en tu perfil y añade una con el ámbito api, sin Confidencial y con esta URI de retorno. Debe tener una dirección pública.",
+                "register": "URI de retorno",
+                "address": "URL de GitLab",
+                "badAddress": "Escribe la dirección https:// de tu GitLab.",
+                "clientId": "ID de aplicación",
+                "badClientId": "Pega el ID de aplicación que muestra GitLab.",
+                "back": "Atrás",
+                "use": "Continuar"
             }
         }
     },

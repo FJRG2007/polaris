@@ -5,14 +5,10 @@ Zen stand-in audience (own-key people excluded unless `zenStandInEveryone`),
 Copilot `/responses` routing, GitLab list held to its table,
 login tokens renewed before a run/session gets them, OpenCode Console sign-in
 with the Go allowance on the sign-in card.
-OC8 local/cloud selector. See the ledger rows OC1, OC2a and OC8.
+OC8 local/cloud selector, self-managed GitLab. See the ledger rows OC1, OC2a and OC8.
 
 Remaining, in order:
 
-1. GitLab self-managed: an instance URL + OAuth application ID pair on the
-   login (the one value the operator enters is the application ID registered
-   with redirect `http://127.0.0.1:8080/callback`, scope `api`); thread
-   `metadata.instanceUrl/clientID` through `signin-gitlab.ts` (today constants).
-2. Copilot Enterprise (`company.ghe.com`): `oauthURLs`/`userURL`/`baseURL` by
+1. Copilot Enterprise (`company.ghe.com`): `oauthURLs`/`userURL`/`baseURL` by
    domain in `signin-copilot.ts`, a domain field in the dialog.
 

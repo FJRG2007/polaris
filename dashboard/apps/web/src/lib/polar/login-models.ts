@@ -22,6 +22,7 @@ import {
     GITLAB_OPENAI_BASE,
     duoModel,
     gitlabDirectAccess,
+    gitlabInstanceOf,
     type DirectAccess
 } from "@/lib/agents/signin-gitlab";
 
@@ -75,13 +76,14 @@ const MAX_CACHED = 1000;
 
 export function directAccessFor(
     access: string,
+    instanceUrl: string,
     request: LoginRequest = loginRequest,
     now = Date.now()
 ): Promise<DirectAccess> {
     const held = directTokens.get(access);
     if (held && held.until > now) return held.value;
     if (directTokens.size >= MAX_CACHED) directTokens.clear();
-    const value = gitlabDirectAccess(request, access);
+    const value = gitlabDirectAccess(request, access, instanceUrl);
     directTokens.set(access, { until: now + DIRECT_ACCESS_TTL_MS, value });
     value.catch(() => directTokens.delete(access));
     return value;
@@ -89,9 +91,9 @@ export function directAccessFor(
 
 /** Every request to GitLab's gateway carries its token and the headers GitLab
  *  issued with it, in place of whatever the client set. */
-function duoFetch(access: string): typeof fetch {
+function duoFetch(access: string, instanceUrl: string): typeof fetch {
     return async (input, init) => {
-        const direct = await directAccessFor(access);
+        const direct = await directAccessFor(access, instanceUrl);
         const headers = new Headers(init?.headers);
         headers.delete("x-api-key");
         headers.set("Authorization", `Bearer ${direct.token}`);
@@ -103,7 +105,7 @@ function duoFetch(access: string): typeof fetch {
 export function gitlabModel(credential: ChatCredential, model: string): LanguageModel {
     const upstream = duoModel(model);
     if (!upstream) throw new Error(`polar: GitLab Duo does not serve ${model}`);
-    const fetch = duoFetch(credential.secret);
+    const fetch = duoFetch(credential.secret, gitlabInstanceOf(credential.oauth).url);
     // The token is set per request by the fetch above; the placeholders only
     // satisfy the clients' own check that one is configured.
     if (upstream.api === "anthropic") {

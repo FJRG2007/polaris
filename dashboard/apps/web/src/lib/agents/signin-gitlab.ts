@@ -1,11 +1,16 @@
 /**
- * Signing in to GitLab Duo on gitlab.com, and calling it.
+ * Signing in to GitLab Duo, on gitlab.com or a self-managed GitLab, and calling it.
  *
  * The login is OpenCode's (`packages/core/src/plugin/provider/gitlab.ts`): a
- * PKCE authorization on gitlab.com with OpenCode's public application. That
- * application only returns to `http://127.0.0.1:8080/callback`, which on a
- * server nobody is sitting at goes nowhere, so the person copies the address
- * their browser lands on and pastes it back; the code is read from it here.
+ * PKCE authorization with OpenCode's public application on gitlab.com, or on a
+ * self-managed instance with the application its owner registered there (the
+ * same return address, scope `api`, not confidential). That application only
+ * returns to `http://127.0.0.1:8080/callback`, which on a server nobody is
+ * sitting at goes nowhere, so the person copies the address their browser
+ * lands on and pastes it back; the code is read from it here. The instance and
+ * application are kept on the login (`metadata.instanceUrl`, `clientID`, as
+ * OpenCode keeps them), because a refresh token only renews with the
+ * application that issued it.
  *
  * Chat does not go through a package. GitLab hands a short-lived token for its
  * AI gateway at `/api/v4/ai/third_party_agents/direct_access`, and the gateway
@@ -22,6 +27,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { DirectSigninError } from "@/lib/agents/signin-direct";
 import type { StoredOAuth } from "@/lib/agents/provider-oauth";
 import type { LoginRequest } from "@/lib/agents/provider-login-http";
+import { gitlabInstanceUrl, GITLAB_CLIENT_ID_PATTERN, type GitlabInstance } from "@/lib/agents/login-instances";
 
 // gitlab.ts lines 24-35: OpenCode's public application on gitlab.com (PKCE, no
 // secret), its one registered return address, and the scope it asks for.
@@ -35,7 +41,11 @@ const DEFAULT_TOKEN_SECONDS = 7200;
 export const GITLAB_AI_GATEWAY = "https://cloud.gitlab.com";
 export const GITLAB_ANTHROPIC_BASE = `${GITLAB_AI_GATEWAY}/ai/v1/proxy/anthropic/v1`;
 export const GITLAB_OPENAI_BASE = `${GITLAB_AI_GATEWAY}/ai/v1/proxy/openai/v1`;
-export const GITLAB_DIRECT_ACCESS_URL = `${GITLAB_INSTANCE}/api/v4/ai/third_party_agents/direct_access`;
+const DIRECT_ACCESS_PATH = "/api/v4/ai/third_party_agents/direct_access";
+export const GITLAB_DIRECT_ACCESS_URL = `${GITLAB_INSTANCE}${DIRECT_ACCESS_PATH}`;
+/** gitlab.com with OpenCode's application: every login made before an instance
+ *  could be named. */
+export const GITLAB_COM: GitlabInstance = { url: GITLAB_INSTANCE, clientId: GITLAB_CLIENT_ID };
 /** "Tokens are cached for 25 minutes (they expire after 30 minutes)." */
 export const DIRECT_ACCESS_TTL_MS = 25 * 60_000;
 
@@ -44,14 +54,33 @@ export interface GitlabAuthorization {
     readonly url: string;
     readonly state: string;
     readonly verifier: string;
+    readonly instance: GitlabInstance;
 }
 
-export function startGitlabAuthorization(): GitlabAuthorization {
+/**
+ * The instance a stored login was made against: the address and application
+ * it names, read through the same rules a typed one is, or gitlab.com with
+ * OpenCode's application for a login that names none (all made before).
+ */
+export function gitlabInstanceOf(metadata: Readonly<Record<string, string>> | undefined): GitlabInstance {
+    const url = metadata?.instanceUrl ? gitlabInstanceUrl(metadata.instanceUrl) : null;
+    if (!url) return GITLAB_COM;
+    const clientId = metadata?.clientID;
+    if (clientId && GITLAB_CLIENT_ID_PATTERN.test(clientId)) return { url, clientId };
+    return url === GITLAB_INSTANCE ? GITLAB_COM : { url, clientId: GITLAB_CLIENT_ID };
+}
+
+/** What a login keeps about where it was made. */
+export function gitlabMetadata(instance: GitlabInstance): Record<string, string> {
+    return { instanceUrl: instance.url, clientID: instance.clientId };
+}
+
+export function startGitlabAuthorization(instance: GitlabInstance = GITLAB_COM): GitlabAuthorization {
     const verifier = randomBytes(32).toString("base64url");
     const state = randomBytes(16).toString("base64url");
     const challenge = createHash("sha256").update(verifier).digest("base64url");
     const query = new URLSearchParams({
-        client_id: GITLAB_CLIENT_ID,
+        client_id: instance.clientId,
         redirect_uri: GITLAB_REDIRECT_URI,
         response_type: "code",
         state,
@@ -59,7 +88,7 @@ export function startGitlabAuthorization(): GitlabAuthorization {
         code_challenge: challenge,
         code_challenge_method: "S256"
     });
-    return { url: `${GITLAB_INSTANCE}/oauth/authorize?${query.toString()}`, state, verifier };
+    return { url: `${instance.url}/oauth/authorize?${query.toString()}`, state, verifier, instance };
 }
 
 /**
@@ -90,10 +119,15 @@ const tokenSchema = z.object({
 
 type Tokens = Pick<StoredOAuth, "access" | "refresh" | "expires">;
 
-async function tokenCall(request: LoginRequest, form: Record<string, string>, now: number): Promise<Tokens> {
-    const response = await request(`${GITLAB_INSTANCE}/oauth/token`, {
+async function tokenCall(
+    request: LoginRequest,
+    instance: GitlabInstance,
+    form: Record<string, string>,
+    now: number
+): Promise<Tokens> {
+    const response = await request(`${instance.url}/oauth/token`, {
         method: "POST",
-        form: { ...form, client_id: GITLAB_CLIENT_ID }
+        form: { ...form, client_id: instance.clientId }
     });
     if (response.status < 200 || response.status >= 300) {
         throw new DirectSigninError(`gitlab token: HTTP ${response.status}`);
@@ -115,6 +149,7 @@ export function exchangeGitlabCode(
 ): Promise<Tokens> {
     return tokenCall(
         request,
+        authorization.instance,
         {
             grant_type: "authorization_code",
             code,
@@ -125,10 +160,16 @@ export function exchangeGitlabCode(
     );
 }
 
-/** gitlab.ts line 163: a refresh names the same return address. */
-export function refreshGitlabTokens(request: LoginRequest, login: Tokens, now: number): Promise<Tokens> {
+/** gitlab.ts line 163: a refresh names the same return address, on the
+ *  instance and with the application the login was made with. */
+export function refreshGitlabTokens(
+    request: LoginRequest,
+    login: Tokens & { readonly metadata?: Readonly<Record<string, string>> },
+    now: number
+): Promise<Tokens> {
     return tokenCall(
         request,
+        gitlabInstanceOf(login.metadata),
         { grant_type: "refresh_token", refresh_token: login.refresh, redirect_uri: GITLAB_REDIRECT_URI },
         now
     );
@@ -144,9 +185,14 @@ export interface DirectAccess {
     readonly headers: Record<string, string>;
 }
 
-/** A gateway token for this account. 403 is Duo not being available to it. */
-export async function gitlabDirectAccess(request: LoginRequest, access: string): Promise<DirectAccess> {
-    const response = await request(GITLAB_DIRECT_ACCESS_URL, {
+/** A gateway token for this account, from the instance it signed in on. 403
+ *  is Duo not being available to it. */
+export async function gitlabDirectAccess(
+    request: LoginRequest,
+    access: string,
+    instanceUrl: string = GITLAB_INSTANCE
+): Promise<DirectAccess> {
+    const response = await request(`${instanceUrl}${DIRECT_ACCESS_PATH}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${access}` },
         json: {}

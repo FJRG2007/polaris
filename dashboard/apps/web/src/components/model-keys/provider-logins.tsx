@@ -31,6 +31,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
 import type { GoUsageRow } from "@/lib/agents/go-usage";
 import type { LoginStart, LoginState, ProviderLogin } from "@/lib/agents/provider-logins";
+import { GITLAB_CLIENT_ID_PATTERN, gitlabInstanceUrl, type GitlabInstance } from "@/lib/agents/login-instances";
 import {
     finishGitlabLoginAction,
     goUsageAction,
@@ -45,6 +46,9 @@ const LOGINS: readonly { provider: ProviderLogin; name: string }[] = [
     { provider: "opencode", name: "OpenCode Zen" }, // i18n-ignore: product name
     { provider: "opencode-go", name: "OpenCode Go" } // i18n-ignore: product name
 ];
+
+/** The one return address GitLab's application must be registered with. */
+const GITLAB_RETURN = "http://127.0.0.1:8080/callback"; // i18n-ignore: address
 
 const POE_DOCS = "https://creator.poe.com/docs/external-applications/openai-compatible-api";
 
@@ -182,19 +186,32 @@ function LoginDialog({ provider, name, onClose }: { provider: ProviderLogin; nam
     const [pasted, setPasted] = useState("");
     const [busy, setBusy] = useState(false);
     const [pastedError, setPastedError] = useState(false);
+    // A self-managed GitLab: null is gitlab.com; `asking` shows its form.
+    const [instance, setInstance] = useState<GitlabInstance | null>(null);
+    const [asking, setAsking] = useState(false);
     const started = useRef(false);
 
-    useEffect(() => {
-        if (started.current) return;
-        started.current = true;
+    /** Starts a login, on the instance given (GitLab) or the vendor's own. */
+    const begin = (on: GitlabInstance | null) => {
+        setStart(null);
+        setEnded(null);
+        setPasted("");
+        setPastedError(false);
         void runAction(
-            () => startProviderLoginAction(provider),
+            () => startProviderLoginAction(on ? { provider: "gitlab" as const, gitlab: on } : provider),
             () => setEnded({ state: "failed" })
         ).then((answer) => {
             if (!answer) return;
             if ("error" in answer) setEnded({ state: "failed" });
             else setStart(answer);
         });
+    };
+
+    useEffect(() => {
+        if (started.current) return;
+        started.current = true;
+        begin(null);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on open
     }, [provider]);
 
     // A device login is checked every two seconds; the server asks the vendor
@@ -237,7 +254,17 @@ function LoginDialog({ provider, name, onClose }: { provider: ProviderLogin; nam
                     <DialogTitle>{t("aiKeys.logins.signIn", { name })}</DialogTitle>
                 </DialogHeader>
                 <div className="flex min-w-0 flex-col gap-3 text-sm">
-                    {ended ? (
+                    {asking ? (
+                        <GitlabInstanceForm
+                            initial={instance}
+                            onCancel={() => setAsking(false)}
+                            onUse={(next) => {
+                                setAsking(false);
+                                setInstance(next);
+                                begin(next);
+                            }}
+                        />
+                    ) : ended ? (
                         <p role="status">{endedText(t, ended)}</p>
                     ) : !start ? (
                         <p className="text-muted-foreground flex items-center gap-2">
@@ -276,7 +303,28 @@ function LoginDialog({ provider, name, onClose }: { provider: ProviderLogin; nam
                                     {pastedError ? (
                                         <p className="text-destructive text-xs">{t("aiKeys.logins.badPaste")}</p>
                                     ) : null}
-                                    <p className="text-muted-foreground text-xs">{t("aiKeys.logins.gitlabSelfManaged")}</p>
+                                    <p className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-x-2 text-xs">
+                                        <span className="min-w-0 truncate" title={instance?.url}>
+                                            {instance
+                                                ? t("aiKeys.logins.gitlab.on", { host: new URL(instance.url).host })
+                                                : t("aiKeys.logins.gitlab.onCom")}
+                                        </span>
+                                        <button type="button" className="shrink-0 underline" onClick={() => setAsking(true)}>
+                                            {instance ? t("aiKeys.logins.gitlab.change") : t("aiKeys.logins.gitlab.selfManaged")}
+                                        </button>
+                                        {instance ? (
+                                            <button
+                                                type="button"
+                                                className="shrink-0 underline"
+                                                onClick={() => {
+                                                    setInstance(null);
+                                                    begin(null);
+                                                }}
+                                            >
+                                                {t("aiKeys.logins.gitlab.useCom")}
+                                            </button>
+                                        ) : null}
+                                    </p>
                                 </div>
                             ) : (
                                 <p className="text-muted-foreground flex items-center gap-2 text-xs">
@@ -288,7 +336,7 @@ function LoginDialog({ provider, name, onClose }: { provider: ProviderLogin; nam
                     )}
                 </div>
                 <DialogFooter>
-                    {start?.paste && !ended ? (
+                    {start?.paste && !ended && !asking ? (
                         <Button size="sm" onClick={submitPaste} disabled={busy || pasted.trim() === ""}>
                             {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                             {t("aiKeys.logins.finish")}
@@ -300,6 +348,85 @@ function LoginDialog({ provider, name, onClose }: { provider: ProviderLogin; nam
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/**
+ * A self-managed GitLab: its address, and the ID of the OAuth application its
+ * owner registered there with the return address above. Checked as typed with
+ * the rules the server applies; an empty field is incomplete, not wrong.
+ */
+function GitlabInstanceForm({
+    initial,
+    onUse,
+    onCancel
+}: {
+    initial: GitlabInstance | null;
+    onUse: (instance: GitlabInstance) => void;
+    onCancel: () => void;
+}) {
+    const t = useTranslations("account");
+    const [address, setAddress] = useState(initial?.url ?? "");
+    const [clientId, setClientId] = useState(initial?.clientId ?? "");
+    const url = gitlabInstanceUrl(address);
+    const id = clientId.trim();
+    const idOk = GITLAB_CLIENT_ID_PATTERN.test(id);
+    const ready = url !== null && idOk;
+    return (
+        <form
+            className="flex min-w-0 flex-col gap-3"
+            onSubmit={(event) => {
+                event.preventDefault();
+                if (url && idOk) onUse({ url, clientId: id });
+            }}
+        >
+            <p>{t("aiKeys.logins.gitlab.intro")}</p>
+            <div className="bg-muted/50 flex min-w-0 flex-col gap-1 rounded-md p-2 text-xs">
+                <span className="text-muted-foreground">{t("aiKeys.logins.gitlab.register")}</span>
+                <span className="flex min-w-0 items-center gap-2">
+                    <code className="min-w-0 truncate font-mono" title={GITLAB_RETURN}>
+                        {GITLAB_RETURN}
+                    </code>
+                    <CopyButton value={GITLAB_RETURN} />
+                </span>
+            </div>
+            <label className="flex min-w-0 flex-col gap-1">
+                <span className="text-xs font-medium">{t("aiKeys.logins.gitlab.address")} *</span>
+                <Input
+                    value={address}
+                    onChange={(event) => setAddress(event.target.value)}
+                    placeholder="https://gitlab.example.com" // i18n-ignore: address shape
+                    inputMode="url"
+                    autoComplete="url"
+                    aria-invalid={(address.trim() !== "" && url === null) || undefined}
+                />
+                {address.trim() !== "" && url === null ? (
+                    <span className="text-destructive text-xs">{t("aiKeys.logins.gitlab.badAddress")}</span>
+                ) : null}
+            </label>
+            <label className="flex min-w-0 flex-col gap-1">
+                <span className="text-xs font-medium">{t("aiKeys.logins.gitlab.clientId")} *</span>
+                <Input
+                    value={clientId}
+                    onChange={(event) => setClientId(event.target.value)}
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="font-mono"
+                    aria-invalid={(id !== "" && !idOk) || undefined}
+                />
+                {id !== "" && !idOk ? (
+                    <span className="text-destructive text-xs">{t("aiKeys.logins.gitlab.badClientId")}</span>
+                ) : null}
+            </label>
+            <div className="flex flex-wrap justify-end gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+                    {t("aiKeys.logins.gitlab.back")}
+                </Button>
+                <Button type="submit" size="sm" disabled={!ready}>
+                    {t("aiKeys.logins.gitlab.use")}
+                </Button>
+            </div>
+        </form>
     );
 }
 

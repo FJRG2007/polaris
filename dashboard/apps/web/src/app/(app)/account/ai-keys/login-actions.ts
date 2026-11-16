@@ -18,16 +18,22 @@ import {
     type LoginState
 } from "@/lib/agents/provider-logins";
 import { goUsageFor, type GoUsageRow } from "@/lib/agents/go-usage";
+import { gitlabInstanceSchema } from "@/lib/agents/login-instances";
 
 const providerSchema = z.enum(PROVIDER_LOGINS);
+/** A provider alone (its public instance), or with where to sign in. */
+const startSchema = z.union([
+    providerSchema.transform((provider) => ({ provider, gitlab: undefined })),
+    z.object({ provider: z.literal("gitlab"), gitlab: gitlabInstanceSchema })
+]);
 const idSchema = z.string().uuid();
 const pasteSchema = z.string().trim().min(1).max(4096);
 
 export async function startProviderLoginAction(input: unknown): Promise<LoginStart | { error: "failed" }> {
     const user = await requireUser();
-    const provider = providerSchema.parse(input);
+    const { provider, gitlab } = startSchema.parse(input);
     try {
-        return await startProviderLogin(user.id, provider);
+        return await startProviderLogin(user.id, provider, undefined, undefined, gitlab ? { gitlab } : {});
     } catch (caught) {
         console.warn("[provider-login] start failed:", caught instanceof Error ? caught.message : "error");
         return { error: "failed" };

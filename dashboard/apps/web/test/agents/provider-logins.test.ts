@@ -61,4 +61,28 @@ describe("provider logins", () => {
         ).toEqual({ state: "bad-paste" });
         expect(created).toHaveLength(0);
     });
+
+    it("keeps a self-managed GitLab's instance and application on the stored login", async () => {
+        const urls: string[] = [];
+        const request: LoginRequest = async (url) => {
+            urls.push(url);
+            return url.endsWith("/oauth/token")
+                ? { status: 200, json: { access_token: "acc", refresh_token: "ref" } }
+                : { status: 200, json: { token: "gw", headers: {} } };
+        };
+        const gitlab = { url: "https://git.example.com", clientId: "b".repeat(64) };
+        const start = await startProviderLogin("u1", "gitlab", request, 0, { gitlab });
+        expect(start.url.startsWith("https://git.example.com/oauth/authorize?")).toBe(true);
+        const state = new URL(start.url).searchParams.get("state");
+        const done = await finishGitlabLogin("u1", start.id, `http://127.0.0.1:8080/callback?code=c&state=${state}`, request);
+        expect(done).toEqual({ state: "done", keyId: "key-1" });
+        expect(urls).toEqual([
+            "https://git.example.com/oauth/token",
+            "https://git.example.com/api/v4/ai/third_party_agents/direct_access"
+        ]);
+        expect(readOAuthSecret(created[0].secret)?.metadata).toEqual({
+            instanceUrl: "https://git.example.com",
+            clientID: gitlab.clientId
+        });
+    });
 });

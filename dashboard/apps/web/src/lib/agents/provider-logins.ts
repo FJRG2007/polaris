@@ -17,6 +17,7 @@ import { DirectSigninError } from "@/lib/agents/signin-direct";
 import { writeOAuthSecret } from "@/lib/agents/provider-oauth";
 import { createModelKey, ownerHasModelKeyName } from "@/lib/agents/model-keys";
 import { asDirectPost, loginRequest, type LoginRequest } from "@/lib/agents/provider-login-http";
+import type { GitlabInstance } from "@/lib/agents/login-instances";
 
 export const PROVIDER_LOGINS = ["xai", "github-copilot", "gitlab", "opencode", "opencode-go"] as const;
 export type ProviderLogin = (typeof PROVIDER_LOGINS)[number];
@@ -77,11 +78,18 @@ function sweep(now: number): void {
     }
 }
 
+/** Where a login is made when it is not the vendor's public instance. */
+export interface LoginPlace {
+    /** A self-managed GitLab; absent is gitlab.com. */
+    readonly gitlab?: GitlabInstance;
+}
+
 export async function startProviderLogin(
     userId: string,
     provider: ProviderLogin,
     request: LoginRequest = loginRequest,
-    now = Date.now()
+    now = Date.now(),
+    place: LoginPlace = {}
 ): Promise<LoginStart> {
     sweep(now);
     const id = randomUUID();
@@ -104,7 +112,7 @@ export async function startProviderLogin(
         intervalMs = device.intervalMs;
         start = { url: device.verificationUrl, userCode: device.userCode, paste: false };
     } else {
-        const authorization = gitlab.startGitlabAuthorization();
+        const authorization = gitlab.startGitlabAuthorization(place.gitlab);
         pending = { kind: "gitlab", authorization };
         start = { url: authorization.url, userCode: null, paste: true };
     }
@@ -203,14 +211,15 @@ export async function finishGitlabLogin(
         // Asked once here so an account without Duo hears it now, not at its
         // first chat.
         try {
-            await gitlab.gitlabDirectAccess(request, tokens.access);
+            await gitlab.gitlabDirectAccess(request, tokens.access, attempt.pending.authorization.instance.url);
         } catch (caught) {
             if (caught instanceof DirectSigninError && caught.message.includes("not available")) {
                 return { state: "no-duo" };
             }
             throw caught;
         }
-        const secret = writeOAuthSecret({ ...tokens, metadata: { instanceUrl: gitlab.GITLAB_INSTANCE } });
+        const metadata = gitlab.gitlabMetadata(attempt.pending.authorization.instance);
+        const secret = writeOAuthSecret({ ...tokens, metadata });
         return { state: "done", keyId: await store(userId, "gitlab", secret) };
     } catch (caught) {
         logFailure(caught);
