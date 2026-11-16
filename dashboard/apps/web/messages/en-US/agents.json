@@ -109,6 +109,13 @@
         "description": "Put a coding agent in your repositories. It reviews pull requests, answers issues, fixes failing checks, and opens pull requests when you ask it to."
     },
     "text": {
+        "acpBusy": "The agent is still on the last message. Stop it or wait for it to finish.",
+        "acpNoMode": "This agent has no such mode in Chat.",
+        "acpExited": "The agent exited as soon as it started.",
+        "acpSlow": "The agent did not start in time.",
+        "acpUnavailable": "This agent cannot be used in Chat here.",
+        "acpTurnFailed": "The agent stopped before it answered.",
+        "acpRefused": "The agent declined to carry on.",
         "computerOffline": "{name} is offline. Open Polaris on that computer, or start the session somewhere else.",
         "computerGone": "That computer is no longer paired with your account.",
         "runGateGone": "That task is not waiting on a decision.",

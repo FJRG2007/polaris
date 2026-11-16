@@ -19,6 +19,7 @@ import { onRunnerLive } from "@/lib/computers/computer-bus";
 import { after } from "next/server";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import * as acpProviders from "@/lib/agents/acp/providers";
 import * as taskAccess from "@/lib/tasks/access";
 import { requirePermission } from "@/lib/session";
 import * as runtime from "@/lib/agents/session-runtime";
@@ -563,6 +564,35 @@ export async function setSessionModeAction(input: unknown): Promise<{ error?: st
     } catch (error) {
         console.error(`[agent-session] ${session.id}: mode change failed:`, error);
         return { error: tp("code.modeFailed") };
+    }
+    return {};
+}
+
+const sessionSurfaceSchema = z
+    .object({ sessionId: z.string().trim().uuid(), surface: z.enum(acpProviders.SESSION_SURFACES) })
+    .strict();
+
+/**
+ * Hold a running session's conversation in its terminal or in Chat (over the
+ * Agent Client Protocol). Not mid-turn: the turn belongs to the side that
+ * started it.
+ */
+export async function setSessionSurfaceAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const [t, tp] = await Promise.all([getTranslations("agents"), getTranslations("polar")]);
+    const parsed = sessionSurfaceSchema.safeParse(input);
+    if (!parsed.success) return { error: t("sessions.errors.gone") };
+    const session = await sessions.getSession(parsed.data.sessionId, user.id);
+    if (!session || core.isSessionOver(session.state)) return { error: t("sessions.errors.gone") };
+    if (session.surface === parsed.data.surface) return {};
+    if (parsed.data.surface === "chat" && !acpProviders.chatAvailable(session.cli, session.place))
+        return { error: tp("code.surface.unavailable") };
+    if (session.state === "working" || session.state === "waiting") return { error: tp("code.surface.busy") };
+    try {
+        await runtime.switchSessionSurface(session.id, parsed.data.surface);
+    } catch (error) {
+        console.error(`[agent-session] ${session.id}: surface change failed:`, error);
+        return { error: tp("code.surface.failed") };
     }
     return {};
 }

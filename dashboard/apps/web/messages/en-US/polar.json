@@ -1439,6 +1439,20 @@
         "issueGone": "That issue could not be read on GitHub. Pick it again or start without it.",
         "skillGone": "That skill is no longer yours. Pick another or start without it.",
         "starterGone": "The issue or skill picked could not be used. Pick it again.",
+        "surface": {
+            "label": "Conversation",
+            "terminal": {
+                "name": "Terminal",
+                "hint": "The agent's own interface, as it runs on its machine."
+            },
+            "chat": {
+                "name": "Chat",
+                "hint": "Messages, tool steps and approvals right here."
+            },
+            "unavailable": "This agent cannot be used in Chat here.",
+            "busy": "Wait for the agent to finish, then switch.",
+            "failed": "The session could not be switched. Try again."
+        },
         "mode": {
             "label": "Permissions",
             "ask": {

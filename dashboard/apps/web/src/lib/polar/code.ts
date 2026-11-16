@@ -81,6 +81,7 @@ import {
     listSessionsAction,
     promptSessionAction,
     setSessionModeAction,
+    setSessionSurfaceAction,
     setSessionEffortAction,
     sessionAccountsAction,
     switchSessionAccountAction,
@@ -897,6 +898,13 @@ export async function polarCodeMode(user: SessionUser, input: unknown): Promise<
     if ((await accessOf(user)) !== "manage")
         return { error: (await getTranslations("polar"))("code.noAccess") };
     return setSessionModeAction(input);
+}
+
+/** Hold a running session in its terminal or in Chat, from its thread. */
+export async function polarCodeSurface(user: SessionUser, input: unknown): Promise<{ error?: string }> {
+    if ((await accessOf(user)) !== "manage")
+        return { error: (await getTranslations("polar"))("code.noAccess") };
+    return setSessionSurfaceAction(input);
 }
 
 /** Take a session that has not started out of the queue, from its thread. One

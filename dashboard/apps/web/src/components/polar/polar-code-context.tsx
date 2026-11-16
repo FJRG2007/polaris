@@ -21,6 +21,7 @@ import { desktopBridge } from "@/lib/desktop-bridge";
 import { MODEL_TRIGGER } from "@/components/polar/elements/model-selector";
 import { EffortPill } from "@/components/polar/elements/effort-pill";
 import * as core from "@polaris/core";
+import * as acpProviders from "@/lib/agents/acp/providers";
 import {
     Bot,
     Check,
@@ -31,12 +32,14 @@ import {
     HardDrive,
     FolderPlus,
     Laptop,
+    MessageSquare,
     Server,
     CircleDot,
     GitBranch,
     Plus,
     RefreshCw,
     ShieldCheck,
+    SquareTerminal,
     Wand2,
     X
 } from "lucide-react";
@@ -882,6 +885,56 @@ export function PermissionModePicker({
                             </span>
                         </span>
                         <Mark on={mode === value} />
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+/**
+ * Where a running session's conversation is held: its agent's own terminal, or
+ * Polaris's chat over the Agent Client Protocol. Shown only for an agent that
+ * can be driven in Chat.
+ */
+export function SessionSurfacePicker({
+    value,
+    onChange,
+    disabled
+}: {
+    value: acpProviders.SessionSurface;
+    onChange: (surface: acpProviders.SessionSurface) => void;
+    disabled: boolean;
+}) {
+    const t = useTranslations("polar");
+    const Icon = value === "chat" ? MessageSquare : SquareTerminal;
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild disabled={disabled}>
+                <button
+                    type="button"
+                    title={t(`code.surface.${value}.hint`)}
+                    aria-label={`${t("code.surface.label")}: ${t(`code.surface.${value}.name`)}`}
+                    className={cn(MODEL_TRIGGER, "disabled:opacity-60")}
+                >
+                    <Icon className="size-3.5 shrink-0" aria-hidden />
+                    <span className="truncate text-foreground">{t(`code.surface.${value}.name`)}</span>
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-2rem)]">
+                <DropdownMenuLabel>{t("code.surface.label")}</DropdownMenuLabel>
+                {acpProviders.SESSION_SURFACES.map((surface) => (
+                    <DropdownMenuItem
+                        key={surface}
+                        onSelect={() => onChange(surface)}
+                        className="items-start"
+                    >
+                        <span className="flex min-w-0 flex-col">
+                            <span className="truncate">{t(`code.surface.${surface}.name`)}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t(`code.surface.${surface}.hint`)}
+                            </span>
+                        </span>
+                        <Mark on={surface === value} />
                     </DropdownMenuItem>
                 ))}
             </DropdownMenuContent>

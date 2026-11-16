@@ -74,6 +74,7 @@ import type { VoiceNotice } from "@/components/polar/polar-voice";
 import { GithubAppGapNotice } from "@/components/github-app-gap";
 import * as core from "@polaris/core";
 import { codePlaceTarget, placeOf, type CodePlaceTarget } from "@/lib/polar/code-place";
+import * as acpProviders from "@/lib/agents/acp/providers";
 import { automaticChoice, type ModelChoice } from "@/lib/polar/shared";
 import { usePolarUploads } from "@/components/polar/polar-uploads";
 import { POLAR_ATTACHMENT_MOST, POLAR_ATTACHMENT_TYPES } from "@/lib/polar/shared";
@@ -117,6 +118,7 @@ import {
     useThisComputer,
     readCodeEffort,
     PermissionModePicker,
+    SessionSurfacePicker,
     readPermissionMode,
     readRepo,
     useRepoName
@@ -1580,6 +1582,25 @@ function CodeThread({
         });
     };
 
+    // Terminal or Chat, for an agent Polaris can drive over ACP where it runs.
+    const liveSurface =
+        cli && thread?.session.live && acpProviders.chatAvailable(cli, thread.view.place)
+            ? thread.view.surface
+            : null;
+    const changeSurface = (surface: acpProviders.SessionSurface) => {
+        if (surface === liveSurface) return;
+        setError(null);
+        startTransition(() => {
+            void runAction(
+                () => postCode<{ error?: string }>("/api/polar/code/surface", { sessionId, surface }),
+                setError
+            ).then((result) => {
+                if (result?.error) setError(result.error);
+                read();
+            });
+        });
+    };
+
     // The model, changeable while it runs: Claude Code only, among the models
     // of the source it already signs in with. The sources are the start
     // picker's, read once here when this tab has not read them yet.
@@ -1858,7 +1879,7 @@ function CodeThread({
                 maxLength={PROMPT_MAX}
                 onSubmit={send}
                 picker={
-                    liveSource || liveMode || liveEffort || liveAccount ? (
+                    liveSource || liveMode || liveEffort || liveAccount || liveSurface ? (
                         <>
                             {liveAccount ? (
                                 <CodeAccountSwitch
@@ -1887,6 +1908,13 @@ function CodeThread({
                             ) : null}
                             {liveMode ? (
                                 <PermissionModePicker value={liveMode} onChange={changeMode} disabled={busy} />
+                            ) : null}
+                            {liveSurface ? (
+                                <SessionSurfacePicker
+                                    value={liveSurface}
+                                    onChange={changeSurface}
+                                    disabled={busy}
+                                />
                             ) : null}
                         </>
                     ) : null

@@ -1439,6 +1439,20 @@
         "issueGone": "No se pudo leer esa issue en GitHub. Elígela de nuevo o empieza sin ella.",
         "skillGone": "Esa skill ya no es tuya. Elige otra o empieza sin ella.",
         "starterGone": "No se pudo usar la issue o skill elegida. Elígela de nuevo.",
+        "surface": {
+            "label": "Conversación",
+            "terminal": {
+                "name": "Terminal",
+                "hint": "La interfaz del propio agente, tal como corre en su máquina."
+            },
+            "chat": {
+                "name": "Chat",
+                "hint": "Mensajes, pasos y aprobaciones aquí mismo."
+            },
+            "unavailable": "Este agente no puede usarse en Chat aquí.",
+            "busy": "Espera a que el agente termine y cambia.",
+            "failed": "No se pudo cambiar la sesión. Inténtalo de nuevo."
+        },
         "mode": {
             "label": "Permisos",
             "ask": {

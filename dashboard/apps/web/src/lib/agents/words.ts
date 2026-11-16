@@ -69,6 +69,13 @@ export function agentWord(
  */
 const EXACT: Readonly<Record<string, NamespaceKey<"agents">>> = {
     "Cancelled before it started.": "text.queueCancelled",
+    "The agent is still on the last message. Stop it or wait for it to finish.": "text.acpBusy",
+    "This agent has no such mode in Chat.": "text.acpNoMode",
+    "The agent exited as soon as it started.": "text.acpExited",
+    "The agent did not start in time.": "text.acpSlow",
+    "This agent cannot be used in Chat here.": "text.acpUnavailable",
+    "The agent stopped before it answered.": "text.acpTurnFailed",
+    "The agent declined to carry on.": "text.acpRefused",
     "That task is not waiting on a decision.": "text.runGateGone",
     "That question has been answered.": "text.runAnswered",
     "No question with that id in this run.": "text.runAnswered",

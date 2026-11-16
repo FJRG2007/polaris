@@ -109,6 +109,13 @@
         "description": "Pon un agente de código en tus repositorios. Revisa pull requests, responde issues, arregla checks que fallan y abre pull requests cuando se lo pides."
     },
     "text": {
+        "acpBusy": "El agente sigue con el último mensaje. Detenlo o espera a que termine.",
+        "acpNoMode": "Este agente no tiene ese modo en Chat.",
+        "acpExited": "El agente se cerró nada más empezar.",
+        "acpSlow": "El agente no arrancó a tiempo.",
+        "acpUnavailable": "Este agente no puede usarse en Chat aquí.",
+        "acpTurnFailed": "El agente se detuvo antes de responder.",
+        "acpRefused": "El agente se negó a continuar.",
         "computerOffline": "{name} no está conectado. Abre Polaris en ese equipo o inicia la sesión en otro sitio.",
         "computerGone": "Ese equipo ya no está vinculado a tu cuenta.",
         "runGateGone": "Esa tarea ya no espera una decisión.",
