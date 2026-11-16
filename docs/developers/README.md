@@ -70,6 +70,9 @@ flight is tracked in [`../../dashboard/ROADMAP.md`](../../dashboard/ROADMAP.md).
 Adding an MCP tool, a `polaris_search` provider or a scope category:
 [`mcp.md`](mcp.md).
 
+Running a coding agent from a script, CI or your own code (`plr run`, the
+`polaris-run` GitHub Action, `@polaris/sdk`): [`polaris-run.md`](polaris-run.md).
+
 Reporting into Polaris from your own code: the visit tracker in
 [`analytics.md`](analytics.md), and Sentry SDKs pointed at Telemetry in
 [`telemetry.md`](telemetry.md).

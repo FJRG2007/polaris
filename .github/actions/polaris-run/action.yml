@@ -1,0 +1,92 @@
+# Run a Polaris coding agent from a workflow: `plr run` against your own
+# Polaris, with the CLI that Polaris serves. See docs/developers/polaris-run.md.
+#
+# Every input reaches the script through the environment, never by being
+# written into it, so a prompt taken from an issue comment cannot become a
+# command.
+name: Polaris run
+description: Start a coding agent session on your Polaris and follow it to the end of its turn.
+
+inputs:
+  url:
+    description: The address your Polaris answers at, e.g. https://polaris.example.com.
+    required: true
+  token:
+    description: A Polaris API key with the agents.manage permission. Pass it from a secret.
+    required: true
+  prompt:
+    description: What to ask the agent to do.
+    required: true
+  repo:
+    description: The repository the session works in, as owner/name. Empty opens a workspace with nothing checked out.
+    required: false
+    default: ""
+  agent:
+    description: Which coding agent runs it.
+    required: false
+    default: claude
+  model:
+    description: The model, as provider/model. Empty takes the agent's own default.
+    required: false
+    default: ""
+  stop:
+    description: End the session once the run is over ("true" or "false").
+    required: false
+    default: "true"
+
+outputs:
+  exit-code:
+    description: 0 when the turn ended, 1 when it failed, 3 when the agent is waiting for an answer.
+    value: ${{ steps.run.outputs.exit-code }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      with:
+        node-version: "22"
+
+    - name: Download the CLI from your Polaris
+      shell: bash
+      env:
+        POLARIS_URL: ${{ inputs.url }}
+      run: |
+        set -euo pipefail
+        case "$POLARIS_URL" in
+          https://*|http://*) ;;
+          *) echo "::error::url must start with https:// or http://"; exit 2 ;;
+        esac
+        dir="$RUNNER_TEMP/polaris-cli"
+        mkdir -p "$dir"
+        curl --fail --silent --show-error --location --proto '=https,http' \
+          --dump-header "$dir/headers" --output "$dir/polaris.mjs" "${POLARIS_URL%/}/cli/polaris.mjs"
+        expected="$(tr -d '\r' < "$dir/headers" | awk -F': ' 'tolower($1) == "x-content-sha256" { print $2 }' | tail -n 1)"
+        actual="$(sha256sum "$dir/polaris.mjs" | cut -d' ' -f1)"
+        if [ -n "$expected" ] && [ "$expected" != "$actual" ]; then
+          echo "::error::The CLI downloaded from $POLARIS_URL does not match the checksum it was served with."
+          exit 1
+        fi
+        echo "POLARIS_CLI=$dir/polaris.mjs" >> "$GITHUB_ENV"
+
+    - name: Run the agent
+      id: run
+      shell: bash
+      env:
+        POLARIS_URL: ${{ inputs.url }}
+        POLARIS_TOKEN: ${{ inputs.token }}
+        PROMPT: ${{ inputs.prompt }}
+        REPO: ${{ inputs.repo }}
+        AGENT: ${{ inputs.agent }}
+        MODEL: ${{ inputs.model }}
+        STOP: ${{ inputs.stop }}
+      run: |
+        set -uo pipefail
+        args=(run --agent "$AGENT")
+        [ -n "$REPO" ] && args+=(--repo "$REPO")
+        [ -n "$MODEL" ] && args+=(--model "$MODEL")
+        [ "$STOP" = "true" ] && args+=(--stop)
+        # `--` so a prompt that starts with a dash is still the prompt.
+        node "$POLARIS_CLI" "${args[@]}" -- "$PROMPT"
+        code=$?
+        echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+        exit "$code"
