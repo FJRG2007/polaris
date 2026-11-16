@@ -2104,6 +2104,25 @@
                 "limited": "Demasiados intentos. Espera unos minutos.",
                 "refused": "Esta ventana no puede vincular el equipo."
             }
+        },
+        "local": {
+            "button": "Modelos locales",
+            "title": "Modelos locales en {name}",
+            "intro": "Los modelos que sirven Ollama, LM Studio, vLLM o llama.cpp en este equipo aparecen en Polar mientras está en línea.",
+            "none": "Aún no hay servidor de modelos en este equipo.",
+            "models": "{count, plural, one {# modelo} other {# modelos}}",
+            "lanLabel": "Buscar también en estas direcciones de red",
+            "lanHint": "Solo direcciones privadas, como 192.168.1.20. No se accede a nada más de tu red.",
+            "add": "Añadir",
+            "remove": "Quitar {host}",
+            "invalid": "Escribe una IP privada, como 192.168.1.20.",
+            "offline": "Este equipo está sin conexión. Abre Polaris en él y reinténtalo.",
+            "servers": {
+                "ollama": "Ollama",
+                "lmstudio": "LM Studio",
+                "vllm": "vLLM",
+                "llamacpp": "llama.cpp"
+            }
         }
     }
 }

@@ -108,6 +108,11 @@ export const runnerHelloSchema = frame("hello", {
 export const RUNNER_PLATFORMS = ["win32", "darwin", "linux", "freebsd", "openbsd"] as const;
 export const RUNNER_SIGNED_IN = ["yes", "no", "unknown"] as const;
 
+/** The local model servers a runner looks for, and how much it reports. */
+export const LOCAL_MODEL_SERVERS = ["ollama", "lmstudio", "vllm", "llamacpp"] as const;
+export type LocalModelServer = (typeof LOCAL_MODEL_SERVERS)[number];
+export const LOCAL_MODEL_LIMITS = { servers: 24, models: 100, lanHosts: 8 } as const;
+
 export const runnerCapabilitiesSchema = frame("capabilities", {
     os: z.object({
         platform: z.enum(RUNNER_PLATFORMS),
@@ -149,7 +154,23 @@ export const runnerCapabilitiesSchema = frame("capabilities", {
     toolchain: z
         .array(z.object({ tool: cliId, version: shortText(60) }))
         .max(20)
-        .optional()
+        .optional(),
+    /** The model servers it found on this computer (`local-models`), each with
+     *  the models it serves. Absent on a runner without the feature. */
+    localModels: z
+        .array(
+            z.object({
+                server: z.enum(["ollama", "lmstudio", "vllm", "llamacpp"]),
+                /** `loopback` or one of the private addresses the person added. */
+                host: shortText(80),
+                models: z.array(z.object({ id: shortText(200), name: shortText(200).optional() })).max(LOCAL_MODEL_LIMITS.models)
+            })
+        )
+        .max(LOCAL_MODEL_LIMITS.servers)
+        .optional(),
+    /** The private addresses the person allowed it to look for model servers
+     *  on (`local.config`). Empty or absent: loopback only. */
+    lanHosts: z.array(shortText(80)).max(LOCAL_MODEL_LIMITS.lanHosts).optional()
 });
 
 /**
@@ -167,8 +188,12 @@ export const runnerCapabilitiesSchema = frame("capabilities", {
  * - `transcript-read`: reads the agent's own transcript (Claude Code's JSONL
  *   under its projects folder) a chunk at a time from an offset, for the
  *   session's history (`transcript.read`, `transcript.answer`).
+ * - `local-models`: finds Ollama, LM Studio, vLLM and llama.cpp servers on
+ *   this computer, lists their models in `capabilities.localModels`, and runs
+ *   a Polar Chat turn on one of them (`chat.turn` with `local`). It looks on the
+ *   LAN only at the private addresses the person added (`local.config`).
  */
-export const RUNNER_FEATURES = ["toolchain", "claude-chat", "workspace-read", "transcript-read"] as const;
+export const RUNNER_FEATURES = ["toolchain", "claude-chat", "workspace-read", "transcript-read", "local-models"] as const;
 export type RunnerFeature = (typeof RUNNER_FEATURES)[number];
 
 /** Whether a runner's capabilities announce `feature`. */
@@ -535,7 +560,20 @@ export const serverChatTurnSchema = frame("chat.turn", {
         .min(1)
         .max(200),
     effort: z.enum(AGENT_EFFORT_LEVELS).nullable(),
-    mcp: z.object({ url: z.string().url().max(500), token: shortText(400) }).nullable()
+    mcp: z.object({ url: z.string().url().max(500), token: shortText(400) }).nullable(),
+    /** Run the turn on one of this computer's model servers instead of
+     *  Claude. Only sent to a runner announcing `local-models`; an older
+     *  runner never sees it. */
+    local: z
+        .object({ server: z.enum(LOCAL_MODEL_SERVERS), host: shortText(80), model: shortText(200) })
+        .optional()
+});
+
+/** The private addresses the person allows this runner to look for model
+ *  servers on (`local-models`). The runner keeps them and checks each is a
+ *  private address itself; it answers with a fresh `capabilities`. */
+export const serverLocalConfigSchema = frame("local.config", {
+    lanHosts: z.array(shortText(80)).max(LOCAL_MODEL_LIMITS.lanHosts)
 });
 
 export const serverChatCancelSchema = frame("chat.cancel", { turnId: id });
@@ -603,6 +641,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     serverChatApprovalSchema,
     serverWorkspaceReadSchema,
     serverTranscriptReadSchema,
+    serverLocalConfigSchema,
     serverErrorSchema
 ]);
 export type ServerMessage = z.infer<typeof serverMessageSchema>;

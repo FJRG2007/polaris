@@ -24,7 +24,8 @@ export async function GET(): Promise<Response> {
         polarModelOptions(user.id, access, { waitForWindows: true }).then((listed) =>
             withSubscription(user.id, listed, {
                 name: t("claudeSubscription.label"),
-                note: t("claudeSubscription.note")
+                note: t("claudeSubscription.note"),
+                local: t("localModels.label")
             })
         ),
         polarTools(user),

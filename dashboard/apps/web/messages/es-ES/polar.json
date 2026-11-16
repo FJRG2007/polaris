@@ -2166,5 +2166,8 @@
         },
         "startFailed": "La sesión no pudo iniciarse en este equipo.",
         "preparingStep": "{tool}: {percent} %"
+    },
+    "localModels": {
+        "label": "Tus equipos"
     }
 }

@@ -22,6 +22,7 @@ import { homedir, hostname, release } from "node:os";
 import { app, safeStorage } from "electron";
 import { version } from "../../../package.json";
 import { ChatHost, type ClaudeSdk } from "./chat";
+import * as localModels from "./local-models";
 import { Folders } from "./folders";
 import { createReadStream } from "node:fs";
 import * as workspace from "./workspace";
@@ -249,6 +250,15 @@ class RunnerService {
         maxSessions: MAX_SESSIONS,
         log: (message) => console.warn(message)
     });
+    /** The private addresses the person allowed model servers on (`local.config`). */
+    #lanHosts: string[] = [];
+    /** Looks again for model servers started or stopped since the last look. */
+    #modelWatch: ReturnType<typeof setInterval> | null = null;
+    #modelsSeen = "";
+    readonly #local = new localModels.LocalChat({
+        send: (frame) => this.#connection?.send(frame) ?? false,
+        lanHosts: () => this.#lanHosts
+    });
     readonly #chat = new ChatHost({
         send: (frame) => this.#connection?.send(frame) ?? false,
         prepare: () => this.#prepareChat(),
@@ -282,6 +292,7 @@ class RunnerService {
         this.#server = server;
         if (!server) return this.#changed();
         await folders.load();
+        this.#lanHosts = await this.#loadLanHosts();
         const credential = (await loadCredentials())[server];
         this.#paired = Boolean(credential);
         this.#runnerId = credential?.runnerId ?? null;
@@ -292,6 +303,9 @@ class RunnerService {
     #disconnect(): void {
         this.#sessions.stopAll();
         this.#chat.cancelAll();
+        this.#local.cancelAll();
+        if (this.#modelWatch) clearInterval(this.#modelWatch);
+        this.#modelWatch = null;
         this.#connection?.stop();
         this.#connection = null;
         this.#state = "stopped";
@@ -306,7 +320,8 @@ class RunnerService {
             capabilities: () => this.#capabilities(),
             sessions: () => this.#sessions.ids(),
             onCommand: (frame) => {
-                if (this.#sessions.handle(frame) || this.#chat.handle(frame)) return;
+                if (this.#sessions.handle(frame) || this.#local.handle(frame) || this.#chat.handle(frame)) return;
+                if (frame.type === "local.config") void this.#saveLanHosts(frame.lanHosts);
                 if (frame.type === "toolchain.prepare") void this.#prepareRequested(frame.requestId, frame.agents);
                 if (frame.type === "workspace.read") void this.#readWorkspace(frame);
                 if (frame.type === "transcript.read") void this.#readTranscript(frame);
@@ -320,6 +335,8 @@ class RunnerService {
         });
         this.#connection = connection;
         connection.start();
+        this.#modelWatch = setInterval(() => void this.#announceModelsIfChanged(), MODEL_WATCH_MS);
+        this.#modelWatch.unref?.();
     }
 
     async pair(code: string): Promise<PairOutcome> {
@@ -451,6 +468,42 @@ class RunnerService {
         return { env: prepared.env, claudePath, sdk: loaded };
     }
 
+    async #announceModelsIfChanged(): Promise<void> {
+        const connection = this.#connection;
+        if (!connection || this.#state !== "online") return;
+        const found = JSON.stringify(await localModels.detectLocalServers(this.#lanHosts));
+        if (found === this.#modelsSeen) return;
+        this.#modelsSeen = found;
+        connection.send({ ...(await this.#capabilities()), type: "capabilities" });
+    }
+
+    #lanHostsFile(): string {
+        return join(this.#root(), "local-models.json");
+    }
+
+    async #loadLanHosts(): Promise<string[]> {
+        try {
+            const parsed = z.object({ lanHosts: z.array(z.string().max(80)).max(50) }).safeParse(JSON.parse(await readFile(this.#lanHostsFile(), "utf8")));
+            return parsed.success ? localModels.cleanLanHosts(parsed.data.lanHosts) : [];
+        } catch {
+            return [];
+        }
+    }
+
+    /** Keep the person's LAN addresses (private ones only) and announce what is
+     *  found there, so the screen that set them shows it at once. */
+    async #saveLanHosts(hosts: readonly string[]): Promise<void> {
+        this.#lanHosts = localModels.cleanLanHosts(hosts);
+        try {
+            await mkdir(this.#root(), { recursive: true });
+            await writeFile(this.#lanHostsFile(), JSON.stringify({ lanHosts: this.#lanHosts }));
+        } catch (error) {
+            console.warn("runner: could not keep the LAN model addresses", error);
+        }
+        const connection = this.#connection;
+        if (connection) connection.send({ ...(await this.#capabilities()), type: "capabilities" });
+    }
+
     async #capabilities() {
         const platform = process.platform;
         const toolRoot = this.#toolRoot();
@@ -467,14 +520,19 @@ class RunnerService {
             shells: [],
             clis: ready.filter((item) => agentSet.has(item.tool)).map((item) => ({ id: item.tool, version: item.version, signedIn: "unknown" as const })),
             maxSessions: MAX_SESSIONS,
-            features: ["toolchain", "claude-chat", "workspace-read", "transcript-read"],
-            toolchain: ready
+            features: ["toolchain", "claude-chat", "workspace-read", "transcript-read", "local-models"],
+            toolchain: ready,
+            localModels: await localModels.detectLocalServers(this.#lanHosts),
+            lanHosts: this.#lanHosts
         };
     }
 }
 
 /** The Agent SDK as a toolchain download: an npm tarball installed by the
  *  managed npm, integrity-checked like the agent CLIs. */
+/** How often the runner looks again for model servers on this computer. */
+const MODEL_WATCH_MS = 60_000;
+
 export function sdkDownload(): pins.ToolchainDownload {
     const sdk = pins.TOOLCHAIN_CLAUDE_AGENT_SDK;
     return {

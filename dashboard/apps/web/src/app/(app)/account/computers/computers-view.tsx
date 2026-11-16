@@ -14,7 +14,8 @@ import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { desktopBridge, type DesktopComputer, type DesktopComputerState } from "@/lib/desktop-bridge";
 import type { ComputerView } from "@/lib/computers/computer-service";
-import { Laptop, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Cpu, Laptop, MoreHorizontal, Pencil, Plus, Trash2, X } from "lucide-react";
+import { LAN_HOSTS_MAX, lanHostSchema, normalizeLanHost } from "@/lib/computers/lan-hosts";
 import {
     Badge,
     Button,
@@ -34,7 +35,8 @@ import {
     openPairingAction,
     pairingWaitingAction,
     renameComputerAction,
-    revokeComputerAction
+    revokeComputerAction,
+    setLanHostsAction
 } from "./actions";
 
 const POLL_PAIRING_MS = 3_000;
@@ -55,6 +57,7 @@ export function ComputersView({ initial }: { initial: ComputerView[] }) {
     const [error, setError] = useState<string | null>(null);
     const [pairing, setPairing] = useState(false);
     const [renaming, setRenaming] = useState<ComputerView | null>(null);
+    const [modelsOf, setModelsOf] = useState<ComputerView | null>(null);
     const [confirm, confirmElement] = useConfirm();
 
     const reload = useCallback(() => {
@@ -163,6 +166,12 @@ export function ComputersView({ initial }: { initial: ComputerView[] }) {
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
+                                    {computer.localModels ? (
+                                        <DropdownMenuItem onSelect={() => setModelsOf(computer)}>
+                                            <Cpu className="size-4" aria-hidden />
+                                            {t("computers.local.button")}
+                                        </DropdownMenuItem>
+                                    ) : null}
                                     <DropdownMenuItem onSelect={() => setRenaming(computer)}>
                                         <Pencil className="size-4" aria-hidden />
                                         {t("computers.rename.button")}
@@ -183,6 +192,16 @@ export function ComputersView({ initial }: { initial: ComputerView[] }) {
                     onPaired={() => {
                         setPairing(false);
                         reload();
+                    }}
+                />
+            ) : null}
+            {modelsOf ? (
+                <LocalModelsDialog
+                    computer={modelsOf}
+                    onClose={() => setModelsOf(null)}
+                    onSaved={() => {
+                        setModelsOf(null);
+                        void listComputersAction().then(setItems).catch(() => undefined);
                     }}
                 />
             ) : null}
@@ -272,6 +291,124 @@ function PairDialog({ onClose, onPaired }: { onClose: () => void; onPaired: () =
                     <Button variant="ghost" onClick={onClose}>
                         {t("computers.pair.close")}
                     </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/**
+ * The model servers a computer found, and the private addresses on its
+ * network it may look at too. Loopback is always looked at; nothing else is
+ * until the person adds it here.
+ */
+function LocalModelsDialog({ computer, onClose, onSaved }: { computer: ComputerView; onClose: () => void; onSaved: () => void }) {
+    const t = useTranslations("account");
+    const local = computer.localModels!;
+    const [hosts, setHosts] = useState<string[]>([...local.lanHosts]);
+    const [draft, setDraft] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [busy, setBusy] = useState(false);
+    const normalized = normalizeLanHost(draft);
+    const draftOk = lanHostSchema.safeParse(draft).success;
+    const draftValid = normalized.length > 0 && draftOk && !hosts.includes(normalized) && hosts.length < LAN_HOSTS_MAX;
+    const draftError = normalized.length > 0 && !draftOk ? t("computers.local.invalid") : null;
+    const changed = hosts.join(",") !== local.lanHosts.join(",");
+
+    const add = () => {
+        if (!draftValid) return;
+        setHosts([...hosts, normalized]);
+        setDraft("");
+    };
+    const save = async () => {
+        if (!changed || busy) return;
+        setBusy(true);
+        const result = await setLanHostsAction(computer.id, hosts).catch(() => ({ error: t("computers.local.offline") }));
+        setBusy(false);
+        if (result.error) setError(result.error);
+        else onSaved();
+    };
+
+    return (
+        <Dialog open onOpenChange={(next) => !next && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="min-w-0 truncate">{t("computers.local.title", { name: computer.name })}</DialogTitle>
+                    <DialogDescription>{t("computers.local.intro")}</DialogDescription>
+                </DialogHeader>
+                <div className="flex min-w-0 flex-col gap-4">
+                    {local.servers.length > 0 ? (
+                        <ul className="flex min-w-0 flex-col gap-1 text-sm">
+                            {local.servers.map((one) => (
+                                <li key={`${one.server}-${one.host}`} className="flex min-w-0 items-center justify-between gap-2">
+                                    <span className="min-w-0 truncate">
+                                        {t(`computers.local.servers.${one.server as "ollama" | "lmstudio" | "vllm" | "llamacpp"}`)}
+                                        {one.host === "loopback" ? "" : ` (${one.host})`}
+                                    </span>
+                                    <span className="text-muted-foreground shrink-0">{t("computers.local.models", { count: one.models })}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p className="text-muted-foreground text-sm">{t("computers.local.none")}</p>
+                    )}
+                    <form
+                        className="flex min-w-0 flex-col gap-2"
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            add();
+                        }}
+                    >
+                        <label className="flex min-w-0 flex-col gap-1 text-sm">
+                            <span>{t("computers.local.lanLabel")}</span>
+                            <div className="flex min-w-0 gap-2">
+                                <Input
+                                    value={draft}
+                                    maxLength={80}
+                                    placeholder="192.168.1.20"
+                                    aria-invalid={draftError ? true : undefined}
+                                    onChange={(event) => {
+                                        setDraft(event.target.value);
+                                        setError(null);
+                                    }}
+                                />
+                                <Button type="submit" variant="outline" aria-disabled={!draftValid}>
+                                    {t("computers.local.add")}
+                                </Button>
+                            </div>
+                        </label>
+                        {draftError ? <p className="text-sm text-destructive">{draftError}</p> : null}
+                        <p className="text-muted-foreground text-xs">{t("computers.local.lanHint")}</p>
+                    </form>
+                    {hosts.length > 0 ? (
+                        <div className="flex min-w-0 flex-wrap gap-1">
+                            {hosts.map((host) => (
+                                <Badge key={host} className="max-w-full gap-1">
+                                    <span className="min-w-0 truncate">{host}</span>
+                                    <button
+                                        type="button"
+                                        aria-label={t("computers.local.remove", { host })}
+                                        onClick={() => setHosts(hosts.filter((one) => one !== host))}
+                                    >
+                                        <X className="size-3 shrink-0" aria-hidden />
+                                    </button>
+                                </Badge>
+                            ))}
+                        </div>
+                    ) : null}
+                    {error ? (
+                        <p role="alert" className="text-sm text-destructive">
+                            {error}
+                        </p>
+                    ) : null}
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={onClose}>
+                            {t("computers.pair.close")}
+                        </Button>
+                        <Button type="button" aria-disabled={!changed || busy} disabled={busy} onClick={() => void save()}>
+                            {t("computers.rename.save")}
+                        </Button>
+                    </div>
                 </div>
             </DialogContent>
         </Dialog>

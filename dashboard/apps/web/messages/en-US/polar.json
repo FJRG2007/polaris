@@ -2166,5 +2166,8 @@
         },
         "startFailed": "The session could not start on this computer.",
         "preparingStep": "{tool}: {percent}%"
+    },
+    "localModels": {
+        "label": "Your computers"
     }
 }

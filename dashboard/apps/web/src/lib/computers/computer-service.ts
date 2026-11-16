@@ -53,6 +53,26 @@ export interface ComputerView {
     readonly clis: ReadonlyArray<{ id: string; version: string; signedIn: string }>;
     readonly tokenHint: string;
     readonly createdAt: string;
+    /** What it serves of local models (`local-models`); null on a runner
+     *  without the feature. */
+    readonly localModels: LocalModelsView | null;
+}
+
+export interface LocalModelsView {
+    readonly lanHosts: readonly string[];
+    readonly servers: ReadonlyArray<{ server: string; host: string; models: number }>;
+}
+
+/** A runner's stored capabilities as the screen shows its local models. Pure. */
+export function localModelsOf(raw: unknown): LocalModelsView | null {
+    if (!core.runnerHasFeature(raw as { features?: string[] } | null, "local-models")) return null;
+    const source = raw as { localModels?: unknown; lanHosts?: unknown };
+    const served = core.runnerCapabilitiesSchema.shape.localModels.safeParse(source.localModels);
+    const hosts = core.runnerCapabilitiesSchema.shape.lanHosts.safeParse(source.lanHosts);
+    return {
+        lanHosts: hosts.success ? (hosts.data ?? []) : [],
+        servers: served.success ? (served.data ?? []).map((one) => ({ server: one.server, host: one.host, models: one.models.length })) : []
+    };
 }
 
 export function isOnline(
@@ -255,7 +275,8 @@ export async function listComputers(userId: string, now = Date.now()): Promise<C
         runnerVersion: row.runnerVersion,
         clis: clisOf(row.capabilities),
         tokenHint: row.tokenHint,
-        createdAt: row.createdAt.toISOString()
+        createdAt: row.createdAt.toISOString(),
+        localModels: localModelsOf(row.capabilities)
     }));
 }
 

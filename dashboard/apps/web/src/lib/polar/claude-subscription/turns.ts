@@ -109,6 +109,9 @@ export interface SubscriptionTurnInput {
     readonly messages: { role: "user" | "assistant"; text: string }[];
     readonly effort: core.AgentEffortLevel | null;
     readonly mcp: { url: string; token: string } | null;
+    /** A model server on that computer to run the turn on instead of Claude
+     *  (`local-models`). */
+    readonly local?: { server: core.LocalModelServer; host: string; model: string };
     readonly signal?: AbortSignal;
     /** Carry on a turn that stopped at an approval instead of starting one:
      *  the position it stopped at and the person's answers. */
@@ -172,7 +175,8 @@ export async function* runSubscriptionTurn(input: SubscriptionTurnInput): AsyncG
                 system: input.system,
                 messages: input.messages,
                 effort: input.effort,
-                mcp: input.mcp
+                mcp: input.mcp,
+                ...(input.local ? { local: input.local } : {})
             });
         }
         if (!sent) {

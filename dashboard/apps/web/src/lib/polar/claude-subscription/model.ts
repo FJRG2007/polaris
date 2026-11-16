@@ -23,6 +23,7 @@ import {
     subscriptionRunnerFor
 } from "@/lib/polar/claude-subscription/turns";
 import { mintTurnToken } from "@/lib/polar/claude-subscription/mcp-token";
+import { LOCAL_MODELS_PROVIDER, localModelReady, type LocalModelRef } from "@/lib/polar/local-models/catalogue";
 import { SUBSCRIPTION_FAILURES, type SubscriptionFailure } from "@/lib/polar/provider-failure";
 
 type Model = Parameters<NonNullable<LanguageModelMiddleware["wrapStream"]>>[0]["model"];
@@ -200,10 +201,14 @@ async function turnMcp(userId: string, turnId: string): Promise<{ url: string; t
 }
 
 /** Claude on the person's subscription, as `model` (an alias Claude Code
- *  takes: `opus`, `sonnet`, `haiku`). */
-export function subscriptionLanguageModel(userId: string, model: string): Model {
+ *  takes: `opus`, `sonnet`, `haiku`) - or, with `local`, a model served on
+ *  one of their computers, through the same runner turn. A local turn is plain
+ *  text: no Polaris tools are handed to a model server. */
+/** `local: null` is a local pick whose id could not be read: never Claude. */
+export function subscriptionLanguageModel(userId: string, model: string, local?: LocalModelRef | null): Model {
     async function doStream(options: CallOptions): Promise<Awaited<ReturnType<Model["doStream"]>>> {
-        const runnerId = await subscriptionRunnerFor(userId);
+        const runnerId =
+            local === undefined ? await subscriptionRunnerFor(userId) : local && (await localModelReady(userId, local)) ? local.runnerId : null;
         if (!runnerId) throw new SubscriptionTurnError("offline");
         const read = readPrompt(options.prompt);
         const turnId = read.resume?.turnId ?? randomUUID();
@@ -211,11 +216,12 @@ export function subscriptionLanguageModel(userId: string, model: string): Model 
             userId,
             runnerId,
             turnId,
-            model,
+            model: local ? null : model,
             system: read.system,
             messages: read.messages,
             effort: null,
-            mcp: read.resume ? null : await turnMcp(userId, turnId),
+            mcp: read.resume || local ? null : await turnMcp(userId, turnId),
+            ...(local ? { local: { server: local.server, host: local.host, model: local.model } } : {}),
             signal: options.abortSignal,
             ...(read.resume ? { resume: { seq: read.resume.seq, answers: read.resume.answers } } : {})
         });
@@ -251,7 +257,7 @@ export function subscriptionLanguageModel(userId: string, model: string): Model 
 
     return {
         specificationVersion: "v4",
-        provider: CLAUDE_SUBSCRIPTION_PROVIDER,
+        provider: local !== undefined ? LOCAL_MODELS_PROVIDER : CLAUDE_SUBSCRIPTION_PROVIDER,
         modelId: model,
         supportedUrls: {},
         doStream,

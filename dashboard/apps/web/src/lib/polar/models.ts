@@ -82,6 +82,7 @@ import { polarLimitReached } from "@/lib/polar/usage";
 import { TRIED_MOST, type FailureKind } from "@/lib/polar/provider-failure";
 import { CLAUDE_SUBSCRIPTION_PROVIDER, subscriptionRunnerFor } from "@/lib/polar/claude-subscription/turns";
 import { subscriptionLanguageModel } from "@/lib/polar/claude-subscription/model";
+import * as localModels from "@/lib/polar/local-models/catalogue";
 
 /** How long one call to a person's own model endpoint may run, a streamed answer
  *  included: the guarded fetch bounds the whole exchange. */
@@ -190,10 +191,19 @@ export function subscriptionProvider(name = "Claude", note?: string): PolarProvi
 export async function withSubscription(
     userId: string,
     options: PolarProviderOption[],
-    words?: { name: string; note: string }
+    words?: { name: string; note: string; local?: string }
 ): Promise<PolarProviderOption[]> {
-    const runner = await subscriptionRunnerFor(userId).catch(() => null);
-    return runner ? [...options, subscriptionProvider(words?.name, words?.note)] : options;
+    const [runner, local] = await Promise.all([
+        subscriptionRunnerFor(userId).catch(() => null),
+        localModels.localModelRunners(userId).catch(() => [])
+    ]);
+    const served = localModels.localModelsProvider(local, words?.local ?? "Your computers");
+    return [...options, ...(runner ? [subscriptionProvider(words?.name, words?.note)] : []), ...(served ? [served] : [])];
+}
+
+/** Whether a provider is answered by the person's own computer, with no key. */
+function onComputer(provider: string): boolean {
+    return provider === CLAUDE_SUBSCRIPTION_PROVIDER || provider === localModels.LOCAL_MODELS_PROVIDER;
 }
 
 /** The stand-in credential the subscription is planned on: nothing is spent
@@ -557,8 +567,8 @@ export async function resolvePolarModel(
     const option = provider.models.find((model) => model.model === choice.model);
     if (!option) return "unknown_model";
     const held =
-        choice.provider === CLAUDE_SUBSCRIPTION_PROVIDER
-            ? [SUBSCRIPTION_CREDENTIAL]
+        onComputer(choice.provider)
+            ? [{ ...SUBSCRIPTION_CREDENTIAL, provider: choice.provider }]
             : await polarCredentialsFor(userId, choice.provider, choice.payer, granted);
     const credentials = options.keyId ? held.filter((key) => key.keyId === options.keyId) : held;
     if (credentials.length === 0) return "no_key";
@@ -612,7 +622,7 @@ export interface ResolveOptions {
 function credentialCache(userId: string, access: PolarAccess) {
     const read = new Map<string, Promise<ChatCredential[]>>();
     return (provider: string): Promise<ChatCredential[]> => {
-        if (provider === CLAUDE_SUBSCRIPTION_PROVIDER) return Promise.resolve([SUBSCRIPTION_CREDENTIAL]);
+        if (onComputer(provider)) return Promise.resolve([{ ...SUBSCRIPTION_CREDENTIAL, provider }]);
         if (!read.has(provider)) {
             read.set(provider, polarCredentialsFor(userId, provider, null, access));
         }
@@ -634,7 +644,9 @@ function entryOf(
         credentials,
         reasoning,
         build: (credential) =>
-            option.provider === CLAUDE_SUBSCRIPTION_PROVIDER
+            option.provider === localModels.LOCAL_MODELS_PROVIDER
+                ? subscriptionLanguageModel(userId, option.model, localModels.readLocalModelId(option.model))
+                : option.provider === CLAUDE_SUBSCRIPTION_PROVIDER
                 ? subscriptionLanguageModel(userId, option.model)
                 : languageModel(
                 credential,

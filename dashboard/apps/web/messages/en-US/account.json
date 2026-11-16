@@ -2104,6 +2104,25 @@
                 "limited": "Too many tries. Wait a few minutes.",
                 "refused": "This window cannot pair the computer."
             }
+        },
+        "local": {
+            "button": "Local models",
+            "title": "Local models on {name}",
+            "intro": "Models served on this computer by Ollama, LM Studio, vLLM or llama.cpp show up in Polar while it is online.",
+            "none": "No model server found on this computer yet.",
+            "models": "{count, plural, one {# model} other {# models}}",
+            "lanLabel": "Also look on these network addresses",
+            "lanHint": "Private addresses only, such as 192.168.1.20. Nothing else on your network is reached.",
+            "add": "Add",
+            "remove": "Remove {host}",
+            "invalid": "Enter a private IP address, such as 192.168.1.20.",
+            "offline": "This computer is offline. Open the Polaris app on it and try again.",
+            "servers": {
+                "ollama": "Ollama",
+                "lmstudio": "LM Studio",
+                "vllm": "vLLM",
+                "llamacpp": "llama.cpp"
+            }
         }
     }
 }
