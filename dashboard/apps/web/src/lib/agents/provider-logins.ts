@@ -82,6 +82,8 @@ function sweep(now: number): void {
 export interface LoginPlace {
     /** A self-managed GitLab; absent is gitlab.com. */
     readonly gitlab?: GitlabInstance;
+    /** A GitHub Enterprise domain for Copilot; absent is GitHub.com. */
+    readonly copilotDomain?: string;
 }
 
 export async function startProviderLogin(
@@ -102,7 +104,7 @@ export async function startProviderLogin(
         intervalMs = device.intervalMs;
         start = { url: device.verificationUrl, userCode: device.userCode, paste: false };
     } else if (provider === "github-copilot") {
-        const device = await copilot.requestCopilotDevice(request, now);
+        const device = await copilot.requestCopilotDevice(request, now, place.copilotDomain ?? null);
         pending = { kind: "github-copilot", device };
         intervalMs = device.intervalMs;
         start = { url: device.verificationUrl, userCode: device.userCode, paste: false };
@@ -163,11 +165,15 @@ export async function pollProviderLogin(
         const poll = await copilot.pollCopilotDevice(request, attempt.pending.device, now);
         if (poll.state === "done") {
             attempts.delete(id);
+            const metadata = {
+                ...(poll.login.enterpriseUrl ? { enterpriseUrl: poll.login.enterpriseUrl } : {}),
+                ...(poll.login.apiEndpoint ? { apiEndpoint: poll.login.apiEndpoint } : {})
+            };
             const secret = writeOAuthSecret({
                 access: poll.login.token,
                 refresh: "",
                 expires: 0,
-                ...(poll.login.apiEndpoint ? { metadata: { apiEndpoint: poll.login.apiEndpoint } } : {})
+                ...(Object.keys(metadata).length > 0 ? { metadata } : {})
             });
             return { state: "done", keyId: await store(userId, "github-copilot", secret) };
         }

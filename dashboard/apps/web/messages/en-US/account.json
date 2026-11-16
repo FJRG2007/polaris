@@ -1329,6 +1329,16 @@
                 "badClientId": "Paste the Application ID GitLab shows for it.",
                 "back": "Back",
                 "use": "Continue"
+            },
+            "copilot": {
+                "onCom": "Signing in on GitHub.com.",
+                "on": "Signing in on {domain}.",
+                "enterprise": "Use GitHub Enterprise",
+                "change": "Change",
+                "useCom": "Use GitHub.com",
+                "intro": "Sign in with a Copilot seat from your company's GitHub Enterprise. Enter its domain, the one you open GitHub on.",
+                "domain": "Enterprise domain",
+                "badDomain": "Enter a domain like company.ghe.com, without a path or port."
             }
         }
     },

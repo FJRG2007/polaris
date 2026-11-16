@@ -85,4 +85,21 @@ describe("provider logins", () => {
             clientID: gitlab.clientId
         });
     });
+
+    it("keeps a Copilot Enterprise domain on the stored login", async () => {
+        const request: LoginRequest = async (url) => {
+            if (url === "https://acme.ghe.com/login/device/code") {
+                return {
+                    status: 200,
+                    json: { verification_uri: "https://acme.ghe.com/login/device", user_code: "C", device_code: "d", interval: 5 }
+                };
+            }
+            if (url === "https://acme.ghe.com/login/oauth/access_token") return { status: 200, json: { access_token: "t" } };
+            return { status: 200, json: { chat_enabled: true } };
+        };
+        const start = await startProviderLogin("u1", "github-copilot", request, 0, { copilotDomain: "acme.ghe.com" });
+        expect(start.url).toBe("https://acme.ghe.com/login/device");
+        expect(await pollProviderLogin("u1", start.id, request, 6000)).toEqual({ state: "done", keyId: "key-1" });
+        expect(readOAuthSecret(created[0].secret)?.metadata).toEqual({ enterpriseUrl: "acme.ghe.com" });
+    });
 });

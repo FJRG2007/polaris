@@ -1,6 +1,10 @@
 /**
  * Signing in to GitHub Copilot from the Polaris server: GitHub's device flow,
- * ported from OpenCode's provider (`packages/core/src/plugin/provider/github-copilot.ts`).
+ * ported from OpenCode's provider (`packages/core/src/plugin/provider/github-copilot.ts`),
+ * on GitHub.com or a GitHub Enterprise domain (`company.ghe.com`), whose
+ * sign-in, API and Copilot API are the domain itself and its `api.` and
+ * `copilot-api.` hosts (OpenCode's `oauthURLs`, `userURL`, `baseURL`). The
+ * domain is kept on the login (`metadata.enterpriseUrl`, as OpenCode keeps it).
  *
  * The GitHub token it ends with is itself the bearer on Copilot's API, and it
  * does not expire, so there is nothing to refresh. The account's own API
@@ -15,6 +19,7 @@
 import { z } from "zod";
 import { DirectSigninError } from "@/lib/agents/signin-direct";
 import type { LoginRequest } from "@/lib/agents/provider-login-http";
+import { copilotDomain } from "@/lib/agents/login-instances";
 
 // github-copilot.ts line 22: OpenCode's public OAuth app (device flow, no
 // secret), reused as Polaris reuses the Codex CLI's id for the ChatGPT login.
@@ -27,6 +32,18 @@ export const COPILOT_DEVICE_URL = "https://github.com/login/device/code";
 export const COPILOT_TOKEN_URL = "https://github.com/login/oauth/access_token";
 export const COPILOT_USER_URL = "https://api.github.com/copilot_internal/user";
 export const COPILOT_BASE_URL = "https://api.githubcopilot.com";
+
+/** Where a login on a domain signs in and reads its account; GitHub.com's
+ *  when there is none. */
+export function copilotUrls(domain: string | null): { device: string; token: string; user: string } {
+    if (!domain) return { device: COPILOT_DEVICE_URL, token: COPILOT_TOKEN_URL, user: COPILOT_USER_URL };
+    return {
+        device: `https://${domain}/login/device/code`,
+        token: `https://${domain}/login/oauth/access_token`,
+        user: `https://api.${domain}/copilot_internal/user`
+    };
+}
+
 const DEVICE_GRANT = "urn:ietf:params:oauth:grant-type:device_code";
 /** GitHub's device codes live fifteen minutes; the answer carries no lifetime
  *  OpenCode reads, so the code is given that. */
@@ -59,13 +76,16 @@ export interface CopilotDevice {
     readonly verificationUrl: string;
     readonly intervalMs: number;
     readonly expiresAt: number;
+    /** The GitHub Enterprise domain; absent on GitHub.com. */
+    readonly domain?: string;
 }
 
-/** A finished login: the GitHub token, and the account's API address when
- *  GitHub named one. */
+/** A finished login: the GitHub token, the account's API address when
+ *  GitHub named one, and the Enterprise domain it was made on. */
 export interface CopilotLogin {
     readonly token: string;
     readonly apiEndpoint: string | null;
+    readonly enterpriseUrl?: string;
 }
 
 export type CopilotPoll =
@@ -79,8 +99,12 @@ function ok(status: number): boolean {
     return status >= 200 && status < 300;
 }
 
-export async function requestCopilotDevice(request: LoginRequest, now: number): Promise<CopilotDevice> {
-    const response = await request(COPILOT_DEVICE_URL, {
+export async function requestCopilotDevice(
+    request: LoginRequest,
+    now: number,
+    domain: string | null = null
+): Promise<CopilotDevice> {
+    const response = await request(copilotUrls(domain).device, {
         method: "POST",
         headers: JSON_HEADERS,
         json: { client_id: COPILOT_CLIENT_ID, scope: "read:user" }
@@ -93,7 +117,8 @@ export async function requestCopilotDevice(request: LoginRequest, now: number): 
         userCode: parsed.data.user_code,
         verificationUrl: parsed.data.verification_uri,
         intervalMs: Math.max(parsed.data.interval, 1) * 1000,
-        expiresAt: now + DEVICE_LIFETIME_MS
+        expiresAt: now + DEVICE_LIFETIME_MS,
+        ...(domain ? { domain } : {})
     };
 }
 
@@ -104,7 +129,8 @@ export async function pollCopilotDevice(
     now: number
 ): Promise<CopilotPoll> {
     if (now >= device.expiresAt) return { state: "expired" };
-    const response = await request(COPILOT_TOKEN_URL, {
+    const urls = copilotUrls(device.domain ?? null);
+    const response = await request(urls.token, {
         method: "POST",
         headers: JSON_HEADERS,
         json: { client_id: COPILOT_CLIENT_ID, device_code: device.deviceCode, grant_type: DEVICE_GRANT }
@@ -113,7 +139,7 @@ export async function pollCopilotDevice(
     const parsed = tokenSchema.safeParse(response.json);
     if (!parsed.success) throw new DirectSigninError("copilot device token: unexpected answer");
     const { access_token: token, error } = parsed.data;
-    if (token) return copilotAccount(request, token);
+    if (token) return copilotAccount(request, token, device.domain ?? null);
     if (error === "authorization_pending") return { state: "pending" };
     if (error === "slow_down") return { state: "slower" };
     if (error === "access_denied") return { state: "denied" };
@@ -124,8 +150,8 @@ export async function pollCopilotDevice(
 /** The account behind a fresh token. Only an explicit "no chat" refuses the
  *  login; a failed or malformed lookup must not turn a GitHub hiccup into a
  *  denial (github-copilot.ts, the comment over `orElseSucceed`). */
-async function copilotAccount(request: LoginRequest, token: string): Promise<CopilotPoll> {
-    const user = await request(COPILOT_USER_URL, {
+async function copilotAccount(request: LoginRequest, token: string, domain: string | null): Promise<CopilotPoll> {
+    const user = await request(copilotUrls(domain).user, {
         method: "GET",
         headers: {
             Accept: "application/json",
@@ -139,12 +165,17 @@ async function copilotAccount(request: LoginRequest, token: string): Promise<Cop
         return { state: "no-copilot", canSignUp: account.can_signup_for_limited === true };
     }
     const api = account?.endpoints?.api?.replace(/\/+$/, "") ?? null;
-    return { state: "done", login: { token, apiEndpoint: api && api.startsWith("https://") ? api : null } };
+    const login = { token, apiEndpoint: api && api.startsWith("https://") ? api : null };
+    return { state: "done", login: domain ? { ...login, enterpriseUrl: domain } : login };
 }
 
-/** Where a chat is sent: the account's own address when GitHub named one. */
-export function copilotBaseUrl(apiEndpoint: string | null | undefined): string {
-    return apiEndpoint || COPILOT_BASE_URL;
+/** Where a chat is sent: the account's own address when GitHub named one,
+ *  else its Enterprise domain's Copilot API, else GitHub.com's (OpenCode's
+ *  `copilotBaseURL`). A stored domain is read through the typed rules again. */
+export function copilotBaseUrl(apiEndpoint: string | null | undefined, enterpriseUrl?: string | null): string {
+    if (apiEndpoint) return apiEndpoint;
+    const domain = enterpriseUrl ? copilotDomain(enterpriseUrl) : null;
+    return domain ? `https://copilot-api.${domain}` : COPILOT_BASE_URL;
 }
 
 /** The headers every Copilot chat carries (github-copilot.ts `applyHeaders`).

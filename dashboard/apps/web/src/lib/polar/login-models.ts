@@ -60,7 +60,7 @@ export function loginListsModel(provider: string, model: string): boolean {
 }
 
 export function copilotModel(credential: ChatCredential, model: string): LanguageModel {
-    const baseURL = copilotBaseUrl(credential.oauth?.apiEndpoint);
+    const baseURL = copilotBaseUrl(credential.oauth?.apiEndpoint, credential.oauth?.enterpriseUrl);
     const headers = copilotChatHeaders();
     if (copilotEndpoint(model) === "responses") {
         const client = createOpenAI({ name: "github-copilot", baseURL, apiKey: credential.secret, headers });

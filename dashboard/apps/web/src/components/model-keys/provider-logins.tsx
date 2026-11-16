@@ -31,7 +31,12 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
 import type { GoUsageRow } from "@/lib/agents/go-usage";
 import type { LoginStart, LoginState, ProviderLogin } from "@/lib/agents/provider-logins";
-import { GITLAB_CLIENT_ID_PATTERN, gitlabInstanceUrl, type GitlabInstance } from "@/lib/agents/login-instances";
+import {
+    GITLAB_CLIENT_ID_PATTERN,
+    copilotDomain,
+    gitlabInstanceUrl,
+    type GitlabInstance
+} from "@/lib/agents/login-instances";
 import {
     finishGitlabLoginAction,
     goUsageAction,
@@ -186,19 +191,28 @@ function LoginDialog({ provider, name, onClose }: { provider: ProviderLogin; nam
     const [pasted, setPasted] = useState("");
     const [busy, setBusy] = useState(false);
     const [pastedError, setPastedError] = useState(false);
-    // A self-managed GitLab: null is gitlab.com; `asking` shows its form.
+    // A self-managed GitLab or a GitHub Enterprise domain: null is the
+    // vendor's public one; `asking` shows its form.
     const [instance, setInstance] = useState<GitlabInstance | null>(null);
+    const [domain, setDomain] = useState<string | null>(null);
     const [asking, setAsking] = useState(false);
     const started = useRef(false);
 
-    /** Starts a login, on the instance given (GitLab) or the vendor's own. */
-    const begin = (on: GitlabInstance | null) => {
+    /** Starts a login, on the instance or domain given or the vendor's own. */
+    const begin = (on: GitlabInstance | null, enterprise: string | null = null) => {
         setStart(null);
         setEnded(null);
         setPasted("");
         setPastedError(false);
         void runAction(
-            () => startProviderLoginAction(on ? { provider: "gitlab" as const, gitlab: on } : provider),
+            () =>
+                startProviderLoginAction(
+                    on
+                        ? { provider: "gitlab" as const, gitlab: on }
+                        : enterprise
+                          ? { provider: "github-copilot" as const, copilotDomain: enterprise }
+                          : provider
+                ),
             () => setEnded({ state: "failed" })
         ).then((answer) => {
             if (!answer) return;
@@ -254,7 +268,17 @@ function LoginDialog({ provider, name, onClose }: { provider: ProviderLogin; nam
                     <DialogTitle>{t("aiKeys.logins.signIn", { name })}</DialogTitle>
                 </DialogHeader>
                 <div className="flex min-w-0 flex-col gap-3 text-sm">
-                    {asking ? (
+                    {asking && provider === "github-copilot" ? (
+                        <CopilotDomainForm
+                            initial={domain}
+                            onCancel={() => setAsking(false)}
+                            onUse={(next) => {
+                                setAsking(false);
+                                setDomain(next);
+                                begin(null, next);
+                            }}
+                        />
+                    ) : asking ? (
                         <GitlabInstanceForm
                             initial={instance}
                             onCancel={() => setAsking(false)}
@@ -327,10 +351,36 @@ function LoginDialog({ provider, name, onClose }: { provider: ProviderLogin; nam
                                     </p>
                                 </div>
                             ) : (
-                                <p className="text-muted-foreground flex items-center gap-2 text-xs">
-                                    <Loader2 className="size-3 shrink-0 animate-spin" />
-                                    {t("aiKeys.logins.waiting")}
-                                </p>
+                                <>
+                                    <p className="text-muted-foreground flex items-center gap-2 text-xs">
+                                        <Loader2 className="size-3 shrink-0 animate-spin" />
+                                        {t("aiKeys.logins.waiting")}
+                                    </p>
+                                    {provider === "github-copilot" ? (
+                                        <p className="text-muted-foreground flex min-w-0 flex-wrap items-center gap-x-2 text-xs">
+                                            <span className="min-w-0 truncate" title={domain ?? undefined}>
+                                                {domain
+                                                    ? t("aiKeys.logins.copilot.on", { domain })
+                                                    : t("aiKeys.logins.copilot.onCom")}
+                                            </span>
+                                            <button type="button" className="shrink-0 underline" onClick={() => setAsking(true)}>
+                                                {domain ? t("aiKeys.logins.copilot.change") : t("aiKeys.logins.copilot.enterprise")}
+                                            </button>
+                                            {domain ? (
+                                                <button
+                                                    type="button"
+                                                    className="shrink-0 underline"
+                                                    onClick={() => {
+                                                        setDomain(null);
+                                                        begin(null);
+                                                    }}
+                                                >
+                                                    {t("aiKeys.logins.copilot.useCom")}
+                                                </button>
+                                            ) : null}
+                                        </p>
+                                    ) : null}
+                                </>
                             )}
                         </>
                     )}
@@ -423,6 +473,55 @@ function GitlabInstanceForm({
                     {t("aiKeys.logins.gitlab.back")}
                 </Button>
                 <Button type="submit" size="sm" disabled={!ready}>
+                    {t("aiKeys.logins.gitlab.use")}
+                </Button>
+            </div>
+        </form>
+    );
+}
+
+/** A GitHub Enterprise domain for Copilot, checked as typed with the rules the
+ *  server applies; an empty field is incomplete, not wrong. */
+function CopilotDomainForm({
+    initial,
+    onUse,
+    onCancel
+}: {
+    initial: string | null;
+    onUse: (domain: string) => void;
+    onCancel: () => void;
+}) {
+    const t = useTranslations("account");
+    const [typed, setTyped] = useState(initial ?? "");
+    const domain = copilotDomain(typed);
+    const wrong = typed.trim() !== "" && domain === null;
+    return (
+        <form
+            className="flex min-w-0 flex-col gap-3"
+            onSubmit={(event) => {
+                event.preventDefault();
+                if (domain) onUse(domain);
+            }}
+        >
+            <p>{t("aiKeys.logins.copilot.intro")}</p>
+            <label className="flex min-w-0 flex-col gap-1">
+                <span className="text-xs font-medium">{t("aiKeys.logins.copilot.domain")} *</span>
+                <Input
+                    value={typed}
+                    onChange={(event) => setTyped(event.target.value)}
+                    placeholder="company.ghe.com" // i18n-ignore: domain shape
+                    inputMode="url"
+                    autoComplete="off"
+                    spellCheck={false}
+                    aria-invalid={wrong || undefined}
+                />
+                {wrong ? <span className="text-destructive text-xs">{t("aiKeys.logins.copilot.badDomain")}</span> : null}
+            </label>
+            <div className="flex flex-wrap justify-end gap-2">
+                <Button type="button" size="sm" variant="outline" onClick={onCancel}>
+                    {t("aiKeys.logins.gitlab.back")}
+                </Button>
+                <Button type="submit" size="sm" disabled={domain === null}>
                     {t("aiKeys.logins.gitlab.use")}
                 </Button>
             </div>
