@@ -1419,65 +1419,105 @@ async function threadFor(accountId: string, envelope: core.MailEnvelope): Promis
 const MAX_THREAD_SIZE = 2_147_483_647;
 
 export async function refreshThreads(accountId: string): Promise<void> {
-    const stale = await prisma.mailThread.findMany({
+    // Three reads and the writes that change something, rather than a read and a
+    // write per conversation: this runs after every page a sync stores, and one
+    // at a time it was a thousand round trips for a mailbox of five hundred
+    // conversations, nearly all of them rewriting a row with what it held.
+    const threads = await prisma.mailThread.findMany({
         where: { accountId },
-        select: { id: true },
+        select: {
+            id: true,
+            subject: true,
+            participants: true,
+            messageCount: true,
+            unreadCount: true,
+            starred: true,
+            important: true,
+            hasAttachments: true,
+            size: true,
+            snippet: true,
+            firstMessageAt: true,
+            lastMessageAt: true
+        },
         orderBy: { lastMessageAt: "desc" },
         take: 500
     });
-    for (const thread of stale) {
-        const messages = await prisma.mailMessage.findMany({
-            where: { threadId: thread.id },
-            select: {
-                seen: true,
-                flagged: true,
-                important: true,
-                sentAt: true,
-                snippet: true,
-                subject: true,
-                fromJson: true,
-                toJson: true,
-                hasAttachments: true,
-                size: true
-            },
-            orderBy: { sentAt: "asc" }
-        });
-        if (messages.length === 0) {
-            await prisma.mailThread.delete({ where: { id: thread.id } }).catch(() => undefined);
-            continue;
-        }
+    if (threads.length === 0) return;
+    const rows = await prisma.mailMessage.findMany({
+        where: { threadId: { in: threads.map((thread) => thread.id) } },
+        select: {
+            threadId: true,
+            seen: true,
+            flagged: true,
+            important: true,
+            sentAt: true,
+            snippet: true,
+            subject: true,
+            fromJson: true,
+            toJson: true,
+            hasAttachments: true,
+            size: true
+        },
+        orderBy: { sentAt: "asc" }
+    });
+    const byThread = new Map<string, typeof rows>();
+    for (const row of rows) {
+        if (!row.threadId) continue;
+        const list = byThread.get(row.threadId) ?? [];
+        list.push(row);
+        byThread.set(row.threadId, list);
+    }
+
+    const empty: string[] = [];
+    for (const thread of threads) {
+        const messages = byThread.get(thread.id) ?? [];
         const newest = messages.at(-1);
         const oldest = messages[0];
-        if (!newest || !oldest) continue;
+        if (!newest || !oldest) {
+            empty.push(thread.id);
+            continue;
+        }
         const participants = core.dedupeAddresses(
             messages.flatMap((message) => [
                 ...addressesFrom(message.fromJson),
                 ...addressesFrom(message.toJson)
             ])
         );
+        const next = {
+            subject: oldest.subject,
+            messageCount: messages.length,
+            unreadCount: messages.filter((message) => !message.seen).length,
+            starred: messages.some((message) => message.flagged),
+            important: messages.some((message) => message.important),
+            hasAttachments: messages.some((message) => message.hasAttachments),
+            // What the server said each message weighs, added up. A message
+            // whose size the server never gave counts as nothing, which is
+            // the honest answer: nought is what is known about it.
+            size: Math.min(
+                messages.reduce((total, message) => total + message.size, 0),
+                MAX_THREAD_SIZE
+            ),
+            snippet: newest.snippet,
+            firstMessageAt: oldest.sentAt,
+            lastMessageAt: newest.sentAt
+        };
+        const unchanged =
+            JSON.stringify(thread.participants) === JSON.stringify(participants) &&
+            (Object.keys(next) as (keyof typeof next)[]).every((key) => {
+                const before = thread[key];
+                const after = next[key];
+                return before instanceof Date && after instanceof Date
+                    ? before.getTime() === after.getTime()
+                    : before === after;
+            });
+        if (unchanged) continue;
         await prisma.mailThread.update({
             where: { id: thread.id },
-            data: {
-                subject: oldest.subject,
-                participants: asJson(participants),
-                messageCount: messages.length,
-                unreadCount: messages.filter((message) => !message.seen).length,
-                starred: messages.some((message) => message.flagged),
-                important: messages.some((message) => message.important),
-                hasAttachments: messages.some((message) => message.hasAttachments),
-                // What the server said each message weighs, added up. A message
-                // whose size the server never gave counts as nothing, which is
-                // the honest answer: nought is what is known about it.
-                size: Math.min(
-                    messages.reduce((total, message) => total + message.size, 0),
-                    MAX_THREAD_SIZE
-                ),
-                snippet: newest.snippet,
-                firstMessageAt: oldest.sentAt,
-                lastMessageAt: newest.sentAt
-            }
+            data: { ...next, participants: asJson(participants) }
         });
     }
+    if (empty.length > 0)
+        await prisma.mailThread.deleteMany({ where: { id: { in: empty } } }).catch(() => undefined);
 }
 
 /* -------------------------------------------------------------------------- */
