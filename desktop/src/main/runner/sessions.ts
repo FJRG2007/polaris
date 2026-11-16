@@ -58,6 +58,12 @@ export interface SessionDeps {
 const REPLAY_BYTES = 64 * 1024;
 /** Output is gathered this long before it is sent, so a burst is one frame. */
 const FLUSH_MS = 16;
+/** How long an ended session's checkout stays readable, so the server's last
+ *  history and workspace reads after the exit still find it. The server sends
+ *  no word that it has finished reading, so time bounds it. */
+export const ENDED_READABLE_MS = 10 * 60 * 1000;
+/** Ended sessions kept readable at once; the oldest goes first past it. */
+const ENDED_KEPT = 32;
 /** Quiet after the agent's first output before a queued prompt is typed. */
 const SETTLE_MS = 1500;
 
@@ -80,6 +86,8 @@ interface Held {
 
 export class SessionHost {
     readonly #held = new Map<string, Held>();
+    /** Checkouts of sessions that ended, readable until `ENDED_READABLE_MS`. */
+    readonly #ended = new Map<string, Checkout>();
     readonly #setTimer: (run: () => void, ms: number) => unknown;
 
     constructor(private readonly deps: SessionDeps) {
@@ -93,7 +101,19 @@ export class SessionHost {
     /** Where a held session works, for `workspace.read`. Null for a session
      *  this computer does not hold or that is not in place yet. */
     checkout(sessionId: string): Checkout | null {
-        return this.#held.get(sessionId)?.checkout ?? null;
+        return this.#held.get(sessionId)?.checkout ?? this.#ended.get(sessionId) ?? null;
+    }
+
+    /** Keep an ended session's checkout readable for a while. */
+    #keepReadable(held: Held): void {
+        if (!held.checkout) return;
+        this.#ended.delete(held.id);
+        this.#ended.set(held.id, held.checkout);
+        while (this.#ended.size > ENDED_KEPT) this.#ended.delete(this.#ended.keys().next().value!);
+        const checkout = held.checkout;
+        this.#setTimer(() => {
+            if (this.#ended.get(held.id) === checkout) this.#ended.delete(held.id);
+        }, ENDED_READABLE_MS);
     }
 
     /** One server frame about a session. Answers false for a frame that is not
@@ -154,6 +174,7 @@ export class SessionHost {
         if (!held || held.stopped) return;
         held.stopped = true;
         this.#held.delete(sessionId);
+        this.#keepReadable(held);
         try {
             held.terminal?.kill();
         } catch {
@@ -170,6 +191,7 @@ export class SessionHost {
     async #start(start: launch.SessionStart): Promise<void> {
         const { deps } = this;
         if (this.#held.has(start.sessionId)) return;
+        this.#ended.delete(start.sessionId);
         if (this.#held.size >= deps.maxSessions) {
             deps.send({ type: "session.ended", sessionId: start.sessionId, reason: "failed", detail: "This computer is running as many sessions as it allows." });
             return;
@@ -227,6 +249,7 @@ export class SessionHost {
                 this.#flush(held);
                 held.stopped = true;
                 this.#held.delete(held.id);
+                this.#keepReadable(held);
                 deps.send({ type: "session.ended", sessionId: held.id, reason: "exited", exitCode });
             });
             deps.send({

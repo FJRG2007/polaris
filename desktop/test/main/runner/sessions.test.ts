@@ -108,8 +108,28 @@ describe("runner sessions", () => {
         expect(host.ids()).toEqual([SESSION_ID]);
         expect(host.checkout(SESSION_ID)).toEqual({ workdir: join(ROOT, "sessions", SESSION_ID), env: { PATH: "/tc/bin" } });
         expect(host.checkout("0b7c5d1e-0000-4000-8000-000000000000")).toBeNull();
+    });
+
+    it("keeps an ended session's checkout readable until the grace timer runs", async () => {
+        const { host, timers, terminal } = harness();
+        host.handle(start);
+        await settle();
+        const checkout = { workdir: join(ROOT, "sessions", SESSION_ID), env: { PATH: "/tc/bin" } };
         host.stop(SESSION_ID, "stopped");
+        expect(host.ids()).toEqual([]);
+        expect(host.checkout(SESSION_ID)).toEqual(checkout);
+        timers.at(-1)!();
         expect(host.checkout(SESSION_ID)).toBeNull();
+
+        // An exit keeps it too.
+        const again = harness();
+        again.host.handle(start);
+        await settle();
+        again.terminal.exit!({ exitCode: 0 });
+        expect(again.host.checkout(SESSION_ID)).toEqual(checkout);
+        again.timers.at(-1)!();
+        expect(again.host.checkout(SESSION_ID)).toBeNull();
+        expect(terminal.killed).toBe(true);
     });
 
     it("queues a prompt until the agent has drawn, then types it as a paste", async () => {
