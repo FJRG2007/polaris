@@ -131,6 +131,7 @@ describe("polarTools", () => {
         );
         expect(toolset.described.tasks_list).toEqual({
             title: "List tasks",
+            category: "productivity",
             writes: false,
             destructive: false
         });

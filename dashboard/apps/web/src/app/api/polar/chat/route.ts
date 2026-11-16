@@ -9,10 +9,11 @@
  * run as the person, and any that can change something waits for an approval
  * in the chat (`toolApproval`). The page context arrives fenced as data, on
  * the question it was asked with (`withScreenNotes`), never in the system
- * prompt: the prompt stays byte-identical across screens and the tools across
- * screens of one app, so the provider's prompt cache keeps hitting. The model
- * is sent the core tools and the current app's (`tool-relevance.ts`);
- * `find_tools` brings in the rest. A chat with a `/goal` has each finished
+ * prompt: the prompt and the tools stay byte-identical across screens, so the
+ * provider's prompt cache keeps hitting. The tools are Polaris's own MCP
+ * server reached in-process (`tools.ts`) and the person's connectors; the
+ * model is sent their discovery tools, not their catalogues
+ * (`tool-relevance.ts`), and what discovery loads from the next step on. A chat with a `/goal` has each finished
  * turn judged against it inside this same stream (`goal-service.ts`); the
  * screen sends the next turn only on a not-met verdict, and this route admits
  * it only while the goal has turns and time left.
@@ -46,6 +47,7 @@ import {
     FIND_TOOLS,
     READ_CURRENT_VIEW,
     activeToolNames,
+    boundedLoad,
     currentViewTool,
     findToolsTool,
     nextStep,
@@ -268,7 +270,10 @@ export async function POST(request: Request): Promise<Response> {
     // read again on every turn so an edit to the agent reaches it at once.
     const agent = await polarThreadAgent(user.id, body.data.threadId, body.data.agentId);
     const [toolset, connectorSet] = await Promise.all([
-        polarTools(user, body.data.code),
+        polarTools(user, body.data.code, {
+            tools: body.data.off,
+            servers: body.data.serversOff
+        }),
         polarConnectorTools(
             user,
             access,
@@ -281,9 +286,13 @@ export async function POST(request: Request): Promise<Response> {
         ...Object.fromEntries(Object.keys(toolset.tools).map((name) => [name, {}])),
         ...connectorSet.described
     });
-    const catalog = toolset.catalog.filter((entry) => !off.has(entry.name));
-    // The connector tools this turn offers: always sent (`always` below), and
-    // found by find_tools too, so a search for the service lands on them.
+    // What discovery searches and loads from: Polaris's tools, and the
+    // connectors' while they are on for this turn.
+    const catalog = [
+        ...toolset.catalog,
+        ...(body.data.connectors ? connectorSet.catalog : [])
+    ].filter((entry) => !off.has(entry.name));
+    // The connector tools this turn offers, for the system prompt's naming.
     const offeredConnectors = body.data.connectors
         ? Object.keys(connectorSet.tools).filter((name) => !off.has(name))
         : [];
@@ -294,10 +303,7 @@ export async function POST(request: Request): Promise<Response> {
         ...currentViewTool(body.data.context, async (name, input) =>
             off.has(name) ? null : toolset.call(name, input)
         ),
-        ...findToolsTool([
-            ...catalog,
-            ...connectorSet.catalog.filter((entry) => offeredConnectors.includes(entry.name))
-        ])
+        ...findToolsTool(catalog)
     };
     const visualTools = polarVisualTools();
     const weatherTools = polarWeatherTools();
@@ -556,8 +562,8 @@ export async function POST(request: Request): Promise<Response> {
         },
         started: { count: 0 }
     });
-    // What the model is sent: the core and the current app's tools, and any
-    // this conversation already reached for. Every one stays registered, so an
+    // What the model is sent: the discovery tools, and any tool this
+    // conversation already reached for or loaded. Every one stays registered, so an
     // approval or an older turn naming one still resolves.
     const always = [
         READ_CURRENT_VIEW,
@@ -568,8 +574,6 @@ export async function POST(request: Request): Promise<Response> {
         ...Object.keys(web ? weatherTools : {}),
         ...(repoOffered ? Object.keys(repoTools) : []),
         ...(browserOffered ? [BROWSER_TOOL] : []),
-        // A connector is one the person added on purpose: its tools are always sent.
-        ...offeredConnectors,
         // Skills are listed in the system prompt, so the tool that reads them goes with it.
         ...(USE_SKILL in skillTools ? [USE_SKILL] : []),
         ...(TASK_TOOL in taskTools ? [TASK_TOOL] : []),
@@ -585,9 +589,8 @@ export async function POST(request: Request): Promise<Response> {
     const activeFor = (found: ReadonlySet<string>) =>
         activeToolNames(
             catalog,
-            body.data.context?.app,
             always,
-            new Set([...used, ...found])
+            boundedLoad(found, used)
         ) as (keyof typeof tools & string)[];
     // A tool that throws is told apart from the provider failing (`tool-failure.ts`).
     const turnTools = withTaggedToolErrors({ ...tools, ...taskTools, ...askTools });

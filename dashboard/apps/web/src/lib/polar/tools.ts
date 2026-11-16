@@ -1,10 +1,18 @@
 /**
- * Polaris's own MCP tools, handed to Polar in-process for the signed-in person.
+ * Polaris's own MCP server as Polar's built-in connector, for the signed-in
+ * person.
  *
- * The same tool list (`lib/mcp/catalog.ts`), the same handlers and the same
- * scope check as a connected assistant gets - only the caller is built from the
- * session rather than from a key: every scope whose permission the person holds
- * right now, and never an administrator's view-as. No token is minted.
+ * Every call goes through the MCP server itself, in-process
+ * (`lib/mcp/in-process.ts`): the same `tools/call` an external assistant
+ * makes, held to the same scope check, input parse and record-level checks.
+ * Only the caller is built from the session rather than from a key: every
+ * scope whose permission the person holds right now, never an administrator's
+ * view-as, and the tools they switched off `hidden`, so the server neither
+ * lists, runs nor names them in its discovery answers. No token is minted.
+ *
+ * Every tool stays registered so an older turn naming one still validates;
+ * which ones the model is SENT is `tool-relevance.ts`'s: the discovery tools
+ * and whatever they loaded.
  *
  * A tool that can change anything (`readOnly: false`) is marked for approval,
  * so the chat shows a card and nothing runs until the person says yes - unless
@@ -17,19 +25,20 @@
 
 import { tool, type ToolSet } from "ai";
 import { mcpTools } from "@/lib/mcp/catalog";
+import { connectInProcess } from "@/lib/mcp/in-process";
 import { sessionCan, type SessionUser } from "@/lib/session";
-import { MCP_SCOPES, scopeRequires, type McpScope } from "@/lib/mcp/scope-table";
 import {
-    McpRefusal,
-    callerMayUse,
-    toolCategory,
-    type McpCaller,
-    type McpTool
-} from "@/lib/mcp/protocol";
+    MCP_SCOPES,
+    scopeRequires,
+    type McpCategory,
+    type McpScope
+} from "@/lib/mcp/scope-table";
+import { callerMayUse, toolCategory, type McpCaller, type McpTool } from "@/lib/mcp/protocol";
 import type { CatalogEntry } from "@/lib/polar/tool-relevance";
 import { callTarget, grantCovers, grantKeys } from "@/lib/polar/tool-grants";
 import { polarInputSchema } from "@/lib/polar/tool-input";
 import { codeTaskInput, type PolarCodeTask } from "@/lib/polar/code-task";
+import { POLARIS_SERVER } from "@/lib/polar/tool-servers";
 
 /** The scopes this person holds, worked out once per request. */
 export async function sessionScopes(user: SessionUser): Promise<McpScope[]> {
@@ -43,13 +52,37 @@ export async function sessionScopes(user: SessionUser): Promise<McpScope[]> {
     return scopes;
 }
 
-/** The person as an MCP caller: their own scopes, never a view-as. */
-export async function polarCaller(user: SessionUser): Promise<McpCaller> {
+/** The person as an MCP caller: their own scopes, never a view-as, and the
+ *  tools they switched off hidden from the server's answers. */
+export async function polarCaller(
+    user: SessionUser,
+    hidden: ReadonlySet<string> | null = null
+): Promise<McpCaller> {
     return {
         userId: user.id,
         isAdmin: user.isAdmin && !user.viewingAs,
-        scopes: await sessionScopes(user)
+        scopes: await sessionScopes(user),
+        ...(hidden && hidden.size > 0 ? { hidden } : {})
     };
+}
+
+/** The person's own switches for Polaris's tools, as the settings store them:
+ *  tools off by name, servers off by id (`tool-servers.ts`). */
+export interface PolarToolsOff {
+    readonly tools: readonly string[];
+    readonly servers: readonly string[];
+}
+
+/** Which of Polaris's tools are switched off: every one while the Polaris
+ *  server is, else the ones switched off by name. */
+export function hiddenPolarisTools(
+    off: PolarToolsOff | null,
+    names: readonly string[]
+): Set<string> {
+    if (!off) return new Set();
+    if (off.servers.includes(POLARIS_SERVER)) return new Set(names);
+    const known = new Set(names);
+    return new Set(off.tools.filter((name) => known.has(name)));
 }
 
 /** Whether a tool must be approved in the chat before it runs. */
@@ -57,14 +90,25 @@ export function needsApproval(entry: Pick<McpTool<never>, "readOnly">): boolean 
     return !entry.readOnly;
 }
 
+/** One of Polaris's tools as the settings screen and the cards describe it. */
+export interface PolarToolDescription {
+    title: string;
+    /** The heading it is listed under, the MCP server's own (`polaris_tools`). */
+    category: McpCategory;
+    writes: boolean;
+    destructive: boolean;
+}
+
 export interface PolarToolSet {
     tools: ToolSet;
     /** Tool name to whether a call waits for the person, for streamText's
      *  `toolApproval`: approved when a stored grant covers it, else asked. */
     approval: Record<string, (input: unknown) => Promise<"approved" | "user-approval">>;
-    /** Name to the title and whether it writes, for the cards. */
-    described: Record<string, { title: string; writes: boolean; destructive: boolean }>;
-    /** Every tool here, in catalog order, for choosing which the model sees. */
+    /** Name to the title, category and whether it writes, for the cards and
+     *  the settings screen. */
+    described: Record<string, PolarToolDescription>;
+    /** Every tool the person may use and has not switched off, in catalog
+     *  order: what discovery searches and loads from. */
     catalog: CatalogEntry[];
     /** Runs a read-only tool as the person, for `read_current_view`: null when
      *  it is not theirs to use or would change something. */
@@ -77,16 +121,12 @@ type RunOutcome =
     | { kind: "invalid" }
     | { kind: "ran"; ok: boolean; text: string; data: unknown };
 
-/** What a tool answers when it refused or failed, as the model reads it. */
-function failure(entry: McpTool<never>, error: unknown): string {
-    if (error instanceof McpRefusal) return error.message;
-    console.error(`polar: ${entry.name} failed`, error);
-    return `${entry.name} could not be completed. Polaris has logged why.`;
-}
-
 /**
  * The tools this person may use, as AI SDK tools. One they hold no scope for is
- * not offered at all, the way `tools/list` leaves it out for a key.
+ * not offered at all, the way `tools/list` leaves it out for a key. `off` is
+ * the person's own switches: a tool switched off stays registered, so an older
+ * turn naming it still validates, but the server refuses it and discovery
+ * never finds it.
  *
  * `codeTask` is the Code task the chat is on: a tool that would put work on a
  * repository takes that one, or none for "No repository", whatever the model
@@ -96,25 +136,29 @@ function failure(entry: McpTool<never>, error: unknown): string {
  */
 export async function polarTools(
     user: SessionUser,
-    codeTask: PolarCodeTask | null = null
+    codeTask: PolarCodeTask | null = null,
+    off: PolarToolsOff | null = null
 ): Promise<PolarToolSet> {
-    const caller = await polarCaller(user);
+    const catalogue = await mcpTools();
+    const hidden = hiddenPolarisTools(
+        off,
+        catalogue.map((entry) => entry.name)
+    );
+    const caller = await polarCaller(user, hidden);
     const readers = new Map<string, McpTool<never>>();
     const runAs = async (entry: McpTool<never>, written: unknown): Promise<RunOutcome> => {
         const input = codeTaskInput(entry.name, written, codeTask);
         // Checked again at the moment it runs: an approval can sit for a
         // while, and a permission removed in between must hold.
-        const fresh = { ...caller, scopes: await sessionScopes(user) };
+        const fresh: McpCaller = { ...caller, scopes: await sessionScopes(user) };
         if (!callerMayUse(entry, fresh)) return { kind: "denied" };
-        // Checked as the model wrote it, parsed here: see `tool-input.ts`.
-        const parsed = entry.input.safeParse(input);
-        if (!parsed.success) return { kind: "invalid" };
-        try {
-            const answer = await entry.run(parsed.data as never, fresh);
-            return { kind: "ran", ok: true, text: answer.text, data: answer.structured ?? null };
-        } catch (error) {
-            return { kind: "ran", ok: false, text: failure(entry, error), data: null };
-        }
+        // Through the MCP server, as an external client's call goes: its scope
+        // check, its parse of the input as the model wrote it (see
+        // `tool-input.ts`), the tool's own checks, and its refusal wording.
+        const outcome = await connectInProcess(fresh, catalogue).call(entry.name, input);
+        if (outcome.kind === "missing") return { kind: "denied" };
+        if (outcome.kind === "invalid") return { kind: "invalid" };
+        return { kind: "ran", ok: outcome.ok, text: outcome.text, data: outcome.structured };
     };
     const result: PolarToolSet = {
         tools: {},
@@ -132,15 +176,19 @@ export async function polarTools(
         }
     };
     const grants = await grantKeys(user.id);
-    for (const entry of await mcpTools()) {
+    for (const entry of catalogue) {
         if (!callerMayUse(entry, caller)) continue;
         const writes = needsApproval(entry);
         if (!writes) readers.set(entry.name, entry);
-        result.catalog.push({
-            name: entry.name,
-            description: entry.description,
-            category: toolCategory(entry)
-        });
+        // A tool switched off stays registered, for older turns, but is never
+        // offered, searched or loaded.
+        if (!hidden.has(entry.name)) {
+            result.catalog.push({
+                name: entry.name,
+                description: entry.description,
+                category: toolCategory(entry)
+            });
+        }
         result.tools[entry.name] = tool({
             description: entry.description,
             inputSchema: polarInputSchema(entry.input, (value) =>
@@ -170,6 +218,7 @@ export async function polarTools(
         }
         result.described[entry.name] = {
             title: entry.title ?? entry.name,
+            category: toolCategory(entry),
             writes,
             destructive: writes && (entry.destructive ?? true)
         };

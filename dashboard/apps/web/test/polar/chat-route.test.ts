@@ -319,6 +319,31 @@ function calls(toolName: string, input: object): LanguageModelV4StreamPart[] {
     ];
 }
 
+/** A conversation in which discovery already loaded both of Polaris's tools:
+ *  only the discovery tools are sent until something loads a tool. */
+const LOADED = [
+    { id: "u0", role: "user", parts: [{ type: "text", text: "What can you do with tasks?" }] },
+    {
+        id: "a0",
+        role: "assistant",
+        parts: [
+            {
+                type: "tool-find_tools",
+                toolCallId: "find-1",
+                state: "output-available",
+                input: { names: ["read_tasks", "delete_task"] },
+                output: {
+                    tools: [
+                        { name: "read_tasks", description: "Lists tasks" },
+                        { name: "delete_task", description: "Deletes a task" }
+                    ]
+                }
+            }
+        ]
+    },
+    { id: "u1", role: "user", parts: [{ type: "text", text: "Tidy my tasks" }] }
+];
+
 function body(overrides: Record<string, unknown> = {}): Record<string, unknown> {
     return {
         threadId: THREAD,
@@ -687,7 +712,7 @@ describe("what a request has to look like", () => {
 describe("tools", () => {
     it("runs a read tool without asking", async () => {
         state.parts = calls("read_tasks", {});
-        const text = await (await post(body())).text();
+        const text = await (await post(body({ messages: LOADED }))).text();
         expect(state.executed).toEqual(["read_tasks"]);
         expect(text).not.toContain("tool-approval-request");
         expect(text).toContain("Here you go.");
@@ -695,7 +720,7 @@ describe("tools", () => {
 
     it("stops a write tool at an approval and does not run it", async () => {
         state.parts = calls("delete_task", { id: "ENG-1" });
-        const text = await (await post(body())).text();
+        const text = await (await post(body({ messages: LOADED }))).text();
         expect(text).toContain("tool-approval-request");
         expect(state.executed).toEqual([]);
     });
@@ -839,7 +864,7 @@ describe("Polar on the web", () => {
 
     it("offers no web tool once an administrator turns the web off", async () => {
         state.web = false;
-        const names = await offered(body());
+        const names = await offered(body({ messages: LOADED }));
         expect(names).not.toContain("web_search");
         expect(names).not.toContain("read_page");
         expect(names).not.toContain("search_web");
@@ -908,9 +933,16 @@ describe("Polar on the web", () => {
     });
 
     it("does not offer a tool the person switched off in Polar's settings", async () => {
-        const names = await offered(body({ off: ["read_tasks"] }));
+        const names = await offered(body({ off: ["read_tasks"], messages: LOADED }));
         expect(names).not.toContain("read_tasks");
         expect(names).toContain("delete_task");
+    });
+
+    it("sends Polaris's discovery, not its catalogue, until a tool is loaded", async () => {
+        const names = await offered(body());
+        expect(names).toContain("find_tools");
+        expect(names).not.toContain("read_tasks");
+        expect(names).not.toContain("delete_task");
     });
 
     it("offers none of Polaris's tools while its server is switched off, whatever each one says", async () => {

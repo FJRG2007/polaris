@@ -23,34 +23,91 @@ function run(set: Record<string, { execute?: unknown }>, name: string, input: un
 }
 
 describe("active tools", () => {
-    it("sends the core and the current app's tools, in catalog order", () => {
-        expect(relevance.activeToolNames(catalog, "drive", always)).toEqual([
+    it("sends only the discovery tools, whatever the screen", () => {
+        expect(relevance.activeToolNames(catalog, always)).toEqual([
             relevance.READ_CURRENT_VIEW,
             relevance.FIND_TOOLS,
-            "polaris_search",
-            "drive_list"
+            "polaris_search"
         ]);
-        expect(relevance.activeToolNames(catalog, "unknown-app", always)).toEqual([
+    });
+
+    it("keeps what the conversation already reached for, in catalog order", () => {
+        const names = relevance.activeToolNames(
+            catalog,
+            always,
+            new Set(["mail_list", "games_players"])
+        );
+        expect(names).toEqual([...always, "polaris_search", "games_players", "mail_list"]);
+    });
+
+    it("never sends a name the catalog does not hold (switched off, not theirs)", () => {
+        expect(relevance.activeToolNames(catalog, always, new Set(["vault_reveal"]))).toEqual([
             ...always,
             "polaris_search"
         ]);
     });
 
-    it("keeps what the conversation already reached for", () => {
-        const names = relevance.activeToolNames(
-            catalog,
-            "drive",
-            always,
-            new Set(["games_players"])
-        );
-        expect(names).toContain("games_players");
-        expect(names).not.toContain("mail_list");
+    it("bounds what one request carries, this turn's finds first", () => {
+        const used = new Set(Array.from({ length: 100 }, (_, index) => `old_${index}`));
+        const bounded = relevance.boundedLoad(new Set(["fresh"]), used);
+        expect(bounded.size).toBe(relevance.LOADED_MAX);
+        expect([...bounded][0]).toBe("fresh");
+        // The newest of the older ones are kept.
+        expect(bounded.has("old_99")).toBe(true);
+        expect(bounded.has("old_0")).toBe(false);
+    });
+});
+
+describe("what discovery loads", () => {
+    it("loads by exact name, and says which names are not there", async () => {
+        const output = (await run(relevance.findToolsTool(catalog), relevance.FIND_TOOLS, {
+            names: ["mail_list", "vault_reveal"]
+        })) as { tools: { name: string }[]; unavailable?: string[] };
+        expect(output.tools.map((entry) => entry.name)).toEqual(["mail_list"]);
+        expect(output.unavailable).toEqual(["vault_reveal"]);
+        expect(relevance.loadedBy(relevance.FIND_TOOLS, output)).toEqual(["mail_list"]);
     });
 
-    it("is the same list for the same screen", () => {
-        expect(relevance.activeToolNames(catalog, "mail", always)).toEqual(
-            relevance.activeToolNames(catalog, "mail", always)
-        );
+    it("loads the tools polaris_search names for its matches", () => {
+        const output = {
+            ok: true,
+            text: "...",
+            data: {
+                results: [
+                    { next: [{ tool: "places_device_control" }, { tool: "places_devices" }] },
+                    { next: [{ tool: "places_device_control" }] }
+                ]
+            }
+        };
+        expect(relevance.loadedBy("polaris_search", output)).toEqual([
+            "places_device_control",
+            "places_devices"
+        ]);
+    });
+
+    it("loads a short polaris_tools answer for an intent, never the whole catalogue", () => {
+        const rows = (count: number) => ({
+            ok: true,
+            text: "...",
+            data: {
+                matched: true,
+                categories: [
+                    {
+                        category: "mail",
+                        tools: Array.from({ length: count }, (_, index) => ({
+                            name: `mail_${index}`,
+                            needs: []
+                        }))
+                    }
+                ]
+            }
+        });
+        expect(relevance.loadedBy("polaris_tools", rows(2))).toEqual(["mail_0", "mail_1"]);
+        expect(relevance.loadedBy("polaris_tools", rows(relevance.LOAD_MAX + 1))).toEqual([]);
+    });
+
+    it("loads nothing from any other tool's answer", () => {
+        expect(relevance.loadedBy("mail_list", { tools: [{ name: "x" }] })).toEqual([]);
     });
 });
 
@@ -105,6 +162,7 @@ describe("find_tools with nothing matched", () => {
         expect(output.tools).toEqual([]);
         expect(output.areas).toContainEqual({
             area: "home",
+            count: 2,
             tools: ["places_devices", "places_device_control"]
         });
         expect(output.areas.map((entry) => entry.area)).toEqual([
