@@ -1,6 +1,7 @@
 /**
- * POST /api/polar/import - a Polar chat export (`.json`, format version 1) as a
- * new chat of the signed-in person. The body is the file itself, capped at
+ * POST /api/polar/import - a Polar chat export (`.json`, format version 1), or
+ * an OpenCode session export (`opencode export`), as a new chat of the
+ * signed-in person. The body is the file itself, capped at
  * `MAX_IMPORT_BYTES` while it is read; only the words come over (see
  * `lib/polar/import.ts`), so nothing in the file runs. A few per ten minutes.
  */

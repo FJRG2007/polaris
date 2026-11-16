@@ -535,13 +535,13 @@
             "exportAll": "Exportar todo",
             "import": "Importar un chat",
             "importing": "Importando...",
-            "importHint": "Elige el .json de un chat exportado. Solo se traen los textos; no se ejecuta nada.",
+            "importHint": "Elige el .json de un chat exportado de Polar u OpenCode. Solo se traen los textos; no se ejecuta nada.",
             "importedTitle": "Chat importado",
             "importErrors": {
                 "large": "Ese archivo supera los 8 MB.",
                 "json": "Ese archivo no es JSON.",
-                "version": "No es una exportación de Polar.",
-                "shape": "La exportación está dañada o es de un Polaris más nuevo.",
+                "version": "No es una exportación de Polar ni de OpenCode.",
+                "shape": "La exportación está dañada o es de una versión más nueva.",
                 "empty": "La exportación no tiene mensajes que traer.",
                 "rate_limited": "Demasiadas importaciones. Prueba en unos minutos.",
                 "failed": "No se pudo importar el chat. Inténtalo de nuevo."
