@@ -206,6 +206,19 @@ export const GROUPS: readonly Group[] = [
         ]
     },
     {
+        noun: "session",
+        title: "Agent sessions",
+        commands: [
+            {
+                verb: "run",
+                usage: '"PROMPT" [--repo OWNER/NAME] [--agent ID] [--model P/M] [--continue ID] [--format json] [--stop]',
+                summary: "Put a coding agent on a task and follow it to the end of its turn",
+                run: async (context, flags, args) =>
+                    (await import("./commands/run.js")).run(context, flags, args)
+            }
+        ]
+    },
+    {
         noun: "cli",
         title: "This CLI",
         commands: [
@@ -235,7 +248,8 @@ type Target = readonly [noun: string, verb?: string];
  */
 export const SHORTCUTS: Readonly<Record<string, Target>> = {
     login: ["auth", "login"],
-    logout: ["auth", "logout"]
+    logout: ["auth", "logout"],
+    run: ["session", "run"]
 };
 
 /** The names before `plr <noun> <verb>`. Hidden from the help; they keep working. */

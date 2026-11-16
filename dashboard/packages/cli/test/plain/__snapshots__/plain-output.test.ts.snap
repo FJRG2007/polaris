@@ -59,6 +59,11 @@ Terminal UI (also plr on its own, at a terminal)
                          Browse projects, services, deployments, logs and
                          variables; deploy and restart
 
+Agent sessions
+  plr session run "PROMPT" [--repo OWNER/NAME] [--agent ID] [--model P/M] [--continue ID] [--format json] [--stop]
+                         Put a coding agent on a task and follow it to the end
+                         of its turn
+
 This CLI
   plr cli update [--url URL]
                          Get the newest CLI, or the one a Polaris serves

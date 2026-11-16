@@ -33,7 +33,8 @@ const OLD_NAMES: Record<string, readonly string[]> = {
     "env rm": ["env", "remove"],
     open: ["dashboard", "open"],
     update: ["cli", "update"],
-    uninstall: ["cli", "uninstall"]
+    uninstall: ["cli", "uninstall"],
+    run: ["session", "run"]
 };
 
 describe("the command names", () => {

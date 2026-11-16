@@ -27,6 +27,20 @@ export interface Flags {
     readonly url?: string;
     readonly profile?: string;
     readonly tail?: number;
+    /** `plr run`: the repository, as owner/name. */
+    readonly repo?: string;
+    /** `plr run`: which coding agent runs it. */
+    readonly agent?: string;
+    /** `plr run`: the session's title. */
+    readonly title?: string;
+    /** `plr run`: the model, as provider/model. */
+    readonly model?: string;
+    /** `plr run`: prompt this session instead of starting one. */
+    readonly continue?: string;
+    /** `plr run`: "json" prints every frame as a line of JSON. */
+    readonly format?: "default" | "json";
+    /** `plr run`: end the session once the run is over. */
+    readonly stop: boolean;
 }
 
 export interface Parsed {
@@ -47,7 +61,14 @@ const OPTIONS = {
     "from-file": { type: "string" },
     url: { type: "string" },
     profile: { type: "string", short: "p" },
-    tail: { type: "string", short: "n" }
+    tail: { type: "string", short: "n" },
+    repo: { type: "string" },
+    agent: { type: "string" },
+    title: { type: "string" },
+    model: { type: "string", short: "m" },
+    continue: { type: "string", short: "c" },
+    format: { type: "string" },
+    stop: { type: "boolean" }
 } as const;
 
 /** The largest tail the server accepts. */
@@ -76,7 +97,9 @@ export function parse(argv: readonly string[]): Parsed {
             throw usage(`--tail takes a whole number from 1 to ${MAX_TAIL}.`);
         }
     }
-    for (const name of ["url", "profile", "from-file"] as const) {
+    if (values.format !== undefined && values.format !== "default" && values.format !== "json")
+        throw usage("--format takes default or json.");
+    for (const name of ["url", "profile", "from-file", "repo", "agent", "title", "model", "continue"] as const) {
         if (values[name] === "") throw usage(`--${name} needs a value.`);
     }
 
@@ -94,7 +117,14 @@ export function parse(argv: readonly string[]): Parsed {
             fromFile: typeof values["from-file"] === "string" ? values["from-file"] : undefined,
             url: typeof values.url === "string" ? values.url : undefined,
             profile: typeof values.profile === "string" ? values.profile : undefined,
-            tail
+            tail,
+            repo: typeof values.repo === "string" ? values.repo : undefined,
+            agent: typeof values.agent === "string" ? values.agent : undefined,
+            title: typeof values.title === "string" ? values.title : undefined,
+            model: typeof values.model === "string" ? values.model : undefined,
+            continue: typeof values.continue === "string" ? values.continue : undefined,
+            format: values.format === "json" || values.format === "default" ? values.format : undefined,
+            stop: values.stop === true
         }
     };
 }

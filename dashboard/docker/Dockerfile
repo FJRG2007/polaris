@@ -70,6 +70,7 @@ COPY packages/pdf2docx/package.json ./packages/pdf2docx/
 COPY packages/pptx/package.json ./packages/pptx/
 COPY packages/pptx-render/package.json ./packages/pptx-render/
 COPY packages/project-store/package.json ./packages/project-store/
+COPY packages/sdk/package.json ./packages/sdk/
 COPY packages/ssh/package.json ./packages/ssh/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/ui/package.json ./packages/ui/
