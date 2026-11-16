@@ -23,13 +23,18 @@
  * - Pi, Oh My Pi and Kimchi: session JSONL files; assistant `message.usage`,
  *   `usage`/`model_usage` side records, and tool-result, compaction and
  *   branch-summary usage filed under "Tools/summaries".
+ * - DeepSeek harness: zstd-compressed `sessions/<dir>/<id>/session.v4.jsonl.zstd`
+ *   under `DSH_HOME` (else `~/.dsh`), a `session` header then
+ *   `assistant/message` records with `data.usage` (input uncached) and
+ *   `data.message.source.{provider,model}`. Decoded with Node's own zstd
+ *   (22.15 / 23.8 and later); skipped where it is missing.
  * - Codex: `rollout-*.jsonl` `token_count` events, the cumulative
  *   `total_token_usage` turned into deltas from a baseline, the model from
  *   `turn_context`.
  *
  * Ported from Agent Orchestrator (Apache-2.0), backend/internal/observe/usage
  * (parser_opencode.go, parser_goose.go, parser_qwen.go, parser_grok.go,
- * parser_pi.go, parser.go parseCodexEvent).
+ * parser_pi.go, parser_deepseek.go, parser.go parseCodexEvent).
  *
  * Plain CommonJS that runs on any Node with `node:sqlite` (22.13 and later;
  * the session image is `node:24`). Reads only, bounded: the newest 200 files
@@ -238,7 +243,34 @@ function codex() {
         }
     }
 }
-const readers = { opencode, goose, qwen, grok, codex, pi: () => pi(PI.pi), omp: () => pi(PI.omp), kimchi: () => pi(PI.kimchi) };
+function deepseek() {
+    // Node 22.15 / 23.8 and later; nothing is read where it is missing.
+    const zlib = require("zlib");
+    if (typeof zlib.zstdDecompressSync !== "function") return;
+    const root = path.join(abs(E.DSH_HOME) || path.join(H, ".dsh"), "sessions");
+    const seen = new Set();
+    for (const file of files(root, (n) => n === "session.v4.jsonl.zstd", 2)) {
+        let body;
+        try {
+            if (fs.statSync(file).size > 67108864) continue;
+            body = zlib.zstdDecompressSync(fs.readFileSync(file), { maxOutputLength: 268435456 }).toString("utf8");
+        } catch { continue; }
+        const lines = body.split("\n");
+        let header = null; try { header = JSON.parse(lines[0]); } catch {}
+        if (!header || header.type !== "session") continue;
+        for (const line of lines.slice(1)) {
+            let r; try { r = JSON.parse(line); } catch { continue; }
+            if (!r || r.type !== "assistant/message" || !r.data || typeof r.data !== "object") continue;
+            const d = r.data, u = d.usage, msg = d.message && typeof d.message === "object" ? d.message : {};
+            const src = msg.source && typeof msg.source === "object" ? msg.source : {};
+            if (!u || typeof u !== "object" || typeof u.inputTokens !== "number" || typeof u.outputTokens !== "number") continue;
+            const key = str(header.id) + "\n" + (str(msg.id) || "seq-" + num(r.seq));
+            if (seen.has(key)) continue; seen.add(key);
+            add(src.provider, src.model, num(u.inputTokens), num(u.outputTokens), num(u.cacheReadTokens), num(u.cacheWriteTokens), null, 1);
+        }
+    }
+}
+const readers = { opencode, goose, qwen, grok, codex, pi: () => pi(PI.pi), omp: () => pi(PI.omp), kimchi: () => pi(PI.kimchi), "deepseek-harness": deepseek };
 const cli = process.argv[1];
 if (Object.prototype.hasOwnProperty.call(readers, cli)) { try { readers[cli](); } catch {} }
 process.stdout.write(JSON.stringify({ v: 1, rows: [...rows.values()] }) + "\n");
@@ -253,5 +285,6 @@ export const USAGE_READER_CLIS: ReadonlySet<string> = new Set([
     "codex",
     "pi",
     "omp",
-    "kimchi"
+    "kimchi",
+    "deepseek-harness"
 ]);

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS "AgentLimitHit" (
 );
 
 CREATE INDEX IF NOT EXISTS "AgentLimitHit_userId_createdAt_idx" ON "AgentLimitHit"("userId", "createdAt");
+CREATE INDEX IF NOT EXISTS "AgentLimitHit_createdAt_idx" ON "AgentLimitHit"("createdAt");
 
 ALTER TABLE "AgentLimitHit" DROP CONSTRAINT IF EXISTS "AgentLimitHit_userId_fkey";
 ALTER TABLE "AgentLimitHit" ADD CONSTRAINT "AgentLimitHit_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

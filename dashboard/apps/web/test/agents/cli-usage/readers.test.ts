@@ -5,6 +5,7 @@
 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { zstdCompressSync } from "node:zlib";
 import { execFileSync } from "node:child_process";
 import { USAGE_READER_JS } from "@/lib/agents/cli-usage-reader";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -269,6 +270,24 @@ describe("Codex", () => {
             )
         );
         expect(read("codex")).toEqual([{ p: "openai", m: "unknown", f: 0, i: 1100, o: 110, cr: 0, cw: 0, c: 0, n: 2 }]);
+    });
+});
+
+describe("DeepSeek harness", () => {
+    it("decodes the zstd session log and sums each assistant reply once", () => {
+        const log = jsonl(
+            { type: "session", id: "d1" },
+            { type: "user/message", seq: 1, data: { text: "hi" } },
+            { type: "assistant/message", seq: 2, data: { message: { id: "r1", source: { provider: "deepseek", model: "deepseek-chat" } }, usage: { inputTokens: 100, outputTokens: 20, cacheReadTokens: 300, cacheWriteTokens: 0 } } },
+            { type: "assistant/message", seq: 3, data: { message: { id: "r1", source: { provider: "deepseek", model: "deepseek-chat" } }, usage: { inputTokens: 100, outputTokens: 20 } } },
+            { type: "assistant/message", seq: 4, data: { message: { id: "r2", source: { provider: "deepseek", model: "deepseek-chat" } }, usage: { outputTokens: 5 } } }
+        );
+        const full = join(home, ".dsh/sessions/work/d1/session.v4.jsonl.zstd");
+        mkdirSync(join(full, ".."), { recursive: true });
+        writeFileSync(full, zstdCompressSync(Buffer.from(log)));
+        // Not compressed: not a log the tool wrote, so nothing is read from it.
+        file(".dsh/sessions/work/d2/session.v4.jsonl.zstd", log);
+        expect(read("deepseek-harness")).toEqual([{ p: "deepseek", m: "deepseek-chat", f: 0, i: 100, o: 20, cr: 300, cw: 0, c: 0, n: 1 }]);
     });
 });
 

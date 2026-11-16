@@ -17560,6 +17560,8 @@ model AgentLimitHit {
     createdAt DateTime  @default(now())
 
     @@index([userId, createdAt])
+    // The 30-day cleanup that runs on every write.
+    @@index([createdAt])
 }
 
 model PolarToolUse {

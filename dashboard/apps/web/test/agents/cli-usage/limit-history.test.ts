@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 
 describe("noteLimitHit", () => {
-    it("records the hit and clears this person's hits older than 30 days", async () => {
+    it("records the hit and clears everybody's hits older than 30 days", async () => {
         await noteLimitHit(
             { userId: "u1", sessionId: "s1", cli: "codex", accountId: "a1", resetAt: NOW + 60_000, outcome: "rotated" },
             NOW
@@ -37,7 +37,7 @@ describe("noteLimitHit", () => {
             outcome: "rotated"
         });
         expect(db.deleteMany).toHaveBeenCalledWith({
-            where: { userId: "u1", createdAt: { lt: new Date(NOW - 30 * 86_400_000) } }
+            where: { createdAt: { lt: new Date(NOW - 30 * 86_400_000) } }
         });
     });
 

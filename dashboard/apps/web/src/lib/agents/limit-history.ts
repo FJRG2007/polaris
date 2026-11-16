@@ -3,8 +3,8 @@
  * spent, for the Usage page of Polar's settings.
  *
  * A hit is written where the session moves on from it (`account-rotation.ts`)
- * and kept 30 days; a person's own older hits are cleared as a new one lands,
- * so the table holds a bounded window per person rather than growing forever.
+ * and kept 30 days: every write clears everybody's hits past that (on the
+ * `createdAt` index), so the table holds a bounded window rather than growing.
  *
  * Ported from Agent Orchestrator (Apache-2.0),
  * backend/internal/service/usage/limit_history.go (limit history view).
@@ -47,7 +47,7 @@ export async function noteLimitHit(hit: LimitHit, now = Date.now()): Promise<voi
             select: { id: true }
         });
         await prisma.agentLimitHit.deleteMany({
-            where: { userId: hit.userId, createdAt: { lt: new Date(now - LIMIT_HIT_DAYS * DAY) } }
+            where: { createdAt: { lt: new Date(now - LIMIT_HIT_DAYS * DAY) } }
         });
     } catch (error) {
         console.error(
