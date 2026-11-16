@@ -19,6 +19,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { UNEXPECTED_FAILURE } from "@/lib/unexpected-failure";
 import * as core from "@polaris/core";
 import { randomBytes } from "node:crypto";
 import { scopeValues } from "./env-values";
@@ -44,9 +45,8 @@ const EXEC_LIMIT_MS = 5 * 60_000;
  *  at. Promotion follows the deploy's own verdict by a few queries. */
 const PROMOTION_WAIT_MS = 60_000;
 
-/** What a failure nobody anticipated reads as; the error itself goes to the log. */
-const UNEXPECTED =
-    "It stopped on something Polaris did not expect. The details are in the server log.";
+/** What a failure nobody anticipated is stored as; the error itself goes to the log. */
+const UNEXPECTED = UNEXPECTED_FAILURE;
 
 /** A secret the way the catalog generates one: 32 random bytes as hex. */
 const generateSecret = (): string => randomBytes(32).toString("hex");

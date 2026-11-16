@@ -12,6 +12,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { UNEXPECTED_FAILURE } from "@/lib/unexpected-failure";
 import type { RuntimePorts } from "@polaris/deploy";
 import { ensureRedisCluster } from "./redis-cluster";
 import { ensureTopology, topologySetup } from "./topology";
@@ -75,7 +76,7 @@ export async function afterProvision(databaseId: string, ownerId: string): Promi
         const reason =
             error instanceof DatabaseOperationError
                 ? error.message
-                : "It stopped on something Polaris did not expect. The details are in the server log.";
+                : UNEXPECTED_FAILURE;
         if (!(error instanceof DatabaseOperationError)) {
             console.error(`database: setting up ${databaseId} failed:`, error);
         }

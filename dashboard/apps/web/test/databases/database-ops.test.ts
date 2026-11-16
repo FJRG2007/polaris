@@ -96,7 +96,9 @@ describe("startOperation", () => {
         mocks.findFirst.mockResolvedValue(null);
         const operation = await ops.startOperation("db-1", "upgrade", null);
         const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
-        expect(await operation.fail(new Error("ECONNREFUSED 10.0.0.5:2375"))).toMatch(/did not expect/);
+        // A code the screen says in the reader's words: never the internals, and
+        // never a pointer to a log they cannot open.
+        expect(await operation.fail(new Error("ECONNREFUSED 10.0.0.5:2375"))).toBe("unexpected");
         expect(await operation.fail(new ops.DatabaseOperationError("Version 18 did not start."))).toBe(
             "Version 18 did not start."
         );

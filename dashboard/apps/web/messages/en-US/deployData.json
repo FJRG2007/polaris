@@ -1,6 +1,7 @@
 {
     "database": {
         "unreadable": "Could not read this database",
+        "unexpected": "It stopped on an error Polaris did not expect. Try again.",
         "tabs": {
             "version": "Version",
             "settings": "Settings",

@@ -108,6 +108,25 @@ describe("a one-click service's setup", () => {
         );
     });
 
+    it("says a failure nobody anticipated in the reader's words, never pointing at a log", () => {
+        const said = "Polaris could not run \"Create the Gitea admin\": it stopped on an error Polaris did not expect. Try again.";
+        for (const toValue of [
+            "unexpected",
+            // What rows stored before the code carry.
+            "It stopped on something Polaris did not expect. The details are in the server log."
+        ]) {
+            const failed = line({
+                ...polaris,
+                action: "setup-failed",
+                fromValue: "Create the Gitea admin",
+                toValue
+            });
+            expect(describeServiceEvent(failed)).toBe(said);
+        }
+        const first = line({ ...polaris, action: "first-deploy-failed", toValue: "unexpected" });
+        expect(describeServiceEvent(first)).not.toMatch(/log|unexpected/);
+    });
+
     it("says what kept it from being deployed", () => {
         const blocked = line({
             ...polaris,

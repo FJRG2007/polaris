@@ -20,6 +20,7 @@ import { useProjectCan } from "./access-context";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { isUnexpectedFailure } from "@/lib/unexpected-failure";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { PrivateNetworkPanel } from "./private-network-panel";
 import { useCallback, useEffect, useState, useTransition, type ReactNode } from "react";
@@ -511,7 +512,11 @@ function VersionsSection({
             ) : null}
             {upgrade.state === "failed" && upgrade.error ? (
                 <p className="rounded-md border border-danger-edge bg-danger-soft px-3 py-2 text-xs text-danger-ink">
-                    {t("database.versions.failed", { error: upgrade.error })}
+                    {t("database.versions.failed", {
+                        error: isUnexpectedFailure(upgrade.error)
+                            ? t("database.unexpected")
+                            : upgrade.error
+                    })}
                 </p>
             ) : null}
             {error ? <p className="text-sm text-danger">{error}</p> : null}
@@ -1940,7 +1945,13 @@ function ActivityList({ overview, compact }: { overview: Overview; compact: bool
                                 : ""}
                         </p>
                     ) : null}
-                    {operation.error ? <p className="mt-1 text-danger">{operation.error}</p> : null}
+                    {operation.error ? (
+                        <p className="mt-1 text-danger">
+                            {isUnexpectedFailure(operation.error)
+                                ? t("database.unexpected")
+                                : operation.error}
+                        </p>
+                    ) : null}
                 </li>
             ))}
         </ul>

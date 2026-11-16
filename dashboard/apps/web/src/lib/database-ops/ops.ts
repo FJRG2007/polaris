@@ -11,6 +11,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { UNEXPECTED_FAILURE } from "@/lib/unexpected-failure";
 import { stat } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import type { RuntimePorts } from "@polaris/deploy";
@@ -334,7 +335,7 @@ export async function startOperation(
             const reason =
                 error instanceof DatabaseOperationError
                     ? error.message
-                    : "It stopped on something Polaris did not expect. The details are in the server log.";
+                    : UNEXPECTED_FAILURE;
             if (!(error instanceof DatabaseOperationError)) {
                 console.error(`database: ${kind} on ${databaseId} failed:`, error);
             }

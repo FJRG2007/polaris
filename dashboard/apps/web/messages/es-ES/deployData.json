@@ -1,5 +1,6 @@
 {
     "database": {
+        "unexpected": "Se detuvo por un error que Polaris no esperaba. Vuelve a intentarlo.",
         "unreadable": "No se pudo leer esta base de datos",
         "tabs": {
             "version": "Versión",

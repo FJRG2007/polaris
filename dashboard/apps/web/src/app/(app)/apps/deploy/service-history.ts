@@ -6,6 +6,7 @@
  */
 
 import type { ActivityLine } from "@/lib/activity/activity";
+import { isUnexpectedFailure } from "@/lib/unexpected-failure";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { AUTOSCALE_IDLE_AFTER, AUTOSCALE_SIGNALS, AUTOSCALED_ACTION_PREFIX } from "@polaris/core";
 
@@ -47,6 +48,12 @@ function describeAutoscale(line: ActivityLine, who: string, t: ServiceT): string
 }
 
 /** One line of a service's history, as a sentence. */
+/** Why a one-click service's setup stopped. A failure nobody anticipated is
+ *  stored as a code (`lib/unexpected-failure.ts`) and said in the reader's words. */
+function failureOutput(line: ActivityLine, t: ServiceT): string {
+    return isUnexpectedFailure(line.toValue) ? t("history.unexpected") : (line.toValue ?? "");
+}
+
 export function describeServiceEvent(line: ActivityLine, t: ServiceT): string {
     // i18n-ignore: the product's name stands in for a person
     const who = line.authorName ?? "Polaris";
@@ -98,16 +105,16 @@ export function describeServiceEvent(line: ActivityLine, t: ServiceT): string {
             return t("history.setupFailed", {
                 who,
                 step: line.fromValue ?? "",
-                output: line.toValue ?? ""
+                output: failureOutput(line, t)
             });
         case "setup-blocked":
             return t("history.setupBlocked", {
                 who,
                 companion: line.fromValue ?? "",
-                output: line.toValue ?? ""
+                output: failureOutput(line, t)
             });
         case "first-deploy-failed":
-            return t("history.firstDeployFailed", { who, output: line.toValue ?? "" });
+            return t("history.firstDeployFailed", { who, output: failureOutput(line, t) });
         case "secrets-withheld":
             return t("history.secretsWithheld", { who, names: line.toValue ?? "" });
         // Written by the wait for CI (`lib/deploy/ci-wait.ts`): the commit held

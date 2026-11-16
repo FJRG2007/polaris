@@ -128,6 +128,7 @@
         "setupFailed": "{who} could not run \"{step}\": {output}",
         "setupBlocked": "{who} did not deploy it, because {companion} did not come up: {output}",
         "firstDeployFailed": "{who} could not start its first deploy: {output}",
+        "unexpected": "it stopped on an error Polaris did not expect. Try again.",
         "secretsWithheld": "{who} did not copy these secrets into the preview: {names}",
         "changed": "{who} changed it",
         "ciWaiting": "Waiting for the GitHub checks on {sha} to pass before deploying it",

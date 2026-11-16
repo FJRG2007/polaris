@@ -128,6 +128,7 @@
         "setupFailed": "{who} no pudo ejecutar \"{step}\": {output}",
         "setupBlocked": "{who} no lo desplegó porque {companion} no arrancó: {output}",
         "firstDeployFailed": "{who} no pudo iniciar su primer despliegue: {output}",
+        "unexpected": "se detuvo por un error que Polaris no esperaba. Vuelve a intentarlo.",
         "secretsWithheld": "{who} no copió estos secretos a la vista previa: {names}",
         "changed": "{who} lo cambió",
         "ciWaiting": "Esperando a que pasen los checks de GitHub en {sha} antes de desplegarlo",
