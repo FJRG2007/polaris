@@ -86,6 +86,12 @@ export async function ingestHookPayload(session: HookSession, payload: unknown, 
     after(() => dispatchSessionHook(id, kind, { tool: event.subject, detail: event.detail }).catch(() => undefined));
     // A prompt typed straight into the terminal gets its undo point here.
     if (kind === "prompt") after(() => snapshotTypedPrompt(id, event.detail).catch(() => undefined));
+    // What the turn left in the deliverables folder gets its version.
+    if (kind === "turn.end")
+        after(async () => {
+            const { captureSessionArtifacts } = await import("./session-artifacts");
+            await captureSessionArtifacts(id, true);
+        });
     if (kind === "turn.failed" && isSignInRefusal(event.detail)) after(() => noteRefusedSignIn(id));
     else if (kind === "turn.failed") after(() => handleTurnFailure(id, payload, seq));
     else if (kind === "turn.end")

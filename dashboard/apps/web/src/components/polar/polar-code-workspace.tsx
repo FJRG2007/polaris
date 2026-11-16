@@ -29,9 +29,11 @@ import { SessionChanges } from "@/components/agents/sessions/session-changes";
 import { SessionTurns } from "@/components/agents/sessions/session-turns";
 import { useCheckoutWake } from "@/components/polar/use-checkout-wake";
 import { SessionPullTab } from "@/components/agents/sessions/session-pr-tab";
+import { SessionArtifacts } from "@/components/agents/sessions/session-artifacts";
 import { openAgentInterfaceAction } from "@/components/agents/sessions/actions";
 import {
     Crosshair,
+    FileBox,
     ExternalLink,
     FileCode2,
     FolderTree,
@@ -47,7 +49,7 @@ import {
     Tablet
 } from "lucide-react";
 
-type Pane = "files" | "preview" | "changes" | "pull" | "terminal";
+type Pane = "files" | "artifacts" | "preview" | "changes" | "pull" | "terminal";
 
 /** How often the file list is read again while the agent works. */
 const FILES_MS = 20_000;
@@ -162,6 +164,15 @@ export function PolarCodeWorkspace({
                                 )
                             },
                             {
+                                value: "artifacts",
+                                label: (
+                                    <span className="flex items-center gap-1.5">
+                                        <FileBox className="size-4" />
+                                        {t("code.pane.artifacts")}
+                                    </span>
+                                )
+                            },
+                            {
                                 value: "preview",
                                 label: (
                                     <span className="flex items-center gap-1.5">
@@ -206,6 +217,8 @@ export function PolarCodeWorkspace({
                     <div className="min-h-0 flex-1 overflow-hidden">
                         {pane === "files" ? (
                             <FilesPane sessionId={session.id} live={live} />
+                        ) : pane === "artifacts" ? (
+                            <SessionArtifacts sessionId={session.id} live={live} />
                         ) : pane === "preview" ? (
                             <PreviewPane sessionId={session.id} live={live} lastEdit={wake} onPick={onPick} />
                         ) : pane === "changes" ? (

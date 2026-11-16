@@ -1723,7 +1723,8 @@
             "binary": "No es un archivo de texto.",
             "tooLarge": "Este archivo es demasiado grande para mostrarlo aquí.",
             "missing": "Este archivo ya no existe.",
-            "pull": "Pull request"
+            "pull": "Pull request",
+            "artifacts": "Archivos"
         },
         "preview": {
             "none": "Aún no hay ningún servidor web en esta sesión.",
@@ -1871,6 +1872,22 @@
         "keys": {
             "shortcuts": "Atajos de teclado",
             "stopAgain": "Pulsa Esc otra vez para parar al agente."
+        },
+        "artifacts": {
+            "hint": "Lo que el agente entrega en .polaris/deliverables",
+            "capture": "Buscar cambios",
+            "failed": "No se pudieron leer los archivos.",
+            "empty": "Nada entregado aún. Pide al agente un informe, página o imagen en .polaris/deliverables.",
+            "pick": "Elige un archivo",
+            "meta": "v{version} - {size}",
+            "full": "La sesión guarda todo lo que puede; los cambios nuevos no se guardaron.",
+            "tooLarge": "{count, plural, one {# archivo supera} other {# archivos superan}} 10 MB y se omitió.",
+            "truncated": "Solo se guardan los 200 primeros archivos.",
+            "version": "Versión",
+            "versionLabel": "v{version} - {when}",
+            "download": "Descargar",
+            "share": "Compartir",
+            "noPreview": "Sin vista previa"
         }
     },
     "compare": {

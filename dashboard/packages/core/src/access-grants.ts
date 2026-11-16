@@ -93,6 +93,7 @@ export const GRANT_SUBJECTS = [
     "note.note",
     "dns.filter",
     "agents.session",
+    "agents.artifact",
     "polar.project",
     "task.task",
     "place.place",
@@ -132,7 +133,8 @@ export const GRANT_SUBJECT_PRINCIPALS: Partial<Record<GrantSubject, readonly Gra
     "calendar.calendar": ["role"],
     "note.note": ["user"],
     "task.task": ["user"],
-    "agents.session": ["user"]
+    "agents.session": ["user"],
+    "agents.artifact": ["user"]
 };
 
 /** The principals a grant on this subject may be to. */
@@ -241,6 +243,9 @@ export const GRANT_CAPABILITIES = {
     // Typing to it, stopping it, its terminal and its changes stay with whoever
     // steers it.
     "agents.session": ["view"],
+    // One file a session's agent delivered: read it, at any of its versions.
+    // The session itself, its conversation and its other files stay unshared.
+    "agents.artifact": ["view"],
     // One Polar project: its name and its instructions, to read and to copy into a
     // project of one's own. Its chats stay private; a chat is shared on its own.
     "polar.project": ["view"],
@@ -318,6 +323,7 @@ export const GRANT_ACTIONS = {
     "note.note": [],
     "dns.filter": [],
     "agents.session": [],
+    "agents.artifact": [],
     "polar.project": [],
     "task.task": [],
     "place.place": ["watch", "open", "close", "operate"],
@@ -740,7 +746,8 @@ export const grantLinkSchema = withGrantRules(
 export type GrantLinkInput = z.infer<typeof grantLinkSchema>;
 
 /**
- * What may be handed out as a link: everything in Places, and the
+ * What may be handed out as a link: everything in Places, a file a Polar Code
+ * session delivered, and the
  * connectivity record in Watch. A door and a UPS may be driven through one; a
  * camera is only watched (no PTZ, no recordings); the rest only seen - see
  * `LINK_WATCH_ONLY_SUBJECTS`.
@@ -754,7 +761,8 @@ export const GRANT_LINK_SUBJECTS = [
     "place.domain",
     "place.room",
     "place.panel",
-    "watch.connectivity"
+    "watch.connectivity",
+    "agents.artifact"
 ] as const satisfies readonly GrantSubject[];
 
 export type GrantLinkSubject = (typeof GRANT_LINK_SUBJECTS)[number];
@@ -773,7 +781,8 @@ export const LINK_WATCH_ONLY_SUBJECTS = [
     "place.nas",
     "place.server",
     "place.domain",
-    "watch.connectivity"
+    "watch.connectivity",
+    "agents.artifact"
 ] as const satisfies readonly GrantLinkSubject[];
 
 /**

@@ -9584,6 +9584,7 @@ model AgentSession {
     queuedPrompts AgentQueuedPrompt[]
     pullFacts SessionPullFacts[]
     reviews   SessionReview[]
+    artifacts AgentSessionArtifact[]
 
     @@unique([tokenHash])
     @@index([repoId, createdAt])
@@ -18259,3 +18260,45 @@ model DisposableFile {
     @@index([transferId])
 }
 
+
+// A file a Polar Code session's agent left in its deliverables folder
+// (`.polaris/deliverables` in the checkout), as Polaris last captured it.
+// Captured at the end of every turn and when the session's Artifacts tab is
+// opened (lib/agents/session-artifacts.ts). Its bytes live with each version.
+model AgentSessionArtifact {
+    id        String                        @id @default(uuid(7)) @db.Uuid
+    sessionId String                        @db.Uuid
+    session   AgentSession                  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+    // Relative to the deliverables folder.
+    path      String
+    // The newest version's number, size and digest, so the list reads one row.
+    version   Int                           @default(1)
+    size      Int
+    sha256    String
+    mediaType String
+    // Set when the file was no longer in the folder; its versions are kept.
+    removedAt DateTime?
+    createdAt DateTime                      @default(now())
+    updatedAt DateTime                      @updatedAt
+    versions  AgentSessionArtifactVersion[]
+
+    @@unique([sessionId, path])
+    @@index([sessionId, updatedAt])
+}
+
+// One captured state of an artifact. The bytes are stored where Polar's own
+// files go (chat storage, `polaris/polar/...`), through `streamFile`.
+model AgentSessionArtifactVersion {
+    id           String               @id @default(uuid(7)) @db.Uuid
+    artifactId   String               @db.Uuid
+    artifact     AgentSessionArtifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+    version      Int
+    size         Int
+    sha256       String
+    // Null when the bytes are on this server rather than on a connected storage.
+    connectionId String?
+    storagePath  String
+    createdAt    DateTime             @default(now())
+
+    @@unique([artifactId, version])
+}

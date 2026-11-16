@@ -216,6 +216,16 @@ export async function requireMayShare(
                 throw new GrantError("You cannot share that");
             return;
         }
+        case "agents.artifact": {
+            // A file a session delivered goes out with whoever may read that
+            // session: its owner, or somebody it was shown to.
+            const { artifactDetail } = await import("@/lib/agents/session-artifacts");
+            const { getSession } = await import("@/lib/agents/session-service");
+            const detail = await artifactDetail(subjectId);
+            if (!detail || !(await getSession(detail.sessionId, user.id)))
+                throw new GrantError("You cannot share that");
+            return;
+        }
         case "mail.mailbox":
             // Only the person who linked a mailbox lends it, as only they read
             // it. Whoever runs the organization it is part of cannot: they can
@@ -623,6 +633,8 @@ export function subjectHref(subject: core.GrantSubject, subjectId: string): stri
             return `/mail/shared/${subjectId}`;
         case "agents.session":
             return `/polar?session=${subjectId}`;
+        case "agents.artifact":
+            return `/polar/artifacts/${subjectId}`;
         case "dns.filter":
             return "/network-filter";
         case "telemetry.project":

@@ -21,7 +21,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import * as acpProviders from "@/lib/agents/acp/providers";
 import * as taskAccess from "@/lib/tasks/access";
-import { requirePermission } from "@/lib/session";
+import { requirePermission, requireUser } from "@/lib/session";
 import * as runtime from "@/lib/agents/session-runtime";
 import * as sessions from "@/lib/agents/session-service";
 import * as permissions from "@/lib/agents/session-permissions";
@@ -36,6 +36,7 @@ import * as timelines from "@/lib/agents/session-pr-timeline";
 import * as reviewer from "@/lib/agents/session-reviewer";
 import { requestReview } from "@/lib/agents/session-reviewer-service";
 import * as files from "@/lib/agents/session-files";
+import * as artifacts from "@/lib/agents/session-artifacts";
 import * as preview from "@/lib/agents/session-preview";
 import * as history from "@/lib/agents/session-history";
 import * as rotation from "@/lib/agents/account-rotation";
@@ -1642,4 +1643,38 @@ export async function requestSessionReviewAction(input: unknown): Promise<{ erro
     const known = ["missing_reviewer", "review_running", "terminated", "no_pr", "closed_pr", "merged_pr", "start_failed"] as const;
     const reason = known.find((one) => one === outcome.reason) ?? "other";
     return { error: t(`session.reviewer.refused.${reason}`) };
+}
+
+/**
+ * A session's deliverables as stored, after capturing what changed when
+ * `capture` is set. The list answers either way: a capture that cannot reach
+ * the container leaves what was captured before.
+ */
+export async function sessionArtifactsAction(input: unknown): Promise<{
+    artifacts?: artifacts.ArtifactView[];
+    capture?: artifacts.CaptureAnswer;
+    error?: string;
+}> {
+    const t = await getTranslations("agents");
+    const parsed = z.object({ sessionId: sessionIdSchema, capture: z.boolean().default(false) }).safeParse(input);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await controlledSession(parsed.data.sessionId);
+    if (!session) return { error: t("sessions.errors.gone") };
+    const capture = parsed.data.capture ? await artifacts.captureSessionArtifacts(session.id) : undefined;
+    return { artifacts: await artifacts.listSessionArtifacts(session.id), capture };
+}
+
+/** One artifact and its versions, for whoever may read it. */
+export async function sessionArtifactAction(artifactId: unknown): Promise<{
+    detail?: { artifact: artifacts.ArtifactView; versions: artifacts.ArtifactVersionView[] };
+    error?: string;
+}> {
+    const t = await getTranslations("agents");
+    const parsed = sessionIdSchema.safeParse(artifactId);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const user = await requireUser();
+    if (!(await artifacts.mayReadArtifact(user.id, parsed.data))) return { error: t("sessions.errors.gone") };
+    const detail = await artifacts.artifactDetail(parsed.data);
+    if (!detail) return { error: t("sessions.errors.gone") };
+    return { detail: { artifact: detail.artifact, versions: detail.versions } };
 }

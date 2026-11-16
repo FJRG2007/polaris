@@ -55,7 +55,7 @@ export function checkoutPath(path: string): string | null {
     return trimmed;
 }
 
-async function readAll(stream: ReadableStream<Uint8Array>, limit: number): Promise<Buffer | null> {
+export async function readAll(stream: ReadableStream<Uint8Array>, limit: number): Promise<Buffer | null> {
     const reader = stream.getReader();
     const chunks: Buffer[] = [];
     let size = 0;
@@ -76,7 +76,7 @@ async function readAll(stream: ReadableStream<Uint8Array>, limit: number): Promi
     return Buffer.concat(chunks);
 }
 
-async function containerOf(sessionId: string) {
+export async function containerOf(sessionId: string) {
     const placement = await sessionPlacement(sessionId);
     if (!placement || placement.place !== "local" || !placement.containerId) return null;
     if (core.isSessionOver(placement.state)) return null;

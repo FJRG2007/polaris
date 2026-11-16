@@ -1723,7 +1723,8 @@
             "binary": "This is not a text file.",
             "tooLarge": "This file is too large to show here.",
             "missing": "This file is no longer there.",
-            "pull": "Pull request"
+            "pull": "Pull request",
+            "artifacts": "Artifacts"
         },
         "preview": {
             "none": "No web server is running in this session yet.",
@@ -1871,6 +1872,22 @@
         "keys": {
             "shortcuts": "Keyboard shortcuts",
             "stopAgain": "Press Esc again to stop the agent."
+        },
+        "artifacts": {
+            "hint": "Files the agent delivers in .polaris/deliverables",
+            "capture": "Check for changes",
+            "failed": "The artifacts could not be read.",
+            "empty": "Nothing delivered yet. Ask the agent to put a report, page or picture in .polaris/deliverables.",
+            "pick": "Pick a file to see it",
+            "meta": "v{version} - {size}",
+            "full": "This session holds as much as it may keep; newer changes were not saved.",
+            "tooLarge": "{count, plural, one {# file is} other {# files are}} over 10 MB and was left out.",
+            "truncated": "Only the first 200 files are kept.",
+            "version": "Version",
+            "versionLabel": "v{version} - {when}",
+            "download": "Download",
+            "share": "Share",
+            "noPreview": "No preview for this file"
         }
     },
     "compare": {

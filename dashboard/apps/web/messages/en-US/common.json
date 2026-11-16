@@ -78,6 +78,7 @@
             "note.note": "a note",
             "dns.filter": "the network filter's statistics",
             "agents.session": "an agent session",
+            "agents.artifact": "a session file",
             "polar.project": "a Polar project",
             "task.task": "one task",
             "place.place": "a place",

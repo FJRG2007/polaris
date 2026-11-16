@@ -30,6 +30,7 @@ import { shellQuote } from "./session-hooks";
 import { POLICY_PATHS } from "@/lib/polar/agents/cli-policies";
 import { STATE_DIR_MARK, TOOLS_NO_NODE_FILE, TOOLS_SERVER_FILE } from "./session-tools-mcp";
 import { INSTALL_GH, PREINSTALL_GH } from "./session-gh";
+import { DELIVERABLES_DIR } from "./artifacts/artifact-files";
 import {
     FIRST_RUN_WORKDIR,
     HOOK_BLOCK_END,
@@ -878,7 +879,20 @@ export function firstRunScript(answers: readonly AgentFirstRunAnswer[]): string 
  * it holds no double quote, dollar sign, backtick or backslash of its own; the
  * one variable in it is expanded when the line is built.
  */
+/**
+ * What the agent is told about its deliverables folder
+ * (`lib/agents/session-artifacts.ts`). Carried in the same argument as the
+ * preview's words, so it holds nothing the launch line reads as quoting.
+ */
+export const DELIVERABLES_PROMPT =
+    "Files meant for the person rather than the repository (a report, a plan, a diagram, an HTML page, " +
+    "a picture) go in .polaris/deliverables in the working directory: Polaris keeps a version of each " +
+    "every time it changes, shows it rendered beside the chat, and lets the person share it. " +
+    "That folder is never committed.";
+
 export const PREVIEW_PROMPT =
+    DELIVERABLES_PROMPT +
+    " " +
     "Polaris shows the web servers this session runs in a Preview tab beside the chat. " +
     "Bind a server to 0.0.0.0, not localhost, or the preview cannot reach it. " +
     "Port N opens at the path ${POLARIS_PREVIEW_BASE}/N/ of the Polaris address. " +
@@ -1089,6 +1103,9 @@ export const LAUNCH_SCRIPT = [
     `: > ${AGENT_READY_FLAG}`,
     `chmod 0666 ${AGENT_READY_FLAG} 2>/dev/null || true`,
     'cd "$POLARIS_WORKDIR"',
+    // The deliverables folder (DELIVERABLES_PROMPT), there before the agent
+    // looks, owned like the checkout, and kept out of git on this clone only.
+    `mkdir -p ${DELIVERABLES_DIR} 2>/dev/null && chown "$(stat -c %u:%g .)" .polaris ${DELIVERABLES_DIR} 2>/dev/null; [ ! -d .git ] || grep -qxF '${DELIVERABLES_DIR}/' .git/info/exclude 2>/dev/null || echo '${DELIVERABLES_DIR}/' >> .git/info/exclude 2>/dev/null || true`,
     // A turn reads its prompt from the file, so no part of it is ever a shell
     // word or a keystroke.
     'if [ -n "$turn" ]; then line="$line < \\"$turn\\""; fi',

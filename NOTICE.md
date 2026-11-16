@@ -60,7 +60,11 @@ in [CITATION.cff](CITATION.cff).
   adapter source. The session hook files and hook activity mapping
   (`dashboard/packages/core/src/agent-hook-files.ts`,
   `dashboard/apps/web/src/lib/agents/hook-activity.ts`) are ported from its
-  `backend/internal/adapters/agent/` at commit e4ded08c6f15. The Codewhale and MiMo Code marks are MIT and the Stakpak mark
+  `backend/internal/adapters/agent/` at commit e4ded08c6f15. Which of a
+  session's delivered files are listed
+  (`dashboard/apps/web/src/lib/agents/artifacts/deliverables.ts`) is copied
+  from its `packages/shared/artifacts/deliverables.ts` at the same commit, with
+  three index reads checked for a stricter compiler. The Codewhale and MiMo Code marks are MIT and the Stakpak mark
   Apache-2.0, with their notices kept beside the files. The marks remain their
   owners' trademarks.
 

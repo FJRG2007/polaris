@@ -115,6 +115,17 @@ const READERS: Partial<Record<core.GrantSubject, OwnerReader>> = {
                 select: { id: true, startedById: true, repo: { select: { ownerId: true } } }
             })
         ).map((row) => [row.id, row.repo?.ownerId ?? row.startedById ?? null] as const),
+    // A session's file is whoever's session it is.
+    "agents.artifact": async (ids) =>
+        (
+            await prisma.agentSessionArtifact.findMany({
+                where: { id: { in: ids } },
+                select: {
+                    id: true,
+                    session: { select: { startedById: true, repo: { select: { ownerId: true } } } }
+                }
+            })
+        ).map((row) => [row.id, row.session.repo?.ownerId ?? row.session.startedById ?? null] as const),
     // "<kind>:<uuid>": one read per kind present, never one per record.
     "crm.record": async (ids) => {
         const kinds = {

@@ -74,3 +74,17 @@ export const sessionFile = (
         { input: JSON.stringify(input) },
         signal
     );
+
+export const sessionArtifacts = (sessionId: string, capture: boolean, signal?: AbortSignal) =>
+    readPoll<Answer<typeof actions.sessionArtifactsAction>>(
+        "/api/agents/sessions/artifacts",
+        { sessionId, capture: capture ? "1" : "0" },
+        signal
+    );
+
+export const sessionArtifact = (artifactId: string, signal?: AbortSignal) =>
+    readPoll<Answer<typeof actions.sessionArtifactAction>>(
+        "/api/agents/sessions/artifact",
+        { artifactId },
+        signal
+    );

@@ -311,6 +311,14 @@ export async function removeAgentRepo(ownerId: string, repoId: string): Promise<
         where: { repoId, repo: { ownerId } },
         select: { id: true }
     });
+    // Delivered files are bytes in storage: found through their rows, which
+    // the cascade below takes, so they go first.
+    if (sessions.length > 0) {
+        const { discardSessionArtifacts } = await import("@/lib/agents/session-artifacts");
+        await discardSessionArtifacts(sessions.map((session) => session.id)).catch((error) =>
+            console.error("[agent-repo] could not discard session artifacts:", error)
+        );
+    }
     const { count } = await prisma.agentRepo.deleteMany({ where: { id: repoId, ownerId } });
     // Its workspaces cascade with it; what was lent of them does not.
     if (count > 0) {

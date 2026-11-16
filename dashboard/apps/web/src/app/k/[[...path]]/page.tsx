@@ -26,6 +26,8 @@ import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
 import { LinkUnavailable, PublicShell } from "@/components/public-shell";
 import { renderAppPage, type AppPageProps } from "@/lib/app-bundles/serve-page";
+import { artifactDetail } from "@/lib/agents/session-artifacts";
+import { SharedArtifact } from "./artifact-guest";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -96,6 +98,17 @@ export default async function GuestLinkPage(props: AppPageProps) {
         return (
             <PublicShell>
                 <StatusGuest view={view} />
+            </PublicShell>
+        );
+    }
+    if (reached.subjectType === "agents.artifact") {
+        const detail = await artifactDetail(reached.subjectId);
+        if (!detail) return <LinkUnavailable message={words("guestLink.gone")} />;
+        return (
+            <PublicShell>
+                <Messages namespaces={["polar", "publicPages"]}>
+                    <SharedArtifact token={token} artifact={detail.artifact} versions={detail.versions} />
+                </Messages>
             </PublicShell>
         );
     }
