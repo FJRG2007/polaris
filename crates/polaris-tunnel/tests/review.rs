@@ -252,7 +252,20 @@ async fn media_stays_fast_under_inbound_bulk() {
         "media under bulk: p50 {:?} p95 {p95:?} max {max:?} lost {lost}",
         rtts[rtts.len() / 2]
     );
-    assert!(lost <= 3, "{lost} of 150 media datagrams lost");
+    // The daemon itself drops none of the media: every drop it makes is
+    // counted, and none is. What is lost is lost in the kernel, at the wire
+    // socket the junk keeps full; how much depends on how much CPU the machine
+    // gives the daemon (0-2 on a quiet one, up to 10 on a loaded CI runner),
+    // so the bound only catches a broken path.
+    for side in [pair.relay(), pair.house()] {
+        let c = side.status.lock().unwrap().counters.clone();
+        assert_eq!(
+            (c.dropped_full, c.dropped_malformed, c.dropped_unrouted),
+            (0, 0, 0),
+            "the daemon dropped media"
+        );
+    }
+    assert!(lost <= 15, "{lost} of 150 media datagrams lost");
     assert!(p95 < Duration::from_millis(100), "p95 {p95:?}");
 }
 
