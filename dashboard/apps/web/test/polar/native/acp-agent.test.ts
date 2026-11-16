@@ -12,9 +12,12 @@ import {
     checkAcpAccess,
     createAcpAgent,
     describeCall,
+    mcpNotice,
     permissionDecision,
     promptText,
-    readAcpEnv
+    readAcpEnv,
+    replayUpdates,
+    type AcpStore
 } from "@/lib/polar/native/acp-agent";
 
 const USAGE = {
@@ -113,6 +116,16 @@ function editor(answer: string | null, files: Record<string, string> = {}) {
     return { app, seen };
 }
 
+/** Transcripts kept in memory, shared across connections like the folder is. */
+function memoryStore(): AcpStore & { files: Map<string, string> } {
+    const files = new Map<string, string>();
+    return {
+        files,
+        append: (id, line) => void files.set(id, `${files.get(id) ?? ""}${line}\n`),
+        read: (id) => files.get(id) ?? null
+    };
+}
+
 let root: string;
 
 beforeEach(async () => {
@@ -123,11 +136,17 @@ afterEach(async () => {
 });
 
 /** The agent behind a stdio-shaped pipe, and an editor connected to it. */
-function connect(steps: Step[], answer: string | null, capabilities: acp.ClientCapabilities, files?: Record<string, string>) {
+function connect(
+    steps: Step[],
+    answer: string | null,
+    capabilities: acp.ClientCapabilities,
+    files?: Record<string, string>,
+    store: AcpStore = memoryStore()
+) {
     const { model, prompts } = scripted(steps);
     const wire = pipes();
     let ids = 0;
-    createAcpAgent({ model: () => model, modelName: "polar", newId: () => `s-${++ids}`, rules: () => [] }).connect(
+    createAcpAgent({ model: () => model, modelName: "polar", newId: () => `s-${++ids}`, rules: () => [], store }).connect(
         wire.agentStream
     );
     const { app, seen } = editor(answer, files);
@@ -152,7 +171,8 @@ describe("Polar as an ACP agent", () => {
         const run = connect([], null, NO_CAPS);
         const { init, session } = await run.start();
         expect(init.protocolVersion).toBe(acp.PROTOCOL_VERSION);
-        expect(init.agentCapabilities?.loadSession).toBe(false);
+        expect(init.agentCapabilities?.loadSession).toBe(true);
+        expect(init.agentCapabilities?.mcpCapabilities).toEqual({ http: false, sse: false });
         expect(init.agentCapabilities?.promptCapabilities?.image).toBe(false);
         expect(session.sessionId).toBe("s-1");
         expect(session.modes?.currentModeId).toBe("default");
@@ -299,7 +319,7 @@ describe("Polar as an ACP agent", () => {
                 })
         });
         const wire = pipes();
-        createAcpAgent({ model: () => model, modelName: "polar", newId: () => "s-1", rules: () => [] }).connect(wire.agentStream);
+        createAcpAgent({ model: () => model, modelName: "polar", newId: () => "s-1", rules: () => [], store: memoryStore() }).connect(wire.agentStream);
         const { app } = editor(null);
         const connection = app.connect(acp.ndJsonStream(wire.toAgent.writable, wire.toClient.readable));
         await connection.agent.request(acp.methods.agent.initialize, { protocolVersion: acp.PROTOCOL_VERSION, clientCapabilities: NO_CAPS });
@@ -319,7 +339,7 @@ describe("Polar as an ACP agent", () => {
     it("drops a frame that is not a JSON-RPC envelope and answers the next", async () => {
         const wire = pipes();
         const { model } = scripted([]);
-        createAcpAgent({ model: () => model, modelName: "polar", rules: () => [] }).connect(wire.agentStream);
+        createAcpAgent({ model: () => model, modelName: "polar", rules: () => [], store: memoryStore() }).connect(wire.agentStream);
         const writer = wire.toAgent.writable.getWriter();
         const encode = (value: unknown) => new TextEncoder().encode(`${JSON.stringify(value)}\n`);
         const params = { protocolVersion: acp.PROTOCOL_VERSION, clientCapabilities: NO_CAPS };
@@ -339,7 +359,153 @@ describe("Polar as an ACP agent", () => {
     });
 });
 
+describe("loading a session", () => {
+    it("replays the conversation, then continues it with the earlier turn in the model's input", async () => {
+        const store = memoryStore();
+        const file = path.join(root, "a.txt");
+        await fs.writeFile(file, "on disk\n");
+        const first = connect(
+            [{ calls: [{ name: "Read", input: { file_path: file } }] }, { text: "First answer." }],
+            null,
+            NO_CAPS,
+            undefined,
+            store
+        );
+        const { session } = await first.start();
+        await first.agent.request(acp.methods.agent.session.prompt, {
+            sessionId: session.sessionId,
+            prompt: [{ type: "text", text: "Read a.txt" }]
+        });
+        first.connection.close();
+        expect(store.files.get(session.sessionId)).toContain("First answer.");
+
+        const second = connect([{ text: "Second answer." }], null, NO_CAPS, undefined, store);
+        await second.agent.request(acp.methods.agent.initialize, {
+            protocolVersion: acp.PROTOCOL_VERSION,
+            clientCapabilities: NO_CAPS
+        });
+        const loaded = await second.agent.request(acp.methods.agent.session.load, {
+            sessionId: session.sessionId,
+            cwd: root,
+            mcpServers: []
+        });
+        expect(loaded?.modes?.currentModeId).toBe("default");
+        // Replayed before the answer, in order.
+        expect(second.seen.updates.map((update) => update.sessionUpdate)).toEqual([
+            "user_message_chunk",
+            "tool_call",
+            "agent_message_chunk"
+        ]);
+        expect(second.seen.updates[0]).toEqual({
+            sessionUpdate: "user_message_chunk",
+            content: { type: "text", text: "Read a.txt" }
+        });
+        expect(second.seen.updates[1]).toEqual(
+            expect.objectContaining({ sessionUpdate: "tool_call", status: "completed", kind: "read", locations: [{ path: file }] })
+        );
+        expect(second.seen.updates[2]).toEqual({
+            sessionUpdate: "agent_message_chunk",
+            content: { type: "text", text: "First answer." }
+        });
+        const done = await second.agent.request(acp.methods.agent.session.prompt, {
+            sessionId: session.sessionId,
+            prompt: [{ type: "text", text: "And now?" }]
+        });
+        expect(done.stopReason).toBe("end_turn");
+        const input = JSON.stringify(second.prompts[0]);
+        expect(input).toContain("Read a.txt");
+        expect(input).toContain("on disk");
+        expect(input).toContain("First answer.");
+        expect(input).toContain("And now?");
+        second.connection.close();
+    });
+
+    it("answers sessionNotFound for an id it has no transcript for, or one that is not an id", async () => {
+        const run = connect([], null, NO_CAPS);
+        await run.start();
+        for (const sessionId of ["s-404", "../../etc/passwd"]) {
+            await expect(
+                run.agent.request(acp.methods.agent.session.load, { sessionId, cwd: root, mcpServers: [] })
+            ).rejects.toThrow();
+        }
+        run.connection.close();
+    });
+
+    it("says once that the editor's MCP servers are not mounted", async () => {
+        const run = connect([{ text: "One." }, { text: "Two." }], null, NO_CAPS);
+        await run.agent.request(acp.methods.agent.initialize, {
+            protocolVersion: acp.PROTOCOL_VERSION,
+            clientCapabilities: NO_CAPS
+        });
+        const session = await run.agent.request(acp.methods.agent.session.new, {
+            cwd: root,
+            mcpServers: [{ name: "github", command: "github-mcp", args: [], env: [] }]
+        });
+        expect(run.seen.updates).toEqual([]);
+        for (const text of ["first", "second"]) {
+            await run.agent.request(acp.methods.agent.session.prompt, {
+                sessionId: session.sessionId,
+                prompt: [{ type: "text", text }]
+            });
+        }
+        const notices = run.seen.updates.filter((update) => JSON.stringify(update).includes("MCP servers"));
+        expect(notices).toHaveLength(1);
+        expect(run.seen.updates[0]).toEqual(notices[0]);
+        expect(JSON.stringify(notices[0])).toContain("github");
+        run.connection.close();
+    });
+});
+
 describe("pieces", () => {
+    it("replays only the main conversation, and a failed call as failed", () => {
+        const line = (record: unknown) => JSON.stringify(record);
+        const text = [
+            line({ type: "user", message: { content: [{ type: "text", text: "Hi" }] } }),
+            line({ type: "assistant", isSidechain: true, message: { content: [{ type: "text", text: "subagent" }] } }),
+            line({
+                type: "assistant",
+                message: {
+                    content: [
+                        { type: "text", text: "On it." },
+                        { type: "tool_use", id: "t1", name: "Bash", input: { command: "false" } }
+                    ]
+                }
+            }),
+            line({
+                type: "user",
+                message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "exit 1", is_error: true }] }
+            }),
+            line({ type: "system", subtype: "compact_boundary", content: "Conversation compacted" }),
+            line({ type: "user", isCompactSummary: true, message: { content: [{ type: "text", text: "summary" }] } }),
+            line({ type: "user", message: { content: [{ type: "text", text: "[Request interrupted by user]" }] } }),
+            "not json"
+        ].join("\n");
+        expect(replayUpdates(text)).toEqual([
+            { sessionUpdate: "user_message_chunk", content: { type: "text", text: "Hi" } },
+            { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "On it." } },
+            {
+                sessionUpdate: "tool_call",
+                toolCallId: "t1",
+                status: "completed",
+                rawInput: { command: "false" },
+                title: "Bash: false",
+                kind: "execute"
+            },
+            {
+                sessionUpdate: "tool_call_update",
+                toolCallId: "t1",
+                status: "failed",
+                content: [{ type: "content", content: { type: "text", text: "exit 1" } }]
+            }
+        ]);
+    });
+
+    it("names the editor's MCP servers, bounded", () => {
+        expect(mcpNotice([])).toBeNull();
+        const many = Array.from({ length: 12 }, (_, index) => ({ name: `s${index}` }));
+        expect(mcpNotice(many)).toContain("s9 and 2 more");
+    });
+
     it("reads the environment and names what is missing, never its value", () => {
         expect(readAcpEnv({})).toEqual({ invalid: ["POLARIS_API_KEY", "POLARIS_URL"] });
         const read = readAcpEnv({ POLARIS_URL: "https://polaris.example.test/", POLARIS_API_KEY: "pk_test_0123456789abcdef" });

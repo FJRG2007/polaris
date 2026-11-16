@@ -13,7 +13,9 @@
  * permission the engine asks is a `session/request_permission`, and text is
  * streamed as `agent_message_chunk` once each step is written. Files and
  * commands use the editor's own `fs` and `terminal` when it offers them
- * (`acp-workspace.ts`).
+ * (`acp-workspace.ts`). Every conversation is kept as the engine's own
+ * transcript beside the other native ones, so `session/load` replays it to
+ * the editor and continues it.
  *
  * Every inbound frame is held to the JSON-RPC envelope (`agents/acp/frames`)
  * before the SDK parses each method's params against the protocol's own
@@ -21,16 +23,20 @@
  */
 
 import { z } from "zod";
+import * as fs from "node:fs";
 import * as path from "node:path";
 import type { LanguageModel } from "ai";
 import * as acp from "@agentclientprotocol/sdk";
 import { Readable, Writable } from "node:stream";
 import { discoverRules } from "@/lib/polar/native/rules";
 import { NativeSession } from "@/lib/polar/native/engine";
+import { transcriptDir } from "@/lib/polar/native/launch";
 import { nodeWorkspace } from "@/lib/polar/native/workspace";
 import { acpWorkspace } from "@/lib/polar/native/acp-workspace";
+import { INTERRUPTED_TEXT } from "@/lib/polar/native/transcript";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { MAX_FRAME_BYTES, validatedFrames } from "@/lib/agents/acp/frames";
+import { CONVERSATION_ID, replayTranscript } from "@/lib/polar/native/resume";
 import { PERMISSION_MODES, type PermissionMode } from "@/lib/polar/native/tools";
 import type { HookDecision, HookPayload, HookSink } from "@/lib/polar/native/hooks";
 
@@ -195,6 +201,111 @@ const PLAN_OPTIONS: acp.PermissionOption[] = [
     { optionId: "reject", name: "Keep planning", kind: "reject_once" }
 ];
 
+/** Where each ACP conversation's transcript is kept, so `session/load` can
+ *  read it back. Ids reaching `read` are held to `CONVERSATION_ID` first. */
+export interface AcpStore {
+    append(id: string, line: string): void;
+    read(id: string): string | null;
+}
+
+/** The transcripts beside every other native conversation's
+ *  (`transcriptDir()`), one `<sessionId>.jsonl` each. */
+export function fileAcpStore(dir: string = transcriptDir()): AcpStore {
+    let made = false;
+    const file = (id: string) => path.join(dir, `${id}.jsonl`);
+    return {
+        append(id, line) {
+            if (!made) fs.mkdirSync(dir, { recursive: true });
+            made = true;
+            fs.appendFileSync(file(id), `${line}\n`);
+        },
+        read(id) {
+            try {
+                return fs.readFileSync(file(id), "utf8");
+            } catch {
+                return null;
+            }
+        }
+    };
+}
+
+interface ReplayBlock {
+    readonly type?: unknown;
+    readonly text?: unknown;
+    readonly id?: unknown;
+    readonly name?: unknown;
+    readonly input?: unknown;
+    readonly tool_use_id?: unknown;
+    readonly content?: unknown;
+    readonly is_error?: unknown;
+}
+
+/** A stored transcript as the updates an editor shows, in order, for
+ *  `session/load` to replay: what the person typed, what Polar answered, each
+ *  call as finished, and a failed one as failed. A subagent's own lines and
+ *  the compaction summary are not part of the conversation shown. */
+export function replayUpdates(text: string): acp.SessionUpdate[] {
+    const updates: acp.SessionUpdate[] = [];
+    for (const raw of text.split("\n")) {
+        let record: {
+            type?: unknown;
+            isSidechain?: unknown;
+            isCompactSummary?: unknown;
+            message?: { content?: unknown };
+        };
+        try {
+            record = JSON.parse(raw) as typeof record;
+        } catch {
+            continue;
+        }
+        if (!record || typeof record !== "object" || record.isSidechain === true || record.isCompactSummary === true) continue;
+        const content = record.message?.content;
+        const blocks: ReplayBlock[] =
+            typeof content === "string"
+                ? [{ type: "text", text: content }]
+                : Array.isArray(content)
+                  ? content.filter((block): block is ReplayBlock => Boolean(block) && typeof block === "object")
+                  : [];
+        for (const block of blocks) {
+            const said = block.type === "text" && typeof block.text === "string" && block.text ? block.text : null;
+            if (record.type === "user") {
+                if (said && said !== INTERRUPTED_TEXT) {
+                    updates.push({ sessionUpdate: "user_message_chunk", content: { type: "text", text: said } });
+                } else if (block.type === "tool_result" && block.is_error === true && typeof block.tool_use_id === "string") {
+                    const failure = typeof block.content === "string" ? block.content : "";
+                    updates.push({
+                        sessionUpdate: "tool_call_update",
+                        toolCallId: block.tool_use_id,
+                        status: "failed",
+                        ...(failure ? { content: [{ type: "content", content: { type: "text", text: failure } }] } : {})
+                    });
+                }
+            } else if (record.type === "assistant") {
+                if (said) updates.push({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: said } });
+                else if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
+                    updates.push({
+                        sessionUpdate: "tool_call",
+                        toolCallId: block.id,
+                        status: "completed",
+                        rawInput: block.input,
+                        ...describeCall(block.name, block.input)
+                    });
+                }
+            }
+        }
+    }
+    return updates;
+}
+
+/** The sentence a session opens with when the editor listed MCP servers:
+ *  the engine has no MCP client, so none of them is mounted. */
+export function mcpNotice(servers: readonly { name: string }[]): string | null {
+    if (servers.length === 0) return null;
+    const names = servers.slice(0, 10).map((server) => server.name.slice(0, 80));
+    const more = servers.length > names.length ? ` and ${servers.length - names.length} more` : "";
+    return `This editor listed MCP servers (${names.join(", ")}${more}). Polar does not mount an editor's MCP servers yet, so their tools are not available in this session.`;
+}
+
 /** What the agent needs to build a session; replaceable in tests. */
 export interface AcpAgentDeps {
     readonly model: (id: string) => LanguageModel;
@@ -205,14 +316,19 @@ export interface AcpAgentDeps {
     readonly newId?: () => string;
     /** The rules files the session reads (`discoverRules`). */
     readonly rules?: (cwd: string) => { file: string; text: string }[];
+    /** Where transcripts are kept for `session/load` (`fileAcpStore`). */
+    readonly store?: AcpStore;
 }
 
 interface LiveSession {
     readonly engine: NativeSession;
     /** Settles once every message chunk written so far reached the editor. */
     readonly flushed: () => Promise<void>;
+    readonly notify: Notify;
     turn: AbortController | null;
     mode: PermissionMode;
+    /** Said once, before the session's next answer (`mcpNotice`). */
+    notice: string | null;
 }
 
 type Notify = (update: acp.SessionUpdate) => Promise<void>;
@@ -341,6 +457,69 @@ export function createAcpAgent(deps: AcpAgentDeps): acp.AgentApp {
     let capabilities: acp.ClientCapabilities | undefined;
     const newId = deps.newId ?? (() => crypto.randomUUID());
     const rules = deps.rules ?? ((cwd: string) => discoverRules({ cwd }).map(({ file, text }) => ({ file, text })));
+    let fileStore: AcpStore | null = null;
+    const store = () => deps.store ?? (fileStore ??= fileAcpStore());
+    const modes = () => ({ currentModeId: "default", availableModes: [...ACP_MODES] });
+
+    /** One conversation's engine, wired to this editor; a new one or one
+     *  read back from its transcript. */
+    const open = (sessionId: string, cwd: string, client: acp.AgentContext, servers: readonly { name: string }[]) => {
+        sessions.get(sessionId)?.turn?.abort(new Error("reopened"));
+        const notify: Notify = (update) => client.notify(acp.methods.client.session.update, { sessionId, update });
+        const current = { call: null as string | null, mode: "default" as PermissionMode };
+        const ws = acpWorkspace(nodeWorkspace(cwd), {
+            sessionId,
+            capabilities,
+            client: client as never,
+            onTerminal: (terminalId) => {
+                if (current.call) {
+                    void notify({
+                        sessionUpdate: "tool_call_update",
+                        toolCallId: current.call,
+                        status: "in_progress",
+                        content: [{ type: "terminal", terminalId }]
+                    });
+                }
+            }
+        });
+        let streamed: Promise<void> = Promise.resolve();
+        const engine = new NativeSession({
+            sessionId,
+            ws,
+            model: deps.model(deps.modelName),
+            modelName: deps.modelName,
+            hooks: protocolHooks(client, sessionId, notify, current),
+            writeTranscript: (line) => {
+                store().append(sessionId, line);
+                const text = assistantText(line);
+                if (!text) return;
+                streamed = streamed.then(() =>
+                    notify({ sessionUpdate: "agent_message_chunk", content: { type: "text", text } })
+                );
+            },
+            transcriptPath: path.join(transcriptDir(), `${sessionId}.jsonl`),
+            environment: {
+                platform: process.platform,
+                shell: process.platform === "win32" ? "bash" : "sh",
+                branch: null,
+                repository: null,
+                place: "computer",
+                date: (deps.now?.() ?? new Date()).toISOString().slice(0, 10),
+                memory: rules(cwd),
+                task: null
+            }
+        });
+        const live: LiveSession = {
+            engine,
+            flushed: () => streamed,
+            notify,
+            turn: null,
+            mode: "default",
+            notice: mcpNotice(servers)
+        };
+        sessions.set(sessionId, live);
+        return live;
+    };
 
     return acp
         .agent({ name: "polar" })
@@ -349,8 +528,11 @@ export function createAcpAgent(deps: AcpAgentDeps): acp.AgentApp {
             return {
                 protocolVersion: acp.PROTOCOL_VERSION,
                 agentCapabilities: {
-                    loadSession: false,
-                    promptCapabilities: { image: false, audio: false, embeddedContext: true }
+                    loadSession: true,
+                    promptCapabilities: { image: false, audio: false, embeddedContext: true },
+                    // The engine has no MCP client: only stdio is a transport
+                    // an editor offers by default, and it is named, not mounted.
+                    mcpCapabilities: { http: false, sse: false }
                 },
                 authMethods: [],
                 agentInfo: { name: "polar", title: "Polar", version: "1" }
@@ -360,52 +542,22 @@ export function createAcpAgent(deps: AcpAgentDeps): acp.AgentApp {
             if (!path.isAbsolute(params.cwd)) throw acp.RequestError.invalidParams({ cwd: "must be absolute" });
             await deps.checkAccess?.();
             const sessionId = newId();
-            const notify: Notify = (update) => client.notify(acp.methods.client.session.update, { sessionId, update });
-            const current = { call: null as string | null, mode: "default" as PermissionMode };
-            const ws = acpWorkspace(nodeWorkspace(params.cwd), {
-                sessionId,
-                capabilities,
-                client: client as never,
-                onTerminal: (terminalId) => {
-                    if (current.call) {
-                        void notify({
-                            sessionUpdate: "tool_call_update",
-                            toolCallId: current.call,
-                            status: "in_progress",
-                            content: [{ type: "terminal", terminalId }]
-                        });
-                    }
-                }
-            });
-            let streamed: Promise<void> = Promise.resolve();
-            const engine = new NativeSession({
-                sessionId,
-                ws,
-                model: deps.model(deps.modelName),
-                modelName: deps.modelName,
-                hooks: protocolHooks(client, sessionId, notify, current),
-                writeTranscript: (line) => {
-                    const text = assistantText(line);
-                    if (!text) return;
-                    streamed = streamed.then(() =>
-                        notify({ sessionUpdate: "agent_message_chunk", content: { type: "text", text } })
-                    );
-                },
-                transcriptPath: path.join(params.cwd, ".polar-acp", `${sessionId}.jsonl`),
-                environment: {
-                    platform: process.platform,
-                    shell: process.platform === "win32" ? "bash" : "sh",
-                    branch: null,
-                    repository: null,
-                    place: "computer",
-                    date: (deps.now?.() ?? new Date()).toISOString().slice(0, 10),
-                    memory: rules(params.cwd),
-                    task: null
-                }
-            });
-            sessions.set(sessionId, { engine, flushed: () => streamed, turn: null, mode: "default" });
-            await engine.start("startup");
-            return { sessionId, modes: { currentModeId: "default", availableModes: [...ACP_MODES] } };
+            const live = open(sessionId, params.cwd, client, params.mcpServers);
+            await live.engine.start("startup");
+            return { sessionId, modes: modes() };
+        })
+        .onRequest(acp.methods.agent.session.load, async ({ params, client }) => {
+            if (!path.isAbsolute(params.cwd)) throw acp.RequestError.invalidParams({ cwd: "must be absolute" });
+            if (!CONVERSATION_ID.test(params.sessionId)) throw acp.RequestError.sessionNotFound(params.sessionId);
+            const text = store().read(params.sessionId);
+            if (text === null) throw acp.RequestError.sessionNotFound(params.sessionId);
+            await deps.checkAccess?.();
+            const live = open(params.sessionId, params.cwd, client, params.mcpServers);
+            live.engine.restore(replayTranscript(text));
+            // The spec: the whole conversation is replayed before the answer.
+            for (const update of replayUpdates(text)) await live.notify(update);
+            await live.engine.start("resume");
+            return { modes: modes() };
         })
         .onRequest(acp.methods.agent.session.setMode, ({ params }) => {
             const live = sessions.get(params.sessionId);
@@ -426,6 +578,11 @@ export function createAcpAgent(deps: AcpAgentDeps): acp.AgentApp {
             const controller = new AbortController();
             live.turn = controller;
             try {
+                if (live.notice) {
+                    const notice = live.notice;
+                    live.notice = null;
+                    await live.notify({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: `${notice}\n\n` } });
+                }
                 const result = await live.engine.turn(text, controller.signal);
                 await live.flushed();
                 if (result.interrupted) return { stopReason: "cancelled" };
