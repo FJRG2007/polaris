@@ -29,6 +29,8 @@ export interface GitReadOptions {
     readonly env: Record<string, string>;
     /** Bytes of stdout kept; the rest is read and counted, not kept. */
     readonly maxBytes: number;
+    /** How long git may run before it is stopped; a short default when unset. */
+    readonly timeoutMs?: number;
 }
 
 export interface WorkspaceDeps {

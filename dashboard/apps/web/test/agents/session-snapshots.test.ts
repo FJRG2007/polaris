@@ -151,6 +151,14 @@ describe("against a real checkout", () => {
         expect(read("a.txt")).toBe("one\n");
     });
 
+    it("takes a hook's report of a prompt just snapshotted as the same turn", () => {
+        const newest = list().turns[0]!;
+        expect(capture("[Polaris: note] turn three")).toEqual({ kind: "captured", id: newest.id });
+        writeFileSync(join(repo, "a.txt"), "typed\n");
+        expect(capture("typed in the terminal")?.kind).toBe("captured");
+        expect(list().turns.map((turn) => turn.label)).toEqual(["typed in the terminal", "turn three"]);
+    });
+
     it("refuses a turn that is not on the chain", () => {
         expect(undo("b".repeat(40))).toEqual({ kind: "stale" });
     });

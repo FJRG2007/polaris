@@ -3,7 +3,9 @@
  * file, the changes and one diff - what a container session answers with
  * commands run in the container (`session-files.ts`, `session-review.ts`) -
  * and pieces of its transcript for the history (`transcript.read`, only to a
- * runner that announced `transcript-read`).
+ * runner that announced `transcript-read`) - and the turn snapshots behind
+ * undo and redo (`snapshot.run`, only to one that announced
+ * `workspace-snapshot`).
  *
  * The question goes to the runner as `workspace.read`, only to one that
  * announced `workspace-read`; a runner without it is answered with null here,
@@ -24,13 +26,22 @@ export const WORKSPACE_READ_TIMEOUT_MS = 15_000;
 /** Reads one node waits on at once; past it a read is refused. */
 const MAX_PENDING = 500;
 
-type Read = "workspace" | "transcript";
-type AnswerOf<K extends Read> = K extends "workspace" ? core.WorkspaceAnswer : core.TranscriptAnswer;
+/** How long a snapshot step waits: adding a large checkout to the snapshot
+ *  index takes a while the first time. */
+export const SNAPSHOT_TIMEOUT_MS = 60_000;
+
+type Read = "workspace" | "transcript" | "snapshot";
+type AnswerOf<K extends Read> = K extends "workspace"
+    ? core.WorkspaceAnswer
+    : K extends "transcript"
+      ? core.TranscriptAnswer
+      : core.SnapshotAnswer;
+type AnyAnswer = core.WorkspaceAnswer | core.TranscriptAnswer | core.SnapshotAnswer;
 
 interface Pending {
     readonly runnerId: string;
     readonly kind: Read;
-    readonly resolve: (answer: core.WorkspaceAnswer | core.TranscriptAnswer | null) => void;
+    readonly resolve: (answer: AnyAnswer | null) => void;
 }
 
 const pending = new Map<string, Pending>();
@@ -49,7 +60,8 @@ async function storedFeatures(runnerId: string): Promise<readonly string[] | nul
 }
 
 function receiveLive(notice: LiveNotice): void {
-    if (notice.k === "workspace" || notice.k === "transcript") deliverLocal(notice.k, notice.runnerId, notice.requestId, notice.answer);
+    if (notice.k === "workspace" || notice.k === "transcript" || notice.k === "snapshot")
+        deliverLocal(notice.k, notice.runnerId, notice.requestId, notice.answer);
 }
 
 const defaults: WorkspaceDeps = {
@@ -70,7 +82,8 @@ async function ask<K extends Read>(
     runnerId: string,
     feature: core.RunnerFeature,
     command: (requestId: string) => core.ServerCommand,
-    deps: WorkspaceDeps
+    deps: WorkspaceDeps,
+    timeoutMs = WORKSPACE_READ_TIMEOUT_MS
 ): Promise<AnswerOf<K> | null> {
     if (!((await deps.features(runnerId))?.includes(feature) ?? false)) return null;
     if (pending.size >= MAX_PENDING) return null;
@@ -80,7 +93,7 @@ async function ask<K extends Read>(
         const timer = setTimeout(() => {
             pending.delete(requestId);
             resolve(null);
-        }, deps.timeoutMs ?? WORKSPACE_READ_TIMEOUT_MS);
+        }, deps.timeoutMs ?? timeoutMs);
         pending.set(requestId, {
             runnerId,
             kind,
@@ -123,7 +136,32 @@ export async function readComputerTranscript(
     return ask("transcript", session.runnerId, "transcript-read", (requestId) => ({ type: "transcript.read", requestId, sessionId: session.id, path, query }), deps);
 }
 
-function deliverLocal(kind: Read, runnerId: string, requestId: string, answer: core.WorkspaceAnswer | core.TranscriptAnswer): boolean {
+/** Whether this runner keeps turn snapshots. */
+export async function runnerSnapshots(runnerId: string, deps: WorkspaceDeps = defaults): Promise<boolean> {
+    return (await deps.features(runnerId))?.includes("workspace-snapshot") ?? false;
+}
+
+/**
+ * One snapshot step on a session's checkout on the computer. Null when the
+ * runner does not keep snapshots (an older desktop), is not connected, or did
+ * not answer in time.
+ */
+export async function runComputerSnapshot(
+    session: { readonly id: string; readonly runnerId: string },
+    action: core.SnapshotAction,
+    deps: WorkspaceDeps = defaults
+): Promise<core.SnapshotAnswer | null> {
+    return ask(
+        "snapshot",
+        session.runnerId,
+        "workspace-snapshot",
+        (requestId) => ({ type: "snapshot.run", requestId, sessionId: session.id, action }),
+        deps,
+        SNAPSHOT_TIMEOUT_MS
+    );
+}
+
+function deliverLocal(kind: Read, runnerId: string, requestId: string, answer: AnyAnswer): boolean {
     const waiting = pending.get(requestId);
     if (!waiting || waiting.runnerId !== runnerId || waiting.kind !== kind) return false;
     waiting.resolve(answer);
@@ -152,6 +190,18 @@ export function deliverTranscriptAnswer(
 ): boolean {
     if (deliverLocal("transcript", runnerId, requestId, answer)) return true;
     if (!pending.has(requestId)) void publish({ k: "transcript", runnerId, requestId, answer });
+    return false;
+}
+
+/** A runner's `snapshot.answer`, delivered like a workspace answer. */
+export function deliverSnapshotAnswer(
+    runnerId: string,
+    requestId: string,
+    answer: core.SnapshotAnswer,
+    publish: (notice: LiveNotice) => Promise<void> = publishRunnerLive
+): boolean {
+    if (deliverLocal("snapshot", runnerId, requestId, answer)) return true;
+    if (!pending.has(requestId)) void publish({ k: "snapshot", runnerId, requestId, answer });
     return false;
 }
 

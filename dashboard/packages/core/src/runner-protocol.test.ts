@@ -161,3 +161,27 @@ describe("optional features (additive on protocol 1)", () => {
         expect(RELAYED_SERVER_TYPES).toEqual(expect.arrayContaining(["chat.turn", "chat.cancel", "chat.approval", "toolchain.prepare"]));
     });
 });
+
+describe("snapshot frames", () => {
+    const COMMIT = "a".repeat(40);
+
+    it("sends a snapshot step only to a runner that announced it", () => {
+        const raw = encodeServerFrame({ type: "snapshot.run", requestId: SESSION, sessionId: SESSION, action: { kind: "undo", to: COMMIT } });
+        expect(parseServerFrame(raw).ok).toBe(true);
+        expect(() =>
+            encodeServerFrame({ type: "snapshot.run", requestId: SESSION, sessionId: SESSION, action: { kind: "undo", to: "HEAD~1" } })
+        ).toThrow();
+        expect(SERVER_FRAME_FEATURE["snapshot.run"]).toBe("workspace-snapshot");
+        expect(RELAYED_SERVER_TYPES).toContain("snapshot.run");
+        expect(runnerHasFeature({ features: ["workspace-read"] }, "workspace-snapshot")).toBe(false);
+    });
+
+    it("reads a runner's listing and refuses one past the limit", () => {
+        const turn = { id: COMMIT, at: 1_700_000_000_000, label: "Fix the build" };
+        const frame = (turns: unknown[]) =>
+            JSON.stringify({ v: 1, type: "snapshot.answer", requestId: SESSION, sessionId: SESSION, answer: { kind: "list", turns, undone: null } });
+        expect(parseRunnerFrame(frame([turn])).ok).toBe(true);
+        expect(parseRunnerFrame(frame(Array.from({ length: 41 }, () => turn))).ok).toBe(false);
+        expect(parseRunnerFrame(frame([{ ...turn, label: "x".repeat(161) }])).ok).toBe(false);
+    });
+});

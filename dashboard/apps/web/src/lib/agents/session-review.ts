@@ -117,7 +117,7 @@ export async function sessionFileDiff(session: SessionView, path: string): Promi
 
 /** A live session on a computer that has a checkout to read: a clone of its
  *  repository or a folder chosen there. Null for any other session. */
-function computerCheckout(
+export function computerCheckout(
     session: Pick<SessionView, "id" | "place" | "runnerId" | "state" | "repoFullName" | "localFolder">
 ): { id: string; runnerId: string } | null {
     if (session.place !== "computer" || !session.runnerId) return null;

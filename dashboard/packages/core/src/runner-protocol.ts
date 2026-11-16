@@ -192,8 +192,12 @@ export const runnerCapabilitiesSchema = frame("capabilities", {
  *   this computer, lists their models in `capabilities.localModels`, and runs
  *   a Polar Chat turn on one of them (`chat.turn` with `local`). It looks on the
  *   LAN only at the private addresses the person added (`local.config`).
+ * - `workspace-snapshot`: keeps a snapshot of the checkout before each turn and
+ *   puts the files back to one of them and forward again, with the same shadow
+ *   git repository a container session uses (`snapshot.run`,
+ *   `snapshot.answer`).
  */
-export const RUNNER_FEATURES = ["toolchain", "claude-chat", "workspace-read", "transcript-read", "local-models"] as const;
+export const RUNNER_FEATURES = ["toolchain", "claude-chat", "workspace-read", "transcript-read", "local-models", "workspace-snapshot"] as const;
 export type RunnerFeature = (typeof RUNNER_FEATURES)[number];
 
 /** Whether a runner's capabilities announce `feature`. */
@@ -412,6 +416,47 @@ export const runnerTranscriptAnswerSchema = frame("transcript.answer", {
     answer: transcriptAnswerSchema
 });
 
+/** What snapshot frames carry at most. */
+export const SNAPSHOT_LIMITS = {
+    /** Characters of a prompt kept as its turn's label. */
+    labelChars: 160,
+    /** Turns one listing names, newest first. */
+    turns: 40
+} as const;
+
+/** A commit name in a sha1 or sha256 repository. */
+const snapshotCommit = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/);
+const snapshotLabel = z.string().max(SNAPSHOT_LIMITS.labelChars);
+
+/** What a runner did with one `snapshot.run`. `missing` is a session this
+ *  computer does not hold; the rest mean what the container scripts say
+ *  (`session-snapshots.ts`). */
+export const snapshotAnswerSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("captured"), id: snapshotCommit }),
+    z.object({ kind: z.literal("kept"), id: snapshotCommit, undoneLabel: snapshotLabel }),
+    z.object({
+        kind: z.literal("list"),
+        turns: z
+            .array(z.object({ id: snapshotCommit, at: z.number().int().min(0), label: snapshotLabel }))
+            .max(SNAPSHOT_LIMITS.turns),
+        undone: snapshotCommit.nullable()
+    }),
+    z.object({ kind: z.literal("undone"), id: snapshotCommit }),
+    z.object({ kind: z.literal("restored") }),
+    z.object({ kind: z.literal("empty") }),
+    z.object({ kind: z.literal("stale") }),
+    z.object({ kind: z.literal("nocheckout") }),
+    z.object({ kind: z.literal("failed") }),
+    z.object({ kind: z.literal("missing") })
+]);
+export type SnapshotAnswer = z.infer<typeof snapshotAnswerSchema>;
+
+export const runnerSnapshotAnswerSchema = frame("snapshot.answer", {
+    requestId: id,
+    sessionId: id,
+    answer: snapshotAnswerSchema
+});
+
 export const runnerErrorSchema = frame("error", {
     code: shortText(60),
     message: shortText(500),
@@ -432,6 +477,7 @@ export const runnerMessageSchema = z.discriminatedUnion("type", [
     runnerChatFrameSchema,
     runnerWorkspaceAnswerSchema,
     runnerTranscriptAnswerSchema,
+    runnerSnapshotAnswerSchema,
     runnerErrorSchema
 ]);
 export type RunnerMessage = z.infer<typeof runnerMessageSchema>;
@@ -661,6 +707,23 @@ export const serverTranscriptReadSchema = frame("transcript.read", {
     query: transcriptQuerySchema
 });
 
+/** One step on a session's snapshots (`workspace-snapshot`): take one before
+ *  a turn, list them, put the files back to before the newest turn (or before
+ *  `to`), or forward again. */
+export const snapshotActionSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("capture"), label: snapshotLabel }),
+    z.object({ kind: z.literal("list") }),
+    z.object({ kind: z.literal("undo"), to: snapshotCommit.optional() }),
+    z.object({ kind: z.literal("redo") })
+]);
+export type SnapshotAction = z.infer<typeof snapshotActionSchema>;
+
+export const serverSnapshotRunSchema = frame("snapshot.run", {
+    requestId: id,
+    sessionId: id,
+    action: snapshotActionSchema
+});
+
 export const serverErrorSchema = frame("error", {
     code: shortText(60),
     message: shortText(500)
@@ -686,6 +749,7 @@ export const serverMessageSchema = z.discriminatedUnion("type", [
     serverWorkspaceReadSchema,
     serverTranscriptReadSchema,
     serverLocalConfigSchema,
+    serverSnapshotRunSchema,
     serverErrorSchema
 ]);
 export type ServerMessage = z.infer<typeof serverMessageSchema>;
@@ -715,7 +779,8 @@ export const RELAYED_SERVER_TYPES = [
     "chat.cancel",
     "chat.approval",
     "workspace.read",
-    "transcript.read"
+    "transcript.read",
+    "snapshot.run"
 ] as const;
 
 /** The frames a runner must have announced a feature for before it is sent
@@ -726,7 +791,8 @@ export const SERVER_FRAME_FEATURE: Partial<Record<ServerMessage["type"], RunnerF
     "chat.cancel": "claude-chat",
     "chat.approval": "claude-chat",
     "workspace.read": "workspace-read",
-    "transcript.read": "transcript-read"
+    "transcript.read": "transcript-read",
+    "snapshot.run": "workspace-snapshot"
 };
 
 /** Whether a runner speaking `range` can talk to this server. */

@@ -27,7 +27,8 @@ import { Folders } from "./folders";
 import { createReadStream } from "node:fs";
 import * as workspace from "./workspace";
 import * as transcript from "./transcript";
-import { lstat, mkdir, open, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import * as snapshots from "./snapshots";
+import { copyFile, lstat, mkdir, open, readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { RunnerConnection, type RunnerSocket, type RunnerState, type ServerFrame } from "./connection";
 import { SessionHost, type SpawnTerminal, type Terminal, type ToolchainProgressFrame } from "./sessions";
 
@@ -149,7 +150,7 @@ function gitRead(args: string[], options: workspace.GitReadOptions): Promise<wor
         const chunks: Buffer[] = [];
         let kept = 0;
         let total = 0;
-        const timer = setTimeout(() => child.kill(), GIT_READ_TIMEOUT_MS);
+        const timer = setTimeout(() => child.kill(), options.timeoutMs ?? GIT_READ_TIMEOUT_MS);
         child.stdout.on("data", (chunk: Buffer) => {
             total += chunk.length;
             if (kept >= options.maxBytes) return;
@@ -205,6 +206,19 @@ const workspaceDeps: workspace.WorkspaceDeps = {
         }
     },
     countLines
+};
+
+const snapshotDeps: snapshots.SnapshotDeps = {
+    gitRead,
+    exists: async (path) => (await stat(path).catch(() => null)) !== null,
+    mkdir: async (path) => {
+        await mkdir(path, { recursive: true });
+    },
+    copyFile: (from, to) => copyFile(from, to).then(
+        () => true,
+        () => false
+    ),
+    writeFile: (path, text) => writeFile(path, text)
 };
 
 const transcriptDeps: transcript.TranscriptDeps = {
@@ -325,6 +339,7 @@ class RunnerService {
                 if (frame.type === "toolchain.prepare") void this.#prepareRequested(frame.requestId, frame.agents);
                 if (frame.type === "workspace.read") void this.#readWorkspace(frame);
                 if (frame.type === "transcript.read") void this.#readTranscript(frame);
+                if (frame.type === "snapshot.run") void this.#runSnapshot(frame);
             },
             onState: (state) => {
                 this.#state = state;
@@ -415,6 +430,14 @@ class RunnerService {
             return { kind: "nocheckout" } as const;
         });
         this.#connection?.send({ type: "workspace.answer", requestId: frame.requestId, sessionId: frame.sessionId, answer });
+    }
+
+    async #runSnapshot(frame: Extract<ServerFrame, { type: "snapshot.run"; }>): Promise<void> {
+        const answer = await snapshots.runSnapshot(this.#sessions.checkout(frame.sessionId), frame.action, snapshotDeps).catch((error: unknown) => {
+            console.warn(`runner: snapshot ${frame.action.kind} for ${frame.sessionId} failed: ${String(error)}`);
+            return { kind: "failed" } as const;
+        });
+        this.#connection?.send({ type: "snapshot.answer", requestId: frame.requestId, sessionId: frame.sessionId, answer });
     }
 
     async #readTranscript(frame: Extract<ServerFrame, { type: "transcript.read"; }>): Promise<void> {
@@ -520,7 +543,7 @@ class RunnerService {
             shells: [],
             clis: ready.filter((item) => agentSet.has(item.tool)).map((item) => ({ id: item.tool, version: item.version, signedIn: "unknown" as const })),
             maxSessions: MAX_SESSIONS,
-            features: ["toolchain", "claude-chat", "workspace-read", "transcript-read", "local-models"],
+            features: ["toolchain", "claude-chat", "workspace-read", "transcript-read", "local-models", "workspace-snapshot"],
             toolchain: ready,
             localModels: await localModels.detectLocalServers(this.#lanHosts),
             lanHosts: this.#lanHosts

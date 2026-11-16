@@ -733,7 +733,7 @@
                 "workspace": "La sesión no tiene repositorio: no hay archivos que deshacer.",
                 "ended": "La copia de trabajo de la sesión ya no existe.",
                 "starting": "La sesión aún está arrancando.",
-                "computer": "Deshacer aún no está disponible en un ordenador.",
+                "computer": "Actualiza la app de Polaris en ese ordenador para deshacer turnos.",
                 "over": "La sesión terminó y sus archivos se quedan como están."
             }
         }

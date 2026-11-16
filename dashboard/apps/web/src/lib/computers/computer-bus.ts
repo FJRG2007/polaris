@@ -58,6 +58,12 @@ export const liveNoticeSchema = z.discriminatedUnion("k", [
         runnerId: z.string().uuid(),
         requestId: z.string().uuid(),
         answer: core.transcriptAnswerSchema
+    }),
+    z.object({
+        k: z.literal("snapshot"),
+        runnerId: z.string().uuid(),
+        requestId: z.string().uuid(),
+        answer: core.snapshotAnswerSchema
     })
 ]);
 export type LiveNotice = z.infer<typeof liveNoticeSchema>;

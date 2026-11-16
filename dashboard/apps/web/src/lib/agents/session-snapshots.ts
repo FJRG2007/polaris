@@ -44,6 +44,10 @@ export const LABEL_CHARS = 160;
  *  huge checkout delays a prompt by this much at most. */
 export const CAPTURE_TIMEOUT_S = 25;
 
+/** How recent a turn with the same files has to be to stand for the prompt a
+ *  hook reports, in seconds. */
+export const SAME_TURN_WINDOW_S = 120;
+
 const REF_TURNS = "refs/polaris/turns";
 const REF_REDO = "refs/polaris/redo";
 const REF_UNDONE = "refs/polaris/undone";
@@ -104,6 +108,11 @@ export function captureScript(input: { workdir: string; prompt: string }): strin
         '  kept=$(S log -1 --format=%s "$u" 2>/dev/null)',
         '  head=$(S rev-parse -q --verify "$u^" 2>/dev/null)',
         `  S update-ref -d ${REF_REDO} >/dev/null 2>&1; S update-ref -d ${REF_UNDONE} >/dev/null 2>&1`,
+        // The same files as a turn taken moments ago: the prompt a hook reports
+        // is the one already snapshotted before Polaris sent it.
+        'elif [ -n "$head" ] && [ "$(S log -1 --format=%T "$head" 2>/dev/null)" = "$tree" ] &&',
+        `  [ $(( $(date +%s) - $(S log -1 --format=%ct "$head" 2>/dev/null || echo 0) )) -lt ${SAME_TURN_WINDOW_S} ]; then`,
+        `  echo "${MARK} captured $head"; exit 0`,
         "fi",
         `c=$(printf '%s\\n' "$label" | S commit-tree "$tree" \${head:+-p "$head"} 2>/dev/null) || { echo "${MARK} failed"; exit 0; }`,
         `S update-ref ${REF_TURNS} "$c" >/dev/null 2>&1 || { echo "${MARK} failed"; exit 0; }`,

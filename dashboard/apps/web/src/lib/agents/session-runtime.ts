@@ -71,6 +71,7 @@ import { previewBase } from "./session-preview-link";
 import * as placement from "./session-placement";
 import * as snapshots from "./session-snapshots";
 import * as computer from "@/lib/computers/computer-sessions";
+import { computerSessionRunner, runComputerSnapshot } from "@/lib/computers/computer-workspace";
 import {
     addSessionMessage,
     finishSession,
@@ -1222,6 +1223,48 @@ async function waitForAgent(
     }
 }
 
+/** What a computer's runner said to a capture, in the scripts' words. */
+function computerCapture(answer: core.SnapshotAnswer | null): snapshots.CaptureResult | null {
+    switch (answer?.kind) {
+        case "captured":
+            return { kind: "captured", id: answer.id };
+        case "kept":
+            return { kind: "kept", id: answer.id, undoneLabel: answer.undoneLabel };
+        case "nocheckout":
+        case "failed":
+            return { kind: answer.kind };
+        default:
+            return null;
+    }
+}
+
+/** Take a turn's snapshot where the session runs: its container or server
+ *  through the script, a computer through its runner (only one that keeps
+ *  snapshots; an older desktop is skipped). Never longer than
+ *  `CAPTURE_TIMEOUT_S`; null when it said nothing in time. */
+async function captureTurn(
+    sessionId: string,
+    placement: { place: core.AgentSessionPlace; workdir: string },
+    text: string
+): Promise<snapshots.CaptureResult | null> {
+    const capture = (async () => {
+        if (placement.place !== "computer")
+            return snapshots.parseCapture((await runInSession(sessionId, snapshots.captureScript({ workdir: placement.workdir, prompt: text }))).output);
+        const runnerId = await computerSessionRunner(sessionId);
+        if (!runnerId) return null;
+        const label = text.replace(/\s+/g, " ").trim().slice(0, core.SNAPSHOT_LIMITS.labelChars);
+        return computerCapture(await runComputerSnapshot({ id: sessionId, runnerId }, { kind: "capture", label }));
+    })().catch((error: unknown) => {
+        console.error(`polaris: could not snapshot session ${sessionId} before a turn:`, error);
+        return null;
+    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), snapshots.CAPTURE_TIMEOUT_S * 1000);
+    });
+    return Promise.race([capture, late]).finally(() => clearTimeout(timer));
+}
+
 /**
  * Snapshot the checkout before a turn (`session-snapshots.ts`), so the turn can
  * be undone, and hand back the prompt to send. When an undo was in progress the
@@ -1229,21 +1272,28 @@ async function waitForAgent(
  * conversation cannot be cut from here. Never holds a prompt longer than
  * `CAPTURE_TIMEOUT_S`, and a snapshot that fails only loses the undo point.
  */
-async function snapshotBeforeTurn(sessionId: string, workdir: string, text: string): Promise<string> {
-    const capture = runInSession(sessionId, snapshots.captureScript({ workdir, prompt: text }))
-        .then((result) => snapshots.parseCapture(result.output))
-        .catch((error: unknown) => {
-            console.error(`polaris: could not snapshot session ${sessionId} before a turn:`, error);
-            return null;
-        });
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const late = new Promise<null>((resolve) => {
-        timer = setTimeout(() => resolve(null), snapshots.CAPTURE_TIMEOUT_S * 1000);
-    });
-    const said = await Promise.race([capture, late]).finally(() => clearTimeout(timer));
+async function snapshotBeforeTurn(
+    sessionId: string,
+    placement: { place: core.AgentSessionPlace; workdir: string },
+    text: string
+): Promise<string> {
+    const said = await captureTurn(sessionId, placement, text);
     return said?.kind === "kept" ? `${snapshots.undoneNote(said.undoneLabel)}
 
 ${text}` : text;
+}
+
+/**
+ * Snapshot the checkout for a prompt somebody typed straight into the session's
+ * terminal, which Polaris hears of only from the agent's prompt hook. Taken as
+ * soon as the hook reports it, so the agent may already have begun; a prompt
+ * Polaris sent itself was snapshotted before it went, and the script takes the
+ * same files moments later as that same turn.
+ */
+export async function snapshotTypedPrompt(sessionId: string, text: string): Promise<void> {
+    const placement = await sessionPlacement(sessionId).catch(() => null);
+    if (!placement || core.isSessionOver(placement.state)) return;
+    await captureTurn(sessionId, placement, text);
 }
 
 /**
@@ -1266,9 +1316,9 @@ export async function promptSession(sessionId: string, text: string): Promise<vo
     // A session whose runner takes its prompts gets this one as a file in the
     // queue: nothing typed, nothing that has to look ready first.
     if (!placement) throw new Error("That session no longer exists.");
-    if (placement.place === "computer") return computer.promptOnComputer(sessionId, text);
-    // Saved before either kind of turn, so a Chat-driven turn can be undone too.
-    const sent = await snapshotBeforeTurn(sessionId, placement.workdir, text);
+    if (placement.place === "computer")
+        return computer.promptOnComputer(sessionId, await snapshotBeforeTurn(sessionId, placement, text));
+    const sent = await snapshotBeforeTurn(sessionId, placement, text);
     if (acpProviders.usesAcp(placement)) return acpPrompt(sessionId, placement.cli, sent);
     const queued = await runInSession(
         sessionId,

@@ -733,7 +733,7 @@
                 "workspace": "This session has no repository, so there are no files to undo.",
                 "ended": "The session's checkout is gone.",
                 "starting": "The session is still starting.",
-                "computer": "Undo is not available for a session on a computer yet.",
+                "computer": "Update the Polaris app on that computer to undo turns there.",
                 "over": "The session has ended, so its files stay as they are."
             }
         }

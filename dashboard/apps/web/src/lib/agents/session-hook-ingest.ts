@@ -37,6 +37,7 @@ import { pushPermissionRequest } from "@/lib/agents/agent-notices";
 import * as permissions from "@/lib/agents/session-permissions";
 import * as asks from "@/lib/agents/session-asks";
 import { dispatchSessionHook } from "@/lib/polar/custom-tools/plugins";
+import { snapshotTypedPrompt } from "@/lib/agents/session-runtime";
 
 /** The events after which the transcript is read. */
 const HISTORY_KINDS = new Set(["turn.end", "turn.failed", "tool.end", "tool.failed"]);
@@ -83,6 +84,8 @@ export async function ingestHookPayload(session: HookSession, payload: unknown, 
     );
     // The owner's plugins hear it after it is recorded, never in its way.
     after(() => dispatchSessionHook(id, kind, { tool: event.subject, detail: event.detail }).catch(() => undefined));
+    // A prompt typed straight into the terminal gets its undo point here.
+    if (kind === "prompt") after(() => snapshotTypedPrompt(id, event.detail).catch(() => undefined));
     if (kind === "turn.failed" && isSignInRefusal(event.detail)) after(() => noteRefusedSignIn(id));
     else if (kind === "turn.failed") after(() => handleTurnFailure(id, payload, seq));
     else if (kind === "turn.end")
