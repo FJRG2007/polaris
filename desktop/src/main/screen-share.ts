@@ -37,6 +37,9 @@ const MAX_WINDOWS = 40;
 const THUMBNAIL = { width: 320, height: 180 };
 /** How long a pick waits for the `getDisplayMedia` it was made for. */
 const PICK_MS = 15_000;
+/** How long the windows' icons are kept before they are read again. Reading
+ *  them costs a lookup per window on every listing, and an icon rarely changes. */
+const ICONS_MS = 60_000;
 
 /** The source ids `desktopCapturer` hands out: `screen:0:0`, `window:1234:0`. */
 export const SOURCE_ID = /^(screen|window):[\w-]+:\d+$/;
@@ -45,6 +48,11 @@ export const SOURCE_ID = /^(screen|window):[\w-]+:\d+$/;
 const SOUND = process.platform === "win32";
 
 let pick: { readonly id: string; readonly sound: boolean; readonly until: number; } | null = null;
+
+/** What the last listing saw of each source, so a pick from the page's picker
+ *  is shared without listing everything again, and the icons are reused. */
+let known = new Map<string, { readonly name: string; readonly displayId: string; readonly icon: string | null; }>();
+let iconsReadAt = 0;
 
 /** What is being shared now, for drawing on it: the source and its display. */
 let shared: { readonly id: string; readonly displayId: string; } | null = null;
@@ -69,13 +77,20 @@ function label(source: DesktopCapturerSource): string {
  *  Listing alone costs most of a second on Windows (measured: 0.6-1.0 s for
  *  16 sources, 1.1-1.7 s with pictures and icons), so the picker opens at once
  *  and asks twice: names first (`thumbnails: false`), pictures right after. */
-export async function listShareSources({ thumbnails = true }: { readonly thumbnails?: boolean; } = {}): Promise<ShareSources | null> {
+export async function listShareSources(
+    { thumbnails = true }: { readonly thumbnails?: boolean; } = {},
+    now = Date.now()
+): Promise<ShareSources | null> {
     if (process.platform === "darwin") return null;
+    // The picker takes the pictures again every few seconds while it is open;
+    // the icons are read only on the first of those and then once a minute.
+    const icons = thumbnails && now - iconsReadAt >= ICONS_MS;
     const sources = await desktopCapturer.getSources(
         thumbnails
-            ? { types: ["screen", "window"], thumbnailSize: THUMBNAIL, fetchWindowIcons: true }
+            ? { types: ["screen", "window"], thumbnailSize: THUMBNAIL, ...(icons ? { fetchWindowIcons: true } : {}) }
             : { types: ["screen", "window"], thumbnailSize: { width: 0, height: 0 } }
     );
+    if (icons) iconsReadAt = now;
     const screens = sources.filter((source) => source.id.startsWith("screen:"));
     const windows = sources.filter((source) => !source.id.startsWith("screen:")).slice(0, MAX_WINDOWS);
     const shape = (source: DesktopCapturerSource): ShareSource => ({
@@ -83,10 +98,22 @@ export async function listShareSources({ thumbnails = true }: { readonly thumbna
         name: source.name.trim().slice(0, 200),
         kind: source.id.startsWith("screen:") ? "screen" : "window",
         thumbnail: source.thumbnail.isEmpty() ? null : `data:image/jpeg;base64,${source.thumbnail.toJPEG(70).toString("base64")}`,
-        icon: source.appIcon && !source.appIcon.isEmpty() ? source.appIcon.resize({ width: 32 }).toDataURL() : null
+        icon: source.appIcon && !source.appIcon.isEmpty()
+            ? source.appIcon.resize({ width: 32 }).toDataURL()
+            : (known.get(source.id)?.icon ?? null)
     });
-    return { sources: [...screens, ...windows].map(shape), sound: SOUND };
+    const shaped = [...screens, ...windows].map(shape);
+    known = new Map(
+        shaped.map((source, index) => [
+            source.id,
+            { name: source.name, displayId: [...screens, ...windows][index]?.display_id ?? "", icon: source.icon }
+        ])
+    );
+    return { sources: shaped, sound: SOUND };
 }
+
+/** What a share is handed: a listed source, or what the picker saw of one. */
+type Chosen = Pick<DesktopCapturerSource, "id" | "name" | "display_id">;
 
 /** Remember what the page's picker chose, for the request that follows it. */
 export function chooseShare(id: string, sound: boolean, now = Date.now()): void {
@@ -94,14 +121,18 @@ export function chooseShare(id: string, sound: boolean, now = Date.now()): void 
 }
 
 /** The source the person picked, or null when they picked none. */
-async function choose(frame: WebFrameMain | null): Promise<{ source: DesktopCapturerSource; sound: boolean; } | null> {
-    const sources = await desktopCapturer.getSources({ types: ["screen", "window"], thumbnailSize: { width: 0, height: 0 } });
-    if (sources.length === 0) return null;
-
+async function choose(frame: WebFrameMain | null): Promise<{ source: Chosen; sound: boolean; } | null> {
     // A pick stays until a share starts from it or it runs out, so the
     // page's retry without sound, after one with sound failed, shares the
-    // same source instead of opening the old dialog.
+    // same source instead of opening the old dialog. A source the picker
+    // listed is shared as it was listed: listing everything again costs most
+    // of a second on Windows, right at the press on Share.
     const picked = pick && pick.until > Date.now() ? pick : null;
+    const seen = picked ? known.get(picked.id) : undefined;
+    if (picked && seen) return { source: { id: picked.id, name: seen.name, display_id: seen.displayId }, sound: picked.sound };
+
+    const sources = await desktopCapturer.getSources({ types: ["screen", "window"], thumbnailSize: { width: 0, height: 0 } });
+    if (sources.length === 0) return null;
     if (picked) {
         const source = sources.find((candidate) => candidate.id === picked.id);
         // A window closed between the pick and the request: nothing is shared
@@ -148,7 +179,7 @@ export function installScreenShare(server: () => string | null): void {
                     pick = null;
                     shared = { id: chosen.source.id, displayId: chosen.source.display_id };
                     callback({
-                        video: chosen.source,
+                        video: { id: chosen.source.id, name: chosen.source.name },
                         ...(chosen.sound && request.audioRequested ? { audio: "loopback" as const } : {})
                     });
                 },

@@ -7,17 +7,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getSources = vi.fn();
+let displayHandler: unknown = null;
 
 vi.mock("electron", () => ({
     BrowserWindow: {},
     desktopCapturer: { getSources: (options: unknown) => getSources(options) },
     dialog: {},
-    session: {},
+    session: { defaultSession: { setDisplayMediaRequestHandler: (handler: unknown) => (displayHandler = handler) } },
     webContents: {}
 }));
 vi.mock("@/main/permissions", () => ({ allowPermission: () => true }));
 
-const { listShareSources } = await import("@/main/screen-share");
+const { chooseShare, installScreenShare, listShareSources } = await import("@/main/screen-share");
 
 const image = (empty: boolean) => ({
     isEmpty: () => empty,
@@ -48,5 +49,30 @@ describe.runIf(process.platform !== "darwin")("listing what can be shared", () =
         expect(getSources).toHaveBeenCalledWith(
             expect.objectContaining({ thumbnailSize: { width: 320, height: 180 }, fetchWindowIcons: true })
         );
+    });
+
+    it("reads the windows' icons on the first picture round and reuses them after", async () => {
+        const start = Date.now() + 3_600_000;
+        await listShareSources({ thumbnails: true }, start);
+        await listShareSources({ thumbnails: true }, start + 10_000);
+        expect(getSources.mock.calls[0]?.[0]).toMatchObject({ fetchWindowIcons: true });
+        expect(getSources.mock.calls[1]?.[0]).not.toHaveProperty("fetchWindowIcons");
+        await listShareSources({ thumbnails: true }, start + 70_000);
+        expect(getSources.mock.calls[2]?.[0]).toMatchObject({ fetchWindowIcons: true });
+    });
+
+    it("shares a source the picker listed without listing everything again", async () => {
+        installScreenShare(() => "https://polaris.example");
+        await listShareSources({ thumbnails: false });
+        getSources.mockClear();
+        chooseShare("window:1:0", false);
+        const granted = await new Promise<unknown>((resolve) =>
+            (displayHandler as (request: object, callback: (streams: unknown) => void) => void)(
+                { videoRequested: true, audioRequested: false, securityOrigin: "https://polaris.example", frame: null },
+                resolve
+            )
+        );
+        expect(getSources).not.toHaveBeenCalled();
+        expect(granted).toEqual({ video: { id: "window:1:0", name: "Editor" } });
     });
 });

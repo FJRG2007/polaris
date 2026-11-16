@@ -40,8 +40,10 @@ import {
     Switch
 } from "@polaris/ui";
 
-/** How often the pictures are taken again while the picker is open. */
-const REFRESH_MS = 4_000;
+/** How often the pictures are taken again while the picker is open. Each
+ *  round films every window on the computer, which costs the app a second or
+ *  more on Windows: a round every 4 s kept it busy most of the time. */
+const REFRESH_MS = 10_000;
 /** Placeholder tiles drawn while the first list is on its way. */
 const PLACEHOLDERS = 6;
 
@@ -182,6 +184,11 @@ function Picker({ request }: { request: Request }) {
         let first = true;
         let timer: ReturnType<typeof setTimeout> | undefined;
         const read = async (thumbnails: boolean) => {
+            // Nobody is looking at pictures in a window that is not on screen.
+            if (thumbnails && !first && document.visibilityState === "hidden") {
+                timer = setTimeout(() => void read(true), REFRESH_MS);
+                return;
+            }
             const next = await request.bridge.shareSources?.({ thumbnails }).catch(() => null);
             if (!live) return;
             if (!next) {
