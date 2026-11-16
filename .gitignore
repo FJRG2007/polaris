@@ -133,3 +133,7 @@ Thumbs.db
 # one and the global ignore, and nothing else. Only `worktrees/` is listed, so
 # anything else under `.claude/` (agents, commands, settings) can still be shared.
 .claude/worktrees/
+
+# Working plans an agent keeps while it works (`*-PLAN.md` at the root) are
+# notes for the next session, not part of the project.
+/*-PLAN.md
