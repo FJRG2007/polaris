@@ -121,13 +121,27 @@ describe("startRunFromTasksAction", () => {
             ownerId: "u1",
             repoId: REPO,
             cli: "claude",
-            model: null,
+            // Left on the source's default: the repository's role default.
+            modelChoice: null,
             mode: "coordinator",
             brief: "Ship it",
             items: [
                 { id: B, reference: "ENG-1", listId: "list-1" },
                 { id: A, reference: "ENG-2", listId: "list-1" }
             ]
+        });
+    });
+
+    it("passes the picked model on, resolved once on the server", async () => {
+        await startRunFromTasksAction({
+            ...BODY,
+            mode: "workers",
+            pick: { source: `account:${PLAN}`, provider: "anthropic", model: "claude-opus-4" }
+        });
+        expect(state.started).toMatchObject({
+            mode: "workers",
+            cli: "claude",
+            modelChoice: { provider: "anthropic", model: "claude-opus-4" }
         });
     });
 

@@ -8,12 +8,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const PLAN = "0190c6a0-0000-7000-8000-0000000000a1";
 
-const state = vi.hoisted(() => ({ startedWith: null as unknown }));
+const state = vi.hoisted(() => ({ startedWith: null as unknown, agents: true }));
 
 vi.mock("@/lib/session", () => ({
     requireUser: async () => ({ id: "u1", isAdmin: false }),
     requirePermission: async () => ({ id: "u1", isAdmin: false }),
-    sessionCan: async () => true
+    sessionCan: async () => state.agents
 }));
 vi.mock("@/lib/i18n/request", () => ({
     getTranslations: async () => (key: string) => `t:${key}`
@@ -103,6 +103,13 @@ describe("handTaskToAgentAction", () => {
             modelChoice: null
         });
         expect(state.startedWith).not.toHaveProperty("pick");
+    });
+
+    it("refuses an account without Agents, in Tasks' words, starting nothing", async () => {
+        state.agents = false;
+        expect(await handTaskToAgentAction({ ...BODY, pick: null })).toEqual({ error: "t:errors.agentRunNotAllowed" });
+        state.agents = true;
+        expect(state.startedWith).toBeNull();
     });
 
     it("refuses a pick that is not this person's or does not validate, starting nothing", async () => {

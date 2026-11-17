@@ -2071,6 +2071,9 @@ export async function deleteFormAction(
  * one. Tasks talks to Tasks.
  */
 export async function agentHandoffChoicesAction(): Promise<{
+    /** Whether this account may start agents at all: what both handoff
+     *  buttons follow, and what the starts refuse on. */
+    allowed: boolean;
     repos: { id: string; name: string }[];
     agents: AgentOption[];
     /** The same rows as the sources Code's model picker lists. */
@@ -2081,7 +2084,7 @@ export async function agentHandoffChoicesAction(): Promise<{
     // than being refused: the button is beside every task, and most people who
     // press it once are finding out what it does.
     const allowed = await sessionCan(user, "agents.manage");
-    if (!allowed) return { repos: [], agents: [], sources: [] };
+    if (!allowed) return { allowed: false, repos: [], agents: [], sources: [] };
     // The first page only: the default and whether there are any. The picker
     // reads the rest through `agentHandoffRepoOptionsAction`.
     const [repos, agents] = await Promise.all([
@@ -2091,7 +2094,7 @@ export async function agentHandoffChoicesAction(): Promise<{
         // in is a task that goes quiet, and the board never learns why.
         agentOptionsFor(user.id)
     ]);
-    return { repos: repos.items, agents, sources: codeSourcesFor(agents) };
+    return { allowed: true, repos: repos.items, agents, sources: codeSourcesFor(agents) };
 }
 
 /** A page of the repositories a task can be handed to an agent on. */
@@ -2116,6 +2119,8 @@ export async function handTaskToAgentAction(
     input: unknown
 ): Promise<{ id?: string; error?: string }> {
     const user = await requirePermission("tasks.read");
+    // Said in Tasks' words rather than thrown by the Agents app's own check.
+    if (!(await sessionCan(user, "agents.manage"))) return { error: await errorText("errors.agentRunNotAllowed") };
     const body = handoffBodySchema.safeParse(input ?? {});
     if (!body.success) return startSessionAction(input);
     const resolved = await resolvedStart(user, body.data);
@@ -2203,7 +2208,7 @@ export async function startRunFromTasksAction(
             ownerId: user.id,
             repoId: repo.id,
             cli: cli.data,
-            model: choice.success ? `${choice.data.provider}/${choice.data.model}` : null,
+            modelChoice: choice.success ? choice.data : null,
             mode: parsed.data.mode,
             items,
             brief: parsed.data.brief

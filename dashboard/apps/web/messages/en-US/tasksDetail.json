@@ -21,7 +21,8 @@
         "brief": "Anything to add",
         "briefPlaceholder": "Context every agent should have",
         "follows": "Each task's status follows its agent until someone changes it by hand.",
-        "tooMany": "One run takes up to {count} tasks. Select fewer."
+        "tooMany": "One run takes up to {count} tasks. Select fewer.",
+        "noAgents": "Your account has no access to Agents. Ask an administrator for it."
     },
     "files": {
         "uploadFailed": "Could not upload that file",

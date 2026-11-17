@@ -39,6 +39,9 @@ export interface RunInput {
     /** Tasks items the run is started on: its plan, each followed by the
      *  worker that takes it. Linked before the coordinator starts. */
     readonly planItemIds?: readonly string[];
+    /** The coordinator's model as the person picked it, already resolved.
+     *  Absent or null: the repository's coordinator default. */
+    readonly coordinatorModel?: core.SessionModelChoice | null;
 }
 
 export interface TaskInput {
@@ -163,9 +166,11 @@ export async function createRun(input: RunInput): Promise<{ id: string }> {
         // The coordinator runs on the agent the person picked, and on the model
         // the repository keeps for its coordinator when that is the same agent.
         const coordinator = roles.pickRoleAgent(await repoRoles(run.repoId), "coordinator", { agent: run.cli });
-        const modelChoice = coordinator.model
-            ? await startModel(run.ownerId, coordinator.agent, coordinator.model).catch(() => null)
-            : null;
+        const modelChoice =
+            input.coordinatorModel ??
+            (coordinator.model
+                ? await startModel(run.ownerId, coordinator.agent, coordinator.model).catch(() => null)
+                : null);
         const admission = await queue.admitSession(
             sessionInput(run, `Coordinate: ${input.objective}`, null, modelChoice),
             plan.coordinatorPreamble(run)
@@ -941,8 +946,9 @@ export interface ItemRunInput {
     readonly ownerId: string;
     readonly repoId: string;
     readonly cli: string;
-    /** provider/model for the workers, or null for the role default. */
-    readonly model: string | null;
+    /** The model the person picked, resolved once by the caller; null when
+     *  they left it on default, which is the repository's role default. */
+    readonly modelChoice: core.SessionModelChoice | null;
     /** One coordinator that plans over the items, or one worker per item. */
     readonly mode: "coordinator" | "workers";
     readonly items: readonly (itemRules.PlanItem & { listId: string })[];
@@ -968,6 +974,7 @@ export async function startRunFromItems(input: ItemRunInput): Promise<{ id: stri
         baseRef: "",
         cli: input.cli,
         coordinator,
+        coordinatorModel: input.modelChoice,
         taskListId: input.items[0]!.listId,
         planItemIds: input.items.map((item) => item.id)
     });
@@ -978,9 +985,11 @@ export async function startRunFromItems(input: ItemRunInput): Promise<{ id: stri
                 title: `${item.reference} ${item.name}`.slice(0, 80),
                 spec: itemRules.itemBrief(item, input.brief),
                 dependsOn: [],
-                cli: null,
+                // The agent the person picked, not the repository's worker
+                // default: that is only for workers nobody chose an agent for.
+                cli: input.cli,
                 gateQuestion: null,
-                model: input.model,
+                model: input.modelChoice ? `${input.modelChoice.provider}/${input.modelChoice.model}` : null,
                 clientKey: `item:${item.id}`,
                 itemId: item.id
             }))

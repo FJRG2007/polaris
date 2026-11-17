@@ -30,7 +30,7 @@ import { ListView, TableView } from "./views/rows";
 import { TaskCreateDialog } from "./task-create-dialog";
 import { affected, undoSteps } from "./bulk-edits";
 import { BarButton, SelectionBar } from "./selection-bar";
-import { HandSelectionDialog } from "./hand-to-agent";
+import { HandSelectionDialog, useHandoffGate } from "./hand-to-agent";
 import { downloadCsv, tasksToCsv } from "./export-csv";
 import { AssigneePicker, dayZone, PriorityPicker, StatusPicker } from "./pickers";
 import type { SavedView } from "@/lib/tasks/view-service";
@@ -188,6 +188,7 @@ export function ListScreen({
     // The selection being handed to agents, held apart from the live selection
     // so a row that scrolls away mid-dialog is still in it.
     const [handing, setHanding] = useState<readonly TaskRow[]>([]);
+    const handoff = useHandoffGate();
     const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
     // The task a shift-click reaches back to: the last one clicked on its own.
     const [anchor, setAnchor] = useState<string | null>(null);
@@ -1285,11 +1286,15 @@ export function ListScreen({
                     </>
                 )}
                 {context.canEdit && (
-                    <BarButton
-                        label={t("bulk.agents")}
-                        icon={<Bot />}
-                        onClick={() => setHanding(selected)}
-                    />
+                    <span title={handoff.reason ?? undefined} className="inline-flex">
+                        <BarButton
+                            label={t("bulk.agents")}
+                            aria-description={handoff.reason ?? undefined}
+                            icon={<Bot />}
+                            disabled={!handoff.usable}
+                            onClick={() => setHanding(selected)}
+                        />
+                    </span>
                 )}
                 <BarButton
                     label={t("bulk.export")}

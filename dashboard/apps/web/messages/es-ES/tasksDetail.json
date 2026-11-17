@@ -21,7 +21,8 @@
         "brief": "Algo que añadir",
         "briefPlaceholder": "Contexto para todos los agentes",
         "follows": "El estado de cada tarea sigue a su agente hasta que alguien lo cambie a mano.",
-        "tooMany": "Una ejecución admite hasta {count} tareas. Elige menos."
+        "tooMany": "Una ejecución admite hasta {count} tareas. Elige menos.",
+        "noAgents": "Tu cuenta no tiene acceso a Agentes. Pídeselo a un admin."
     },
     "files": {
         "uploadFailed": "No se pudo subir ese archivo",

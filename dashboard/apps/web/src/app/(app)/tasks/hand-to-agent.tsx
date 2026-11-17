@@ -54,19 +54,24 @@ interface Props {
 export function HandToAgent({ taskId, reference, name, description }: Props) {
     const [open, setOpen] = useState(false);
     const t = useTranslations("tasksDetail");
+    const gate = useHandoffGate();
+    const label = gate.reason ?? t("agent.giveThis");
 
     return (
         <>
-            <Button
-                size="sm"
-                variant="ghost"
-                title={t("agent.giveThis")}
-                aria-label={t("agent.giveThis")}
-                onClick={() => setOpen(true)}
-            >
-                <Bot className="size-4" />
-                <span className="hidden sm:inline">{t("agent.give")}</span>
-            </Button>
+            {/* The reason sits on a wrapper: a disabled button shows no tooltip. */}
+            <span title={label} className="inline-flex">
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={label}
+                    disabled={!gate.usable}
+                    onClick={() => setOpen(true)}
+                >
+                    <Bot className="size-4" />
+                    <span className="hidden sm:inline">{t("agent.give")}</span>
+                </Button>
+            </span>
             {open ? (
                 <HandOffDialog
                     taskId={taskId}
@@ -385,3 +390,25 @@ export function HandSelectionDialog({
 
 /** The most tasks one run takes, as the server holds it. */
 const RUN_TASKS_MAX = 20;
+
+/**
+ * Whether a handoff can start for this account, from the same answer the
+ * starts refuse on: Agents access, and a repository of their own. Unusable
+ * until that answer is in, so nothing is offered and then refused.
+ */
+export function useHandoffGate(): { usable: boolean; reason: string | null } {
+    const t = useTranslations("tasksDetail");
+    const [answer, setAnswer] = useState<{ allowed: boolean; repos: number } | null>(null);
+    useEffect(() => {
+        const controller = new AbortController();
+        void polls
+            .handoffChoices(controller.signal)
+            .then((choices) => setAnswer({ allowed: choices.allowed, repos: choices.repos.length }))
+            .catch(() => undefined);
+        return () => controller.abort();
+    }, []);
+    if (!answer) return { usable: false, reason: null };
+    if (!answer.allowed) return { usable: false, reason: t("agent.noAgents") };
+    if (answer.repos === 0) return { usable: false, reason: t("agent.noRepos") };
+    return { usable: true, reason: null };
+}
