@@ -1041,7 +1041,8 @@ export async function addApplicationDomain(
         // silently fails off the network; the UI labels it and offers public setup.
         const plan = await resolveAutoDomain(
             app.slug,
-            remoteHost ? { ip: remoteIp ?? "", wildcard: remoteHost.wildcardDomain } : undefined
+            remoteHost ? { ip: remoteIp ?? "", wildcard: remoteHost.wildcardDomain } : undefined,
+            async (candidate) => !(await hostnameTaken(candidate))
         );
         if (!plan) {
             throw new Error(

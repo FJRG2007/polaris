@@ -113,4 +113,26 @@ describe("resolveAutoDomain on the Polaris host", () => {
         expect(plan?.hostname.endsWith(".plr.example.com")).toBe(true);
         expect(plan).toMatchObject({ cert: "le", kind: "auto" });
     });
+
+    it("gives a service its own name in the zone while nothing holds it", async () => {
+        store.set("domain.zones.verified", "1");
+        const plan = await resolveAutoDomain("Invoices", undefined, async () => true);
+        expect(plan?.hostname).toBe("invoices.plr.example.com");
+    });
+
+    it("falls back to the hashed name when the plain one is taken", async () => {
+        store.set("domain.zones.verified", "1");
+        const asked: string[] = [];
+        const plan = await resolveAutoDomain("invoices", undefined, async (hostname) => {
+            asked.push(hostname);
+            return false;
+        });
+        expect(asked).toEqual(["invoices.plr.example.com"]);
+        expect(plan?.hostname).toMatch(/^invoices-[0-9a-f]{6}\.plr\.example\.com$/);
+    });
+
+    it("never uses the plain name on a shared free domain", async () => {
+        const plan = await resolveAutoDomain("invoices", undefined, async () => true);
+        expect(plan?.hostname).toContain("5-6-7-8.sslip.io");
+    });
 });

@@ -13,7 +13,7 @@
 import { getSetting, setSetting } from "./setting-store";
 import { actingEnvironment, INBOUND_KEY, lineIsCgnat, readReach } from "./backup-access/inbound";
 import { deployZoneBase, zoneDnsVerified } from "./domain-zones";
-import { DEFAULT_SUBDOMAIN_BASE, magicDomain } from "@polaris/deploy";
+import { DEFAULT_SUBDOMAIN_BASE, magicDomain, normalizeZoneName } from "@polaris/deploy";
 import { deployBase, duckdnsConfigured, getPublicIp } from "./domain-service";
 import {
     isCarrierGradeNat,
@@ -465,9 +465,30 @@ export interface AutoDomainPlan {
  * served by the internal CA, flagged so the UI can say so instead of pretending it
  * works everywhere. Null when no IP or domain is known at all.
  */
+/**
+ * A service's name in a wildcard domain the operator owns: the service's own name
+ * (`planner.plr.example.com`) while nothing else holds it, else the hashed form that
+ * cannot collide (`planner-244b84.plr.example.com`). The plain name is what people
+ * expect to type; the hash only ever settles a clash.
+ */
+async function wildcardName(
+    name: string,
+    wildcard: string,
+    free?: (hostname: string) => Promise<boolean>
+): Promise<string> {
+    const label = normalizeZoneName(name);
+    const plain = label ? `${label}.${wildcard}` : "";
+    return plain && free && (await free(plain)) ? plain : magicDomain(name, "", wildcard);
+}
+
+/**
+ * `free` says whether a hostname is still unclaimed; without it a wildcard name
+ * is always the hashed one.
+ */
 export async function resolveAutoDomain(
     name: string,
-    override?: { ip: string; wildcard?: string | null }
+    override?: { ip: string; wildcard?: string | null },
+    free?: (hostname: string) => Promise<boolean>
 ): Promise<AutoDomainPlan | null> {
     // An app on a remote server gets a subdomain that embeds THAT server's IP and
     // is served by its own edge, so it never inherits the Polaris host's IP or
@@ -479,7 +500,7 @@ export async function resolveAutoDomain(
         // reached by hostname, where there is no address to encode.
         const wildcard = override.wildcard?.trim();
         if (wildcard)
-            return { hostname: magicDomain(name, "", wildcard), cert: "le", kind: "auto" };
+            return { hostname: await wildcardName(name, wildcard, free), cert: "le", kind: "auto" };
         const ip = override.ip.trim();
         // The subdomain encodes the address in a DNS label, so a host reached by
         // name or over IPv6 has no auto domain to offer - the caller falls back.
@@ -495,7 +516,11 @@ export async function resolveAutoDomain(
     const status = await getNetworkStatus();
 
     if (status.effectiveMode === "wildcard" && status.wildcardDomain) {
-        return { hostname: magicDomain(name, "", status.wildcardDomain), cert: "le", kind: "auto" };
+        return {
+            hostname: await wildcardName(name, status.wildcardDomain, free),
+            cert: "le",
+            kind: "auto"
+        };
     }
     if (status.effectiveMode === "public" && status.subdomainIp) {
         return {
