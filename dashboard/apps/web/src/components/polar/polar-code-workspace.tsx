@@ -349,7 +349,7 @@ function SessionTerminal({ session }: { session: SessionView }) {
                         type="button"
                         role="tab"
                         aria-selected={tabs.active === "agent"}
-                        className={tabClass(tabs.active === "agent")}
+                        className={ui.cn("whitespace-nowrap", tabClass(tabs.active === "agent"))}
                         onClick={() => setTabs((now) => ({ ...now, active: "agent" }))}
                     >
                         {t("code.shells.agent")}
@@ -360,6 +360,7 @@ function SessionTerminal({ session }: { session: SessionView }) {
                                 type="button"
                                 role="tab"
                                 aria-selected={tabs.active === shell}
+                                className="whitespace-nowrap"
                                 onClick={() => setTabs((now) => ({ ...now, active: shell }))}
                             >
                                 {t("code.shells.shell", { number: shell })}
