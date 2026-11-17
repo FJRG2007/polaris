@@ -12,6 +12,7 @@
 
 import * as ui from "@polaris/ui";
 import { formatBytes } from "@polaris/core";
+import { framedUrl } from "@/lib/agents/artifacts/artifact-files";
 import { languageForFile } from "@/lib/code-language";
 import { CodeSurface } from "@/components/code-surface";
 import { useCallback, useEffect, useState } from "react";
@@ -29,16 +30,26 @@ const ARTIFACT_FRAME_SANDBOX = "allow-scripts allow-popups";
 const TEXT_LIMIT = 1024 * 1024;
 
 /** Where one version's bytes are read from. */
-export type ArtifactSource = (version: number, download?: boolean) => string;
+export interface ArtifactSource {
+    (version: number, download?: boolean): string;
+    /** A page read by path, so what it references beside it resolves. */
+    framed: (version: number, path: string) => string;
+}
 
 export function ownArtifactSource(artifactId: string): ArtifactSource {
-    return (version, download) =>
-        `/api/agents/artifacts/${artifactId}?v=${version}${download ? "&download=1" : ""}`;
+    return Object.assign(
+        (version: number, download?: boolean) =>
+            `/api/agents/artifacts/${artifactId}?v=${version}${download ? "&download=1" : ""}`,
+        { framed: (version: number) => `/api/agents/artifacts/${artifactId}/frame?v=${version}` }
+    );
 }
 
 export function linkArtifactSource(token: string): ArtifactSource {
-    return (version, download) =>
-        `/api/agents/artifacts/link/${encodeURIComponent(token)}?v=${version}${download ? "&download=1" : ""}`;
+    const base = `/api/agents/artifacts/link/${encodeURIComponent(token)}`;
+    return Object.assign(
+        (version: number, download?: boolean) => `${base}?v=${version}${download ? "&download=1" : ""}`,
+        { framed: (version: number, path: string) => framedUrl(`${base}/f`, path, version) }
+    );
 }
 
 /** The Artifacts pane of a session's workspace. */
@@ -276,7 +287,7 @@ export function ArtifactViewer({
                     key={version}
                     artifact={artifact}
                     size={shown?.size ?? artifact.size}
-                    url={source(version)}
+                    url={artifact.kind === "html" ? source.framed(version, artifact.path) : source(version)}
                     download={source(version, true)}
                 />
             </div>

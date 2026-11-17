@@ -6,8 +6,8 @@
 
 import { z } from "zod";
 import { NextResponse } from "next/server";
-import { readArtifactVersion } from "@/lib/agents/session-artifacts";
-import { artifactHeaders } from "./artifact-files";
+import { framedArtifact, readArtifactVersion } from "@/lib/agents/session-artifacts";
+import { artifactFramePath, artifactHeaders } from "./artifact-files";
 
 const querySchema = z.object({
     v: z.coerce.number().int().min(1).max(1_000_000).optional(),
@@ -23,7 +23,39 @@ export async function serveArtifact(request: Request, artifactId: string | null)
     const query = querySchema.safeParse(Object.fromEntries(url.searchParams));
     // i18n-ignore: status bodies no screen shows
     if (!query.success) return NextResponse.json({ error: "Bad request" }, { status: 400, headers: NO_STORE });
-    const file = await readArtifactVersion(artifactId, query.data.v ?? null).catch((error) => {
+    return respond(artifactId, query.data.v ?? null, query.data.download === "1", false);
+}
+
+/**
+ * A delivered page, or a file beside it, read by path (`segments`, as the
+ * route received them) from the page `anchorId`, so a relative reference in
+ * the page resolves to the file next to it. `wholeSession` says whether the
+ * reader may read the page's whole session or only the page
+ * (`frameReaches`). A step out of the folder is refused as not found.
+ */
+export async function serveFramed(
+    request: Request,
+    anchorId: string | null,
+    segments: readonly string[],
+    wholeSession: boolean
+): Promise<Response> {
+    const path = artifactFramePath(segments);
+    // i18n-ignore: status bodies no screen shows; the viewer says it in its own words
+    if (!anchorId || !path) return NextResponse.json({ error: "Not found" }, { status: 404, headers: NO_STORE });
+    const query = querySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+    // i18n-ignore: status bodies no screen shows
+    if (!query.success) return NextResponse.json({ error: "Bad request" }, { status: 400, headers: NO_STORE });
+    const target = await framedArtifact(anchorId, path, wholeSession, query.data.v ?? null).catch((error) => {
+        console.error(`[agent-artifact] ${anchorId}: could not find ${JSON.stringify(path)} beside it:`, error);
+        return null;
+    });
+    // i18n-ignore: status bodies no screen shows
+    if (!target) return NextResponse.json({ error: "Not found" }, { status: 404, headers: NO_STORE });
+    return respond(target.artifactId, target.version, false, true);
+}
+
+async function respond(artifactId: string, version: number | null, download: boolean, framed: boolean) {
+    const file = await readArtifactVersion(artifactId, version).catch((error) => {
         console.error(`[agent-artifact] ${artifactId}: could not read it:`, error);
         return null;
     });
@@ -34,8 +66,9 @@ export async function serveArtifact(request: Request, artifactId: string | null)
             mediaType: file.mediaType,
             name: file.name,
             size: file.size,
-            download: query.data.download === "1",
-            immutable: query.data.v !== undefined
+            download,
+            immutable: version !== null,
+            framed
         })
     });
 }

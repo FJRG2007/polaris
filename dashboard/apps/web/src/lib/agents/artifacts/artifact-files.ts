@@ -164,6 +164,58 @@ export const ARTIFACT_CSP = [
     "base-uri 'none'"
 ].join("; ");
 
+/**
+ * The policy a page and the files beside it are served under when they are
+ * read by path (`artifactFramePath`): the same one, with `'self'` added where a
+ * page loads its own pictures, styles and scripts, so a relative reference to
+ * a file next to it draws on an install served over plain HTTP too. Still no
+ * `connect-src`: the page reads nothing back.
+ */
+export const ARTIFACT_FRAME_CSP = [
+    "sandbox allow-scripts allow-popups",
+    "default-src 'none'",
+    "script-src 'self' 'unsafe-inline' https:",
+    "style-src 'self' 'unsafe-inline' https:",
+    "img-src 'self' data: blob: https:",
+    "font-src 'self' data: https:",
+    "media-src 'self' data: blob: https:",
+    "connect-src 'none'",
+    "form-action 'none'",
+    "base-uri 'none'"
+].join("; ");
+
+/**
+ * The deliverable a path-based address names (its segments as the route
+ * received them, already decoded), or null for anything that is not a plain
+ * path inside the deliverables folder: a step out, a hidden part, an empty
+ * segment, a control character.
+ */
+export function artifactFramePath(segments: readonly string[]): string | null {
+    if (segments.length === 0 || segments.length > 32) return null;
+    if (segments.some((segment) => segment.includes("/") || segment.includes("\\"))) return null;
+    return deliverablePath(segments.join("/"));
+}
+
+/**
+ * Whether a page's reader may load `path` beside it. Somebody who may read the
+ * whole session may load any of its files; somebody the page alone was shared
+ * with (a grant on it, or its link) only the files in the page's own folder and
+ * below it - what the page was delivered with, never the session's work
+ * outside the deliverables folder. A page at the top of the folder reaches the
+ * whole folder, which is what it was delivered beside.
+ */
+export function frameReaches(anchorPath: string, path: string, wholeSession: boolean): boolean {
+    if (wholeSession || path === anchorPath) return true;
+    const slash = anchorPath.lastIndexOf("/");
+    if (slash < 0) return true;
+    return path.startsWith(anchorPath.slice(0, slash + 1));
+}
+
+/** The address of a page read by path: `base` then each segment encoded. */
+export function framedUrl(base: string, path: string, version: number): string {
+    return `${base}/${path.split("/").map(encodeURIComponent).join("/")}?v=${version}`;
+}
+
 /** The headers an artifact's bytes go out with. */
 export function artifactHeaders(input: {
     mediaType: string;
@@ -171,6 +223,8 @@ export function artifactHeaders(input: {
     size: number;
     download: boolean;
     immutable: boolean;
+    /** Read by path from inside a page's frame, whose origin is opaque. */
+    framed?: boolean;
 }): Record<string, string> {
     const kind = artifactKind(input.mediaType);
     const inline = !input.download && kind !== "binary";
@@ -179,9 +233,11 @@ export function artifactHeaders(input: {
         "content-type": input.mediaType,
         "content-length": String(input.size),
         "content-disposition": `${inline ? "inline" : "attachment"}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(input.name)}`,
-        "content-security-policy": ARTIFACT_CSP,
+        "content-security-policy": input.framed ? ARTIFACT_FRAME_CSP : ARTIFACT_CSP,
         "x-content-type-options": "nosniff",
-        "cross-origin-resource-policy": "same-origin",
+        // A frame with an opaque origin is never same-origin, so a file it loads
+        // by path is let through; the address itself carries the right to it.
+        "cross-origin-resource-policy": input.framed ? "cross-origin" : "same-origin",
         "referrer-policy": "no-referrer",
         "cache-control": input.immutable ? "private, max-age=31536000, immutable" : "private, no-cache"
     };

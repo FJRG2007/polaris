@@ -360,11 +360,47 @@ async function sessionOf(artifactId: string): Promise<string | null> {
  * grant on the artifact itself.
  */
 export async function mayReadArtifact(userId: string, artifactId: string): Promise<boolean> {
+    return (await artifactReach(userId, artifactId)) !== null;
+}
+
+/**
+ * How far a reader reaches from an artifact: its whole session (they may read
+ * the session), the artifact alone (it was shared with them on its own), or
+ * nowhere (null).
+ */
+export async function artifactReach(userId: string, artifactId: string): Promise<"session" | "artifact" | null> {
     const sessionId = await sessionOf(artifactId);
-    if (!sessionId) return false;
-    if (await getSession(sessionId, userId)) return true;
+    if (!sessionId) return null;
+    if (await getSession(sessionId, userId)) return "session";
     const held = await grantedCapability(userId, "agents.artifact", artifactId);
-    return core.atLeast("agents.artifact", held, "view");
+    return core.atLeast("agents.artifact", held, "view") ? "artifact" : null;
+}
+
+/**
+ * The artifact a page's frame names by path, read from beside the page
+ * `anchorId` (see `files.frameReaches`), and the version to read: the one
+ * asked for when it is the page itself, the newest otherwise. Null when the
+ * path is not a stored, current file the reader reaches.
+ */
+export async function framedArtifact(
+    anchorId: string,
+    path: string,
+    wholeSession: boolean,
+    version: number | null
+): Promise<{ artifactId: string; version: number | null } | null> {
+    const anchor = await prisma.agentSessionArtifact.findUnique({
+        where: { id: anchorId },
+        select: { sessionId: true, path: true }
+    });
+    if (!anchor) return null;
+    if (path === anchor.path) return { artifactId: anchorId, version };
+    if (!files.frameReaches(anchor.path, path, wholeSession)) return null;
+    const sibling = await prisma.agentSessionArtifact.findUnique({
+        where: { sessionId_path: { sessionId: anchor.sessionId, path } },
+        select: { id: true, removedAt: true }
+    });
+    if (!sibling || sibling.removedAt !== null) return null;
+    return { artifactId: sibling.id, version: null };
 }
 
 /** The artifact a live link opens, or null. */
