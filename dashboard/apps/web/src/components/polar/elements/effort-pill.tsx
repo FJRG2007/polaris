@@ -11,16 +11,16 @@
 
 import { Brain, Check } from "lucide-react";
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuTrigger
-} from "@polaris/ui";
+    SheetMenu,
+    SheetMenuContent,
+    SheetMenuItem,
+    SheetMenuLabel,
+    SheetMenuTrigger
+} from "@/components/polar/elements/sheet-menu";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const PILL =
-    "inline-flex h-7 min-w-0 max-w-[40%] shrink items-center gap-1.5 rounded-full border border-border px-2.5 text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 [@media(pointer:coarse)]:h-9 [@media(pointer:coarse)]:px-3";
+    "inline-flex h-7 min-w-0 max-w-[40%] shrink items-center gap-1.5 rounded-full border border-border px-2.5 text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:px-3";
 
 export function EffortPill<T extends string>({
     toggle = false,
@@ -64,8 +64,8 @@ export function EffortPill<T extends string>({
     }
     const current = value === null ? t("effort.default") : labelOf(value);
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+        <SheetMenu>
+            <SheetMenuTrigger>
                 <button
                     type="button"
                     disabled={disabled}
@@ -76,11 +76,11 @@ export function EffortPill<T extends string>({
                     <Brain className="size-3.5 shrink-0" aria-hidden />
                     <span className="min-w-0 truncate">{current}</span>
                 </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-48 max-w-[min(20rem,calc(100vw-2rem))]">
-                <DropdownMenuLabel>{t("effort.title")}</DropdownMenuLabel>
+            </SheetMenuTrigger>
+            <SheetMenuContent title={t("effort.title")} align="start" className="min-w-48 max-w-[min(20rem,calc(100vw-2rem))]">
+                <SheetMenuLabel>{t("effort.title")}</SheetMenuLabel>
                 {levels.map((level) => (
-                    <DropdownMenuItem
+                    <SheetMenuItem
                         key={level}
                         role="menuitemradio"
                         aria-checked={level === value}
@@ -98,9 +98,9 @@ export function EffortPill<T extends string>({
                                     : "ms-auto size-3.5 shrink-0 opacity-0"
                             }
                         />
-                    </DropdownMenuItem>
+                    </SheetMenuItem>
                 ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
+            </SheetMenuContent>
+        </SheetMenu>
     );
 }

@@ -17,7 +17,7 @@
  */
 
 import Link from "next/link";
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { Bell, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { badgeLabel } from "@/lib/notification-badge";
@@ -27,6 +27,7 @@ import { NotificationRepeats } from "@/components/notifications/notification-rep
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import { NotificationFace } from "@/components/notifications/notification-face";
 import { describeAudience } from "@/components/notifications/notification-visuals";
+import { usePhone } from "@/components/use-phone";
 import type { NotificationView } from "@/lib/notification-service";
 import {
     Dialog,
@@ -44,22 +45,6 @@ import {
 const PREVIEW_COUNT = 8;
 /** How many the phone's sheet lists: it has the whole screen to scroll. */
 const SHEET_COUNT = 30;
-/** Below `sm`, where the bell opens a sheet rather than a menu. */
-const PHONE_QUERY = "(max-width: 639px)";
-
-/** Whether the screen is a phone's. Not on the server, where the menu is drawn. */
-function usePhone(): boolean {
-    return useSyncExternalStore(
-        (notify) => {
-            if (typeof window.matchMedia !== "function") return () => undefined;
-            const query = window.matchMedia(PHONE_QUERY);
-            query.addEventListener("change", notify);
-            return () => query.removeEventListener("change", notify);
-        },
-        () => typeof window.matchMedia === "function" && window.matchMedia(PHONE_QUERY).matches,
-        () => false
-    );
-}
 
 /** Where a notice goes when it is pressed: its own page, or the full list. */
 function noticeHref(item: NotificationView): string {

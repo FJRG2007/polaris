@@ -32,6 +32,7 @@ import {
     DropdownMenuTrigger,
     MenuSearch
 } from "@polaris/ui";
+import { SheetMenuItem } from "@/components/polar/elements/sheet-menu";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { applyOrder, polarSourceKey } from "@/lib/polar/picker-order";
 import { usePickerPrefs } from "@/components/polar/elements/use-picker-prefs";
@@ -162,22 +163,23 @@ export function MoreModels({ onMore, label }: { onMore: () => void; label: strin
         return () => observer.disconnect();
     }, []);
     return (
-        <DropdownMenuItem
-            ref={ref}
-            onSelect={(event) => {
-                // Stays open: the next rows land right here.
-                event.preventDefault();
-                onMore();
-            }}
-            className="justify-center text-xs text-muted-foreground"
-        >
-            {label}
-        </DropdownMenuItem>
+        <div ref={ref}>
+            <SheetMenuItem
+                onSelect={(event) => {
+                    // Stays open: the next rows land right here.
+                    event.preventDefault();
+                    onMore();
+                }}
+                className="justify-center text-xs text-muted-foreground"
+            >
+                {label}
+            </SheetMenuItem>
+        </div>
     );
 }
 
 export const MODEL_TRIGGER =
-    "inline-flex h-7 min-w-0 max-w-[60%] items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground";
+    "inline-flex h-7 min-w-0 max-w-[60%] items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:h-11";
 
 function Mark({ on }: { on: boolean }) {
     return (

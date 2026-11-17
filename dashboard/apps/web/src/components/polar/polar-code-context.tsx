@@ -58,6 +58,14 @@ import {
     MenuSearch,
     menuSearchMatches
 } from "@polaris/ui";
+import {
+    SheetMenu,
+    SheetMenuContent,
+    SheetMenuItem,
+    SheetMenuLabel,
+    SheetMenuSeparator,
+    SheetMenuTrigger
+} from "@/components/polar/elements/sheet-menu";
 
 /** The repository picker's "none": a workspace with nothing checked out. */
 export const NO_REPO = "workspace";
@@ -655,8 +663,8 @@ export function CodePlacePicker({
     const label = picked ? picked.name : t("code.place.polaris");
     const Icon = picked?.kind === "server" ? HardDrive : picked ? Laptop : Server;
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild disabled={disabled}>
+        <SheetMenu>
+            <SheetMenuTrigger disabled={disabled}>
                 <button
                     type="button"
                     title={label}
@@ -666,24 +674,24 @@ export function CodePlacePicker({
                     <Icon className="size-3.5 shrink-0" aria-hidden />
                     <span className="min-w-0 truncate text-foreground">{label}</span>
                 </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-2rem)]">
-                <DropdownMenuLabel>{t("code.place.label")}</DropdownMenuLabel>
-                <DropdownMenuItem onSelect={() => onChange(null)} className="items-start">
+            </SheetMenuTrigger>
+            <SheetMenuContent title={t("code.place.label")} align="start" className="w-72 max-w-[calc(100vw-2rem)]">
+                <SheetMenuLabel>{t("code.place.label")}</SheetMenuLabel>
+                <SheetMenuItem onSelect={() => onChange(null)} className="items-start">
                     <Server className="mt-0.5 size-4 shrink-0" aria-hidden />
                     <span className="flex min-w-0 flex-col">
                         <span className="truncate">{t("code.place.polaris")}</span>
                         <span className="text-xs text-muted-foreground">{t("code.place.polarisHint")}</span>
                     </span>
                     <Mark on={value === null} />
-                </DropdownMenuItem>
+                </SheetMenuItem>
                 {computers === null ? (
                     <div className="px-2 py-1.5" aria-hidden>
                         <div className="h-8 animate-pulse rounded bg-muted" />
                     </div>
                 ) : (
                     computers.map((computer) => (
-                        <DropdownMenuItem
+                        <SheetMenuItem
                             key={computer.id}
                             disabled={!computer.online}
                             onSelect={() => onChange(computer.id)}
@@ -709,20 +717,20 @@ export function CodePlacePicker({
                                 </span>
                             </span>
                             <Mark on={computer.id === value} />
-                        </DropdownMenuItem>
+                        </SheetMenuItem>
                     ))
                 )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
+                <SheetMenuSeparator />
+                <SheetMenuItem asChild>
                     <Link href="/account/computers">
                         <Plus className="size-4 shrink-0" aria-hidden />
                         <span className="truncate">
                             {computers && computers.length > 0 ? t("code.place.manage") : t("code.place.pair")}
                         </span>
                     </Link>
-                </DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+                </SheetMenuItem>
+            </SheetMenuContent>
+        </SheetMenu>
     );
 }
 
@@ -859,8 +867,8 @@ export function PermissionModePicker({
 }) {
     const t = useTranslations("polar");
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild disabled={disabled}>
+        <SheetMenu>
+            <SheetMenuTrigger disabled={disabled}>
                 <button
                     type="button"
                     title={t(`code.mode.${value}.hint`)}
@@ -872,11 +880,11 @@ export function PermissionModePicker({
                         {t(`code.mode.${value}.name`)}
                     </span>
                 </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-2rem)]">
-                <DropdownMenuLabel>{t("code.mode.label")}</DropdownMenuLabel>
+            </SheetMenuTrigger>
+            <SheetMenuContent title={t("code.mode.label")} align="start" className="w-72 max-w-[calc(100vw-2rem)]">
+                <SheetMenuLabel>{t("code.mode.label")}</SheetMenuLabel>
                 {core.SESSION_PERMISSION_MODES.map((mode) => (
-                    <DropdownMenuItem
+                    <SheetMenuItem
                         key={mode}
                         onSelect={() => onChange(mode)}
                         className="items-start"
@@ -888,10 +896,10 @@ export function PermissionModePicker({
                             </span>
                         </span>
                         <Mark on={mode === value} />
-                    </DropdownMenuItem>
+                    </SheetMenuItem>
                 ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
+            </SheetMenuContent>
+        </SheetMenu>
     );
 }
 /**
@@ -911,8 +919,8 @@ export function SessionSurfacePicker({
     const t = useTranslations("polar");
     const Icon = value === "chat" ? MessageSquare : SquareTerminal;
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild disabled={disabled}>
+        <SheetMenu>
+            <SheetMenuTrigger disabled={disabled}>
                 <button
                     type="button"
                     title={t(`code.surface.${value}.hint`)}
@@ -922,11 +930,11 @@ export function SessionSurfacePicker({
                     <Icon className="size-3.5 shrink-0" aria-hidden />
                     <span className="truncate text-foreground">{t(`code.surface.${value}.name`)}</span>
                 </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-72 max-w-[calc(100vw-2rem)]">
-                <DropdownMenuLabel>{t("code.surface.label")}</DropdownMenuLabel>
+            </SheetMenuTrigger>
+            <SheetMenuContent title={t("code.surface.label")} align="start" className="w-72 max-w-[calc(100vw-2rem)]">
+                <SheetMenuLabel>{t("code.surface.label")}</SheetMenuLabel>
                 {acpProviders.SESSION_SURFACES.map((surface) => (
-                    <DropdownMenuItem
+                    <SheetMenuItem
                         key={surface}
                         onSelect={() => onChange(surface)}
                         className="items-start"
@@ -938,10 +946,10 @@ export function SessionSurfacePicker({
                             </span>
                         </span>
                         <Mark on={surface === value} />
-                    </DropdownMenuItem>
+                    </SheetMenuItem>
                 ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
+            </SheetMenuContent>
+        </SheetMenu>
     );
 }
 const CHIP =

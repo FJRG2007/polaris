@@ -13,16 +13,18 @@ import * as core from "@polaris/core";
 import { Check, Cpu } from "lucide-react";
 import {
     cn,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
     SearchableSelect,
     useToast,
     type SearchableSelectOption
 } from "@polaris/ui";
+import {
+    SheetMenu,
+    SheetMenuContent,
+    SheetMenuItem,
+    SheetMenuLabel,
+    SheetMenuSeparator,
+    SheetMenuTrigger
+} from "@/components/polar/elements/sheet-menu";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CodeSource } from "@/lib/polar/agents/code-sources";
@@ -178,8 +180,8 @@ export function CodeEnginePill({
     const picked = value ? (options.find((option) => option.id === value && option.disabled === null) ?? null) : null;
     const label = picked ? engineName(picked.id, t) : t("settings.engine.yourSetting");
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild disabled={disabled}>
+        <SheetMenu>
+            <SheetMenuTrigger disabled={disabled}>
                 <button
                     type="button"
                     title={label}
@@ -189,22 +191,22 @@ export function CodeEnginePill({
                     <Cpu className="size-3.5 shrink-0" aria-hidden />
                     <span className="min-w-0 truncate text-foreground">{label}</span>
                 </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
+            </SheetMenuTrigger>
+            <SheetMenuContent title={t("settings.engine.label")}
                 align="start"
                 className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain"
             >
-                <DropdownMenuLabel>{t("settings.engine.label")}</DropdownMenuLabel>
-                <DropdownMenuItem onSelect={() => onChange(null)} className="items-start">
+                <SheetMenuLabel>{t("settings.engine.label")}</SheetMenuLabel>
+                <SheetMenuItem onSelect={() => onChange(null)} className="items-start">
                     <span className="flex min-w-0 flex-col">
                         <span className="truncate">{t("settings.engine.yourSetting")}</span>
                         <span className="text-xs text-muted-foreground">{t("settings.engine.yourSettingHint")}</span>
                     </span>
                     <Mark on={picked === null} />
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
+                </SheetMenuItem>
+                <SheetMenuSeparator />
                 {options.map((option) => (
-                    <DropdownMenuItem
+                    <SheetMenuItem
                         key={option.id}
                         disabled={option.disabled !== null}
                         onSelect={() => onChange(option.id)}
@@ -221,9 +223,9 @@ export function CodeEnginePill({
                             ) : null}
                         </span>
                         <Mark on={picked?.id === option.id} />
-                    </DropdownMenuItem>
+                    </SheetMenuItem>
                 ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
+            </SheetMenuContent>
+        </SheetMenu>
     );
 }

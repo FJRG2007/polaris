@@ -14,16 +14,15 @@ import * as core from "@polaris/core";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowDownUp, Check, History, KeyRound, Shuffle } from "lucide-react";
+import { cn, MenuSearch } from "@polaris/ui";
 import {
-    cn,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-    MenuSearch
-} from "@polaris/ui";
+    SheetMenu,
+    SheetMenuContent,
+    SheetMenuItem,
+    SheetMenuLabel,
+    SheetMenuSeparator,
+    SheetMenuTrigger
+} from "@/components/polar/elements/sheet-menu";
 import { applyOrder } from "@/lib/polar/picker-order";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { AgentLogo, IntegrationLogo } from "@/components/logos";
@@ -189,7 +188,7 @@ export function CodeModelPicker({
         onChange({ source: entry.key, provider: row.provider, model: row.model });
 
     return (
-        <DropdownMenu
+        <SheetMenu
             open={open}
             onOpenChange={(next) => {
                 onOpenChange?.(next);
@@ -199,7 +198,7 @@ export function CodeModelPicker({
                 setLimit(MODELS_PAGE);
             }}
         >
-            <DropdownMenuTrigger asChild disabled={disabled || sources === null}>
+            <SheetMenuTrigger disabled={disabled || sources === null}>
                 <button
                     type="button"
                     title={label}
@@ -215,8 +214,8 @@ export function CodeModelPicker({
                     )}
                     <span className="min-w-0 truncate text-foreground" title={label}>{label}</span>
                 </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
+            </SheetMenuTrigger>
+            <SheetMenuContent title={t("code.model")}
                 align="start"
                 className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain pt-2"
                 onEscapeKeyDown={(event) => {
@@ -227,7 +226,7 @@ export function CodeModelPicker({
             >
                 {ordering ? (
                     <>
-                        <DropdownMenuLabel>{t("picker.order")}</DropdownMenuLabel>
+                        <SheetMenuLabel>{t("picker.order")}</SheetMenuLabel>
                         <SourceOrderList
                             entries={ordered.map((entry) => ({
                                 key: entry.key,
@@ -242,15 +241,15 @@ export function CodeModelPicker({
                                 {t("picker.orderFailed")}
                             </p>
                         ) : null}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
+                        <SheetMenuSeparator />
+                        <SheetMenuItem
                             onSelect={(event) => {
                                 event.preventDefault();
                                 setOrdering(false);
                             }}
                         >
                             {t("picker.orderDone")}
-                        </DropdownMenuItem>
+                        </SheetMenuItem>
                     </>
                 ) : (
                     <>
@@ -264,7 +263,7 @@ export function CodeModelPicker({
                         ) : null}
                         {!searching && automatic ? (
                             <>
-                                <DropdownMenuItem onSelect={() => onChange(AUTOMATIC_PICK)} className="items-start">
+                                <SheetMenuItem onSelect={() => onChange(AUTOMATIC_PICK)} className="items-start">
                                     <Shuffle className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
                                     <span className="flex min-w-0 flex-col">
                                         <span className="truncate">{t("picker.automatic")}</span>
@@ -273,18 +272,18 @@ export function CodeModelPicker({
                                         </span>
                                     </span>
                                     <Mark on={auto} />
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
+                                </SheetMenuItem>
+                                <SheetMenuSeparator />
                             </>
                         ) : null}
                         {!searching && recent.length > 0 ? (
                             <>
-                                <DropdownMenuLabel className="flex items-center gap-1.5">
+                                <SheetMenuLabel className="flex items-center gap-1.5">
                                     <History className="size-3.5 shrink-0" aria-hidden />
                                     {t("picker.recent")}
-                                </DropdownMenuLabel>
+                                </SheetMenuLabel>
                                 {recent.map((entry) => (
-                                    <DropdownMenuItem
+                                    <SheetMenuItem
                                         key={`recent-${entry.source.key}-${entry.model.model ?? ""}`}
                                         onSelect={() => pick(entry.source, entry.model)}
                                     >
@@ -295,16 +294,16 @@ export function CodeModelPicker({
                                         <span className="min-w-0 shrink truncate text-xs text-muted-foreground">
                                             {sourceTitle(entry.source, t)}
                                         </span>
-                                    </DropdownMenuItem>
+                                    </SheetMenuItem>
                                 ))}
-                                <DropdownMenuSeparator />
+                                <SheetMenuSeparator />
                             </>
                         ) : null}
                         {shown.map((group) => {
                             const detail = sourceDetail(group.source, t);
                             return (
                                 <div key={group.source.key} data-source={group.source.key}>
-                                    <DropdownMenuLabel className="flex min-w-0 items-center gap-1.5">
+                                    <SheetMenuLabel className="flex min-w-0 items-center gap-1.5">
                                         <SourceMark source={group.source} className="size-3.5 shrink-0" />
                                         <span className="min-w-0 truncate" title={sourceTitle(group.source, t)}>
                                             {sourceTitle(group.source, t)}
@@ -317,14 +316,14 @@ export function CodeModelPicker({
                                                 {detail}
                                             </span>
                                         ) : null}
-                                    </DropdownMenuLabel>
+                                    </SheetMenuLabel>
                                     {group.source.readiness === "missing" ? (
                                         <p className="px-2 pb-1 text-xs text-muted-foreground">
                                             {t("code.notSignedIn")}
                                         </p>
                                     ) : null}
                                     {group.models.map((row) => (
-                                        <DropdownMenuItem
+                                        <SheetMenuItem
                                             key={row.model.model ?? "default"}
                                             onSelect={() => pick(group.source, row.model)}
                                         >
@@ -332,16 +331,16 @@ export function CodeModelPicker({
                                                 {row.name}
                                             </span>
                                             <Mark on={same(value, group.source.key, row.model.model)} />
-                                        </DropdownMenuItem>
+                                        </SheetMenuItem>
                                     ))}
                                 </div>
                             );
                         })}
                         {typedSources.length > 0 ? (
                             <div data-typed-model>
-                                <DropdownMenuLabel>{t("picker.typed")}</DropdownMenuLabel>
+                                <SheetMenuLabel>{t("picker.typed")}</SheetMenuLabel>
                                 {typedSources.map((entry) => (
-                                    <DropdownMenuItem
+                                    <SheetMenuItem
                                         key={`typed-${entry.key}`}
                                         onSelect={() =>
                                             onChange({
@@ -358,7 +357,7 @@ export function CodeModelPicker({
                                         <span className="min-w-0 shrink truncate text-xs text-muted-foreground">
                                             {sourceTitle(entry, t)}
                                         </span>
-                                    </DropdownMenuItem>
+                                    </SheetMenuItem>
                                 ))}
                             </div>
                         ) : null}
@@ -370,9 +369,9 @@ export function CodeModelPicker({
                         ) : null}
                         {searching ? null : (
                             <>
-                                <DropdownMenuSeparator />
+                                <SheetMenuSeparator />
                                 {ordered.length > 1 ? (
-                                    <DropdownMenuItem
+                                    <SheetMenuItem
                                         onSelect={(event) => {
                                             event.preventDefault();
                                             setOrdering(true);
@@ -380,16 +379,16 @@ export function CodeModelPicker({
                                     >
                                         <ArrowDownUp className="size-3.5 shrink-0" aria-hidden />
                                         {t("picker.order")}
-                                    </DropdownMenuItem>
+                                    </SheetMenuItem>
                                 ) : null}
-                                <DropdownMenuItem asChild>
+                                <SheetMenuItem asChild>
                                     <Link href="/account/ai-keys">{t("picker.manage")}</Link>
-                                </DropdownMenuItem>
+                                </SheetMenuItem>
                             </>
                         )}
                     </>
                 )}
-            </DropdownMenuContent>
-        </DropdownMenu>
+            </SheetMenuContent>
+        </SheetMenu>
     );
 }
