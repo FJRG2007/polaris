@@ -51,7 +51,9 @@ import { zenLastStep } from "@/lib/polar/zen-stand-in";
 import {
     autoRoute,
     automaticCandidates,
+    currentModels,
     failingProviders,
+    garbledModels,
     noteNoCredit,
     noteProviderFailure,
     PLAIN_TURN,
@@ -299,6 +301,9 @@ async function keyedModelOptions(
                     )
                 );
         }
+        // Only what is current: the picker and Automatic never offer a model
+        // the field has moved past (`currentModels`).
+        models = currentModels(models);
         if (models.length > 0) options.push({ provider: slug, name, payers, models });
     }
     return options;
@@ -884,7 +889,8 @@ async function resolveAutomatic(
         options,
         signals,
         failingProviders(userId),
-        unpaidProviders(userId)
+        unpaidProviders(userId),
+        garbledModels(userId)
     );
     const route = autoRoute(signals);
     const keysOf = credentialCache(userId, access);

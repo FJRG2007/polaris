@@ -48,6 +48,37 @@ const CHARS_PER_TOKEN = 4;
  *  that it cannot help. */
 export const AGENTIC_MIN_BILLIONS = 10;
 
+/**
+ * How recent a model has to be for Polar to offer it, in months before today.
+ * The window moves with the clock, so the list keeps itself current: what was
+ * frontier a year ago (Mistral Nemo, gpt-oss-120b) drops out on its own as
+ * newer releases land, with nothing to edit by hand.
+ */
+export const CURRENT_MODEL_MONTHS = 12;
+
+/**
+ * The models still current: released within `CURRENT_MODEL_MONTHS` of `now`,
+ * or of unknown date (a deployment, a gateway, a model somebody typed - Polar
+ * cannot judge those, so it does not hide them). When none of `models` is
+ * current, the newest few stay rather than leaving a provider with nothing.
+ * Order is kept. Pure.
+ */
+export function currentModels<T extends Pick<PolarModelOption, "releaseDate">>(
+    models: readonly T[],
+    now: Date = new Date()
+): T[] {
+    const floor = new Date(now);
+    floor.setUTCMonth(floor.getUTCMonth() - CURRENT_MODEL_MONTHS);
+    const cutoff = floor.toISOString().slice(0, 10);
+    const current = models.filter((model) => !model.releaseDate || model.releaseDate >= cutoff);
+    if (current.length > 0) return current;
+    const newest = [...models].sort((a, b) =>
+        (b.releaseDate ?? "").localeCompare(a.releaseDate ?? "")
+    );
+    const keep = new Set(newest.slice(0, 3));
+    return models.filter((model) => keep.has(model));
+}
+
 /** Which kind of model a turn goes to. */
 export type AutoRoute = "fast" | "reasoning";
 
@@ -137,7 +168,10 @@ export function automaticCandidates(
     providers: readonly PolarProviderOption[],
     signals: TurnSignals,
     failing: ReadonlySet<string> = new Set(),
-    unpaid: ReadonlySet<string> = new Set()
+    unpaid: ReadonlySet<string> = new Set(),
+    /** `provider/model` of models that wrote their tool calls out as text
+     *  lately (`toolMarkupIn`); a turn offering tools skips them. */
+    garbled: ReadonlySet<string> = new Set()
 ): PolarModelOption[] {
     const route = autoRoute(signals);
     let models = providers.flatMap((provider) =>
@@ -151,6 +185,7 @@ export function automaticCandidates(
     };
     if (signals.files > 0) keep((model) => model.attachment);
     if (signals.agentic) {
+        keep((model) => !garbled.has(`${model.provider}/${model.model}`));
         keep((model) => {
             const billions = statedBillions(model);
             return billions === null || billions >= AGENTIC_MIN_BILLIONS;
@@ -203,7 +238,33 @@ function providerMemo(ttl: number) {
     };
 }
 
+/** How long a model that wrote its tool calls out as text is kept off
+ *  Automatic's turns that offer tools. */
+export const GARBLED_MS = 6 * 60 * 60_000;
+
+/**
+ * Whether an answer holds a tool call written out as text rather than made:
+ * the markup a model's own chat template uses (`<invoke name=`, `<tool_call>`,
+ * `<|tool_call...|>`, `<function_calls>`) leaking into what the reader sees.
+ * Such a model cannot drive tools through this API, whatever its catalogue
+ * says. Pure.
+ */
+export function toolMarkupIn(text: string): boolean {
+    return /<invoke\s+name=|<\/?tool_call\b|<\|tool_calls?[_a-z]*\|>|<\/?function_calls>/i.test(text);
+}
+
 const failures = providerMemo(FAILURE_MS);
+const garbled = providerMemo(GARBLED_MS);
+
+/** Notes that this model wrote its tool calls out as text for this person. */
+export function noteToolMarkup(userId: string, provider: string, model: string, now = Date.now()): void {
+    garbled.note(userId, `${provider}/${model}`, now);
+}
+
+/** The `provider/model` of models that wrote tool calls as text lately. */
+export function garbledModels(userId: string, now = Date.now()): Set<string> {
+    return garbled.list(userId, now);
+}
 const unpaid = providerMemo(UNPAID_MS);
 
 /** Notes that a call to this provider failed for this person just now. */

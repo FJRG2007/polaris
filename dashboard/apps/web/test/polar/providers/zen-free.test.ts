@@ -5,7 +5,7 @@
  */
 
 import { ZEN_MODELS_ANSWER } from "../fixtures/zen-models";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = {
     sources: new Map<string, "own" | "instance">(),
@@ -113,6 +113,15 @@ describe("Zen's free list", () => {
 });
 
 describe("the catalogue with no keys", () => {
+    // A day both fixture models are current on (one a year old, one new), so
+    // the list Polar keeps (`currentModels`) does not change with the day the
+    // suite runs.
+    beforeEach(() => {
+        vi.useFakeTimers({ toFake: ["Date"] });
+        vi.setSystemTime(new Date("2026-10-17T12:00:00Z"));
+    });
+    afterEach(() => vi.useRealTimers());
+
     it("answers with Zen's free models", async () => {
         const options = await polarModelOptions("u1", ACCESS);
         expect(options.map((option) => option.provider)).toEqual([ZEN_FREE_SLUG]);

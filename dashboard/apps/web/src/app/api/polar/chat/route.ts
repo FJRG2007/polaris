@@ -111,7 +111,7 @@ import {
     type PolarHelper
 } from "@/lib/polar/helper-model";
 import { fenceSummary, splitAtCompaction } from "@/lib/polar/compaction";
-import { turnSignals } from "@/lib/polar/automatic";
+import { noteToolMarkup, toolMarkupIn, turnSignals } from "@/lib/polar/automatic";
 import {
     answerUsage,
     stepContext,
@@ -882,6 +882,15 @@ export async function POST(request: Request): Promise<Response> {
         },
         onFinish: async ({ messages: finished, responseMessage }) => {
             await save(finished);
+            // A model that wrote its tool calls out as text cannot drive this
+            // turn's tools: Automatic keeps it off such turns for a while.
+            const said = (responseMessage?.parts ?? [])
+                .map((part) => (part.type === "text" ? part.text : ""))
+                .join(" ");
+            if (toolMarkupIn(said)) {
+                const answered = answeredBy(resolved);
+                noteToolMarkup(user.id, answered.option.provider, answered.option.model);
+            }
             if (spent) {
                 // Whether the stable prefix is being served from the cache.
                 const answered = answeredBy(resolved);

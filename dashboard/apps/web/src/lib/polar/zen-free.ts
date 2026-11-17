@@ -22,6 +22,7 @@
 
 import { z } from "zod";
 import { ZEN_FREE_SLUG } from "@/lib/polar/shared";
+import { currentModels } from "@/lib/polar/automatic";
 import type { ChatCredential } from "@/lib/agents/model-keys";
 import type { PolarModelOption, PolarProviderOption } from "@/lib/polar/models";
 
@@ -207,7 +208,7 @@ export function zenProviderOption(models: readonly ZenModel[]): PolarProviderOpt
         provider: ZEN_FREE_SLUG,
         name: ZEN_FREE_NAME,
         payers: ["instance"],
-        models: models.map(
+        models: currentModels(models).map(
             (model): PolarModelOption => ({
                 provider: ZEN_FREE_SLUG,
                 providerName: ZEN_FREE_NAME,
