@@ -15,6 +15,7 @@ import { runAction } from "@/lib/run-action";
 import { CopyButton } from "@/components/copy-button";
 import { CodeSurface } from "@/components/code-surface";
 import type { SessionView } from "@/lib/agents/session-service";
+import { TOUCH_TARGET } from "@/components/use-phone";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useConfirm } from "@/components/confirm-dialog";
 import { splitHunks, type ChangedFile, type FileDiff } from "@/lib/agents/session-changes";
@@ -385,7 +386,7 @@ export function SessionChanges({
                             ? t("session.changes.summary", { count: listing.total })
                             : t("session.views.changes")}
                     </span>
-                    <Button size="sm" variant="ghost" onClick={refresh} disabled={loading}>
+                    <Button size="sm" className={TOUCH_TARGET} variant="ghost" onClick={refresh} disabled={loading}>
                         <RefreshCw className={cn("size-4 shrink-0", loading && "animate-spin")} />
                         {t("session.changes.refresh")}
                     </Button>
@@ -410,13 +411,14 @@ export function SessionChanges({
                             <>
                                 <Button
                                     size="sm"
+                                    className={TOUCH_TARGET}
                                     variant="ghost"
                                     onClick={() => setComments([])}
                                     disabled={sending}
                                 >
                                     {t("session.review.discard")}
                                 </Button>
-                                <Button size="sm" onClick={sendReview} disabled={sending || over}>
+                                <Button size="sm" className={TOUCH_TARGET} onClick={sendReview} disabled={sending || over}>
                                     {sending ? (
                                         <Loader2 className="size-4 shrink-0 animate-spin" />
                                     ) : (
@@ -448,7 +450,7 @@ export function SessionChanges({
                     />
                 ) : listing ? (
                     <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
-                        <ul className="max-h-[70vh] min-w-0 space-y-0.5 overflow-y-auto overscroll-contain">
+                        <ul className="max-h-[70vh] min-w-0 space-y-0.5 overflow-y-auto overscroll-contain max-sm:max-h-[40vh]">
                             {listing.files.map((file) => (
                                 <li key={file.path}>
                                     <button
@@ -456,7 +458,7 @@ export function SessionChanges({
                                         onClick={() => void open(file.path)}
                                         title={file.path}
                                         className={cn(
-                                            "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-start text-xs hover:bg-muted",
+                                            "flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1 text-start text-xs hover:bg-muted [@media(pointer:coarse)]:min-h-11",
                                             selected === file.path && "bg-muted",
                                             isAccepted(file) && "text-muted-foreground"
                                         )}
@@ -501,6 +503,7 @@ export function SessionChanges({
                                 <li>
                                     <Button
                                         size="sm"
+                                        className={TOUCH_TARGET}
                                         variant="ghost"
                                         onClick={() => void loadMore()}
                                         disabled={more}
@@ -587,7 +590,7 @@ function DiffPane({
         <div className="space-y-2">
             <p className="text-sm text-muted-foreground">{text}</p>
             {again ? (
-                <Button size="sm" variant="ghost" onClick={retry}>
+                <Button size="sm" className={TOUCH_TARGET} variant="ghost" onClick={retry}>
                     {t("session.changes.retry")}
                 </Button>
             ) : null}
@@ -605,6 +608,7 @@ function DiffPane({
                     <>
                         <Button
                             size="sm"
+                            className={TOUCH_TARGET}
                             variant={actions.accepted ? "secondary" : "ghost"}
                             onClick={actions.toggleFile}
                             aria-pressed={actions.accepted}
@@ -618,6 +622,7 @@ function DiffPane({
                         </Button>
                         <Button
                             size="sm"
+                            className={TOUCH_TARGET}
                             variant="ghost"
                             onClick={actions.revertFile}
                             disabled={actions.busy}
@@ -636,6 +641,7 @@ function DiffPane({
                 {review && diff !== undefined && diff !== "unreachable" && diff.kind === "diff" ? (
                     <Button
                         size="sm"
+                        className={TOUCH_TARGET}
                         variant={review.on ? "secondary" : "ghost"}
                         onClick={review.toggle}
                         aria-pressed={review.on}
@@ -730,6 +736,7 @@ function HunkList({ path, text, actions }: { path: string; text: string; actions
                             </span>
                             <Button
                                 size="sm"
+                                className={TOUCH_TARGET}
                                 variant={accepted ? "secondary" : "ghost"}
                                 onClick={() => actions.toggleHunk(hunk.id)}
                                 aria-pressed={accepted}
@@ -743,6 +750,7 @@ function HunkList({ path, text, actions }: { path: string; text: string; actions
                             </Button>
                             <Button
                                 size="sm"
+                                className={TOUCH_TARGET}
                                 variant="ghost"
                                 onClick={() => actions.revertHunk(index, hunk.id)}
                                 disabled={actions.busy}
@@ -833,6 +841,7 @@ export function ShipPullRequest({ session }: { session: SessionView }) {
                 {linked}
                 <Button
                     size="sm"
+                    className={TOUCH_TARGET}
                     variant="ghost"
                     disabled
                     title={reason}
@@ -880,7 +889,7 @@ export function ShipPullRequest({ session }: { session: SessionView }) {
     return (
         <span className="flex min-w-0 flex-wrap items-center gap-2">
             {linked}
-            <Button size="sm" variant="secondary" onClick={start}>
+            <Button size="sm" className={TOUCH_TARGET} variant="secondary" onClick={start}>
                 <GitPullRequest className="size-4 shrink-0" />
                 {t("session.ship.open")}
             </Button>

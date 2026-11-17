@@ -175,8 +175,8 @@ export function SheetMenuItem({
                 disabled={disabled}
                 className={className}
                 variant={variant}
-                role={role}
-                aria-checked={checked}
+                // Radix names the row a menuitem; an absent role must not clear that.
+                {...(role ? { role, "aria-checked": checked } : {})}
             >
                 {children}
             </DropdownMenuItem>
