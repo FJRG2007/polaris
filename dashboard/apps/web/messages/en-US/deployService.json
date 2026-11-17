@@ -623,6 +623,24 @@
         "privateLink": "Private networking between services",
         "certUnknown": "The certificate could not be read from here. It shows once the address answers this server."
     },
+    "login": {
+        "title": "Require Polaris login",
+        "hint": "Visitors sign in to Polaris before they reach this service. It is the firewall's rule for this service, so it shows there too.",
+        "openRule": "Open in firewall",
+        "on": "A login is required",
+        "off": "No login is required",
+        "aboveNote": "A rule above this service already requires a login, and it cannot be waived here. Open it in the firewall to see where it is set.",
+        "noAddress": "This service has no address yet. Add a domain under Networking, then require a login here.",
+        "guards": "Covers {hosts}",
+        "guardsMore": "Covers {hosts} and {count} more",
+        "admits": "Who it admits",
+        "advanced": "Advanced",
+        "createHint": "Visitors sign in to Polaris before they reach this service, on every address it gets.",
+        "refusal": {
+            "permission": "You do not have permission to change firewall rules.",
+            "owner": "Only the project's owner can change its firewall rules."
+        }
+    },
     "kit": {
         "sections": "Settings sections",
         "learnMore": "Learn more",

@@ -15,6 +15,7 @@
  */
 
 import * as deployActions from "./actions";
+import { LoginOnCreate, type LoginOnCreateValue } from "./service-login";
 import { formatBytes } from "@polaris/core";
 import { Button, Input, cn } from "@polaris/ui";
 import { FolderUp, Loader2 } from "lucide-react";
@@ -332,6 +333,7 @@ export function NewFolderForm({
     const [name, setName] = useState("");
     const [picked, setPicked] = useState<PickedSource | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [login, setLogin] = useState<LoginOnCreateValue>(null);
     const [pending, startTransition] = useTransition();
 
     function submit() {
@@ -339,6 +341,7 @@ export function NewFolderForm({
         setError(null);
         startTransition(async () => {
             const created = await deployActions.createApplicationAction({
+                login: login ?? undefined,
                 environmentId,
                 name: name.trim() || picked.name,
                 sourceType: "upload",
@@ -381,6 +384,7 @@ export function NewFolderForm({
                     if (next && !name.trim()) setName(next.name);
                 }}
             />
+            <LoginOnCreate environmentId={environmentId} value={login} onChange={setLogin} />
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !picked}>

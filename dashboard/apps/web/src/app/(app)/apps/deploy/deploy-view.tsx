@@ -14,6 +14,7 @@ import { NewTemplateForm, ServerField, useDeployServers } from "./service-form";
 import { dbTone, StatusPill } from "./status-pill";
 import { DeployFailureNote } from "./deploy-failure";
 import * as deployActions from "./actions";
+import { LoginOnCreate, type LoginOnCreateValue } from "./service-login";
 import { IntegrationLogo } from "@/components/logos";
 import { NewFolderForm } from "./upload-source";
 import { TerminalPanel } from "./terminal-panel";
@@ -1064,6 +1065,7 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
     const [port, setPort] = useState("");
     const { servers, serverId, setServerId } = useDeployServers(environmentId);
     const [error, setError] = useState<string | null>(null);
+    const [login, setLogin] = useState<LoginOnCreateValue>(null);
     const [pending, startTransition] = useTransition();
 
     function submit() {
@@ -1071,6 +1073,7 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
         const parsedPort = Number(port.trim());
         startTransition(async () => {
             const result = await deployActions.createApplicationAction({
+                login: login ?? undefined,
                 environmentId,
                 name,
                 sourceType: "image",
@@ -1111,6 +1114,7 @@ function NewImageForm({ environmentId, onDone }: { environmentId: string; onDone
                 />
             </Field>
             <ServerField servers={servers} value={serverId} onChange={setServerId} />
+            <LoginOnCreate environmentId={environmentId} value={login} onChange={setLogin} />
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !name.trim() || !image.trim()}>
@@ -1169,6 +1173,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
     const [inspecting, setInspecting] = useState(false);
     const { servers, serverId, setServerId } = useDeployServers(environmentId);
     const [error, setError] = useState<string | null>(null);
+    const [login, setLogin] = useState<LoginOnCreateValue>(null);
     const [pending, startTransition] = useTransition();
 
     // Whether the account is connected decides one line of copy here and whether
@@ -1232,6 +1237,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
         setError(null);
         startTransition(async () => {
             const result = await deployActions.createApplicationAction({
+                login: login ?? undefined,
                 environmentId,
                 name,
                 sourceType: builder,
@@ -1378,6 +1384,7 @@ function NewGithubForm({ environmentId, onDone }: { environmentId: string; onDon
                 </>
             )}
 
+            <LoginOnCreate environmentId={environmentId} value={login} onChange={setLogin} />
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end">
                 <Button onClick={submit} disabled={pending || !canSubmit}>

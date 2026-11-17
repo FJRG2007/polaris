@@ -58,6 +58,8 @@ export function ScopePicker({
         next.set("scope", nextKind);
         if (nextId) next.set("id", nextId);
         else next.delete("id");
+        // The rule a link opened on belongs to the scope it named, not the next one.
+        next.delete("rule");
         router.push(`/apps/firewall?${next.toString()}`);
     }
 

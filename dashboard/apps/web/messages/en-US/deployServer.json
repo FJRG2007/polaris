@@ -26,6 +26,9 @@
     },
     "service": {
         "templateUnknown": "That template is not in the list",
+        "loginInvalid": "The login settings could not be read. Choose who it admits again.",
+        "loginNotOwner": "Only the project's owner can put a service behind a Polaris login.",
+        "loginOutOfReach": "One of the accounts it admits is not one you can choose.",
         "nameRequired": "An application name is required",
         "repoRequired": "A git repository URL is required",
         "imageRequired": "An image reference is required (e.g. nginx:latest)",

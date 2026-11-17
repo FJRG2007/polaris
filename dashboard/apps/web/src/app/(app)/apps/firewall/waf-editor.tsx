@@ -210,7 +210,9 @@ export function WafEditor({
     /** Traffic, bans and jails, which are instance-wide and belong under the rule list
      *  rather than under whichever rule happens to be open. Rendered by the caller
      *  because it is a server component; shown here only on the list. */
-    instancePanels
+    instancePanels,
+    /** The rule to open on rather than the list, from a link that named one. */
+    initialRule
 }: {
     scopeType: WafScopeType;
     scopeId: string;
@@ -219,6 +221,7 @@ export function WafEditor({
     callerIp?: string | null;
     canOperate?: boolean;
     instancePanels?: React.ReactNode;
+    initialRule?: "login";
 }) {
     const t = useTranslations("firewall");
     // What the server holds. Every immediate change is composed against this, so a
@@ -231,7 +234,12 @@ export function WafEditor({
     // address switched on, so this scope's own "off" is not read as "nobody signs in".
     const [loginBelow, setLoginBelow] = useState<WafLoginBelowView>(NO_LOGIN_BELOW);
     const [tor, setTor] = useState<WafFeedView | null>(null);
-    const [view, setView] = useState<View>({ kind: "list" });
+    // The first read lands on the rule a link named; every read after it (a restore
+    // from History) goes back to the list as before.
+    const opening = useRef<View>(
+        initialRule === "login" && offerLogin ? { kind: "login" } : { kind: "list" }
+    );
+    const [view, setView] = useState<View>(opening.current);
     const [error, setError] = useState<string | null>(null);
     // What the server last accepted, and what is on screen, kept outside React so a
     // save can compare them without running inside a state updater.
@@ -258,11 +266,12 @@ export function WafEditor({
         setLoginBelow(NO_LOGIN_BELOW);
         setTor(null);
         setError(null);
-        setView({ kind: "list" });
+        setView(opening.current);
         setAddresses(null);
         setMatches(undefined);
         void polls.wafRule({ scopeType, scopeId }).then((result) => {
             if (!active) return;
+            opening.current = { kind: "list" };
             // Filled from BLANK so a field this screen writes is never missing from what
             // it sends back - a save always carries the whole scope.
             const rule = { ...BLANK, ...result.rule };

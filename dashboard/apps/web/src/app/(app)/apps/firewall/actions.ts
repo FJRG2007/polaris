@@ -15,9 +15,10 @@ import { syncAppRoutes } from "@/lib/deploy-service";
 import * as directPort from "@/lib/deploy/direct-port";
 import { closeDirectPorts } from "@/lib/deploy/direct-port-close";
 import { assertScopeOwner } from "@/lib/waf-service";
+import { principalIdsOf, principalsWithinReach, setWafLogin } from "@/lib/waf-login";
 import { getPublicIp } from "@/lib/domain-service";
 import { syncDashboardRoute } from "@/lib/domain-edge";
-import { requirePermission, userHasManage } from "@/lib/session";
+import { requirePermission, requireUser, userHasManage } from "@/lib/session";
 import { accountsAtAddress, type AddressAccounts } from "@/lib/address-accounts";
 import { liftHostBlocks } from "@/lib/waf-ssh-service";
 import { lookupWafBlock, type WafBlockLookup } from "@/lib/waf-block-lookup";
@@ -47,8 +48,6 @@ import {
 } from "@/lib/firewall-scope-options-schema";
 import { findAccountsAsAdmin, findPeople, SHORTEST_SEARCH } from "@/lib/people-search";
 import { like } from "@/lib/rich-text/mention-service";
-import { discoverableBy } from "@/lib/privacy-service";
-import { blockedBetween } from "@/lib/blocks";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
 type FirewallKey = NamespaceKey<"firewall">;
@@ -247,39 +246,7 @@ async function withinReach(
     const kept = new Set(
         [...stored.loginAllowPrincipals, ...stored.loginDenyPrincipals].map((grant) => grant.ref)
     );
-    const added = [...new Set(sent.filter((ref) => !kept.has(ref)))];
-    if (added.length === 0) return true;
-    const roleIds = idsOf(added, "role");
-    const groupIds = idsOf(added, "group");
-    const userIds = idsOf(added, "user").filter((id) => id !== user.id);
-    // An entry that is not a well-formed id of a known kind is nothing the picker offered.
-    if (roleIds.length + groupIds.length + idsOf(added, "user").length !== added.length)
-        return false;
-    const [roles, groups, findable, blocked] = await Promise.all([
-        roleIds.length
-            ? prisma.userRole.findMany({
-                  where: { userId: user.id, roleId: { in: roleIds } },
-                  select: { roleId: true }
-              })
-            : [],
-        groupIds.length
-            ? prisma.groupMember.findMany({
-                  where: { userId: user.id, groupId: { in: groupIds } },
-                  select: { groupId: true }
-              })
-            : [],
-        userIds.length
-            ? discoverableBy({ id: user.id, isAdmin: false }, userIds)
-            : new Set<string>(),
-        userIds.length ? blockedBetween(user.id, userIds) : new Set<string>()
-    ]);
-    const heldRoles = new Set(roles.map((row) => row.roleId));
-    const heldGroups = new Set(groups.map((row) => row.groupId));
-    return (
-        roleIds.every((id) => heldRoles.has(id)) &&
-        groupIds.every((id) => heldGroups.has(id)) &&
-        userIds.every((id) => findable.has(id) && !blocked.has(id))
-    );
+    return principalsWithinReach(user, sent, kept);
 }
 
 /** What one rule matches over the recent log, keyed as the caller asked for it. */
@@ -372,13 +339,6 @@ const scopeSchema = z.object({
     scopeId: z.string().max(80)
 });
 
-/** The ids of one kind among stored refs, as uuids - anything else names nobody. */
-function idsOf(refs: readonly string[], type: WafPrincipalType): string[] {
-    const ids = refs
-        .filter((ref) => ref.startsWith(`${type}:`))
-        .map((ref) => ref.slice(type.length + 1));
-    return ids.filter((id) => z.string().uuid().safeParse(id).success);
-}
 
 /**
  * The roles and groups a require-login rule can be narrowed to, and the names of
@@ -439,15 +399,15 @@ export async function listWafPrincipalsAction(scope?: {
                 take: MAX_NAMED
             }),
             prisma.role.findMany({
-                where: { id: { in: idsOf(refs.data, "role") } },
+                where: { id: { in: principalIdsOf(refs.data, "role") } },
                 select: { id: true, name: true }
             }),
             prisma.group.findMany({
-                where: { id: { in: idsOf(refs.data, "group") } },
+                where: { id: { in: principalIdsOf(refs.data, "group") } },
                 select: { id: true, name: true }
             }),
             prisma.user.findMany({
-                where: { id: { in: idsOf(refs.data, "user") } },
+                where: { id: { in: principalIdsOf(refs.data, "user") } },
                 select: { id: true, name: true, email: true }
             })
         ]);
@@ -994,5 +954,132 @@ export async function firewallScopeOptionsAction(
     } catch (error) {
         console.error("[firewall-scope-options] read failed", error);
         return { error: t("asyncSelect.failed") };
+    }
+}
+
+/** Why a service's login rule cannot be changed from where it is shown: the reader
+ *  does not hold `deploy.manage`, or the project is not theirs - the same two checks
+ *  every firewall rule is read and written behind. */
+export type ServiceLoginRefusal = "permission" | "owner";
+
+/** The login part of a service's own firewall rule, as its Settings tab shows it. */
+export interface ServiceLoginView {
+    readonly requireLogin: boolean;
+    /** A scope above the service (its environment, project, server, or every service)
+     *  already demands a login, which the service cannot waive. */
+    readonly requiredAbove: boolean;
+    readonly loginAllowPrincipals: WafPrincipalGrant[];
+    readonly loginDenyPrincipals: WafPrincipalGrant[];
+    /** The first few addresses the rule guards, and how many there are. */
+    readonly hostnames: string[];
+    readonly hostnameCount: number;
+}
+
+const serviceIdSchema = z.string().uuid();
+const loginPrincipalList = z.array(core.wafPrincipalGrantSchema).max(core.WAF_LIST_MAX);
+const HOSTNAMES_SHOWN = 3;
+
+/** Whether the caller may change the firewall rules of what `check` names - answered
+ *  rather than redirected, so a screen can say why its control is off. */
+async function loginRefusal(
+    check: (userId: string) => Promise<void>
+): Promise<{ user: Awaited<ReturnType<typeof requireUser>>; refusal?: ServiceLoginRefusal }> {
+    const user = await requireUser();
+    if (!(await userHasManage(user, "deploy.manage"))) return { user, refusal: "permission" };
+    try {
+        await check(user.id);
+    } catch {
+        return { user, refusal: "owner" };
+    }
+    return { user };
+}
+
+/**
+ * A service's require-login rule for its Settings tab: the same row the firewall's
+ * Service scope edits, and the addresses it guards.
+ */
+export async function getServiceLoginAction(applicationId: string): Promise<{
+    login?: ServiceLoginView;
+    refusal?: ServiceLoginRefusal;
+    error?: string;
+}> {
+    const id = serviceIdSchema.safeParse(applicationId);
+    if (!id.success) return { error: await say("errors.load") };
+    const { user, refusal } = await loginRefusal((userId) =>
+        assertScopeOwner(userId, "application", id.data)
+    );
+    if (refusal) return { refusal };
+    try {
+        const guarded = { applicationId: id.data, enabled: true, kind: { not: "release" } };
+        const [rule, inherited, domains, hostnameCount] = await Promise.all([
+            getWafRule(user.id, "application", id.data),
+            getWafInherited(user.id, "application", id.data),
+            prisma.domain.findMany({
+                where: guarded,
+                select: { hostname: true },
+                orderBy: { createdAt: "asc" },
+                take: HOSTNAMES_SHOWN
+            }),
+            prisma.domain.count({ where: guarded })
+        ]);
+        return {
+            login: {
+                requireLogin: rule.requireLogin,
+                requiredAbove: inherited.requireLogin,
+                loginAllowPrincipals: rule.loginAllowPrincipals,
+                loginDenyPrincipals: rule.loginDenyPrincipals,
+                hostnames: domains.map((domain) => domain.hostname),
+                hostnameCount
+            }
+        };
+    } catch (caught) {
+        return { error: await failure(caught, "errors.load") };
+    }
+}
+
+/** Whether a new service in this environment could be put behind a login by its
+ *  creator - asked by the new-service form before it offers the option. */
+export async function serviceLoginAccessAction(
+    environmentId: string
+): Promise<{ refusal?: ServiceLoginRefusal; error?: string }> {
+    const id = serviceIdSchema.safeParse(environmentId);
+    if (!id.success) return { error: await say("errors.load") };
+    const { refusal } = await loginRefusal((userId) =>
+        assertScopeOwner(userId, "environment", id.data)
+    );
+    return refusal ? { refusal } : {};
+}
+
+const serviceLoginSchema = z.object({
+    applicationId: serviceIdSchema,
+    requireLogin: z.boolean().optional(),
+    loginAllowPrincipals: loginPrincipalList.optional(),
+    loginDenyPrincipals: loginPrincipalList.optional()
+});
+
+/**
+ * Change the login part of a service's own firewall rule and nothing else. The
+ * write is the firewall's own (`setWafRule` on the Service scope), behind the same
+ * checks as `setWafRuleAction`: `deploy.manage`, ownership of the project, and a
+ * new entry only if the caller could have picked it.
+ */
+export async function setServiceLoginAction(input: unknown): Promise<{ error?: string }> {
+    const parsed = serviceLoginSchema.safeParse(input);
+    if (!parsed.success) return { error: await say("errors.save") };
+    const { applicationId, ...patch } = parsed.data;
+    const user = await requirePermission("deploy.manage");
+    try {
+        const refused = await setWafLogin(user, "application", applicationId, patch);
+        if (refused) return { error: await say("errors.outOfReach") };
+        await recordAudit({
+            actorId: user.id,
+            action: "deploy.waf.set",
+            targetType: "application",
+            targetId: applicationId
+        });
+        await syncAppRoutes().catch(() => undefined);
+        return {};
+    } catch (caught) {
+        return { error: await failure(caught, "errors.save") };
     }
 }

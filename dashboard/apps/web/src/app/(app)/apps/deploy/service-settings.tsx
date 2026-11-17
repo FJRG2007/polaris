@@ -16,6 +16,7 @@ import { DomainCdnButton } from "./domain-cdn";
 import { DomainCutoverButton } from "./domain-cutover";
 import { DomainPrivateButton } from "./domain-private";
 import { EdgeSettings } from "./edge-settings";
+import { ServiceLoginCard } from "./service-login";
 import * as publicNet from "./public-networking";
 import { useProjectCan, useProjectIsOwner } from "./access-context";
 import { GpuCard } from "./gpu-card";
@@ -824,6 +825,8 @@ export function SettingsTab({
             </SettingsSection>
 
             <SettingsSection {...head("security")}>
+                {/* Shown to anybody on the tab: who cannot change it is told why. */}
+                <ServiceLoginCard applicationId={app.id} />
                 {(configure || domains) && (
                     <EdgeSettings
                         applicationId={app.id}

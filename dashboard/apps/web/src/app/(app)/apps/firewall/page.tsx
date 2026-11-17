@@ -54,9 +54,9 @@ function describe(kind: ScopeKind, label: string, t: NamespaceTranslator<"firewa
 export default async function FirewallPage({
     searchParams
 }: {
-    searchParams: Promise<{ scope?: string; id?: string }>;
+    searchParams: Promise<{ scope?: string; id?: string; rule?: string }>;
 }) {
-    const { scope, id } = await searchParams;
+    const { scope, id, rule } = await searchParams;
     const user = await requirePermission("deploy.manage");
     const canOperate = await userHasManage(user, "system.manage");
     const t = await getTranslations("firewall");
@@ -150,6 +150,9 @@ export default async function FirewallPage({
                         // Polaris has a login of its own; sending its visitors round the
                         // guard's cross-domain handoff to reach it would be a loop.
                         offerLogin={kind !== "polaris"}
+                        // A link from a service's settings opens straight on the rule it
+                        // came from (`&rule=login`), not on the list it sits in.
+                        initialRule={rule === "login" ? "login" : undefined}
                         callerIp={callerIp}
                         canOperate={canOperate}
                         // Traffic, bans and jails are instance-wide however narrow the

@@ -144,6 +144,13 @@ export const SERVICE_SETTINGS_INDEX = {
             es: ["publicar puerto", "puerto abierto", "cortafuegos", "acceso directo"]
         }
     },
+    polarisLogin: {
+        section: "security",
+        keywords: {
+            en: ["login", "sign in", "require login", "private", "password", "accounts", "access"],
+            es: ["inicio de sesion", "iniciar sesion", "requerir login", "privado", "cuentas", "acceso"]
+        }
+    },
     traffic: {
         section: "security",
         keywords: {

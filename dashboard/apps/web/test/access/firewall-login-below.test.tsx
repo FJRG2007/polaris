@@ -122,3 +122,18 @@ describe("the login row over services that already require one", () => {
         expect(screen.getByText("And 2 more")).toBeTruthy();
     });
 });
+
+describe("a link that names the login rule", () => {
+    it("opens the editor on that rule's page rather than the list", async () => {
+        below = [];
+        count = null;
+        render(
+            <MessagesWrapper>
+                <WafEditor scopeType="application" scopeId={SERVICE} initialRule="login" />
+            </MessagesWrapper>
+        );
+        expect(
+            await screen.findByRole("switch", { name: "Require Polaris login" })
+        ).toBeTruthy();
+    });
+});

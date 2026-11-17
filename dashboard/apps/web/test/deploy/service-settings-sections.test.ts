@@ -23,6 +23,7 @@ const FILES = [
     "service-settings.tsx",
     "service-source-cards.tsx",
     "edge-settings.tsx",
+    "service-login.tsx",
     "deploy-behaviour-section.tsx",
     "scaling-section.tsx",
     "build-machine-section.tsx",

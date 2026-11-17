@@ -21,6 +21,8 @@ import {
     variableTargetType
 } from "@/lib/deploy/variable-groups";
 import { requirePermission } from "@/lib/session";
+import { assertScopeOwner } from "@/lib/waf-service";
+import { principalsWithinReach, setWafLogin } from "@/lib/waf-login";
 import * as activity from "@/lib/activity/activity";
 import * as comments from "@/lib/comments/comments";
 import * as deployService from "@/lib/deploy-service";
@@ -43,7 +45,13 @@ import { pickerRepoList, pickerRepoSearch } from "@/lib/github-repo-picker";
 import { provisionHostnameDns, type HostnameDnsResult } from "@/lib/domain-dns";
 import { applyImportedAfterCreate, importedCreate } from "@/lib/deploy/repo-import";
 import { getOrCreateLocalTarget, getOrCreateHostTarget } from "@/lib/deploy-target-service";
-import { serviceTemplate, serviceTemplateIdSchema, templateNeedsSetup } from "@polaris/core";
+import {
+    serviceTemplate,
+    serviceTemplateIdSchema,
+    templateNeedsSetup,
+    WAF_LIST_MAX,
+    wafPrincipalGrantSchema
+} from "@polaris/core";
 import {
     inspectGithubRepo,
     readGithubRepoSetup,
@@ -356,6 +364,12 @@ export async function deleteEnvironmentAction(input: {
     }
 }
 
+/** A new service's firewall login, as the new-service form sends it. */
+const createLoginSchema = z.object({
+    loginAllowPrincipals: z.array(wafPrincipalGrantSchema).max(WAF_LIST_MAX),
+    loginDenyPrincipals: z.array(wafPrincipalGrantSchema).max(WAF_LIST_MAX)
+});
+
 export async function createApplicationAction(input: {
     environmentId: string;
     name: string;
@@ -374,8 +388,13 @@ export async function createApplicationAction(input: {
     /** A one-click service: its image, port, volumes and variables come from the
      *  template, and anything given here beside a name is ignored. */
     templateId?: string;
+    /** Put the service behind a Polaris login from its first deploy: the firewall's
+     *  rule on the new service's own scope, naming who it admits and refuses. */
+    login?: { loginAllowPrincipals: unknown[]; loginDenyPrincipals: unknown[] };
 }): Promise<{ error?: string; deploymentId?: string; applicationId?: string; needs?: string[] }> {
     const user = await requirePermission("deploy.manage");
+    const login = input.login === undefined ? null : createLoginSchema.safeParse(input.login);
+    if (login && !login.success) return { error: await reply("service.loginInvalid") };
     let template: ReturnType<typeof serviceTemplate> = null;
     if (input.templateId !== undefined) {
         const id = serviceTemplateIdSchema.safeParse(input.templateId);
@@ -440,6 +459,18 @@ export async function createApplicationAction(input: {
             await requireEnvironmentAccess(input.environmentId, user.id, "databases.manage");
         }
         const owner = access.ownerId;
+        // Asked before anything is created, so a refusal leaves nothing half-made: the
+        // same checks the firewall makes for a rule on this project.
+        if (login?.success) {
+            try {
+                await assertScopeOwner(user.id, "environment", input.environmentId);
+            } catch {
+                return { error: await reply("service.loginNotOwner") };
+            }
+            const sent = [...login.data.loginAllowPrincipals, ...login.data.loginDenyPrincipals];
+            if (!(await principalsWithinReach(user, sent.map((grant) => grant.ref), new Set())))
+                return { error: await reply("service.loginOutOfReach") };
+        }
         // The clone goes out as the owner's account or the instance's App, so the
         // repository has to be one this person can see on GitHub themselves.
         if (isGit) {
@@ -510,6 +541,20 @@ export async function createApplicationAction(input: {
                 : {})
         });
         const needs = await applyImportedAfterCreate(app.id, owner, setup?.imported ?? null);
+        // Written before the first deploy and before any address, so the service is
+        // never reachable without it; it covers whichever addresses it gets.
+        if (login?.success) {
+            await setWafLogin(user, "application", app.id, {
+                requireLogin: true,
+                ...login.data
+            });
+            await recordDeployAudit({
+                actorId: user.id,
+                action: "deploy.waf.set",
+                targetType: "application",
+                targetId: app.id
+            });
+        }
         await recordDeployAudit({
             actorId: user.id,
             action: "deploy.app.create",

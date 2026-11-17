@@ -9,6 +9,7 @@
 
 import { ServerPicker } from "@/components/server-picker";
 import * as deployActions from "./actions";
+import { LoginOnCreate, type LoginOnCreateValue } from "./service-login";
 import { ChevronRight, Loader2 } from "lucide-react";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { Button, Input } from "@polaris/ui";
@@ -94,6 +95,7 @@ export function NewTemplateForm({
     const [query, setQuery] = useState("");
     const { servers, serverId, setServerId } = useDeployServers(environmentId);
     const [error, setError] = useState<string | null>(null);
+    const [login, setLogin] = useState<LoginOnCreateValue>(null);
     const [pending, startTransition] = useTransition();
 
     function submit() {
@@ -101,6 +103,7 @@ export function NewTemplateForm({
         setError(null);
         startTransition(async () => {
             const result = await deployActions.createApplicationAction({
+                login: login ?? undefined,
                 environmentId,
                 name: name.trim() || picked.name,
                 templateId: picked.id,
@@ -216,6 +219,7 @@ export function NewTemplateForm({
                 {picked.secrets.length > 0 && t("view.template.secrets")}
                 {picked.prepare?.length ? t("view.template.setup") : ""}
             </p>
+            <LoginOnCreate environmentId={environmentId} value={login} onChange={setLogin} />
             {error && <p className="text-sm text-danger">{error}</p>}
             <div className="flex justify-end gap-2">
                 {!initial && (

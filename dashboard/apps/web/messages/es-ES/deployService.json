@@ -623,6 +623,24 @@
         "privateLink": "Red privada entre servicios",
         "certUnknown": "No se pudo leer el certificado desde aquí. Se mostrará cuando la dirección responda a este servidor."
     },
+    "login": {
+        "title": "Exigir sesión en Polaris",
+        "hint": "Los visitantes inician sesión en Polaris antes de llegar a este servicio. Es la regla del cortafuegos del servicio, así que también aparece allí.",
+        "openRule": "Ver en cortafuegos",
+        "on": "Se exige iniciar sesión",
+        "off": "Sin inicio de sesión",
+        "aboveNote": "Una regla por encima de este servicio ya exige iniciar sesión y aquí no se puede eximir. Ábrela en el cortafuegos para ver dónde está.",
+        "noAddress": "Este servicio aún no tiene dirección. Añade un dominio en Red y luego exige aquí el inicio de sesión.",
+        "guards": "Cubre {hosts}",
+        "guardsMore": "Cubre {hosts} y {count} más",
+        "admits": "A quién admite",
+        "advanced": "Avanzado",
+        "createHint": "Los visitantes inician sesión en Polaris antes de llegar a este servicio, en cada dirección que tenga.",
+        "refusal": {
+            "permission": "No tienes permiso para cambiar las reglas del cortafuegos.",
+            "owner": "Solo el propietario del proyecto puede cambiar sus reglas del cortafuegos."
+        }
+    },
     "kit": {
         "sections": "Secciones",
         "learnMore": "Saber más",
