@@ -201,8 +201,10 @@ export function PolarComposer({
                     onChange={(event) => onValueChange(event.target.value)}
                     onSubmitKey={onSubmit}
                 />
-                <PromptInputFooter>
-                    <PromptInputTools>
+                {/* On a phone the pickers wrap onto a second row rather than
+                    squeezing each other to nothing. */}
+                <PromptInputFooter className="max-sm:items-end">
+                    <PromptInputTools className="max-sm:flex-wrap">
                         <span id={attachId} className="contents">
                             {"files" in attach ? (
                                 <PromptInputAttach

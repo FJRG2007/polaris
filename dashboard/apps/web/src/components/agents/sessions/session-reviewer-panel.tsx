@@ -12,6 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, RefreshCw, ScanSearch } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
 import type { SessionView } from "@/lib/agents/session-service";
+import { TOUCH_TARGET } from "@/components/use-phone";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Input, Select, Skeleton } from "@polaris/ui";
 import {
@@ -97,7 +98,7 @@ export function SessionReviewerPanel({ session }: { session: SessionView }) {
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <h4 className="min-w-0 flex-1 truncate text-sm font-semibold">{t("session.reviewer.title")}</h4>
                 {view.cli && session.pullRequest ? (
-                    <Button size="sm" variant="secondary" onClick={() => void reviewNow()} disabled={busy || running}>
+                    <Button size="sm" className={TOUCH_TARGET} variant="secondary" onClick={() => void reviewNow()} disabled={busy || running}>
                         {busy || running ? (
                             <Loader2 className="size-4 shrink-0 animate-spin" />
                         ) : (
@@ -108,7 +109,10 @@ export function SessionReviewerPanel({ session }: { session: SessionView }) {
                 ) : null}
             </div>
             <p className="text-xs text-muted-foreground">{t("session.reviewer.hint")}</p>
-            <div className="flex min-w-0 flex-wrap items-center gap-2" title={disabledReason}>
+            <div
+                className="flex min-w-0 flex-wrap items-center gap-2 [@media(pointer:coarse)]:[&_button]:min-h-11 [@media(pointer:coarse)]:[&_input]:min-h-11"
+                title={disabledReason}
+            >
                 <div className="min-w-0 flex-1 basis-40">
                     <Select
                         aria-label={t("session.reviewer.tool")}
@@ -132,7 +136,7 @@ export function SessionReviewerPanel({ session }: { session: SessionView }) {
                             onChange={(event) => setModel(event.target.value)}
                         />
                         {modelChanged ? (
-                            <Button size="sm" onClick={() => void save(view.cli, model.trim() || null)}>
+                            <Button size="sm" className={TOUCH_TARGET} onClick={() => void save(view.cli, model.trim() || null)}>
                                 {t("session.reviewer.save")}
                             </Button>
                         ) : null}
@@ -148,7 +152,7 @@ export function SessionReviewerPanel({ session }: { session: SessionView }) {
                     {view.reviews.map((review, index) => (
                         <li key={review.id} className="min-w-0 rounded-md bg-muted/40 px-3 py-2">
                             <details open={index === 0} className="min-w-0">
-                                <summary className="flex min-w-0 cursor-pointer flex-wrap items-center gap-2 text-sm">
+                                <summary className="flex min-w-0 cursor-pointer flex-wrap items-center gap-2 text-sm [@media(pointer:coarse)]:min-h-11">
                                     <ScanSearch className="size-4 shrink-0 text-muted-foreground" />
                                     <Badge variant={badgeOf(review.state, review.verdict)}>
                                         {t(`session.reviewer.states.${stateKey(review.state, review.verdict)}`)}
@@ -174,7 +178,7 @@ export function SessionReviewerPanel({ session }: { session: SessionView }) {
                                             {review.findings.map((finding, at) => (
                                                 <li key={at} className="min-w-0 text-sm">
                                                     <code
-                                                        className="block truncate text-xs"
+                                                        className="block truncate text-xs max-sm:whitespace-normal max-sm:break-all"
                                                         title={finding.line ? `${finding.path}:${finding.line}` : finding.path}
                                                     >
                                                         {finding.line ? `${finding.path}:${finding.line}` : finding.path}

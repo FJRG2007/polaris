@@ -18,6 +18,7 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { useDisplayFormat } from "@/components/display-format";
 import type { SessionView } from "@/lib/agents/session-service";
+import { TOUCH_TARGET } from "@/components/use-phone";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type * as timelines from "@/lib/agents/session-pr-timeline";
 import { COMMENT_MAX, replyQuote } from "@/lib/agents/pr-reply-quote";
@@ -211,13 +212,13 @@ export function SessionPullTab({ session }: { session: SessionView }) {
                     <Badge variant={timeline.state === "merged" ? "primary" : timeline.state === "open" ? "success" : "neutral"}>
                         {t(`session.pr.states.${stateLabel}`)}
                     </Badge>
-                    <h3 className="min-w-0 flex-1 truncate text-sm font-semibold" title={timeline.title}>
+                    <h3 className="min-w-0 flex-1 truncate text-sm font-semibold max-sm:whitespace-normal max-sm:break-words" title={timeline.title}>
                         {timeline.title || `#${timeline.number}`}{" "}
                         <span className="font-normal text-muted-foreground">#{timeline.number}</span>
                     </h3>
                 </div>
                 <p
-                    className="min-w-0 truncate text-xs text-muted-foreground"
+                    className="min-w-0 truncate text-xs text-muted-foreground max-sm:whitespace-normal max-sm:break-all"
                     title={t("session.pr.branches", { source: timeline.sourceBranch, target: timeline.targetBranch })}
                 >
                     {t("session.pr.branches", { source: timeline.sourceBranch, target: timeline.targetBranch })}
@@ -226,7 +227,7 @@ export function SessionPullTab({ session }: { session: SessionView }) {
                 </p>
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <Button
-                        size="sm"
+                        size="sm" className={TOUCH_TARGET}
                         onClick={() => setMerging(true)}
                         disabled={view.mergeBlock !== null}
                         title={blockReason ?? undefined}
@@ -235,18 +236,18 @@ export function SessionPullTab({ session }: { session: SessionView }) {
                         {t("session.merge.open")}
                     </Button>
                     {timeline.url ? (
-                        <Button size="sm" variant="ghost" asChild>
+                        <Button size="sm" className={TOUCH_TARGET} variant="ghost" asChild>
                             <a href={timeline.url} target="_blank" rel="noreferrer noopener">
                                 <ExternalLink className="size-4 shrink-0" />
                                 {t("session.pr.openOnGithub")}
                             </a>
                         </Button>
                     ) : null}
-                    <Button size="sm" variant="ghost" onClick={() => void load(true)} disabled={refreshing}>
+                    <Button size="sm" className={TOUCH_TARGET} variant="ghost" onClick={() => void load(true)} disabled={refreshing}>
                         <RefreshCw className={`size-4 shrink-0 ${refreshing ? "animate-spin" : ""}`} />
                         {t("session.pr.refresh")}
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setClaiming(true)}>
+                    <Button size="sm" className={TOUCH_TARGET} variant="ghost" onClick={() => setClaiming(true)}>
                         <Link2 className="size-4 shrink-0" />
                         {t("session.pr.claim.open")}
                     </Button>
@@ -346,7 +347,7 @@ function ErrorLine({ message, onRetry, busy }: { message: string; onRetry: () =>
             <p role="alert" className="min-w-0 text-sm text-danger">
                 {message}
             </p>
-            <Button size="sm" variant="ghost" onClick={onRetry} disabled={busy}>
+            <Button size="sm" className={TOUCH_TARGET} variant="ghost" onClick={onRetry} disabled={busy}>
                 <RefreshCw className={`size-4 shrink-0 ${busy ? "animate-spin" : ""}`} />
                 {t("session.pr.refresh")}
             </Button>
@@ -387,7 +388,7 @@ function ChecksSection({ checks }: { checks: timelines.PullTimeline["checks"] })
                                         href={check.url}
                                         target="_blank"
                                         rel="noreferrer noopener"
-                                        className="min-w-0 flex-1 truncate hover:underline"
+                                        className="min-w-0 flex-1 truncate hover:underline [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center"
                                         title={check.name}
                                     >
                                         {check.name}
@@ -465,7 +466,7 @@ function Entry({
             <div className="flex min-w-0 items-center gap-2 px-1 py-1 text-xs text-muted-foreground">
                 <GitCommitHorizontal className="size-4 shrink-0" />
                 {entry.url ? (
-                    <a href={entry.url} target="_blank" rel="noreferrer noopener" className="shrink-0 font-mono hover:underline">
+                    <a href={entry.url} target="_blank" rel="noreferrer noopener" className="shrink-0 font-mono hover:underline [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center">
                         {entry.sha.slice(0, 7)}
                     </a>
                 ) : (
@@ -499,7 +500,7 @@ function Entry({
                     </div>
                 ))}
                 {entry.more > 0 && first.url ? (
-                    <a href={first.url} target="_blank" rel="noreferrer noopener" className="text-xs text-muted-foreground hover:underline">
+                    <a href={first.url} target="_blank" rel="noreferrer noopener" className="text-xs text-muted-foreground hover:underline [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center">
                         {t("session.pr.moreReplies", { count: entry.more })}
                     </a>
                 ) : null}
@@ -540,7 +541,7 @@ function Entry({
                         href={entry.url}
                         target="_blank"
                         rel="noreferrer noopener"
-                        className="ms-auto shrink-0 text-muted-foreground hover:text-foreground"
+                        className="ms-auto shrink-0 text-muted-foreground hover:text-foreground [@media(pointer:coarse)]:grid [@media(pointer:coarse)]:size-11 [@media(pointer:coarse)]:place-items-center"
                         aria-label={t("session.pr.openOnGithub")}
                         title={t("session.pr.openOnGithub")}
                     >
@@ -574,7 +575,7 @@ function Entry({
 function ReplyButton({ onClick }: { onClick: () => void }) {
     const t = useTranslations("agents");
     return (
-        <Button size="sm" variant="ghost" className="self-start" onClick={onClick}>
+        <Button size="sm" variant="ghost" className={`self-start ${TOUCH_TARGET}`} onClick={onClick}>
             <Reply className="size-4 shrink-0" />
             {t("session.pr.reply")}
         </Button>
@@ -651,11 +652,11 @@ function Composer({
             ) : null}
             <div className="flex flex-wrap justify-end gap-2">
                 {onCancel ? (
-                    <Button size="sm" variant="ghost" onClick={onCancel} disabled={busy}>
+                    <Button size="sm" className={TOUCH_TARGET} variant="ghost" onClick={onCancel} disabled={busy}>
                         {tcommon("actions.cancel")}
                     </Button>
                 ) : null}
-                <Button size="sm" onClick={submit} disabled={!body || busy} aria-disabled={!body || busy}>
+                <Button size="sm" className={TOUCH_TARGET} onClick={submit} disabled={!body || busy} aria-disabled={!body || busy}>
                     {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
                     {submitLabel}
                 </Button>
