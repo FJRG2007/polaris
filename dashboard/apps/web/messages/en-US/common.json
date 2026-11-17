@@ -132,6 +132,19 @@
             "loadFailed": "Could not load your terminals on this server.",
             "changeFailed": "That change to the terminal did not save.",
             "keepsRunning": "Terminals keep running when you close this, and end after {minutes} min with nobody on them."
+        },
+        "keys": {
+            "bar": "Keys a phone keyboard lacks",
+            "esc": "Esc",
+            "escName": "Escape",
+            "tab": "Tab",
+            "tabName": "Tab",
+            "ctrl": "Ctrl",
+            "ctrlName": "Control, for the next key",
+            "up": "Up arrow",
+            "down": "Down arrow",
+            "left": "Left arrow",
+            "right": "Right arrow"
         }
     },
     "storage": {

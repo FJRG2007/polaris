@@ -132,6 +132,19 @@
             "loadFailed": "No se pudieron cargar tus terminales en este servidor.",
             "changeFailed": "Ese cambio en la terminal no se guardó.",
             "keepsRunning": "Las terminales siguen en marcha al cerrar esto y terminan tras {minutes} min sin nadie."
+        },
+        "keys": {
+            "bar": "Teclas que le faltan al móvil",
+            "esc": "Esc",
+            "escName": "Escape",
+            "tab": "Tab",
+            "tabName": "Tabulador",
+            "ctrl": "Ctrl",
+            "ctrlName": "Control, para la siguiente",
+            "up": "Arriba",
+            "down": "Abajo",
+            "left": "Izquierda",
+            "right": "Derecha"
         }
     },
     "storage": {

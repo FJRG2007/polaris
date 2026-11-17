@@ -15,9 +15,10 @@
 import "@xterm/xterm/css/xterm.css";
 import { Button } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
-import { RotateCw, Search, ShieldAlert } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, RotateCw, Search, ShieldAlert } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { LocalPath } from "@/lib/server-local-path";
+import { BAR_KEYS, barKeySequence, keyboardInset, withCtrl, type BarKey } from "@/lib/terminal-keys";
 
 /** What to attach to: a container on a deploy target, a container on a
  *  Containers connection, a registered server - as the Polaris login, or as root
@@ -186,6 +187,10 @@ export function TerminalPanel({
     const sessionRef = useRef(resumeId);
     const callbacks = useRef({ onSession, onClosed });
     callbacks.current = { onSession, onClosed };
+    // The key bar's way into the live session, and Ctrl held for the next key.
+    const input = useRef<{ send: (data: string) => void; focus: () => void } | null>(null);
+    const ctrlHeld = useRef(false);
+    const [ctrl, setCtrl] = useState(false);
     // The object identity of `target` would restart the session on every parent
     // render; its contents are what actually decide the connection.
     const key =
@@ -294,13 +299,21 @@ export function TerminalPanel({
             // handler has the code and reason, so this only avoids a silent gap.
             socket.onerror = () => !opened && setStatus({ kind: "couldNotConnect" });
 
-            const onData = term.onData((input) => {
-                if (socket?.readyState === WebSocket.OPEN) socket.send(input);
+            const send = (data: string): void => {
+                if (socket?.readyState === WebSocket.OPEN) socket.send(data);
+            };
+            input.current = { send, focus: () => term.focus() };
+            const onData = term.onData((typed) => {
+                if (!ctrlHeld.current) return send(typed);
+                ctrlHeld.current = false;
+                setCtrl(false);
+                send(withCtrl(typed));
             });
             const onResize = (): void => sendResize();
             window.addEventListener("resize", onResize);
 
             cleanup = () => {
+                input.current = null;
                 onData.dispose();
                 window.removeEventListener("resize", onResize);
                 term.dispose();
@@ -336,6 +349,20 @@ export function TerminalPanel({
                 ref={mountRef}
                 className={`${height} w-full overflow-hidden rounded-md bg-[#0b0e14] p-2`}
             />
+            <KeyBar
+                ctrl={ctrl}
+                onKey={(key) => {
+                    if (key === "ctrl") {
+                        ctrlHeld.current = !ctrlHeld.current;
+                        setCtrl(ctrlHeld.current);
+                    } else {
+                        input.current?.send(barKeySequence(key, ctrlHeld.current));
+                        ctrlHeld.current = false;
+                        setCtrl(false);
+                    }
+                    input.current?.focus();
+                }}
+            />
             {failure ? (
                 <FailureNote
                     failure={failure}
@@ -344,6 +371,74 @@ export function TerminalPanel({
                     onRetry={() => setAttempt((n) => n + 1)}
                 />
             ) : null}
+        </div>
+    );
+}
+
+const KEY_ICON = { up: ArrowUp, down: ArrowDown, left: ArrowLeft, right: ArrowRight } as const;
+
+/** How far the on-screen keyboard covers the window, kept current as it opens,
+ *  closes and changes height. Zero where the browser cannot say. */
+function useKeyboardInset(): number {
+    const [inset, setInset] = useState(0);
+    useEffect(() => {
+        const viewport = window.visualViewport;
+        if (!viewport) return;
+        const measure = () => setInset(keyboardInset(window.innerHeight, viewport.height, viewport.offsetTop));
+        measure();
+        viewport.addEventListener("resize", measure);
+        viewport.addEventListener("scroll", measure);
+        return () => {
+            viewport.removeEventListener("resize", measure);
+            viewport.removeEventListener("scroll", measure);
+        };
+    }, []);
+    return inset;
+}
+
+/**
+ * The keys a phone's keyboard lacks - Escape, Tab, Ctrl for the next key, the
+ * arrows - on a touch screen only. Under the terminal while the keyboard is
+ * down; pinned just above it while it is up, the way Termius and Blink do it.
+ * A press never takes the focus, so the keyboard stays where it is.
+ */
+function KeyBar({ ctrl, onKey }: { ctrl: boolean; onKey: (key: BarKey) => void }) {
+    const t = useTranslations("common");
+    const inset = useKeyboardInset();
+    return (
+        <div
+            role="toolbar"
+            aria-label={t("terminal.keys.bar")}
+            style={inset > 0 ? { bottom: inset } : undefined}
+            className={`hidden gap-1 overflow-x-auto [@media(pointer:coarse)]:flex ${
+                inset > 0 ? "fixed inset-x-0 z-50 border-t border-border bg-elevated px-2 py-1" : ""
+            }`}
+        >
+            {BAR_KEYS.map((key) => {
+                const Icon = key === "esc" || key === "tab" || key === "ctrl" ? null : KEY_ICON[key];
+                const name =
+                    key === "esc" || key === "tab" || key === "ctrl"
+                        ? t(`terminal.keys.${key}Name`)
+                        : t(`terminal.keys.${key}`);
+                return (
+                    <button
+                        key={key}
+                        type="button"
+                        aria-label={name}
+                        title={name}
+                        aria-pressed={key === "ctrl" ? ctrl : undefined}
+                        onPointerDown={(event) => event.preventDefault()}
+                        onClick={() => onKey(key)}
+                        className={`grid min-h-11 min-w-11 shrink-0 place-items-center rounded-md px-2 font-mono text-xs ${
+                            key === "ctrl" && ctrl
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted text-foreground active:bg-card-hover"
+                        }`}
+                    >
+                        {Icon ? <Icon className="size-4" aria-hidden /> : t(`terminal.keys.${key}`)}
+                    </button>
+                );
+            })}
         </div>
     );
 }
