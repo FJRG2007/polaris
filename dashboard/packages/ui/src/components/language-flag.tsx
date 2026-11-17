@@ -23,6 +23,9 @@ const LANGUAGE_FLAG: Readonly<Record<string, string>> = {
     da: "dk",
     de: "de",
     el: "gr",
+    // English with no region is read as American English, the one every
+    // engine translates into by default.
+    en: "us",
     es: "es",
     et: "ee",
     eu: "es-pv",

@@ -11,6 +11,7 @@ describe("languageFlagCode", () => {
     it.each([
         ["en-US", "us"],
         ["en-GB", "gb"],
+        ["en", "us"],
         ["es", "es"],
         ["es-ES", "es"],
         ["pt-BR", "br"],
@@ -46,7 +47,6 @@ describe("languageFlagCode", () => {
 
     it("shows no flag rather than a guess", () => {
         // A language spoken across many countries, with no region to say which.
-        expect(languageFlagCode("en")).toBeNull();
         expect(languageFlagCode("zh")).toBeNull();
         // Codes that look like a country but are not that country's language.
         expect(languageFlagCode("be")).toBeNull();

@@ -25,7 +25,8 @@ const LANGUAGES = [
     { value: "de", tag: "de" },
     { value: "en-GB", tag: "en-GB" },
     { value: "es", tag: "es" },
-    { value: "en", tag: "en" }
+    { value: "en", tag: "en" },
+    { value: "zh", tag: "zh" }
 ];
 
 function open(value = "es") {
@@ -49,7 +50,7 @@ describe("language picker rows", () => {
     it("names each language in itself, with the reader's name for it muted at the right", () => {
         const { rows } = open();
         const labels = rows.map((row) => row.querySelector("span.flex-1")?.textContent);
-        expect(labels).toEqual(["Dansk", "Deutsch", "English (UK)", "Español", "English"]);
+        expect(labels).toEqual(["Dansk", "Deutsch", "English (UK)", "Español", "English", "中文"]);
         expect(within(rows[0]!).getByTitle("Danish")).toBeTruthy();
         expect(within(rows[3]!).getByTitle("Spanish").className).toContain("text-muted-foreground");
         // The reader's name is left out where it would only repeat the label.
@@ -65,8 +66,8 @@ describe("language picker rows", () => {
                         ?.querySelector("[data-flag]")
                         ?.getAttribute("data-flag") ?? null
             )
-        ).toEqual(["dk", "de", "gb", "es", "none"]);
-        expect(rows[4]!.querySelector("[data-icon-placeholder]")).not.toBeNull();
+        ).toEqual(["dk", "de", "gb", "es", "us", "none"]);
+        expect(rows[5]!.querySelector("[data-icon-placeholder]")).not.toBeNull();
         await waitFor(() =>
             expect(
                 (rows[1]!.querySelector("[data-flag]") as HTMLElement).style.backgroundImage
@@ -79,6 +80,7 @@ describe("language picker rows", () => {
         expect(rows.map((row) => row.querySelector("svg.lucide-check") !== null)).toEqual([
             false,
             true,
+            false,
             false,
             false,
             false
