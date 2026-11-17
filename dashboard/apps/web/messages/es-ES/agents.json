@@ -574,6 +574,30 @@
                 "failed": "GitHub no fusionó la pull request. Inténtalo de nuevo en un momento."
             }
         },
+        "switch": {
+            "button": "Cambiar agente",
+            "title": "Cambiar agente",
+            "intro": "La sesión se detiene y su trabajo se guarda en su rama. El agente que elijas sigue allí con la conversación.",
+            "pick": "Agente y modelo",
+            "confirm": "Cambiar",
+            "cancel": "Cancelar",
+            "switching": "Cambiando...",
+            "loadFailed": "No se cargaron tus agentes. Reinténtalo.",
+            "none": "No tienes otro agente con sesión.",
+            "errors": {
+                "invalid": "Elige un agente al que cambiar.",
+                "notRunning": "Solo una sesión activa cambia de agente.",
+                "place": "Solo las sesiones en Polaris cambian de agente.",
+                "noRepo": "Un espacio sin repositorio no tiene rama.",
+                "same": "Esta sesión ya usa ese agente y modelo.",
+                "busy": "Responde antes la pregunta del agente.",
+                "kept": "La sesión se detuvo, pero su trabajo no se subió. Súbelo de nuevo desde la sesión y continúa.",
+                "failed": "No se pudo cambiar de agente. Reinténtalo."
+            }
+        },
+        "restore": {
+            "kept": "El trabajo de esta sesión aún no se subió. Súbelo de nuevo desde la sesión y continúa."
+        },
         "fork": {
             "action": "Bifurcar",
             "hint": "Abre una sesión nueva sobre este trabajo, con la conversación cuando el agente puede llevarla.",

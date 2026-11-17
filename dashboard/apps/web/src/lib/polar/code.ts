@@ -37,7 +37,7 @@ import { agentTaskPrompt } from "@/lib/polar/agents/shared";
 import type { PermissionRule } from "@/lib/polar/agents/permissions";
 import { codeComposerFor, type CodeComposer } from "@/lib/polar/agents/composer-agents";
 import { resolvedStart } from "@/lib/polar/agents/resolve-start";
-import { liveSourceFor } from "@/lib/polar/agents/code-sources";
+import { codePickSchema, liveSourceFor } from "@/lib/polar/agents/code-sources";
 import { listComputers } from "@/lib/computers/computer-service";
 import { placeOf } from "@/lib/polar/code-place";
 import { codeStartersSchema, starterPrompt, type StarterSkill } from "@/lib/polar/code-starters";
@@ -86,6 +86,7 @@ import {
     setSessionEffortAction,
     sessionAccountsAction,
     switchSessionAccountAction,
+    switchSessionAgentAction,
     setSessionModelAction,
     sessionChoicesAction,
     sessionDetailAction,
@@ -957,7 +958,29 @@ export async function polarCodeContinue(
     const parsed = continueSchema.safeParse(input);
     if (!parsed.success) return { error: (await getTranslations("polar"))("code.continueFailed") };
     const { sessionId, target } = parsed.data;
-    const answer = await forkSessionAction(sessionId, target ? placeOf(target) : undefined);
+    const answer = await forkSessionAction(sessionId, target ? placeOf(target) : undefined, { carry: "restore" });
+    return answer.id ? { id: answer.id } : { error: answer.error };
+}
+
+const polarCodeSwitchSchema = z.object({ sessionId: z.string().uuid(), pick: codePickSchema }).strict();
+
+/**
+ * Hand a running session to another agent or model, from its thread. The pick
+ * is resolved from this person's own sources, the way a start resolves it, so
+ * only an agent they can use is ever started; the Agents action then saves the
+ * work, stops the session and starts the new one with the conversation.
+ */
+export async function polarCodeSwitch(
+    user: SessionUser,
+    input: unknown
+): Promise<{ id?: string; error?: string }> {
+    if ((await accessOf(user)) !== "manage")
+        return { error: (await getTranslations("polar"))("code.noAccess") };
+    const parsed = polarCodeSwitchSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("agents"))("session.switch.errors.invalid") };
+    const resolved = await resolvedStart(user, { pick: parsed.data.pick });
+    if ("error" in resolved) return { error: resolved.error };
+    const answer = await switchSessionAgentAction({ sessionId: parsed.data.sessionId, ...resolved.input });
     return answer.id ? { id: answer.id } : { error: answer.error };
 }
 

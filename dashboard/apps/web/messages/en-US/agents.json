@@ -574,6 +574,30 @@
                 "failed": "GitHub did not merge the pull request. Try again in a moment."
             }
         },
+        "switch": {
+            "button": "Switch agent",
+            "title": "Switch agent",
+            "intro": "The session stops and its work is saved to its branch. The agent you pick carries on there with the conversation so far.",
+            "pick": "Agent and model",
+            "confirm": "Switch",
+            "cancel": "Cancel",
+            "switching": "Switching...",
+            "loadFailed": "Couldn't load your agents. Try again.",
+            "none": "No other agent is signed in for you.",
+            "errors": {
+                "invalid": "Pick an agent to switch to.",
+                "notRunning": "Only a running session can switch agents.",
+                "place": "Only sessions on Polaris can switch agents.",
+                "noRepo": "A workspace has no branch to carry the work on.",
+                "same": "This session already runs on that agent and model.",
+                "busy": "Answer the agent's question first, then switch.",
+                "kept": "The session stopped, but its work could not be pushed. Push it again from the session, then continue.",
+                "failed": "Couldn't switch agents. Try again."
+            }
+        },
+        "restore": {
+            "kept": "This session's work was not pushed yet. Push it again from the session, then continue."
+        },
         "fork": {
             "action": "Fork session",
             "hint": "Start a new session on this work, carrying the conversation where the agent can.",

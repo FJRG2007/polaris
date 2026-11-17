@@ -64,7 +64,10 @@ in [CITATION.cff](CITATION.cff).
   session's delivered files are listed
   (`dashboard/apps/web/src/lib/agents/artifacts/deliverables.ts`) is copied
   from its `packages/shared/artifacts/deliverables.ts` at the same commit, with
-  three index reads checked for a stricter compiler. The Codewhale and MiMo Code marks are MIT and the Stakpak mark
+  three index reads checked for a stricter compiler. The note an agent starts
+  with when it takes over or restores a session
+  (`dashboard/apps/web/src/lib/agents/session-handoff.ts`) is ported from its
+  `backend/pkg/handoffnote/handoffnote.go` at the same commit. The Codewhale and MiMo Code marks are MIT and the Stakpak mark
   Apache-2.0, with their notices kept beside the files. The marks remain their
   owners' trademarks.
 

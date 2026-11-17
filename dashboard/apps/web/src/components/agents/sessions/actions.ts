@@ -46,6 +46,8 @@ import { addComment } from "@/lib/tasks/task-detail-service";
 import { noteIssueOfPull } from "@/lib/agents/issue-sessions";
 import * as loop from "@/lib/agents/session-review-loop";
 import * as forking from "@/lib/agents/session-fork";
+import * as handoffs from "@/lib/agents/session-handoff-service";
+import * as handoff from "@/lib/agents/session-handoff";
 import { mergePullRequest, pullRequestChecks } from "@/lib/github-service";
 import { agentChoicesFor, agentOptionsFor, type AgentOption } from "@/lib/agents/agent-readiness";
 import { chatCredentialFor } from "@/lib/agents/model-keys";
@@ -185,7 +187,7 @@ async function startParsed(
     userId: string,
     value: core.StartAgentSessionInput,
     t: Awaited<ReturnType<typeof getTranslations>>,
-    fork: { parentId: string; enigma: core.EnigmaSettings | null } | null,
+    fork: { parentId: string; enigma: core.EnigmaSettings | null; carry?: Carry } | null,
     agentPermission: PermissionRule[] = []
 ): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap; queuedAt?: number | null }> {
     const user = { id: userId };
@@ -264,36 +266,10 @@ async function startParsed(
     // which is checked here rather than the tool's own sign-in.
     // Only for a tool that runs on a provider's key; one that only takes the
     // model's name signs in with its own account, checked below.
-    const keyed = Boolean(value.modelChoice) && core.MODEL_CHOICE_AGENT_CLIS.includes(value.cli);
-    if (value.modelChoice && keyed) {
-        const credential = await chatCredentialFor(
-            user.id,
-            value.modelChoice.provider,
-            value.modelChoice.payer
-        );
-        if (!credential) return { error: t("sessions.errors.noModelKey") };
-    }
+    const refusal = await signInRefusal(user.id, value, t);
+    if (refusal) return { error: refusal };
     const files = await sessionAttachments.sessionAttachmentsFor(user.id, value.attachments);
     if ("refusal" in files) return { error: t(`sessions.errors.files.${files.refusal}`) };
-
-    const blocked =
-        // A computer signs its tools in itself; nothing Polaris holds is asked for.
-        value.place === "computer" || value.accountId || value.useMachineLogin || keyed
-            ? undefined
-            : (await agentChoicesFor(user.id)).find(
-                  (agent) => agent.id === value.cli && agent.readiness === "missing"
-              );
-    if (blocked) {
-        const ways = blocked.missing
-            .map((credential) => credential.label)
-            .join(` ${t("sessions.errors.or")} `);
-        return {
-            error:
-                value.place === "host"
-                    ? t("sessions.errors.signInHost", { agent: blocked.label, ways })
-                    : t("sessions.errors.signInLocal", { agent: blocked.label, ways })
-        };
-    }
 
     // A session names the task it was started for, and that association is what
     // puts a note on somebody else's board. Checked here rather than only when
@@ -359,6 +335,8 @@ async function startParsed(
         };
     }
 
+    if (fork?.carry) await carryConversation(fork.carry, session, admission.queuedAt !== null, Boolean(value.prompt));
+
     if (value.prompt && admission.queuedAt === null) {
         const prompt = sessionAttachments.withAttachmentNote(
             value.prompt,
@@ -385,6 +363,89 @@ async function startParsed(
     return { id: session.id, queuedAt: admission.queuedAt };
 }
 
+/**
+ * Why the agent a start names could never sign in, or null. Before a row
+ * exists, because a session that could never have signed in is not a record of
+ * an attempt - it is a dead row somebody has to notice and clear. Shared by a
+ * start and by an agent switch, which asks it before the running session stops.
+ */
+async function signInRefusal(
+    userId: string,
+    value: Pick<core.StartAgentSessionInput, "cli" | "modelChoice" | "place" | "accountId" | "useMachineLogin">,
+    t: Awaited<ReturnType<typeof getTranslations>>
+): Promise<string | null> {
+    const keyed = Boolean(value.modelChoice) && core.MODEL_CHOICE_AGENT_CLIS.includes(value.cli);
+    if (value.modelChoice && keyed) {
+        const credential = await chatCredentialFor(
+            userId,
+            value.modelChoice.provider,
+            value.modelChoice.payer
+        );
+        if (!credential) return t("sessions.errors.noModelKey");
+    }
+
+    const blocked =
+        // A computer signs its tools in itself; nothing Polaris holds is asked for.
+        value.place === "computer" || value.accountId || value.useMachineLogin || keyed
+            ? undefined
+            : (await agentChoicesFor(userId)).find(
+                  (agent) => agent.id === value.cli && agent.readiness === "missing"
+              );
+    if (blocked) {
+        const ways = blocked.missing
+            .map((credential) => credential.label)
+            .join(` ${t("sessions.errors.or")} `);
+        return value.place === "host"
+            ? t("sessions.errors.signInHost", { agent: blocked.label, ways })
+            : t("sessions.errors.signInLocal", { agent: blocked.label, ways });
+    }
+    return null;
+}
+
+/**
+ * A fork that carries its parent's conversation: `switch` when another agent
+ * takes over a running session, `restore` when a stopped one carries on in a
+ * new container. See `carryConversation`.
+ */
+interface Carry {
+    readonly kind: "switch" | "restore";
+    readonly parent: handoffs.HandoffSource;
+}
+
+/**
+ * The parent's conversation on the session that carries it on: copied into its
+ * history, so the person reads on where it ended, and - unless its own agent
+ * reopens the parent's transcript, or a prompt was typed for it - handed to the
+ * new agent as a summary with a file holding all of it (`session-handoff`).
+ * Best effort: a session that started is not failed over the copy.
+ */
+async function carryConversation(
+    carry: Carry,
+    session: sessions.SessionView,
+    queued: boolean,
+    prompted: boolean
+): Promise<void> {
+    try {
+        await handoffs.copyHistory(carry.parent.id, session.id);
+        if (prompted) return;
+        if (carry.kind === "restore" && (await runtime.reopensParentConversation(session))) return;
+        if (queued) {
+            // The queue starts it with no prompt; the person tells it where
+            // things stand, with the conversation above to read.
+            await sessions.addSessionMessage(
+                session.id,
+                "system",
+                "This session waited for a slot, so its agent was not given the earlier conversation. Tell it where things stand once it starts."
+            );
+            return;
+        }
+        const { note, file } = await handoffs.handoffFor(carry.parent, { kind: carry.kind, targetCli: session.cli });
+        after(() => runtime.deliverHandoff(session, note, file));
+    } catch (error) {
+        console.error(`[agent-session] ${session.id}: conversation not carried:`, error instanceof Error ? error.message : "unknown");
+    }
+}
+
 /** Where a fork runs instead of its parent's machine. */
 export interface SessionPlace {
     place: core.AgentSessionPlace;
@@ -401,7 +462,9 @@ export interface SessionPlace {
  */
 export async function forkSessionAction(
     sessionId: string,
-    moveTo?: SessionPlace
+    moveTo?: SessionPlace,
+    /** `as` starts it on another agent; `carry` hands it the conversation. */
+    options: { as?: SwitchTarget; carry?: Carry["kind"] } = {}
 ): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap; queuedAt?: number | null }> {
     const t = await getTranslations("agents");
     const id = sessionIdSchema.safeParse(sessionId);
@@ -409,12 +472,15 @@ export async function forkSessionAction(
     const parent = await controlledSession(id.data);
     if (!parent) return { error: t("sessions.errors.gone") };
     if (!parent.repoId) return { error: t("session.fork.noRepo") };
+    // Its work is still only in the kept container; restored now, the new one
+    // would start from before it. Its push is retried from the session first.
+    if (options.carry === "restore" && parent.work?.state === "kept") return { error: t("session.restore.kept") };
     const user = await requirePermission("agents.manage");
     const parsed = core.startAgentSessionSchema.safeParse({
         title: parent.title,
         repoId: parent.repoId,
-        cli: parent.cli,
-        command: parent.command ?? undefined,
+        cli: options.as?.cli ?? parent.cli,
+        command: options.as ? undefined : (parent.command ?? undefined),
         ...(moveTo ?? { place: parent.place, hostId: parent.hostId, runnerId: parent.runnerId }),
         // The shared machine is a home on Polaris; a session moved anywhere
         // else opens in its own.
@@ -425,10 +491,12 @@ export async function forkSessionAction(
                 ? ""
                 : parent.localFolder,
         unattended: parent.unattended,
-        permissionMode: parent.permissionMode,
-        effort: parent.effort,
-        accountId: parent.accountId,
-        useMachineLogin: parent.useMachineLogin,
+        // A mode and an effort are the parent tool's; another one starts on its own.
+        permissionMode: options.as ? null : parent.permissionMode,
+        effort: options.as ? null : parent.effort,
+        accountId: options.as ? options.as.accountId : parent.accountId,
+        useMachineLogin: options.as ? options.as.useMachineLogin : parent.useMachineLogin,
+        ...(options.as ? { modelChoice: options.as.modelChoice } : {}),
         baseRef: forking.forkBaseRef(parent),
         taskId: parent.taskId
     });
@@ -443,7 +511,66 @@ export async function forkSessionAction(
         select: { enigma: true }
     });
     const enigma = stored?.enigma ? core.parseEnigmaSettings(stored.enigma) : null;
-    return startParsed(user.id, parsed.data, t, { parentId: parent.id, enigma });
+    const carry = options.carry ? { kind: options.carry, parent } : undefined;
+    return startParsed(user.id, parsed.data, t, { parentId: parent.id, enigma, carry });
+}
+
+/** The agent a session switches to, resolved on the server from the person's
+ *  own sources (Polar Code's `polarCodeSwitch`). */
+export interface SwitchTarget {
+    readonly cli: string;
+    readonly accountId: string | null;
+    readonly useMachineLogin: boolean;
+    readonly modelChoice: core.SessionModelChoice | null;
+}
+
+/** Built when asked: `sessionIdSchema` is declared further down. */
+const switchTargetSchema = () =>
+    z
+        .object({
+            sessionId: sessionIdSchema,
+            cli: z.string().trim().min(1).max(64).refine(core.isKnownAgentCli),
+            accountId: z.string().uuid().nullable().default(null),
+            useMachineLogin: z.boolean().default(false),
+            modelChoice: core.sessionModelChoiceSchema.nullable().default(null)
+        })
+        .strict();
+
+/**
+ * Hand a running session to another agent, or the same one on another model:
+ * the work is saved to its branch as the session stops, and a new session on
+ * that branch starts with the other agent, given a summary of the conversation
+ * and a file holding all of it (AO Cloud's handoff). The new agent is checked
+ * the way a start checks it before anything stops, so a switch to an agent the
+ * person cannot sign in never ends the session it was meant to continue.
+ */
+export async function switchSessionAgentAction(
+    input: unknown
+): Promise<{ id?: string; error?: string; githubGap?: GithubInstallGap; queuedAt?: number | null }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const parsed = switchTargetSchema().safeParse(input);
+    if (!parsed.success) return { error: t("session.switch.errors.invalid") };
+    const { sessionId, ...target } = parsed.data;
+    const session = await controlledSession(sessionId);
+    if (!session) return { error: t("sessions.errors.gone") };
+    const refused = handoff.switchRefusal(session, target);
+    if (refused) return { error: t(refused as Parameters<typeof t>[0]) };
+    // A restart would drop the answer the agent is waiting on.
+    if (await permissions.pendingPermission(session.id)) return { error: t("session.switch.errors.busy") };
+    const signIn = await signInRefusal(user.id, { ...target, place: session.place }, t);
+    if (signIn) return { error: signIn };
+    let saved: Awaited<ReturnType<typeof runtime.stopSession>>;
+    try {
+        saved = await runtime.stopSession(session.id);
+    } catch (error) {
+        console.error(`[agent-session] ${session.id}: switch could not stop it:`, error instanceof Error ? error.message : "unknown");
+        return { error: t("session.switch.errors.failed") };
+    }
+    // The work stayed in the kept container; the session says so, with the
+    // button that pushes it, and the switch is Continue once it went.
+    if (saved?.kind === "kept") return { error: t("session.switch.errors.kept") };
+    return forkSessionAction(session.id, undefined, { as: target, carry: "switch" });
 }
 
 /**

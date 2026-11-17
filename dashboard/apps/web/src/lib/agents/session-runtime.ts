@@ -343,6 +343,12 @@ async function forkTranscriptFor(session: SessionView, cli: string): Promise<str
     return fork.forkTranscript({ ...session, cli }, parent);
 }
 
+/** Whether a fork's own agent reopens its parent's conversation, so it needs
+ *  no handoff note to know it. */
+export async function reopensParentConversation(session: SessionView): Promise<boolean> {
+    return (await forkTranscriptFor(session, session.cli)) !== "";
+}
+
 async function bootstrapFor(session: SessionView, token: string): Promise<Bootstrap> {
     // A workspace checks nothing out, so it needs no installation and asks for
     // no token. Refusing to start one because an organization has not connected
@@ -1386,6 +1392,45 @@ export async function deliverFirstPrompt(
             sessionId,
             "system",
             `Polaris could not send the first prompt: ${error instanceof Error ? error.message : "unknown"}. Send it again from the box below.`
+        ).catch(() => undefined);
+    }
+}
+
+/**
+ * The first prompt of a session that took over from another agent, or carries
+ * on a stopped one: the whole conversation is written into the working
+ * directory first (`session-handoff`), then the note naming it is sent. A file
+ * that does not arrive leaves the note to stand alone, said on the session.
+ */
+export async function deliverHandoff(
+    session: SessionView,
+    note: string,
+    file: { path: string; text: string }
+): Promise<void> {
+    try {
+        if (!(await waitForAgent(session.id))) {
+            throw new Error("its agent never opened a terminal to type into");
+        }
+        try {
+            const workdir = (await sessionPlacement(session.id))?.workdir || workdirFor(session);
+            const bytes = new TextEncoder().encode(file.text);
+            for (const command of attachments.attachmentCommands(workdir, [{ path: file.path, bytes }])) {
+                await steer(session.id, command, "The conversation file did not reach the session");
+            }
+        } catch (error) {
+            console.error(`[agent-session] ${session.id}: conversation file not written:`, error instanceof Error ? error.message : "unknown");
+            await addSessionMessage(
+                session.id,
+                "system",
+                "Polaris could not write the earlier conversation into this session. The agent was given a summary of it."
+            ).catch(() => undefined);
+        }
+        await promptSession(session.id, note);
+    } catch (error) {
+        await addSessionMessage(
+            session.id,
+            "system",
+            `Polaris could not send the earlier conversation: ${error instanceof Error ? error.message : "unknown"}. Tell the agent where things stand from the box below.`
         ).catch(() => undefined);
     }
 }
