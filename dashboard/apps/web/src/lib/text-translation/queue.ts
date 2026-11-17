@@ -88,18 +88,23 @@ type Fetcher = (input: string, init?: RequestInit) => Promise<Response>;
 type Detect = (text: string) => Promise<string | null>;
 
 interface DetectorApi {
+    /** "available" once its model is on the device; the other answers mean a download. */
+    availability?(): Promise<string>;
     create(): Promise<{
         detect(text: string): Promise<Array<{ detectedLanguage: string; confidence: number }>>;
     }>;
 }
 
-/** The browser's own language detector, where it has one; null otherwise. */
+/** The browser's own language detector, where it has one and its model is
+ *  already on the device; null otherwise. A text is never held up by a
+ *  detector download: the engine reads the language itself. */
 export function browserDetector(): Detect {
     let made: ReturnType<DetectorApi["create"]> | null = null;
     return async (text) => {
         const api = (globalThis as { LanguageDetector?: DetectorApi }).LanguageDetector;
         if (!api || text.length < DETECT_MIN) return null;
         try {
+            if (!made && (await api.availability?.()) !== "available") return null;
             made ??= api.create();
             const [top] = await (await made).detect(text);
             return top && top.confidence >= 0.85 ? top.detectedLanguage : null;

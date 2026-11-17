@@ -20,7 +20,8 @@ export function deviceEngine(
     /** True where nobody should wait on a first download; see `isCached` in `local-engine.ts`. */
     cachedOnly = false
 ): TranslateEngine {
-    const browser = createBrowserEngine(self as unknown as BrowserScope);
+    // Detection waits on no download either where nothing may.
+    const browser = createBrowserEngine(self as unknown as BrowserScope, undefined, cachedOnly);
     return createLocalEngine({
         makeWorker: bergamotWorker,
         loadFile: cachedModelFiles(downloadFailed),

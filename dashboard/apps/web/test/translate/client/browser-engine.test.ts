@@ -61,6 +61,39 @@ describe("the browser engine", () => {
         );
     });
 
+    it("waits on no model download when it must answer at once", async () => {
+        for (const state of ["downloadable", "downloading"]) {
+            const { scope, create } = chrome(state);
+            const engine = createBrowserEngine(scope, undefined, true);
+            await expect(engine.translate(["hola"], "es", "en")).rejects.toBeInstanceOf(
+                BrowserEngineUnavailable
+            );
+            expect(create).not.toHaveBeenCalled();
+        }
+        const { scope, create } = chrome("available");
+        await createBrowserEngine(scope, undefined, true).translate(["hola"], "es", "en");
+        expect(create).toHaveBeenCalledTimes(1);
+    });
+
+    it("downloads a model when the reader can wait for it", async () => {
+        const { scope, create } = chrome("downloadable");
+        await createBrowserEngine(scope).translate(["hola"], "es", "en");
+        expect(create).toHaveBeenCalledTimes(1);
+    });
+
+    it("detects nothing through a detector it would have to download", async () => {
+        const { scope } = chrome();
+        const detectorCreate = vi.fn(scope.LanguageDetector.create);
+        const waiting = {
+            ...scope,
+            LanguageDetector: { availability: async () => "downloadable", create: detectorCreate }
+        };
+        await expect(createBrowserEngine(waiting, undefined, true).detect("hola")).rejects.toBeInstanceOf(
+            BrowserEngineUnavailable
+        );
+        expect(detectorCreate).not.toHaveBeenCalled();
+    });
+
     it("spells Simplified Chinese the way the browser does", () => {
         expect(browserCode("zh-Hans")).toBe("zh");
         expect(browserCode("zh-Hant")).toBe("zh-Hant");

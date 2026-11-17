@@ -66,7 +66,8 @@ export function translationOf(id: string, body: string): MessageTranslationEntry
  * From the menu it always ends showing the translation - a second press on a
  * message showing its original shows the translation again, and a failure is
  * tried again. Live translation never overrides the reader: a message they put
- * back to its original, or one that already failed, is left as it is.
+ * back to its original, one that already failed, or one they translated from
+ * the menu - into whatever language they picked there - is left as it is.
  */
 export function translateMessage(
     id: string,
@@ -78,6 +79,9 @@ export function translateMessage(
 ): void {
     const known = translationOf(id, body);
     const asked = source === "menu";
+    // A translation the reader asked for, finished or still out, is theirs:
+    // live translation coming back into view must not swap it for another.
+    if (!asked && known?.asked) return;
     if (known && known.to === to) {
         if (!asked) return;
         const failed = known.state.phase === "done" && known.state.outcome.kind === "failed";

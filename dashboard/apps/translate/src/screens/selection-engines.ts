@@ -22,7 +22,8 @@ export interface SelectionEngines {
 export function selectionEngines(failed: string): SelectionEngines {
     const scope = self as unknown as BrowserScope;
     return {
-        browser: hasBrowserTranslator(scope) ? createBrowserEngine(scope) : null,
+        // Nor on the browser's: a pair it has not downloaded goes to the next engine.
+        browser: hasBrowserTranslator(scope) ? createBrowserEngine(scope, undefined, true) : null,
         // A selection never waits on a first model download: the server answers it meanwhile.
         local: canRunLocally(scope) ? deviceEngine(failed, failed, undefined, true) : null
     };

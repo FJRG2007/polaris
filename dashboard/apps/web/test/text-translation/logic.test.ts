@@ -8,7 +8,32 @@ import {
     translatesIncoming,
     unchanged
 } from "@/lib/text-translation/logic";
-import { TranslationQueue } from "@/lib/text-translation/queue";
+import { browserDetector, TranslationQueue } from "@/lib/text-translation/queue";
+
+describe("the browser's detector", () => {
+    const LONG = "Este texto es lo bastante largo para detectarlo";
+
+    it("is not asked to download its model in the middle of a translation", async () => {
+        const create = vi.fn();
+        vi.stubGlobal("LanguageDetector", { availability: async () => "downloadable", create });
+        try {
+            expect(await browserDetector()(LONG)).toBeNull();
+            expect(create).not.toHaveBeenCalled();
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it("reads the language once its model is on the device", async () => {
+        const detect = async () => [{ detectedLanguage: "es", confidence: 0.99 }];
+        vi.stubGlobal("LanguageDetector", { availability: async () => "available", create: async () => ({ detect }) });
+        try {
+            expect(await browserDetector()(LONG)).toBe("es");
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+});
 import { readChatTranslation, readSentTranslation } from "@polaris/core";
 
 const ON = { incoming: true, outgoing: null };

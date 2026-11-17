@@ -13,7 +13,8 @@
  * `LanguageDetector.create()` resolves to a detector whose `detect(text)`
  * resolves to `{ detectedLanguage, confidence }[]`, most likely first.
  * `create()` may need a user gesture the first time a model downloads, which
- * typing is.
+ * typing is. `LanguageDetector.availability()` answers the same four values
+ * for the detector's own model.
  *
  * Nothing here leaves the device.
  */
@@ -52,6 +53,7 @@ interface BrowserDetector {
 }
 
 interface DetectorApi {
+    availability?(): Promise<Availability>;
     create(options?: {
         signal?: AbortSignal;
         monitor?: (monitor: DownloadMonitor) => void;
@@ -94,11 +96,15 @@ export class BrowserEngineUnavailable extends Error {
 /**
  * The browser engine over `scope`. Translators are kept per language pair, so
  * a model is created once and every later keystroke reuses it.
- * `onProgress` hears a download's progress, 0 to 1.
+ * `onProgress` hears a download's progress, 0 to 1. With `readyOnly`, a model
+ * the browser would still have to download is treated as unavailable, so a
+ * caller that must answer in a moment hands the text on instead of waiting on
+ * a download of its own.
  */
 export function createBrowserEngine(
     scope: BrowserScope,
-    onProgress?: (loaded: number) => void
+    onProgress?: (loaded: number) => void,
+    readyOnly = false
 ): TranslateEngine {
     const translators = new Map<string, Promise<BrowserTranslator>>();
     let detector: Promise<BrowserDetector> | null = null;
@@ -108,6 +114,9 @@ export function createBrowserEngine(
     const detect = async (text: string, signal?: AbortSignal): Promise<string | null> => {
         const api = detectorApi(scope);
         if (!api) throw new BrowserEngineUnavailable("no detector");
+        if (!detector && readyOnly && (await api.availability?.().catch(() => "unavailable")) !== "available") {
+            throw new BrowserEngineUnavailable("detector not downloaded");
+        }
         detector ??= api.create({ monitor }).catch((caught: unknown) => {
             detector = null;
             throw caught;
@@ -124,9 +133,9 @@ export function createBrowserEngine(
         const key = `${pair.sourceLanguage}>${pair.targetLanguage}`;
         let made = translators.get(key);
         if (!made) {
-            if ((await api.availability(pair)) === "unavailable") {
-                throw new BrowserEngineUnavailable("pair");
-            }
+            const availability = await api.availability(pair);
+            if (availability === "unavailable") throw new BrowserEngineUnavailable("pair");
+            if (readyOnly && availability !== "available") throw new BrowserEngineUnavailable("not downloaded");
             made = api.create({ ...pair, monitor });
             translators.set(key, made);
             made.catch(() => translators.delete(key));

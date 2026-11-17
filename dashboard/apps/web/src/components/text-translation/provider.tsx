@@ -7,7 +7,16 @@
  */
 
 import { useRouter } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ReactNode
+} from "react";
 import type { TextTranslationOffer } from "@/lib/app-extensions/types";
 import { useLocale } from "@/components/i18n/i18n-provider";
 import { localeLanguage, TARGET_LANGUAGES } from "@/lib/text-translation/logic";
@@ -54,14 +63,14 @@ export interface TextTranslator {
  */
 function deviceLoader(
     offer: TextTranslationOffer,
-    router: ReturnType<typeof useRouter>
+    router: { readonly current: ReturnType<typeof useRouter> }
 ): LoadDevices | undefined {
     const device = offer.device;
     if (!device?.src) return undefined;
     const src = device.src;
     return async () => {
         const runtime = await import("@/components/app-bundles/runtime");
-        const made = (await runtime.loadAppModule(src, router))[device.name];
+        const made = (await runtime.loadAppModule(src, router.current))[device.name];
         if (typeof made !== "function") return null;
         return (made as (failed: string) => DeviceEngines)("") ?? null;
     };
@@ -89,15 +98,22 @@ export function TextTranslationProvider({
             // Private windows and blocked storage: the reader's language stays the default.
         }
     }, []);
-    const value = useMemo<TextTranslator | null>(() => {
+    // One queue for as long as the offer says the same thing. The shell hands a
+    // new offer object on every refresh, and a new queue is an empty cache and
+    // the device engines loaded all over again - a translation asked twice.
+    const routerRef = useRef(router);
+    routerRef.current = router;
+    const endpoint = offer?.endpoint ?? null;
+    const deviceSrc = offer?.device?.src ?? null;
+    const deviceName = offer?.device?.name ?? null;
+    const queue = useMemo(() => {
         if (!offer) return null;
-        const queue = new TranslationQueue(
-            offer,
-            undefined,
-            undefined,
-            undefined,
-            deviceLoader(offer, router)
-        );
+        return new TranslationQueue(offer, undefined, undefined, undefined, deviceLoader(offer, routerRef));
+        // `offer` is read through the three values that make it the same one.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [endpoint, deviceSrc, deviceName]);
+    const value = useMemo<TextTranslator | null>(() => {
+        if (!offer || !queue) return null;
         return {
             target: localeLanguage(locale),
             preferred: last ?? localeLanguage(locale),
@@ -108,7 +124,7 @@ export function TextTranslationProvider({
                 return `${offer.page}?${query.toString()}`;
             }
         };
-    }, [offer, locale, router, last, choose]);
+    }, [offer, queue, locale, last, choose]);
     return <TranslatorContext.Provider value={value}>{children}</TranslatorContext.Provider>;
 }
 
