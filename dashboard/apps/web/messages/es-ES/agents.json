@@ -760,6 +760,17 @@
                 "computer": "Actualiza la app de Polaris en ese ordenador para deshacer turnos.",
                 "over": "La sesión terminó y sus archivos se quedan como están."
             }
+        },
+        "selection": {
+            "picked": "Líneas {range} elegidas",
+            "note": "Qué debería pasar aquí (opcional)",
+            "send": "Enviar al agente",
+            "clear": "Quitar la selección",
+            "pick": "Elegir la línea {line}",
+            "pickHint": "Elige esta línea. Mayús+clic en otra elige las de en medio.",
+            "sent": "Líneas enviadas al agente.",
+            "promptNew": "Sobre estas líneas de {path} ({range}):",
+            "promptOld": "Sobre estas líneas quitadas de {path} ({range} de la versión anterior):"
         }
     },
     "rules": {

@@ -760,6 +760,17 @@
                 "computer": "Update the Polaris app on that computer to undo turns there.",
                 "over": "The session has ended, so its files stay as they are."
             }
+        },
+        "selection": {
+            "picked": "Lines {range} selected",
+            "note": "What should happen here (optional)",
+            "send": "Send to the agent",
+            "clear": "Clear the selection",
+            "pick": "Select line {line}",
+            "pickHint": "Select this line. Shift-click another to select the lines between.",
+            "sent": "Lines sent to the agent.",
+            "promptNew": "About these lines of {path} ({range}):",
+            "promptOld": "About these removed lines of {path} ({range} of the old version):"
         }
     },
     "rules": {

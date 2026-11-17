@@ -100,6 +100,65 @@ export function reviewPrompt(
     return parts.join("\n");
 }
 
+/** Most lines one selection may carry to the agent. */
+export const SELECTION_MAX_LINES = 200;
+
+/** A run of lines somebody selected in a file's diff, to send to the agent. */
+export interface DiffSelection {
+    readonly path: string;
+    /** `new` when any selected line is in the new file, else `old` (all removed). */
+    readonly side: "new" | "old";
+    readonly start: number;
+    readonly end: number;
+    /** The selected diff lines as they read, markers included. */
+    readonly code: readonly string[];
+}
+
+/**
+ * The selection between two rows of a parsed diff, in either order. Headers are
+ * skipped; null when nothing numbered is between them. The range is read on the
+ * new side when the selection touches it, since that is the file the agent has.
+ */
+export function selectionOf(
+    path: string,
+    lines: readonly DiffLine[],
+    from: number,
+    to: number
+): DiffSelection | null {
+    const picked = lines
+        .slice(Math.max(0, Math.min(from, to)), Math.max(from, to) + 1)
+        .filter((line) => line.kind === "add" || line.kind === "remove" || line.kind === "context")
+        .slice(0, SELECTION_MAX_LINES);
+    if (picked.length === 0) return null;
+    const fresh = picked.map((line) => line.newLine).filter((line): line is number => line !== null);
+    const side = fresh.length > 0 ? "new" : "old";
+    const numbers = side === "new" ? fresh : picked.map((line) => line.oldLine ?? 0);
+    return {
+        path,
+        side,
+        start: Math.min(...numbers),
+        end: Math.max(...numbers),
+        code: picked.map((line) => line.text.slice(0, CODE_MAX))
+    };
+}
+
+/** The range as a reader names it: `L12` or `L12-L18`. */
+export function selectionRange(selection: Pick<DiffSelection, "start" | "end">): string {
+    return selection.start === selection.end ? `L${selection.start}` : `L${selection.start}-L${selection.end}`;
+}
+
+/**
+ * A selection as one prompt: where it is, the lines quoted as a diff, then what
+ * the person said about them. The heading is the reader's words, since the
+ * prompt is shown in the session's conversation as theirs.
+ */
+export function selectionPrompt(selection: DiffSelection, note: string, heading: string): string {
+    const fence = selection.code.some((line) => line.includes("```")) ? "~~~~" : "```";
+    const parts = [heading, "", `${fence}diff`, ...selection.code, fence];
+    if (note.trim()) parts.push("", note.trim());
+    return parts.join("\n");
+}
+
 /** Whether a check counts as failing: finished, and not a pass, a skip or neutral. */
 export function checkFailed(check: Pick<PullCheck, "status" | "conclusion">): boolean {
     if (check.status !== "completed") return false;

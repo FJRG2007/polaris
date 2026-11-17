@@ -1379,6 +1379,41 @@ export async function sendReviewCommentsAction(input: unknown): Promise<{ error?
     return sendToAgent(session, user.id, text.slice(0, 20_000));
 }
 
+const selectionInputSchema = z
+    .object({
+        sessionId: sessionIdSchema,
+        selection: z
+            .object({
+                path: z.string().trim().min(1).max(1024),
+                side: z.enum(["new", "old"]),
+                start: z.number().int().positive().max(10_000_000),
+                end: z.number().int().positive().max(10_000_000),
+                code: z.array(z.string().max(2000)).min(1).max(loop.SELECTION_MAX_LINES)
+            })
+            .strict()
+            .refine((selection) => selection.start <= selection.end),
+        note: z.string().trim().max(4000)
+    })
+    .strict();
+
+/** Lines selected in a file's diff, sent to the agent with the file and range. */
+export async function sendDiffSelectionAction(input: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("agents.manage");
+    const t = await getTranslations("agents");
+    const parsed = selectionInputSchema.safeParse(input);
+    if (!parsed.success || !safeChangePath(parsed.data.selection.path))
+        return { error: t("session.review.errors.invalid") };
+    const session = await sessions.getSession(parsed.data.sessionId, user.id);
+    if (!session) return { error: t("sessions.errors.gone") };
+    const { selection, note } = parsed.data;
+    const where = { path: selection.path, range: loop.selectionRange(selection) };
+    const heading =
+        selection.side === "old"
+            ? t("session.selection.promptOld", where)
+            : t("session.selection.promptNew", where);
+    return sendToAgent(session, user.id, loop.selectionPrompt(selection, note, heading).slice(0, 20_000));
+}
+
 export interface SessionChecksView {
     checks: { name: string; state: "passed" | "failed" | "pending"; url: string | null }[];
     tally: { passed: number; failed: number; pending: number };

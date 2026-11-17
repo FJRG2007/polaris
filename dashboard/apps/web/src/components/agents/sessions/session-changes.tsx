@@ -52,6 +52,7 @@ import {
 import {
     openSessionPullRequestAction,
     revertSessionChangeAction,
+    sendDiffSelectionAction,
     sendReviewCommentsAction,
     sessionFileDiffAction,
     sessionShipAction,
@@ -59,7 +60,7 @@ import {
 } from "./actions";
 import * as polls from "./sessions-polls";
 import { DiffReview, commentKey } from "./diff-review";
-import type { LineComment } from "@/lib/agents/session-review-loop";
+import type { DiffSelection, LineComment } from "@/lib/agents/session-review-loop";
 
 /** How often the list is read again while the agent is still working. */
 const REFRESH_MS = 15_000;
@@ -374,6 +375,19 @@ export function SessionChanges({
             setComments((list) => list.filter((row) => !sent.includes(row)));
             setReviewNote({ tone: "ok", text: t("session.review.sent") });
         });
+    const sendSelection = async (selection: DiffSelection, note: string): Promise<boolean> => {
+        const result = await runAction(
+            () => sendDiffSelectionAction({ sessionId: session.id, selection, note }),
+            (text) => setReviewNote({ tone: "error", text })
+        );
+        if (!result) return false;
+        if (result.error) {
+            setReviewNote({ tone: "error", text: result.error });
+            return false;
+        }
+        setReviewNote({ tone: "ok", text: t("session.selection.sent") });
+        return true;
+    };
     const commentFiles = new Set(comments.map((row) => row.path)).size;
 
     return (
@@ -547,7 +561,8 @@ export function SessionChanges({
                                           toggle: () => setReviewing((on) => !on),
                                           comments: comments.filter((row) => row.path === selected),
                                           add: addComment,
-                                          remove: removeComment
+                                          remove: removeComment,
+                                          sendSelection
                                       }
                             }
                         />
@@ -581,6 +596,7 @@ function DiffPane({
         comments: readonly LineComment[];
         add: (comment: LineComment) => void;
         remove: (key: string) => void;
+        sendSelection: (selection: DiffSelection, note: string) => Promise<boolean>;
     } | null;
 }) {
     const t = useTranslations("agents");
@@ -672,6 +688,7 @@ function DiffPane({
                         comments={review.comments}
                         onAdd={review.add}
                         onRemove={review.remove}
+                        onSendSelection={review.sendSelection}
                     />
                 ) : diff.kind === "diff" && actions ? (
                     <HunkList path={path} text={diff.text} actions={actions} />

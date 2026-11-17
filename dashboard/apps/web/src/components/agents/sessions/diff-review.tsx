@@ -7,11 +7,18 @@
  */
 
 import { useMemo, useState } from "react";
-import { Button, Textarea, cn } from "@polaris/ui";
-import { MessageSquarePlus, X } from "lucide-react";
+import { Button, Input, Textarea, cn } from "@polaris/ui";
+import { MessageSquarePlus, Send, X } from "lucide-react";
 import { TOUCH_TARGET } from "@/components/use-phone";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { parseUnifiedDiff, type DiffLine, type LineComment } from "@/lib/agents/session-review-loop";
+import {
+    parseUnifiedDiff,
+    selectionOf,
+    selectionRange,
+    type DiffLine,
+    type DiffSelection,
+    type LineComment
+} from "@/lib/agents/session-review-loop";
 
 /** A comment's identity: one per line and side of a file. */
 export function commentKey(comment: Pick<LineComment, "path" | "side" | "line">): string {
@@ -44,13 +51,17 @@ export function DiffReview({
     text,
     comments,
     onAdd,
-    onRemove
+    onRemove,
+    onSendSelection
 }: {
     path: string;
     text: string;
     comments: readonly LineComment[];
     onAdd: (comment: LineComment) => void;
     onRemove: (key: string) => void;
+    /** Sends the selected lines to the agent; true once it took them. Without
+     *  it, lines cannot be selected. */
+    onSendSelection?: (selection: DiffSelection, note: string) => Promise<boolean>;
 }) {
     const t = useTranslations("agents");
     const tcommon = useTranslations("common");
@@ -58,6 +69,25 @@ export function DiffReview({
     const byKey = useMemo(() => new Map(comments.map((c) => [commentKey(c), c])), [comments]);
     const [open, setOpen] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
+    // The row a selection started on and the row it reaches, by index.
+    const [picked, setPicked] = useState<{ from: number; to: number } | null>(null);
+    const [note, setNote] = useState("");
+    const [sending, setSending] = useState(false);
+    const selection = picked ? selectionOf(path, lines, picked.from, picked.to) : null;
+    const low = picked ? Math.min(picked.from, picked.to) : -1;
+    const high = picked ? Math.max(picked.from, picked.to) : -1;
+    const pick = (index: number, extend: boolean) =>
+        setPicked((current) => (extend && current ? { from: current.from, to: index } : { from: index, to: index }));
+    const send = async () => {
+        if (!selection || !onSendSelection) return;
+        setSending(true);
+        const sent = await onSendSelection(selection, note);
+        setSending(false);
+        if (sent) {
+            setPicked(null);
+            setNote("");
+        }
+    };
 
     return (
         <div
@@ -65,6 +95,38 @@ export function DiffReview({
             role="region"
             aria-label={t("session.changes.diffOf", { path })}
         >
+            {selection && onSendSelection ? (
+                <div className="sticky top-0 z-10 flex min-w-0 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2 font-sans text-sm">
+                    <span className="min-w-0 truncate" title={selection.path}>
+                        {t("session.selection.picked", { range: selectionRange(selection) })}
+                    </span>
+                    <Input
+                        value={note}
+                        maxLength={4000}
+                        aria-label={t("session.selection.note")}
+                        placeholder={t("session.selection.note")}
+                        className="h-8 min-w-0 flex-1 basis-40"
+                        onChange={(event) => setNote(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") void send();
+                            if (event.key === "Escape") setPicked(null);
+                        }}
+                    />
+                    <Button size="sm" onClick={() => void send()} disabled={sending}>
+                        <Send className="size-4 shrink-0" />
+                        {t("session.selection.send")}
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label={t("session.selection.clear")}
+                        title={t("session.selection.clear")}
+                        onClick={() => setPicked(null)}
+                    >
+                        <X className="size-4 shrink-0" />
+                    </Button>
+                </div>
+            ) : null}
             {lines.map((line, index) => {
                 const anchor = anchorOf(line);
                 const key = anchor ? commentKey({ path, ...anchor }) : null;
@@ -82,7 +144,8 @@ export function DiffReview({
                         <div
                             className={cn(
                                 "group flex min-w-max items-start max-sm:min-w-0 [@media(pointer:coarse)]:leading-6",
-                                LINE_TONE[line.kind]
+                                LINE_TONE[line.kind],
+                                index >= low && index <= high && "bg-primary/15"
                             )}
                             onClick={(event) => {
                                 if (!anchor || open === key || !coarsePointer()) return;
@@ -90,12 +153,27 @@ export function DiffReview({
                                 comment();
                             }}
                         >
-                            <span className="w-10 shrink-0 select-none px-1 text-end text-muted-foreground max-sm:w-8">
-                                {line.oldLine ?? ""}
-                            </span>
-                            <span className="w-10 shrink-0 select-none px-1 text-end text-muted-foreground max-sm:w-8">
-                                {line.newLine ?? ""}
-                            </span>
+                            {anchor && onSendSelection ? (
+                                <button
+                                    type="button"
+                                    className="flex shrink-0 select-none text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    aria-label={t("session.selection.pick", { line: anchor.line })}
+                                    title={t("session.selection.pickHint")}
+                                    onClick={(event) => pick(index, event.shiftKey)}
+                                >
+                                    <span className="w-10 px-1 text-end max-sm:w-8">{line.oldLine ?? ""}</span>
+                                    <span className="w-10 px-1 text-end max-sm:w-8">{line.newLine ?? ""}</span>
+                                </button>
+                            ) : (
+                                <>
+                                    <span className="w-10 shrink-0 select-none px-1 text-end text-muted-foreground max-sm:w-8">
+                                        {line.oldLine ?? ""}
+                                    </span>
+                                    <span className="w-10 shrink-0 select-none px-1 text-end text-muted-foreground max-sm:w-8">
+                                        {line.newLine ?? ""}
+                                    </span>
+                                </>
+                            )}
                             <span className="flex w-6 shrink-0 justify-center [@media(pointer:coarse)]:w-2">
                                 {anchor && key ? (
                                     <button
