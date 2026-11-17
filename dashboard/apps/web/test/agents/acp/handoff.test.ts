@@ -10,11 +10,11 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { execFile, execFileSync } from "node:child_process";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmdirSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import {
     ACP_TERMINAL_BACK,
     acpLaunchCommand,
-    AGENT_LOCK_DIR,
+    AGENT_LOCK_FILE,
     agentLockCommand,
     TERMINAL_BACK_FILE
 } from "@/lib/agents/acp/pipe-commands";
@@ -105,7 +105,7 @@ describe("the terminal's waiting script", () => {
         expect(existsSync(join(dir, "acp", "generation"))).toBe(false);
         expect(existsSync(join(dir, TERMINAL_BACK_FILE))).toBe(true);
         // The lock is given back before the terminal's agent takes the window.
-        expect(existsSync(join(dir, AGENT_LOCK_DIR))).toBe(false);
+        expect(existsSync(join(dir, AGENT_LOCK_FILE))).toBe(false);
 
         // The mark stays for every check until the session goes to Chat again.
         expect(execFileSync("sh", ["-c", terminalBackCommand(dir)], { env }).toString().trim()).toBe(TERMINAL_BACK);
@@ -169,13 +169,25 @@ describe("the agent lock", () => {
         expect(lines).toHaveLength(4);
         // Whoever went in first came out before the other went in.
         expect(lines[1]).toBe(lines[0]!.replace(" in", " out"));
-        expect(existsSync(join(box.dir, AGENT_LOCK_DIR))).toBe(false);
+        expect(existsSync(join(box.dir, AGENT_LOCK_FILE))).toBe(false);
+    });
+
+    it("holds where mkdir does not refuse a directory that exists, as uutils' does not", async () => {
+        const box = shellBox();
+        // A stand-in for a coreutils whose mkdir lets two racing callers both succeed.
+        writeFileSync(join(box.dir, "bin", "mkdir"), "#!/bin/sh\nexit 0\n");
+        chmodSync(join(box.dir, "bin", "mkdir"), 0o755);
+        const holder = (name: string) =>
+            `${agentLockCommand(box.dir)}\necho "${name} in" >> "${box.log}"\nsleep 1\necho "${name} out" >> "${box.log}"`;
+        expect(await Promise.all([box.run(holder("a")), box.run(holder("b"))])).toEqual([0, 0]);
+        const lines = box.logged().trim().split("\n");
+        expect(lines[1]).toBe(lines[0]!.replace(" in", " out"));
     });
 
     it("breaks a lock whose holder died without giving it back", async () => {
         const box = shellBox();
-        const lock = join(box.dir, AGENT_LOCK_DIR);
-        mkdirSync(lock);
+        const lock = join(box.dir, AGENT_LOCK_FILE);
+        writeFileSync(lock, "");
         const tenMinutesAgo = Date.now() / 1000 - 600;
         utimesSync(lock, tenMinutesAgo, tenMinutesAgo);
         expect(await box.run(`${agentLockCommand(box.dir)}\necho in >> "${box.log}"`)).toBe(0);
@@ -192,19 +204,19 @@ describe("a protocol launch once the terminal took the session back", () => {
         writeFileSync(join(box.dir, TERMINAL_BACK_FILE), "");
         expect(await box.run(acpLaunchCommand(box.dir, ["agent"], "polaris-agent", stop(box.log)))).toBe(ACP_TERMINAL_BACK);
         expect(box.logged()).toBe("");
-        expect(existsSync(join(box.dir, AGENT_LOCK_DIR))).toBe(false);
+        expect(existsSync(join(box.dir, AGENT_LOCK_FILE))).toBe(false);
     });
 
     it("waits for a key that holds the lock, then sees what it did", async () => {
         const box = shellBox();
-        const lock = join(box.dir, AGENT_LOCK_DIR);
-        mkdirSync(lock);
+        const lock = join(box.dir, AGENT_LOCK_FILE);
+        writeFileSync(lock, "");
         const launch = box.run(acpLaunchCommand(box.dir, ["agent"], "polaris-agent", stop(box.log)));
         await new Promise((done) => setTimeout(done, 600));
         expect(box.logged()).toBe("");
         // The key side, inside its lock: the mark, then the lock given back.
         writeFileSync(join(box.dir, TERMINAL_BACK_FILE), "");
-        rmdirSync(lock);
+        rmSync(lock);
         expect(await launch).toBe(ACP_TERMINAL_BACK);
         expect(box.logged()).toBe("");
     });
@@ -215,6 +227,6 @@ describe("a protocol launch once the terminal took the session back", () => {
         const lines = box.logged().trim().split("\n");
         expect(lines[0]).toBe("stopped");
         expect(lines.at(-1)).toContain("new-window");
-        expect(existsSync(join(box.dir, AGENT_LOCK_DIR))).toBe(false);
+        expect(existsSync(join(box.dir, AGENT_LOCK_FILE))).toBe(false);
     });
 });

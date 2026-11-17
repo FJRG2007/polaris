@@ -53,31 +53,34 @@ export const TERMINAL_BACK_FILE = "terminal-back";
 
 /** The lock the two ways an agent starts in a Chat session take - a launch
  *  here, the terminal's key in the waiting script - so they never interleave. */
-export const AGENT_LOCK_DIR = "agent.lock";
+export const AGENT_LOCK_FILE = "agent-lock";
 
 /**
- * Take the session's agent lock, held until the shell exits. A `mkdir`, the
- * one atomic test-and-set every shell has (not every machine a session runs on
- * has `flock`). A lock older than a minute is one whose holder died without
- * its trap - killed, or its machine restarted - and is broken. The release is
- * a trap rather than a last line, so every exit takes it, and a subshell does
- * not inherit it.
+ * Take the session's agent lock, held until the shell exits. The file is
+ * created under the shell's own `noclobber`, which opens it with O_EXCL: the
+ * one test-and-set every shell does itself. Not `mkdir`, which is only as
+ * atomic as the machine's coreutils (the uutils one Ubuntu ships lets two
+ * racing callers both succeed), and not `flock`, which not every machine a
+ * session runs on has. A lock older than a minute is one whose holder died
+ * without its trap - killed, or its machine restarted - and is broken. The
+ * release is a trap rather than a last line, so every exit takes it, and a
+ * subshell does not inherit it.
  */
 export function agentLockCommand(stateDir: string): string {
     return [
-        `l="${stateDir}/${AGENT_LOCK_DIR}"`,
-        "until mkdir \"$l\" 2>/dev/null; do",
-        '  if [ -n "$(find "$l" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then rmdir "$l" 2>/dev/null; continue; fi',
+        `l="${stateDir}/${AGENT_LOCK_FILE}"`,
+        "until (set -C; : > \"$l\") 2>/dev/null; do",
+        '  if [ -n "$(find "$l" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then rm -f "$l"; continue; fi',
         "  sleep 0.2 2>/dev/null || sleep 1",
         "done",
-        "trap 'rmdir \"$l\" 2>/dev/null' EXIT",
+        "trap 'rm -f \"$l\"' EXIT",
         "trap 'exit 1' HUP INT TERM"
     ].join("\n");
 }
 
 /** Give the agent lock back before the shell is done, as `exec` would skip
  *  the trap. */
-export const AGENT_UNLOCK = "rmdir \"$l\" 2>/dev/null; trap - EXIT HUP INT TERM";
+export const AGENT_UNLOCK = "rm -f \"$l\"; trap - EXIT HUP INT TERM";
 
 /** The most arguments, and the longest one, a launch accepts. */
 const MAX_ARGS = 64;

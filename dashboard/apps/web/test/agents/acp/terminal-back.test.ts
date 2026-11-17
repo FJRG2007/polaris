@@ -115,7 +115,7 @@ describe("startAcpAgent", () => {
     it("takes the lock and checks the mark before it stops the terminal's agent", async () => {
         await startAcpAgent("s1", ["agent"]);
         const launch = machine.commands.find((command) => command.includes("new-window"))!;
-        expect(launch.indexOf("agent.lock")).toBeLessThan(launch.indexOf("terminal-back"));
+        expect(launch.indexOf("agent-lock")).toBeLessThan(launch.indexOf("terminal-back"));
         expect(launch.indexOf("terminal-back")).toBeLessThan(launch.indexOf("kill -TERM"));
     });
 
