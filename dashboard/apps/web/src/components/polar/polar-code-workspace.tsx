@@ -31,6 +31,7 @@ import { SessionTurns } from "@/components/agents/sessions/session-turns";
 import { useCheckoutWake } from "@/components/polar/use-checkout-wake";
 import { SessionPullTab } from "@/components/agents/sessions/session-pr-tab";
 import { SessionArtifacts } from "@/components/agents/sessions/session-artifacts";
+import { BrowserPane } from "@/components/polar/polar-code-browser";
 import { openAgentInterfaceAction } from "@/components/agents/sessions/actions";
 import {
     Crosshair,
@@ -42,6 +43,7 @@ import {
     GitPullRequest,
     Globe,
     Monitor,
+    MousePointer2,
     RefreshCw,
     RotateCw,
     Search,
@@ -50,7 +52,7 @@ import {
     Tablet
 } from "lucide-react";
 
-type Pane = "files" | "artifacts" | "preview" | "changes" | "pull" | "terminal";
+type Pane = "files" | "artifacts" | "preview" | "browser" | "changes" | "pull" | "terminal";
 
 /** How often the file list is read again while the agent works. */
 const FILES_MS = 20_000;
@@ -182,6 +184,20 @@ export function PolarCodeWorkspace({
                                     </span>
                                 )
                             },
+                            // A container's own browser; a server's account has none.
+                            ...(session.place === "local"
+                                ? [
+                                      {
+                                          value: "browser" as const,
+                                          label: (
+                                              <span className="flex items-center gap-1.5">
+                                                  <MousePointer2 className="size-4" />
+                                                  {t("code.pane.browser")}
+                                              </span>
+                                          )
+                                      }
+                                  ]
+                                : []),
                             {
                                 value: "changes",
                                 label: (
@@ -228,6 +244,8 @@ export function PolarCodeWorkspace({
                             </ClientMessages>
                         ) : pane === "preview" ? (
                             <PreviewPane sessionId={session.id} live={live} lastEdit={wake} onPick={onPick} />
+                        ) : pane === "browser" ? (
+                            <BrowserPane sessionId={session.id} live={live} />
                         ) : pane === "changes" ? (
                             <div className="h-full overflow-y-auto overscroll-contain">
                                 {/* Code lives under Polar, whose routes hand down no Agents catalog. */}

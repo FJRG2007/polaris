@@ -1724,7 +1724,8 @@
             "tooLarge": "This file is too large to show here.",
             "missing": "This file is no longer there.",
             "pull": "Pull request",
-            "artifacts": "Artifacts"
+            "artifacts": "Artifacts",
+            "browser": "Browser"
         },
         "preview": {
             "none": "No web server is running in this session yet.",
@@ -1888,6 +1889,22 @@
             "download": "Download",
             "share": "Share this file",
             "noPreview": "No preview for this file"
+        },
+        "browser": {
+            "view": "The session's browser. Click and type to use it.",
+            "ended": "This session has ended, so its browser is closed.",
+            "failed": "The browser view could not be loaded. Retrying.",
+            "closedHint": "It starts with the agent. Ask the agent to open a page.",
+            "idle": "No page is open yet.",
+            "idleHint": "Ask the agent to open a page. You can watch and use it here.",
+            "installing": "Setting up the browser. The first time takes a minute.",
+            "startFailed": "The browser could not start. Ask the agent to try again.",
+            "agentDriving": "Agent is using it",
+            "back": "Back",
+            "forward": "Forward",
+            "reload": "Reload",
+            "address": "Address",
+            "addressHint": "Type an address and press Enter"
         }
     },
     "compare": {

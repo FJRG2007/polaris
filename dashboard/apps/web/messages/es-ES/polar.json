@@ -1724,7 +1724,8 @@
             "tooLarge": "Este archivo es demasiado grande para mostrarlo aquí.",
             "missing": "Este archivo ya no existe.",
             "pull": "Pull request",
-            "artifacts": "Archivos"
+            "artifacts": "Archivos",
+            "browser": "Navegador"
         },
         "preview": {
             "none": "Aún no hay ningún servidor web en esta sesión.",
@@ -1888,6 +1889,22 @@
             "download": "Descargar",
             "share": "Compartir archivo",
             "noPreview": "Sin vista previa"
+        },
+        "browser": {
+            "view": "El navegador de la sesión. Haz clic y escribe para usarlo.",
+            "ended": "La sesión ha terminado, así que su navegador está cerrado.",
+            "failed": "No se pudo cargar la vista del navegador. Reintentando.",
+            "closedHint": "Se inicia con el agente. Pídele que abra una página.",
+            "idle": "Aún no hay ninguna página abierta.",
+            "idleHint": "Pide al agente que abra una página. Podrás verla y usarla aquí.",
+            "installing": "Preparando el navegador. La primera vez tarda un minuto.",
+            "startFailed": "No se pudo iniciar el navegador. Pide al agente que reintente.",
+            "agentDriving": "El agente lo usa",
+            "back": "Atrás",
+            "forward": "Adelante",
+            "reload": "Recargar",
+            "address": "Dirección",
+            "addressHint": "Escribe una dirección y pulsa Intro"
         }
     },
     "compare": {
