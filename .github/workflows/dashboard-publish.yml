@@ -343,6 +343,11 @@ jobs:
       # handing it to the builder, copying it in, exporting it and saving it cost
       # 10 to 12 minutes of every publish, to save 2 or 3 minutes of compile
       # (measured 2026-11-12: warm 5-8 min against 8.6 min cold).
+      #
+      # The compile gets the same heap as the CI build of the same sources
+      # (dashboard-ci.yml): at 8 GB it ran out near 6.7 GB used on 2026-11-17,
+      # while the CI build of the same commit passed. The three web builds in
+      # this job share their layers, so all three name the same value.
       - id: build
         uses: docker/build-push-action@v7
         with:
@@ -352,7 +357,7 @@ jobs:
           file: dashboard/docker/Dockerfile
           build-args: |
             POLARIS_BUILD_SHA=${{ github.sha }}
-            NODE_BUILD_OPTIONS=--max-old-space-size=8192
+            NODE_BUILD_OPTIONS=--max-old-space-size=10240
             POLARIS_APP_BUNDLES=publish
             POLARIS_BUILD_SKIP_LINT=1
             POLARIS_BUILD_SKIP_TYPECHECK=1
@@ -388,7 +393,7 @@ jobs:
           target: ci-cache
           build-args: |
             POLARIS_BUILD_SHA=${{ github.sha }}
-            NODE_BUILD_OPTIONS=--max-old-space-size=8192
+            NODE_BUILD_OPTIONS=--max-old-space-size=10240
             POLARIS_APP_BUNDLES=publish
             POLARIS_BUILD_SKIP_LINT=1
             POLARIS_BUILD_SKIP_TYPECHECK=1
@@ -407,7 +412,7 @@ jobs:
           target: app-bundles
           build-args: |
             POLARIS_BUILD_SHA=${{ github.sha }}
-            NODE_BUILD_OPTIONS=--max-old-space-size=8192
+            NODE_BUILD_OPTIONS=--max-old-space-size=10240
             POLARIS_APP_BUNDLES=publish
             POLARIS_BUILD_SKIP_LINT=1
             POLARIS_BUILD_SKIP_TYPECHECK=1
