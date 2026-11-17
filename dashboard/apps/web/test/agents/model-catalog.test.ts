@@ -32,12 +32,11 @@ const PAYLOAD = {
         }
     },
     // A provider Polaris holds no credential for. Offering its models would be
-    // offering a run that cannot start. Bedrock rather than one of the labs
-    // because the reason it is absent does not go away: it authenticates with a
-    // set of values rather than one key, which is a credential shape the store
-    // has nowhere to put - so this stays a fair example as the list grows.
-    "amazon-bedrock": {
-        models: { "anthropic.claude": { id: "anthropic.claude", tool_call: true, limit: { context: 200000 } } }
+    // offering a run that cannot start. A made-up id rather than a real one:
+    // the real ones keep joining the list (Bedrock was this example until cloud
+    // accounts made it a provider), and an invented name never will.
+    "example-unsupported-provider": {
+        models: { "example-model": { id: "example-model", tool_call: true, limit: { context: 200000 } } }
     }
 };
 
