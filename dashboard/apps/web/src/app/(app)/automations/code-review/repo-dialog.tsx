@@ -24,6 +24,7 @@ import {
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { REPO_CUES_MAX } from "@/lib/agents/session-cues";
+import { PREVIEW_COMMAND_MAX } from "@/lib/agents/session-preview-command";
 import { agentWord } from "@/lib/agents/words";
 import {
     AGENT_EFFORTS,
@@ -63,6 +64,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
     const [setupScript, setSetupScript] = useState(repo.setupScript);
     const [setupRequired, setSetupRequired] = useState(repo.setupRequired);
     const [cues, setCues] = useState(repo.cues);
+    const [previewCommand, setPreviewCommand] = useState(repo.previewCommand);
     const [roleAgents, setRoleAgents] = useState<RoleAgents>(repo.roleAgents);
     const [advice, setAdvice] = useState<ExecutionAdvice | null>(null);
     const [pools, setPools] = useState<Array<{ id: string; name: string }>>([]);
@@ -102,6 +104,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
             setupScript: repo.setupScript.trim(),
             setupRequired: repo.setupRequired,
             cues: repo.cues.trim(),
+            previewCommand: repo.previewCommand.trim(),
             roleAgents: repo.roleAgents
         },
         {
@@ -119,6 +122,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
             setupScript: setupScript.trim(),
             setupRequired,
             cues: cues.trim(),
+            previewCommand: previewCommand.trim(),
             roleAgents
         }
     );
@@ -149,6 +153,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                             },
                             setup: { script: setupScript, required: setupRequired },
                             cues,
+                            previewCommand,
                             roles: roleAgents
                         }),
                     setError
@@ -302,6 +307,22 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                             <span className="text-sm">{t("repoDialog.setupRequired")}</span>
                         </div>
                     ) : null}
+
+                    <div className="space-y-1">
+                        <label className="text-sm font-medium" htmlFor="repo-preview-command">
+                            {t("repoDialog.previewCommand")}
+                        </label>
+                        <Input
+                            id="repo-preview-command"
+                            maxLength={PREVIEW_COMMAND_MAX}
+                            spellCheck={false}
+                            className="font-mono text-xs"
+                            value={previewCommand}
+                            onChange={(event) => setPreviewCommand(event.target.value.replace(/[\r\n]+/g, " "))}
+                            placeholder={t("repoDialog.previewCommandPlaceholder")}
+                        />
+                        <p className="text-xs text-muted-foreground">{t("repoDialog.previewCommandHint")}</p>
+                    </div>
 
                     <RepoRoleFields value={roleAgents} onChange={setRoleAgents} />
 

@@ -8881,6 +8881,10 @@ model AgentRepo {
     // Standing instructions every session on this repository is handed with
     // its first prompt (`lib/agents/session-cues.ts`). Empty is none.
     cues          String   @default("")
+    // The line that starts this repository's dev server in a session's
+    // checkout, run from the preview pane (`lib/agents/session-preview-command.ts`).
+    // Empty offers no button; the pane still finds what the session listens on.
+    previewCommand String  @default("")
     // The agent and model each orchestration role starts on, as JSON text
     // (`lib/agents/agent-roles.ts`). Null is nothing set: every role falls to
     // the defaults in code.

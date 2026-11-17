@@ -771,6 +771,10 @@
             "sent": "Lines sent to the agent.",
             "promptNew": "About these lines of {path} ({range}):",
             "promptOld": "About these removed lines of {path} ({range} of the old version):"
+        },
+        "previewCommand": {
+            "none": "This repository has no preview command.",
+            "failed": "The preview command did not start. Check it in the repository's settings."
         }
     },
     "rules": {
@@ -862,7 +866,10 @@
         "learningsPlaceholder": "Nothing yet. Runs add commands, quirks and corrections here.",
         "cues": "Cues for every session",
         "cuesPlaceholder": "Run the tests before you commit. Never edit the generated folder.",
-        "cuesHint": "Every session on this repository starts with these instructions ahead of its first prompt."
+        "cuesHint": "Every session on this repository starts with these instructions ahead of its first prompt.",
+        "previewCommand": "Preview command",
+        "previewCommandPlaceholder": "npm run dev",
+        "previewCommandHint": "Starts this repository's dev server from a session's preview, in its checkout. Leave empty to start it yourself."
     },
     "settingsFields": {
         "on": "On",

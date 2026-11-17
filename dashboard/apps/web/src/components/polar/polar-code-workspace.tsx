@@ -32,7 +32,7 @@ import { useCheckoutWake } from "@/components/polar/use-checkout-wake";
 import { SessionPullTab } from "@/components/agents/sessions/session-pr-tab";
 import { SessionArtifacts } from "@/components/agents/sessions/session-artifacts";
 import { BrowserPane } from "@/components/polar/polar-code-browser";
-import { openAgentInterfaceAction } from "@/components/agents/sessions/actions";
+import { openAgentInterfaceAction, startSessionPreviewAction } from "@/components/agents/sessions/actions";
 import {
     Crosshair,
     FileBox,
@@ -284,6 +284,37 @@ export function PolarCodeWorkspace({
                 </div>
             </ui.SheetContent>
         </ui.Dialog>
+    );
+}
+
+/**
+ * The repository's preview command, started in the checkout on a press. The
+ * pane's own polling brings the preview up once the server listens.
+ */
+function PreviewStart({ sessionId, command }: { sessionId: string; command: string }) {
+    const t = useTranslations("polar");
+    const [pending, startTransition] = useTransition();
+    const [state, setState] = useState<{ kind: "idle" | "started" } | { kind: "error"; text: string }>({ kind: "idle" });
+    const start = () =>
+        startTransition(async () => {
+            const result = await startSessionPreviewAction(sessionId).catch(() => ({ error: t("code.preview.startFailed") }));
+            setState(result.error ? { kind: "error", text: result.error } : { kind: "started" });
+        });
+    return (
+        <div className="flex min-w-0 max-w-full flex-col items-center gap-1 px-4">
+            <ui.Button size="sm" onClick={start} disabled={pending || state.kind === "started"}>
+                <SquareTerminal className="size-4 shrink-0" />
+                {t("code.preview.start")}
+            </ui.Button>
+            <code className="min-w-0 max-w-full truncate text-xs text-muted-foreground" title={command}>
+                {command}
+            </code>
+            {state.kind === "started" ? (
+                <p className="text-xs text-muted-foreground" role="status">{t("code.preview.starting")}</p>
+            ) : state.kind === "error" ? (
+                <p className="text-xs text-danger" role="alert">{state.text}</p>
+            ) : null}
+        </div>
     );
 }
 
@@ -634,6 +665,7 @@ function PreviewPane({
                     title={t("code.preview.none")}
                     description={t("code.preview.noneHint")}
                 />
+                {answer?.kind === "ports" && answer.command ? <PreviewStart sessionId={sessionId} command={answer.command} /> : null}
                 {inside}
             </div>
         );

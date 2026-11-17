@@ -1755,7 +1755,10 @@
             "full": "Full width",
             "follow": "Reload when the agent changes a file",
             "pick": "Pick an element for your message",
-            "picking": "Click an element in the page. Esc stops."
+            "picking": "Click an element in the page. Esc stops.",
+            "start": "Start the dev server",
+            "starting": "Starting. The preview opens once it listens.",
+            "startFailed": "Couldn't start the dev server. Try again."
         },
         "noSource": "That model isn't available any more. Pick another one.",
         "sources": {

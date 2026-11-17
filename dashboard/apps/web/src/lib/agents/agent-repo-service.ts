@@ -56,6 +56,8 @@ export interface AgentRepoView {
     setupRequired: boolean;
     /** Standing instructions handed to every session here. Empty is none. */
     cues: string;
+    /** Starts the dev server for the session preview. Empty is none. */
+    previewCommand: string;
     /** The agent and model each orchestration role starts on; a role left out
      *  takes the code default (`agent-roles`). */
     roleAgents: RoleAgents;
@@ -96,6 +98,7 @@ export async function listAgentRepos(ownerId: string): Promise<AgentRepoView[]> 
         setupScript: row.setupScript,
         setupRequired: row.setupRequired,
         cues: row.cues,
+        previewCommand: row.previewCommand,
         roleAgents: parseRoleAgents(row.roleAgents),
         workflowInstalledAt: row.workflowInstalledAt,
         error: row.error,

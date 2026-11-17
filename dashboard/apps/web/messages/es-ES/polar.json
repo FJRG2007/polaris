@@ -1755,7 +1755,10 @@
             "full": "Ancho total",
             "follow": "Recargar al cambiar el agente un archivo",
             "pick": "Elegir un elemento para tu mensaje",
-            "picking": "Haz clic en un elemento. Esc para salir."
+            "picking": "Haz clic en un elemento. Esc para salir.",
+            "start": "Arrancar el servidor",
+            "starting": "Arrancando. Se abre al escuchar.",
+            "startFailed": "No se pudo arrancar el servidor. Reintenta."
         },
         "noSource": "Ese modelo ya no está disponible. Elige otro.",
         "sources": {

@@ -51,6 +51,7 @@
  */
 
 import * as core from "@polaris/core";
+import { prisma } from "@polaris/db";
 import { Readable } from "node:stream";
 import { forwardOut } from "@polaris/ssh";
 import { borrowSsh } from "@/lib/connection-pool";
@@ -116,7 +117,8 @@ export function listeningPorts(proc: string): ListeningPorts {
 }
 
 export type PreviewPortsAnswer =
-    | { kind: "ports"; base: string; open: number[]; inside: number[] }
+    /** `command` is the repository's preview command, empty when it has none. */
+    | { kind: "ports"; base: string; open: number[]; inside: number[]; command: string }
     | { kind: "unavailable" };
 
 async function containerOf(sessionId: string): Promise<{ hostId: string | null; name: string } | null> {
@@ -128,12 +130,20 @@ async function containerOf(sessionId: string): Promise<{ hostId: string | null; 
     return { hostId: placement.hostId, name: placement.containerId };
 }
 
+/** The preview command of the repository a session was started on. */
+async function previewCommandOf(sessionId: string): Promise<string> {
+    const row = await prisma.agentSession
+        .findUnique({ where: { id: sessionId }, select: { repo: { select: { previewCommand: true } } } })
+        .catch(() => null);
+    return row?.repo?.previewCommand ?? "";
+}
+
 /** The web servers a running container session answers on. */
 export async function sessionPreviewPorts(sessionId: string): Promise<PreviewPortsAnswer> {
     const container = await containerOf(sessionId);
     if (!container) return { kind: "unavailable" };
     try {
-        return await withContainerPorts(container.hostId, async (ports) => {
+        const reading = withContainerPorts(container.hostId, async (ports) => {
             const read = await ports.runIn(container.name, [
                 "sh",
                 "-c",
@@ -144,6 +154,8 @@ export async function sessionPreviewPorts(sessionId: string): Promise<PreviewPor
             const found = listeningPorts(read.output);
             return { kind: "ports" as const, base: previewBase(sessionId), ...found };
         });
+        const [ports, command] = await Promise.all([reading, previewCommandOf(sessionId)]);
+        return { ...ports, command };
     } catch (error) {
         console.error(`[agent-preview] ${sessionId}: could not read its ports:`, error);
         return { kind: "unavailable" };

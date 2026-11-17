@@ -11,6 +11,7 @@
  */
 
 import { repoCuesSchema } from "@/lib/agents/session-cues";
+import { previewCommandSchema } from "@/lib/agents/session-preview-command";
 import { roleAgentsSchema, storeRoleAgents } from "@/lib/agents/agent-roles";
 import { z } from "zod";
 import { prisma } from "@polaris/db";
@@ -334,6 +335,7 @@ export async function updateRepoConfigAction(
                 .optional(),
             // Standing instructions for the repository's sessions; optional likewise.
             cues: repoCuesSchema.optional(),
+            previewCommand: previewCommandSchema.optional(),
             // The agent and model per orchestration role; optional likewise.
             roles: roleAgentsSchema.optional()
         })
@@ -371,6 +373,12 @@ export async function updateRepoConfigAction(
             await prisma.agentRepo.update({
                 where: { id: existing.id },
                 data: { cues: parsed.data.cues }
+            });
+        }
+        if (parsed.data.previewCommand !== undefined) {
+            await prisma.agentRepo.update({
+                where: { id: existing.id },
+                data: { previewCommand: parsed.data.previewCommand }
             });
         }
         if (parsed.data.roles) {

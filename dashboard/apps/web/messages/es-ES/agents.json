@@ -771,6 +771,10 @@
             "sent": "Líneas enviadas al agente.",
             "promptNew": "Sobre estas líneas de {path} ({range}):",
             "promptOld": "Sobre estas líneas quitadas de {path} ({range} de la versión anterior):"
+        },
+        "previewCommand": {
+            "none": "Este repositorio no tiene comando de vista previa.",
+            "failed": "El comando de vista previa no arrancó. Revísalo en los ajustes del repositorio."
         }
     },
     "rules": {
@@ -862,7 +866,10 @@
         "learningsPlaceholder": "Nada aún. Aquí se anotan comandos, rarezas y correcciones.",
         "cues": "Pautas de cada sesión",
         "cuesPlaceholder": "Ejecuta los tests antes de hacer commit. No edites la carpeta generada.",
-        "cuesHint": "Cada sesión de este repositorio recibe estas instrucciones antes de su primer prompt."
+        "cuesHint": "Cada sesión de este repositorio recibe estas instrucciones antes de su primer prompt.",
+        "previewCommand": "Comando de vista previa",
+        "previewCommandPlaceholder": "npm run dev",
+        "previewCommandHint": "Arranca el servidor de desarrollo desde la vista previa de una sesión, en su copia. Vacío para arrancarlo tú."
     },
     "settingsFields": {
         "on": "Sí",

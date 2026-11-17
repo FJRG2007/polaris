@@ -10,6 +10,7 @@
  * itself may have ended.
  */
 
+import * as previewCommand from "@/lib/agents/session-preview-command";
 import { permissionRulesSchema, type PermissionRule } from "@/lib/polar/agents/permissions";
 import { z } from "zod";
 import { computerFor } from "@/lib/computers/computer-service";
@@ -1232,6 +1233,30 @@ export async function switchSessionAccountAction(input: unknown): Promise<{ erro
  * Open the agent's own interface in the session's terminal, for whoever may
  * steer it. A session whose terminal already is the interface says so.
  */
+/**
+ * Start the repository's preview command in the session's checkout, for the
+ * preview pane. Only a container session has a preview; one already running is
+ * left alone.
+ */
+export async function startSessionPreviewAction(sessionId: string): Promise<{ error?: string }> {
+    const t = await getTranslations("agents");
+    const parsed = sessionIdSchema.safeParse(sessionId);
+    if (!parsed.success) return { error: t("session.changes.errors.invalid") };
+    const session = await controlledSession(parsed.data);
+    if (!session) return { error: t("sessions.errors.gone") };
+    if (core.isSessionOver(session.state)) return { error: t("sessions.errors.ended") };
+    if (session.place !== "local" || !session.repoId) return { error: t("session.previewCommand.none") };
+    const repo = await prisma.agentRepo.findUnique({ where: { id: session.repoId }, select: { previewCommand: true } });
+    const command = repo?.previewCommand.trim() ?? "";
+    if (!command) return { error: t("session.previewCommand.none") };
+    try {
+        const ran = await runtime.runInSession(session.id, previewCommand.previewStartScript(command));
+        return ran.code === 0 ? {} : { error: t("session.previewCommand.failed") };
+    } catch (error) {
+        return { error: agentText(t, sessions.readableFailure(error, `starting the preview of ${session.id}`)) };
+    }
+}
+
 export async function openAgentInterfaceAction(
     sessionId: string
 ): Promise<{ outcome?: "opened" | "interactive" | "busy"; error?: string }> {
