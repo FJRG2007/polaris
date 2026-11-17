@@ -201,14 +201,14 @@ export function SessionBoard({
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                     {canStart ? null : (
-                        <ui.Button asChild variant="ghost" size="sm">
+                        <ui.Button asChild variant="ghost" size="sm" className="[@media(pointer:coarse)]:h-11">
                             <Link href="/polar" prefetch={false}>
                                 {t("board.openCode")}
                             </Link>
                         </ui.Button>
                     )}
                     {canStart ? (
-                        <ui.Button asChild variant="primary" size="sm">
+                        <ui.Button asChild variant="primary" size="sm" className="[@media(pointer:coarse)]:h-11">
                             <Link href="/polar?session=new" prefetch={false}>
                                 <Plus className="size-4" aria-hidden />
                                 {t("code.newTask")}
@@ -381,7 +381,7 @@ function BoardFilters({
         [t]
     );
     return (
-        <div className="grid min-w-0 shrink-0 grid-cols-1 gap-2 sm:grid-cols-[repeat(3,minmax(0,14rem))_auto] sm:items-center">
+        <div className="grid min-w-0 shrink-0 grid-cols-1 gap-2 sm:grid-cols-[repeat(3,minmax(0,14rem))_auto] sm:items-center [@media(pointer:coarse)]:[&_button]:min-h-11">
             <PagedPicker<Option>
                 read={boardOptionsAction}
                 scope={{ kind: "repo" }}

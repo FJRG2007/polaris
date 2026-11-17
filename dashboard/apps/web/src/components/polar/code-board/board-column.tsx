@@ -163,7 +163,7 @@ function PullChip({ pull }: { pull: NonNullable<BoardCard["pull"]> }) {
                 href={pull.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex shrink-0 items-center gap-0.5 rounded hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="relative flex shrink-0 items-center gap-0.5 rounded hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [@media(pointer:coarse)]:before:absolute [@media(pointer:coarse)]:before:-inset-x-1 [@media(pointer:coarse)]:before:-inset-y-3.5 [@media(pointer:coarse)]:before:content-['']"
                 title={t("board.openPull", { number: pull.number })}
             >
                 <GitPullRequest className="size-3.5" aria-hidden />#{pull.number}
