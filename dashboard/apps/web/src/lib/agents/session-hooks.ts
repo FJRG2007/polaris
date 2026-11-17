@@ -20,6 +20,7 @@
  */
 
 import { TOOLS_SERVER_NAME } from "@/lib/agents/session-tools-mcp";
+import { BROWSER_SERVER_NAME } from "@/lib/agents/session-browser-protocol";
 import {
     hookGroup,
     isTranscriptPath,
@@ -124,8 +125,9 @@ export function claudeHookSettings(
         hooks,
         // The custom tools ask on the session themselves, by each tool's own
         // setting (session-tools.ts); a second prompt from the agent would ask
-        // the same question twice.
-        permissions: { allow: [`mcp__${TOOLS_SERVER_NAME}`] },
+        // the same question twice. The worker browser only reaches what the
+        // container can already reach, so it asks nothing either.
+        permissions: { allow: [`mcp__${TOOLS_SERVER_NAME}`, `mcp__${BROWSER_SERVER_NAME}`] },
         skipDangerousModePermissionPrompt: true,
         ...(memoryDir ? { autoMemoryDirectory: memoryDir } : {}),
         ...(permissions && permissions.allow.length + permissions.ask.length + permissions.deny.length > 0
@@ -150,7 +152,8 @@ export function claudeHookSettings(
 export function mcpConfig(
     url: string,
     token: string,
-    tools?: { script: string; url: string }
+    tools?: { script: string; url: string },
+    browser?: { script: string; key: string; install: boolean }
 ): Record<string, unknown> {
     return {
         mcpServers: {
@@ -169,6 +172,21 @@ export function mcpConfig(
                           command: "node",
                           args: [tools.script],
                           env: { POLARIS_TOOLS_URL: tools.url, POLARIS_TOOLS_TOKEN: token }
+                      }
+                  }
+                : {}),
+            // The worker browser (session-browser-mcp.ts): a headless Chromium
+            // the agent drives and the person watches on the session page.
+            ...(browser
+                ? {
+                      [BROWSER_SERVER_NAME]: {
+                          type: "stdio",
+                          command: "node",
+                          args: [browser.script],
+                          env: {
+                              POLARIS_BROWSER_KEY: browser.key,
+                              POLARIS_BROWSER_INSTALL: browser.install ? "1" : "0"
+                          }
                       }
                   }
                 : {})

@@ -58,6 +58,7 @@ import { withContainerPorts } from "./session-ports";
 import { sessionPlacement } from "./session-service";
 import { sessionNetwork } from "./session-network";
 import { previewBase } from "./session-preview-link";
+import { BROWSER_STREAM_PORT } from "./session-browser-protocol";
 import { canInject, injectPicker, INJECT_MAX_BYTES } from "./preview-picker";
 import { getHostConnectionUnscoped } from "@/lib/host-service";
 import { request as httpRequest, type IncomingHttpHeaders, type IncomingMessage } from "node:http";
@@ -100,6 +101,8 @@ export function listeningPorts(proc: string): ListeningPorts {
         if (!address || !hexPort || !/^[0-9A-F]+$/i.test(hexPort)) continue;
         const port = parseInt(hexPort, 16);
         if (!(port >= 1 && port <= 65535)) continue;
+        // The worker browser's own listener is Polaris's, not a preview.
+        if (port === BROWSER_STREAM_PORT) continue;
         const upper = address.toUpperCase();
         const loopback =
             LOOPBACK_V4.test(upper) || upper === LOOPBACK_V6 || MAPPED_LOOPBACK_V6.test(upper);
@@ -314,12 +317,12 @@ function failureOf(error: unknown): PreviewFailure {
     return "unreachable";
 }
 
-interface Sent {
+export interface Sent {
     readonly response: IncomingMessage;
     readonly done: () => void;
 }
 
-interface Outgoing {
+export interface Outgoing {
     readonly method: string;
     readonly path: string;
     readonly headers: Record<string, string>;
@@ -388,6 +391,27 @@ async function send(
         if (outgoing.body) outgoing.body.pipe(request);
         else request.end();
     });
+}
+
+/**
+ * One request to a port of a running container session, by the same route a
+ * preview takes (its private network here, SSH on a pool server). For the
+ * worker browser (session-browser.ts). `gone` when the session is not a
+ * running container.
+ */
+export async function requestSession(
+    sessionId: string,
+    port: number,
+    outgoing: Outgoing,
+    now = Date.now()
+): Promise<Sent> {
+    const target = await targetOf(sessionId, now);
+    if (!target) throw new PreviewError("gone");
+    try {
+        return await send(target, sessionId, port, outgoing, now);
+    } catch (error) {
+        throw error instanceof PreviewError ? error : new PreviewError(failureOf(error));
+    }
 }
 
 function once(work: () => void): () => void {

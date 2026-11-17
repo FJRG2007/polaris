@@ -1,6 +1,12 @@
 {
     "errors": {
         "unauthorized": "No autorizado",
+        "browserGone": "Esta sesión no está en marcha y no tiene navegador.",
+        "browserClosed": "El agente aún no ha iniciado su navegador.",
+        "browserAgentDriving": "El agente está usando el navegador. Reinténtalo al acabar.",
+        "browserNoBrowser": "El navegador se abre la primera vez que el agente lo usa.",
+        "browserRefused": "Eso no se puede enviar al navegador.",
+        "browserUnreachable": "No se pudo llegar al navegador. Reinténtalo en un momento.",
         "notASession": "No es una sesión",
         "invalidRequest": "Solicitud no válida",
         "signIn": "Inicia sesión primero",

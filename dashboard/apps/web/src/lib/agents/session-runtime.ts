@@ -20,6 +20,9 @@
 
 import { cliPolicyFile, POLICY_PATHS } from "@/lib/polar/agents/cli-policies";
 import * as toolsMcp from "@/lib/agents/session-tools-mcp";
+import * as browserMcp from "@/lib/agents/session-browser-mcp";
+import * as browserProtocol from "@/lib/agents/session-browser-protocol";
+import { browserKey } from "@/lib/agents/session-browser-link";
 import { claudePermissionSettings, configFromRules, rulesOf, type PermissionRule } from "@/lib/polar/agents/permissions";
 import { repoAgentFiles, sessionAgentFiles } from "@/lib/polar/agents/repo-agents";
 import { prisma } from "@polaris/db";
@@ -193,6 +196,9 @@ interface Bootstrap {
     readonly mcpToolsConfig: string;
     /** The custom tools' stdio MCP server (session-tools-mcp.ts). */
     readonly toolsServer: string;
+    /** The worker browser's stdio MCP server (session-browser-mcp.ts), or
+     *  empty where the session is not a container Polaris can dial. */
+    readonly browserServer: string;
     readonly cloneHeader: string;
     /** The credential helper script, or empty for a workspace. */
     readonly gitCredential: string;
@@ -453,9 +459,18 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
             mcpConfig(mcp, token, {
                 script: `${toolsMcp.STATE_DIR_MARK}/${toolsMcp.TOOLS_SERVER_FILE}`,
                 url: `${base}/api/agents/sessions/${session.id}/tools`
-            })
+            }, session.place === "local"
+                ? {
+                      script: `${toolsMcp.STATE_DIR_MARK}/${browserProtocol.BROWSER_SERVER_FILE}`,
+                      key: browserKey(session.id),
+                      install: true
+                  }
+                : undefined)
         ),
         toolsServer: toolsMcp.toolsMcpScript(),
+        // Only a container: the live view dials it on its private network
+        // (session-preview.ts), which a server's own account does not have.
+        browserServer: session.place === "local" ? browserMcp.browserMcpScript() : "",
         // Empty for a workspace, which clones nothing. A header built around an
         // empty token is a header git would send.
         cloneHeader: githubToken ? (cloneAuthHeader(githubToken) ?? "") : "",
@@ -867,6 +882,7 @@ function bootEnv(boot: Bootstrap): Record<string, string> {
         POLARIS_MCP_CONFIG: asFile(boot.mcpConfig),
         POLARIS_MCP_TOOLS_CONFIG: asFile(boot.mcpToolsConfig),
         POLARIS_TOOLS_MCP: asFile(boot.toolsServer),
+        POLARIS_BROWSER_MCP: boot.browserServer ? asFile(boot.browserServer) : "",
         POLARIS_GIT_CREDENTIAL: boot.gitCredential ? asFile(boot.gitCredential) : "",
         POLARIS_REPO_SETUP: boot.repoSetup,
         POLARIS_REPO_SETUP_REQUIRED: boot.repoSetupRequired ? "yes" : "",

@@ -34,7 +34,7 @@ describe("registration", () => {
 
     it("lets Polaris ask about each call instead of the agent asking a second time", () => {
         const settings = claudeHookSettings("/state/hook.sh") as { permissions: { allow: string[] } };
-        expect(settings.permissions.allow).toEqual(["mcp__polaris-tools"]);
+        expect(settings.permissions.allow).toEqual(["mcp__polaris-tools", "mcp__polaris-browser"]);
     });
 });
 

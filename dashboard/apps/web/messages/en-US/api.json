@@ -1,6 +1,12 @@
 {
     "errors": {
         "unauthorized": "Unauthorized",
+        "browserGone": "This session is not running, so it has no browser.",
+        "browserClosed": "The agent has not started its browser tools yet.",
+        "browserAgentDriving": "The agent is using the browser. Try again when it finishes.",
+        "browserNoBrowser": "The browser opens the first time the agent uses it.",
+        "browserRefused": "That cannot be sent to the browser.",
+        "browserUnreachable": "The browser could not be reached. Try again in a moment.",
         "notASession": "Not a session",
         "invalidRequest": "Invalid request",
         "signIn": "Sign in to continue",
