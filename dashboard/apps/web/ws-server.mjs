@@ -145,7 +145,7 @@ wss.on("connection", async (ws, req) => {
     ws.on("error", (err) => console.error(`polaris ws: socket error - ${err?.message ?? err}`));
     const token = (req.headers["sec-websocket-protocol"] || "").split(",")[0]?.trim();
     const ticket = token ? await redeem(token) : null;
-    const interactive = ["terminal", "ssh", "ssh-root", "docker", "agent"];
+    const interactive = ["terminal", "ssh", "ssh-root", "docker", "agent", "agent-shell"];
     if (!ticket || !interactive.includes(ticket.mode)) {
         console.error(
             `polaris ws: rejecting connection - ${token ? "ticket redeem failed / wrong mode" : "no ticket"}`
@@ -174,7 +174,11 @@ wss.on("connection", async (ws, req) => {
             ? await openDockerSession(ticket, ws)
             : ticket.mode === "agent" && ticket.docker
               ? await openDockerSession(ticket, ws, ATTACH_TO_AGENT)
-              : await openContainerSession(ticket, ws, ticket.mode === "agent");
+              : ticket.mode === "agent-shell" && ticket.docker
+                ? await openDockerSession(ticket, ws, SHELL_BESIDE_AGENT)
+                : ticket.mode === "agent-shell"
+                  ? await openContainerSession(ticket, ws, false, SHELL_BESIDE_AGENT)
+                  : await openContainerSession(ticket, ws, ticket.mode === "agent");
     if (!session) return;
     liveTerminals.set(ws, ticket.userId);
 
@@ -320,10 +324,36 @@ const ATTACH_TO_AGENT = [
     ].join(" ")
 ];
 
-async function openContainerSession(ticket, ws, attachToAgent = false) {
+/**
+ * One more shell in an agent session's container, beside the agent rather than
+ * attached to it: the extra tabs of the session terminal. A terminal name the
+ * container can use, the session's checkout as the working directory, and the
+ * account the agent runs as, for the reasons given above ATTACH_TO_AGENT. A
+ * bash where the image has one, for history and line editing.
+ */
+const SHELL_BESIDE_AGENT = [
+    "/bin/sh",
+    "-c",
+    [
+        '{ [ -z "$TERM" ] || [ "$TERM" = dumb ]; } && TERM=xterm-256color; export TERM;',
+        'a="$POLARIS_RUNAS"; h="$POLARIS_HOME";',
+        'if [ -n "$h" ] && [ -d "$h" ]; then HOME="$h"; PATH="$h/.npm-global/bin:$PATH"; export HOME PATH; fi;',
+        // The checkout's path can name the home literally; the boot script
+        // (session-commands.ts) reads it the same way.
+        'w="$POLARIS_WORKDIR"; case "$w" in \'$HOME\'/*) w="$HOME/$(printf %s "$w" | cut -c7-)" ;; esac;',
+        '[ -n "$w" ] && cd "$w" 2>/dev/null;',
+        's=/bin/sh; command -v bash >/dev/null 2>&1 && s="$(command -v bash)";',
+        'if [ "$(id -u)" = 0 ] && [ -n "$a" ] && id "$a" >/dev/null 2>&1 && command -v su >/dev/null 2>&1; then',
+        '  exec su -p "$a" -s "$s";',
+        "fi;",
+        'exec "$s"'
+    ].join(" ")
+];
+
+async function openContainerSession(ticket, ws, attachToAgent = false, command = null) {
     const client = new HostdClient();
     try {
-        const cmd = attachToAgent ? ATTACH_TO_AGENT : ["/bin/sh"];
+        const cmd = command ?? (attachToAgent ? ATTACH_TO_AGENT : ["/bin/sh"]);
         const execId = await client.execCreate({ container: ticket.containerRef, cmd, tty: true });
         const stream = await client.execStart(execId);
         console.error(`polaris ws: terminal open for ${ticket.containerRef}`);

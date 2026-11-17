@@ -1906,6 +1906,14 @@
             "reload": "Reload",
             "address": "Address",
             "addressHint": "Type an address and press Enter"
+        },
+        "shells": {
+            "tabs": "Terminal tabs",
+            "agent": "Agent",
+            "shell": "Shell {number}",
+            "open": "Open a shell beside the agent",
+            "close": "Close shell {number}",
+            "full": "Up to {count} shells at once. Close one to open another."
         }
     },
     "compare": {

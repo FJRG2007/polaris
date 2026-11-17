@@ -65,6 +65,14 @@ describe("redeemTerminalTicket", () => {
         });
     });
 
+    it("keeps a shell tab beside the agent a shell, reached the way the agent is", async () => {
+        row = ticket("agent-shell");
+        session = { place: "local", hostId: "22222222-2222-4222-8222-222222222222" };
+        const redeemed = await redeemTerminalTicket("token");
+        expect(redeemed?.mode).toBe("agent-shell");
+        expect(redeemed && "docker" in redeemed ? redeemed.docker : undefined).toMatchObject({ transport: "ssh" });
+    });
+
     it("keeps a container terminal a container terminal", async () => {
         row = ticket("terminal");
         expect((await redeemTerminalTicket("token"))?.mode).toBe("terminal");

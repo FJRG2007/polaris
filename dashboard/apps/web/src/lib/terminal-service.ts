@@ -36,7 +36,7 @@ export const RUNNER_REF = "runner:";
  *  command. Kept as separate modes rather than a flag on the ticket because the
  *  mode is what the sidecar turns into a command, and the client never gets to
  *  name that command. */
-export type TerminalMode = "terminal" | "logs" | "ssh" | "ssh-root" | "docker" | "agent";
+export type TerminalMode = "terminal" | "logs" | "ssh" | "ssh-root" | "docker" | "agent" | "agent-shell";
 
 export interface MintTicketInput {
     targetId: string;
@@ -140,7 +140,7 @@ export async function redeemTerminalTicket(token: string): Promise<RedeemedTicke
             runner: { runnerId, sessionId: row.id }
         };
     }
-    if (mode === "agent") {
+    if (mode === "agent" || mode === "agent-shell") {
         return {
             userId: ticket.userId,
             targetId: ticket.targetId,
@@ -219,6 +219,7 @@ function resolveMode(value: string): TerminalMode {
     if (value === "ssh-root") return "ssh-root";
     if (value === "docker") return "docker";
     if (value === "agent") return "agent";
+    if (value === "agent-shell") return "agent-shell";
     return "terminal";
 }
 

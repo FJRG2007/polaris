@@ -49,8 +49,11 @@ import {
     Search,
     Smartphone,
     SquareTerminal,
-    Tablet
+    Plus,
+    Tablet,
+    X
 } from "lucide-react";
+import * as shellTabs from "@/components/polar/shell-tabs";
 
 type Pane = "files" | "artifacts" | "preview" | "browser" | "changes" | "pull" | "terminal";
 
@@ -269,11 +272,7 @@ export function PolarCodeWorkspace({
                         ) : live ? (
                             <div className="flex h-full min-h-0 flex-col gap-2">
                                 <InterfaceButton sessionId={session.id} />
-                                <TerminalPanel
-                                    target={{ kind: "agent", sessionId: session.id }}
-                                    label={session.title}
-                                    height="h-full min-h-80"
-                                />
+                                <SessionTerminal session={session} />
                             </div>
                         ) : (
                             <ui.EmptyState
@@ -285,6 +284,87 @@ export function PolarCodeWorkspace({
                 </div>
             </ui.SheetContent>
         </ui.Dialog>
+    );
+}
+
+/**
+ * The session's terminal with tabs: the agent's own first, then any shells
+ * opened beside it in the same container. Every tab stays mounted while it is
+ * open, so switching never drops a shell; closing one ends it. Shells are a
+ * container's, so a session on somebody's own computer has only the agent's.
+ */
+function SessionTerminal({ session }: { session: SessionView }) {
+    const t = useTranslations("polar");
+    const [tabs, setTabs] = useState<shellTabs.ShellTabs>(shellTabs.NO_SHELL_TABS);
+    const canOpen = session.place === "local" && tabs.shells.length < shellTabs.SHELL_TABS_MAX;
+    const tabClass = (on: boolean) =>
+        ui.cn(
+            "inline-flex min-w-0 shrink-0 items-center gap-1 rounded-md px-2 py-1 text-sm",
+            on ? "bg-muted text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+        );
+    return (
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
+            {session.place === "local" ? (
+                <div role="tablist" aria-label={t("code.shells.tabs")} className="flex min-w-0 items-center gap-1 overflow-x-auto">
+                    <button
+                        type="button"
+                        role="tab"
+                        aria-selected={tabs.active === "agent"}
+                        className={tabClass(tabs.active === "agent")}
+                        onClick={() => setTabs((now) => ({ ...now, active: "agent" }))}
+                    >
+                        {t("code.shells.agent")}
+                    </button>
+                    {tabs.shells.map((shell) => (
+                        <span key={shell} className={tabClass(tabs.active === shell)}>
+                            <button
+                                type="button"
+                                role="tab"
+                                aria-selected={tabs.active === shell}
+                                onClick={() => setTabs((now) => ({ ...now, active: shell }))}
+                            >
+                                {t("code.shells.shell", { number: shell })}
+                            </button>
+                            <button
+                                type="button"
+                                className="rounded hover:text-foreground"
+                                aria-label={t("code.shells.close", { number: shell })}
+                                title={t("code.shells.close", { number: shell })}
+                                onClick={() => setTabs((now) => shellTabs.closeShellTab(now, shell))}
+                            >
+                                <X className="size-3.5 shrink-0" />
+                            </button>
+                        </span>
+                    ))}
+                    <button
+                        type="button"
+                        className={tabClass(false)}
+                        disabled={!canOpen}
+                        aria-label={t("code.shells.open")}
+                        title={canOpen ? t("code.shells.open") : t("code.shells.full", { count: shellTabs.SHELL_TABS_MAX })}
+                        onClick={() => setTabs(shellTabs.openShellTab)}
+                    >
+                        <Plus className="size-4 shrink-0" />
+                    </button>
+                </div>
+            ) : null}
+            <div className={ui.cn("min-h-0 flex-1", tabs.active === "agent" ? "flex flex-col" : "hidden")}>
+                <TerminalPanel
+                    target={{ kind: "agent", sessionId: session.id }}
+                    label={session.title}
+                    height="h-full min-h-80"
+                />
+            </div>
+            {tabs.shells.map((shell) => (
+                <div key={shell} className={ui.cn("min-h-0 flex-1", tabs.active === shell ? "flex flex-col" : "hidden")}>
+                    <TerminalPanel
+                        target={{ kind: "agent", sessionId: session.id, shell }}
+                        label={t("code.shells.shell", { number: shell })}
+                        height="h-full min-h-80"
+                    />
+                </div>
+            ))}
+        </div>
     );
 }
 

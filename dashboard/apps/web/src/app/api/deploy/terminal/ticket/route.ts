@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { apiPermission, apiUser } from "@/lib/api-session";
 import { NextResponse } from "next/server";
@@ -41,7 +42,12 @@ export async function POST(request: Request): Promise<Response> {
 
     // A session terminal is the Agents app's, not Deploy's, so it is authorised
     // before the deploy permission below is asked for at all.
-    if (body?.sessionId) return mintSessionTicket(body.sessionId);
+    if (body?.sessionId) {
+        const session = sessionTicketBody.safeParse(body);
+        if (!session.success)
+            return NextResponse.json({ error: (await readerWords("api"))("errors.sessionNotFound") }, { status: 400 });
+        return mintSessionTicket(session.data.sessionId, session.data.shell === true);
+    }
 
     const user = await apiPermission("deploy.manage");
 
@@ -98,7 +104,10 @@ export async function POST(request: Request): Promise<Response> {
  * on that machine, and the way to that terminal is the server's own shell -
  * offering a second door to it here would be a second thing to get wrong.
  */
-async function mintSessionTicket(sessionId: string): Promise<Response> {
+/** A session terminal: the agent's own, or with `shell` one more shell beside it. */
+const sessionTicketBody = z.object({ sessionId: z.string().uuid(), shell: z.boolean().optional() }).passthrough();
+
+async function mintSessionTicket(sessionId: string, shell = false): Promise<Response> {
     const user = await apiPermission("agents.manage");
     if (user instanceof Response) return user;
     const session = await prisma.agentSession.findFirst({
@@ -119,7 +128,8 @@ async function mintSessionTicket(sessionId: string): Promise<Response> {
     // A session on somebody's own computer is reached through its runner, and
     // only by the person whose computer it is.
     const onComputer = session.place === "computer" && session.runnerId && session.startedById === user.id;
-    if (!onComputer && (session.place !== "local" || !session.containerId)) {
+    // A shell beside the agent is a container's; a runner offers only the agent's own.
+    if ((shell && onComputer) || (!onComputer && (session.place !== "local" || !session.containerId))) {
         return NextResponse.json(
             {
                 error: (await readerWords("api"))("errors.sessionOnServer")
@@ -136,7 +146,7 @@ async function mintSessionTicket(sessionId: string): Promise<Response> {
     const token = await mintTerminalTicket(user.id, {
         targetId: sessionId,
         containerRef: onComputer ? `${RUNNER_REF}${session.runnerId}` : (session.containerId ?? ""),
-        mode: "agent"
+        mode: shell ? "agent-shell" : "agent"
     });
     return NextResponse.json({ token });
 }

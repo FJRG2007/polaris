@@ -1906,6 +1906,14 @@
             "reload": "Recargar",
             "address": "Dirección",
             "addressHint": "Escribe una dirección y pulsa Intro"
+        },
+        "shells": {
+            "tabs": "Pestañas del terminal",
+            "agent": "Agente",
+            "shell": "Shell {number}",
+            "open": "Abrir un shell junto al agente",
+            "close": "Cerrar el shell {number}",
+            "full": "Hasta {count} shells a la vez. Cierra uno para abrir otro."
         }
     },
     "compare": {

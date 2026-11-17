@@ -28,7 +28,9 @@ export type TerminalTarget =
     | { kind: "container"; applicationId: string }
     | { kind: "docker"; connectionId: string; containerRef: string }
     | { kind: "host"; hostId: string; asRoot?: boolean }
-    | { kind: "agent"; sessionId: string };
+    /** `shell` names one more shell beside the agent (a tab); absent attaches
+     *  to the agent itself. */
+    | { kind: "agent"; sessionId: string; shell?: number };
 
 /**
  * Why a session ended before it ever started. `unreachable` is the one that used
@@ -199,7 +201,7 @@ export function TerminalPanel({
             : target.kind === "docker"
               ? `docker:${target.connectionId}:${target.containerRef}`
               : target.kind === "agent"
-                ? `agent:${target.sessionId}`
+                ? `agent:${target.sessionId}:${target.shell ?? "agent"}`
                 : `app:${target.applicationId}`;
 
     useEffect(() => {
@@ -241,7 +243,7 @@ export function TerminalPanel({
                         : target.kind === "docker"
                           ? { connectionId: target.connectionId, containerRef: target.containerRef }
                           : target.kind === "agent"
-                            ? { sessionId: target.sessionId }
+                            ? { sessionId: target.sessionId, ...(target.shell === undefined ? {} : { shell: true }) }
                             : { applicationId: target.applicationId, mode: "terminal" }
                 )
             });
