@@ -835,7 +835,7 @@
         "enabled": "Programada",
         "agent": "Agente",
         "schedule": "Horario",
-        "prompt": "Instrucción",
+        "prompt": "Prompt",
         "promptPlaceholder": "Actualiza las dependencias y abre una pull request.",
         "summary": "{agent}, {when} ({zone})",
         "next": "Próxima {when}.",
