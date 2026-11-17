@@ -19,7 +19,7 @@ import { PAIRING_CODE, readPairing, spendPairing } from "@/lib/agents/session-pa
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { robots: { index: false, follow: false }, referrer: "no-referrer" };
+export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 export default async function ContinuePage({ params }: { params: Promise<{ code: string }> }) {
     const { code } = await params;
