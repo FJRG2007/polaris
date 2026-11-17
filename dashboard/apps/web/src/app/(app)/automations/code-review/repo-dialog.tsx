@@ -23,6 +23,7 @@ import {
     isDirty
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { REPO_CUES_MAX } from "@/lib/agents/session-cues";
 import { agentWord } from "@/lib/agents/words";
 import {
     AGENT_EFFORTS,
@@ -61,6 +62,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
     const [learnings, setLearnings] = useState(repo.learnings);
     const [setupScript, setSetupScript] = useState(repo.setupScript);
     const [setupRequired, setSetupRequired] = useState(repo.setupRequired);
+    const [cues, setCues] = useState(repo.cues);
     const [roleAgents, setRoleAgents] = useState<RoleAgents>(repo.roleAgents);
     const [advice, setAdvice] = useState<ExecutionAdvice | null>(null);
     const [pools, setPools] = useState<Array<{ id: string; name: string }>>([]);
@@ -99,6 +101,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
             learnings: repo.learnings.trim(),
             setupScript: repo.setupScript.trim(),
             setupRequired: repo.setupRequired,
+            cues: repo.cues.trim(),
             roleAgents: repo.roleAgents
         },
         {
@@ -115,6 +118,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
             learnings: learnings.trim(),
             setupScript: setupScript.trim(),
             setupRequired,
+            cues: cues.trim(),
             roleAgents
         }
     );
@@ -144,6 +148,7 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                                 learnings: learnings.trim() === repo.learnings.trim() ? null : learnings
                             },
                             setup: { script: setupScript, required: setupRequired },
+                            cues,
                             roles: roleAgents
                         }),
                     setError
@@ -253,6 +258,21 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                             placeholder={t("repoDialog.learningsPlaceholder")}
                         />
                         <p className="text-xs text-muted-foreground">{t("repoDialog.learningsHint")}</p>
+                    </div>
+
+                    <div className="space-y-1">
+                        <label className="text-sm font-medium" htmlFor="repo-cues">
+                            {t("repoDialog.cues")}
+                        </label>
+                        <Textarea
+                            id="repo-cues"
+                            rows={4}
+                            maxLength={REPO_CUES_MAX}
+                            value={cues}
+                            onChange={(event) => setCues(event.target.value)}
+                            placeholder={t("repoDialog.cuesPlaceholder")}
+                        />
+                        <p className="text-xs text-muted-foreground">{t("repoDialog.cuesHint")}</p>
                     </div>
 
                     <div className="space-y-1">

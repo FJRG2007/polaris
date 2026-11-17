@@ -10,6 +10,7 @@
  * public.
  */
 
+import { repoCuesSchema } from "@/lib/agents/session-cues";
 import { roleAgentsSchema, storeRoleAgents } from "@/lib/agents/agent-roles";
 import { z } from "zod";
 import { prisma } from "@polaris/db";
@@ -331,6 +332,8 @@ export async function updateRepoConfigAction(
                     required: z.boolean()
                 })
                 .optional(),
+            // Standing instructions for the repository's sessions; optional likewise.
+            cues: repoCuesSchema.optional(),
             // The agent and model per orchestration role; optional likewise.
             roles: roleAgentsSchema.optional()
         })
@@ -362,6 +365,12 @@ export async function updateRepoConfigAction(
                     setupScript: parsed.data.setup.script,
                     setupRequired: parsed.data.setup.required
                 }
+            });
+        }
+        if (parsed.data.cues !== undefined) {
+            await prisma.agentRepo.update({
+                where: { id: existing.id },
+                data: { cues: parsed.data.cues }
             });
         }
         if (parsed.data.roles) {

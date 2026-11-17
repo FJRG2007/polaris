@@ -74,6 +74,7 @@ import { previewBase } from "./session-preview-link";
 import * as placement from "./session-placement";
 import * as snapshots from "./session-snapshots";
 import * as computer from "@/lib/computers/computer-sessions";
+import { withCues } from "@/lib/agents/session-cues";
 import { computerSessionRunner, runComputerSnapshot } from "@/lib/computers/computer-workspace";
 import {
     addSessionMessage,
@@ -801,6 +802,14 @@ export async function repoAgentFilesFor(
     return Object.keys(rendered).length > 0 ? asFile(JSON.stringify(rendered)) : "";
 }
 
+/** The cues of the repository a session was started on. Empty for a workspace. */
+async function repoCuesFor(sessionId: string): Promise<string> {
+    const row = await prisma.agentSession
+        .findUnique({ where: { id: sessionId }, select: { repo: { select: { cues: true } } } })
+        .catch(() => null);
+    return row?.repo?.cues ?? "";
+}
+
 async function repoSetupFor(
     repoId: string
 ): Promise<{ setupScript: string; setupRequired: boolean } | null> {
@@ -1402,7 +1411,7 @@ export async function deliverFirstPrompt(
         }
         // Once the agent is up, the checkout is there to write into.
         if (files) await placeAttachments(files.session, files.userId, files.files);
-        await promptSession(sessionId, text);
+        await promptSession(sessionId, withCues(await repoCuesFor(sessionId), text));
     } catch (error) {
         await addSessionMessage(
             sessionId,

@@ -848,7 +848,10 @@
         "publicShell": "This repository is public, so anybody can open a pull request the agent then reads. A full shell hands whatever it runs the provider keys in its environment.",
         "learnings": "What the agent has learned",
         "learningsHint": "Notes runs keep about this repository and read at the start of the next one. Correct or delete anything wrong.",
-        "learningsPlaceholder": "Nothing yet. Runs add commands, quirks and corrections here."
+        "learningsPlaceholder": "Nothing yet. Runs add commands, quirks and corrections here.",
+        "cues": "Cues for every session",
+        "cuesPlaceholder": "Run the tests before you commit. Never edit the generated folder.",
+        "cuesHint": "Every session on this repository starts with these instructions ahead of its first prompt."
     },
     "settingsFields": {
         "on": "On",

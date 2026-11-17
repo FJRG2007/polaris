@@ -848,7 +848,10 @@
         "publicShell": "Este repositorio es público, así que cualquiera puede abrir una pull request que el agente leerá después. Un shell completo entrega a lo que ejecute las claves del proveedor de su entorno.",
         "learnings": "Lo que ha aprendido",
         "learningsHint": "Notas que guardan las ejecuciones y leen al empezar la siguiente. Corrige o borra lo que esté mal.",
-        "learningsPlaceholder": "Nada aún. Aquí se anotan comandos, rarezas y correcciones."
+        "learningsPlaceholder": "Nada aún. Aquí se anotan comandos, rarezas y correcciones.",
+        "cues": "Pautas de cada sesión",
+        "cuesPlaceholder": "Ejecuta los tests antes de hacer commit. No edites la carpeta generada.",
+        "cuesHint": "Cada sesión de este repositorio recibe estas instrucciones antes de su primer prompt."
     },
     "settingsFields": {
         "on": "Sí",

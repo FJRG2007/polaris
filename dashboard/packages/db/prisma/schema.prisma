@@ -8878,6 +8878,9 @@ model AgentRepo {
     // Whether a setup script that fails stops the session. Off, the failure is
     // shown and the agent starts anyway.
     setupRequired Boolean  @default(false)
+    // Standing instructions every session on this repository is handed with
+    // its first prompt (`lib/agents/session-cues.ts`). Empty is none.
+    cues          String   @default("")
     // The agent and model each orchestration role starts on, as JSON text
     // (`lib/agents/agent-roles.ts`). Null is nothing set: every role falls to
     // the defaults in code.

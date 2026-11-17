@@ -54,6 +54,8 @@ export interface AgentRepoView {
     setupScript: string;
     /** Whether a failing setup script stops the session. */
     setupRequired: boolean;
+    /** Standing instructions handed to every session here. Empty is none. */
+    cues: string;
     /** The agent and model each orchestration role starts on; a role left out
      *  takes the code default (`agent-roles`). */
     roleAgents: RoleAgents;
@@ -93,6 +95,7 @@ export async function listAgentRepos(ownerId: string): Promise<AgentRepoView[]> 
         learnings: row.learnings ?? "",
         setupScript: row.setupScript,
         setupRequired: row.setupRequired,
+        cues: row.cues,
         roleAgents: parseRoleAgents(row.roleAgents),
         workflowInstalledAt: row.workflowInstalledAt,
         error: row.error,
