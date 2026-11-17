@@ -34,6 +34,7 @@ import * as acpPipe from "./acp/pipe-commands";
 import * as acpTransport from "./acp/transport";
 import * as acpProviders from "./acp/providers";
 import * as acpDrivers from "./acp/session-drivers";
+import * as handoff from "./acp/handoff";
 import { AcpRefusal } from "./acp/session-driver";
 import { CodexAppServerMissing } from "./codex/session-driver";
 import { touchSession } from "./session-live";
@@ -1335,7 +1336,11 @@ export async function snapshotTypedPrompt(sessionId: string, text: string): Prom
  * sending both at once sends half a prompt. The text is recorded as a message
  * first, so what somebody asked for survives even if the machine has gone away.
  */
-export async function promptSession(sessionId: string, text: string): Promise<void> {
+export async function promptSession(
+    sessionId: string,
+    text: string,
+    options: { fromChat?: boolean } = {}
+): Promise<void> {
     // Before the prompt is queued, so the turn it starts reads the credentials
     // as they are now rather than as they were when the machine booted.
     // The placement is read alongside, rather than after, so a turn waits on one
@@ -1350,6 +1355,7 @@ export async function promptSession(sessionId: string, text: string): Promise<vo
     if (placement.place === "computer")
         return computer.promptOnComputer(sessionId, await snapshotBeforeTurn(sessionId, placement, text));
     const sent = await snapshotBeforeTurn(sessionId, placement, text);
+    if (options.fromChat && (await remoteTurn(sessionId, placement, sent))) return;
     if (acpProviders.usesAcp(placement)) return acpPrompt(sessionId, placement.cli, sent);
     const queued = await runInSession(
         sessionId,
@@ -1609,6 +1615,75 @@ async function acpPrompt(sessionId: string, cli: string, text: string): Promise<
     }
 }
 
+/** Sessions whose Chat would not start lately, and when, in this process. */
+const chatFailures = new Map<string, number>();
+
+/**
+ * A message from Polar Code to a session that can be answered in Chat
+ * (`acp/handoff.ts`): a Terminal session that is idle hands its conversation
+ * to Chat first, so the answer streams; one the terminal took back since the
+ * last message is put back in Terminal before that is decided. True when the
+ * message was sent; false leaves it to the terminal, as before. A Chat that
+ * will not start here (no npx, no network, an adapter that exits) is logged
+ * and the message goes to the terminal instead, with nothing shown.
+ */
+async function remoteTurn(
+    sessionId: string,
+    placement: NonNullable<Awaited<ReturnType<typeof sessionPlacement>>>,
+    text: string
+): Promise<boolean> {
+    if (!handoff.handsOff(placement.cli, placement.place)) return false;
+    const stateDir = stateDirFor(placement);
+    let surface = placement.surface;
+    if (surface === "chat") {
+        const back = await runInSession(sessionId, handoff.terminalBackCommand(stateDir)).catch(() => null);
+        if (back?.output.trim() === handoff.TERMINAL_BACK) {
+            // The waiting script already stopped Chat's agent and resumed the
+            // conversation in the terminal; only the record is behind.
+            acpDrivers.closeAcpDriver(sessionId);
+            await prisma.agentSession.update({ where: { id: sessionId }, data: { surface: "terminal" }, select: { id: true } });
+            touchSession(sessionId);
+            surface = "terminal";
+        }
+    }
+    const row = await prisma.agentSession.findUnique({ where: { id: sessionId }, select: { vendorSessionId: true } });
+    const failedAt = chatFailures.get(sessionId);
+    const route = handoff.remoteTurnRoute({
+        cli: placement.cli,
+        place: placement.place,
+        surface,
+        state: placement.state,
+        vendorSessionId: row?.vendorSessionId ?? null,
+        chatFailedRecently: failedAt !== undefined && Date.now() - failedAt < handoff.CHAT_RETRY_MS
+    });
+    if (route === "terminal") return false;
+    if (route === "hand-off") {
+        try {
+            await switchSessionSurface(sessionId, "chat");
+        } catch (error) {
+            console.error(`[agent-session] ${sessionId}: the terminal did not hand over to Chat`, error);
+            return false;
+        }
+    }
+    try {
+        await acpDrivers.acpDriver(sessionId, placement.cli).prompt(text);
+        chatFailures.delete(sessionId);
+        return true;
+    } catch (error) {
+        // A turn still running in Chat is the person's to wait for or stop.
+        if (route === "chat" && error instanceof AcpRefusal && acpDrivers.acpDriver(sessionId, placement.cli).busy)
+            throw new SessionRefusal(error.message);
+        console.error(`[agent-session] ${sessionId}: Chat did not start here, the terminal answers instead`, error);
+        chatFailures.set(sessionId, Date.now());
+        await switchSessionSurface(sessionId, "terminal").catch((caught: unknown) =>
+            console.error(`[agent-session] ${sessionId}: the terminal did not take the session back`, caught)
+        );
+        // The terminal is resuming the conversation; the message waits for it.
+        if (await promptMovedAgent(sessionId, text)) return true;
+        throw new Error("The agent's terminal did not take the prompt");
+    }
+}
+
 /** An ACP call whose refusal is a sentence for the person, and whose other
  *  failures (the agent's own words, a machine's) stay in the log. */
 async function acpCall(work: () => Promise<void>): Promise<void> {
@@ -1641,13 +1716,42 @@ export async function switchSessionSurface(
     // where it was.
     if (surface === "chat" && moving)
         await steer(sessionId, acpPipe.terminalAgentStopCommand(stateDir), "The agent in the session's terminal did not stop");
+    if (surface === "chat" && moving && handoff.handsOff(placement.cli, placement.place))
+        await holdTerminal(sessionId, stateDir);
     if (surface === "terminal") {
         acpDrivers.closeAcpDriver(sessionId);
+        if (moving) await runInSession(sessionId, handoff.chatHoldStopCommand()).catch(() => undefined);
         await runInSession(sessionId, acpPipe.acpStopCommand(stateDir)).catch(() => undefined);
     }
     await prisma.agentSession.update({ where: { id: sessionId }, data: { surface }, select: { id: true } });
     touchSession(sessionId);
     if (surface === "terminal" && moving) await handConversationBack(sessionId, stateDir);
+}
+
+/**
+ * Into Chat: the terminal's window waits for a key to take the conversation
+ * back (`acp/handoff.ts`). Best effort - without it the window is left at its
+ * shell, as a switch always left it, and Terminal is one click away.
+ */
+async function holdTerminal(sessionId: string, stateDir: string): Promise<void> {
+    const row = await prisma.agentSession.findUnique({ where: { id: sessionId }, select: { vendorSessionId: true } });
+    const id = row?.vendorSessionId;
+    if (!id || !core.isVendorSessionId(id)) return;
+    try {
+        await steer(sessionId, handoff.chatHoldCommand(stateDir, id), "The terminal did not wait for Chat");
+    } catch (error) {
+        console.error(`[agent-session] ${sessionId}: the terminal will not take the conversation back by itself`, error);
+    }
+}
+
+/** Record the conversation Chat is on where the terminal's waiting script
+ *  reads it. Best effort, like the script. */
+export async function noteChatConversation(sessionId: string, vendorSessionId: string): Promise<void> {
+    const placement = await sessionPlacement(sessionId);
+    if (!placement || !handoff.handsOff(placement.cli, placement.place)) return;
+    await runInSession(sessionId, handoff.chatConversationCommand(stateDirFor(placement), vendorSessionId)).catch(
+        () => undefined
+    );
 }
 
 /**

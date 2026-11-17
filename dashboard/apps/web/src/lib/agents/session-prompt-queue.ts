@@ -141,7 +141,8 @@ export async function sendPromptNow(
     );
     await sessions.addSessionMessage(session.id, "user", said, userId);
     await runtime.placeAttachments(session, userId, files.files);
-    await runtime.promptSession(session.id, said);
+    // Sent from Polar Code: answered in Chat where the session can hand off.
+    await runtime.promptSession(session.id, said, { fromChat: true });
     return {};
 }
 

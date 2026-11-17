@@ -15,7 +15,7 @@ import { sessionDrafts } from "../session-drafts";
 import { storeHistoryRows } from "../session-history";
 import { sessionPermissionHandler } from "./approvals";
 import { shellQuote } from "../session-hooks";
-import { runInSession, sessionAcpPipe, startAcpAgent } from "../session-runtime";
+import { noteChatConversation, runInSession, sessionAcpPipe, startAcpAgent } from "../session-runtime";
 import { AcpSessionDriver, type DriverDeps } from "./session-driver";
 import { awaitPermission, openPermissionRequest } from "../session-permissions";
 import { CodexSessionDriver, type CodexDriverDeps } from "../codex/session-driver";
@@ -48,6 +48,8 @@ const deps: DriverDeps = {
         // reconnect then opens a new conversation instead of a wrong one.
         if (!core.isVendorSessionId(vendorSessionId)) return;
         await recordSessionConversation(sessionId, { vendorSessionId, transcriptPath: null });
+        // The terminal, when it takes the session back, resumes this one.
+        await noteChatConversation(sessionId, vendorSessionId);
     },
     permission: (sessionId) => sessionPermissionHandler(sessionId),
     touch: touchSession,
