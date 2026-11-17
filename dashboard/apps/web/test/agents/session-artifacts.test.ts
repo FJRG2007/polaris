@@ -20,9 +20,9 @@ describe("the deliverables listing", () => {
 
     it("keeps spaces in a name, refuses a tab, and skips what does not parse", () => {
         const listing = files.parseListing(
-            [`5\t${SHA_A}\ta\tb.txt`, "x\tnope\tc.txt", `4\t${SHA_A}\t../escape`, `4\t${SHA_A}\t.hidden/x`, `4\t${SHA_A}\t/abs`].join("\n")
+            [`5\t${SHA_A}\ta b.txt`, `5\t${SHA_A}\ta\tb.txt`, "x\tnope\tc.txt", `4\t${SHA_A}\t../escape`, `4\t${SHA_A}\t.hidden/x`, `4\t${SHA_A}\t/abs`].join("\n")
         );
-        expect(listing.files.map((file) => file.path)).toEqual(["a\tb.txt"]);
+        expect(listing.files.map((file) => file.path)).toEqual(["a b.txt"]);
     });
 
     it("says when the folder held more than a capture takes", () => {

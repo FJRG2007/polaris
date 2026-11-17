@@ -1886,7 +1886,7 @@
             "version": "Version",
             "versionLabel": "v{version} - {when}",
             "download": "Download",
-            "share": "Share",
+            "share": "Share this file",
             "noPreview": "No preview for this file"
         }
     },

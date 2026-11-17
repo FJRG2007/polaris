@@ -36,3 +36,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS "AgentSessionArtifactVersion_artifactId_versio
 
 ALTER TABLE "AgentSessionArtifactVersion" DROP CONSTRAINT IF EXISTS "AgentSessionArtifactVersion_artifactId_fkey";
 ALTER TABLE "AgentSessionArtifactVersion" ADD CONSTRAINT "AgentSessionArtifactVersion_artifactId_fkey" FOREIGN KEY ("artifactId") REFERENCES "AgentSessionArtifact"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- A grant on a delivered file, and its log, that outlived the file: the same
+-- cleanup 20270329000000_orphan_cleanup does for the kinds before this one.
+-- Data only; a second run finds nothing to delete.
+DELETE FROM "AccessGrant" g
+WHERE g."subjectType" = 'agents.artifact'
+  AND g."subjectId"::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+  AND NOT EXISTS (SELECT 1 FROM "AgentSessionArtifact" t WHERE t."id" = CASE WHEN g."subjectId"::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN g."subjectId"::text::uuid END);
+DELETE FROM "GrantUse" g
+WHERE g."subjectType" = 'agents.artifact'
+  AND g."subjectId"::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+  AND NOT EXISTS (SELECT 1 FROM "AgentSessionArtifact" t WHERE t."id" = CASE WHEN g."subjectId"::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN g."subjectId"::text::uuid END);

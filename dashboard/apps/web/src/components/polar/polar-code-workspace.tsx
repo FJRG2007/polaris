@@ -218,7 +218,13 @@ export function PolarCodeWorkspace({
                         {pane === "files" ? (
                             <FilesPane sessionId={session.id} live={live} />
                         ) : pane === "artifacts" ? (
-                            <SessionArtifacts sessionId={session.id} live={live} />
+                            // A Markdown deliverable draws with the Drive viewer's words.
+                            <ClientMessages
+                                namespaces={["driveViewer"]}
+                                fallback={<ui.Skeleton className="h-24 w-full" />}
+                            >
+                                <SessionArtifacts sessionId={session.id} live={live} />
+                            </ClientMessages>
                         ) : pane === "preview" ? (
                             <PreviewPane sessionId={session.id} live={live} lastEdit={wake} onPick={onPick} />
                         ) : pane === "changes" ? (

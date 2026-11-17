@@ -5,7 +5,7 @@
  * row's, since every one of those columns is a uuid.
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { GRANT_SUBJECTS } from "@polaris/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -170,6 +170,21 @@ describe("the orphan_cleanup migration", () => {
         ),
         "utf8"
     );
+    // That migration is applied and checksummed on real installs, so a kind added
+    // after it carries the same cleanup in its own migration instead.
+    const folder = new URL("../../../../packages/db/prisma/migrations/", import.meta.url);
+    const covering = [
+        sql,
+        ...readdirSync(folder)
+            .filter((name) => name > "20270329000000_orphan_cleanup")
+            .map((name) => {
+                try {
+                    return readFileSync(new URL(`${name}/migration.sql`, folder), "utf8");
+                } catch {
+                    return "";
+                }
+            })
+    ].join("\n");
 
     it("covers every subject kind the code knows a table for, in grants and their log", () => {
         expect(Object.keys(forget.SUBJECT_TABLES).sort()).toEqual([...GRANT_SUBJECTS].sort());
@@ -185,8 +200,8 @@ describe("the orphan_cleanup migration", () => {
                 const use = new RegExp(
                     `DELETE FROM "GrantUse" g\\s+WHERE g\\."subjectType" = '${kind.replace(".", "\\.")}'[^;]*FROM "${table}"`
                 );
-                expect(sql).toMatch(grant);
-                expect(sql).toMatch(use);
+                expect(covering).toMatch(grant);
+                expect(covering).toMatch(use);
             }
         }
     });

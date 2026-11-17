@@ -106,7 +106,7 @@ export default async function GuestLinkPage(props: AppPageProps) {
         if (!detail) return <LinkUnavailable message={words("guestLink.gone")} />;
         return (
             <PublicShell>
-                <Messages namespaces={["polar", "publicPages"]}>
+                <Messages namespaces={["polar", "publicPages", "driveViewer"]}>
                     <SharedArtifact token={token} artifact={detail.artifact} versions={detail.versions} />
                 </Messages>
             </PublicShell>

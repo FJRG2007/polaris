@@ -62,6 +62,7 @@ const DELETERS: Record<GrantSubject, readonly Deleter[] | string> = {
     "backup.plan": [drop("web/src/app/(app)/apps/backups/actions.ts", "backup.plan")],
     "dns.filter": "the house's one network filter, never deleted",
     "agents.session": [forget("web/src/lib/agents/agent-repo-service.ts", "agents.session")],
+    "agents.artifact": [forget("web/src/lib/agents/session-artifacts.ts", "agents.artifact")],
     "polar.project": [drop("web/src/app/api/polar/projects/[id]/route.ts", "polar.project")],
     "mail.mailbox": [
         drop("web/src/lib/mailbox/accounts.ts", "mail.mailbox"),
