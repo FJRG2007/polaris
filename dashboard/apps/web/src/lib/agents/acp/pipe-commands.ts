@@ -41,6 +41,44 @@ export const ACP_WRITE_BYTES = 48 * 1024;
  *  different one from the generation the caller holds. */
 export const ACP_NOT_RUNNING = 3;
 
+/** What a launch exits with, having started nothing, when the session's
+ *  terminal took it back from Chat since (`TERMINAL_BACK_FILE`). */
+export const ACP_TERMINAL_BACK = 4;
+
+/** Written by the terminal's waiting script once the terminal has the
+ *  conversation back (`acp/handoff.ts`), and cleared when the session goes to
+ *  Chat again. While it is there no protocol agent may start: it would stop
+ *  the agent the person is typing to. */
+export const TERMINAL_BACK_FILE = "terminal-back";
+
+/** The lock the two ways an agent starts in a Chat session take - a launch
+ *  here, the terminal's key in the waiting script - so they never interleave. */
+export const AGENT_LOCK_DIR = "agent.lock";
+
+/**
+ * Take the session's agent lock, held until the shell exits. A `mkdir`, the
+ * one atomic test-and-set every shell has (not every machine a session runs on
+ * has `flock`). A lock older than a minute is one whose holder died without
+ * its trap - killed, or its machine restarted - and is broken. The release is
+ * a trap rather than a last line, so every exit takes it, and a subshell does
+ * not inherit it.
+ */
+export function agentLockCommand(stateDir: string): string {
+    return [
+        `l="${stateDir}/${AGENT_LOCK_DIR}"`,
+        "until mkdir \"$l\" 2>/dev/null; do",
+        '  if [ -n "$(find "$l" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then rmdir "$l" 2>/dev/null; continue; fi',
+        "  sleep 0.2 2>/dev/null || sleep 1",
+        "done",
+        "trap 'rmdir \"$l\" 2>/dev/null' EXIT",
+        "trap 'exit 1' HUP INT TERM"
+    ].join("\n");
+}
+
+/** Give the agent lock back before the shell is done, as `exec` would skip
+ *  the trap. */
+export const AGENT_UNLOCK = "rmdir \"$l\" 2>/dev/null; trap - EXIT HUP INT TERM";
+
 /** The most arguments, and the longest one, a launch accepts. */
 const MAX_ARGS = 64;
 const MAX_ARG_CHARS = 4_096;
@@ -98,6 +136,12 @@ const CONTROL = /[\u0000-\u001f\u007f]/;
 /**
  * Start (or restart) the agent in its own window, running `argv`.
  *
+ * Under the agent lock, and not at all - exiting `ACP_TERMINAL_BACK` - once
+ * the terminal took the session back: whatever asked for this read the
+ * session before the key was pressed. `before` (stopping the terminal's own
+ * agent) runs in a subshell inside the lock, after that check, so it never
+ * stops the agent the key just resumed.
+ *
  * `argv` is Polaris's own - a provider binding's launch line, never something a
  * person typed - and is still checked: bounded, and no control characters, the
  * rule the boot environment is held to. Each word is quoted, so nothing in it
@@ -106,7 +150,8 @@ const CONTROL = /[\u0000-\u001f\u007f]/;
 export function acpLaunchCommand(
     stateDir: string,
     argv: readonly string[],
-    session = commands.TMUX_SESSION
+    session = commands.TMUX_SESSION,
+    before = ""
 ): string {
     if (argv.length === 0 || argv.length > MAX_ARGS)
         throw new Error("An agent's launch line has to name between 1 and 64 words.");
@@ -118,6 +163,9 @@ export function acpLaunchCommand(
     const dir = pipeDir(stateDir);
     const target = shellQuote(`${session}:${ACP_WINDOW}`);
     return [
+        agentLockCommand(stateDir),
+        `[ -f "${stateDir}/${TERMINAL_BACK_FILE}" ] && exit ${ACP_TERMINAL_BACK}`,
+        ...(before ? [`(\n${before}\n)`] : []),
         `a="${dir}"`,
         'mkdir -p "$a"',
         `printf %s ${ACP_LAUNCH_SCRIPT_BASE64} | base64 -d > "$a/launch.sh"`,

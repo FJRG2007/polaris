@@ -1345,13 +1345,14 @@ export async function promptSession(
     // as they are now rather than as they were when the machine booted.
     // The placement is read alongside, rather than after, so a turn waits on one
     // round trip of reads instead of two.
-    const [, placement] = await Promise.all([
+    const [, stored] = await Promise.all([
         refreshCredentials(sessionId),
         sessionPlacement(sessionId)
     ]);
     // A session whose runner takes its prompts gets this one as a file in the
     // queue: nothing typed, nothing that has to look ready first.
-    if (!placement) throw new Error("That session no longer exists.");
+    if (!stored) throw new Error("That session no longer exists.");
+    const placement = await reconcileTerminalBack(sessionId, stored);
     if (placement.place === "computer")
         return computer.promptOnComputer(sessionId, await snapshotBeforeTurn(sessionId, placement, text));
     const sent = await snapshotBeforeTurn(sessionId, placement, text);
@@ -1477,7 +1478,7 @@ export async function changeSessionMode(
     to: core.SessionPermissionMode
 ): Promise<void> {
     const args = core.permissionModeArgs(cliId, to);
-    const placement = await sessionPlacement(sessionId);
+    const placement = await reconcileTerminalBack(sessionId, await sessionPlacement(sessionId));
     if (placement?.place === "computer") return computer.settingsOnComputer(sessionId, { permissionMode: to });
     if (placement && acpProviders.usesAcp(placement))
         return acpCall(() => acpDrivers.acpDriver(sessionId, placement.cli).setMode(to));
@@ -1527,7 +1528,7 @@ export async function changeSessionEffort(
 
 /** Stop what the agent is doing without ending the session. */
 export async function interruptSession(sessionId: string): Promise<void> {
-    const placement = await sessionPlacement(sessionId);
+    const placement = await reconcileTerminalBack(sessionId, await sessionPlacement(sessionId));
     if (placement?.place === "computer") return computer.interruptOnComputer(sessionId);
     if (placement && acpProviders.usesAcp(placement))
         return acpCall(() => acpDrivers.acpDriver(sessionId, placement.cli).cancel());
@@ -1591,12 +1592,54 @@ export async function startAcpAgent(sessionId: string, argv: readonly string[]):
     await refreshCredentials(sessionId);
     const stateDir = stateDirFor(placement);
     // In Chat the terminal holds no agent of its own: one a boot or a resume
-    // started there would work the same checkout as this one.
-    await steer(
+    // started there would work the same checkout as this one. Unless the
+    // terminal took the session back since whoever asked for this looked:
+    // then the agent there is the person's, and nothing starts.
+    const launched = await runInSession(
         sessionId,
-        `(\n${acpPipe.terminalAgentStopCommand(stateDir)}\n)\n${acpPipe.acpLaunchCommand(stateDir, argv)}`,
-        "The session's machine did not start the agent"
+        acpPipe.acpLaunchCommand(stateDir, argv, commands.TMUX_SESSION, acpPipe.terminalAgentStopCommand(stateDir))
     );
+    if (launched.code === acpPipe.ACP_TERMINAL_BACK) throw new AcpRefusal(TERMINAL_HAS_IT);
+    if (launched.code === 0) return;
+    const said = launched.output.trim().slice(-300);
+    const whatFor = "The session's machine did not start the agent";
+    throw new Error(said ? `${whatFor}: ${said}` : whatFor);
+}
+
+/** What `reconcileTerminalBack` reads of a placement. */
+interface TerminalBackPlacement {
+    id: string;
+    place: core.AgentSessionPlace;
+    cli: string;
+    surface: acpProviders.SessionSurface;
+}
+
+/** Why Chat did not start: the terminal has the session. */
+const TERMINAL_HAS_IT = "The terminal took this session back. Send it again to reach it there.";
+
+/**
+ * Bring the stored surface up to what the session's terminal did: when its
+ * waiting script took the session back from Chat on a key (`acp/handoff.ts`),
+ * the Chat driver is closed, the session is recorded in Terminal and the page
+ * is told. Returns the placement as it now stands, so the caller acts on the
+ * terminal instead of on Chat. Called before anything that reaches the Chat
+ * driver, and by the hook the script reports with; a machine that does not
+ * answer leaves the record as it was.
+ */
+export async function reconcileTerminalBack<T extends TerminalBackPlacement | null>(
+    sessionId: string,
+    placement: T
+): Promise<T> {
+    if (!placement || placement.surface !== "chat" || !handoff.handsOff(placement.cli, placement.place))
+        return placement;
+    const back = await runInSession(sessionId, handoff.terminalBackCommand(stateDirFor(placement))).catch(() => null);
+    if (back?.output.trim() !== handoff.TERMINAL_BACK) return placement;
+    // The waiting script already stopped Chat's agent and resumed the
+    // conversation in the terminal; only the record is behind.
+    acpDrivers.closeAcpDriver(sessionId);
+    await prisma.agentSession.update({ where: { id: sessionId }, data: { surface: "terminal" }, select: { id: true } });
+    touchSession(sessionId);
+    return { ...placement, surface: "terminal" } as T;
 }
 
 /**
@@ -1633,19 +1676,7 @@ async function remoteTurn(
     text: string
 ): Promise<boolean> {
     if (!handoff.handsOff(placement.cli, placement.place)) return false;
-    const stateDir = stateDirFor(placement);
-    let surface = placement.surface;
-    if (surface === "chat") {
-        const back = await runInSession(sessionId, handoff.terminalBackCommand(stateDir)).catch(() => null);
-        if (back?.output.trim() === handoff.TERMINAL_BACK) {
-            // The waiting script already stopped Chat's agent and resumed the
-            // conversation in the terminal; only the record is behind.
-            acpDrivers.closeAcpDriver(sessionId);
-            await prisma.agentSession.update({ where: { id: sessionId }, data: { surface: "terminal" }, select: { id: true } });
-            touchSession(sessionId);
-            surface = "terminal";
-        }
-    }
+    const surface = placement.surface;
     const row = await prisma.agentSession.findUnique({ where: { id: sessionId }, select: { vendorSessionId: true } });
     const failedAt = chatFailures.get(sessionId);
     const route = handoff.remoteTurnRoute({
@@ -1673,8 +1704,12 @@ async function remoteTurn(
         // A turn still running in Chat is the person's to wait for or stop.
         if (route === "chat" && error instanceof AcpRefusal && acpDrivers.acpDriver(sessionId, placement.cli).busy)
             throw new SessionRefusal(error.message);
-        console.error(`[agent-session] ${sessionId}: Chat did not start here, the terminal answers instead`, error);
-        chatFailures.set(sessionId, Date.now());
+        // A key in the terminal between the check and the launch: nothing is
+        // wrong with Chat, the terminal simply has the session.
+        if (!(error instanceof AcpRefusal && error.message === TERMINAL_HAS_IT)) {
+            console.error(`[agent-session] ${sessionId}: Chat did not start here, the terminal answers instead`, error);
+            chatFailures.set(sessionId, Date.now());
+        }
         await switchSessionSurface(sessionId, "terminal").catch((caught: unknown) =>
             console.error(`[agent-session] ${sessionId}: the terminal did not take the session back`, caught)
         );
@@ -1705,7 +1740,7 @@ export async function switchSessionSurface(
     sessionId: string,
     surface: acpProviders.SessionSurface
 ): Promise<void> {
-    const placement = await sessionPlacement(sessionId);
+    const placement = await reconcileTerminalBack(sessionId, await sessionPlacement(sessionId));
     if (!placement) throw new Error("That session no longer exists.");
     if (surface === "chat" && !acpProviders.chatAvailable(placement.cli, placement.place))
         throw new SessionRefusal("This agent cannot be used in Chat here.");
@@ -1714,8 +1749,14 @@ export async function switchSessionSurface(
     // Two agents in one checkout would write over each other's work, so the
     // terminal's goes first; a machine that does not answer keeps the session
     // where it was.
+    // Into Chat the last hand-back is forgotten first, or the launch would
+    // refuse as though the terminal had just taken it back.
     if (surface === "chat" && moving)
-        await steer(sessionId, acpPipe.terminalAgentStopCommand(stateDir), "The agent in the session's terminal did not stop");
+        await steer(
+            sessionId,
+            `${handoff.chatEntryCommand(stateDir)}\n${acpPipe.terminalAgentStopCommand(stateDir)}`,
+            "The agent in the session's terminal did not stop"
+        );
     if (surface === "chat" && moving && handoff.handsOff(placement.cli, placement.place))
         await holdTerminal(sessionId, stateDir);
     if (surface === "terminal") {

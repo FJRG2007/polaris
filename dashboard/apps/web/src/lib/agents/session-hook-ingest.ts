@@ -23,7 +23,8 @@ import {
     recordSessionEvents,
     recordSessionTodos,
     recordTaskTool,
-    recordReportedMode
+    recordReportedMode,
+    sessionPlacement
 } from "@/lib/agents/session-service";
 import { isSessionOver } from "@polaris/core";
 import { prisma, type Prisma } from "@polaris/db";
@@ -37,7 +38,8 @@ import { pushPermissionRequest } from "@/lib/agents/agent-notices";
 import * as permissions from "@/lib/agents/session-permissions";
 import * as asks from "@/lib/agents/session-asks";
 import { dispatchSessionHook } from "@/lib/polar/custom-tools/plugins";
-import { snapshotTypedPrompt } from "@/lib/agents/session-runtime";
+import { TERMINAL_BACK_EVENT } from "@/lib/agents/acp/handoff";
+import { reconcileTerminalBack, snapshotTypedPrompt } from "@/lib/agents/session-runtime";
 
 /** The events after which the transcript is read. */
 const HISTORY_KINDS = new Set(["turn.end", "turn.failed", "tool.end", "tool.failed"]);
@@ -53,6 +55,14 @@ export interface HookSession {
  *  when the hook ran, in nanoseconds (`parseHookSequence`), or null. */
 export async function ingestHookPayload(session: HookSession, payload: unknown, seq: bigint | null): Promise<void> {
     const { id } = session;
+    // The terminal took the session back from Chat on a key. The payload is
+    // only the prompt to look: the mark on the machine is what is believed.
+    if ((payload as { hook_event_name?: unknown } | null)?.hook_event_name === TERMINAL_BACK_EVENT) {
+        await reconcileTerminalBack(id, await sessionPlacement(id)).catch((error) =>
+            console.error(`[agent-session] ${id}: could not record the terminal taking the session back`, error)
+        );
+        return;
+    }
     await recordSessionConversation(id, hookConversation(payload)).catch((error) =>
         console.error(`[agent-session] ${id}: could not keep the conversation id`, error)
     );

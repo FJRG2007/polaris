@@ -21,27 +21,33 @@
  * The terminal cannot be watched for keys from outside it - a person may be
  * attached through Polaris, SSH or a runner - so what waits for the key is a
  * small script left running in the terminal's own window (`chatHoldCommand`).
- * It writes `TERMINAL_BACK_FILE` once it has handed back, which the next
- * message reads (`terminalBackCommand`) to put the session in Terminal again.
+ * It writes `TERMINAL_BACK_FILE` once it has handed back and reports that
+ * through the session's hook (`TERMINAL_BACK_EVENT`), so the page shows
+ * Terminal at once; anything that would act on Chat checks the mark first
+ * (`reconcileTerminalBack`), and a launch refuses while it is there. The mark
+ * stays until the session goes to Chat again (`chatEntryCommand`). The key and
+ * a launch take the same lock (`agentLockCommand`), so one never starts in the
+ * middle of the other.
  */
 
 import * as core from "@polaris/core";
 import { shellQuote } from "../session-hooks";
 import * as commands from "../session-commands";
-import { acpStopCommand } from "./pipe-commands";
+import { acpStopCommand, AGENT_UNLOCK, agentLockCommand, TERMINAL_BACK_FILE } from "./pipe-commands";
 import { chatAvailable, type SessionSurface } from "./providers";
 
 /** The agents whose terminal and Chat reopen one conversation by one id. */
 const HANDOFF_AGENTS: readonly string[] = ["claude", "codex"];
-
-/** Written by the waiting script once the terminal has the conversation back. */
-export const TERMINAL_BACK_FILE = "terminal-back";
 
 /** The conversation Chat is on, for the waiting script to resume. */
 export const CHAT_CONVERSATION_FILE = "chat-conversation";
 
 /** What `terminalBackCommand` prints when the terminal took the session back. */
 export const TERMINAL_BACK = "back";
+
+/** The hook event the waiting script reports the hand-back with. Not one any
+ *  agent sends; the dashboard checks the mark itself before believing it. */
+export const TERMINAL_BACK_EVENT = "PolarisTerminalBack";
 
 /** Whether a Terminal session of this agent may be answered in Chat. Pure. */
 export function handsOff(cli: string, place: core.AgentSessionPlace): boolean {
@@ -83,6 +89,8 @@ export const CHAT_RETRY_MS = 30 * 60_000;
  * Leave a script waiting in the terminal's window, which Chat left at its
  * shell: on the first key it stops the protocol agent, says so, and resumes
  * the conversation there - the one Chat last recorded, else `vendorSessionId`.
+ * The stop and the mark are under the agent lock, and the conversation is
+ * read inside it, so a launch that got there first has recorded its own.
  * Nothing for a session with a runner, whose turns read the conversation from
  * a file instead (`conversationHandBackCommand`).
  */
@@ -96,10 +104,15 @@ export function chatHoldCommand(stateDir: string, vendorSessionId: string, sessi
         "stty -icanon -echo min 1 time 0 2>/dev/null",
         "dd bs=1 count=1 >/dev/null 2>&1",
         '[ -n "$s" ] && stty "$s" 2>/dev/null',
+        agentLockCommand(stateDir),
         acpStopCommand(stateDir, session),
         `id="$(tr -dc 'A-Za-z0-9_-' < "${stateDir}/${CHAT_CONVERSATION_FILE}" 2>/dev/null | head -c 128)"`,
         `[ -n "$id" ] || id=${shellQuote(vendorSessionId)}`,
         `: > "${stateDir}/${TERMINAL_BACK_FILE}"`,
+        AGENT_UNLOCK,
+        // Told the way the runner tells a turn's end, in the background: the
+        // terminal does not wait on the network.
+        `[ -f "${stateDir}/hook.sh" ] && (printf '{"hook_event_name":"${TERMINAL_BACK_EVENT}"}' | sh "${stateDir}/hook.sh" >/dev/null 2>&1 &)`,
         'exec sh "$POLARIS_STATE_DIR/launch.sh" "$id"'
     ].join("\n");
     return [
@@ -118,10 +131,16 @@ export function chatConversationCommand(stateDir: string, vendorSessionId: strin
     return `printf %s ${shellQuote(vendorSessionId)} > "${stateDir}/${CHAT_CONVERSATION_FILE}"`;
 }
 
-/** Print `TERMINAL_BACK` (and clear the mark) when the terminal took the
- *  session back since the last message. */
+/** Print `TERMINAL_BACK` while the terminal holds the session it took back
+ *  from Chat. Reads only: the mark is what keeps a launch from starting. */
 export function terminalBackCommand(stateDir: string): string {
-    return `if [ -f "${stateDir}/${TERMINAL_BACK_FILE}" ]; then rm -f "${stateDir}/${TERMINAL_BACK_FILE}" "${stateDir}/${CHAT_CONVERSATION_FILE}"; echo ${TERMINAL_BACK}; fi`;
+    return `if [ -f "${stateDir}/${TERMINAL_BACK_FILE}" ]; then echo ${TERMINAL_BACK}; fi`;
+}
+
+/** Going to Chat: forget the last hand-back and the conversation the last
+ *  Chat was on, before anything starts there. */
+export function chatEntryCommand(stateDir: string): string {
+    return `rm -f "${stateDir}/${TERMINAL_BACK_FILE}" "${stateDir}/${CHAT_CONVERSATION_FILE}"`;
 }
 
 /** End a script still waiting for its key - not one that already took it and
