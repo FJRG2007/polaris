@@ -820,6 +820,39 @@
         "keep": "Keep it",
         "clearFailed": "The memory could not be cleared. Try again."
     },
+    "repoSchedules": {
+        "title": "Scheduled sessions",
+        "hint": "Start a Code session on this repository on a schedule. It runs as you, and waits for a free slot like any other.",
+        "empty": "No scheduled sessions.",
+        "new": "Schedule a session",
+        "add": "Schedule it",
+        "save": "Save",
+        "cancel": "Cancel",
+        "edit": "Edit",
+        "remove": "Remove",
+        "keep": "Keep it",
+        "confirmRemove": "Remove schedule",
+        "enabled": "Scheduled",
+        "agent": "Agent",
+        "schedule": "Schedule",
+        "prompt": "Prompt",
+        "promptPlaceholder": "Update the dependencies and open a pull request.",
+        "summary": "{agent}, {when} ({zone})",
+        "next": "Next {when}.",
+        "openSession": "Open session",
+        "status": {
+            "started": "Started",
+            "queued": "Queued",
+            "skipped": "Skipped",
+            "failed": "Failed"
+        },
+        "errors": {
+            "invalid": "Check the schedule and the prompt.",
+            "notFound": "That schedule is gone. Reopen the repository.",
+            "tooMany": "A repository can keep {max} schedules. Remove one first.",
+            "saveFailed": "The schedule could not be saved. Try again."
+        }
+    },
     "repoRoles": {
         "title": "Agents per role",
         "intro": "What a coordinator, the workers it starts and a reviewer run on in this repository.",

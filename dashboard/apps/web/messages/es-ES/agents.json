@@ -820,6 +820,39 @@
         "keep": "Conservar",
         "clearFailed": "No se pudo borrar la memoria. Inténtalo de nuevo."
     },
+    "repoSchedules": {
+        "title": "Sesiones programadas",
+        "hint": "Inicia una sesión de Code en este repositorio según un horario. Se ejecuta como tú y espera un hueco libre como cualquier otra.",
+        "empty": "No hay sesiones programadas.",
+        "new": "Programar sesión",
+        "add": "Programar",
+        "save": "Guardar",
+        "cancel": "Cancelar",
+        "edit": "Editar",
+        "remove": "Quitar",
+        "keep": "Mantener",
+        "confirmRemove": "Quitar horario",
+        "enabled": "Programada",
+        "agent": "Agente",
+        "schedule": "Horario",
+        "prompt": "Instrucción",
+        "promptPlaceholder": "Actualiza las dependencias y abre una pull request.",
+        "summary": "{agent}, {when} ({zone})",
+        "next": "Próxima {when}.",
+        "openSession": "Abrir sesión",
+        "status": {
+            "started": "Iniciada",
+            "queued": "En cola",
+            "skipped": "Omitida",
+            "failed": "Fallida"
+        },
+        "errors": {
+            "invalid": "Revisa el horario y la instrucción.",
+            "notFound": "Ese horario ya no existe. Vuelve a abrir el repositorio.",
+            "tooMany": "Un repositorio admite {max} horarios. Quita uno antes.",
+            "saveFailed": "No se pudo guardar el horario. Inténtalo de nuevo."
+        }
+    },
     "repoRoles": {
         "title": "Agentes por rol",
         "intro": "Con qué trabajan aquí el coordinador, sus agentes y el revisor.",

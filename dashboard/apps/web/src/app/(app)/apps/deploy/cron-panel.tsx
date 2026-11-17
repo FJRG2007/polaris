@@ -10,6 +10,7 @@
  */
 
 import { RestoreHistoryButton } from "@/components/restore-history";
+import { CronScheduleField, browserTimeZone } from "@/components/cron-schedule-field";
 import * as core from "@polaris/core";
 import { useProjectCan } from "./access-context";
 import { relativeTime } from "@/lib/relative-time";
@@ -28,15 +29,6 @@ import {
 } from "./cron-actions";
 import * as polls from "./deploy-polls";
 
-/** Schedules offered with one click, because most jobs are one of these. */
-const PRESETS = [
-    { label: "cron.presets.every15", schedule: "*/15 * * * *" },
-    { label: "cron.presets.hourly", schedule: "0 * * * *" },
-    { label: "cron.presets.daily", schedule: "0 3 * * *" },
-    { label: "cron.presets.mondays", schedule: "0 9 * * 1" },
-    { label: "cron.presets.monthly", schedule: "0 0 1 * *" }
-] as const;
-
 interface Draft {
     id?: string;
     name: string;
@@ -50,12 +42,7 @@ interface Draft {
 }
 
 function emptyDraft(): Draft {
-    let timezone = "UTC";
-    try {
-        timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    } catch {
-        // A browser that will not say keeps UTC.
-    }
+    const timezone = browserTimeZone();
     return {
         name: "",
         schedule: "0 3 * * *",
@@ -369,7 +356,6 @@ function CronForm({
     onSaved: () => void;
 }) {
     const t = useTranslations("deployConfig");
-    const format = useDisplayFormat();
     const [problem, setProblem] = useState<string | null>(null);
     const [touched, setTouched] = useState<Record<string, boolean>>({});
     const [pending, startTransition] = useTransition();
@@ -389,17 +375,6 @@ function CronForm({
         }
         return out;
     }, [parsed]);
-    const next = useMemo(() => {
-        try {
-            return core.nextCronRun(
-                core.parseCron(draft.schedule),
-                new Date(),
-                draft.timezone || "UTC"
-            );
-        } catch {
-            return null;
-        }
-    }, [draft.schedule, draft.timezone]);
 
     const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
         onChange({ ...draft, [key]: value });
@@ -449,52 +424,15 @@ function CronForm({
                 <span className="text-xs font-medium text-muted-foreground">
                     {t("cron.schedule")} <span aria-hidden>*</span>
                 </span>
-                <div className="flex flex-wrap gap-1.5">
-                    {PRESETS.map((preset) => (
-                        <button
-                            key={preset.schedule}
-                            type="button"
-                            onClick={() => set("schedule", preset.schedule)}
-                            className={cn(
-                                "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
-                                draft.schedule === preset.schedule
-                                    ? "border-primary/50 bg-primary/10 text-primary"
-                                    : "border-border text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            {t(preset.label)}
-                        </button>
-                    ))}
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_12rem]">
-                    <Input
-                        value={draft.schedule}
-                        onChange={(event) => set("schedule", event.target.value)}
-                        onBlur={leave("schedule")}
-                        className="font-mono"
-                        spellCheck={false}
-                        aria-label={t("cron.expression")}
-                    />
-                    <Input
-                        value={draft.timezone}
-                        onChange={(event) => set("timezone", event.target.value)}
-                        onBlur={leave("timezone")}
-                        spellCheck={false}
-                        aria-label={t("cron.timezone")}
-                        // i18n-ignore: a time zone name
-                        placeholder="UTC"
-                    />
-                </div>
-                {shown("schedule") || shown("timezone") ? (
-                    <span className="text-xs text-danger">
-                        {shown("schedule") ?? shown("timezone")}
-                    </span>
-                ) : (
-                    <span className="text-xs text-muted-foreground">
-                        {core.describeCron(draft.schedule)}
-                        {next ? t("cron.next", { when: format.dateTime(next.toISOString()) }) : ""}
-                    </span>
-                )}
+                <CronScheduleField
+                    schedule={draft.schedule}
+                    timezone={draft.timezone}
+                    onSchedule={(value) => set("schedule", value)}
+                    onTimezone={(value) => set("timezone", value)}
+                    onBlurSchedule={leave("schedule")}
+                    onBlurTimezone={leave("timezone")}
+                    error={shown("schedule") ?? shown("timezone")}
+                />
             </div>
             <label className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-muted-foreground">

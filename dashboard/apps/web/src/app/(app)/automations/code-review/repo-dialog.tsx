@@ -5,6 +5,7 @@ import { ExecutionPicker } from "./execution-picker";
 import { useEffect, useState, useTransition } from "react";
 import { RepoSettingsFields } from "./repo-settings-fields";
 import { RepoMemorySection } from "./repo-memory-section";
+import { RepoSchedulesSection } from "./repo-schedules-section";
 import { RepoRoleFields, roleAgentsValid } from "./repo-role-fields";
 import type { RoleAgents } from "@/lib/agents/agent-roles";
 import type { AgentRepoView } from "@/lib/agents/agent-repo-service";
@@ -327,6 +328,8 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                     <RepoRoleFields value={roleAgents} onChange={setRoleAgents} />
 
                     <RepoMemorySection repoFullName={repo.repoFullName} />
+
+                    <RepoSchedulesSection repoId={repo.id} />
 
                     {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </div>

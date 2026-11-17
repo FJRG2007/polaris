@@ -44,6 +44,7 @@ import { sweepEmptyGroups } from "@/lib/chat/chat-service";
 import { sweepEndedFriendRequestNotices } from "@/lib/friends-service";
 import { probeAllDomains } from "@/lib/domain-health-probe";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
+import { tickSessionSchedules } from "@/lib/agents/session-schedules";
 import { tickDeployAutomations } from "@/lib/deploy/automations";
 import { evaluateAlarms } from "@/lib/watch/alarm-evaluator";
 import { scanServiceUpdates } from "@/lib/deploy/update-scan";
@@ -602,6 +603,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         everyMs: MINUTE,
         leaseMs: null,
         run: tickServiceCrons
+    },
+    {
+        key: "session-schedules",
+        // Every minute, a cron's finest grain. Not leased, for the same reason
+        // as scheduled jobs: each firing is claimed by a compare-and-swap on the
+        // schedule's own `nextRunAt`, so two processes cannot start it twice.
+        everyMs: MINUTE,
+        leaseMs: null,
+        run: () => tickSessionSchedules()
     },
     {
         key: "deploy-automations",

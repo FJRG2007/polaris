@@ -337,6 +337,7 @@ model User {
     enrollments         Enrollment[]
     runnerPools         RunnerPool[]
     agentRepos          AgentRepo[]
+    agentSessionSchedules AgentSessionSchedule[]
     agentDefaults       AgentDefaults[]
     modelKeys           UserModelKey[]
     linkedAccounts      UserConnection[]
@@ -8900,6 +8901,7 @@ model AgentRepo {
     automations AgentAutomation[]
     runs        AgentRun[]
     sessions    AgentSession[]
+    sessionSchedules AgentSessionSchedule[]
 
     @@unique([ownerId, repoFullName])
     @@index([repoFullName])
@@ -9336,6 +9338,7 @@ model AgentRun {
 
     repo AgentRepo @relation(fields: [repoId], references: [id], onDelete: Cascade)
 
+
     @@index([repoId, createdAt])
     // How many pushes to one pull request were reviewed, for the review pause.
     @@index([repoId, prNumber])
@@ -9344,6 +9347,54 @@ model AgentRun {
     @@index([githubRunId])
     @@index([parentRunId])
 }
+
+// A Code session a repository starts on its own, on a cron schedule
+// (`apps/web/src/lib/agents/session-schedules.ts`). Each firing is claimed by a
+// compare-and-swap on `nextRunAt`, so two dashboard processes never start the
+// same one twice, and a firing missed while Polaris was down starts once.
+model AgentSessionSchedule {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    repoId        String    @db.Uuid
+    // The session starts as this person, through their own admission.
+    createdById   String    @db.Uuid
+    // The agent the session runs, an AGENT_CLIS id.
+    cli           String
+    schedule      String
+    timezone      String    @default("UTC")
+    prompt        String
+    enabled       Boolean   @default(true)
+    // Null when off, or for a schedule that never fires again.
+    nextRunAt     DateTime?
+    lastRunAt     DateTime?
+    lastSessionId String?   @db.Uuid
+    lastError     String?
+    createdAt     DateTime  @default(now())
+    updatedAt     DateTime  @updatedAt
+
+    repo      AgentRepo                 @relation(fields: [repoId], references: [id], onDelete: Cascade)
+    createdBy User                      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+    runs      AgentSessionScheduleRun[]
+
+    @@index([enabled, nextRunAt])
+    @@index([repoId])
+    @@index([createdById])
+}
+
+// One firing of a session schedule: the session it started, or why it did not.
+model AgentSessionScheduleRun {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    scheduleId String   @db.Uuid
+    // started | queued | skipped | failed
+    status     String
+    sessionId  String?  @db.Uuid
+    error      String?
+    createdAt  DateTime @default(now())
+
+    schedule AgentSessionSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+    @@index([scheduleId, createdAt])
+}
+
 // A coding agent running right now, in a worktree of its own, on a machine
 // Polaris can reach.
 //
