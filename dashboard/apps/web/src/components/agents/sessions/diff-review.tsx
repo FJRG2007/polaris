@@ -9,6 +9,7 @@
 import { useMemo, useState } from "react";
 import { Button, Textarea, cn } from "@polaris/ui";
 import { MessageSquarePlus, X } from "lucide-react";
+import { TOUCH_TARGET } from "@/components/use-phone";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { parseUnifiedDiff, type DiffLine, type LineComment } from "@/lib/agents/session-review-loop";
 
@@ -34,6 +35,9 @@ const LINE_TONE: Record<DiffLine["kind"], string> = {
     hunk: "bg-muted text-muted-foreground",
     meta: "text-muted-foreground"
 };
+
+/** Whether the screen is pressed rather than pointed at. */
+const coarsePointer = () => typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
 
 export function DiffReview({
     path,
@@ -65,38 +69,56 @@ export function DiffReview({
                 const anchor = anchorOf(line);
                 const key = anchor ? commentKey({ path, ...anchor }) : null;
                 const left = key ? byKey.get(key) : undefined;
+                const comment = () => {
+                    if (!key) return;
+                    setOpen(key);
+                    setDraft(left?.body ?? "");
+                };
                 return (
                     <div key={index}>
-                        <div className={cn("group flex min-w-max items-start", LINE_TONE[line.kind])}>
-                            <span className="w-10 shrink-0 select-none px-1 text-end text-muted-foreground">
+                        {/* On a phone the line wraps instead of running off the
+                            screen, and the whole line is what a finger presses
+                            to comment: the gutter's button is too small to aim at. */}
+                        <div
+                            className={cn(
+                                "group flex min-w-max items-start max-sm:min-w-0 [@media(pointer:coarse)]:leading-6",
+                                LINE_TONE[line.kind]
+                            )}
+                            onClick={(event) => {
+                                if (!anchor || open === key || !coarsePointer()) return;
+                                if ((event.target as HTMLElement).closest("button")) return;
+                                comment();
+                            }}
+                        >
+                            <span className="w-10 shrink-0 select-none px-1 text-end text-muted-foreground max-sm:w-8">
                                 {line.oldLine ?? ""}
                             </span>
-                            <span className="w-10 shrink-0 select-none px-1 text-end text-muted-foreground">
+                            <span className="w-10 shrink-0 select-none px-1 text-end text-muted-foreground max-sm:w-8">
                                 {line.newLine ?? ""}
                             </span>
-                            <span className="flex w-6 shrink-0 justify-center">
+                            <span className="flex w-6 shrink-0 justify-center [@media(pointer:coarse)]:w-2">
                                 {anchor && key ? (
                                     <button
                                         type="button"
-                                        className="rounded text-primary opacity-0 focus-visible:opacity-100 group-hover:opacity-100"
+                                        className="rounded text-primary opacity-0 focus-visible:opacity-100 group-hover:opacity-100 [@media(pointer:coarse)]:sr-only"
                                         aria-label={t("session.review.add", { line: anchor.line })}
                                         title={t("session.review.add", { line: anchor.line })}
-                                        onClick={() => {
-                                            setOpen(key);
-                                            setDraft(left?.body ?? "");
-                                        }}
+                                        onClick={comment}
                                     >
                                         <MessageSquarePlus className="size-4 shrink-0" />
                                     </button>
                                 ) : null}
                             </span>
-                            <span className="whitespace-pre pe-4">{line.text || " "}</span>
+                            <span className="whitespace-pre pe-4 max-sm:min-w-0 max-sm:flex-1 max-sm:whitespace-pre-wrap max-sm:break-all max-sm:pe-2">
+                                {line.text || " "}
+                            </span>
                         </div>
                         {left && open !== key ? (
                             <div className="flex min-w-0 items-start gap-2 border-y border-border bg-card px-3 py-2 font-sans text-sm">
                                 <p className="min-w-0 flex-1 whitespace-pre-wrap break-words">{left.body}</p>
                                 <Button
                                     size="sm"
+                                    className={TOUCH_TARGET}
                                     variant="ghost"
                                     onClick={() => {
                                         setOpen(key);
@@ -107,6 +129,7 @@ export function DiffReview({
                                 </Button>
                                 <Button
                                     size="sm"
+                                    className={TOUCH_TARGET}
                                     variant="ghost"
                                     aria-label={t("session.review.remove")}
                                     title={t("session.review.remove")}
@@ -130,11 +153,12 @@ export function DiffReview({
                                     }}
                                 />
                                 <div className="flex justify-end gap-2">
-                                    <Button size="sm" variant="ghost" onClick={() => setOpen(null)}>
+                                    <Button size="sm" variant="ghost" className={TOUCH_TARGET} onClick={() => setOpen(null)}>
                                         {tcommon("actions.cancel")}
                                     </Button>
                                     <Button
                                         size="sm"
+                                        className={TOUCH_TARGET}
                                         disabled={!draft.trim()}
                                         onClick={() => {
                                             onAdd({
