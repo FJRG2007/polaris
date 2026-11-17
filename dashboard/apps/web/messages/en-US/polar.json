@@ -126,7 +126,8 @@
         "bulkKind": "conversations",
         "selectionActions": "Selected conversations",
         "codeSessions": "Code sessions",
-        "openBoard": "Board"
+        "openBoard": "Board",
+        "searchHintCode": "Type to search your chats and Code sessions, archived chats included."
     },
     "actions": {
         "new": "New chat",

@@ -110,6 +110,7 @@ import {
 import type { PolarProjectRow, PolarThreadRow } from "@/lib/polar/shared";
 import type { PolarCodeHistory } from "@/components/polar/polar-code";
 import type { PolarCodeRow } from "@/lib/polar/code";
+import type { SessionSearchHit } from "@/lib/agents/session-search";
 import { filterCodeRows } from "@/lib/polar/code-history";
 import dynamic from "next/dynamic";
 import {
@@ -505,6 +506,7 @@ export function PolarThreads({
             {searching ? (
                 <SearchDialog
                     sidebar={sidebar}
+                    codeSearch={Boolean(code)}
                     onClose={() => setSearching(false)}
                     onOpen={(row) => {
                         sidebar.know(row);
@@ -1949,10 +1951,13 @@ const BAR_ACTION =
  */
 function SearchDialog({
     sidebar,
+    codeSearch,
     onClose,
     onOpen
 }: {
     sidebar: PolarSidebar;
+    /** Whether Code is open to this person, so their sessions are searched too. */
+    codeSearch: boolean;
     onClose: () => void;
     onOpen: (row: PolarThreadRow) => void;
 }) {
@@ -2022,7 +2027,7 @@ function SearchDialog({
                 <DialogHeader>
                     <DialogTitle>{t(archived ? "history.archived" : "history.search")}</DialogTitle>
                     <DialogDescription className={archived ? "sr-only" : undefined}>
-                        {t("history.searchHint")}
+                        {t(codeSearch ? "history.searchHintCode" : "history.searchHint")}
                     </DialogDescription>
                 </DialogHeader>
                 {archived ? null : (
@@ -2079,6 +2084,7 @@ function SearchDialog({
                             ))}
                         </ul>
                     )}
+                    {codeSearch && !archived && words ? <CodeSearchResults words={words} onOpen={onClose} /> : null}
                     {more ? (
                         <button
                             type="button"
@@ -2105,6 +2111,61 @@ function SearchDialog({
                 </DialogFooter>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** The person's Code sessions matching the search, from the server. */
+function CodeSearchResults({ words, onOpen }: { words: string; onOpen: () => void }) {
+    const t = useTranslations("polar");
+    const [hits, setHits] = useState<SessionSearchHit[] | null>(null);
+    const [failed, setFailed] = useState(false);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => {
+            setFailed(false);
+            fetch(`/api/polar/code/search?q=${encodeURIComponent(words)}`, { signal: controller.signal })
+                .then((response) => (response.ok ? response.json() : Promise.reject()))
+                .then((data: { value?: { results?: SessionSearchHit[] } }) => setHits(data.value?.results ?? []))
+                .catch(() => {
+                    if (!controller.signal.aborted) setFailed(true);
+                });
+        }, 250);
+        return () => {
+            controller.abort();
+            window.clearTimeout(timer);
+        };
+    }, [words]);
+
+    if (!failed && (hits === null || hits.length === 0)) return null;
+    return (
+        <section className="mt-2" aria-label={t("history.codeSessions")}>
+            <h3 className="px-2 py-1 text-xs font-medium text-muted-foreground">{t("history.codeSessions")}</h3>
+            {failed ? (
+                <p className="px-2 py-1.5 text-sm text-danger">{t("history.searchFailed")}</p>
+            ) : (
+                <ul>
+                    {(hits ?? []).map((hit) => (
+                        <li key={hit.id} className="rounded-md hover:bg-card-hover">
+                            <Link
+                                href={`/polar?session=${encodeURIComponent(hit.id)}`}
+                                prefetch={false}
+                                onClick={onOpen}
+                                title={hit.title}
+                                className="flex min-w-0 items-center gap-2 px-2 py-1.5 text-sm text-foreground"
+                            >
+                                <span className="min-w-0 truncate">{hit.title}</span>
+                                {hit.repoFullName ? (
+                                    <span className="min-w-0 shrink truncate text-xs text-muted-foreground" title={hit.repoFullName}>
+                                        {hit.repoFullName}
+                                    </span>
+                                ) : null}
+                            </Link>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </section>
     );
 }
 

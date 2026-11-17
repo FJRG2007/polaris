@@ -126,7 +126,8 @@
         "bulkKind": "conversaciones",
         "selectionActions": "Conversaciones seleccionadas",
         "codeSessions": "Sesiones de Code",
-        "openBoard": "Tablero"
+        "openBoard": "Tablero",
+        "searchHintCode": "Escribe para buscar en tus chats y sesiones de Code, archivados incluidos."
     },
     "actions": {
         "new": "Nuevo chat",

@@ -12,6 +12,7 @@
  * not have to carry the whole Agents catalog onto every page.
  */
 
+import * as search from "@/lib/agents/session-search";
 import * as core from "@polaris/core";
 import { repoAgentFiles, type RepoAgentFile } from "@/lib/polar/agents/repo-agents";
 import { z } from "zod";
@@ -286,6 +287,19 @@ export async function polarCodeOverview(
         // the page must not be read again on the next.
         next: list.length > POLAR_CODE_PAGE && last ? sessionCursor(last) : null
     };
+}
+
+/**
+ * The person's own sessions matching a search, a page at a time. Nothing for an
+ * account Code is not open to, the same as the history.
+ */
+export async function polarCodeSearch(
+    user: SessionUser,
+    text: string,
+    page: number
+): Promise<{ results: search.SessionSearchHit[]; more: boolean }> {
+    if ((await accessOf(user)) === "none") return { results: [], more: false };
+    return search.searchSessions(user.id, text, page);
 }
 
 /** Why a session ended, in words, from the reason its tool reported. */
