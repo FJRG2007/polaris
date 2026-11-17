@@ -46,7 +46,7 @@ import { CodeModelPicker } from "@/components/polar/code-model-picker";
 import { neighbourSession, useCodeKeys, useStopTwice } from "@/components/polar/polar-code-keys";
 import { useCodeTheme } from "@/components/polar/polar-display";
 import { CodeAccountSwitch } from "@/components/polar/code-account-switch";
-import { CodeAgentSwitch } from "@/components/polar/code-agent-switch";
+import { CodeAgentSwitch, canSwitchAgent } from "@/components/polar/code-agent-switch";
 import { CodeEnginePill, KNOWN_ENGINES } from "@/components/polar/session-engine";
 import { engineOptions, NATIVE_ENGINE } from "@/lib/polar/native/engine-choice";
 import { CodeView } from "@/components/json-view";
@@ -1747,13 +1747,7 @@ function CodeThread({
     const liveAccount = Boolean(thread?.session.live && thread.canManage && !thread.view.useMachineLogin);
     // Another agent or model, for a running session on Polaris with a branch to
     // carry the work on: the same checks the switch makes on the server.
-    const liveSwitch = Boolean(
-        thread?.session.live &&
-            thread.canManage &&
-            thread.view.place === "local" &&
-            thread.view.repoId &&
-            thread.view.state !== "starting"
-    );
+    const liveSwitch = canSwitchAgent(thread ?? null);
     // The effort, changeable while it runs, for a tool with an effort command.
     const liveEffort = Boolean(cli && core.agentEffortLevels(cli).length > 0 && thread?.session.live);
     const changeEffort = (next: core.AgentEffortLevel) => {

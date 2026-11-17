@@ -29,6 +29,27 @@ export function switchableSources(sources: readonly CodeSource[]): CodeSource[] 
     return sources.filter((source) => source.readiness !== "missing");
 }
 
+/**
+ * Whether the thread offers the switch: a running session on Polaris with a
+ * branch to carry the work on, for somebody who may steer it. The same checks
+ * the server's `switchRefusal` makes, so the button is never a refusal.
+ */
+export function canSwitchAgent(
+    thread: {
+        readonly canManage: boolean;
+        readonly session: { readonly live: boolean };
+        readonly view: { readonly place: string; readonly repoId: string | null; readonly state: string };
+    } | null
+): boolean {
+    return Boolean(
+        thread?.session.live &&
+            thread.canManage &&
+            thread.view.place === "local" &&
+            thread.view.repoId &&
+            thread.view.state !== "starting"
+    );
+}
+
 async function readChoices(): Promise<readonly CodeSource[]> {
     const response = await fetch("/api/polar/code/choices", { cache: "no-store" });
     if (!response.ok) throw new Error(`choices answered ${response.status}`);
