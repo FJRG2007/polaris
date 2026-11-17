@@ -180,7 +180,7 @@ export function BrowserPane({ sessionId, live }: { sessionId: string; live: bool
                     {notice}
                 </p>
             ) : null}
-            <div className="relative min-h-0 flex-1 overflow-auto rounded-md border bg-muted/30">
+            <div className="relative min-h-0 flex-1 overflow-auto overscroll-contain rounded-md border bg-muted/30">
                 <canvas
                     ref={canvas}
                     width={protocol.BROWSER_VIEWPORT.width}
