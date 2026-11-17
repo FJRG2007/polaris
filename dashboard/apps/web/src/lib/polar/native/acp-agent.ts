@@ -15,7 +15,8 @@
  * commands use the editor's own `fs` and `terminal` when it offers them
  * (`acp-workspace.ts`). Every conversation is kept as the engine's own
  * transcript beside the other native ones, so `session/load` replays it to
- * the editor and continues it.
+ * the editor and continues it. The editor's model picker is the session's
+ * `model` config option, listing what the key's owner can address.
  *
  * Every inbound frame is held to the JSON-RPC envelope (`agents/acp/frames`)
  * before the SDK parses each method's params against the protocol's own
@@ -318,6 +319,8 @@ export interface AcpAgentDeps {
     readonly rules?: (cwd: string) => { file: string; text: string }[];
     /** Where transcripts are kept for `session/load` (`fileAcpStore`). */
     readonly store?: AcpStore;
+    /** The models the key's owner can pick (`acpModels`); asked once. */
+    readonly models?: () => Promise<readonly AcpModelChoice[]>;
 }
 
 interface LiveSession {
@@ -329,6 +332,8 @@ interface LiveSession {
     mode: PermissionMode;
     /** Said once, before the session's next answer (`mcpNotice`). */
     notice: string | null;
+    /** The model id the next step is sent to. */
+    model: string;
 }
 
 type Notify = (update: acp.SessionUpdate) => Promise<void>;
@@ -460,6 +465,17 @@ export function createAcpAgent(deps: AcpAgentDeps): acp.AgentApp {
     let fileStore: AcpStore | null = null;
     const store = () => deps.store ?? (fileStore ??= fileAcpStore());
     const modes = () => ({ currentModeId: "default", availableModes: [...ACP_MODES] });
+    let listed: Promise<readonly AcpModelChoice[]> | null = null;
+    const models = (): Promise<readonly AcpModelChoice[]> => {
+        if (!deps.models) return Promise.resolve([]);
+        // Once per process; a failed listing is asked again next time.
+        listed ??= deps.models().catch(() => {
+            listed = null;
+            return [];
+        });
+        return listed;
+    };
+    const configOptions = async (live: LiveSession) => modelOption(live.model, await models(), deps.modelName);
 
     /** One conversation's engine, wired to this editor; a new one or one
      *  read back from its transcript. */
@@ -515,6 +531,7 @@ export function createAcpAgent(deps: AcpAgentDeps): acp.AgentApp {
             notify,
             turn: null,
             mode: "default",
+            model: deps.modelName,
             notice: mcpNotice(servers)
         };
         sessions.set(sessionId, live);
@@ -544,7 +561,7 @@ export function createAcpAgent(deps: AcpAgentDeps): acp.AgentApp {
             const sessionId = newId();
             const live = open(sessionId, params.cwd, client, params.mcpServers);
             await live.engine.start("startup");
-            return { sessionId, modes: modes() };
+            return { sessionId, modes: modes(), configOptions: await configOptions(live) };
         })
         .onRequest(acp.methods.agent.session.load, async ({ params, client }) => {
             if (!path.isAbsolute(params.cwd)) throw acp.RequestError.invalidParams({ cwd: "must be absolute" });
@@ -557,7 +574,21 @@ export function createAcpAgent(deps: AcpAgentDeps): acp.AgentApp {
             // The spec: the whole conversation is replayed before the answer.
             for (const update of replayUpdates(text)) await live.notify(update);
             await live.engine.start("resume");
-            return { modes: modes() };
+            return { modes: modes(), configOptions: await configOptions(live) };
+        })
+        .onRequest(acp.methods.agent.session.setConfigOption, async ({ params }) => {
+            const live = sessions.get(params.sessionId);
+            if (!live) throw acp.RequestError.sessionNotFound(params.sessionId);
+            if (params.configId !== "model") throw acp.RequestError.invalidParams({ configId: "unknown option" });
+            const value = params.value;
+            const choices = await models();
+            const known =
+                typeof value === "string" &&
+                (value === deps.modelName || value === live.model || choices.some((choice) => choice.value === value));
+            if (!known) throw acp.RequestError.invalidParams({ value: "not a model this key can use" });
+            live.model = value;
+            live.engine.setModel(deps.model(value), value);
+            return { configOptions: await configOptions(live) };
         })
         .onRequest(acp.methods.agent.session.setMode, ({ params }) => {
             const live = sessions.get(params.sessionId);
@@ -620,6 +651,65 @@ export function acpModel(config: AcpConfig, fetchImpl?: typeof fetch) {
 
 /** Asks the compatible API whether it serves this key, without spending a
  *  call (the route's HEAD probe), and says why not in the editor's terms. */
+/** A model the editor offers: the id sent, and the name shown. */
+export interface AcpModelChoice {
+    readonly value: string;
+    readonly name: string;
+}
+
+/** The most models one listing offers. */
+export const ACP_MODELS_MAX = 200;
+
+const modelListSchema = z.object({
+    data: z
+        .array(
+            z.object({
+                id: z.string().trim().min(1).max(200),
+                display_name: z.string().trim().max(200).optional()
+            })
+        )
+        .max(5000)
+});
+
+/** The listing as choices: one per name, the last form listed (the plain
+ *  `provider/model` an OpenAI-compatible client sends, `compat/models.ts`),
+ *  bounded. */
+export function modelChoices(data: readonly { id: string; display_name?: string }[]): AcpModelChoice[] {
+    const byName = new Map<string, AcpModelChoice>();
+    for (const entry of data) {
+        const name = entry.display_name || entry.id;
+        byName.delete(name);
+        byName.set(name, { value: entry.id, name });
+    }
+    return [...byName.values()].slice(0, ACP_MODELS_MAX);
+}
+
+/** The session's one config option: the model. The one the session started
+ *  with (`POLARIS_MODEL`, `polar` for the person's default) is listed first
+ *  when the listing does not hold it, so the editor can always go back. */
+export function modelOption(
+    current: string,
+    choices: readonly AcpModelChoice[],
+    started: string = current
+): acp.SessionConfigOption[] {
+    const extra = [...new Set([started, current])]
+        .filter((id) => !choices.some((choice) => choice.value === id))
+        .map((id) => ({ value: id, name: id === ACP_DEFAULT_MODEL ? "Your default model" : id }));
+    const options = [...extra, ...choices];
+    return [{ id: "model", name: "Model", category: "model", type: "select", currentValue: current, options }];
+}
+
+/** The models this key's owner can address, from the compatible API's
+ *  `GET /v1/models`. */
+export async function acpModels(config: AcpConfig, fetchImpl: typeof fetch = fetch): Promise<AcpModelChoice[]> {
+    const response = await fetchImpl(`${config.POLARIS_URL}/api/v1/models`, {
+        headers: { authorization: `Bearer ${config.POLARIS_API_KEY}` },
+        signal: AbortSignal.timeout(15_000)
+    });
+    if (!response.ok) throw new Error(`Polaris answered ${response.status}.`);
+    return modelChoices(modelListSchema.parse(await response.json()).data);
+}
+
 export async function checkAcpAccess(config: AcpConfig, fetchImpl: typeof fetch = fetch): Promise<void> {
     let status: number;
     try {
@@ -664,7 +754,8 @@ export async function runAcp(env: NodeJS.ProcessEnv): Promise<number> {
     const connection = createAcpAgent({
         model: acpModel(config),
         modelName: config.POLARIS_MODEL,
-        checkAccess: () => checkAcpAccess(config)
+        checkAccess: () => checkAcpAccess(config),
+        models: () => acpModels(config)
     }).connect(stream);
     await connection.closed;
     return 0;

@@ -7,12 +7,15 @@ import * as acp from "@agentclientprotocol/sdk";
 import { validatedFrames } from "@/lib/agents/acp/frames";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+    ACP_MODELS_MAX,
     acpEnvSchema,
+    acpModels,
     assistantText,
     checkAcpAccess,
     createAcpAgent,
     describeCall,
     mcpNotice,
+    modelChoices,
     permissionDecision,
     promptText,
     readAcpEnv,
@@ -453,6 +456,127 @@ describe("loading a session", () => {
         expect(run.seen.updates[0]).toEqual(notices[0]);
         expect(JSON.stringify(notices[0])).toContain("github");
         run.connection.close();
+    });
+});
+
+describe("choosing a model", () => {
+    function withModels(listing: () => Promise<{ value: string; name: string }[]>) {
+        const first = scripted([{ text: "From the default." }]);
+        const second = scripted([{ text: "From the other one." }]);
+        const wire = pipes();
+        let asked = 0;
+        createAcpAgent({
+            model: (id) => (id === "openai/gpt-test" ? second.model : first.model),
+            modelName: "polar",
+            newId: () => `s-${++asked}`,
+            rules: () => [],
+            store: memoryStore(),
+            models: listing
+        }).connect(wire.agentStream);
+        const { app, seen } = editor(null);
+        const connection = app.connect(acp.ndJsonStream(wire.toAgent.writable, wire.toClient.readable));
+        return { agent: connection.agent, connection, seen, first, second };
+    }
+
+    it("lists the key's models with the default first, switches the next prompt to the one picked, and refuses another", async () => {
+        let listings = 0;
+        const run = withModels(async () => {
+            listings += 1;
+            return [{ value: "openai/gpt-test", name: "GPT Test (OpenAI)" }];
+        });
+        await run.agent.request(acp.methods.agent.initialize, { protocolVersion: acp.PROTOCOL_VERSION, clientCapabilities: NO_CAPS });
+        const session = await run.agent.request(acp.methods.agent.session.new, { cwd: root, mcpServers: [] });
+        expect(session.configOptions).toEqual([
+            {
+                id: "model",
+                name: "Model",
+                category: "model",
+                type: "select",
+                currentValue: "polar",
+                options: [
+                    { value: "polar", name: "Your default model" },
+                    { value: "openai/gpt-test", name: "GPT Test (OpenAI)" }
+                ]
+            }
+        ]);
+        const changed = await run.agent.request(acp.methods.agent.session.setConfigOption, {
+            sessionId: session.sessionId,
+            configId: "model",
+            value: "openai/gpt-test"
+        });
+        const option = changed.configOptions[0]!;
+        expect(option.type === "select" && option.currentValue).toBe("openai/gpt-test");
+        // The default stays listed, so the editor can go back.
+        expect(option.type === "select" && option.options).toHaveLength(2);
+        await run.agent.request(acp.methods.agent.session.prompt, {
+            sessionId: session.sessionId,
+            prompt: [{ type: "text", text: "hi" }]
+        });
+        expect(run.first.prompts).toHaveLength(0);
+        expect(run.second.prompts).toHaveLength(1);
+        expect(run.seen.updates).toContainEqual({
+            sessionUpdate: "agent_message_chunk",
+            content: { type: "text", text: "From the other one." }
+        });
+        for (const bad of [
+            { configId: "model", value: "anthropic/not-listed" },
+            { configId: "temperature", value: "openai/gpt-test" },
+            { configId: "model", type: "boolean", value: true }
+        ]) {
+            await expect(
+                run.agent.request(acp.methods.agent.session.setConfigOption, { sessionId: session.sessionId, ...bad } as never)
+            ).rejects.toThrow();
+        }
+        await run.agent.request(acp.methods.agent.session.new, { cwd: root, mcpServers: [] });
+        expect(listings).toBe(1);
+        run.connection.close();
+    });
+
+    it("still offers the default when the listing fails, and asks again next time", async () => {
+        let listings = 0;
+        const run = withModels(async () => {
+            listings += 1;
+            throw new Error("offline");
+        });
+        await run.agent.request(acp.methods.agent.initialize, { protocolVersion: acp.PROTOCOL_VERSION, clientCapabilities: NO_CAPS });
+        const session = await run.agent.request(acp.methods.agent.session.new, { cwd: root, mcpServers: [] });
+        const option = session.configOptions?.[0];
+        expect(option?.type === "select" && option.options).toEqual([{ value: "polar", name: "Your default model" }]);
+        await run.agent.request(acp.methods.agent.session.new, { cwd: root, mcpServers: [] });
+        expect(listings).toBe(2);
+        run.connection.close();
+    });
+
+    it("reads the compatible API's listing with the key, one choice per name", async () => {
+        const config = { POLARIS_URL: "https://polaris.example.test", POLARIS_API_KEY: "pk_test_0123456789abcdef", POLARIS_MODEL: "polar" };
+        let seenAuth = "";
+        let seenUrl = "";
+        const listing = (async (url: string, init: RequestInit) => {
+            seenUrl = url;
+            seenAuth = String((init.headers as Record<string, string>).authorization);
+            return Response.json({
+                object: "list",
+                data: [
+                    { id: "claude-opus-5-5", display_name: "Claude Opus 5.5" },
+                    { id: "anthropic/openai/gpt-test", display_name: "GPT Test (OpenAI)" },
+                    { id: "claude-3-freecc-no-thinking/openai/gpt-test", display_name: "GPT Test (OpenAI) (no thinking)" },
+                    { id: "openai/gpt-test", display_name: "GPT Test (OpenAI)" }
+                ]
+            });
+        }) as unknown as typeof fetch;
+        expect(await acpModels(config, listing)).toEqual([
+            { value: "claude-opus-5-5", name: "Claude Opus 5.5" },
+            { value: "claude-3-freecc-no-thinking/openai/gpt-test", name: "GPT Test (OpenAI) (no thinking)" },
+            { value: "openai/gpt-test", name: "GPT Test (OpenAI)" }
+        ]);
+        expect(seenUrl).toBe("https://polaris.example.test/api/v1/models");
+        expect(seenAuth).toBe("Bearer pk_test_0123456789abcdef");
+        const malformed = (async () => Response.json({ data: [{ id: 7 }] })) as unknown as typeof fetch;
+        await expect(acpModels(config, malformed)).rejects.toThrow();
+        const refused = (async () => new Response(null, { status: 403 })) as unknown as typeof fetch;
+        await expect(acpModels(config, refused)).rejects.toThrow(/403/);
+        const many = Array.from({ length: ACP_MODELS_MAX + 5 }, (_, index) => ({ id: `p/m${index}` }));
+        expect(modelChoices(many)).toHaveLength(ACP_MODELS_MAX);
     });
 });
 
