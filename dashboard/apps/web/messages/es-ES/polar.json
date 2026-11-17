@@ -1911,7 +1911,7 @@
             "addressHint": "Escribe una dirección y pulsa Intro"
         },
         "shells": {
-            "tabs": "Pestañas del terminal",
+            "tabs": "Pestañas",
             "agent": "Agente",
             "shell": "Shell {number}",
             "open": "Abrir un shell junto al agente",

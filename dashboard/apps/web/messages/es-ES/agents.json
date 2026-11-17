@@ -867,7 +867,7 @@
         "cues": "Pautas de cada sesión",
         "cuesPlaceholder": "Ejecuta los tests antes de hacer commit. No edites la carpeta generada.",
         "cuesHint": "Cada sesión de este repositorio recibe estas instrucciones antes de su primer prompt.",
-        "previewCommand": "Comando de vista previa",
+        "previewCommand": "Comando de preview",
         "previewCommandPlaceholder": "npm run dev",
         "previewCommandHint": "Arranca el servidor de desarrollo desde la vista previa de una sesión, en su copia. Vacío para arrancarlo tú."
     },
