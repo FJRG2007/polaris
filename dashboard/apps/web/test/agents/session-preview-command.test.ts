@@ -3,6 +3,7 @@ import {
     PREVIEW_COMMAND_MAX,
     PREVIEW_STATE,
     previewCommandSchema,
+    previewStartBlock,
     previewStartScript
 } from "@/lib/agents/session-preview-command";
 
@@ -33,5 +34,21 @@ describe("previewStartScript", () => {
         expect(script).toContain('cd "$w"');
         expect(script).toContain('nohup su -p "$a"');
         expect(script).toContain(`echo $! > ${PREVIEW_STATE}.pid`);
+    });
+});
+
+describe("previewStartBlock", () => {
+    const facts = { over: false, place: "local", repoId: "r-1", command: "npm run dev" };
+
+    it("lets a running container session with a command start it", () => {
+        expect(previewStartBlock(facts)).toBeNull();
+    });
+
+    it("names why it cannot: ended first, then not in a container, then no command", () => {
+        expect(previewStartBlock({ ...facts, over: true, place: "host" })).toBe("ended");
+        expect(previewStartBlock({ ...facts, place: "host" })).toBe("elsewhere");
+        expect(previewStartBlock({ ...facts, place: "computer" })).toBe("elsewhere");
+        expect(previewStartBlock({ ...facts, repoId: null })).toBe("elsewhere");
+        expect(previewStartBlock({ ...facts, command: "   " })).toBe("noCommand");
     });
 });

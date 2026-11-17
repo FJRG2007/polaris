@@ -55,3 +55,24 @@ export function previewStartScript(command: string): string {
         "echo started"
     ].join("\n");
 }
+
+/** Why a session's preview command cannot be started from the preview, or
+ *  null when it can: a session that has ended, one that is not in a container
+ *  Polaris manages (or has no repository), and a repository with no command. */
+export type PreviewStartBlock = "ended" | "elsewhere" | "noCommand";
+
+/**
+ * The one answer both the Start button and the action that runs it read, so the
+ * screen never offers a start the server refuses.
+ */
+export function previewStartBlock(facts: {
+    over: boolean;
+    place: string;
+    repoId: string | null;
+    command: string;
+}): PreviewStartBlock | null {
+    if (facts.over) return "ended";
+    if (facts.place !== "local" || !facts.repoId) return "elsewhere";
+    if (!facts.command.trim()) return "noCommand";
+    return null;
+}

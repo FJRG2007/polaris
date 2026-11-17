@@ -1244,11 +1244,15 @@ export async function startSessionPreviewAction(sessionId: string): Promise<{ er
     if (!parsed.success) return { error: t("session.changes.errors.invalid") };
     const session = await controlledSession(parsed.data);
     if (!session) return { error: t("sessions.errors.gone") };
-    if (core.isSessionOver(session.state)) return { error: t("sessions.errors.ended") };
-    if (session.place !== "local" || !session.repoId) return { error: t("session.previewCommand.none") };
-    const repo = await prisma.agentRepo.findUnique({ where: { id: session.repoId }, select: { previewCommand: true } });
+    const over = core.isSessionOver(session.state);
+    const repo =
+        session.repoId && !over
+            ? await prisma.agentRepo.findUnique({ where: { id: session.repoId }, select: { previewCommand: true } })
+            : null;
     const command = repo?.previewCommand.trim() ?? "";
-    if (!command) return { error: t("session.previewCommand.none") };
+    const block = previewCommand.previewStartBlock({ over, place: session.place, repoId: session.repoId, command });
+    if (block === "ended") return { error: t("sessions.errors.ended") };
+    if (block) return { error: t("session.previewCommand.none") };
     try {
         const ran = await runtime.runInSession(session.id, previewCommand.previewStartScript(command));
         return ran.code === 0 ? {} : { error: t("session.previewCommand.failed") };

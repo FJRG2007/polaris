@@ -54,6 +54,7 @@ import {
     X
 } from "lucide-react";
 import * as shellTabs from "@/components/polar/shell-tabs";
+import { previewStartBlock } from "@/lib/agents/session-preview-command";
 
 type Pane = "files" | "artifacts" | "preview" | "browser" | "changes" | "pull" | "terminal";
 
@@ -246,7 +247,14 @@ export function PolarCodeWorkspace({
                                 <SessionArtifacts sessionId={session.id} live={live} />
                             </ClientMessages>
                         ) : pane === "preview" ? (
-                            <PreviewPane sessionId={session.id} live={live} lastEdit={wake} onPick={onPick} />
+                            <PreviewPane
+                                sessionId={session.id}
+                                place={session.place}
+                                repoId={session.repoId}
+                                live={live}
+                                lastEdit={wake}
+                                onPick={onPick}
+                            />
                         ) : pane === "browser" ? (
                             <BrowserPane sessionId={session.id} live={live} />
                         ) : pane === "changes" ? (
@@ -567,11 +575,15 @@ function FilesPane({ sessionId, live }: { sessionId: string; live: boolean }) {
 
 function PreviewPane({
     sessionId,
+    place,
+    repoId,
     live,
     lastEdit,
     onPick
 }: {
     sessionId: string;
+    place: SessionView["place"];
+    repoId: string | null;
     live: boolean;
     lastEdit: string | null;
     onPick?: (element: PickedElement) => void;
@@ -614,8 +626,10 @@ function PreviewPane({
         [sessionId]
     );
 
+    // Only a session in a container Polaris manages has ports to show.
+    const contained = place === "local";
     useEffect(() => {
-        if (!live) return;
+        if (!live || !contained) return;
         const controller = new AbortController();
         read(controller.signal);
         const timer = window.setInterval(() => {
@@ -625,7 +639,7 @@ function PreviewPane({
             controller.abort();
             window.clearInterval(timer);
         };
-    }, [read, live]);
+    }, [read, live, contained]);
 
     const open = useMemo(() => (answer?.kind === "ports" ? answer.open : []), [answer]);
     // The first server, until the one picked stops answering.
@@ -635,7 +649,7 @@ function PreviewPane({
     }, [open, port]);
 
     if (!live) return <ui.EmptyState icon={<Globe className="size-5" />} title={t("code.preview.ended")} />;
-    if (answer?.kind === "unavailable") {
+    if (!contained || answer?.kind === "unavailable") {
         return <ui.EmptyState icon={<Globe className="size-5" />} title={t("code.preview.unavailable")} />;
     }
     if (!answer) {
@@ -665,7 +679,10 @@ function PreviewPane({
                     title={t("code.preview.none")}
                     description={t("code.preview.noneHint")}
                 />
-                {answer?.kind === "ports" && answer.command ? <PreviewStart sessionId={sessionId} command={answer.command} /> : null}
+                {/* The same facts the start action checks: never a button it refuses. */}
+                {previewStartBlock({ over: !live, place, repoId, command: answer.command }) === null ? (
+                    <PreviewStart sessionId={sessionId} command={answer.command} />
+                ) : null}
                 {inside}
             </div>
         );

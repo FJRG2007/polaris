@@ -10,15 +10,22 @@ import type { SessionView } from "@/lib/agents/session-service";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
-const ports = { open: [] as number[] };
+const ports = { open: [] as number[], command: "" };
+const started: string[] = [];
 
 vi.mock("@/components/agents/sessions/sessions-polls", () => ({
     sessionPreview: async () => ({
-        answer: { kind: "ports", base: "/api/agents/preview/s-1/sig", open: ports.open, inside: [] }
+        answer: { kind: "ports", base: "/api/agents/preview/s-1/sig", open: ports.open, inside: [], command: ports.command }
     }),
     sessionFiles: async () => ({ answer: { kind: "files", files: [], truncated: false } })
 }));
-vi.mock("@/components/agents/sessions/actions", () => ({ openAgentInterfaceAction: async () => ({}) }));
+vi.mock("@/components/agents/sessions/actions", () => ({
+    openAgentInterfaceAction: async () => ({}),
+    startSessionPreviewAction: async (id: string) => {
+        started.push(id);
+        return {};
+    }
+}));
 vi.mock("@/components/agents/sessions/session-changes", () => ({ SessionChanges: () => null }));
 vi.mock("@/components/agents/sessions/session-pr-tab", () => ({ SessionPullTab: () => null }));
 vi.mock("@/components/agents/sessions/session-artifacts", () => ({ SessionArtifacts: () => null }));
@@ -26,16 +33,28 @@ vi.mock("@/app/(app)/apps/deploy/terminal-panel", () => ({ TerminalPanel: () => 
 
 const { PolarCodeWorkspace } = await import("@/components/polar/polar-code-workspace");
 
-const SESSION = { id: "s-1", title: "Fixture task", repoFullName: "", state: "working" } as unknown as SessionView;
+const SESSION = {
+    id: "s-1",
+    title: "Fixture task",
+    repoId: "r-1",
+    repoFullName: "",
+    place: "local",
+    state: "working"
+} as unknown as SessionView;
 
-function draw(lastEdit: string | null, onPick?: (element: unknown) => void) {
+function draw(
+    lastEdit: string | null,
+    onPick?: (element: unknown) => void,
+    session: SessionView = SESSION,
+    live = true
+) {
     return withMessages(
         <PolarCodeWorkspace
             open
             onOpenChange={() => undefined}
-            session={SESSION}
+            session={session}
             branch=""
-            live
+            live={live}
             lastEdit={lastEdit}
             onPick={onPick}
         />
@@ -57,6 +76,8 @@ const PICKED = {
 
 beforeEach(() => {
     ports.open = [];
+    ports.command = "";
+    started.length = 0;
 });
 afterEach(() => {
     cleanup();
@@ -147,5 +168,51 @@ describe("PolarCodeWorkspace preview", () => {
         render(draw(null));
         await screen.findByTitle("Preview of port 3000");
         expect(screen.queryByRole("button", { name: "Pick an element for your message" })).toBeNull();
+    });
+
+    describe("the dev-server start", () => {
+        const openPreview = () => fireEvent.click(screen.getByRole("radio", { name: "Live preview" }));
+
+        it("is offered on a running container session whose repository has a command", async () => {
+            ports.command = "npm run dev";
+            render(draw(null));
+            openPreview();
+            fireEvent.click(await screen.findByRole("button", { name: "Start the dev server" }));
+            expect(await screen.findByText("Starting. The preview opens once it listens.")).toBeTruthy();
+            expect(started).toEqual(["s-1"]);
+        });
+
+        it("is not offered on a session that has ended, and says why", async () => {
+            ports.command = "npm run dev";
+            render(draw(null, undefined, SESSION, false));
+            openPreview();
+            expect(await screen.findByText("This session is not running, so there is nothing to preview.")).toBeTruthy();
+            expect(screen.queryByRole("button", { name: "Start the dev server" })).toBeNull();
+        });
+
+        it("is not offered on a session outside a container Polaris manages, and says why", async () => {
+            ports.command = "npm run dev";
+            render(draw(null, undefined, { ...SESSION, place: "host" } as SessionView));
+            openPreview();
+            expect(
+                await screen.findByText("Previews are only here while the session runs on a machine Polaris manages.")
+            ).toBeTruthy();
+            expect(screen.queryByRole("button", { name: "Start the dev server" })).toBeNull();
+        });
+
+        it("is not offered without a repository or a command", async () => {
+            ports.command = "npm run dev";
+            const view = render(draw(null, undefined, { ...SESSION, repoId: null } as SessionView));
+            openPreview();
+            expect(await screen.findByText("No web server is running in this session yet.")).toBeTruthy();
+            expect(screen.queryByRole("button", { name: "Start the dev server" })).toBeNull();
+            view.unmount();
+
+            ports.command = "";
+            render(draw(null));
+            openPreview();
+            expect(await screen.findByText("No web server is running in this session yet.")).toBeTruthy();
+            expect(screen.queryByRole("button", { name: "Start the dev server" })).toBeNull();
+        });
     });
 });
