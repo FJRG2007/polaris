@@ -87,6 +87,9 @@ describe("the work Polaris runs on a schedule", () => {
             // Two runners would each see the same free slot and start two queued
             // sessions, or dispatch the same orchestration task twice.
             "agent-queue",
+            // Two runners would read the same reviewer's logs and send the same
+            // requested changes back to the session twice.
+            "agent-session-reviews",
             // Two runners tearing the same container down race each other onto
             // the same daemon call, and the one that loses fails on a container
             // the other already removed.
@@ -126,6 +129,9 @@ describe("the work Polaris runs on a schedule", () => {
             "calendar-housekeeping",
             "calendar-reminders",
             "calendar-sync",
+            // Two passes would delete the same expired rows and race each other
+            // on the ones the other already took.
+            "chat-disappearing",
             // Two passes would each fire the same reminder; each row is also
             // claimed before it fires.
             "chat-reminders",
