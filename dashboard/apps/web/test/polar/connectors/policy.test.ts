@@ -147,3 +147,26 @@ describe("embedded resources in a connector's answer", () => {
         expect(text).toBe("hello\n[resource: file:///b.png]\n[image]");
     });
 });
+
+describe("input problems", () => {
+    const schema = {
+        type: "object",
+        required: ["intent", "livemode"],
+        properties: { intent: { type: "string" }, livemode: { type: "boolean" }, limit: { type: "integer" } },
+        additionalProperties: false
+    };
+
+    it("names what is missing, mistyped or unknown, and the fields it takes", () => {
+        const problems = policy.inputProblems(schema, { intent: "list", limit: "5", params: "{}" });
+        expect(problems).toEqual([
+            'Missing required field "livemode" (boolean).',
+            'Field "limit" has to be integer.',
+            '"params" is not a field of this tool.',
+            "Its fields are: intent, livemode, limit."
+        ]);
+    });
+
+    it("is empty when the input fits", () => {
+        expect(policy.inputProblems(schema, { intent: "list", livemode: true })).toEqual([]);
+    });
+});

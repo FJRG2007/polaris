@@ -78,16 +78,21 @@ export async function polarConnectorTools(
                     .join(" ")
                     .slice(0, 1200),
                 inputSchema: jsonSchema(entry.inputSchema as never, {
-                    validate: async (value) =>
-                        rules.inputFits(entry.inputSchema, value)
+                    // The reasons go back to the model with the refusal, so it
+                    // can call again with what was missing instead of guessing.
+                    validate: async (value) => {
+                        const problems = rules.inputProblems(entry.inputSchema, value);
+                        return problems.length === 0
                             ? { success: true, value }
-                            : { success: false, error: new Error("input does not fit") }
+                            : { success: false, error: new Error(problems.join(" ")) };
+                    }
                 }),
                 async execute(input: unknown, options) {
-                    if (!rules.inputFits(entry.inputSchema, input)) {
+                    const problems = rules.inputProblems(entry.inputSchema, input);
+                    if (problems.length > 0) {
                         return {
                             ok: false,
-                            text: `${name} was called with input it does not take.`
+                            text: `${name} was called with input it does not take. ${problems.join(" ")}`
                         };
                     }
                     const session = await import("@/lib/polar/connectors/session");

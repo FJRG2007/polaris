@@ -321,32 +321,61 @@ export function isConnectorToolName(name: string): boolean {
  * call to this tool before it leaves the deployment.
  */
 export function inputFits(schema: Record<string, unknown>, input: unknown): boolean {
-    if (!input || typeof input !== "object" || Array.isArray(input)) return false;
+    return inputProblems(schema, input).length === 0;
+}
+
+/** Most problems one refusal names, so a wild call cannot write an essay back. */
+const PROBLEMS_MOST = 10;
+
+/**
+ * What is wrong with a call's input, by `inputFits`'s rules, one sentence per
+ * field, in words the model can act on: the field missing and the type it
+ * wants, the field of the wrong type, the field this tool does not take. Empty
+ * when it fits. The field names are the tool's own schema's, never the input's
+ * values, so nothing the model wrote is echoed back.
+ */
+export function inputProblems(schema: Record<string, unknown>, input: unknown): string[] {
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+        return ["The input has to be a JSON object of named fields."];
+    }
     let size: number;
     try {
         size = JSON.stringify(input).length;
     } catch {
-        return false;
+        return ["The input could not be read as JSON."];
     }
-    if (size > INPUT_MAX) return false;
+    if (size > INPUT_MAX) return [`The input is larger than ${INPUT_MAX} characters.`];
     const values = input as Record<string, unknown>;
     const properties = (schema.properties ?? {}) as Record<string, { type?: unknown }>;
     const required = Array.isArray(schema.required) ? schema.required : [];
+    const typeOf = (key: string) => {
+        const type = properties[key]?.type;
+        const types = (Array.isArray(type) ? type : [type]).filter((one) => typeof one === "string");
+        return types.length > 0 ? ` (${types.join(" or ")})` : "";
+    };
+    const problems: string[] = [];
     for (const key of required) {
-        if (typeof key === "string" && !(key in values)) return false;
+        if (typeof key === "string" && !(key in values)) {
+            problems.push(`Missing required field "${key}"${typeOf(key)}.`);
+        }
     }
     for (const [key, value] of Object.entries(values)) {
         const described = properties[key];
         if (!described) {
-            if (schema.additionalProperties === false) return false;
+            if (schema.additionalProperties === false) {
+                problems.push(`"${key.slice(0, 64)}" is not a field of this tool.`);
+            }
             continue;
         }
         const types = Array.isArray(described.type) ? described.type : [described.type];
         if (described.type !== undefined && !types.some((type) => typeMatches(type, value))) {
-            return false;
+            problems.push(`Field "${key}" has to be${typeOf(key).replace(/[()]/g, "")}.`);
         }
     }
-    return true;
+    if (problems.length === 0) return problems;
+    const fields = Object.keys(properties).slice(0, 40);
+    const named = fields.length > 0 ? [`Its fields are: ${fields.join(", ")}.`] : [];
+    return [...problems.slice(0, PROBLEMS_MOST), ...named];
 }
 
 function typeMatches(type: unknown, value: unknown): boolean {
