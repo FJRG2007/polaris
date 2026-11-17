@@ -27,6 +27,7 @@ import {
     Textarea
 } from "@polaris/ui";
 import * as actions from "./custom-tools-actions";
+import { CodeView } from "@/components/json-view";
 import * as shared from "@/lib/polar/custom-tools/shared";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { StoredPlugin, StoredTool } from "@/lib/polar/custom-tools/store";
@@ -494,6 +495,11 @@ function PluginDialog({
     );
 }
 
+/** The grammar a repository tool's script is painted with, by what runs it. */
+function scriptLanguage(runtime: string): string {
+    return runtime === "node" ? "javascript" : runtime === "bun" ? "typescript" : "bash";
+}
+
 function ProjectTools({ readOnly }: { readOnly: boolean }) {
     const t = useTranslations("polar");
     const [review, setReview] = useState<actions.ProjectToolsView | null | "none">(null);
@@ -551,7 +557,7 @@ function ProjectTools({ readOnly }: { readOnly: boolean }) {
                                 <p className="mt-1 truncate text-xs text-muted-foreground" title={tool.path}>
                                     {tool.path}
                                 </p>
-                                <pre className="mt-1 max-h-60 overflow-auto overscroll-contain rounded bg-muted p-2 text-xs">{tool.script}</pre>
+                                <CodeView value={tool.script} language={scriptLanguage(tool.runtime)} label={tool.path} className="mt-1 max-h-60" />
                             </details>
                         ))}
                         {review.modules.map((module) => (
@@ -562,7 +568,7 @@ function ProjectTools({ readOnly }: { readOnly: boolean }) {
                                         {t(`settings.customTools.project.module.${module.status}`)}
                                     </span>
                                 </summary>
-                                <pre className="mt-1 max-h-60 overflow-auto overscroll-contain rounded bg-muted p-2 text-xs">{module.source}</pre>
+                                <CodeView value={module.source} language={module.path.split(".").pop() ?? "ts"} label={module.path} className="mt-1 max-h-60" />
                             </details>
                         ))}
                         {review.refused.length > 0 && (
