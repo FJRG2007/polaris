@@ -560,8 +560,10 @@ describe("cast lights by graphics quality", () => {
 });
 
 describe("the helicopter on the keyboard", () => {
-    it("descends on Ctrl as well as Q and C, and climbs on Space and E", () => {
-        expect(rules.KEY_BINDINGS.down).toEqual(["KeyQ", "KeyC", "ControlLeft", "ControlRight"]);
+    it("descends on Q and C, never Ctrl (Ctrl+W closes the tab), and climbs on Space and E", () => {
+        expect(rules.KEY_BINDINGS.down).toEqual(["KeyQ", "KeyC"]);
+        const codes = Object.values(rules.KEY_BINDINGS).flat();
+        expect(codes.some((code) => code.startsWith("Control") || code.startsWith("Meta"))).toBe(false);
         expect(rules.KEY_BINDINGS.up).toEqual(["Space", "KeyE"]);
     });
 

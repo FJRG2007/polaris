@@ -463,14 +463,14 @@ function stepArm(current, allowed, dt, rate = PERSON_CAMERA.armReturnRate) {
   return current + (allowed - current) * (1 - Math.exp(-rate * (dt > 0 ? dt : 0)));
 }
 
-// The keyboard, by action. Ctrl descends as well as Q and C: it is where flight games put "down".
+// The keyboard, by action. Nothing is bound to Ctrl: with W or Shift+W it closes the tab or the window, and no page can stop that.
 const KEY_BINDINGS = Object.freeze({
   forward: ['KeyW', 'ArrowUp'],
   backward: ['KeyS', 'ArrowDown'],
   left: ['KeyA', 'ArrowLeft'],
   right: ['KeyD', 'ArrowRight'],
   up: ['Space', 'KeyE'],
-  down: ['KeyQ', 'KeyC', 'ControlLeft', 'ControlRight'],
+  down: ['KeyQ', 'KeyC'],
   turbo: ['ShiftLeft', 'ShiftRight'] // the helicopter's turbo and the walker's sprint; Shift+V still steps the camera back
 });
 

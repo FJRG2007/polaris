@@ -45,6 +45,15 @@ export function GamePlayer({ gameId, together }: { gameId: string; together: boo
         return () => document.removeEventListener("fullscreenchange", read);
     }, []);
 
+    // Ctrl+W and Ctrl+Shift+W belong to the browser and no page can take them, so
+    // a key missed while playing would close the game outright: the browser asks first.
+    // The Close button leaves through the router, which does not ask.
+    useEffect(() => {
+        const leaving = (event: BeforeUnloadEvent) => event.preventDefault();
+        window.addEventListener("beforeunload", leaving);
+        return () => window.removeEventListener("beforeunload", leaving);
+    }, []);
+
     useEffect(() => {
         if (!multiplayer) return;
         let live = true;

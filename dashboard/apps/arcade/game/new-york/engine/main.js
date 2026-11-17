@@ -493,7 +493,7 @@ async function initApp() {
             [["W", "S"], "move"],
             [["A", "D"], "turn"],
             [["Space", "E"], "up"],
-            [["Q", "C", "Ctrl"], "down"],
+            [["Q", "C"], "down"],
             [["Shift"], "turbo"]
         ]
     };

@@ -266,10 +266,9 @@ class ThirdPersonControllerManager {
 
     const onKey = (e, isDown) => {
       const action = actionsByCode.get(e.code);
-      if (!action || (isDown && isTypingInField(e))) return;
-      // Ctrl descends, so Ctrl with a flying key must not save, bookmark or select the page instead. The browser keeps
-      // Ctrl+W, Ctrl+T and Ctrl+N for itself whatever a page does; outside full screen those still reach it.
-      if (isDown && e.ctrlKey && !e.altKey && !e.metaKey) e.preventDefault();
+      // A key pressed with Ctrl or Cmd is the browser's shortcut, not a move: Ctrl+W must not also drive forward while
+      // the tab asks whether to close.
+      if (!action || (isDown && (isTypingInField(e) || e.ctrlKey || e.metaKey))) return;
       if (isDown) this._pressedCodes.add(e.code);
       else this._pressedCodes.delete(e.code);
       // Releasing one binding must not cancel another key held for the same action.
