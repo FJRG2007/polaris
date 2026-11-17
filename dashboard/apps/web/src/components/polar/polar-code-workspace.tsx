@@ -16,6 +16,7 @@ import { languageForFile } from "@/lib/code-language";
 import { CodeSurface } from "@/components/code-surface";
 import type { SessionView } from "@/lib/agents/session-service";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { TOUCH_TARGET } from "@/components/use-phone";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCodeTheme } from "@/components/polar/polar-display";
 import { ClientMessages } from "@/components/i18n/client-namespaces";
@@ -146,7 +147,7 @@ export function PolarCodeWorkspace({
                         </ui.DialogDescription>
                     </ui.DialogHeader>
                     <ui.SegmentedControl
-                        className="self-start"
+                        className="max-w-full self-start overflow-x-auto [@media(pointer:coarse)]:[&_button]:min-h-11 [@media(pointer:coarse)]:[&_button]:min-w-11"
                         aria-label={t("code.pane.title")}
                         value={pane}
                         onValueChange={(next) => {
@@ -159,7 +160,7 @@ export function PolarCodeWorkspace({
                                 label: (
                                     <span className="flex items-center gap-1.5">
                                         <FolderTree className="size-4" />
-                                        {t("code.pane.files")}
+                                        <span className="max-sm:sr-only">{t("code.pane.files")}</span>
                                     </span>
                                 )
                             },
@@ -168,7 +169,7 @@ export function PolarCodeWorkspace({
                                 label: (
                                     <span className="flex items-center gap-1.5">
                                         <FileBox className="size-4" />
-                                        {t("code.pane.artifacts")}
+                                        <span className="max-sm:sr-only">{t("code.pane.artifacts")}</span>
                                     </span>
                                 )
                             },
@@ -177,7 +178,7 @@ export function PolarCodeWorkspace({
                                 label: (
                                     <span className="flex items-center gap-1.5">
                                         <Globe className="size-4" />
-                                        {t("code.pane.preview")}
+                                        <span className="max-sm:sr-only">{t("code.pane.preview")}</span>
                                     </span>
                                 )
                             },
@@ -186,7 +187,7 @@ export function PolarCodeWorkspace({
                                 label: (
                                     <span className="flex items-center gap-1.5">
                                         <GitCompare className="size-4" />
-                                        {t("code.pane.changes")}
+                                        <span className="max-sm:sr-only">{t("code.pane.changes")}</span>
                                     </span>
                                 )
                             },
@@ -197,7 +198,7 @@ export function PolarCodeWorkspace({
                                           label: (
                                               <span className="flex items-center gap-1.5">
                                                   <GitPullRequest className="size-4" />
-                                                  {t("code.pane.pull")}
+                                                  <span className="max-sm:sr-only">{t("code.pane.pull")}</span>
                                               </span>
                                           )
                                       }
@@ -208,7 +209,7 @@ export function PolarCodeWorkspace({
                                 label: (
                                     <span className="flex items-center gap-1.5">
                                         <SquareTerminal className="size-4" />
-                                        {t("code.pane.terminal")}
+                                        <span className="max-sm:sr-only">{t("code.pane.terminal")}</span>
                                     </span>
                                 )
                             }
@@ -290,7 +291,7 @@ function InterfaceButton({ sessionId }: { sessionId: string }) {
         });
     return (
         <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <ui.Button type="button" size="sm" variant="outline" onClick={open} disabled={busy}>
+            <ui.Button type="button" size="sm" variant="outline" className={TOUCH_TARGET} onClick={open} disabled={busy}>
                 <SquareTerminal className="size-4 shrink-0" aria-hidden />
                 {t("code.pane.openInterface")}
             </ui.Button>
@@ -370,6 +371,7 @@ function FilesPane({ sessionId, live }: { sessionId: string; live: boolean }) {
                     <ui.Button
                         variant="ghost"
                         size="icon"
+                        className={TOUCH_TARGET}
                         onClick={() => read()}
                         aria-label={t("code.pane.refresh")}
                         title={t("code.pane.refresh")}
@@ -556,7 +558,7 @@ function PreviewPane({
                             variant={one === port ? "secondary" : "ghost"}
                             aria-pressed={one === port}
                             onClick={() => setPort(one)}
-                            className="shrink-0"
+                            className={`shrink-0 ${TOUCH_TARGET}`}
                         >
                             {t("code.preview.port", { port: one })}
                         </ui.Button>
@@ -566,6 +568,7 @@ function PreviewPane({
                     <ui.Button
                         variant={picking ? "secondary" : "ghost"}
                         size="icon"
+                        className={TOUCH_TARGET}
                         onClick={() => setPicking((on) => !on)}
                         aria-pressed={picking}
                         aria-label={t("code.preview.pick")}
@@ -577,14 +580,17 @@ function PreviewPane({
                 <ui.Button
                     variant="ghost"
                     size="icon"
+                    className={TOUCH_TARGET}
                     onClick={() => setVersion((n) => n + 1)}
                     aria-label={t("code.preview.reload")}
                     title={t("code.preview.reload")}
                 >
                     <RotateCw className="size-4" />
                 </ui.Button>
+                {/* A phone already draws the page at a phone's width. */}
                 <ui.SegmentedControl
                     size="sm"
+                    className="max-sm:hidden"
                     aria-label={t("code.preview.device")}
                     value={device}
                     onValueChange={setDevice}
@@ -601,14 +607,18 @@ function PreviewPane({
                             )
                     }))}
                 />
-                <ui.CopyButton value={address} label={t("code.preview.address")} className="p-2" />
+                <ui.CopyButton
+                    value={address}
+                    label={t("code.preview.address")}
+                    className={`p-2 ${TOUCH_TARGET}`}
+                />
                 <a
                     href={path}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label={t("code.preview.openTab")}
                     title={t("code.preview.openTab")}
-                    className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground"
+                    className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-card-hover hover:text-foreground [@media(pointer:coarse)]:size-11"
                 >
                     <ExternalLink className="size-4" />
                 </a>
@@ -630,12 +640,13 @@ function PreviewPane({
                     className="h-full min-h-0 w-full max-w-full shrink-0 rounded-md border border-border bg-white"
                 />
             </div>
-            <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+            {/* A label, so the words toggle it too: the switch alone is small for a finger. */}
+            <label className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground [@media(pointer:coarse)]:min-h-11">
                 <ui.Switch checked={follow} onChange={setFollow} aria-label={t("code.preview.follow")} />
                 <span className="min-w-0 truncate" title={t("code.preview.follow")}>
                     {t("code.preview.follow")}
                 </span>
-            </div>
+            </label>
             {inside}
         </div>
     );
