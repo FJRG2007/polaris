@@ -324,6 +324,55 @@ export function inputFits(schema: Record<string, unknown>, input: unknown): bool
     return inputProblems(schema, input).length === 0;
 }
 
+/** A string that is JSON of the given kind, parsed; undefined when it is not. */
+function parsedAs(text: string, kind: "object" | "array"): unknown {
+    const trimmed = text.trim();
+    if (!trimmed.startsWith(kind === "object" ? "{" : "[")) return undefined;
+    try {
+        const value: unknown = JSON.parse(trimmed);
+        return typeMatches(kind, value) ? value : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/** One field's value in the type its schema states, when it is plainly that
+ *  value written as text; otherwise the value unchanged. */
+function coerceField(type: unknown, value: unknown): unknown {
+    if (typeof value !== "string" || typeof type !== "string") return value;
+    if (type === "object" || type === "array") return parsedAs(value, type) ?? value;
+    if (type === "boolean") {
+        const word = value.trim().toLowerCase();
+        return word === "true" ? true : word === "false" ? false : value;
+    }
+    if (type === "number" || type === "integer") {
+        const trimmed = value.trim();
+        if (!/^-?\d+(\.\d+)?$/.test(trimmed)) return value;
+        const number = Number(trimmed);
+        return typeMatches(type, number) ? number : value;
+    }
+    return value;
+}
+
+/**
+ * The input with the slips every model makes put right, the way the field's
+ * own schema says it should read: the whole input sent as a JSON string, and
+ * an object, array, boolean or number sent as text ("{\"limit\": 10}", "true",
+ * "5"). Only a field whose schema names one type is touched, and only when the
+ * text is exactly that value, so nothing is guessed. Any MCP server's tools,
+ * with nothing to configure. Pure.
+ */
+export function coerceInput(schema: Record<string, unknown>, input: unknown): unknown {
+    const whole = typeof input === "string" ? parsedAs(input, "object") : input;
+    if (!whole || typeof whole !== "object" || Array.isArray(whole)) return input;
+    const properties = (schema.properties ?? {}) as Record<string, { type?: unknown }>;
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(whole as Record<string, unknown>)) {
+        out[key] = properties[key] ? coerceField(properties[key].type, value) : value;
+    }
+    return out;
+}
+
 /** Most problems one refusal names, so a wild call cannot write an essay back. */
 const PROBLEMS_MOST = 10;
 

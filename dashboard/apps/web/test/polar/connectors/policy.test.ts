@@ -170,3 +170,43 @@ describe("input problems", () => {
         expect(policy.inputProblems(schema, { intent: "list", livemode: true })).toEqual([]);
     });
 });
+
+describe("input coercion", () => {
+    const schema = {
+        type: "object",
+        properties: {
+            params: { type: "object" },
+            ids: { type: "array" },
+            livemode: { type: "boolean" },
+            limit: { type: "integer" },
+            note: { type: "string" },
+            either: { type: ["string", "number"] }
+        }
+    };
+
+    it("puts right a value written as text in the type its field states", () => {
+        expect(
+            policy.coerceInput(schema, {
+                params: '{"limit": 10}',
+                ids: '["a"]',
+                livemode: "TRUE",
+                limit: "5",
+                note: "5",
+                either: "5"
+            })
+        ).toEqual({ params: { limit: 10 }, ids: ["a"], livemode: true, limit: 5, note: "5", either: "5" });
+    });
+
+    it("reads a whole input sent as a JSON string", () => {
+        expect(policy.coerceInput(schema, '{"livemode": "false"}')).toEqual({ livemode: false });
+    });
+
+    it("leaves what is not plainly that value alone", () => {
+        expect(policy.coerceInput(schema, { params: "limit 10", limit: "5.5", livemode: "yes" })).toEqual({
+            params: "limit 10",
+            limit: "5.5",
+            livemode: "yes"
+        });
+        expect(policy.coerceInput(schema, "not json")).toBe("not json");
+    });
+});

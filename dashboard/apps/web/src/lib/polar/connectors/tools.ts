@@ -80,7 +80,8 @@ export async function polarConnectorTools(
                 inputSchema: jsonSchema(entry.inputSchema as never, {
                     // The reasons go back to the model with the refusal, so it
                     // can call again with what was missing instead of guessing.
-                    validate: async (value) => {
+                    validate: async (raw) => {
+                        const value = rules.coerceInput(entry.inputSchema, raw);
                         const problems = rules.inputProblems(entry.inputSchema, value);
                         return problems.length === 0
                             ? { success: true, value }
@@ -88,6 +89,7 @@ export async function polarConnectorTools(
                     }
                 }),
                 async execute(input: unknown, options) {
+                    input = rules.coerceInput(entry.inputSchema, input);
                     const problems = rules.inputProblems(entry.inputSchema, input);
                     if (problems.length > 0) {
                         return {
