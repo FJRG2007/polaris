@@ -10,7 +10,7 @@
 
 import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2 } from "lucide-react";
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useMemo, useState } from "react";
 import {
     Button,
     Card,
@@ -29,6 +29,7 @@ import {
 import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { cloudCredentialSchema, type CloudProvider } from "@/lib/agents/cloud-credentials";
 import {
     addCloudAccountAction,
@@ -218,8 +219,9 @@ function CloudDialog({ provider, name, onClose }: { provider: CloudProvider; nam
         });
     };
 
-    const loadFile = (event: ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
+    const [choose, chooser] = useChooseFiles();
+    const loadFile = async () => {
+        const [file] = await choose({ accept: "application/json,.json" });
         if (!file || file.size > 64 * 1024) return;
         void file.text().then((content) => set("serviceAccount", content));
     };
@@ -345,12 +347,16 @@ function CloudDialog({ provider, name, onClose }: { provider: CloudProvider; nam
                                         aria-invalid={invalid.has(field.key) || undefined}
                                         placeholder={t("aiKeys.cloud.serviceAccountPlaceholder")}
                                     />
-                                    <input
-                                        type="file"
-                                        accept="application/json,.json"
-                                        className="text-muted-foreground text-xs"
-                                        onChange={loadFile}
-                                    />
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="self-start"
+                                        onClick={() => void loadFile()}
+                                    >
+                                        {t("aiKeys.cloud.chooseFile")}
+                                    </Button>
+                                    {chooser}
                                 </>
                             ) : (
                                 <Input

@@ -8,7 +8,7 @@
  */
 
 import { FileUp } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import {
     Button,
     Dialog,
@@ -22,6 +22,7 @@ import {
     type AsyncLoad
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { readAgentFilesAction, repoAgentFilesAction, type ReadAgentFile } from "./agents-actions";
 import { AGENT_FILE_MAX, type AgentFile } from "@/lib/polar/agents/agent-files";
 
@@ -38,7 +39,7 @@ export function AgentImportDialog({
     onUse: (agent: AgentFile) => void;
 }) {
     const t = useTranslations("polar");
-    const picker = useRef<HTMLInputElement>(null);
+    const [choose, chooser] = useChooseFiles();
     const [pasted, setPasted] = useState("");
     const [read, setRead] = useState<ReadAgentFile[] | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -62,15 +63,15 @@ export function AgentImportDialog({
         show(answer.ok ? answer.value : answer.error);
     }
 
-    async function pick(list: FileList | null) {
-        const chosen = [...(list ?? [])].slice(0, FILES_MAX);
+    async function pick() {
+        const picked = await choose({ accept: ".md,text/markdown", multiple: true, onFailed: setError });
+        const chosen = picked.slice(0, FILES_MAX);
         const files = await Promise.all(
             chosen.map(async (file) => ({
                 path: file.name,
                 content: file.size > AGENT_FILE_MAX ? "" : await file.text()
             }))
         );
-        if (picker.current) picker.current.value = "";
         await readFiles(files);
     }
 
@@ -117,19 +118,12 @@ export function AgentImportDialog({
                                 size="sm"
                                 variant="outline"
                                 disabled={pending}
-                                onClick={() => picker.current?.click()}
+                                onClick={() => void pick()}
                             >
                                 <FileUp className="h-3.5 w-3.5 shrink-0" />
                                 {t("settings.agents.import.files")}
                             </Button>
-                            <input
-                                ref={picker}
-                                type="file"
-                                accept=".md,text/markdown"
-                                multiple
-                                hidden
-                                onChange={(event) => void pick(event.target.files)}
-                            />
+                            {chooser}
                         </div>
                     </div>
                     <RepoAgentsSource show={show} />

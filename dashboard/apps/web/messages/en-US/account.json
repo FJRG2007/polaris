@@ -1442,6 +1442,7 @@
             "optional": "optional",
             "deploymentsHint": "Separate with commas. Listed from the resource when it allows it.",
             "serviceAccountPlaceholder": "Paste the key file, or choose it below",
+            "chooseFile": "Choose a file",
             "digitalocean": {
                 "steps": "Sign in, approve, then copy the address of the page that fails to open and paste it here.",
                 "open": "Open DigitalOcean",

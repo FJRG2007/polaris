@@ -24,6 +24,7 @@ import {
     useToast
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { useSettingsModels } from "@/components/polar/settings-models";
 import { serversOffOf, useToolPrefs, type ToolPrefs } from "@/components/polar/tool-prefs";
 import {
@@ -405,7 +406,7 @@ const IMPORT_MAX_BYTES = 8 * 1024 * 1024;
 export function DataSettings() {
     const t = useTranslations("polar");
     const router = useRouter();
-    const picker = useRef<HTMLInputElement>(null);
+    const [choose, chooser] = useChooseFiles();
     const [importing, setImporting] = useState(false);
     const [problem, setProblem] = useState<string | null>(null);
 
@@ -442,21 +443,19 @@ export function DataSettings() {
                     <Download />
                     {t("settings.data.exportAll")}
                 </a>
-                <Button variant="outline" size="sm" disabled={importing} onClick={() => picker.current?.click()}>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={importing}
+                    onClick={async () => {
+                        const [file] = await choose({ accept: ".json,application/json", onFailed: setProblem });
+                        if (file) void importFile(file);
+                    }}
+                >
                     <Upload />
                     {importing ? t("settings.data.importing") : t("settings.data.import")}
                 </Button>
-                <input
-                    ref={picker}
-                    type="file"
-                    accept=".json,application/json"
-                    className="hidden"
-                    onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        event.target.value = "";
-                        if (file) void importFile(file);
-                    }}
-                />
+                {chooser}
             </div>
             <p className="text-sm text-muted-foreground">{t("settings.data.importHint")}</p>
             {problem ? (

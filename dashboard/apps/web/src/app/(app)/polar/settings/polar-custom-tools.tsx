@@ -551,7 +551,7 @@ function ProjectTools({ readOnly }: { readOnly: boolean }) {
                                 <p className="mt-1 truncate text-xs text-muted-foreground" title={tool.path}>
                                     {tool.path}
                                 </p>
-                                <pre className="mt-1 max-h-60 overflow-auto rounded bg-muted p-2 text-xs">{tool.script}</pre>
+                                <pre className="mt-1 max-h-60 overflow-auto overscroll-contain rounded bg-muted p-2 text-xs">{tool.script}</pre>
                             </details>
                         ))}
                         {review.modules.map((module) => (
@@ -562,7 +562,7 @@ function ProjectTools({ readOnly }: { readOnly: boolean }) {
                                         {t(`settings.customTools.project.module.${module.status}`)}
                                     </span>
                                 </summary>
-                                <pre className="mt-1 max-h-60 overflow-auto rounded bg-muted p-2 text-xs">{module.source}</pre>
+                                <pre className="mt-1 max-h-60 overflow-auto overscroll-contain rounded bg-muted p-2 text-xs">{module.source}</pre>
                             </details>
                         ))}
                         {review.refused.length > 0 && (

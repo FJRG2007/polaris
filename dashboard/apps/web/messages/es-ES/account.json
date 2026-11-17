@@ -1442,6 +1442,7 @@
             "optional": "opcional",
             "deploymentsHint": "Separa con comas. Se leen del recurso si lo permite.",
             "serviceAccountPlaceholder": "Pega el archivo o elígelo abajo",
+            "chooseFile": "Elegir archivo",
             "digitalocean": {
                 "steps": "Entra, aprueba, copia la dirección de la página que no abre y pégala aquí.",
                 "open": "Abrir DigitalOcean",
