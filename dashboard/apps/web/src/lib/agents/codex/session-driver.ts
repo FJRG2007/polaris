@@ -20,6 +20,8 @@
 
 import type * as core from "@polaris/core";
 import { CodexNormalizer } from "./normalize";
+import { MAX_DRAFT_CHARS } from "../draft-frames";
+import { NO_DRAFTS, type DraftSink } from "../session-drafts";
 import type { HistoryRow } from "../transcript-decoders";
 import type { PermissionStatus } from "../session-permissions";
 import { AcpRefusal, waitForAgent } from "../acp/session-driver";
@@ -59,6 +61,9 @@ export interface CodexDriverDeps {
     /** Put a request to the person; resolves to their answer. */
     ask(sessionId: string, prompt: { tool: string; detail: string }, signal: AbortSignal): Promise<PermissionStatus>;
     touch(sessionId: string): void;
+    /** Where the message being written is sent while it grows
+     *  (`session-drafts.ts`); none when absent. */
+    drafts?(sessionId: string): DraftSink;
     /** Server-side only. */
     log(message: string, error?: unknown): void;
     pipeOptions?: PipeStreamOptions;
@@ -92,11 +97,16 @@ export class CodexSessionDriver {
     private closedByUs = false;
     /** A mode picked mid-session, for the next turn. */
     private mode: core.SessionPermissionMode | null = null;
+    private readonly draft: DraftSink;
+    /** The agent message its deltas are adding up to, until the item completes. */
+    private drafting: { itemId: string; text: string } | null = null;
 
     constructor(
         readonly sessionId: string,
         private readonly deps: CodexDriverDeps
-    ) {}
+    ) {
+        this.draft = deps.drafts?.(sessionId) ?? NO_DRAFTS;
+    }
 
     get busy(): boolean {
         return this.turn !== null;
@@ -161,6 +171,7 @@ export class CodexSessionDriver {
 
     close(): void {
         this.closedByUs = true;
+        this.endDraft();
         this.connection?.rpc.close();
         this.connection = null;
     }
@@ -256,13 +267,24 @@ export class CodexSessionDriver {
                     method === "item/started"
                         ? connection.normalizer.started(event.data.item)
                         : connection.normalizer.completed(event.data.item);
+                if (method === "item/completed" && this.drafting?.itemId === event.data.item.id) this.endDraft();
                 if (rows.length > 0) this.store(rows);
                 this.deps.touch(this.sessionId);
                 return;
             }
-            case "item/agentMessage/delta":
-                if (protocol.itemDeltaSchema.safeParse(params).success) this.deps.touch(this.sessionId);
+            case "item/agentMessage/delta": {
+                // Nothing is stored until the item completes: the draft is
+                // what the page sees of it meanwhile.
+                const delta = protocol.itemDeltaSchema.safeParse(params);
+                if (!delta.success) return;
+                const { itemId } = delta.data;
+                const before = this.drafting?.itemId === itemId ? this.drafting.text : "";
+                const text = before.length < MAX_DRAFT_CHARS ? `${before}${delta.data.delta}` : before;
+                this.drafting = { itemId, text };
+                const shown = text.trimStart();
+                if (shown) this.draft.set(itemId, shown);
                 return;
+            }
             case "turn/completed": {
                 const event = protocol.turnCompletedSchema.safeParse(params);
                 if (!event.success) return;
@@ -297,6 +319,11 @@ export class CodexSessionDriver {
         return { decision };
     }
 
+    private endDraft(): void {
+        this.drafting = null;
+        this.draft.end();
+    }
+
     private store(rows: readonly HistoryRow[]): void {
         this.stored = this.stored
             .then(() => this.deps.storeRows(this.sessionId, rows))
@@ -307,6 +334,7 @@ export class CodexSessionDriver {
         // The completion can overtake the last items' handlers by a microtask.
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
         const rows = connection.normalizer.finish(status, turn.id ?? "turn");
+        this.endDraft();
         if (rows.length > 0) this.store(rows);
         await this.stored;
         if (this.turn === turn) this.turn = null;

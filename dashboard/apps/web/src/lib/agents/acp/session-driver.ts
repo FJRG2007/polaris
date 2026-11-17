@@ -16,6 +16,7 @@
 
 import type * as core from "@polaris/core";
 import { AcpNormalizer } from "./normalize";
+import { NO_DRAFTS, type DraftSink } from "../session-drafts";
 import type * as acp from "@agentclientprotocol/sdk";
 import { connectAcp, type AcpClient } from "./client";
 import type { HistoryRow } from "../transcript-decoders";
@@ -44,6 +45,9 @@ export interface DriverDeps {
     recordVendorId(sessionId: string, vendorSessionId: string): Promise<void>;
     permission(sessionId: string): (request: acp.RequestPermissionRequest, signal: AbortSignal) => Promise<string | null>;
     touch(sessionId: string): void;
+    /** Where the message being written is sent while it grows
+     *  (`session-drafts.ts`); none when absent. */
+    drafts?(sessionId: string): DraftSink;
     /** Server-side only. */
     log(message: string, error?: unknown): void;
     pipeOptions?: PipeStreamOptions;
@@ -117,11 +121,14 @@ export class AcpSessionDriver {
     /** Stored rows, in order, so a turn's closing rows land after its last update. */
     private stored: Promise<unknown> = Promise.resolve();
     private closedByUs = false;
+    private readonly draft: DraftSink;
 
     constructor(
         readonly sessionId: string,
         private readonly deps: DriverDeps
-    ) {}
+    ) {
+        this.draft = deps.drafts?.(sessionId) ?? NO_DRAFTS;
+    }
 
     /** Whether a turn is running. */
     get busy(): boolean {
@@ -159,6 +166,7 @@ export class AcpSessionDriver {
     /** End the connection. The agent's window is the caller's to take down. */
     close(): void {
         this.closedByUs = true;
+        this.draft.end();
         this.connection?.client.close();
         this.connection = null;
     }
@@ -200,7 +208,13 @@ export class AcpSessionDriver {
                 if (notification.sessionId !== connection.acpSessionId) return;
                 const rows = connection.normalizer.push(notification.update);
                 if (rows.length > 0) this.store(rows);
+                const draft = connection.normalizer.draft();
+                if (draft) this.draft.set(draft.id, draft.text);
+                else this.draft.end();
                 if (notification.update.sessionUpdate === "current_mode_update") return;
+                // A chunk that completed nothing changed nothing stored: the
+                // draft carries it, and a page need not read the session again.
+                if (notification.update.sessionUpdate === "agent_message_chunk" && rows.length === 0) return;
                 this.deps.touch(this.sessionId);
             },
             onPermission: async (request, signal) => {
@@ -273,6 +287,7 @@ export class AcpSessionDriver {
         // a macrotask lets every one of them run first.
         await new Promise<void>((resolve) => setTimeout(resolve, 0));
         const rows = connection.normalizer.finish(stopReason);
+        this.draft.end();
         if (rows.length > 0) this.store(rows);
         await this.stored;
         this.turn = null;

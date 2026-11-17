@@ -87,6 +87,7 @@ function harness(cli: string, pipe: FakePipe, vendorSessionId: string | null = n
     const events: string[] = [];
     const vendorIds: string[] = [];
     const starts: (readonly string[])[] = [];
+    const drafts: (readonly [string, string] | "end")[] = [];
     const binding = acpBinding(cli)!;
     const deps: DriverDeps = {
         session: async () => ({ binding, workdir: "/work/repo", vendorSessionId }),
@@ -107,11 +108,12 @@ function harness(cli: string, pipe: FakePipe, vendorSessionId: string | null = n
         },
         permission: () => async (request) => request.options.find((option) => option.kind === "allow_once")?.optionId ?? null,
         touch: () => undefined,
+        drafts: () => ({ set: (id, text) => drafts.push([id, text]), end: () => drafts.push("end") }),
         log: () => undefined,
         pipeOptions: { sleep: noSleep, minPollMs: 0, maxPollMs: 0 },
         sleep: noSleep
     };
-    return { driver: new AcpSessionDriver("session-1", deps), rows, events, vendorIds, starts };
+    return { driver: new AcpSessionDriver("session-1", deps), rows, events, vendorIds, starts, drafts };
 }
 
 describe("ACP provider bindings", () => {
@@ -210,6 +212,24 @@ describe.each(AGENTS)("recorded %s conversation through the driver", (cli) => {
         ]);
         expect(events).toEqual(["prompt", "permission", "tool.start", "turn.end"]);
         expect(driver.busy).toBe(false);
+        driver.close();
+    });
+
+    it("draws each message while it is gathered, under its row's id, and ends it", async () => {
+        const pipe = new FakePipe(agentFor(cli));
+        const { driver, rows, drafts } = harness(cli, pipe);
+        await driver.prompt("Run the tests");
+        await driver.settled();
+        const texts = rows.filter((row) => row.kind === "text");
+        const grown = drafts.filter((call) => call !== "end");
+        expect(grown.length).toBeGreaterThan(0);
+        // Every draft is the start of the row it becomes, under the same id.
+        for (const [id, text] of grown) {
+            const row = texts.find((candidate) => candidate.vendorId === id);
+            expect(row?.body.startsWith(text.trim())).toBe(true);
+        }
+        expect(new Set(grown.map((call) => call[0]))).toEqual(new Set(texts.map((row) => row.vendorId)));
+        expect(drafts.at(-1)).toBe("end");
         driver.close();
     });
 });

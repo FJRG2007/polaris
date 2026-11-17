@@ -11,6 +11,7 @@ import * as core from "@polaris/core";
 import { acpBinding, usesAppServer } from "./providers";
 import { CODEX_APP_SERVER_ARGV } from "../codex/protocol";
 import { touchSession } from "../session-live";
+import { sessionDrafts } from "../session-drafts";
 import { storeHistoryRows } from "../session-history";
 import { sessionPermissionHandler } from "./approvals";
 import { shellQuote } from "../session-hooks";
@@ -50,6 +51,7 @@ const deps: DriverDeps = {
     },
     permission: (sessionId) => sessionPermissionHandler(sessionId),
     touch: touchSession,
+    drafts: sessionDrafts,
     log(message, error) {
         console.error(`[agent-session] ${message}`, ...(error === undefined ? [] : [error]));
     }
@@ -83,6 +85,7 @@ const codexDeps: CodexDriverDeps = {
         return (await awaitPermission(id, sessionId, undefined, signal)).status;
     },
     touch: touchSession,
+    drafts: sessionDrafts,
     log: deps.log
 };
 

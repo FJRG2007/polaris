@@ -69,6 +69,27 @@ describe("AcpNormalizer", () => {
         ]);
     });
 
+    it("offers the agent's message so far as a draft under its row's id, never the person's", () => {
+        const normalizer = new AcpNormalizer("s", () => 1);
+        const chunk = (sessionUpdate: "agent_message_chunk" | "user_message_chunk", text: string) => ({
+            sessionUpdate,
+            content: { type: "text" as const, text }
+        });
+        expect(normalizer.draft()).toBeNull();
+        normalizer.push(chunk("agent_message_chunk", "  "));
+        // Only whitespace yet: nothing to draw.
+        expect(normalizer.draft()).toBeNull();
+        normalizer.push(chunk("agent_message_chunk", "Hel"));
+        expect(normalizer.draft()).toEqual({ id: "s:1:0", text: "Hel" });
+        normalizer.push(chunk("agent_message_chunk", "lo"));
+        expect(normalizer.draft()).toEqual({ id: "s:1:0", text: "Hello" });
+        const rows = normalizer.push(chunk("user_message_chunk", "next"));
+        expect(rows[0]?.vendorId).toBe("s:1:0");
+        expect(normalizer.draft()).toBeNull();
+        normalizer.finish("end_turn");
+        expect(normalizer.draft()).toBeNull();
+    });
+
     it("bounds a message and marks a failed tool once", () => {
         const normalizer = new AcpNormalizer("s", () => 1);
         normalizer.push({

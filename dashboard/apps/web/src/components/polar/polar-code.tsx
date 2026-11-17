@@ -79,6 +79,7 @@ import { GithubAppGapNotice } from "@/components/github-app-gap";
 import * as core from "@polaris/core";
 import { codePlaceTarget, placeOf, type CodePlaceTarget } from "@/lib/polar/code-place";
 import * as acpProviders from "@/lib/agents/acp/providers";
+import * as drafts from "@/lib/agents/draft-frames";
 import { automaticChoice, type ModelChoice } from "@/lib/polar/shared";
 import { usePolarUploads } from "@/components/polar/polar-uploads";
 import { POLAR_ATTACHMENT_MOST, POLAR_ATTACHMENT_TYPES } from "@/lib/polar/shared";
@@ -263,12 +264,28 @@ export function titleFromPrompt(prompt: string): string {
     return line.length > TITLE_MAX ? `${line.slice(0, TITLE_MAX - 3).trimEnd()}...` : line;
 }
 
-/** Call `onChange` whenever the session changes on the server, until the
+/** Call `onChange` whenever the session changes on the server, and `onDraft`
+ *  with each frame of the agent's message while it is written, until the
  *  returned function is called. Silent where streams are not available. */
-export function watchSession(sessionId: string, onChange: () => void): () => void {
+export function watchSession(
+    sessionId: string,
+    onChange: () => void,
+    onDraft?: (frame: drafts.DraftFrame) => void
+): () => void {
     if (typeof EventSource === "undefined") return () => undefined;
     const source = new EventSource(`/api/agents/sessions/${encodeURIComponent(sessionId)}/live`);
     source.addEventListener("change", onChange);
+    if (onDraft)
+        source.addEventListener("draft", (event) => {
+            let parsed: unknown;
+            try {
+                parsed = JSON.parse((event as MessageEvent<string>).data);
+            } catch {
+                return;
+            }
+            const frame = drafts.draftFrameSchema.safeParse(parsed);
+            if (frame.success) onDraft(frame.data);
+        });
     return () => source.close();
 }
 
@@ -1482,7 +1499,41 @@ function CodeThread({
     }, [live, read]);
     // Told the moment the session changes - an answer stored, a step taken -
     // rather than on the next poll, which stays underneath as the fallback.
-    useEffect(() => (live ? watchSession(sessionId, read) : undefined), [live, sessionId, read]);
+    // The agent's answer while it is written, drawn under the thread until the
+    // stored message replaces it (`lib/agents/draft-frames`).
+    const [draft, setDraft] = useState<drafts.Draft | null>(null);
+    const onDraft = useCallback(
+        (frame: drafts.DraftFrame) => setDraft((current) => drafts.applyDraftFrame(current, frame)),
+        []
+    );
+    useEffect(() => (live ? watchSession(sessionId, read, onDraft) : undefined), [live, sessionId, read, onDraft]);
+    useEffect(() => setDraft(null), [sessionId]);
+    const answers = useMemo(
+        () =>
+            (thread?.entries ?? [])
+                .filter((entry) => entry.type === "message" && entry.role !== "user" && entry.role !== "system")
+                .map((entry) => entry.text),
+        [thread]
+    );
+    useEffect(() => {
+        if (!draft) return;
+        if (!live) {
+            setDraft(null);
+            return;
+        }
+        if (!draft.ended) return;
+        if (drafts.draftLanded(draft, answers)) {
+            setDraft(null);
+            return;
+        }
+        // Its row is on the way; one that never comes does not leave the
+        // draft standing in for it.
+        const timer = setTimeout(
+            () => setDraft((current) => (current === draft ? null : current)),
+            drafts.DRAFT_LINGER_MS
+        );
+        return () => clearTimeout(timer);
+    }, [draft, answers, live]);
     // Opened from a notification's Reply: the cursor goes to the reply box
     // once the thread has drawn one.
     const drawn = Boolean(thread);
@@ -2190,7 +2241,14 @@ function CodeThread({
                                 </MessageContent>
                             </Message>
                         ) : null}
-                        {indicator ? (
+                        {draft ? (
+                            <Message from="assistant">
+                                <MessageContent from="assistant">
+                                    <MessageResponse>{draft.text}</MessageResponse>
+                                </MessageContent>
+                            </Message>
+                        ) : null}
+                        {indicator && !draft ? (
                             <div className="flex items-center gap-2 text-xs text-muted-foreground" role="status">
                                 <ThinkingOrb state="solving" size={20} decorative />
                                 <Shimmer>

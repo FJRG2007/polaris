@@ -29,6 +29,7 @@ function harness(options: {
     const asked: { tool: string; detail: string }[] = [];
     const vendorIds: string[] = [];
     const started: (readonly string[])[] = [];
+    const drafts: (readonly [string, string] | "end")[] = [];
     const deps: CodexDriverDeps = {
         session: async () => ({
             workdir: "/work",
@@ -54,12 +55,13 @@ function harness(options: {
             return options.answer ?? "allow";
         },
         touch: () => undefined,
+        drafts: () => ({ set: (id, text) => drafts.push([id, text]), end: () => drafts.push("end") }),
         log: () => undefined,
         pipeOptions: { minPollMs: 5, maxPollMs: 20 },
         sleep: (ms) => new Promise((resolve) => setTimeout(resolve, Math.min(ms, 10)))
     };
     const driver = new CodexSessionDriver("session-1", deps);
-    return { driver, pipe, rows, events, asked, vendorIds, started };
+    return { driver, pipe, rows, events, asked, vendorIds, started, drafts };
 }
 
 async function until(check: () => boolean, ms = 8_000): Promise<void> {
@@ -163,6 +165,20 @@ describe("CodexSessionDriver against a fake app-server on stdio", () => {
             ["agent", "text", "", "All done."]
         ]);
         expect(events.map((event) => event.kind)).toEqual(["prompt", "permission", "tool.start", "turn.end"]);
+        driver.close();
+    });
+
+    it("draws the answer as its deltas arrive and ends the draft once the item is whole", async () => {
+        const { driver, drafts } = harness();
+        await driver.prompt("run tests");
+        await until(() => !driver.busy);
+        await driver.settled();
+        const grown = drafts.filter((call) => call !== "end");
+        expect(grown.map((call) => call[1])).toEqual(["All ", "All done."]);
+        expect(new Set(grown.map((call) => call[0])).size).toBe(1);
+        // Ended when the item completed, before the turn did.
+        expect(drafts.indexOf("end")).toBe(grown.length);
+        expect(drafts.at(-1)).toBe("end");
         driver.close();
     });
 

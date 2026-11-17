@@ -5,7 +5,8 @@
  *
  * An agent streams a message as chunks; a row is a whole message, so chunks are
  * gathered until something else arrives (or the turn ends) and then kept as one
- * row. Thinking is never kept, as in the decoders. A tool call is a row when it
+ * row; `draft()` is that message so far, for the page to draw while it is
+ * written (`session-drafts.ts`). Thinking is never kept, as in the decoders. A tool call is a row when it
  * is announced and its result another once it completes or fails. Everything
  * kept is cut to the decoders' bounds. The SDK has already parsed each update
  * against the protocol's schema; this only reads what it needs.
@@ -115,6 +116,16 @@ export class AcpNormalizer {
             default:
                 return rows;
         }
+    }
+
+    /** The agent's message being gathered, as far as it has come, under the id
+     *  its row will have; null while there is none or it is only whitespace.
+     *  Never stored: the session page draws it until the row lands. */
+    draft(): { id: string; text: string } | null {
+        const pending = this.pending;
+        if (!pending || pending.role !== "agent") return null;
+        const text = pending.text.trimStart();
+        return text ? { id: `${pending.id}:0`, text } : null;
     }
 
     /** The end of a turn: the message being gathered is whole, and a cancelled
