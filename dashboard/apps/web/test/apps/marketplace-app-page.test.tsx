@@ -24,6 +24,14 @@ vi.mock("@/lib/app-bundles/actions", () => ({
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh }) }));
 // The template dialog reaches Deploy's server actions; nothing here deploys.
+// The template form's login option reads the firewall's actions, which reach the server.
+vi.mock("@/app/(app)/apps/firewall/actions", () => ({
+    serviceLoginAccessAction: async () => ({}),
+    getServiceLoginAction: async () => ({}),
+    setServiceLoginAction: async () => ({}),
+    findWafPeopleAction: async () => ({ results: [] }),
+    listWafPrincipalsAction: async () => ({ principals: [] })
+}));
 vi.mock("@/app/(app)/apps/deploy/actions", () => ({
     createApplicationAction: vi.fn()
 }));
