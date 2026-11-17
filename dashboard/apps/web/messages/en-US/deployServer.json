@@ -29,6 +29,7 @@
         "loginInvalid": "The login settings could not be read. Choose who it admits again.",
         "loginNotOwner": "Only the project's owner can put a service behind a Polaris login.",
         "loginOutOfReach": "One of the accounts it admits is not one you can choose.",
+        "loginNotSaved": "The service was created, but its Polaris login was not saved. Turn it on in the service's Security & edge settings, then deploy.",
         "nameRequired": "An application name is required",
         "repoRequired": "A git repository URL is required",
         "imageRequired": "An image reference is required (e.g. nginx:latest)",

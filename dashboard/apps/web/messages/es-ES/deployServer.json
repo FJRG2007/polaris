@@ -29,6 +29,7 @@
         "loginInvalid": "No se pudieron leer los ajustes de sesión. Vuelve a elegir a quién admite.",
         "loginNotOwner": "Solo el propietario del proyecto puede exigir sesión en Polaris en un servicio.",
         "loginOutOfReach": "Una de las cuentas que admite no es una que puedas elegir.",
+        "loginNotSaved": "El servicio se creó, pero no se guardó su inicio de sesión en Polaris. Actívalo en Seguridad y borde del servicio y despliega.",
         "nameRequired": "La aplicación necesita un nombre",
         "repoRequired": "Falta la URL del repositorio git",
         "imageRequired": "Falta la referencia de la imagen (p. ej. nginx:latest)",

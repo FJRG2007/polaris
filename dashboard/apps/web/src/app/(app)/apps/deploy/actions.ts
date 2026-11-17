@@ -544,10 +544,18 @@ export async function createApplicationAction(input: {
         // Written before the first deploy and before any address, so the service is
         // never reachable without it; it covers whichever addresses it gets.
         if (login?.success) {
-            await setWafLogin(user, "application", app.id, {
-                requireLogin: true,
-                ...login.data
-            });
+            try {
+                await setWafLogin(user, "application", app.id, {
+                    requireLogin: true,
+                    ...login.data
+                });
+            } catch (error) {
+                // Stopped here: no address and no deploy, so the service is not
+                // reachable without the login it was asked to have.
+                console.error(`[deploy] ${app.id}: the new service's login was not saved`, error);
+                revalidatePath(DEPLOY_PATH);
+                return { applicationId: app.id, error: await reply("service.loginNotSaved") };
+            }
             await recordDeployAudit({
                 actorId: user.id,
                 action: "deploy.waf.set",
