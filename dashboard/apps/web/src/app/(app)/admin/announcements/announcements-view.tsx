@@ -897,12 +897,12 @@ export function AnnouncementsView({
                                                 onClick={() => end(row)}
                                                 disabled={pending}
                                                 aria-label={
-                                                    row.kind === "maintenance" && row.editable
+                                                    row.kind === "maintenance" && ["scheduled", "upcoming"].includes(row.phase)
                                                         ? t("admin.history.cancelMaintenance")
                                                         : t("admin.history.end")
                                                 }
                                                 title={
-                                                    row.kind === "maintenance" && row.editable
+                                                    row.kind === "maintenance" && ["scheduled", "upcoming"].includes(row.phase)
                                                         ? t("admin.history.cancelMaintenance")
                                                         : t("admin.history.end")
                                                 }

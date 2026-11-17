@@ -134,7 +134,7 @@
             "title": "Añade un título.",
             "invalid": "Revisa los campos marcados.",
             "rateLimited": "Demasiados envíos en la última hora. Vuelve a intentarlo en {minutes} min.",
-            "notEditable": "Ya ha empezado, así que no se puede editar. Termínalo o envía uno nuevo.",
+            "notEditable": "Se retiró, así que ya no se puede editar. Duplícalo para enviarlo de nuevo.",
             "gone": "Ese aviso ya no existe.",
             "failed": "No ha funcionado. Inténtalo de nuevo.",
             "update": "Escribe la novedad (hasta 4000 caracteres)."

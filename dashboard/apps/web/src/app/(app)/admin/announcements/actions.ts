@@ -60,10 +60,10 @@ const historyPageSchema = z.object({
 
 /** The newest page, or `take` rows after the row `after` for the ones older than it. */
 export async function historyAction(page: unknown = {}): Promise<announcements.HistoryRow[]> {
-    await requireAdmin();
+    const admin = await requireAdmin();
     const parsed = historyPageSchema.safeParse(page);
     if (!parsed.success) return [];
-    return announcements.listHistory(parsed.data);
+    return announcements.listHistory(parsed.data, await announcements.readerFor(admin.id));
 }
 
 /** Parse and normalize, naming the field and the reason the form shows. */

@@ -19,7 +19,7 @@ import { plainText } from "./markdown";
 import type { Locale } from "@polaris/core";
 import { notify } from "@/lib/notifications/dispatch";
 import { getUserLocale } from "@/lib/i18n/locale-service";
-import { renderFor, type Reader, type RenderInput } from "./templates";
+import { composedTitle, renderFor, type Reader, type RenderInput } from "./templates";
 import { publishNoticeChange } from "@/lib/shell-notices-live";
 import { resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
 import { audiencePages, countAudience, matchesAudience, membershipOf } from "./audience";
@@ -179,7 +179,8 @@ export function composeFrom(row: AnnouncementRow): ComposeInput {
     };
 }
 
-async function readerFor(userId: string): Promise<Reader> {
+/** The language and time zone one person reads dates in. */
+export async function readerFor(userId: string): Promise<Reader> {
     const locale: Locale = await getUserLocale(userId);
     const prefs = await resolveDisplayPreferencesFor(userId, locale).catch(() => null);
     return { locale, timeZone: prefs?.timeZone ?? "UTC" };
@@ -357,16 +358,24 @@ export async function createAnnouncement(actorId: string, input: ComposeInput, n
     return row;
 }
 
-/** Whether a row can still be edited: it has not started, or it is maintenance still ahead. */
+/**
+ * Whether a row can still be edited: anything not retracted. One under way or
+ * already over is edited too, which is how a window that runs long is
+ * extended, or one that ended is reopened with a later end.
+ */
 export function editable(row: AnnouncementRow, now: Date): boolean {
-    const phase = phaseAt(row, now);
+    return phaseAt(row, now) !== "retracted";
+}
+
+/** Whether it has not started yet, so ending it cancels it instead. */
+export function notStarted(phase: Phase): boolean {
     return phase === "scheduled" || phase === "upcoming";
 }
 
 /**
- * Change one that has not happened yet. A maintenance notice already out is
- * rewritten in place on the readers' bells by the next tick, which is the
- * "rescheduled" readers need to see.
+ * Change one. The notice already out is rewritten in place on the readers'
+ * bells (it is keyed by the announcement), as whatever phase the new dates put
+ * it in: "rescheduled" ahead of it, "in progress until ..." for one extended.
  */
 export async function updateAnnouncement(id: string, input: ComposeInput, now = new Date()) {
     const row = await prisma.announcement.findUnique({ where: { id } });
@@ -408,7 +417,7 @@ export async function endAnnouncement(
     const row = await prisma.announcement.findUnique({ where: { id } });
     if (!row || row.retractedAt) return null;
     const phase = phaseAt(row, now);
-    if (row.kind === "maintenance" && (phase === "scheduled" || phase === "upcoming")) {
+    if (row.kind === "maintenance" && notStarted(phase)) {
         return (await retractAnnouncement(id, now)) ? "cancelled" : null;
     }
     if (row.kind === "maintenance" && phase === "inProgress") {
@@ -702,6 +711,7 @@ export interface HistoryRow {
  */
 export async function listHistory(
     { after = null, take = HISTORY_PAGE }: { after?: string | null; take?: number } = {},
+    reader: Reader = { locale: "en-US", timeZone: "UTC" },
     now = new Date()
 ): Promise<HistoryRow[]> {
     const rows = await prisma.announcement.findMany({
@@ -731,7 +741,8 @@ export async function listHistory(
         id: row.id,
         kind: row.kind,
         severity: row.severity,
-        title: row.title,
+        // Filled in, so a template's "{start}" reads as the date it stands for.
+        title: composedTitle(renderInput(row), reader),
         phase: phaseAt(row, now),
         audience: readAudience(row.audience),
         reach: row.reach,

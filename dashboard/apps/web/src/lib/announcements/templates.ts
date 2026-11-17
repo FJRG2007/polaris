@@ -102,6 +102,15 @@ export function templateText(locale: Locale, id: string): { title: string; body:
     };
 }
 
+/**
+ * The title as it was written or picked, filled in for this reader: what the
+ * sender recognizes it by in their list, whatever phase it is in now.
+ */
+export function composedTitle(item: RenderInput, reader: Reader): string {
+    const title = item.localized ? templateText(reader.locale, item.template).title : item.title;
+    return fillPlaceholders(title, placeholderValues(item, reader));
+}
+
 /** The title and body one reader sees in one phase. */
 export function renderFor(
     item: RenderInput,

@@ -134,7 +134,7 @@
             "title": "Add a title.",
             "invalid": "Check the highlighted fields.",
             "rateLimited": "Too many sends in the last hour. Try again in {minutes} min.",
-            "notEditable": "It has already started, so it can no longer be edited. End it or send a new one.",
+            "notEditable": "It was retracted, so it can no longer be edited. Duplicate it to send it again.",
             "gone": "That announcement no longer exists.",
             "failed": "That did not work. Try again.",
             "update": "Write the update (up to 4000 characters)."
