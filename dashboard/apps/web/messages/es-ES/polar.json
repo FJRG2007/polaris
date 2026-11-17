@@ -2089,7 +2089,11 @@
             "keyFailed": "No se pudo crear la clave.",
             "keyMade": "Tu nueva clave está en el bloque. Cópiala ahora: no se volverá a mostrar.",
             "keyHint": "O usa una de <link>Claves de API</link> con el permiso de Polar.",
-            "node": "Requiere Node.js 20 o posterior en este equipo. Polar se actualiza al iniciarlo el editor."
+            "node": "Requiere Node.js 20 o posterior en este equipo. Polar se actualiza al iniciarlo el editor.",
+            "noAccess": "Tu cuenta no tiene permiso para usar Polar.",
+            "noKeys": "Tu cuenta no puede usar claves con el permiso de Polar.",
+            "checkFailed": "No se pudo comprobar qué puede usar tu cuenta.",
+            "retry": "Reintentar"
         },
         "usage": {
             "title": "Uso por clave",

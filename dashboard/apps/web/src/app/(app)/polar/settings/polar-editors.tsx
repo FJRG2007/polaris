@@ -4,16 +4,23 @@
  * Polar in an editor: the block Zed, a JetBrains IDE or any other Agent
  * Client Protocol client takes, generated for this instance's address
  * (`lib/polar/acp-setup.ts`), with a key made here and written into it.
+ *
+ * The block follows what the server will serve (`editorSetupAccessAction`):
+ * nothing to paste for an account that may not use Polar, and no key to
+ * create for one that cannot hold a key with the Polar permission.
  */
 
 import Link from "next/link";
-import { useState } from "react";
 import { useAppUrl } from "@/components/app-url";
 import { JsonView } from "@/components/json-view";
-import { Button, SegmentedControl, useToast } from "@polaris/ui";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { createApiKeyAction } from "@/app/(app)/account/api-keys/actions";
+import { Button, SegmentedControl, Skeleton, useToast } from "@polaris/ui";
 import { ACP_EDITORS, acpSnippet, type AcpEditor } from "@/lib/polar/acp-setup";
+import { editorSetupAccessAction } from "@/app/(app)/polar/settings/routing-actions";
+
+type Access = { use: boolean; keys: boolean } | "failed" | null;
 
 export function EditorsCard() {
     const t = useTranslations("polar");
@@ -22,6 +29,13 @@ export function EditorsCard() {
     const [editor, setEditor] = useState<AcpEditor>("zed");
     const [secret, setSecret] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
+    const [access, setAccess] = useState<Access>(null);
+
+    const check = useCallback(() => {
+        setAccess(null);
+        editorSetupAccessAction().then(setAccess, () => setAccess("failed"));
+    }, []);
+    useEffect(check, [check]);
 
     const createKey = async () => {
         setCreating(true);
@@ -42,38 +56,55 @@ export function EditorsCard() {
                 <h3 className="text-sm font-medium text-foreground">{t("routing.editors.title")}</h3>
                 <p className="text-xs text-muted-foreground">{t("routing.editors.intro")}</p>
             </div>
-            <div className="flex min-w-0 flex-col gap-2 rounded-md border border-border px-3 py-2">
-                <SegmentedControl
-                    value={editor}
-                    onValueChange={setEditor}
-                    size="sm"
-                    aria-label={t("routing.editors.pick")}
-                    options={ACP_EDITORS.map((value) => ({ value, label: t(`routing.editors.${value}.name`) }))}
-                />
-                <p className="text-xs text-muted-foreground">{t(`routing.editors.${editor}.where`)}</p>
-                <JsonView value={acpSnippet(editor, base, secret ?? undefined)} label={t(`routing.editors.${editor}.name`)} />
-                <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    {secret ? (
-                        <p className="min-w-0 text-xs text-muted-foreground">{t("routing.editors.keyMade")}</p>
-                    ) : (
-                        <>
-                            <Button size="sm" variant="outline" onClick={createKey} disabled={creating}>
-                                {t("routing.editors.createKey")}
-                            </Button>
-                            <p className="min-w-0 text-xs text-muted-foreground">
-                                {t.rich("routing.editors.keyHint", {
-                                    link: (chunks) => (
-                                        <Link key="link" href="/account/api-keys" className="text-primary hover:underline">
-                                            {chunks}
-                                        </Link>
-                                    )
-                                })}
-                            </p>
-                        </>
-                    )}
+            {access === null ? (
+                <Skeleton className="h-48 w-full rounded-md" data-testid="editors-skeleton" />
+            ) : access === "failed" ? (
+                <div className="flex min-w-0 flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2">
+                    <p className="min-w-0 text-xs text-muted-foreground">{t("routing.editors.checkFailed")}</p>
+                    <Button size="sm" variant="outline" onClick={check}>
+                        {t("routing.editors.retry")}
+                    </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">{t("routing.editors.node")}</p>
-            </div>
+            ) : !access.use ? (
+                <p className="rounded-md border border-border px-3 py-2 text-xs text-muted-foreground">
+                    {t("routing.editors.noAccess")}
+                </p>
+            ) : (
+                <div className="flex min-w-0 flex-col gap-2 rounded-md border border-border px-3 py-2">
+                    <SegmentedControl
+                        value={editor}
+                        onValueChange={setEditor}
+                        size="sm"
+                        aria-label={t("routing.editors.pick")}
+                        options={ACP_EDITORS.map((value) => ({ value, label: t(`routing.editors.${value}.name`) }))}
+                    />
+                    <p className="text-xs text-muted-foreground">{t(`routing.editors.${editor}.where`)}</p>
+                    <JsonView value={acpSnippet(editor, base, secret ?? undefined)} label={t(`routing.editors.${editor}.name`)} />
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        {!access.keys ? (
+                            <p className="min-w-0 text-xs text-muted-foreground">{t("routing.editors.noKeys")}</p>
+                        ) : secret ? (
+                            <p className="min-w-0 text-xs text-muted-foreground">{t("routing.editors.keyMade")}</p>
+                        ) : (
+                            <>
+                                <Button size="sm" variant="outline" onClick={createKey} disabled={creating}>
+                                    {t("routing.editors.createKey")}
+                                </Button>
+                                <p className="min-w-0 text-xs text-muted-foreground">
+                                    {t.rich("routing.editors.keyHint", {
+                                        link: (chunks) => (
+                                            <Link key="link" href="/account/api-keys" className="text-primary hover:underline">
+                                                {chunks}
+                                            </Link>
+                                        )
+                                    })}
+                                </p>
+                            </>
+                        )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{t("routing.editors.node")}</p>
+                </div>
+            )}
         </section>
     );
 }

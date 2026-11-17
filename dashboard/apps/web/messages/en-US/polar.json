@@ -2089,7 +2089,11 @@
             "keyFailed": "The key could not be created.",
             "keyMade": "Your new key is in the block above. Copy it now: it is not shown again.",
             "keyHint": "Or use one from <link>API keys</link> with the Polar permission.",
-            "node": "Needs Node.js 20 or later on this computer. Polar updates itself each time the editor starts it."
+            "node": "Needs Node.js 20 or later on this computer. Polar updates itself each time the editor starts it.",
+            "noAccess": "Your account is not allowed to use Polar.",
+            "noKeys": "Keys with the Polar permission are not available to your account.",
+            "checkFailed": "Could not check what your account can use.",
+            "retry": "Try again"
         },
         "usage": {
             "title": "Usage by key",

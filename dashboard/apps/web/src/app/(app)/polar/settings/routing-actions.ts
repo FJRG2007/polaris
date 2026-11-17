@@ -10,6 +10,7 @@
  */
 
 import { requireUser } from "@/lib/session";
+import { scopesAvailableTo } from "@polaris/auth";
 import { polarAccessFor } from "@/lib/polar/access";
 import * as core from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
@@ -76,4 +77,15 @@ export async function resetRoutingAction(): Promise<{ error?: string }> {
     if (found.user.viewingAs) return { error: t("routing.errors.viewingAs") };
     await setOwnRouting(found.user.id, null);
     return {};
+}
+
+/** What the editor block can offer this person, from the checks the server
+ *  makes: Polar itself (`compat/auth.ts` refuses a key whose owner may not
+ *  use it), and a key with the Polar permission (`createApiKeyAction` mints
+ *  only scopes the owner holds). */
+export async function editorSetupAccessAction(): Promise<{ use: boolean; keys: boolean }> {
+    const user = await requireUser();
+    if (!(await polarAccessFor(user.id)).use) return { use: false, keys: false };
+    const keys = (await scopesAvailableTo(user.id, user.isAdmin)).includes("polar.use");
+    return { use: true, keys };
 }

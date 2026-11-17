@@ -14,11 +14,19 @@ const FOREIGN_KEY = "0190a3c2-7a3e-7000-8000-000000000009";
 const state = {
     saved: [] as unknown[],
     viewingAs: false,
-    use: true
+    use: true,
+    scopes: ["polar.use"] as string[],
+    scopeAsks: [] as { userId: string; isAdmin: boolean }[]
 };
 
 vi.mock("@/lib/session", () => ({
-    requireUser: async () => ({ id: "user-1", viewingAs: state.viewingAs ? "other" : null })
+    requireUser: async () => ({ id: "user-1", isAdmin: false, viewingAs: state.viewingAs ? "other" : null })
+}));
+vi.mock("@polaris/auth", () => ({
+    scopesAvailableTo: async (userId: string, isAdmin: boolean) => {
+        state.scopeAsks.push({ userId, isAdmin });
+        return state.scopes;
+    }
 }));
 vi.mock("@/lib/polar/access", () => ({
     polarAccessFor: async () => ({ use: state.use, spend: true, web: true, connectors: false })
@@ -39,7 +47,7 @@ vi.mock("@/lib/polar/routing-screen", () => ({
     routingUsageFor: vi.fn()
 }));
 
-const { resetRoutingAction, saveRoutingAction } = await import(
+const { editorSetupAccessAction, resetRoutingAction, saveRoutingAction } = await import(
     "@/app/(app)/polar/settings/routing-actions"
 );
 
@@ -54,6 +62,8 @@ beforeEach(() => {
     state.saved = [];
     state.viewingAs = false;
     state.use = true;
+    state.scopes = ["polar.use"];
+    state.scopeAsks = [];
 });
 
 describe("saveRoutingAction", () => {
@@ -122,5 +132,20 @@ describe("resetRoutingAction", () => {
     it("goes back to the deployment's routing", async () => {
         expect(await resetRoutingAction()).toEqual({});
         expect(state.saved).toEqual([null]);
+    });
+});
+
+describe("editorSetupAccessAction", () => {
+    it("answers from Polar access and the scopes the account may put on a key", async () => {
+        expect(await editorSetupAccessAction()).toEqual({ use: true, keys: true });
+        expect(state.scopeAsks).toEqual([{ userId: "user-1", isAdmin: false }]);
+        state.scopes = ["drive.read"];
+        expect(await editorSetupAccessAction()).toEqual({ use: true, keys: false });
+    });
+
+    it("offers nothing to an account that may not use Polar", async () => {
+        state.use = false;
+        expect(await editorSetupAccessAction()).toEqual({ use: false, keys: false });
+        expect(state.scopeAsks).toEqual([]);
     });
 });
