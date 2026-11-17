@@ -21,6 +21,7 @@ vi.mock("@/components/agents/sessions/sessions-polls", () => ({
 vi.mock("@/components/agents/sessions/actions", () => ({ openAgentInterfaceAction: async () => ({}) }));
 vi.mock("@/components/agents/sessions/session-changes", () => ({ SessionChanges: () => null }));
 vi.mock("@/components/agents/sessions/session-pr-tab", () => ({ SessionPullTab: () => null }));
+vi.mock("@/components/agents/sessions/session-artifacts", () => ({ SessionArtifacts: () => null }));
 vi.mock("@/app/(app)/apps/deploy/terminal-panel", () => ({ TerminalPanel: () => null }));
 
 const { PolarCodeWorkspace } = await import("@/components/polar/polar-code-workspace");
