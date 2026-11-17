@@ -682,6 +682,15 @@ describe("a plain-text message, drawn", () => {
         );
     });
 
+    it("keeps an address that carries an email in it as one link", () => {
+        const url = "https://example.dev/results/1e8a#email=ada@example.com&sign_in=8c88";
+        const escaped = url.replace(/&/g, "&amp;");
+        const out = mailbox.textToHtml(`Your results: ${url} - write to bob@example.com`);
+        expect(out).toContain(`<a href="${escaped}">${escaped}</a>`);
+        expect(out).not.toContain("mailto:ada@example.com");
+        expect(out).toContain('<a href="mailto:bob@example.com">bob@example.com</a>');
+    });
+
     it("escapes before it links, so a message cannot write its own anchor", () => {
         const out = mailbox.textToHtml('<a href="https://evil.example">click</a>');
         expect(out).not.toContain('<a href="https://evil.example">click</a>');

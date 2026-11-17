@@ -1855,26 +1855,29 @@ export function textToHtml(text: string): string {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
 
-    const linked = escaped
-        // A bare http(s) address. The trailing character class is what stops a
-        // sentence's full stop, comma or closing bracket being swallowed into
-        // the link - the single most common way an autolinker gets it wrong.
-        .replace(/\bhttps?:\/\/[^\s<>"]+/g, (found) => {
+    // One pass, left to right, so a match is never looked at again: an address
+    // that carries an email in it (`...#email=someone@example.com`) is one link,
+    // not a link with a `mailto:` written into the middle of its own markup.
+    // The trailing character class is what stops a sentence's full stop, comma
+    // or closing bracket being swallowed into the link - the single most common
+    // way an autolinker gets it wrong.
+    const linked = escaped.replace(
+        /\bhttps?:\/\/[^\s<>"]+|(^|[\s(])(www\.[^\s<>"]+)|\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/g,
+        (found: string, before: string | undefined, www: string | undefined) => {
+            if (www !== undefined) {
+                // A bare `www.` address, which is what people actually type.
+                const trimmed = www.replace(/[.,;:!?)\]}'"]+$/, "");
+                const tail = www.slice(trimmed.length);
+                return `${before ?? ""}<a href="https://${trimmed}">${trimmed}</a>${tail}`;
+            }
+            // An address somebody can write to.
+            if (!/^https?:\/\//i.test(found)) return `<a href="mailto:${found}">${found}</a>`;
+            // A bare http(s) address.
             const trimmed = found.replace(/[.,;:!?)\]}'"]+$/, "");
             const tail = found.slice(trimmed.length);
             return `<a href="${trimmed}">${trimmed}</a>${tail}`;
-        })
-        // A bare `www.` address, which is what people actually type.
-        .replace(/(^|[\s(])(www\.[^\s<>"]+)/g, (_match, before: string, found: string) => {
-            const trimmed = found.replace(/[.,;:!?)\]}'"]+$/, "");
-            const tail = found.slice(trimmed.length);
-            return `${before}<a href="https://${trimmed}">${trimmed}</a>${tail}`;
-        })
-        // An address somebody can write to.
-        .replace(
-            /\b[\w.+-]+@[\w-]+(?:\.[\w-]+)+\b/g,
-            (found) => `<a href="mailto:${found}">${found}</a>`
-        );
+        }
+    );
 
     // Quoted history is dimmed rather than dropped: it is what a reply is
     // answering, and hiding it entirely is how people lose the thread.
