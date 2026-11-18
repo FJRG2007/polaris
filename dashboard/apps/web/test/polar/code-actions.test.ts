@@ -179,7 +179,13 @@ vi.mock("@/components/agents/sessions/actions", () => ({
         return {
             session,
             messages: [
-                { role: "user", body: "Fix it", authorId: "u1", at: "2026-10-20T10:00:01.000Z" }
+                {
+                    id: "m-1",
+                    role: "user",
+                    body: "Fix it",
+                    authorId: "u1",
+                    at: "2026-10-20T10:00:01.000Z"
+                }
             ],
             events: [
                 { kind: "tool.start", detail: "", subject: "Edit", at: "2026-10-20T10:00:03.000Z" },
@@ -199,7 +205,8 @@ const {
     polarCodeStartLike,
     repositoryNamed,
     polarCodeThread,
-    polarCodeTranscript
+    polarCodeTranscript,
+    startSurfaceFor
 } = await import("@/lib/polar/code");
 
 const QUEUED = "00000000-0000-4000-8000-0000000000a1";
@@ -640,5 +647,24 @@ describe("polarCodeChoices", () => {
             repos: [],
             installUrl: "https://github.com/apps/polaris-test/installations/new"
         });
+    });
+});
+
+describe("startSurfaceFor", () => {
+    it("answers in Chat where it was picked and the agent can be driven there", () => {
+        expect(startSurfaceFor("gemini", "host", "chat")).toBe("chat");
+        expect(startSurfaceFor("claude", "local", "chat")).toBe("chat");
+    });
+
+    it("keeps a Chat pick in the terminal for an agent with no Chat, or on a computer", () => {
+        expect(startSurfaceFor("custom", "host", "chat")).toBe("terminal");
+        expect(startSurfaceFor("claude", "computer", "chat")).toBe("terminal");
+    });
+
+    it("moves a Terminal pick to Chat only for an agent whose terminal and Chat share one conversation", () => {
+        expect(startSurfaceFor("claude", "host", "terminal")).toBe("chat");
+        expect(startSurfaceFor("codex", "local", "terminal")).toBe("chat");
+        expect(startSurfaceFor("gemini", "host", "terminal")).toBe("terminal");
+        expect(startSurfaceFor("claude", "computer", "terminal")).toBe("terminal");
     });
 });
