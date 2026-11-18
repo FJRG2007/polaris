@@ -118,6 +118,13 @@ describe("sharingBaseUrl", () => {
         expect(await sharingBaseUrl()).toBe("https://calm-river.trycloudflare.com");
     });
 
+    it("passes over a sharing domain saved before the field was checked", async () => {
+        // `////` was accepted once, and every share link read `https://` after it.
+        store.set("domain.app", "polaris.example.com");
+        store.set("domain.sharing", "////");
+        expect(await sharingBaseUrl()).toBe("https://polaris.example.com");
+    });
+
     it("labels its free subdomain differently from the app one", async () => {
         store.set("domain.publicIp", "5.6.7.8");
         expect(await sharingBaseUrl()).toMatch(/^https:\/\/share-[a-z0-9]+-5-6-7-8\.sslip\.io$/);

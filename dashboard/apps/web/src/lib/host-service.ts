@@ -15,7 +15,7 @@ import { routerPlanKey, routerSecretsKey } from "@/lib/router/plan";
 import { dropGrantsFor } from "@/lib/access/grants";
 import { dropSshConnections } from "@/lib/connection-pool";
 import { testAndCaptureHostKey, type SshAuth } from "@polaris/ssh";
-import { isBaseDomain, normalizeBaseDomain } from "@polaris/deploy";
+import { baseDomainField } from "@/lib/domain-fields";
 import { decryptSecret, encryptCredentials, type EncryptedBlob } from "@polaris/storage";
 import {
     hostCredentialsSchema,
@@ -226,8 +226,10 @@ export async function setHostWildcardDomain(
     hostId: string,
     domain: string
 ): Promise<boolean> {
-    const clean = normalizeBaseDomain(domain);
-    if (clean && !isBaseDomain(clean)) throw new Error("Enter a domain like apps.example.com");
+    // The same reading as the field: something typed that normalizes to nothing
+    // (`////`) is refused, not taken as clearing the domain.
+    const { value: clean, ok } = baseDomainField(domain);
+    if (!ok) throw new Error("Enter a domain like apps.example.com");
     const { count } = await prisma.host.updateMany({
         where: { id: hostId, ownerId },
         data: { wildcardDomain: clean || null }

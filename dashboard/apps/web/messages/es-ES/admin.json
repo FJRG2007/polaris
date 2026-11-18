@@ -537,6 +537,7 @@
             "appDomainHint": "La dirección fija del panel. Déjalo vacío para usar la del despliegue ({url}).",
             "sharingDomain": "Dominio compartir",
             "sharingDomainHint": "Se usa en los enlaces que reparte Polaris (enlaces compartidos y puntos de entrega). Apunta aquí un subdominio gratuito desechable (p. ej. uno de dokploy / traefik.me) para enlaces de usar y tirar. Si está vacío, se usa el dominio de la aplicación.",
+            "invalidAddress": "Usa una dirección como polaris.example.com, sin ruta.",
             "saveFailed": "No se guardaron los dominios",
             "use": "Usar {suggestion}"
         },
@@ -603,6 +604,7 @@
             "homeAdvice": "Recomendado para un servidor en casa o local: configura <b>DuckDNS</b> abajo (gratis) y usa <code>{base}</code> como base comodín. Polaris servirá subdominios públicos con Let's Encrypt y mantendrá la IP actualizada solo.",
             "exposureMode": "Exposición",
             "wildcardBase": "Dominio base comodín",
+            "invalidWildcard": "Usa un dominio como apps.example.com.",
             "wildcardManaged": "Sale de tu distribución de zonas. Cámbialo en la configuración guiada de arriba.",
             "wildcardNotReady": "Aún no se usa: no se ha visto que el comodín resuelva a este servidor. Los servicios nuevos mantienen un subdominio gratuito hasta que pase la comprobación de DNS de la configuración guiada.",
             "saveExposure": "Guardar"
@@ -1379,6 +1381,8 @@
             "token": "Token",
             "baseDomain": "Dominio base",
             "baseDomainHint": "Cualquier dominio o subdominio que controles: example.com, plr.com o plr.example.com.",
+            "invalidZoneLabel": "Solo letras, números y guiones, como plr.",
+            "invalidBaseDomain": "Usa un dominio como example.com.",
             "zones": "Zonas",
             "addZone": "Añadir zona",
             "scopePolaris": "El propio Polaris",

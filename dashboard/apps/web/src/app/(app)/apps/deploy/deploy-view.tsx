@@ -74,6 +74,7 @@ import {
     MANAGED_ENGINES,
     MANAGED_ENGINE_INFO,
     REDIS_CLUSTER_MASTERS,
+    normalizeDeployHostname,
     type DatabaseCreateInput,
     type ManagedEngine
 } from "@polaris/core";
@@ -1904,6 +1905,8 @@ function DomainDialog({
     const [port, setPort] = useState("80");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+    // Blank is a free subdomain; anything typed has to be a name the edge can route.
+    const hostnameBad = hostname.trim() !== "" && normalizeDeployHostname(hostname) === null;
 
     function submit() {
         setError(null);
@@ -1972,12 +1975,14 @@ function DomainDialog({
                     <Field
                         label={t("view.domainDialog.custom")}
                         hint={t("view.domainDialog.customHint")}
+                        error={hostnameBad ? t("view.domainDialog.invalidHostname") : undefined}
                     >
                         <Input
                             value={hostname}
                             onChange={(event) => setHostname(event.target.value)}
                             // i18n-ignore: an example hostname
                             placeholder="app.example.com"
+                            aria-invalid={hostnameBad}
                         />
                     </Field>
                     <Field label={t("view.domainDialog.targetPort")}>
@@ -1990,7 +1995,7 @@ function DomainDialog({
                     </Field>
                     {error && <p className="text-sm text-danger">{error}</p>}
                     <div className="flex justify-end">
-                        <Button onClick={submit} disabled={pending}>
+                        <Button onClick={submit} disabled={pending || hostnameBad}>
                             {pending && <Loader2 className="size-4 animate-spin" />}{" "}
                             {t("view.domainDialog.add")}
                         </Button>

@@ -24,6 +24,7 @@ import { setServerEnvironmentAction, setServerWildcardAction } from "./actions";
 import { dropServerOptions } from "@/components/server-picker";
 import { ENVIRONMENT_CHOICES, environmentWords } from "./environment-meta";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { baseDomainField } from "@/lib/domain-fields";
 
 export interface EnvironmentTarget {
     /** Null for the box Polaris runs on, which has no Host row. */
@@ -162,6 +163,8 @@ function ServerWildcard({ hostId, current }: { hostId: string; current: string }
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const wildcardBad = !baseDomainField(value).ok;
+
     async function save() {
         setSaving(true);
         setSaved(false);
@@ -189,6 +192,7 @@ function ServerWildcard({ hostId, current }: { hostId: string; current: string }
                         }}
                         placeholder="apps.example.com" // i18n-ignore example domain
                         autoComplete="off"
+                        aria-invalid={wildcardBad}
                     />
                     <Button
                         size="sm"
@@ -196,7 +200,8 @@ function ServerWildcard({ hostId, current }: { hostId: string; current: string }
                         onClick={save}
                         disabled={
                             saving ||
-                            !isDirty(current, value, (domain) => domain.trim().toLowerCase())
+                            wildcardBad ||
+                            !isDirty(current, value, (domain) => baseDomainField(domain).value)
                         }
                     >
                         {saving ? tcommon("actions.saving") : tcommon("actions.save")}
@@ -209,6 +214,9 @@ function ServerWildcard({ hostId, current }: { hostId: string; current: string }
                     code: (chunks) => <code key="domain">{chunks}</code>
                 })}
             </p>
+            {wildcardBad ? (
+                <p className="text-xs text-danger">{t("environment.invalidWildcard")}</p>
+            ) : null}
             {saved ? <p className="text-xs text-success">{t("environment.saved")}</p> : null}
             {error ? <p className="text-xs text-danger">{error}</p> : null}
         </div>

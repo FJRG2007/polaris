@@ -67,6 +67,7 @@
         "detected": "Polaris detected <b>{name}</b> from its address. Confirm it or pick another.",
         "wildcard": "Wildcard domain for this server",
         "wildcardHint": "Point <code>*.{domain}</code> at this server, and its services get a real domain with a Let's Encrypt certificate. Leave empty to use free IP-based subdomains.",
+        "invalidWildcard": "Use a domain like apps.example.com.",
         "saved": "Saved."
     },
     "host": {

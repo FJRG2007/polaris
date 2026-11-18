@@ -8,6 +8,7 @@
  */
 
 import { randomBytes } from "node:crypto";
+import { isDnsLabel, isDomainName, normalizeHostInput } from "@polaris/core";
 import { slugify } from "./naming.js";
 import { magicDomain } from "./subdomain.js";
 
@@ -26,12 +27,6 @@ export interface DomainZone {
 export const POLARIS_ZONE_LABEL = "polaris";
 export const DEPLOY_ZONE_LABEL = "plr";
 
-/** One DNS label: letters, digits and inner dashes, 63 chars max (RFC 1035). */
-const LABEL_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
-
-/** A registrable domain: two or more labels, no wildcard, no scheme. */
-const DOMAIN_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/;
-
 /** The zone layout offered out of the box. */
 export function defaultZones(): DomainZone[] {
     return [
@@ -42,24 +37,17 @@ export function defaultZones(): DomainZone[] {
 
 /** Strip scheme, wildcard prefix, port, path and case from a typed base domain. */
 export function normalizeBaseDomain(value: string): string {
-    return value
-        .trim()
-        .toLowerCase()
-        .replace(/^https?:\/\//, "")
-        .replace(/^\*\./, "")
-        .replace(/\/.*$/, "")
-        .replace(/:\d+$/, "")
-        .replace(/\.+$/, "");
+    return normalizeHostInput(value).replace(/^\*\./, "");
 }
 
 /** Whether a normalized base domain is usable as a zone parent. */
 export function isBaseDomain(value: string): boolean {
-    return DOMAIN_PATTERN.test(value);
+    return isDomainName(value);
 }
 
 /** Whether a label is a valid zone label ("" is valid: the base domain itself). */
 export function isZoneLabel(value: string): boolean {
-    return value === "" || LABEL_PATTERN.test(value);
+    return value === "" || isDnsLabel(value);
 }
 
 /** The zone's own hostname: `plr.example.com`, or the base domain for the empty label. */
@@ -89,7 +77,7 @@ export function zoneHostname(name: string, zone: Pick<DomainZone, "label">, base
  */
 export function normalizeZoneName(value: string): string {
     const label = slugify(value).replace(/-+$/, "");
-    return LABEL_PATTERN.test(label) ? label : "";
+    return isDnsLabel(label) ? label : "";
 }
 
 /**

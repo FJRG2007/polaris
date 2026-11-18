@@ -442,6 +442,7 @@
             "enable": "Enable domain",
             "custom": "Custom domain",
             "customHint": "Leave blank for a free subdomain.",
+            "invalidHostname": "Use a domain like app.example.com or *.example.com.",
             "targetPort": "Target port",
             "add": "Add domain",
             "tunnel": "Tunnel"

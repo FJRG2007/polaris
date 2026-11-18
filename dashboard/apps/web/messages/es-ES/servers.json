@@ -67,6 +67,7 @@
         "detected": "Polaris ha detectado <b>{name}</b> por su dirección. Confírmalo o elige otra opción.",
         "wildcard": "Dominio comodín de este servidor",
         "wildcardHint": "Apunta <code>*.{domain}</code> a este servidor y sus servicios tendrán un dominio real con un certificado de Let's Encrypt. Déjalo vacío para usar subdominios gratuitos basados en la IP.",
+        "invalidWildcard": "Usa un dominio como apps.example.com.",
         "saved": "Guardado."
     },
     "host": {

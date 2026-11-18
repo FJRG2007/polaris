@@ -537,6 +537,7 @@
             "appDomainHint": "The dashboard's stable address. Leave empty to use the deployment default ({url}).",
             "sharingDomain": "Sharing domain",
             "sharingDomainHint": "Used for the links Polaris hands out (share links and drop points). Point a throwaway free subdomain (e.g. a dokploy / traefik.me one) here for disposable links. Falls back to the app domain.",
+            "invalidAddress": "Use an address like polaris.example.com, with no path.",
             "saveFailed": "Could not save the domains",
             "use": "Use {suggestion}"
         },
@@ -603,6 +604,7 @@
             "homeAdvice": "Recommended for a home/local server: set up <b>DuckDNS</b> below (free) and use <code>{base}</code> as the wildcard base - Polaris then serves public subdomains with Let's Encrypt and keeps the IP updated automatically.",
             "exposureMode": "Exposure mode",
             "wildcardBase": "Wildcard base domain",
+            "invalidWildcard": "Use a domain like apps.example.com.",
             "wildcardManaged": "Taken from your zone layout. Change it in the guided setup above.",
             "wildcardNotReady": "Not in use yet: the wildcard has not been seen resolving to this server. New services keep a free subdomain until the DNS check in the guided setup passes.",
             "saveExposure": "Save exposure"
@@ -1379,6 +1381,8 @@
             "token": "Token",
             "baseDomain": "Base domain",
             "baseDomainHint": "Any domain or subdomain you control - example.com, plr.com, or plr.example.com.",
+            "invalidZoneLabel": "Letters, digits and dashes only, like plr.",
+            "invalidBaseDomain": "Use a domain like example.com.",
             "zones": "Zones",
             "addZone": "Add zone",
             "scopePolaris": "Polaris itself",

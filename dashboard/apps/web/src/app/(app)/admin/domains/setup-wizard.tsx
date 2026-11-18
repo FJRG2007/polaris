@@ -71,6 +71,27 @@ import {
     TriangleAlert
 } from "lucide-react";
 import { approachWords, strategyNote, strategyWords } from "./strategy-words";
+import { isDnsLabel } from "@polaris/core";
+import { baseDomainField, duckSubdomainField } from "@/lib/domain-fields";
+
+/** A zone label as the save reads it: "" is the base domain itself. */
+function zoneLabelOk(label: string): boolean {
+    const value = label.trim().toLowerCase();
+    return value === "" || isDnsLabel(value);
+}
+
+/** Whether the domain step's fields are ones the save would take, so the button
+ *  waits for them instead of the save refusing them. */
+function domainFieldsOk(
+    strategy: string,
+    baseDomain: string,
+    duckSub: string,
+    zones: readonly { label: string }[]
+): boolean {
+    const domainOk =
+        strategy === "duckdns" ? duckSubdomainField(duckSub).ok : baseDomainField(baseDomain).ok;
+    return domainOk && zones.every((zone) => zoneLabelOk(zone.label));
+}
 
 /** A zone row as the wizard edits it (the saved shape, plus a key for React). */
 interface ZoneRow {
@@ -458,7 +479,11 @@ export function DomainSetupWizard({ onState }: { onState?: (state: DomainSetupSt
                     </Button>
                 )}
                 {step === 2 && (
-                    <Button size="sm" onClick={save} disabled={busy}>
+                    <Button
+                        size="sm"
+                        onClick={save}
+                        disabled={busy || !domainFieldsOk(strategy, baseDomain, duckSub, zones)}
+                    >
                         {busy ? <Loader2 className="size-4 animate-spin" /> : null}
                         {busy ? tc("actions.saving") : t("domainsSetup.saveAndContinue")}
                     </Button>
@@ -854,7 +879,13 @@ function DomainStep({
                             onChange={(event) => onDuckSub(event.target.value)}
                             placeholder="mypolaris"
                             autoComplete="off"
+                            aria-invalid={!duckSubdomainField(duckSub).ok}
                         />
+                        {!duckSubdomainField(duckSub).ok ? (
+                            <span className="text-xs text-danger">
+                                {t("domainsSetup.errors.subdomainOnly")}
+                            </span>
+                        ) : null}
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         {t("domainsSetup.domain.token")}
@@ -879,7 +910,13 @@ function DomainStep({
                         onChange={(event) => onBaseDomain(event.target.value)}
                         placeholder="example.com"
                         autoComplete="off"
+                        aria-invalid={!baseDomainField(baseDomain).ok}
                     />
+                    {!baseDomainField(baseDomain).ok ? (
+                        <span className="text-xs text-danger">
+                            {t("domainsSetup.domain.invalidBaseDomain")}
+                        </span>
+                    ) : null}
                     <span className="text-xs text-muted-foreground">
                         {t("domainsSetup.domain.baseDomainHint")}
                     </span>
@@ -914,6 +951,8 @@ function DomainStep({
                             placeholder="plr"
                             autoComplete="off"
                             className="w-28"
+                            aria-invalid={!zoneLabelOk(zone.label)}
+                            aria-label={t("domainsSetup.domain.zones")}
                         />
                         <Select
                             value={zone.scope}
@@ -948,6 +987,11 @@ function DomainStep({
                         >
                             <Trash2 className="size-4" />
                         </Button>
+                        {!zoneLabelOk(zone.label) ? (
+                            <span className="basis-full text-xs text-danger">
+                                {t("domainsSetup.domain.invalidZoneLabel")}
+                            </span>
+                        ) : null}
                     </div>
                 ))}
                 <p className="text-xs text-muted-foreground">

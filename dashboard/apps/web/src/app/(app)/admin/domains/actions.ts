@@ -16,6 +16,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { runScheduledJob } from "@/lib/cron/scheduler";
 import { repairCallAddress } from "@/lib/chat/call-address-watch";
 import { acmeEmailSchema } from "@/lib/tls/acme-contact";
+import { baseDomainSchema, duckSubdomainSchema, siteAddressSchema } from "@/lib/domain-fields";
 import {
     ensureWildcardCertificate,
     wildcardCertView,
@@ -84,9 +85,9 @@ import {
  * reach and what stops a non-string reaching `.trim()` as a 500.
  */
 const domainsSchema = z.object({
-    appDomain: z.string().optional(),
-    sharingDomain: z.string().optional(),
-    duckdnsSubdomain: z.string().optional(),
+    appDomain: siteAddressSchema.optional(),
+    sharingDomain: siteAddressSchema.optional(),
+    duckdnsSubdomain: duckSubdomainSchema.optional(),
     duckdnsToken: z.string().optional()
 });
 
@@ -385,7 +386,7 @@ export async function networkStatusAction(redetect = false): Promise<NetworkStat
  */
 const networkSchema = z.object({
     mode: z.enum(MODES as [NetworkMode, ...NetworkMode[]]).optional(),
-    wildcardDomain: z.string().max(253).optional()
+    wildcardDomain: baseDomainSchema.optional()
 });
 
 export async function saveNetworkConfigAction(

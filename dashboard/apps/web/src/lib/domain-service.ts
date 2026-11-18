@@ -11,6 +11,7 @@
  */
 
 import { loadEnv } from "@polaris/config";
+import { normalizeSiteAddress } from "@polaris/core";
 import { getSetting, setSetting } from "./setting-store";
 import { getHostLanIp, isLanAddress } from "./host-address";
 import { getPolarisPublicUrl } from "./polaris-tunnel-service";
@@ -46,12 +47,17 @@ export interface DomainConfig {
     publicIp: string;
 }
 
-/** Normalize a user-typed domain into an https base URL with no trailing slash. */
+/**
+ * A stored domain as an https base URL with no trailing slash, or null when it is
+ * not an address. Null lets the caller fall through to the next address it knows:
+ * a value saved before the Domains page checked its fields (`////`) would otherwise
+ * become `https://`, and every share link with it.
+ */
 function normalizeUrl(value: string | null): string | null {
     if (!value || !value.trim()) return null;
-    let url = value.trim().replace(/\/+$/, "");
-    if (!/^https?:\/\//.test(url)) url = `https://${url}`;
-    return url;
+    const address = normalizeSiteAddress(value);
+    if (address === null) return null;
+    return /^https?:\/\//.test(address) ? address : `https://${address}`;
 }
 
 /** How many extra hostnames one deployment may route, so the generated edge rule

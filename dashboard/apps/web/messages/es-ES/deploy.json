@@ -442,6 +442,7 @@
             "enable": "Activar dominio",
             "custom": "Dominio propio",
             "customHint": "Déjalo en blanco para un subdominio gratuito.",
+            "invalidHostname": "Usa un dominio como app.example.com o *.example.com.",
             "targetPort": "Puerto destino",
             "add": "Nuevo dominio",
             "tunnel": "Túnel"

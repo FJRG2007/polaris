@@ -36,6 +36,7 @@ import type { DomainConfig } from "@/lib/domain-service";
 import type { CheckedAddress } from "@/lib/address-health";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { DOMAINS_OVERVIEW_URL, type DomainsOverview } from "./overview";
+import { baseDomainField, duckSubdomainField, siteAddressField } from "@/lib/domain-fields";
 import type { NetworkMode, NetworkStatus } from "@/lib/network-service";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { domainSuggestions, type DomainSuggestions } from "@/lib/domain-suggestions";
@@ -323,7 +324,7 @@ function useStoredField(stored: string) {
  * The two addresses Polaris itself uses, which the guided setup does not decide: where
  * the dashboard answers, and which domain the links it hands out are built from.
  */
-function AppDomains({
+export function AppDomains({
     config,
     suggestions,
     effectiveAppUrl,
@@ -345,10 +346,14 @@ function AppDomains({
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    const appCheck = siteAddressField(appDomain.value);
+    const sharingCheck = siteAddressField(sharingDomain.value);
     /** Nothing to save until a field differs from what is stored. */
+    // Against the stored value read the same way, so one saved before this check
+    // (`https://...`, a trailing slash) does not count as an edit nobody made.
     const changed =
-        appDomain.value.trim() !== config.appDomain ||
-        sharingDomain.value.trim() !== config.sharingDomain;
+        appCheck.value !== siteAddressField(config.appDomain).value ||
+        sharingCheck.value !== siteAddressField(config.sharingDomain).value;
 
     async function save() {
         setSaving(true);
@@ -379,7 +384,11 @@ function AppDomains({
                     onChange={(event) => appDomain.setValue(event.target.value)}
                     placeholder={suggestions.app ?? "polaris.example.com"}
                     autoComplete="off"
+                    aria-invalid={!appCheck.ok}
                 />
+                {!appCheck.ok ? (
+                    <span className="text-xs text-danger">{t("domains.own.invalidAddress")}</span>
+                ) : null}
                 <span className="text-xs text-muted-foreground">
                     {t("domains.own.appDomainHint", { url: effectiveAppUrl })}
                 </span>
@@ -400,7 +409,11 @@ function AppDomains({
                     onChange={(event) => sharingDomain.setValue(event.target.value)}
                     placeholder={suggestions.sharing ?? "share.example.com"}
                     autoComplete="off"
+                    aria-invalid={!sharingCheck.ok}
                 />
+                {!sharingCheck.ok ? (
+                    <span className="text-xs text-danger">{t("domains.own.invalidAddress")}</span>
+                ) : null}
                 <span className="text-xs text-muted-foreground">
                     {t("domains.own.sharingDomainHint")}
                 </span>
@@ -417,7 +430,10 @@ function AppDomains({
                 {saved && !changed ? (
                     <span className="text-sm text-success">{t("domains.saved")}</span>
                 ) : null}
-                <Button onClick={save} disabled={saving || !changed}>
+                <Button
+                    onClick={save}
+                    disabled={saving || !changed || !appCheck.ok || !sharingCheck.ok}
+                >
                     {saving ? tc("actions.saving") : tc("actions.save")}
                 </Button>
             </div>
@@ -591,7 +607,7 @@ export function LocalCertificate() {
  * the chosen strategy, and this is where an operator who uses it for something else -
  * or who only wants to replace the token - edits it.
  */
-function DuckDns({
+export function DuckDns({
     config,
     onConfig
 }: {
@@ -611,7 +627,8 @@ function DuckDns({
     const [syncResult, setSyncResult] = useState<{ ok: boolean; detail: string } | null>(null);
 
     /** A token is only ever typed, never read back, so any entry counts as a change. */
-    const changed = duckSub.value.trim() !== config.duckdnsSubdomain || duckToken !== "";
+    const subCheck = duckSubdomainField(duckSub.value);
+    const changed = subCheck.value !== config.duckdnsSubdomain || duckToken !== "";
 
     async function save() {
         setSaving(true);
@@ -694,7 +711,13 @@ function DuckDns({
                     onChange={(event) => duckSub.setValue(event.target.value)}
                     placeholder="mypolaris"
                     autoComplete="off"
+                    aria-invalid={!subCheck.ok}
                 />
+                {!subCheck.ok ? (
+                    <span className="text-xs text-danger">
+                        {t("domainsSetup.errors.subdomainOnly")}
+                    </span>
+                ) : null}
                 <span className="text-xs text-muted-foreground">
                     {t.rich("domains.duckdns.subdomainHint", { code })}
                 </span>
@@ -740,7 +763,7 @@ function DuckDns({
                 {saved && !changed ? (
                     <span className="text-sm text-success">{t("domains.saved")}</span>
                 ) : null}
-                <Button onClick={save} disabled={saving || !changed}>
+                <Button onClick={save} disabled={saving || !changed || !subCheck.ok}>
                     {saving ? tc("actions.saving") : tc("actions.save")}
                 </Button>
             </div>
@@ -833,9 +856,13 @@ function NetworkExposure({ nonce }: { nonce: number }) {
         setError(null);
         try {
             // A zone-managed wildcard is not editable here, so it is not written back:
-            // storing a copy would leave two values for one setting.
+            // storing a copy would leave two values for one setting. Nor is a wildcard
+            // the chosen mode does not use: its field is hidden, so whatever is left in
+            // it can be neither seen nor corrected.
             const next = await saveNetworkConfigAction(
-                status?.wildcardManaged ? { mode } : { mode, wildcardDomain: wildcard }
+                status?.wildcardManaged || mode !== "wildcard"
+                    ? { mode }
+                    : { mode, wildcardDomain: wildcard }
             );
             loaded.current = { mode: next.mode, wildcard: next.wildcardDomain };
             setStatus(next);
@@ -883,9 +910,14 @@ function NetworkExposure({ nonce }: { nonce: number }) {
     const publiclyReachable = effective === "public" || effective === "wildcard";
     /** Nothing to save until a control differs from what the last read or save left.
      *  A zone-managed wildcard is not written back, so it cannot be a change either. */
+    const wildcardCheck = baseDomainField(wildcard);
     const changed =
         mode !== loaded.current.mode ||
-        (!status.wildcardManaged && wildcard.trim() !== loaded.current.wildcard);
+        (mode === "wildcard" &&
+            !status.wildcardManaged &&
+            wildcardCheck.value !== baseDomainField(loaded.current.wildcard).value);
+    // Only a wildcard that is used and typed here can stop the save.
+    const wildcardBad = mode === "wildcard" && !status.wildcardManaged && !wildcardCheck.ok;
 
     return (
         <PageSection
@@ -982,7 +1014,13 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                         placeholder="apps.example.com"
                         autoComplete="off"
                         disabled={status.wildcardManaged}
+                        aria-invalid={wildcardBad}
                     />
+                    {wildcardBad ? (
+                        <span className="text-xs text-danger">
+                            {t("domains.network.invalidWildcard")}
+                        </span>
+                    ) : null}
                     {status.wildcardManaged && (
                         <span className="text-xs text-muted-foreground">
                             {t("domains.network.wildcardManaged")}
@@ -1004,7 +1042,7 @@ function NetworkExposure({ nonce }: { nonce: number }) {
                 {saved && !changed ? (
                     <span className="text-sm text-success">{t("domains.saved")}</span>
                 ) : null}
-                <Button onClick={save} disabled={busy || !changed}>
+                <Button onClick={save} disabled={busy || !changed || wildcardBad}>
                     {busy ? tc("actions.saving") : t("domains.network.saveExposure")}
                 </Button>
             </div>
