@@ -57,7 +57,7 @@ import { CodeBootLine } from "@/components/polar/polar-code-boot";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
-import { Button, cn, CopyIcon, SegmentedControl, useCopied } from "@polaris/ui";
+import { Button, cn, CopyIcon, SegmentedControl, useCopied, useToast } from "@polaris/ui";
 import { ConversationEmptyState } from "@/components/polar/elements/conversation";
 import { PolarThreadFrame, PolarWelcome } from "@/components/polar/polar-layout";
 import {
@@ -88,7 +88,7 @@ import * as acpProviders from "@/lib/agents/acp/providers";
 import * as drafts from "@/lib/agents/draft-frames";
 import { automaticChoice, type ModelChoice } from "@/lib/polar/shared";
 import { usePolarUploads } from "@/components/polar/polar-uploads";
-import { POLAR_ATTACHMENT_MOST, POLAR_ATTACHMENT_TYPES } from "@/lib/polar/shared";
+import { POLAR_ATTACHMENT_MOST, POLAR_ATTACHMENT_TYPES, POLAR_COMMAND_PROMPT_MAX } from "@/lib/polar/shared";
 import {
     type ModelSelectorProvider
 } from "@/components/polar/elements/model-selector";
@@ -100,7 +100,7 @@ import { useCodeSlash } from "@/components/polar/polar-code-slash";
 import * as codeCommands from "@/lib/polar/code-commands";
 import * as goals from "@/lib/polar/goals";
 import { goalStateKey, PolarGoalBar } from "@/components/polar/polar-goal";
-import { usePolarCommands } from "@/components/polar/polar-commands";
+import { CommandForm, usePolarCommands, type CommandDraft } from "@/components/polar/polar-commands";
 import { ContextBar } from "@/components/polar/polar-context";
 import * as codeStatus from "@/lib/polar/code-status";
 import {
@@ -148,7 +148,23 @@ import type {
     PolarCodeThread
 } from "@/lib/polar/code";
 import type { SessionView } from "@/lib/agents/session-service";
-import { Code2, Keyboard, MessageSquare, PanelRight, Pencil, Reply, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import {
+    BookmarkPlus,
+    Code2,
+    Keyboard,
+    MessageSquare,
+    PanelRight,
+    Pencil,
+    Reply,
+    RotateCcw,
+    RotateCw,
+    ShieldCheck,
+    Square,
+    TriangleAlert,
+    Volume2,
+    X
+} from "lucide-react";
+import * as answerActions from "@/components/polar/polar-answer-actions";
 import { pickedContext, PICKS_MAX, type PickedElement } from "@/lib/agents/preview-picker";
 import { PickedChips } from "@/components/preview/picked-chips";
 import dynamic from "next/dynamic";
@@ -314,6 +330,26 @@ export function codeBlocks(entries: readonly PolarCodeEntry[]): CodeBlock[] {
         else blocks.push({ kind: "work", entries: [entry] });
     }
     return blocks;
+}
+
+/**
+ * What can be asked again: the person's last message and, when the agent
+ * answered it, that answer. Polaris's own lines are passed over. An agent
+ * session's conversation cannot be cut back, so only the last turn is retried,
+ * as a new one. Pure.
+ */
+export function codeRetryOf(entries: readonly PolarCodeEntry[]): {
+    ask: PolarCodeEntry | null;
+    answer: PolarCodeEntry | null;
+} {
+    let answer: PolarCodeEntry | null = null;
+    for (let index = entries.length - 1; index >= 0; index--) {
+        const entry = entries[index]!;
+        if (entry.type !== "message" || entry.role === "system") continue;
+        if (entry.role === "user") return { ask: entry, answer };
+        answer ??= entry;
+    }
+    return { ask: null, answer: null };
 }
 
 /** The person's own sessions as the sidebar lists them, a page at a time. */
@@ -730,6 +766,7 @@ export function PolarCodeView({
                 canPrompt={canStart}
                 fullPage={fullPage}
                 voiceKit={voiceKit}
+                providers={providers}
                 call={call}
                 onCall={setCall}
                 onOpen={code.open}
@@ -1408,6 +1445,7 @@ function CodeThread({
     canPrompt,
     fullPage,
     voiceKit,
+    providers,
     onOpen,
     onNew,
     onHistory,
@@ -1421,6 +1459,8 @@ function CodeThread({
     canPrompt: boolean;
     fullPage: boolean;
     voiceKit: PolarVoiceKit;
+    /** Chat's providers and models, for a command saved from a message. */
+    providers: ModelSelectorProvider[] | null;
     /** Open another session in this thread's place: the one a stopped session
      *  is continued in. */
     onOpen: (sessionId: string) => void;
@@ -1450,7 +1490,9 @@ function CodeThread({
     const [reply, setReply] = useState("");
     // The "/context" card, open until closed.
     const [showContext, setShowContext] = useState(false);
-    const { commands: own, enigma } = usePolarCommands();
+    const { commands: own, enigma, saved: commandSaved } = usePolarCommands();
+    // A message being saved as a command, open in the command form.
+    const [commandDraft, setCommandDraft] = useState<CommandDraft | null>(null);
     const [error, setError] = useState<string | null>(null);
     // What a command answered that is not a failure: copied, goal cleared.
     const [info, setInfo] = useState<string | null>(null);
@@ -1844,6 +1886,23 @@ function CodeThread({
     const turning = live && session?.state === "working";
     const indicator =
         live && (pending || (turning && blocks.length > 0 && blocks.at(-1)?.kind !== "work"));
+    // Sending again and answering again are new turns: only for whoever may
+    // steer it, while it is open and between turns.
+    const retry = useMemo(() => codeRetryOf(thread?.entries ?? []), [thread]);
+    const canRetry = live && !!thread?.canManage && canPrompt && !busy && !turning && !pending;
+    const askAgain = () => retry.ask && sendText(parseVoiceDelegation(retry.ask.text) ?? retry.ask.text);
+    useEffect(() => () => answerActions.stopReading(), []);
+    const messageActions = (entry: PolarCodeEntry): CodeMessageActions => ({
+        onCompose: setReply,
+        onResend: canRetry && entry === retry.ask ? askAgain : undefined,
+        onRegenerate: canRetry && entry === retry.answer ? askAgain : undefined,
+        onSaveCommand: () =>
+            setCommandDraft({
+                prompt: (parseVoiceDelegation(entry.text) ?? entry.text).slice(0, POLAR_COMMAND_PROMPT_MAX)
+            }),
+        speech: voiceKit.voice.speech,
+        payer: voiceKit.payer
+    });
 
     /** Carry on in a new session on the same branch, with the conversation so
      *  far where the agent can take it, and open it here. `target` moves it to
@@ -2192,7 +2251,7 @@ function CodeThread({
                                     // A thread cached before entries had ids has none.
                                     key={block.entry.id || `${block.entry.at}-${index}`}
                                     entry={block.entry}
-                                    onCompose={setReply}
+                                    actions={messageActions(block.entry)}
                                 />
                             ) : (
                                 <Work
@@ -2300,6 +2359,15 @@ function CodeThread({
                     }}
                 />
             ) : null}
+            {commandDraft ? (
+                <CommandForm
+                    draft={commandDraft}
+                    commands={own}
+                    providers={providers ?? []}
+                    onClose={() => setCommandDraft(null)}
+                    onSaved={commandSaved}
+                />
+            ) : null}
         </>
     );
 }
@@ -2386,15 +2454,36 @@ const ISO_TIME = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g;
 
 /** A message of the session, in Chat's bubbles: the person's words as typed,
  *  the agent's as Markdown. */
+/** What a Code message's row can do beyond copy, reply and edit; an absent
+ *  action is not drawn. */
+export interface CodeMessageActions {
+    /** Replaces the composer's draft: edit and reply. */
+    readonly onCompose: (text: string) => void;
+    /** Sends the person's message again, as a new turn. */
+    readonly onResend?: () => void;
+    /** Asks the agent the question before this answer again. */
+    readonly onRegenerate?: () => void;
+    /** Opens the command form with the person's message as its prompt. */
+    readonly onSaveCommand?: () => void;
+    /** Whether a voice can read an answer aloud, and who pays for it. */
+    readonly speech: boolean;
+    readonly payer: string | null;
+}
+
 /**
  * One line of a Code session, with the chat's own actions under it: copy,
  * reply (quoted into the composer) and, on the person's own message, edit
- * (back into the composer to send again). `onCompose` replaces the draft.
+ * (back into the composer), send again and save as a command; on the agent's,
+ * read aloud and, on the last one, answer again.
  */
-function CodeMessage({ entry, onCompose }: { entry: PolarCodeEntry; onCompose: (text: string) => void }) {
+function CodeMessage({ entry, actions }: { entry: PolarCodeEntry; actions: CodeMessageActions }) {
     const t = useTranslations("polar");
+    const toast = useToast();
     const format = useDisplayFormat();
     const { copied, copy } = useCopied();
+    const readId = `code:${entry.id || entry.at}`;
+    const reading = answerActions.useReading(readId);
+    const { onCompose } = actions;
     // Polaris's own line (an account switch, a wait): quiet, not a reply. Its
     // times travel as ISO and are written in the reader's zone and format.
     if (entry.role === "system")
@@ -2423,6 +2512,16 @@ function CodeMessage({ entry, onCompose }: { entry: PolarCodeEntry; onCompose: (
                         <Pencil />
                     </MessageAction>
                 ) : null}
+                {from === "user" && actions.onResend ? (
+                    <MessageAction label={t("actions.resend")} onClick={actions.onResend}>
+                        <RotateCw />
+                    </MessageAction>
+                ) : null}
+                {from === "user" && actions.onSaveCommand ? (
+                    <MessageAction label={t("commands.saveAs")} onClick={actions.onSaveCommand}>
+                        <BookmarkPlus />
+                    </MessageAction>
+                ) : null}
                 <MessageAction label={t("actions.reply")} onClick={() => onCompose(quoteOf(entry.text))}>
                     <Reply />
                 </MessageAction>
@@ -2432,6 +2531,30 @@ function CodeMessage({ entry, onCompose }: { entry: PolarCodeEntry; onCompose: (
                 >
                     <CopyIcon copied={copied} />
                 </MessageAction>
+                {from === "assistant" && actions.speech && entry.text.trim() ? (
+                    <MessageAction
+                        label={reading.active ? t("actions.stopReading") : t("actions.readAloud")}
+                        aria-pressed={reading.active}
+                        aria-busy={reading.loading}
+                        className={cn(reading.loading && "motion-safe:animate-pulse")}
+                        onClick={() =>
+                            reading.active
+                                ? answerActions.stopReading()
+                                : answerActions.readAloud(readId, entry.text, actions.payer, (error) =>
+                                      toast.show({ title: t(`voice.errors.${error}`) })
+                                  )
+                        }
+                    >
+                        {reading.active ? <Square /> : <Volume2 />}
+                    </MessageAction>
+                ) : null}
+                {/* Plain: an agent session's turn has no longer, shorter or
+                    other-model form to ask for; it is asked again as it was. */}
+                {from === "assistant" && actions.onRegenerate ? (
+                    <MessageAction label={t("actions.regenerate")} onClick={actions.onRegenerate}>
+                        <RotateCcw />
+                    </MessageAction>
+                ) : null}
             </MessageActions>
         </Message>
     );
