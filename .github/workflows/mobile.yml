@@ -37,6 +37,25 @@ jobs:
           path: ${{ runner.temp }}/polaris-android.apk
           if-no-files-found: error
 
+  ios:
+    name: iOS build
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # Pinned by checksum: the project file is generated from project.yml, not kept by hand.
+      - name: XcodeGen
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/xcodegen.zip" https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip
+          echo "4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806  $RUNNER_TEMP/xcodegen.zip" | shasum -a 256 -c -
+          unzip -q "$RUNNER_TEMP/xcodegen.zip" -d "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/xcodegen/bin" >> "$GITHUB_PATH"
+      - name: Build for the simulator
+        working-directory: mobile/ios
+        run: |
+          xcodegen generate
+          xcodebuild -project Polaris.xcodeproj -target Polaris -sdk iphonesimulator \
+            -configuration Release CODE_SIGNING_ALLOWED=NO build
+
   android-release:
     name: Publish the signed Android APK
     # Main only, and nothing until the signing key exists: a key made per run would stop every later

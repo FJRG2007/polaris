@@ -1,0 +1,14 @@
+"server.title" = "Connect to your Polaris";
+"server.hint" = "The address you open Polaris at in a browser.";
+"server.connect" = "Connect";
+"server.invalid" = "That isn't a web address. Type it as you would in a browser.";
+"server.notPolaris" = "That address answers, but it isn't Polaris.";
+"server.starting" = "Polaris is starting there. Try again in a minute.";
+"server.redirects" = "That address sends you somewhere else. Use the address Polaris opens at.";
+"server.unreachable" = "Nothing answers at that address. Check it, and that this phone is online.";
+"page.unreachableTitle" = "Polaris isn't answering";
+"page.unreachable" = "%@ can't be reached from this phone right now.";
+"page.retry" = "Try again";
+"page.changeServer" = "Use another Polaris";
+"dialog.ok" = "OK";
+"dialog.cancel" = "Cancel";

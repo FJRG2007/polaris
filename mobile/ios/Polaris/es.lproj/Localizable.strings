@@ -1,0 +1,14 @@
+"server.title" = "Conecta con tu Polaris";
+"server.hint" = "La dirección con la que abres Polaris en el navegador.";
+"server.connect" = "Conectar";
+"server.invalid" = "Eso no es una dirección web. Escríbela como en el navegador.";
+"server.notPolaris" = "Esa dirección responde, pero no es Polaris.";
+"server.starting" = "Polaris está arrancando ahí. Prueba en un minuto.";
+"server.redirects" = "Esa dirección te lleva a otra. Usa la dirección donde abre Polaris.";
+"server.unreachable" = "Nada responde en esa dirección. Revísala y que el móvil tenga conexión.";
+"page.unreachableTitle" = "Polaris no responde";
+"page.unreachable" = "No se puede llegar a %@ desde este móvil ahora mismo.";
+"page.retry" = "Reintentar";
+"page.changeServer" = "Usar otro Polaris";
+"dialog.ok" = "Vale";
+"dialog.cancel" = "Cancelar";
