@@ -39,6 +39,7 @@ import { z } from "zod";
 import { callRemoteSchema, emitCallRemote } from "@/lib/chat/call-remote";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as quality from "./call-quality";
+import { setStreamPrefs, streamShape, useStreamPrefs } from "./stream-shape";
 import * as shareHeal from "./call-share-heal";
 import { volumeFor } from "./call-volumes";
 import { setMicDevice } from "./mic-device";
@@ -767,7 +768,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      *  ladder - which is when it is held sharp rather than smooth, see
      *  `screenTuning`. A rung somebody picked is never degraded. */
     const screenDegraded = useCallback((level: quality.CallLevel): boolean => {
-        return quality.screenQuality() === "auto" && level !== quality.SCREEN_LADDER.ceiling;
+        return (
+            quality.screenQuality() === "auto" &&
+            !streamShape() &&
+            level !== quality.SCREEN_LADDER.ceiling
+        );
     }, []);
 
     /** Put what is actually going out on screen. Only the controls read this;
@@ -1097,10 +1102,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         : {}),
                     ...(screening
                         ? {
-                              screenShareEncoding: quality.encodingFor(
-                                  quality.SCREEN_LADDER,
-                                  level
-                              ),
+                              screenShareEncoding: quality.screenEncoding(level),
                               // A shared screen goes out as VP8 with plain
                               // simulcast, not the room's VP9 layers. Published
                               // again as VP9 after a reconnection, the server
@@ -3477,7 +3479,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                             ?.track as EncodedTrack | undefined;
                         const live = await retuneScreenEncoding(
                             published,
-                            quality.encodingFor(quality.SCREEN_LADDER, level),
+                            quality.screenEncoding(level),
                             tuning.preference
                         );
                         if (!live) await publish(SCREEN, screen.current, { again: true });
@@ -3493,10 +3495,30 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         (value: quality.CallQuality) => changeQuality("camera", value),
         [changeQuality]
     );
+    /**
+     * A rung of the screen ladder, picked by hand or left to auto, replaces a
+     * frame rate and resolution chosen for the stream: the two are one choice.
+     */
+    const chosenShape = useStreamPrefs().shape;
+    const shapeKey = chosenShape ? `${chosenShape.frameRate}@${chosenShape.resolution}` : "";
+    const shapeSeen = useRef(shapeKey);
     const setScreenQuality = useCallback(
-        (value: quality.CallQuality) => changeQuality("screen", value),
+        (value: quality.CallQuality) => {
+            shapeSeen.current = "";
+            setStreamPrefs({ shape: null });
+            changeQuality("screen", value);
+        },
         [changeQuality]
     );
+
+    // A frame rate or resolution chosen from the picker or a menu goes out on
+    // the screen already being shared, through the same path as a rung.
+    useEffect(() => {
+        if (shapeSeen.current === shapeKey) return;
+        shapeSeen.current = shapeKey;
+        if (screen.current) changeQuality("screen", quality.screenQuality());
+        else settleLevels();
+    }, [shapeKey, changeQuality, settleLevels]);
 
     /**
      * What the encoder says about one of the two pictures going out.
@@ -3633,7 +3655,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     }
                     autoCamera.current = next;
                 }
-                if (quality.screenQuality() === "auto") {
+                // A frame rate and resolution somebody chose stay as chosen.
+                if (quality.screenQuality() === "auto" && !streamShape()) {
                     const health = await senderHealth(SCREEN, connection, false, uplink);
                     const next = quality.driftAuto(
                         autoScreen.current,
@@ -3653,7 +3676,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         void retuneScreenEncoding(
                             current.localParticipant.getTrackPublication(SCREEN)?.track as
                                 EncodedTrack | undefined,
-                            quality.encodingFor(quality.SCREEN_LADDER, next.level),
+                            quality.screenEncoding(next.level),
                             tuning.preference
                         );
                     }

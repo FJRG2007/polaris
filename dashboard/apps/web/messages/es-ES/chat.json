@@ -426,7 +426,13 @@
             "change": "Cambiar emisión",
             "quality": "Calidad de emisión",
             "audio": "Compartir audio",
-            "noSound": "Esta emisión no tiene sonido. Cámbiala e incluye su audio para enviarlo."
+            "noSound": "Esta emisión no tiene sonido. Cámbiala e incluye su audio para enviarlo.",
+            "popOut": "Sacar en ventana",
+            "more": "Más opciones",
+            "showOwn": "Ver mi emisión",
+            "pauseUnfocused": "Pausar la vista previa si Polaris no está delante",
+            "previewPaused": "Vista en pausa",
+            "report": "Avisar de un fallo"
         },
         "undeafen": "Oír",
         "deafen": "No oír",
@@ -2161,11 +2167,19 @@
         "noDevices": "No hay cámaras ni capturadoras.",
         "untitledDevice": "Dispositivo de vídeo {number}",
         "untitled": "Ventana sin título",
-        "sound": "Compartir el sonido del PC",
         "deviceSound": "Compartir el sonido del equipo",
         "cancel": "Cancelar",
-        "share": "Compartir",
-        "pickFirst": "Elige antes qué compartir."
+        "shareWindow": "Emitir ventana",
+        "shareScreen": "Emitir pantalla",
+        "shareDevice": "Emitir cámara",
+        "settings": "Ajustes de emisión",
+        "streamMode": "Modo de envío",
+        "muteAudio": "Silenciar la emisión",
+        "advanced": "Avanzado",
+        "hidePreview": "Ocultar vista previa",
+        "definition": "Calidad de imagen",
+        "sd": "SD",
+        "hd": "HD"
     },
     "annotate": {
         "askToDraw": "Pedir dibujar en esta pantalla",
@@ -2428,5 +2442,43 @@
         "withdraw": "Retirar",
         "accept": "Aceptar",
         "decline": "Rechazar"
+    },
+    "streamQuality": {
+        "custom": "Personal",
+        "source": "Original",
+        "lines": "{lines}p",
+        "fps": "{fps} FPS",
+        "frameRate": "Fotogramas",
+        "resolution": "Resolución",
+        "modes": {
+            "gaming": {
+                "name": "Juegos",
+                "hint": "Vídeo más fluido"
+            },
+            "screenshare": {
+                "name": "Pantalla",
+                "hint": "Texto nítido"
+            },
+            "custom": {
+                "name": "Personal",
+                "hint": "Tus propios ajustes"
+            }
+        }
+    },
+    "streamReport": {
+        "title": "Avisar de un fallo en tu emisión",
+        "description": "Se envía a los administradores de este Polaris con los ajustes de tu emisión.",
+        "problems": {
+            "black": "Los demás ven la pantalla negra",
+            "choppy": "Va a saltos o se congela",
+            "blurry": "Se ve borrosa",
+            "sound": "Falta el sonido o suena mal",
+            "other": "Otra cosa"
+        },
+        "note": "Qué ha pasado (opcional)",
+        "send": "Enviar aviso",
+        "sent": "Aviso enviado. Gracias.",
+        "failed": "No se pudo enviar el aviso. Inténtalo de nuevo.",
+        "pickFirst": "Elige antes qué ha fallado."
     }
 }

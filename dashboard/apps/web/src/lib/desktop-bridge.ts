@@ -294,7 +294,11 @@ export interface PolarisDesktop {
      *  use (macOS). Absent from an app older than the picker, which then shows
      *  its own dialog. `thumbnails: false` answers faster, with names only; an
      *  app older than that option ignores it and sends the pictures. */
-    shareSources?(input?: { readonly thumbnails?: boolean }): Promise<DesktopShareSources | null>;
+    shareSources?(input?: {
+        readonly thumbnails?: boolean;
+        /** One kind only, the tab on screen. An app older than this lists both. */
+        readonly kind?: "screen" | "window";
+    }): Promise<DesktopShareSources | null>;
     /** What the picker chose, for the `getDisplayMedia` call that follows. */
     chooseShare?(input: { readonly id: string; readonly sound: boolean }): Promise<boolean>;
     /** Draw a stroke somebody made on this browser's share over the shared

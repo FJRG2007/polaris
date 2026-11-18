@@ -29,6 +29,7 @@
  */
 
 import { withCameraDevice } from "./camera-device";
+import { streamRung, streamShape } from "./stream-shape";
 import { hostDataSaver } from "@/lib/host-internet";
 import { useCallback, useEffect, useState } from "react";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -183,7 +184,22 @@ const MOTION_FROM_FPS = 30;
  * video on.
  */
 export function screenIsMotion(level: CallLevel): boolean {
-    return SCREEN_LADDER.rungs[level].frameRate >= MOTION_FROM_FPS;
+    return screenRung(level).frameRate >= MOTION_FROM_FPS;
+}
+
+/**
+ * The rung a shared screen is actually sent at: the frame rate and resolution
+ * somebody chose for their stream (`stream-shape`), or else the ladder's rung.
+ */
+export function screenRung(level: CallLevel): QualityRung {
+    const shape = streamShape();
+    return shape ? streamRung(shape) : SCREEN_LADDER.rungs[level];
+}
+
+/** What the encoder may spend on a shared screen at this rung. */
+export function screenEncoding(level: CallLevel): { maxBitrate: number; maxFramerate: number } {
+    const rung = screenRung(level);
+    return { maxBitrate: rung.maxBitrate, maxFramerate: rung.frameRate };
 }
 
 function index(level: CallLevel): number {
@@ -569,7 +585,7 @@ export function screenConstraints(
     /** The size the screen is being captured at now, when it already is. */
     shape?: { readonly width?: number; readonly height?: number } | null
 ): MediaTrackConstraints {
-    const rung = SCREEN_LADDER.rungs[level];
+    const rung = screenRung(level);
     // One edge, for the reason the camera gets one: a 16:10 laptop, an
     // ultrawide or a monitor turned upright keeps its own shape rather than
     // being cut to the rung's.

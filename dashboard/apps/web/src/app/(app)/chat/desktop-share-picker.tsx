@@ -14,7 +14,13 @@
  * It opens the moment it is asked for: listing what can be shared costs the
  * app most of a second on Windows, more with pictures. So it draws the last
  * list it saw (or placeholder tiles), asks for names first and pictures right
- * after, and takes the pictures again every few seconds while it is open.
+ * after, and takes the pictures again every few seconds while it is open - of
+ * the tab on screen only, since every capture stalls the compositor on Windows
+ * and filming forty windows to draw the screens tab froze the pointer.
+ *
+ * A tile is the press: it shares at once. The bar under the tiles says how the
+ * stream will go out - its mode, resolution and frame rate - with SD/HD and the
+ * rest of the stream's settings in the gear beside it (`stream-shape`).
  *
  * `pickDesktopShare` opens it and resolves with the pick, or null when it was
  * closed; the host is mounted once, by the call (`DesktopSharePickerHost`). A
@@ -23,21 +29,36 @@
  * click it requires.
  */
 
-import { AppWindow, Monitor, Video } from "lucide-react";
+import { AppWindow, Check, Monitor, Settings2, Video } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { DesktopShareSources, PolarisDesktop } from "@/lib/desktop-bridge";
+import {
+    STREAM_FRAME_RATES,
+    STREAM_PRESETS,
+    STREAM_RESOLUTIONS,
+    modeOf,
+    setStreamPrefs,
+    useStreamPrefs
+} from "./stream-shape";
+import { DROPDOWN_KIT, MenuRadio, MenuToggle, reshape, resolutionLabel } from "./share-stream-menu";
 import {
     Button,
     cn,
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogHeader,
     DialogTitle,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
+    DropdownMenuTrigger,
     SegmentedControl,
-    Skeleton,
-    Switch
+    Skeleton
 } from "@polaris/ui";
 
 /** How often the pictures are taken again while the picker is open. Each
@@ -129,6 +150,29 @@ export function keepPictures(
 }
 
 /**
+ * Put a listing of one kind - the tab whose pictures were just taken - in
+ * place of that kind, keeping what is known of the other. Screens first. An
+ * app older than one-kind listings sends both; only the asked kind is taken.
+ */
+export function mergeKind(
+    next: DesktopShareSources,
+    previous: DesktopShareSources | null,
+    kind: "screen" | "window"
+): DesktopShareSources {
+    const sources = [
+        ...(previous?.sources ?? []).filter((source) => source.kind !== kind),
+        ...next.sources.filter((source) => source.kind === kind)
+    ];
+    return {
+        ...next,
+        sources: [
+            ...sources.filter((source) => source.kind === "screen"),
+            ...sources.filter((source) => source.kind !== "screen")
+        ]
+    };
+}
+
+/**
  * The cameras and capture cards, each with the audio input of the same device.
  * Windows lists "default" and "communications" aliases beside the real inputs,
  * in the same group, so those are never the match.
@@ -171,52 +215,86 @@ interface Tile {
 
 function Picker({ request }: { request: Request }) {
     const t = useTranslations("chat");
+    const prefs = useStreamPrefs();
     const [listed, setListed] = useState<DesktopShareSources | null>(lastListed);
     const [devices, setDevices] = useState<readonly CaptureDevice[] | null>(null);
-    const [selected, setSelected] = useState<string | null>(null);
-    /** Read by the refresh, which outlives renders. */
-    const picked = useRef(false);
-    picked.current = selected !== null;
     const [sound, setSound] = useState(true);
     // Off until asked: a webcam's own microphone would send the voice twice.
     const [deviceSound, setDeviceSound] = useState(false);
     const [tab, setTab] = useState<Tab>("window");
+    /** Read by the refresh, which outlives renders. */
+    const tabRef = useRef<Tab>(tab);
+    tabRef.current = tab;
+    /** Take the pictures of the tab on screen now, set by the listing effect. */
+    const picturesNow = useRef<(() => void) | null>(null);
 
     useEffect(() => {
         let live = true;
-        let first = true;
+        let busy = false;
+        let again = false;
         let timer: ReturnType<typeof setTimeout> | undefined;
-        const read = async (thumbnails: boolean) => {
+        const pictures = async () => {
+            if (timer) clearTimeout(timer);
+            if (busy) {
+                again = true;
+                return;
+            }
+            const kind = tabRef.current;
             // Nobody is looking at pictures in a window that is not on screen,
-            // and once something is picked the next press is Share: a round
-            // costs the app a second or more, and landing then is the freeze
-            // between choosing and sharing.
-            if (thumbnails && !first && (document.visibilityState === "hidden" || picked.current)) {
-                timer = setTimeout(() => void read(true), REFRESH_MS);
-                return;
+            // and a device tab has none to take.
+            if (kind !== "device" && document.visibilityState !== "hidden") {
+                busy = true;
+                const next = await request.bridge
+                    .shareSources?.({ thumbnails: true, kind })
+                    .catch(() => null);
+                busy = false;
+                if (!live) return;
+                // A refresh that fails keeps the pictures already on screen.
+                if (next) {
+                    setListed((previous) => {
+                        const merged = mergeKind(next, previous, kind);
+                        lastListed = merged;
+                        return merged;
+                    });
+                }
             }
-            const next = await request.bridge.shareSources?.({ thumbnails }).catch(() => null);
             if (!live) return;
-            if (!next) {
-                // No list at all: the app's own picker is the one to use. A
-                // refresh that fails keeps the pictures already on screen.
-                if (first) settle({ kind: "system" });
+            if (again) {
+                again = false;
+                void pictures();
                 return;
             }
-            first = false;
+            timer = setTimeout(() => void pictures(), REFRESH_MS);
+        };
+        void (async () => {
+            const names = await request.bridge
+                .shareSources?.({ thumbnails: false })
+                .catch(() => null);
+            if (!live) return;
+            // No list at all: the app's own picker is the one to use.
+            if (!names) {
+                settle({ kind: "system" });
+                return;
+            }
             setListed((previous) => {
-                const merged = thumbnails ? next : keepPictures(next, previous);
+                const merged = keepPictures(names, previous);
                 lastListed = merged;
                 return merged;
             });
-            timer = setTimeout(() => void read(true), thumbnails ? REFRESH_MS : 0);
-        };
-        void read(false);
+            picturesNow.current = () => void pictures();
+            void pictures();
+        })();
         return () => {
             live = false;
+            picturesNow.current = null;
             if (timer) clearTimeout(timer);
         };
     }, [request]);
+
+    // A tab opened shows its own pictures at once rather than at the next round.
+    useEffect(() => {
+        picturesNow.current?.();
+    }, [tab]);
 
     useEffect(() => {
         const media = navigator.mediaDevices;
@@ -263,18 +341,16 @@ function Picker({ request }: { request: Request }) {
                       icon: source.icon,
                       fallback: source.kind === "screen" ? Monitor : AppWindow
                   }));
-    // A pick whose window closed or whose device was unplugged while the picker
-    // was open is no pick at all, and neither is one on another tab.
-    const chosen = tiles.some((tile) => tile.id === selected) ? selected : null;
-    const chosenDevice =
-        tab === "device" ? ((devices ?? []).find((device) => device.id === chosen) ?? null) : null;
 
-    const share = (id = chosen) => {
-        if (!id) return;
+    const share = (id: string) => {
         if (tab === "device") {
             const device = (devices ?? []).find((candidate) => candidate.id === id);
             if (device) {
-                settle({ kind: "device", deviceId: device.id, audioId: deviceSound ? device.audioId : null });
+                settle({
+                    kind: "device",
+                    deviceId: device.id,
+                    audioId: deviceSound ? device.audioId : null
+                });
             }
             return;
         }
@@ -287,14 +363,36 @@ function Picker({ request }: { request: Request }) {
             : tab === "screen"
               ? t("sharePicker.noScreens")
               : t("sharePicker.noWindows");
+    const action =
+        tab === "device"
+            ? t("sharePicker.shareDevice")
+            : tab === "screen"
+              ? t("sharePicker.shareScreen")
+              : t("sharePicker.shareWindow");
+
+    const shape = prefs.shape;
+    const mode = shape ? modeOf(shape) : null;
+    const definition =
+        shape === null
+            ? null
+            : shape.resolution === "source" || shape.resolution > 720
+              ? "hd"
+              : "sd";
+    const detail = shape
+        ? [
+              t(`streamQuality.modes.${modeOf(shape)}.hint`),
+              resolutionLabel(t, shape.resolution),
+              t("streamQuality.fps", { fps: shape.frameRate })
+          ].join(" - ")
+        : t("callRoom.dropsWhenTheConnectionStruggles");
 
     return (
         <Dialog open onOpenChange={(next) => !next && settle(null)}>
             <DialogContent className="max-w-3xl">
-                <DialogHeader>
-                    <DialogTitle>{t("sharePicker.title")}</DialogTitle>
-                    <DialogDescription>{t("sharePicker.description")}</DialogDescription>
-                </DialogHeader>
+                <DialogTitle className="sr-only">{t("sharePicker.title")}</DialogTitle>
+                <DialogDescription className="sr-only">
+                    {t("sharePicker.description")}
+                </DialogDescription>
                 <div className="flex min-w-0 flex-col gap-4">
                     <SegmentedControl<Tab>
                         aria-label={t("sharePicker.title")}
@@ -329,17 +427,11 @@ function Picker({ request }: { request: Request }) {
                                     <li key={tile.id} className="min-w-0">
                                         <button
                                             type="button"
-                                            aria-pressed={chosen === tile.id}
-                                            onClick={() => setSelected(tile.id)}
-                                            onDoubleClick={() => share(tile.id)}
-                                            className={cn(
-                                                "flex w-full min-w-0 flex-col gap-1.5 rounded-lg border p-1.5 text-start",
-                                                chosen === tile.id
-                                                    ? "border-primary ring-2 ring-primary/40"
-                                                    : "border-border hover:border-muted-foreground/40"
-                                            )}
+                                            onClick={() => share(tile.id)}
+                                            aria-label={`${action}: ${tile.name}`}
+                                            className="group flex w-full min-w-0 flex-col gap-1.5 rounded-lg border border-border p-1.5 text-start transition-colors hover:border-primary focus-visible:border-primary"
                                         >
-                                            <span className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-md bg-muted">
+                                            <span className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-md bg-muted">
                                                 {tile.picture ? (
                                                     // eslint-disable-next-line @next/next/no-img-element -- a data URL the app took a moment ago
                                                     <img
@@ -353,6 +445,14 @@ function Picker({ request }: { request: Request }) {
                                                         aria-hidden
                                                     />
                                                 )}
+                                                <span
+                                                    aria-hidden
+                                                    className="absolute inset-0 flex items-center justify-center bg-background/70 text-sm font-medium opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                                                >
+                                                    <span className="rounded-md bg-primary px-3 py-1.5 text-primary-foreground">
+                                                        {action}
+                                                    </span>
+                                                </span>
                                             </span>
                                             <span className="flex min-w-0 items-center gap-1.5 px-0.5">
                                                 {tile.icon ? (
@@ -362,8 +462,16 @@ function Picker({ request }: { request: Request }) {
                                                         alt=""
                                                         className="size-4 shrink-0"
                                                     />
-                                                ) : null}
-                                                <span className="min-w-0 truncate text-xs" title={tile.name}>
+                                                ) : (
+                                                    <tile.fallback
+                                                        className="size-4 shrink-0 text-muted-foreground"
+                                                        aria-hidden
+                                                    />
+                                                )}
+                                                <span
+                                                    className="min-w-0 truncate text-xs"
+                                                    title={tile.name}
+                                                >
                                                     {tile.name}
                                                 </span>
                                             </span>
@@ -374,41 +482,158 @@ function Picker({ request }: { request: Request }) {
                         )}
                     </div>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    {tab !== "device" && soundAvailable ? (
-                        <div className="flex items-center gap-2 text-sm">
-                            <Switch
-                                checked={sound}
-                                onChange={setSound}
-                                aria-label={t("sharePicker.sound")}
-                            />
-                            <span>{t("sharePicker.sound")}</span>
-                        </div>
-                    ) : chosenDevice?.audioId ? (
-                        <div className="flex items-center gap-2 text-sm">
-                            <Switch
-                                checked={deviceSound}
-                                onChange={setDeviceSound}
-                                aria-label={t("sharePicker.deviceSound")}
-                            />
-                            <span>{t("sharePicker.deviceSound")}</span>
-                        </div>
-                    ) : (
-                        <span />
-                    )}
-                    <div className="flex gap-2">
-                        <Button type="button" variant="ghost" onClick={() => settle(null)}>
-                            {t("sharePicker.cancel")}
-                        </Button>
-                        <Button
-                            type="button"
-                            aria-disabled={!chosen}
-                            onClick={() => share()}
-                            title={chosen ? undefined : t("sharePicker.pickFirst")}
-                        >
-                            {t("sharePicker.share")}
-                        </Button>
+                <div className="flex min-w-0 flex-wrap items-center gap-3 border-t border-border pt-3">
+                    <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-sm font-medium">
+                            {mode ? t(`streamQuality.modes.${mode}.name`) : t("callRoom.automatic")}
+                        </span>
+                        <span className="truncate text-xs text-muted-foreground" title={detail}>
+                            {detail}
+                        </span>
                     </div>
+                    <SegmentedControl<"sd" | "hd">
+                        aria-label={t("sharePicker.definition")}
+                        size="sm"
+                        value={definition}
+                        onValueChange={(next) =>
+                            setStreamPrefs({
+                                shape: reshape(shape, { resolution: next === "hd" ? 1080 : 720 })
+                            })
+                        }
+                        options={[
+                            { value: "sd", label: t("sharePicker.sd") },
+                            { value: "hd", label: t("sharePicker.hd") }
+                        ]}
+                    />
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                aria-label={t("sharePicker.settings")}
+                                title={t("sharePicker.settings")}
+                            >
+                                <Settings2 className="size-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent side="top" align="end" className="w-64">
+                            <DropdownMenuLabel>{t("sharePicker.streamMode")}</DropdownMenuLabel>
+                            <MenuRadio
+                                kit={DROPDOWN_KIT}
+                                on={mode === null}
+                                onPick={() => setStreamPrefs({ shape: null })}
+                            >
+                                {t("callRoom.automatic")}
+                            </MenuRadio>
+                            {(["gaming", "screenshare"] as const).map((preset) => (
+                                <MenuRadio
+                                    key={preset}
+                                    kit={DROPDOWN_KIT}
+                                    on={mode === preset}
+                                    onPick={() => setStreamPrefs({ shape: STREAM_PRESETS[preset] })}
+                                >
+                                    <span className="flex min-w-0 flex-col">
+                                        <span>{t(`streamQuality.modes.${preset}.name`)}</span>
+                                        <span className="truncate text-xs text-muted-foreground">
+                                            {[
+                                                t(`streamQuality.modes.${preset}.hint`),
+                                                resolutionLabel(
+                                                    t,
+                                                    STREAM_PRESETS[preset].resolution
+                                                ),
+                                                t("streamQuality.fps", {
+                                                    fps: STREAM_PRESETS[preset].frameRate
+                                                })
+                                            ].join(" - ")}
+                                        </span>
+                                    </span>
+                                </MenuRadio>
+                            ))}
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>
+                                    <Check
+                                        aria-hidden
+                                        className={cn(
+                                            "size-3.5 shrink-0",
+                                            mode === "custom" ? "opacity-100" : "opacity-0"
+                                        )}
+                                    />
+                                    {t("streamQuality.modes.custom.name")}
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent className="w-52">
+                                    <DropdownMenuLabel>
+                                        {t("streamQuality.frameRate")}
+                                    </DropdownMenuLabel>
+                                    {STREAM_FRAME_RATES.map((frameRate) => (
+                                        <MenuRadio
+                                            key={frameRate}
+                                            kit={DROPDOWN_KIT}
+                                            on={shape?.frameRate === frameRate}
+                                            onPick={() =>
+                                                setStreamPrefs({
+                                                    shape: reshape(shape, { frameRate })
+                                                })
+                                            }
+                                        >
+                                            {t("streamQuality.fps", { fps: frameRate })}
+                                        </MenuRadio>
+                                    ))}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuLabel>
+                                        {t("streamQuality.resolution")}
+                                    </DropdownMenuLabel>
+                                    {STREAM_RESOLUTIONS.map((resolution) => (
+                                        <MenuRadio
+                                            key={resolution}
+                                            kit={DROPDOWN_KIT}
+                                            on={shape?.resolution === resolution}
+                                            onPick={() =>
+                                                setStreamPrefs({
+                                                    shape: reshape(shape, { resolution })
+                                                })
+                                            }
+                                        >
+                                            {resolutionLabel(t, resolution)}
+                                        </MenuRadio>
+                                    ))}
+                                </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                            {(tab === "device" || soundAvailable) && <DropdownMenuSeparator />}
+                            {tab === "device" ? (
+                                <MenuToggle
+                                    kit={DROPDOWN_KIT}
+                                    on={deviceSound}
+                                    onToggle={() => setDeviceSound(!deviceSound)}
+                                >
+                                    {t("sharePicker.deviceSound")}
+                                </MenuToggle>
+                            ) : soundAvailable ? (
+                                <MenuToggle
+                                    kit={DROPDOWN_KIT}
+                                    on={!sound}
+                                    onToggle={() => setSound(!sound)}
+                                >
+                                    {t("sharePicker.muteAudio")}
+                                </MenuToggle>
+                            ) : null}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>
+                                    {t("sharePicker.advanced")}
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent className="w-56">
+                                    <MenuToggle
+                                        kit={DROPDOWN_KIT}
+                                        on={!prefs.showOwn}
+                                        onToggle={() => setStreamPrefs({ showOwn: !prefs.showOwn })}
+                                    >
+                                        {t("sharePicker.hidePreview")}
+                                    </MenuToggle>
+                                </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </DialogContent>
         </Dialog>

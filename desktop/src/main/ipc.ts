@@ -427,7 +427,10 @@ export function registerIpc(host: IpcHost): void {
 
     ipcMain.handle(CHANNELS.shareSources, async (event, raw: unknown) => {
         if (!fromPolaris(event)) return null;
-        const input = z.object({ thumbnails: z.boolean().optional() }).optional().safeParse(raw);
+        const input = z
+            .object({ thumbnails: z.boolean().optional(), kind: z.enum(["screen", "window"]).optional() })
+            .optional()
+            .safeParse(raw);
         return listShareSources(input.success ? input.data : undefined).catch((caught: unknown) => {
             console.error("[screen-share]", caught);
             return null;

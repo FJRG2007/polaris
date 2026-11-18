@@ -360,6 +360,9 @@ export interface CallStage {
  */
 export function stagesOf(room: {
     localScreen: MediaStream | null;
+    /** The sharer asked not to see their own stream: neither the local one nor
+     *  the copy coming back from the server is drawn. */
+    ownHidden?: boolean;
     /** This browser's seat, which is how its own screen is recognised coming
      *  back from the server. Not known for the first moment of a call. */
     participantId: string | null;
@@ -369,7 +372,7 @@ export function stagesOf(room: {
     words: { yourScreen: string; theirScreen: (name: string) => string };
 }): CallStage[] {
     const stages: CallStage[] = [];
-    if (room.localScreen) {
+    if (room.localScreen && !room.ownHidden) {
         stages.push({
             key: LOCAL_SCREEN_KEY,
             stream: room.localScreen,
@@ -380,7 +383,7 @@ export function stagesOf(room: {
         // This browser's own screen coming back from the server, which happens
         // where a client subscribes to itself. Drawn twice it would be two
         // copies of one picture, one of them a round trip late.
-        if (room.localScreen && personId === room.participantId) continue;
+        if ((room.localScreen || room.ownHidden) && personId === room.participantId) continue;
         stages.push({
             key: `screen:${personId}`,
             stream,

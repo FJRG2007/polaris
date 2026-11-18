@@ -426,7 +426,13 @@
             "change": "Change stream",
             "quality": "Stream quality",
             "audio": "Share stream audio",
-            "noSound": "This share has no sound. Change stream and include its audio to send it."
+            "noSound": "This share has no sound. Change stream and include its audio to send it.",
+            "popOut": "Pop out stream",
+            "more": "More options",
+            "showOwn": "Show my screen share",
+            "pauseUnfocused": "Pause preview when Polaris isn't focused",
+            "previewPaused": "Preview paused",
+            "report": "Report a problem"
         },
         "undeafen": "Undeafen",
         "deafen": "Deafen",
@@ -2161,11 +2167,19 @@
         "noDevices": "No cameras or capture devices found.",
         "untitledDevice": "Video device {number}",
         "untitled": "Untitled window",
-        "sound": "Share this computer's sound",
         "deviceSound": "Share the device's sound",
         "cancel": "Cancel",
-        "share": "Start sharing",
-        "pickFirst": "Pick something to share first."
+        "shareWindow": "Share window",
+        "shareScreen": "Share screen",
+        "shareDevice": "Share device",
+        "settings": "Stream settings",
+        "streamMode": "Stream mode",
+        "muteAudio": "Mute stream audio",
+        "advanced": "Advanced",
+        "hidePreview": "Hide stream preview",
+        "definition": "Picture quality",
+        "sd": "SD",
+        "hd": "HD"
     },
     "annotate": {
         "askToDraw": "Ask to draw on this screen",
@@ -2428,5 +2442,43 @@
         "withdraw": "Withdraw",
         "accept": "Accept",
         "decline": "Decline"
+    },
+    "streamQuality": {
+        "custom": "Custom",
+        "source": "Source",
+        "lines": "{lines}p",
+        "fps": "{fps} FPS",
+        "frameRate": "Frame rate",
+        "resolution": "Resolution",
+        "modes": {
+            "gaming": {
+                "name": "Gaming",
+                "hint": "Smoother video"
+            },
+            "screenshare": {
+                "name": "Screenshare",
+                "hint": "Clearer text"
+            },
+            "custom": {
+                "name": "Custom",
+                "hint": "Your own settings"
+            }
+        }
+    },
+    "streamReport": {
+        "title": "Report a problem with your stream",
+        "description": "Sent to the administrators of this Polaris with your stream settings.",
+        "problems": {
+            "black": "Others see a black screen",
+            "choppy": "It is choppy or freezes",
+            "blurry": "It looks blurry",
+            "sound": "The sound is missing or wrong",
+            "other": "Something else"
+        },
+        "note": "What happened (optional)",
+        "send": "Send report",
+        "sent": "Report sent. Thank you.",
+        "failed": "The report could not be sent. Try again.",
+        "pickFirst": "Pick what went wrong first."
     }
 }

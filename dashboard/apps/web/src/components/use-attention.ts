@@ -25,7 +25,7 @@
  */
 
 import type { RefObject } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 
 /**
  * The decision, given what the document says. Pure, and tested, because it is one
@@ -84,4 +84,21 @@ export function useAttention(onReturn?: () => void): RefObject<boolean> {
     }, []);
 
     return present;
+}
+
+function subscribeAttention(listener: () => void): () => void {
+    window.addEventListener("focus", listener);
+    window.addEventListener("blur", listener);
+    document.addEventListener("visibilitychange", listener);
+    return () => {
+        window.removeEventListener("focus", listener);
+        window.removeEventListener("blur", listener);
+        document.removeEventListener("visibilitychange", listener);
+    };
+}
+
+/** The same answer as state, for something that draws differently while the
+ *  window is not the one in front - a preview that pauses, for one. */
+export function useAttending(): boolean {
+    return useSyncExternalStore(subscribeAttention, attendingNow, () => true);
 }

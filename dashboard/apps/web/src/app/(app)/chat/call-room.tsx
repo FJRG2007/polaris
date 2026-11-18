@@ -172,12 +172,18 @@ import {
     DropdownMenuSubContent,
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
+    ContextMenu,
+    ContextMenuContent,
+    ContextMenuTrigger,
     cn,
     useShortcutHint
 } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { useShareAsked } from "./call-share-ask";
-import { ShareStreamItems } from "./share-stream-menu";
+import { CONTEXT_KIT, ShareStreamItems } from "./share-stream-menu";
+import { StreamReportDialog } from "./stream-report-dialog";
+import { useStreamPrefs } from "./stream-shape";
+import { useAttending } from "@/components/use-attention";
 import { sharePress } from "./call-share-menu";
 import { MeetingLinkLimits } from "./meeting-link-limits";
 
@@ -389,8 +395,15 @@ export function CallRoom({
 
     /** Every screen being shared into this room, this browser's own included -
      *  see `stagesOf`, which is where the reasoning lives. */
+    const streamPrefs = useStreamPrefs();
+    const attending = useAttending();
+    const [streamReport, setStreamReport] = useState(false);
+    /** The sharer's own preview is held still while Polaris is not in front,
+     *  when they asked for that. */
+    const ownPaused = streamPrefs.pauseUnfocused && !attending;
     const shared = stagesOf({
         localScreen: call.localScreen,
+        ownHidden: !streamPrefs.showOwn,
         participantId: call.participantId,
         screens: call.screens,
         nameOf: (personId) => nameOf(admitted, personId, t("callRoom.somebody")),
@@ -839,6 +852,11 @@ export function CallRoom({
                         onClose={() => setGameInvite(null)}
                     />
                 )}
+                <StreamReportDialog
+                    call={call}
+                    open={streamReport}
+                    onOpenChange={setStreamReport}
+                />
 
                 {waiting && waiting.length > 0 && (
                     <ul className="flex flex-col gap-1">
@@ -1048,8 +1066,17 @@ export function CallRoom({
                         {showing.map((stage) => (
                             <Tile
                                 key={stage.key}
-                                stream={stage.stream}
+                                stream={
+                                    stage.key === LOCAL_SCREEN_KEY && ownPaused
+                                        ? null
+                                        : stage.stream
+                                }
                                 name={stage.name}
+                                label={
+                                    stage.key === LOCAL_SCREEN_KEY && ownPaused
+                                        ? t("callRoom.shareMenu.previewPaused")
+                                        : undefined
+                                }
                                 personId={null}
                                 focused={letGo || live === stage.key}
                                 onFocus={() => focus(stage.key)}
@@ -1066,6 +1093,16 @@ export function CallRoom({
                                 zoomable
                                 volumeKey={undefined}
                                 streamMenu={streamMenu(stage)}
+                                ownStreamMenu={
+                                    stage.key === LOCAL_SCREEN_KEY ? (
+                                        <ShareStreamItems
+                                            call={call}
+                                            canShare={screenShareable}
+                                            onReport={() => setStreamReport(true)}
+                                            kit={CONTEXT_KIT}
+                                        />
+                                    ) : undefined
+                                }
                             />
                         ))}
                     </div>
@@ -1432,7 +1469,11 @@ export function CallRoom({
                                         sharing: call.sharing,
                                         canShare: screenShareable
                                     }) === "stop" ? (
-                                        <ShareStreamItems call={call} canShare={screenShareable} />
+                                        <ShareStreamItems
+                                            call={call}
+                                            canShare={screenShareable}
+                                            onReport={() => setStreamReport(true)}
+                                        />
                                     ) : undefined
                                 }
                                 // A screen is not a device to pick between: the browser's own
@@ -1487,6 +1528,7 @@ export function CallRoom({
                                                 <ShareStreamItems
                                                     call={call}
                                                     canShare={screenShareable}
+                                                    onReport={() => setStreamReport(true)}
                                                 />
                                             </DropdownMenuSubContent>
                                         </DropdownMenuSub>
@@ -2568,6 +2610,7 @@ function Tile({
     combineAsked = false,
     combineLocked = false,
     streamMenu,
+    ownStreamMenu,
     moderation,
     hosting,
     volumeKey,
@@ -2645,6 +2688,9 @@ function Tile({
     combineLocked?: boolean;
     /** Set on a stream somebody else is sharing: its right-click menu. */
     streamMenu?: StreamMenuFor;
+    /** Right-clicking the sharer's own stream: the same rows as the share
+     *  button's menu. */
+    ownStreamMenu?: React.ReactNode;
     /** Mute, deafen and disconnect, for a reader who moderates the call. */
     moderation?: SeatModeration;
     /** Make host and remove, for the host of a meeting. */
@@ -3207,6 +3253,14 @@ function Tile({
     );
 
     if (streamMenu) return <MaybeStreamMenu menu={streamMenu}>{tile}</MaybeStreamMenu>;
+    if (ownStreamMenu) {
+        return (
+            <ContextMenu>
+                <ContextMenuTrigger asChild>{tile}</ContextMenuTrigger>
+                <ContextMenuContent className="w-64">{ownStreamMenu}</ContextMenuContent>
+            </ContextMenu>
+        );
+    }
     if (!volumeKey) return tile;
 
     return (

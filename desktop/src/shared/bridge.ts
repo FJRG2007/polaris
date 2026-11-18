@@ -157,7 +157,7 @@ export interface PolarisDesktop {
     /** The screens and windows to share, each with a small picture, for the
      *  page's own picker. Null where the system's picker is the one to use.
      *  `thumbnails: false` answers faster, with names only. */
-    shareSources(input?: { readonly thumbnails?: boolean; }): Promise<ShareSources | null>;
+    shareSources(input?: { readonly thumbnails?: boolean; readonly kind?: "screen" | "window"; }): Promise<ShareSources | null>;
     /** What the page's picker chose, for the `getDisplayMedia` that follows. */
     chooseShare(input: { readonly id: string; readonly sound: boolean; }): Promise<boolean>;
     /** Draw a stroke somebody made on this computer's share over the shared

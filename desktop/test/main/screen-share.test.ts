@@ -71,6 +71,28 @@ describe.runIf(process.platform !== "darwin")("listing what can be shared", () =
         expect(getSources.mock.calls[2]?.[0]).toMatchObject({ fetchWindowIcons: true });
     });
 
+    it("films only the kind on screen, and keeps what it knew of the other", async () => {
+        installScreenShare(() => "https://polaris.example");
+        await listShareSources({ thumbnails: false });
+        getSources.mockResolvedValue([
+            { id: "screen:0:0", name: "Screen 1", thumbnail: image(true), appIcon: null, display_id: "1" }
+        ]);
+        getSources.mockClear();
+        await listShareSources({ thumbnails: true, kind: "screen" }, Date.now() + 7_200_000);
+        expect(getSources).toHaveBeenCalledWith({ types: ["screen"], thumbnailSize: { width: 320, height: 180 } });
+        // The window listed by name before is still shared without a new listing.
+        getSources.mockClear();
+        chooseShare("window:1:0", false);
+        const granted = await new Promise<unknown>((resolve) =>
+            (displayHandler as (request: object, callback: (streams: unknown) => void) => void)(
+                { videoRequested: true, audioRequested: false, securityOrigin: "https://polaris.example", frame: null },
+                resolve
+            )
+        );
+        expect(getSources).not.toHaveBeenCalled();
+        expect(granted).toEqual({ video: { id: "window:1:0", name: "Editor" } });
+    });
+
     it("shares a source the picker listed without listing everything again", async () => {
         installScreenShare(() => "https://polaris.example");
         await listShareSources({ thumbnails: false });

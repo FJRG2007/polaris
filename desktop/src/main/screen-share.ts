@@ -88,19 +88,25 @@ function label(source: DesktopCapturerSource): string {
  *
  *  Listing alone costs most of a second on Windows (measured: 0.6-1.0 s for
  *  16 sources, 1.1-1.7 s with pictures and icons), so the picker opens at once
- *  and asks twice: names first (`thumbnails: false`), pictures right after. */
+ *  and asks twice: names first (`thumbnails: false`), pictures right after.
+ *
+ *  Pictures are taken of one kind at a time (`kind`): the tab on screen. Filming
+ *  every window to draw the Entire Screen tab, and every screen to draw the
+ *  Applications one, was most of the work - and on Windows each capture stalls
+ *  the compositor, which is the pointer freezing while the picker is open. */
 export async function listShareSources(
-    { thumbnails = true }: { readonly thumbnails?: boolean; } = {},
+    { thumbnails = true, kind }: { readonly thumbnails?: boolean; readonly kind?: ShareSource["kind"]; } = {},
     now = Date.now()
 ): Promise<ShareSources | null> {
     if (process.platform === "darwin") return null;
+    const types: ("screen" | "window")[] = kind ? [kind] : ["screen", "window"];
     // The picker takes the pictures again every few seconds while it is open;
     // the icons are read only on the first of those and then once a minute.
-    const icons = thumbnails && now - iconsReadAt >= ICONS_MS;
+    const icons = thumbnails && kind !== "screen" && now - iconsReadAt >= ICONS_MS;
     const sources = await desktopCapturer.getSources(
         thumbnails
-            ? { types: ["screen", "window"], thumbnailSize: THUMBNAIL, ...(icons ? { fetchWindowIcons: true } : {}) }
-            : { types: ["screen", "window"], thumbnailSize: { width: 0, height: 0 } }
+            ? { types, thumbnailSize: THUMBNAIL, ...(icons ? { fetchWindowIcons: true } : {}) }
+            : { types, thumbnailSize: { width: 0, height: 0 } }
     );
     if (icons) iconsReadAt = now;
     const screens = sources.filter((source) => source.id.startsWith("screen:"));
@@ -117,12 +123,16 @@ export async function listShareSources(
             : (known.get(source.id)?.icon ?? null)
     });
     const shaped = [...screens, ...windows].map(shape);
-    known = new Map(
+    const listed = new Map(
         shaped.map((source, index) => [
             source.id,
             { name: source.name, displayId: [...screens, ...windows][index]?.display_id ?? "", icon: source.icon }
         ])
     );
+    // A listing of one kind leaves what is known of the other as it was.
+    known = kind
+        ? new Map([...[...known].filter(([id]) => !id.startsWith(`${kind}:`)), ...listed])
+        : listed;
     return { sources: shaped, sound: SOUND };
 }
 
