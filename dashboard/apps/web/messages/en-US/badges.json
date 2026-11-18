@@ -24,7 +24,7 @@
         },
         "tenure": { "name": "Veteran", "description": "Days since the account was made." },
         "messages": { "name": "Voice", "description": "Messages written in chat." },
-        "calls": { "name": "On air", "description": "Minutes spent in calls and meetings." },
+        "calls": { "name": "On air", "description": "Hours spent in calls and meetings." },
         "tasks": { "name": "Finisher", "description": "Tasks completed as an assignee." },
         "arcade": { "name": "Player", "description": "Games joined in the arcade." },
         "servers": { "name": "Explorer", "description": "Hours on game servers linked to you." }
@@ -37,7 +37,9 @@
         "comet": "Comet",
         "nova": "Nova",
         "pulsar": "Pulsar",
-        "quasar": "Quasar"
+        "quasar": "Quasar",
+        "magnetar": "Magnetar",
+        "singularity": "Singularity"
     },
     "units": {
         "days": "{count, plural, one {# day} other {# days}}",

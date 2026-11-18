@@ -130,6 +130,19 @@ vi.mock("@polaris/db", () => ({
         badgeUnlock: {
             findMany: async ({ where }: { where: { userId: string } }) =>
                 unlocks.filter((u) => u.userId === where.userId),
+            deleteMany: async ({
+                where
+            }: {
+                where: { userId: string; OR: { badge: string; level: { gt: number } }[] };
+            }) => {
+                const before = unlocks.length;
+                unlocks = unlocks.filter(
+                    (u) =>
+                        u.userId !== where.userId ||
+                        !where.OR.some((rule) => u.badge === rule.badge && u.level > rule.level.gt)
+                );
+                return { count: before - unlocks.length };
+            },
             createMany: async ({ data }: { data: Unlock[] }) => {
                 for (const row of data) {
                     const known = unlocks.some(
@@ -217,7 +230,7 @@ const person = (id: string, messages: number, isAdmin = false): Person => ({
 });
 
 beforeEach(() => {
-    people = [person(ADMIN, 0, true), person(ALICE, 60), person(BOB, 5), person(CAROL, 0)];
+    people = [person(ADMIN, 0, true), person(ALICE, 60), person(BOB, 15), person(CAROL, 0)];
     unlocks = [];
     prefs = [];
     grants = [];
@@ -406,7 +419,7 @@ describe("rarity", () => {
         expect(settings.has("badges.unlockSweepCursor")).toBe(false);
 
         // Nobody opened Bob's profile; his level still counts. Alice (60) and
-        // Bob (5) hold level 1 of four people; only Alice holds level 2.
+        // Bob (15) hold level 1 of four people; only Alice holds level 2.
         const alice = await service.evaluateBadges(ALICE);
         const messages = alice.find((badge) => badge.key === "ladder:messages")!;
         expect(messages.level).toBe(2);
@@ -441,11 +454,28 @@ describe("rarity", () => {
         const tenure = (await service.evaluateBadges(ALICE, now)).find(
             (badge) => badge.key === "ladder:tenure"
         )!;
-        expect(tenure.levels[0]!.unlockedAt).toBe(new Date("2024-01-08T00:00:00Z").toISOString());
-        expect(tenure.levels[1]!.unlockedAt).toBe(new Date("2024-01-31T00:00:00Z").toISOString());
+        expect(tenure.levels[0]!.unlockedAt).toBe(new Date("2024-12-31T00:00:00Z").toISOString());
+        expect(tenure.levels[1]!.unlockedAt).toBe(new Date("2025-12-31T00:00:00Z").toISOString());
         expect(
             unlocks.find((row) => row.badge === "ladder:tenure" && row.level === 1)!.unlockedAt
-        ).toEqual(new Date("2024-01-08T00:00:00Z"));
+        ).toEqual(new Date("2024-12-31T00:00:00Z"));
+    });
+
+    it("lets go of a level written under the old, easier ladder", async () => {
+        // Bob's 15 messages were level 3 when a level took 1, 50 and 250 less;
+        // under the ladder now it is level 1.
+        unlocks = [1, 2, 3].map((level) => ({
+            userId: BOB,
+            badge: "ladder:messages",
+            level,
+            unlockedAt: new Date("2025-01-01T00:00:00Z")
+        }));
+        const messages = (await service.evaluateBadges(BOB)).find(
+            (badge) => badge.key === "ladder:messages"
+        )!;
+        expect(messages.level).toBe(1);
+        expect(unlocks.filter((row) => row.badge === "ladder:messages").map((row) => row.level)).toEqual([1]);
+        expect(messages.unlockedAt).toBe(new Date("2025-01-01T00:00:00Z").toISOString());
     });
 
     it("never moves the day a level was first reached", async () => {

@@ -60,7 +60,7 @@ export async function activityValues(userId: string, now = new Date()): Promise<
     return {
         tenure: user ? Math.floor((now.getTime() - user.createdAt.getTime()) / DAY_MS) : 0,
         messages,
-        calls: Math.floor(callSeconds / 60),
+        calls: Math.floor(callSeconds / 3600),
         tasks,
         arcade,
         servers: Math.floor(serverSeconds / 3600)
@@ -331,14 +331,27 @@ async function recordUnlocks(
     const due: UnlockRow[] = user.isAdmin
         ? [{ badge: core.STAFF_BADGE, level: 1, unlockedAt: now }]
         : [];
+    const above: { badge: string; level: number }[] = [];
     for (const id of core.BADGE_LADDER_IDS) {
         const { thresholds } = core.BADGE_LADDERS[id];
         const { level } = core.ladderProgress(thresholds, values[id]);
+        // A level written under an easier ladder than this one, or for activity
+        // that is gone now, is not held: what a badge says is what was reached.
+        if (known.some((row) => row.badge === core.ladderKey(id) && row.level > level))
+            above.push({ badge: core.ladderKey(id), level });
         for (let at = 1; at <= level; at++) {
             const unlockedAt =
                 id === "tenure" ? tenureDay(user.createdAt, thresholds[at - 1]!, now) : now;
             due.push({ badge: core.ladderKey(id), level: at, unlockedAt });
         }
+    }
+    if (above.length > 0) {
+        await prisma.badgeUnlock.deleteMany({
+            where: { userId, OR: above.map(({ badge, level }) => ({ badge, level: { gt: level } })) }
+        });
+        for (const { badge, level } of above)
+            for (const key of [...reached.keys()])
+                if (key.startsWith(`${badge}#`) && Number(key.slice(badge.length + 1)) > level) reached.delete(key);
     }
     const missing = due.filter((row) => !reached.has(`${row.badge}#${row.level}`));
     if (missing.length > 0) {

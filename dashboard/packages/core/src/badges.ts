@@ -27,24 +27,36 @@ export const BADGE_LEVELS = [
     "comet",
     "nova",
     "pulsar",
-    "quasar"
+    "quasar",
+    "magnetar",
+    "singularity"
 ] as const;
 
 export type BadgeLevelName = (typeof BADGE_LEVELS)[number];
+
+/**
+ * The ten steps every activity ladder climbs: the curve Discord's own activity
+ * badges use (Game Time, Streaming - 1 to 5,000 hours), so a top level is
+ * years of use rather than a week of it.
+ */
+const ACTIVITY_CURVE = [1, 5, 20, 75, 150, 300, 500, 1000, 2000, 5000] as const;
 
 /**
  * The progress badges. Each is read from data that exists without this
  * feature: the day the account was made, chat messages written, time in
  * calls and meetings, tasks completed as an assignee, games started in the
  * arcade, and hours on a linked game server.
+ *
+ * Tenure is a year a level, one to ten, as Discord's account-age badge is.
+ * Messages are the curve ten times over, since one is a few seconds' work.
  */
 export const BADGE_LADDERS = {
-    tenure: { unit: "days", thresholds: [7, 30, 90, 180, 365, 730, 1095, 1825] },
-    messages: { unit: "messages", thresholds: [1, 50, 250, 1000, 5000, 20000, 50000, 100000] },
-    calls: { unit: "minutes", thresholds: [10, 60, 300, 1000, 3000, 10000, 30000] },
-    tasks: { unit: "tasks", thresholds: [1, 10, 50, 150, 500, 1500, 5000] },
-    arcade: { unit: "games", thresholds: [1, 5, 25, 100, 250, 500] },
-    servers: { unit: "hours", thresholds: [1, 10, 50, 150, 500, 1000, 2500] }
+    tenure: { unit: "days", thresholds: [365, 730, 1095, 1460, 1825, 2190, 2555, 2920, 3285, 3650] },
+    messages: { unit: "messages", thresholds: ACTIVITY_CURVE.map((step) => step * 10) },
+    calls: { unit: "hours", thresholds: ACTIVITY_CURVE },
+    tasks: { unit: "tasks", thresholds: ACTIVITY_CURVE },
+    arcade: { unit: "games", thresholds: ACTIVITY_CURVE },
+    servers: { unit: "hours", thresholds: ACTIVITY_CURVE }
 } as const satisfies Record<string, { unit: string; thresholds: readonly number[] }>;
 
 export type BadgeLadderId = keyof typeof BADGE_LADDERS;

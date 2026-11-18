@@ -21,7 +21,7 @@
         "custom": { "name": "Propia", "description": "Dada por un administrador de aquí." },
         "tenure": { "name": "Veterano", "description": "Días desde que se creó la cuenta." },
         "messages": { "name": "Voz", "description": "Mensajes escritos en el chat." },
-        "calls": { "name": "En antena", "description": "Minutos en llamadas y reuniones." },
+        "calls": { "name": "En antena", "description": "Horas en llamadas y reuniones." },
         "tasks": { "name": "Remate", "description": "Tareas completadas como asignado." },
         "arcade": { "name": "Jugador", "description": "Partidas jugadas en el arcade." },
         "servers": { "name": "Explorador", "description": "Horas en servidores de juego tuyos." }
@@ -34,7 +34,9 @@
         "comet": "Cometa",
         "nova": "Nova",
         "pulsar": "Púlsar",
-        "quasar": "Cuásar"
+        "quasar": "Cuásar",
+        "magnetar": "Magnetar",
+        "singularity": "Singularidad"
     },
     "units": {
         "days": "{count, plural, one {# día} other {# días}}",
