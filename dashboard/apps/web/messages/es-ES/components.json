@@ -1038,6 +1038,38 @@
         "deleteBody": "Las ejecuciones dejan de usar esta clave de {provider}. Lo que haya debajo en la lista sube.",
         "delete": "Eliminar",
         "addKey": "Añadir clave",
+        "connect": {
+            "addConnection": "Añadir conexión",
+            "title": "Añadir una conexión",
+            "hint": "Elige un proveedor, nube o agente. Después, cómo conectarlo.",
+            "howTitle": "Conectar {name}",
+            "howHint": "Elige cómo conectarlo.",
+            "search": "Busca proveedores, nubes y agentes",
+            "loading": "Cargando proveedores...",
+            "none": "Nada coincide con esa búsqueda.",
+            "failed": "No se pudieron cargar los proveedores. Reinténtalo.",
+            "more": "Ver más",
+            "back": "Atrás",
+            "methods": {
+                "key": "Pago por uso con una clave de API",
+                "login": "Usa un plan que ya pagas",
+                "cloud": "Usa modelos con tu cuenta de nube",
+                "account": "Una cuenta con la que entra un agente",
+                "home": "Inicia sesión del agente en tu equipo"
+            },
+            "short": {
+                "key": "Clave",
+                "login": "Plan",
+                "cloud": "Nube",
+                "account": "Cuenta",
+                "home": "Sesión"
+            },
+            "ways": {
+                "key": "Clave de API de {name}",
+                "login": "Entrar con {name}",
+                "cloud": "Cuenta de {name}"
+            }
+        },
         "order": "Orden",
         "provider": "Proveedor",
         "name": "Nombre",

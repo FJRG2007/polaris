@@ -1299,6 +1299,13 @@
             "empty": "No keys yet. A run needs one to reach a provider.",
             "adding": "The provider account your runs bill to. Polaris adds nothing to that bill."
         },
+        "connections": {
+            "title": "Your connections",
+            "hint": "Keys, plans, cloud and agent accounts, tried from the top. The first one that serves what a run needs is used.",
+            "emptyShared": "None of your own yet. Runs use the deployment's.",
+            "empty": "No connections yet. Add one to reach a provider.",
+            "adding": "What your runs and sessions use. A plan costs nothing extra; an API key is metered."
+        },
         "accounts": {
             "title": "Your agent accounts",
             "add": "Add account",

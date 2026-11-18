@@ -38,6 +38,8 @@ import { ProviderSelect, type ProviderReader } from "@/components/model-keys/pro
 import type { KeyHealthView, KeyLimits } from "@/lib/agents/key-limits";
 import { isCoolingState, revivedStatus } from "@/lib/agents/key-status";
 import { KeyLimitsDialog, KeyStanding } from "@/components/model-keys/key-standing";
+import { AddConnectionDialog } from "@/components/model-keys/add-connection";
+import { useHubFlow, type ConnectionOption } from "@/components/model-keys/connection-hub";
 import {
     ChevronDown,
     ChevronUp,
@@ -218,6 +220,7 @@ export function ModelKeysView({
     assist,
     footer,
     health,
+    connectOptions,
     narrow = false
 }: {
     /** The providers the table names: the ones its keys belong to, or - with no
@@ -246,6 +249,9 @@ export function ModelKeysView({
     footer?: ReactNode;
     /** Drawn in a narrow column of another page: optional columns stay folded. */
     narrow?: boolean;
+    /** The agent accounts and agent sign-ins this table can add, as Add
+     *  connection lists them, when it is mounted inside a connection hub. */
+    connectOptions?: readonly ConnectionOption[];
 }) {
     const router = useRouter();
     const columns = narrow ? NARROW_COLUMNS : WIDE_COLUMNS;
@@ -254,6 +260,9 @@ export function ModelKeysView({
     const [rows, setRows] = useState(keys);
     const [editing, setEditing] = useState<ModelKeyView | null>(null);
     const [adding, setAdding] = useState(false);
+    // The provider Add connection opened this dialog on, when it did.
+    const [addingRow, setAddingRow] = useState<ProviderRow | null>(null);
+    const [connecting, setConnecting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
 
@@ -282,6 +291,26 @@ export function ModelKeysView({
     // kept in the home, or a sign-out.
     const [running, setRunning] = useState<{ signin: AgentSignin; mode: SigninDialogMode } | null>(null);
     const homeSignins = assist?.signins.filter((signin) => signin.home) ?? [];
+
+    // Inside a connection hub, Add connection is the one way in: it opens this
+    // table's key dialog on the provider picked, and the sign-in dialog for an
+    // agent that keeps its login on the machine.
+    const openKey = (slug?: string, row?: unknown) => {
+        const known = (row as ProviderRow | undefined) ?? providers.find((one) => one.slug === slug) ?? null;
+        setAddingRow(known);
+        setAdding(true);
+    };
+    const options = connectOptions ?? [];
+    const inHub = useHubFlow("key", openKey, []);
+    useHubFlow("account", openKey, options.filter((option) => option.method === "account"));
+    useHubFlow(
+        "home",
+        (slug) => {
+            const signin = assist?.signins.find((one) => one.slug === slug && one.home);
+            if (signin) setRunning({ signin, mode: "login" });
+        },
+        options.filter((option) => option.method === "home")
+    );
     const canSignOut = (signin: AgentSignin) => Boolean(signin.signout && assist?.actions.signout);
 
     // Each home login's status, null while it is being asked. Asked after the
@@ -481,9 +510,9 @@ export function ModelKeysView({
                         <h2 className="text-sm font-medium">{copy.title}</h2>
                         <p className="text-muted-foreground text-xs">{copy.hint}</p>
                     </div>
-                    <Button size="sm" onClick={() => setAdding(true)}>
+                    <Button size="sm" onClick={() => (inHub ? setConnecting(true) : setAdding(true))}>
                         <Plus className="size-4 shrink-0" />
-                        {copy.action ?? t("modelKeys.addKey")}
+                        {inHub ? t("modelKeys.connect.addConnection") : (copy.action ?? t("modelKeys.addKey"))}
                     </Button>
                 </div>
 
@@ -556,7 +585,11 @@ export function ModelKeysView({
                                             statuses ? (statuses[row.id] ?? null) : undefined
                                         }
                                         onLimits={
-                                            actions.limit && statuses ? () => setLimiting(row) : null
+                                            // Only a key the router spends has limits: an agent's
+                                            // account in the same list is not one.
+                                            actions.limit && statuses && row.id in statuses
+                                                ? () => setLimiting(row)
+                                                : null
                                         }
                                         onRevive={revive ? () => void revive(row) : null}
                                     />
@@ -686,8 +719,16 @@ export function ModelKeysView({
             {/* Mounted only while open, so every dialog starts empty. A form that
                 survives being closed is one that offers the last key's name back,
                 and holds a pasted secret in memory for the rest of the session. */}
+            {connecting ? (
+                <AddConnectionDialog
+                    searchProviders={searchProviders}
+                    providers={providers}
+                    onClose={() => setConnecting(false)}
+                />
+            ) : null}
             {adding ? (
                 <KeyDialog
+                    initial={addingRow}
                     providers={providers}
                     searchProviders={searchProviders}
                     actions={actions}
@@ -696,9 +737,13 @@ export function ModelKeysView({
                     assist={assist}
                     existing={null}
                     takenNames={namesTaken(rows, null)}
-                    onClose={() => setAdding(false)}
+                    onClose={() => {
+                        setAdding(false);
+                        setAddingRow(null);
+                    }}
                     onSaved={(warning) => {
                         setAdding(false);
+                        setAddingRow(null);
                         setNotice(warning ?? null);
                         router.refresh();
                     }}
@@ -990,6 +1035,7 @@ function KeyRow({
  * provider that issued it) and its secret may be left alone.
  */
 function KeyDialog({
+    initial,
     providers,
     searchProviders,
     actions,
@@ -1001,6 +1047,8 @@ function KeyDialog({
     onClose,
     onSaved
 }: {
+    /** The provider a new key starts on, picked before the dialog opened. */
+    initial?: ProviderRow | null;
     providers: ProviderRow[];
     searchProviders?: ProviderReader;
     actions: ModelKeyActions;
@@ -1022,10 +1070,10 @@ function KeyDialog({
     const t = useTranslations("components");
     const tcommon = useTranslations("common");
     const [provider, setProvider] = useState(
-        existing?.provider ?? (searchProviders ? "" : (providers[0]?.slug ?? ""))
+        existing?.provider ?? initial?.slug ?? (searchProviders ? "" : (providers[0]?.slug ?? ""))
     );
     // The row the async picker answered with, which the table's list may lack.
-    const [picked, setPicked] = useState<ProviderRow | null>(null);
+    const [picked, setPicked] = useState<ProviderRow | null>(existing ? null : (initial ?? null));
     const [name, setName] = useState(existing?.name ?? "");
     const [secret, setSecret] = useState("");
     const [signingIn, setSigningIn] = useState(false);

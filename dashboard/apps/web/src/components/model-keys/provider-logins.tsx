@@ -27,6 +27,7 @@ import {
 } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
+import { useHubFlow, type ConnectionOption } from "./connection-hub";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
 import type { GoUsageRow } from "@/lib/agents/go-usage";
@@ -59,9 +60,42 @@ const POE_DOCS = "https://creator.poe.com/docs/external-applications/openai-comp
 
 type Ended = Exclude<LoginState, { state: "pending" }>;
 
+/** What Add connection lists for these: a sign-in each, grouped with the
+ *  provider whose slug it signs in to. */
+const LOGIN_OPTIONS: readonly ConnectionOption[] = LOGINS.map((login) => ({
+    method: "login",
+    slug: login.provider,
+    name: login.name,
+    vendor: login.name
+}));
+
 export function ProviderLogins() {
     const t = useTranslations("account");
     const [open, setOpen] = useState<ProviderLogin | null>(null);
+    // Inside a connection hub, Add connection opens these. What stays is the Go
+    // allowance, which is a reading of a sign-in already made, not a way in.
+    const inHub = useHubFlow(
+        "login",
+        (slug) => {
+            const login = LOGINS.find((one) => one.provider === slug);
+            if (login) setOpen(login.provider);
+        },
+        LOGIN_OPTIONS
+    );
+    const dialog = open ? (
+        <LoginDialog
+            provider={open}
+            name={LOGINS.find((login) => login.provider === open)?.name ?? open}
+            onClose={() => setOpen(null)}
+        />
+    ) : null;
+    if (inHub)
+        return (
+            <>
+                <GoUsageList />
+                {dialog}
+            </>
+        );
     return (
         <Card>
             <CardHeader>
@@ -85,13 +119,7 @@ export function ProviderLogins() {
                     </a>
                 </p>
             </CardBody>
-            {open ? (
-                <LoginDialog
-                    provider={open}
-                    name={LOGINS.find((login) => login.provider === open)?.name ?? open}
-                    onClose={() => setOpen(null)}
-                />
-            ) : null}
+            {dialog}
         </Card>
     );
 }

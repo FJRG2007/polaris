@@ -28,6 +28,7 @@ import {
 } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import { IntegrationLogo } from "@/components/logos";
+import { useHubFlow, type ConnectionOption } from "./connection-hub";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { cloudCredentialSchema, type CloudProvider } from "@/lib/agents/cloud-credentials";
@@ -149,9 +150,34 @@ function payloadOf(provider: CloudProvider, method: MethodKey, values: Record<st
     return body;
 }
 
+/** What Add connection lists for these: one cloud account each. */
+const CLOUD_OPTIONS: readonly ConnectionOption[] = CLOUDS.map((cloud) => ({
+    method: "cloud",
+    slug: cloud.provider,
+    name: cloud.name,
+    vendor: cloud.name
+}));
+
 export function CloudAccounts() {
     const t = useTranslations("account");
     const [open, setOpen] = useState<CloudProvider | null>(null);
+    // Inside a connection hub, Add connection opens these and the card goes.
+    const inHub = useHubFlow(
+        "cloud",
+        (slug) => {
+            const cloud = CLOUDS.find((one) => one.provider === slug);
+            if (cloud) setOpen(cloud.provider);
+        },
+        CLOUD_OPTIONS
+    );
+    const dialog = open ? (
+        <CloudDialog
+            provider={open}
+            name={CLOUDS.find((cloud) => cloud.provider === open)?.name ?? open}
+            onClose={() => setOpen(null)}
+        />
+    ) : null;
+    if (inHub) return dialog;
     return (
         <Card>
             <CardHeader>
@@ -166,13 +192,7 @@ export function CloudAccounts() {
                     </Button>
                 ))}
             </CardBody>
-            {open ? (
-                <CloudDialog
-                    provider={open}
-                    name={CLOUDS.find((cloud) => cloud.provider === open)?.name ?? open}
-                    onClose={() => setOpen(null)}
-                />
-            ) : null}
+            {dialog}
         </Card>
     );
 }

@@ -1038,6 +1038,38 @@
         "deleteBody": "Runs stop using this {provider} key. Anything below it in the list moves up.",
         "delete": "Delete",
         "addKey": "Add key",
+        "connect": {
+            "addConnection": "Add connection",
+            "title": "Add a connection",
+            "hint": "Pick a provider, cloud or agent. Its ways in come next.",
+            "howTitle": "Connect {name}",
+            "howHint": "Choose how to connect it.",
+            "search": "Search providers, clouds and agents",
+            "loading": "Loading providers...",
+            "none": "Nothing matches that search.",
+            "failed": "Providers couldn't be loaded. Try again.",
+            "more": "Show more",
+            "back": "Back",
+            "methods": {
+                "key": "Pay per use with an API key",
+                "login": "Use a plan you already pay for",
+                "cloud": "Use models through your cloud account",
+                "account": "An account an agent signs in with",
+                "home": "Sign the agent in on your computer"
+            },
+            "short": {
+                "key": "Key",
+                "login": "Plan",
+                "cloud": "Cloud",
+                "account": "Account",
+                "home": "Sign-in"
+            },
+            "ways": {
+                "key": "{name} API key",
+                "login": "Sign in with {name}",
+                "cloud": "{name} account"
+            }
+        },
         "order": "Order",
         "provider": "Provider",
         "name": "Name",

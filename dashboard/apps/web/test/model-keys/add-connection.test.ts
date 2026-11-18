@@ -1,0 +1,44 @@
+/**
+ * Add connection groups every way in by who makes it, so connecting Anthropic
+ * offers its key and the Claude subscription together, and xAI its key and the
+ * SuperGrok sign-in.
+ */
+
+import { describe, expect, it } from "vitest";
+import { groupConnections, matchesConnection } from "@/components/model-keys/add-connection";
+import type { ConnectionOption } from "@/components/model-keys/connection-hub";
+import type { ProviderRow } from "@/lib/agents/model-key-providers";
+
+const row = (slug: string, name: string): ProviderRow =>
+    ({ slug, name, aliases: [], apiKeyLabel: null, apiKeyHelp: null, createUrl: null, isGateway: false, checkable: true, freeTier: null }) as ProviderRow;
+
+const options: ConnectionOption[] = [
+    { method: "login", slug: "xai", name: "SuperGrok", vendor: "SuperGrok" },
+    { method: "cloud", slug: "amazon-bedrock", name: "Amazon Bedrock", vendor: "Amazon Bedrock" },
+    { method: "account", slug: "claude-token", name: "Claude subscription token", vendor: "Anthropic", aliases: ["Claude Code"] },
+    { method: "home", slug: "cursor", name: "Cursor", vendor: "Anysphere" }
+];
+
+describe("Add connection", () => {
+    const groups = groupConnections(options, [row("anthropic", "Anthropic"), row("xai", "xAI")]);
+    const find = (name: string) => groups.find((group) => group.name === name);
+
+    it("offers a provider's plan beside its key, plan first", () => {
+        expect(find("xAI")?.ways.map((way) => way.option.method)).toEqual(["login", "key"]);
+        expect(find("Anthropic")?.ways.map((way) => way.option.method)).toEqual(["account", "key"]);
+    });
+
+    it("keeps what no provider row matches as its own entry", () => {
+        expect(find("Amazon Bedrock")?.ways.map((way) => way.option.method)).toEqual(["cloud"]);
+        expect(find("Cursor")?.ways.map((way) => way.option.slug)).toEqual(["cursor"]);
+    });
+
+    it("hands a key the provider row it opens on", () => {
+        expect(find("xAI")?.ways.find((way) => way.option.method === "key")?.row?.slug).toBe("xai");
+    });
+
+    it("finds a way by the tool's name as well as its own", () => {
+        expect(matchesConnection(options[2]!, "claude code")).toBe(true);
+        expect(matchesConnection(options[2]!, "gemini")).toBe(false);
+    });
+});

@@ -1299,6 +1299,13 @@
             "empty": "Todavía no hay claves. Una ejecución necesita una para llegar a un proveedor.",
             "adding": "La cuenta de proveedor a la que se facturan tus ejecuciones. Polaris no añade nada a esa factura."
         },
+        "connections": {
+            "title": "Tus conexiones",
+            "hint": "Claves, planes, cuentas de nube y de agente, de arriba abajo. Se usa la primera que sirva lo que pide una ejecución.",
+            "emptyShared": "Aún no tienes ninguna propia. Las ejecuciones usan las del despliegue.",
+            "empty": "Aún no hay conexiones. Añade una para llegar a un proveedor.",
+            "adding": "Lo que usan tus ejecuciones y sesiones. Un plan no cuesta más; una clave de API se factura por uso."
+        },
         "accounts": {
             "title": "Tus cuentas de agente",
             "add": "Añadir cuenta",

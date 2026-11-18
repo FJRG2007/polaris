@@ -1,7 +1,8 @@
 /**
- * The provider keys and agent sign-ins of one account: what /account/ai-keys
- * shows, and the Agents section of Connected accounts, drawn by one component
- * so both list and change the same rows.
+ * Every AI connection of one account - provider keys, subscription sign-ins,
+ * cloud accounts and agent accounts - as one list with one Add connection: what
+ * /account/ai-keys shows, and the Agents section of Connected accounts, drawn by
+ * one component so both list and change the same rows.
  */
 
 import { getTranslations } from "@/lib/i18n/request";
@@ -9,7 +10,11 @@ import { Badge } from "@polaris/ui";
 import { IntegrationLogo } from "@/components/logos";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { assistedSignins } from "@/lib/agents/signin-runtime";
-import { isSigninRow, signinProviderRows } from "@/lib/agents/agent-signins";
+import { AGENT_CLIS } from "@polaris/core";
+import { agentSignins, isSigninRow, signinProviderRows, type AgentSignin } from "@/lib/agents/agent-signins";
+import { ProviderLogins } from "@/components/model-keys/provider-logins";
+import { CloudAccounts } from "@/components/model-keys/cloud-accounts";
+import { ConnectionHub, type ConnectionOption } from "@/components/model-keys/connection-hub";
 import { keyStatuses } from "@/lib/agents/key-status-read";
 import { ModelKeysView } from "@/components/model-keys/model-keys-view";
 import { ensureProviderCatalog } from "@/lib/integrations/provider-catalog";
@@ -70,7 +75,6 @@ export async function AiKeysPanel({
 
     await ensureProviderCatalog();
     const keys = rows.filter((row) => !isSigninRow(row.provider));
-    const signins = rows.filter((row) => isSigninRow(row.provider));
     const health = await keyStatuses(keys);
 
     const covered = [...sources.entries()]
@@ -82,80 +86,93 @@ export async function AiKeysPanel({
         yours: sources.get(slug) === "own"
     }));
 
-    return (
-        <div className="flex flex-col gap-4">
-            <ModelKeysView
-                providers={providerRowsFor(keys.map((key) => key.provider))}
-                searchProviders={searchKeyProvidersAction}
-                keys={keys}
-                health={health}
-                narrow={narrow}
-                actions={{
-                    add: addModelKeyAction,
-                    update: updateModelKeyAction,
-                    remove: deleteModelKeyAction,
-                    reorder: reorderModelKeysAction,
-                    toggle: toggleModelKeyAction,
-                    limit: limitModelKeyAction,
-                    revive: reviveModelKeyAction
-                }}
-                copy={{
-                    title: t("aiKeys.keys.title"),
-                    hint: t("aiKeys.keys.hint"),
-                    empty:
-                        shared && covered.length > 0
-                            ? t("aiKeys.keys.emptyShared")
-                            : t("aiKeys.keys.empty"),
-                    adding: t("aiKeys.keys.adding")
-                }}
-                footer={<FallbackCard providers={deploymentRows} shared={shared} t={t} />}
-            />
+    const assisted = assistedSignins();
+    const keysEmpty = shared && covered.length > 0;
+    const accountsEmpty = fromPlatform.size > 0;
 
-            {/* The same table, for the accounts an agent signs in with. A second
-                one rather than a section of the first: they are a different
-                question - which account works, not which provider bills - and
-                mixing them put a subscription in a list about metered keys.
-                Everything else about them is a key, so everything else about them
-                is the table: named, reordered, renamed, given an end date, shown
-                with its last use. */}
-            <ModelKeysView
-                providers={signinProviderRows()}
-                keys={signins}
-                narrow={narrow}
-                actions={{
-                    add: addModelKeyAction,
-                    update: updateModelKeyAction,
-                    remove: deleteModelKeyAction,
-                    reorder: reorderModelKeysAction,
-                    toggle: toggleModelKeyAction
-                }}
-                copy={{
-                    title: t("aiKeys.accounts.title"),
-                    action: t("aiKeys.accounts.add"),
-                    hint: t("aiKeys.accounts.hint"),
-                    empty:
-                        fromPlatform.size > 0
-                            ? t("aiKeys.accounts.emptyShared")
-                            : t("aiKeys.accounts.empty"),
-                    adding: t("aiKeys.accounts.adding")
-                }}
-                assist={{
-                    signins: assistedSignins(),
-                    actions: {
-                        begin: beginAgentSigninAction,
-                        screen: agentSigninScreenAction,
-                        answer: answerAgentSigninAction,
-                        identity: agentSigninIdentityAction,
-                        capture: captureAgentSigninAction,
-                        type: typeAgentSigninInputAction,
-                        signout: beginAgentSignoutAction,
-                        status: agentSigninStatusAction,
-                        end: endAgentSigninAction
-                    }
-                }}
-            />
-        </div>
+    // One list and one way in. Keys and agent accounts were two tables with two
+    // Add buttons beside two cards of sign-ins and clouds, and somebody adding
+    // Claude had to know which of the four it was first. They are one table now
+    // - the order is one order, read per provider - and Add connection asks what
+    // is being connected before how.
+    return (
+        <ConnectionHub>
+            <div className="flex flex-col gap-4">
+                <ProviderLogins />
+                <CloudAccounts />
+                <ModelKeysView
+                    providers={[...providerRowsFor(keys.map((key) => key.provider)), ...signinProviderRows()]}
+                    searchProviders={searchKeyProvidersAction}
+                    keys={rows}
+                    health={health}
+                    narrow={narrow}
+                    connectOptions={connectOptions(assisted)}
+                    actions={{
+                        add: addModelKeyAction,
+                        update: updateModelKeyAction,
+                        remove: deleteModelKeyAction,
+                        reorder: reorderModelKeysAction,
+                        toggle: toggleModelKeyAction,
+                        limit: limitModelKeyAction,
+                        revive: reviveModelKeyAction
+                    }}
+                    copy={{
+                        title: t("aiKeys.connections.title"),
+                        hint: t("aiKeys.connections.hint"),
+                        empty:
+                            keysEmpty || accountsEmpty
+                                ? t("aiKeys.connections.emptyShared")
+                                : t("aiKeys.connections.empty"),
+                        adding: t("aiKeys.connections.adding")
+                    }}
+                    assist={{
+                        signins: assisted,
+                        actions: {
+                            begin: beginAgentSigninAction,
+                            screen: agentSigninScreenAction,
+                            answer: answerAgentSigninAction,
+                            identity: agentSigninIdentityAction,
+                            capture: captureAgentSigninAction,
+                            type: typeAgentSigninInputAction,
+                            signout: beginAgentSignoutAction,
+                            status: agentSigninStatusAction,
+                            end: endAgentSigninAction
+                        }
+                    }}
+                    footer={<FallbackCard providers={deploymentRows} shared={shared} t={t} />}
+                />
+            </div>
+        </ConnectionHub>
     );
+}
+
+/**
+ * The agent accounts and agent sign-ins Add connection lists, each with the
+ * vendor of the agent it signs in, so a Claude subscription is offered beside
+ * the Anthropic key rather than on a card of its own.
+ */
+function connectOptions(assisted: readonly AgentSignin[]): ConnectionOption[] {
+    const vendorOf = (id: string | undefined) => AGENT_CLIS.find((cli) => cli.id === id)?.vendor ?? "";
+    const home = new Set(assisted.filter((signin) => signin.home).map((signin) => signin.slug));
+    const accounts = agentSignins()
+        .filter((signin) => !home.has(signin.slug))
+        .map<ConnectionOption>((signin) => ({
+            method: "account",
+            slug: signin.slug,
+            name: signin.label,
+            vendor: vendorOf(signin.serves[0]?.id),
+            aliases: signin.serves.map((tool) => tool.label)
+        }));
+    const homes = assisted
+        .filter((signin) => signin.home)
+        .map<ConnectionOption>((signin) => ({
+            method: "home",
+            slug: signin.slug,
+            name: signin.serves[0]?.label ?? signin.label,
+            vendor: vendorOf(signin.serves[0]?.id),
+            aliases: [signin.label]
+        }));
+    return [...accounts, ...homes];
 }
 
 /**
