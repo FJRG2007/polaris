@@ -57,6 +57,55 @@ export async function provisionUser(auth: Auth, input: ProvisionInput): Promise<
     return { id: user.id };
 }
 
+/**
+ * Point every password back at the account it belongs to.
+ *
+ * better-auth reads a password only from the "credential" row whose
+ * `accountId` is the user's id, and answers "Invalid email or password" when
+ * there is none - so a row carrying any other value locks that account out of
+ * password sign-in with the right password, while Polaris's own checks (which
+ * find the row by user) keep accepting it. Rows like that were written before
+ * user ids became uuids, and a transfer from such an install brings them back
+ * after the migration that fixed them has already run.
+ *
+ * Run at every start, after an import, and whenever a password is written, so
+ * the state cannot outlive the next boot whatever path produced it. Only the
+ * one row better-auth would use is moved, and never onto a user that already
+ * has a matching one. Returns how many changed.
+ */
+export async function repairCredentialAccounts(userId?: string): Promise<number> {
+    if (userId) {
+        const rows = await prisma.account.findMany({
+            where: { userId, providerId: "credential" },
+            select: { id: true, accountId: true, password: true, updatedAt: true }
+        });
+        if (rows.some((row) => row.accountId === userId)) return 0;
+        const [best] = rows.sort(
+            (a, b) =>
+                Number(a.password === null) - Number(b.password === null) ||
+                b.updatedAt.getTime() - a.updatedAt.getTime()
+        );
+        if (!best) return 0;
+        await prisma.account.update({ where: { id: best.id }, data: { accountId: userId } });
+        return 1;
+    }
+    return prisma.$executeRaw`
+        UPDATE "Account" SET "accountId" = CAST("userId" AS TEXT)
+        WHERE "providerId" = 'credential'
+          AND "accountId" <> CAST("userId" AS TEXT)
+          AND NOT EXISTS (
+              SELECT 1 FROM "Account" AS b
+              WHERE b."userId" = "Account"."userId" AND b."providerId" = 'credential'
+                AND b."accountId" = CAST(b."userId" AS TEXT)
+          )
+          AND "id" = (
+              SELECT c."id" FROM "Account" AS c
+              WHERE c."userId" = "Account"."userId" AND c."providerId" = 'credential'
+              ORDER BY c."password" IS NULL, c."updatedAt" DESC
+              LIMIT 1
+          )`;
+}
+
 /** Promote a user to administrator (the second gate for operator surfaces). */
 export async function setUserAdmin(userId: string): Promise<void> {
     await prisma.user.update({ where: { id: userId }, data: { isAdmin: true } });

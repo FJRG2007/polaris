@@ -12,6 +12,7 @@
 
 import { prisma } from "@polaris/db";
 import type { Auth } from "./auth.js";
+import { repairCredentialAccounts } from "./provision.js";
 import {
     parseStringList,
     stringifyList,
@@ -615,6 +616,8 @@ export async function resetUserPassword(
             accountId: userId,
             password: hash
         });
+    } else {
+        await repairCredentialAccounts(userId);
     }
     return {};
 }

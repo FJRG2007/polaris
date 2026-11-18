@@ -7,6 +7,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 interface AccountRow {
+    id?: string;
+    updatedAt?: Date;
     userId: string;
     providerId: string;
     accountId: string;
@@ -29,6 +31,15 @@ const prisma = {
             );
             for (const row of rows) row.password = data.password;
             return { count: rows.length };
+        },
+        findMany: async ({ where }: { where: { userId: string; providerId: string } }) =>
+            accounts
+                .filter((row) => row.userId === where.userId && row.providerId === where.providerId)
+                .map((row) => ({ ...row, updatedAt: row.updatedAt ?? new Date(0) })),
+        update: async ({ where, data }: { where: { id: string }; data: { accountId: string } }) => {
+            const row = accounts.find((entry) => entry.id === where.id)!;
+            row.accountId = data.accountId;
+            return row;
         }
     }
 };
@@ -82,6 +93,32 @@ describe("resetUserPassword", () => {
             password: "hashed:a long new secret"
         });
         expect(accounts.find((row) => row.providerId === "github")?.password).toBeNull();
+    });
+
+    it("points a password kept under an old id back at its account", async () => {
+        // Written before user ids became uuids: sign-in looks the password up
+        // by the user's id and would never find this one.
+        accounts = [
+            {
+                id: "row-1",
+                userId: "user-1",
+                providerId: "credential",
+                accountId: "0123456789abcdef0123456789abcdef",
+                password: "hashed:old"
+            }
+        ];
+        expect(await resetUserPassword(auth, "user-1", "a long new secret")).toEqual({});
+        expect(accounts[0]).toMatchObject({ accountId: "user-1", password: "hashed:a long new secret" });
+        expect(linkAccount).not.toHaveBeenCalled();
+    });
+
+    it("leaves an account that already has a matching row alone", async () => {
+        accounts = [
+            { id: "row-1", userId: "user-1", providerId: "credential", accountId: "user-1", password: "hashed:old" },
+            { id: "row-2", userId: "user-1", providerId: "credential", accountId: "stale", password: null }
+        ];
+        await resetUserPassword(auth, "user-1", "a long new secret");
+        expect(accounts.map((row) => row.accountId)).toEqual(["user-1", "stale"]);
     });
 
     it("writes nothing for a password that is too short", async () => {

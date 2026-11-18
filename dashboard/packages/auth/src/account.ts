@@ -9,6 +9,7 @@
 
 import { prisma } from "@polaris/db";
 import type { Auth } from "./auth.js";
+import { repairCredentialAccounts } from "./provision.js";
 import {
     companyField,
     descriptionField,
@@ -421,5 +422,6 @@ export async function changeUserPassword(
         where: { userId, providerId: "credential" },
         data: { password: hash }
     });
+    await repairCredentialAccounts(userId);
     return {};
 }

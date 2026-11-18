@@ -54,6 +54,8 @@ vi.mock("@polaris/db", async () => {
         {
             get(_target, key: string) {
                 if (key === "$transaction") return async (run: (tx: unknown) => Promise<unknown>) => run(client);
+                // The password repair that follows every import.
+                if (key === "$executeRaw") return async () => 0;
                 if (key === "$executeRawUnsafe")
                     return async (sql: string) => {
                         raw.push(sql);

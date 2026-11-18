@@ -21,6 +21,7 @@
 import { once } from "node:events";
 import { loadEnv } from "@polaris/config";
 import { prisma, Prisma } from "@polaris/db";
+import { repairCredentialAccounts } from "@polaris/auth";
 import { pipeline } from "node:stream/promises";
 import { StringDecoder } from "node:string_decoder";
 import { createGunzip, createGzip } from "node:zlib";
@@ -318,6 +319,9 @@ export async function applyTransfer(path: string, passphrase: string): Promise<T
         },
         { timeout: 60 * 60_000, maxWait: 30_000 }
     );
+    // An export from an install that predates the fix carries its passwords
+    // under the old ids, and this database's migrations have already run.
+    await repairCredentialAccounts();
     return summary;
 }
 

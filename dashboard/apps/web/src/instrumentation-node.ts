@@ -171,6 +171,16 @@ export async function registerNode(): Promise<void> {
         console.error("polaris: could not take back the automatic app installs:", error)
     );
 
+    // A password kept under any id but its account's is refused at sign-in with
+    // the right password; whatever wrote it (an old install, a transfer from
+    // one), it does not survive a start.
+    const { repairCredentialAccounts } = await import("@polaris/auth");
+    void repairCredentialAccounts()
+        .then((count) => {
+            if (count > 0) console.log(`polaris: pointed ${count} password(s) back at their account`);
+        })
+        .catch((error) => console.error("polaris: could not check the stored passwords:", error));
+
     // The ready-made access policies, as this version writes them: an update
     // that changes one reaches everybody it is attached to without anybody
     // opening Policies first.
