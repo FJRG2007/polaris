@@ -161,6 +161,19 @@ export {
     type AsyncPage
 } from "./lib/use-async-options";
 export { SegmentedControl, type SegmentedOption } from "./components/segmented-control";
+export {
+    SearchField,
+    SortHeader,
+    nextSort,
+    type SortDirection as TableSortDirection
+} from "./components/table-toolbar";
+export {
+    CatalogList,
+    CatalogPicked,
+    ChoiceCard,
+    foldSearch,
+    type CatalogEntry
+} from "./components/catalog-list";
 export { ControlSlider, type ControlSliderProps } from "./components/control-slider";
 export { KEY_SETTLE_MS, useReleasedValue } from "./lib/use-released-value";
 export {

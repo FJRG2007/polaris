@@ -48,11 +48,12 @@ import {
     Button,
     Card,
     CardBody,
-    Input,
     SegmentedControl,
     Select,
     Skeleton,
     cn,
+    SearchField,
+    SortHeader,
     useToast
 } from "@polaris/ui";
 import { PagedPicker } from "@/components/paged-picker";
@@ -79,8 +80,6 @@ import type {
     OverviewData
 } from "./types";
 import {
-    ArrowDown,
-    ArrowUp,
     Boxes,
     Cpu,
     FileText,
@@ -91,7 +90,6 @@ import {
     RefreshCw,
     RotateCw,
     ScrollText,
-    Search,
     Server,
     Square,
     TerminalSquare,
@@ -684,23 +682,14 @@ export function ContainersView({
                         {isLocalHost && <PolarisFootprintCard />}
 
                         <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <div className="relative min-w-0 flex-1 basis-48">
-                                <Search
-                                    className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                                    aria-hidden="true"
-                                />
-                                <Input
-                                    type="search"
-                                    value={search}
-                                    onChange={(event) =>
-                                        narrow(() => setSearch(event.target.value))
-                                    }
-                                    placeholder={t("list.search")}
-                                    aria-label={t("list.search")}
-                                    maxLength={200}
-                                    className="ps-8"
-                                />
-                            </div>
+                            <SearchField
+                                wrapperClassName="flex-1 basis-48"
+                                value={search}
+                                onChange={(event) => narrow(() => setSearch(event.target.value))}
+                                placeholder={t("list.search")}
+                                aria-label={t("list.search")}
+                                maxLength={200}
+                            />
                             {isLocalHost ? (
                                 <SegmentedControl<OwnerFilter>
                                     size="sm"
@@ -999,48 +988,6 @@ function Stat({
 
 /** A usage cell. A running container with no reading yet has one coming, which
  *  is a skeleton; a stopped one has nothing to read, which is a dash. */
-/**
- * A column heading that sorts by its own column.
- *
- * The whole heading is the control rather than an icon beside it: the target is
- * the width of the column, which is what makes this usable on a phone and with a
- * pointer somebody is not aiming carefully. `aria-sort` is what carries the same
- * fact to a screen reader, where the arrow is not there to be seen.
- */
-function SortHeader({
-    label,
-    order,
-    sort,
-    onSort
-}: {
-    label: string;
-    order: ConsumptionOrder;
-    sort: { order: ConsumptionOrder; direction: SortDirection };
-    onSort: (order: ConsumptionOrder) => void;
-}) {
-    const active = sort.order === order;
-    const Arrow = sort.direction === "asc" ? ArrowUp : ArrowDown;
-    return (
-        <th
-            scope="col"
-            className="px-0 py-0 font-medium"
-            aria-sort={active ? (sort.direction === "asc" ? "ascending" : "descending") : "none"}
-        >
-            <button
-                type="button"
-                onClick={() => onSort(order)}
-                className={cn(
-                    "flex w-full items-center gap-1 px-3 py-2 text-start transition-colors hover:text-foreground",
-                    active && "text-foreground"
-                )}
-            >
-                {label}
-                {active ? <Arrow className="size-3" aria-hidden="true" /> : null}
-            </button>
-        </th>
-    );
-}
-
 function UsageCell({ running, value }: { running: boolean; value: string | null }) {
     return (
         <td className="px-3 py-2 text-muted-foreground">

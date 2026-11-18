@@ -1060,7 +1060,7 @@
                 "login": "Usa un plan que ya pagas",
                 "cloud": "Usa modelos con tu cuenta de nube",
                 "account": "Una cuenta con la que entra un agente",
-                "home": "Inicia sesión del agente en tu equipo"
+                "home": "Inicia sesión del agente en la máquina de tus sesiones"
             },
             "short": {
                 "key": "Clave",
@@ -1073,6 +1073,17 @@
                 "key": "Clave de API de {name}",
                 "login": "Entrar con {name}",
                 "cloud": "Cuenta de {name}"
+            },
+            "change": "Cambiar",
+            "how": "Cómo conectarlo",
+            "continue": "Continuar",
+            "categoryLabel": "Tipo de conexión",
+            "categories": {
+                "all": "Todo",
+                "providers": "Proveedores",
+                "subscriptions": "Suscripciones",
+                "clouds": "Nubes",
+                "agents": "Agentes"
             }
         },
         "order": "Orden",
@@ -1171,7 +1182,8 @@
         "statusUnknown": "Sin datos",
         "statusChecking": "Comprobando acceso",
         "statusLastKnown": "{status}, último dato",
-        "statusLastKnownHint": "Del último acceso o cierre hecho aquí, no de la propia herramienta."
+        "statusLastKnownHint": "Del último acceso o cierre hecho aquí, no de la propia herramienta.",
+        "cancel": "Cancelar"
     },
     "signinDialog": {
         "title": "Iniciar sesión en {tool}",

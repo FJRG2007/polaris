@@ -6,8 +6,9 @@
 
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ProviderRow } from "@/lib/agents/model-key-providers";
+import type { ProviderReader } from "@/components/model-keys/provider-select";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
 vi.mock("@/app/(app)/account/ai-keys/login-actions", () => ({
@@ -42,7 +43,7 @@ const actions = {
     reorder: vi.fn(async () => ({}))
 };
 
-function open() {
+function open(searchProviders: ProviderReader = async () => ({ items: [XAI], next: null })) {
     render(
         <MessagesWrapper>
             <ConnectionHub>
@@ -50,7 +51,7 @@ function open() {
                 <CloudAccounts />
                 <ModelKeysView
                     providers={[XAI]}
-                    searchProviders={async () => ({ items: [XAI], next: null })}
+                    searchProviders={searchProviders}
                     keys={[]}
                     actions={actions}
                     copy={{ title: "Connections", hint: "", empty: "None", adding: "" }}
@@ -77,6 +78,7 @@ describe("Add connection", () => {
 
         expect(await screen.findByText("Sign in with SuperGrok")).toBeTruthy();
         fireEvent.click(screen.getByText("xAI API key"));
+        fireEvent.click(screen.getByRole("button", { name: "Continue" }));
 
         expect(screen.queryByText("Connect xAI")).toBeNull();
         expect(await screen.findAllByText(/xAI/)).not.toHaveLength(0);
@@ -89,5 +91,42 @@ describe("Add connection", () => {
         fireEvent.click(await screen.findByRole("button", { name: /Amazon Bedrock/ }));
         expect(await screen.findByText("Add Amazon Bedrock")).toBeTruthy();
         expect(screen.getByText("Access key ID", { exact: false })).toBeTruthy();
+    });
+
+    it("paints the plans and clouds before the provider catalogue answers", () => {
+        open(() => new Promise(() => undefined));
+        fireEvent.click(screen.getByRole("button", { name: "Add connection" }));
+        expect(screen.getByRole("button", { name: /Amazon Bedrock/ })).toBeTruthy();
+        expect(screen.getByLabelText("Loading providers...")).toBeTruthy();
+    });
+
+    it("asks the server once typing settles, not once per keystroke", async () => {
+        vi.useFakeTimers();
+        try {
+            const read = vi.fn<ProviderReader>(async () => ({ items: [XAI], next: null }));
+            open(read);
+            fireEvent.click(screen.getByRole("button", { name: "Add connection" }));
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(300);
+            });
+            read.mockClear();
+            const field = screen.getByRole("searchbox", { name: "Search providers, clouds and agents" });
+            for (const text of ["g", "gr", "gro", "grok"]) fireEvent.change(field, { target: { value: text } });
+            await act(async () => {
+                await vi.advanceTimersByTimeAsync(300);
+            });
+            expect(read).toHaveBeenCalledTimes(1);
+            expect(read.mock.calls[0]![0]).toMatchObject({ query: "grok" });
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("narrows the catalogue to a category", () => {
+        open(() => new Promise(() => undefined));
+        fireEvent.click(screen.getByRole("button", { name: "Add connection" }));
+        fireEvent.click(screen.getByRole("radio", { name: "Clouds" }));
+        expect(screen.getByRole("button", { name: /Amazon Bedrock/ })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: /SuperGrok|^xAI/ })).toBeNull();
     });
 });

@@ -1060,7 +1060,7 @@
                 "login": "Use a plan you already pay for",
                 "cloud": "Use models through your cloud account",
                 "account": "An account an agent signs in with",
-                "home": "Sign the agent in on your computer"
+                "home": "Sign the agent in on your sessions' machine"
             },
             "short": {
                 "key": "Key",
@@ -1073,6 +1073,17 @@
                 "key": "{name} API key",
                 "login": "Sign in with {name}",
                 "cloud": "{name} account"
+            },
+            "change": "Change",
+            "how": "How to connect it",
+            "continue": "Continue",
+            "categoryLabel": "Kind of connection",
+            "categories": {
+                "all": "All",
+                "providers": "Providers",
+                "subscriptions": "Subscriptions",
+                "clouds": "Clouds",
+                "agents": "Agents"
             }
         },
         "order": "Order",
@@ -1171,7 +1182,8 @@
         "statusUnknown": "Unknown",
         "statusChecking": "Checking sign-in",
         "statusLastKnown": "{status}, last known",
-        "statusLastKnownHint": "From the last sign-in or sign-out run here, not from the tool itself."
+        "statusLastKnownHint": "From the last sign-in or sign-out run here, not from the tool itself.",
+        "cancel": "Cancel"
     },
     "signinDialog": {
         "title": "Sign in to {tool}",

@@ -45,18 +45,13 @@ import type { DeviceView } from "../../lib/device-kinds";
 import * as registry from "../../lib/device-connections";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DeviceAccountView } from "../../lib/device-accounts";
-import {
-    Check,
-    ChevronRight,
-    ExternalLink,
-    Loader2,
-    RefreshCw,
-    Search,
-    Upload
-} from "lucide-react";
+import { ExternalLink, Loader2, RefreshCw, Upload } from "lucide-react";
 import {
     Badge,
     Button,
+    CatalogList,
+    CatalogPicked,
+    ChoiceCard,
     cn,
     Dialog,
     DialogContent,
@@ -64,8 +59,11 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    foldSearch,
     Input,
-    Select
+    SearchField,
+    Select,
+    type CatalogEntry
 } from "@polaris/ui";
 import { usePlacesT } from "../use-places-t";
 import { hostUi } from "@polaris/app-host/client";
@@ -188,9 +186,7 @@ function knownAs(entry: registry.DeviceBrand, t: PlacesTranslator): string {
 }
 
 /** Case and accents folded away, so "cancion" finds "Canción". */
-function folded(text: string): string {
-    return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
-}
+const folded = foldSearch;
 
 /**
  * The makes that answer what was typed, the way Home Assistant's "add
@@ -340,6 +336,16 @@ export function ConnectDialog({
     const [chosen, setChosen] = useState("");
     const [query, setQuery] = useState("");
     const shown = useMemo(() => matchingBrands(brands, query, t), [brands, query, t]);
+    const shownEntries = useMemo<CatalogEntry[]>(
+        () =>
+            shown.map((entry) => ({
+                key: entry.brand,
+                logo: <IntegrationLogo slug={entry.logo} className="size-6 w-8 shrink-0 object-contain" />,
+                title: brandWords(entry.brand, t),
+                lines: [kindsOf(entry, t), knownAs(entry, t)].filter(Boolean)
+            })),
+        [shown, t]
+    );
     const picked = brands.find((entry) => entry.brand === brand) ?? null;
     /** The first step: the list of makes, before one is picked. */
     const choosing = !reconnect && !picked;
@@ -800,108 +806,44 @@ export function ConnectDialog({
                         <div className="flex flex-col gap-4">
                             {choosing && (
                                 <div className="flex flex-col gap-2">
-                                    <div className="relative">
-                                        <Search className="pointer-events-none absolute top-1/2 start-3 size-4 -translate-y-1/2 text-muted-foreground" />
-                                        <Input
-                                            autoFocus
-                                            type="search"
-                                            value={query}
-                                            className="ps-9"
-                                            spellCheck={false}
-                                            autoComplete="off"
-                                            placeholder={t("connect.search")}
-                                            aria-label={t("connect.search")}
-                                            onChange={(event) => setQuery(event.target.value)}
-                                            onKeyDown={(event) => {
-                                                if (event.key !== "Enter" || !shown[0]) return;
-                                                event.preventDefault();
-                                                pickBrand(shown[0].brand);
-                                            }}
-                                        />
-                                    </div>
-                                    {shown.length === 0 ? (
-                                        <p className="px-1 py-6 text-center text-sm text-muted-foreground">
-                                            {t("connect.noMatch", { query: query.trim() })}
-                                        </p>
-                                    ) : (
-                                        <ul
-                                            aria-label={t("connect.make")}
-                                            className="-mx-1 flex max-h-[min(24rem,55vh)] flex-col overflow-y-auto"
-                                        >
-                                            {shown.map((entry) => (
-                                                <li key={entry.brand}>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => pickBrand(entry.brand)}
-                                                        className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-start transition-colors duration-fast hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
-                                                    >
-                                                        <IntegrationLogo
-                                                            slug={entry.logo}
-                                                            className="size-6 w-8 shrink-0 object-contain"
-                                                        />
-                                                        <span className="flex min-w-0 flex-1 flex-col">
-                                                            <span
-                                                                className="truncate text-sm font-medium"
-                                                                title={brandWords(entry.brand, t)}
-                                                            >
-                                                                {brandWords(entry.brand, t)}
-                                                            </span>
-                                                            <span
-                                                                className="truncate text-[0.6875rem] text-foreground-subtle"
-                                                                title={kindsOf(entry, t)}
-                                                            >
-                                                                {kindsOf(entry, t)}
-                                                            </span>
-                                                            {knownAs(entry, t) && (
-                                                                <span
-                                                                    className="truncate text-[0.6875rem] text-foreground-subtle"
-                                                                    title={knownAs(entry, t)}
-                                                                >
-                                                                    {knownAs(entry, t)}
-                                                                </span>
-                                                            )}
-                                                        </span>
-                                                        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                                                    </button>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
+                                    <SearchField
+                                        autoFocus
+                                        value={query}
+                                        placeholder={t("connect.search")}
+                                        aria-label={t("connect.search")}
+                                        onChange={(event) => setQuery(event.target.value)}
+                                        onKeyDown={(event) => {
+                                            if (event.key !== "Enter" || !shown[0]) return;
+                                            event.preventDefault();
+                                            pickBrand(shown[0].brand);
+                                        }}
+                                    />
+                                    <CatalogList
+                                        label={t("connect.make")}
+                                        className="max-h-[min(24rem,55vh)]"
+                                        entries={shownEntries}
+                                        onPick={pickBrand}
+                                        empty={t("connect.noMatch", { query: query.trim() })}
+                                    />
                                 </div>
                             )}
 
                             {!reconnect && !pairing && picked && (
-                                <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
-                                    <IntegrationLogo
-                                        slug={picked.logo}
-                                        className="size-6 w-8 shrink-0 object-contain"
-                                    />
-                                    <span className="flex min-w-0 flex-1 flex-col">
-                                        <span
-                                            className="truncate text-sm font-medium"
-                                            title={brandWords(picked.brand, t)}
-                                        >
-                                            {brandWords(picked.brand, t)}
-                                        </span>
-                                        <span
-                                            className="truncate text-[0.6875rem] text-foreground-subtle"
-                                            title={kindsOf(picked, t)}
-                                        >
-                                            {kindsOf(picked, t)}
-                                        </span>
-                                        {knownAs(picked, t) && (
-                                            <span
-                                                className="truncate text-[0.6875rem] text-foreground-subtle"
-                                                title={knownAs(picked, t)}
-                                            >
-                                                {knownAs(picked, t)}
-                                            </span>
-                                        )}
-                                    </span>
-                                    <Button variant="ghost" size="sm" onClick={() => pickBrand("")}>
-                                        {t("connect.change")}
-                                    </Button>
-                                </div>
+                                <CatalogPicked
+                                    logo={
+                                        <IntegrationLogo
+                                            slug={picked.logo}
+                                            className="size-6 w-8 shrink-0 object-contain"
+                                        />
+                                    }
+                                    title={brandWords(picked.brand, t)}
+                                    lines={[kindsOf(picked, t), knownAs(picked, t)].filter(Boolean)}
+                                    action={
+                                        <Button variant="ghost" size="sm" onClick={() => pickBrand("")}>
+                                            {t("connect.change")}
+                                        </Button>
+                                    }
+                                />
                             )}
                             {!reconnect && !pairing && ofBrand.length > 1 && (
                                 <div className="flex flex-col gap-1.5">
@@ -910,33 +852,19 @@ export function ConnectDialog({
                                     </span>
                                     <div className="flex flex-col gap-2">
                                         {ofBrand.map((entry) => (
-                                            <button
+                                            <ChoiceCard
                                                 key={entry.id}
-                                                type="button"
-                                                onClick={() => pickConnection(entry.id)}
-                                                aria-pressed={entry.id === chosen}
-                                                className={cn(
-                                                    "flex items-start gap-2 rounded-lg border px-3 py-2 text-start transition-colors duration-fast",
-                                                    entry.id === chosen
-                                                        ? "border-accent bg-accent/10"
-                                                        : "border-border bg-card hover:border-border-strong"
-                                                )}
-                                            >
-                                                <Check
-                                                    className={cn(
-                                                        "mt-0.5 size-4 shrink-0",
-                                                        entry.id === chosen
-                                                            ? "text-accent"
-                                                            : "text-transparent"
-                                                    )}
-                                                />
-                                                <IntegrationLogo
-                                                    slug={entry.logo}
-                                                    className="mt-0.5 size-4 w-6 shrink-0 object-contain"
-                                                />
-                                                <span className="flex min-w-0 flex-col gap-0.5">
-                                                    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
-                                                        {registry.connectionWords(t, entry).label}
+                                                onSelect={() => pickConnection(entry.id)}
+                                                selected={entry.id === chosen}
+                                                logo={
+                                                    <IntegrationLogo
+                                                        slug={entry.logo}
+                                                        className="size-4 w-6 shrink-0 object-contain"
+                                                    />
+                                                }
+                                                title={registry.connectionWords(t, entry).label}
+                                                badges={
+                                                    <>
                                                         {entry.unavailable && (
                                                             <Badge className="border-border bg-muted text-muted-foreground">
                                                                 {t("connect.unavailable")}
@@ -947,13 +875,10 @@ export function ConnectDialog({
                                                                 {t("connect.recommended")}
                                                             </Badge>
                                                         )}
-                                                    </span>
-                                                    <span className="text-[0.6875rem] text-muted-foreground">
-                                                        {registry.connectionWords(t, entry).reach} -{" "}
-                                                        {registry.connectionWords(t, entry).summary}
-                                                    </span>
-                                                </span>
-                                            </button>
+                                                    </>
+                                                }
+                                                summary={`${registry.connectionWords(t, entry).reach} - ${registry.connectionWords(t, entry).summary}`}
+                                            />
                                         ))}
                                     </div>
                                 </div>
