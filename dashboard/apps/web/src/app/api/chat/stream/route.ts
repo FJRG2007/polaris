@@ -16,8 +16,16 @@
  */
 
 import { subscribeChatChanges } from "@/lib/chat/live";
+import { typingAllowed } from "@/lib/privacy-service";
 import { holdStreamScope } from "@/lib/chat/stream-scope";
 import { backgroundUser, sessionCan } from "@/lib/session";
+
+/** How long one "may I see them typing" answer is trusted on a stream. */
+const TYPING_TRUST_MS = 60_000;
+
+/** An account id. Anything else typing - Polar answering a mention - is not an
+ *  account and has no setting to ask. */
+const ACCOUNT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -53,6 +61,25 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const actor = { id: session.id };
+    const viewer = { id: session.id, isAdmin: Boolean(session.isAdmin) };
+
+    /**
+     * Whether this reader may see one person typing, remembered for a minute
+     * per typist: the dots repeat every few seconds while somebody writes, and
+     * one check per pair a minute is what keeps a busy room cheap.
+     */
+    const typingAnswers = new Map<string, { allowed: boolean; at: number }>();
+    const typingFor = async (typerId: string): Promise<boolean> => {
+        if (!ACCOUNT_ID.test(typerId)) return true;
+        const known = typingAnswers.get(typerId);
+        if (known && Date.now() - known.at < TYPING_TRUST_MS) return known.allowed;
+        const allowed = await typingAllowed(viewer, typerId).catch((caught: unknown) => {
+            console.error("polaris: could not check a typing setting:", caught);
+            return false;
+        });
+        typingAnswers.set(typerId, { allowed, at: Date.now() });
+        return allowed;
+    };
     const encoder = new TextEncoder();
 
     let unsubscribe: (() => void) | null = null;
@@ -324,12 +351,16 @@ export async function GET(request: Request): Promise<Response> {
                         return;
                     }
                     if (change.kind === "typing") {
-                        send({
+                        const frame = {
                             kind: "typing",
                             channelId,
                             userId: change.actorId,
                             name: change.actorName ?? "",
                             activity: change.activity ?? "typing"
+                        } as const;
+                        // Only to a reader both sides' typing setting allows.
+                        void typingFor(change.actorId).then((allowed) => {
+                            if (allowed && !closed) send(frame);
                         });
                     } else {
                         wake(channelId, change.messageIds);
