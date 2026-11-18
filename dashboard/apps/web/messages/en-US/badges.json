@@ -27,7 +27,12 @@
         "calls": { "name": "On air", "description": "Hours spent in calls and meetings." },
         "tasks": { "name": "Finisher", "description": "Tasks completed as an assignee." },
         "arcade": { "name": "Player", "description": "Games joined in the arcade." },
-        "servers": { "name": "Explorer", "description": "Hours on game servers linked to you." }
+        "servers": { "name": "Explorer", "description": "Hours on game servers linked to you." },
+        "gameTime": { "name": "Game time", "description": "Hours playing games on your computer." },
+        "gameVariety": {
+            "name": "Game variety",
+            "description": "Different games played on your computer."
+        }
     },
     "levels": {
         "spark": "Spark",
@@ -39,7 +44,17 @@
         "pulsar": "Pulsar",
         "quasar": "Quasar",
         "magnetar": "Magnetar",
-        "singularity": "Singularity"
+        "singularity": "Singularity",
+        "casual": "Casual",
+        "recreational": "Recreational",
+        "dedicated": "Dedicated",
+        "committed": "Committed",
+        "serious": "Serious",
+        "devoted": "Devoted",
+        "seasoned": "Seasoned",
+        "ironclad": "Ironclad",
+        "unshakeable": "Unshakeable",
+        "eternal": "Eternal"
     },
     "units": {
         "days": "{count, plural, one {# day} other {# days}}",

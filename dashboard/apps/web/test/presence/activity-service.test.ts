@@ -36,11 +36,16 @@ const fake = vi.hoisted(() => ({
     settings: new Map<string, Record<string, unknown>>(),
     allowed: new Set<string>(),
     playing: new Map<string, { userId: string; game: string; server: string; since: Date }>(),
-    announced: [] as string[]
+    announced: [] as string[],
+    playtime: [] as unknown[][]
 }));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        $executeRaw: async (_sql: TemplateStringsArray, ...values: unknown[]) => {
+            fake.playtime.push(values);
+            return 1;
+        },
         userActivity: {
             findUnique: async ({
                 where
@@ -164,6 +169,7 @@ beforeEach(() => {
     fake.allowed = new Set(["ada", "bob"]);
     fake.playing.clear();
     fake.announced = [];
+    fake.playtime = [];
 });
 
 describe("a report from the desktop app", () => {
@@ -199,6 +205,7 @@ describe("a report from the desktop app", () => {
             reason: "hidden"
         });
         expect(fake.rows).toHaveLength(0);
+        expect(fake.playtime).toHaveLength(0);
         expect(JSON.parse(String(fake.settings.get("ada")?.seenGames))[0]).toMatchObject({
             key: "celeste.exe",
             name: "Celeste"
@@ -210,6 +217,16 @@ describe("a report from the desktop app", () => {
         expect((await reportGame("ada", game("celeste.exe", "Celeste"), NOW)).reason).toBe("off");
         expect(fake.rows).toHaveLength(0);
         expect(fake.settings.get("ada")?.seenGames).toBe("[]");
+        expect(fake.playtime).toHaveLength(0);
+    });
+
+    it("adds to the game's playtime on every report it is shown for", async () => {
+        await reportGame("ada", game("celeste.exe", "Celeste"), NOW);
+        const later = new Date(NOW.getTime() + 60_000);
+        await reportGame("ada", game("celeste.exe", "Celeste"), later);
+        expect(fake.playtime).toHaveLength(2);
+        // user, key, name, the report's time, then the lapse a gap may not exceed.
+        expect(fake.playtime[1]).toEqual(["ada", "celeste.exe", "Celeste", later, 180]);
     });
 
     it("takes the card down when nothing is running, and says so", async () => {

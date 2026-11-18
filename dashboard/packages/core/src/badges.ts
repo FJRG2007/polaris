@@ -32,7 +32,24 @@ export const BADGE_LEVELS = [
     "singularity"
 ] as const;
 
-export type BadgeLevelName = (typeof BADGE_LEVELS)[number];
+/**
+ * Game Time keeps the level names Discord gives the same ladder, so somebody
+ * who knows one reads the other: "Ironclad" is a thousand hours in both.
+ */
+export const GAME_TIME_LEVELS = [
+    "casual",
+    "recreational",
+    "dedicated",
+    "committed",
+    "serious",
+    "devoted",
+    "seasoned",
+    "ironclad",
+    "unshakeable",
+    "eternal"
+] as const;
+
+export type BadgeLevelName = (typeof BADGE_LEVELS)[number] | (typeof GAME_TIME_LEVELS)[number];
 
 /**
  * The ten steps every activity ladder climbs: the curve Discord's own activity
@@ -45,7 +62,8 @@ const ACTIVITY_CURVE = [1, 5, 20, 75, 150, 300, 500, 1000, 2000, 5000] as const;
  * The progress badges. Each is read from data that exists without this
  * feature: the day the account was made, chat messages written, time in
  * calls and meetings, tasks completed as an assignee, games started in the
- * arcade, and hours on a linked game server.
+ * arcade, hours on a linked game server, and - from the desktop app's game
+ * detection - hours played and how many different games.
  *
  * Tenure is a year a level, one to ten, as Discord's account-age badge is.
  * Messages are the curve ten times over, since one is a few seconds' work.
@@ -56,8 +74,13 @@ export const BADGE_LADDERS = {
     calls: { unit: "hours", thresholds: ACTIVITY_CURVE },
     tasks: { unit: "tasks", thresholds: ACTIVITY_CURVE },
     arcade: { unit: "games", thresholds: ACTIVITY_CURVE },
-    servers: { unit: "hours", thresholds: ACTIVITY_CURVE }
-} as const satisfies Record<string, { unit: string; thresholds: readonly number[] }>;
+    servers: { unit: "hours", thresholds: ACTIVITY_CURVE },
+    gameTime: { unit: "hours", thresholds: ACTIVITY_CURVE, levels: GAME_TIME_LEVELS },
+    gameVariety: { unit: "games", thresholds: [2, 5, 10, 15, 20, 30, 40, 60, 80, 100] }
+} as const satisfies Record<
+    string,
+    { unit: string; thresholds: readonly number[]; levels?: readonly BadgeLevelName[] }
+>;
 
 export type BadgeLadderId = keyof typeof BADGE_LADDERS;
 
@@ -144,8 +167,15 @@ export function ladderProgress(thresholds: readonly number[], raw: number): Ladd
     return { value, level, top, next, fraction };
 }
 
-export function levelName(level: number): BadgeLevelName | null {
-    return level >= 1 ? (BADGE_LEVELS[Math.min(level, BADGE_LEVELS.length) - 1] ?? null) : null;
+/** The names one ladder's levels go by, lowest first. */
+export function ladderLevels(id: BadgeLadderId): readonly BadgeLevelName[] {
+    const ladder = BADGE_LADDERS[id];
+    return "levels" in ladder ? ladder.levels : BADGE_LEVELS;
+}
+
+export function levelName(level: number, ladder?: BadgeLadderId): BadgeLevelName | null {
+    const names = ladder ? ladderLevels(ladder) : BADGE_LEVELS;
+    return level >= 1 ? (names[Math.min(level, names.length) - 1] ?? null) : null;
 }
 
 export const MOST_BADGE_PREFERENCES = 200;

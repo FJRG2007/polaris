@@ -15,7 +15,9 @@ const LEVEL_COLORS = [
     ["#3b82f6", "#1d4fb8"],
     ["#8b5cf6", "#5b34c2"],
     ["#e0508f", "#a12a62"],
-    ["#f97316", "#7c3aed"]
+    ["#f97316", "#7c3aed"],
+    ["#ec4899", "#4c1d95"],
+    ["#fbbf24", "#be185d"]
 ] as const;
 
 const STAFF_COLORS = ["#0ea5e9", "#0b4f8a"] as const;
@@ -36,6 +38,10 @@ const GLYPHS: Record<string, string> = {
     arcade: "M7 10h2V8h2v2h2v2h-2v2H9v-2H7zM15 10.5h.01M17.5 12.5h.01",
     // A cube: a world on a server.
     servers: "M12 5l6 3.5v7L12 19l-6-3.5v-7zM6 8.5l6 3.5 6-3.5M12 12v7",
+    // A stopwatch: hours in games.
+    gameTime: "M12 7a6 6 0 1 0 0 12a6 6 0 1 0 0-12zM12 10v3l2 1.5M10 4.5h4",
+    // Four tiles: many different games.
+    gameVariety: "M6 6h5v5H6zM13 6h5v5h-5zM6 13h5v5H6zM13 13h5v5h-5z",
     // The north star.
     staff: "M12 4l1.6 6.4L20 12l-6.4 1.6L12 20l-1.6-6.4L4 12l6.4-1.6z",
     star: "M12 5l2.1 4.3 4.7.7-3.4 3.3.8 4.7-4.2-2.2-4.2 2.2.8-4.7L5.2 10l4.7-.7z",

@@ -24,7 +24,12 @@
         "calls": { "name": "En antena", "description": "Horas en llamadas y reuniones." },
         "tasks": { "name": "Remate", "description": "Tareas completadas como asignado." },
         "arcade": { "name": "Jugador", "description": "Partidas jugadas en el arcade." },
-        "servers": { "name": "Explorador", "description": "Horas en servidores de juego tuyos." }
+        "servers": { "name": "Explorador", "description": "Horas en servidores de juego tuyos." },
+        "gameTime": { "name": "Jugón", "description": "Horas jugando en tu ordenador." },
+        "gameVariety": {
+            "name": "Variedad",
+            "description": "Juegos distintos jugados en tu ordenador."
+        }
     },
     "levels": {
         "spark": "Chispa",
@@ -36,7 +41,17 @@
         "pulsar": "Púlsar",
         "quasar": "Cuásar",
         "magnetar": "Magnetar",
-        "singularity": "Singularidad"
+        "singularity": "Singularidad",
+        "casual": "Casual",
+        "recreational": "Recreativo",
+        "dedicated": "Dedicado",
+        "committed": "Comprometido",
+        "serious": "Serio",
+        "devoted": "Devoto",
+        "seasoned": "Curtido",
+        "ironclad": "Acorazado",
+        "unshakeable": "Inquebrantable",
+        "eternal": "Eterno"
     },
     "units": {
         "days": "{count, plural, one {# día} other {# días}}",

@@ -198,14 +198,46 @@ export async function reportGame(
     const startedAt = new Date(
         Math.min(now.getTime(), Math.max(now.getTime() - OLDEST_START_MS, claimed))
     );
-    await putActivity(
-        userId,
-        "game",
-        { key: game.key, name: game.name, startedAt },
-        new Date(now.getTime() + GAME_REPORT_TTL_MS),
-        now
-    );
+    await Promise.all([
+        putActivity(
+            userId,
+            "game",
+            { key: game.key, name: game.name, startedAt },
+            new Date(now.getTime() + GAME_REPORT_TTL_MS),
+            now
+        ),
+        addPlaytime(userId, game.key, game.name, now)
+    ]);
     return { shown: true };
+}
+
+/**
+ * Add the time since this game's last report to its playtime, in one statement
+ * so two reports racing each other cannot both count the same minutes.
+ *
+ * A gap longer than a report's lapse is the game having been closed and opened
+ * again - or the computer asleep - so it adds nothing; the first report of a
+ * session only starts the clock. A clock that went backwards adds nothing either.
+ */
+export async function addPlaytime(
+    userId: string,
+    key: string,
+    name: string,
+    now: Date = new Date()
+): Promise<void> {
+    const lapse = GAME_REPORT_TTL_MS / 1000;
+    await prisma.$executeRaw`
+        INSERT INTO "UserGameTime" ("userId", "key", "name", "seconds", "lastReportAt")
+        VALUES (${userId}::uuid, ${key}, ${name}, 0, ${now})
+        ON CONFLICT ("userId", "key") DO UPDATE SET
+            "seconds" = "UserGameTime"."seconds" + CASE
+                WHEN EXCLUDED."lastReportAt" > "UserGameTime"."lastReportAt"
+                 AND EXTRACT(EPOCH FROM (EXCLUDED."lastReportAt" - "UserGameTime"."lastReportAt")) <= ${lapse}
+                THEN FLOOR(EXTRACT(EPOCH FROM (EXCLUDED."lastReportAt" - "UserGameTime"."lastReportAt")))::int
+                ELSE 0
+            END,
+            "lastReportAt" = GREATEST(EXCLUDED."lastReportAt", "UserGameTime"."lastReportAt"),
+            "name" = EXCLUDED."name"`;
 }
 
 /** Which of these people let this reader see one source of theirs at all,

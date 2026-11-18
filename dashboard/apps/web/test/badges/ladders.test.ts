@@ -45,7 +45,21 @@ describe("badge ladders", () => {
         expect(core.parseBadgeKey("staff")).toEqual({ kind: "staff" });
         expect(core.parseBadgeKey("ladder:messages")).toEqual({ kind: "ladder", id: "messages" });
         expect(core.parseBadgeKey("ladder:nope")).toBeNull();
+        expect(core.parseBadgeKey("ladder:gameTime")).toEqual({ kind: "ladder", id: "gameTime" });
         expect(core.parseBadgeKey("custom:not-a-uuid")).toBeNull();
+    });
+
+    it("names Game Time's levels as Discord does and the rest by the shared names", () => {
+        expect(core.BADGE_LADDERS.gameTime.thresholds).toEqual([1, 5, 20, 75, 150, 300, 500, 1000, 2000, 5000]);
+        expect(core.BADGE_LADDERS.gameVariety.thresholds).toEqual([2, 5, 10, 15, 20, 30, 40, 60, 80, 100]);
+        expect(core.levelName(1, "gameTime")).toBe("casual");
+        expect(core.levelName(8, "gameTime")).toBe("ironclad");
+        expect(core.levelName(10, "gameTime")).toBe("eternal");
+        expect(core.levelName(1, "gameVariety")).toBe("spark");
+        expect(core.ladderLevels("messages")).toBe(core.BADGE_LEVELS);
+        for (const id of core.BADGE_LADDER_IDS) {
+            expect(core.ladderLevels(id).length).toBeGreaterThanOrEqual(core.BADGE_LADDERS[id].thresholds.length);
+        }
     });
 
     it("rounds rarity up to 1% for anybody holding it", () => {

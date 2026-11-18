@@ -40,7 +40,7 @@ export type BadgeValues = Record<core.BadgeLadderId, number>;
 
 /** The raw activity each ladder is measured by, for one person. */
 export async function activityValues(userId: string, now = new Date()): Promise<BadgeValues> {
-    const [user, messages, callSeconds, tasks, arcade, serverSeconds] = await Promise.all([
+    const [user, messages, callSeconds, tasks, arcade, serverSeconds, games] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { createdAt: true } }),
         prisma.chatMessage.count({
             where: {
@@ -55,7 +55,8 @@ export async function activityValues(userId: string, now = new Date()): Promise<
             where: { completedAt: { not: null }, assignees: { some: { userId } } }
         }),
         prisma.arcadeSessionPlayer.count({ where: { userId } }),
-        serverTime(userId)
+        serverTime(userId),
+        gameTime(userId)
     ]);
     return {
         tenure: user ? Math.floor((now.getTime() - user.createdAt.getTime()) / DAY_MS) : 0,
@@ -63,7 +64,25 @@ export async function activityValues(userId: string, now = new Date()): Promise<
         calls: Math.floor(callSeconds / 3600),
         tasks,
         arcade,
-        servers: Math.floor(serverSeconds / 3600)
+        servers: Math.floor(serverSeconds / 3600),
+        gameTime: Math.floor(games.seconds / 3600),
+        gameVariety: games.played
+    };
+}
+
+/** A game counts towards Game Variety once it has been played this long. */
+const VARIETY_MIN_SECONDS = 60;
+
+/** Seconds in games the desktop app saw, and how many different games were played. */
+async function gameTime(userId: string): Promise<{ seconds: number; played: number }> {
+    const rows = await prisma.$queryRaw<{ seconds: number | null; played: number | null }[]>`
+        SELECT COALESCE(SUM("seconds"), 0)::float8 AS seconds,
+               COUNT(*) FILTER (WHERE "seconds" >= ${VARIETY_MIN_SECONDS})::int AS played
+        FROM "UserGameTime"
+        WHERE "userId" = ${userId}::uuid`;
+    return {
+        seconds: Math.max(0, Number(rows[0]?.seconds ?? 0)),
+        played: Math.max(0, Number(rows[0]?.played ?? 0))
     };
 }
 
@@ -225,7 +244,7 @@ function badgeViews(
         const key = core.ladderKey(id);
         const levels = ladder.thresholds.map((threshold, index) => ({
             level: index + 1,
-            name: core.BADGE_LEVELS[index]!,
+            name: core.ladderLevels(id)[index]!,
             threshold,
             unlockedAt:
                 index < state.level
@@ -288,7 +307,7 @@ function badgeViews(
         owned: entry.state.level > 0,
         level: entry.state.level,
         top: entry.ladder.thresholds.length,
-        levelName: core.levelName(entry.state.level),
+        levelName: core.levelName(entry.state.level, entry.id),
         unlockedAt: entry.levels[entry.state.level - 1]?.unlockedAt ?? null,
         rarity: rarity.ladder[`${entry.key}#${Math.max(1, entry.state.level)}`] ?? 0,
         unit: entry.ladder.unit,

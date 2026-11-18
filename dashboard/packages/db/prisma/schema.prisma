@@ -416,6 +416,7 @@ model User {
     presenceSchedules   PresenceSchedule[]
     activities          UserActivity[]
     activitySettings    UserActivitySettings?
+    gameTime            UserGameTime[]
     badgesSeen          UserBadgeSeen[]
     listeningAlong      SpotifyListenAlong?  @relation("ListenAlongListener")
     ownOAuthApps        UserOAuthApp[]
@@ -11754,6 +11755,25 @@ model UserActivitySettings {
     updatedAt   DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Time somebody has spent in each game the desktop app saw them play, for the
+// Game Time and Game Variety badges. `UserActivity` only holds the game running
+// now, so each report adds the minutes since the one before it here; a gap
+// longer than a report's lapse is a closed game, not playtime. Only games that
+// were being shown are counted - a hidden game is never stored anywhere.
+model UserGameTime {
+    userId       String   @db.Uuid
+    // The game's executable, as `UserActivity.key`.
+    key          String
+    name         String
+    seconds      Int      @default(0)
+    lastReportAt DateTime
+    createdAt    DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([userId, key])
 }
 
 // One repeating window in which an account appears as something it decided in

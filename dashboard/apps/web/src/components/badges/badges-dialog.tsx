@@ -34,7 +34,9 @@ const CATEGORIES = [
     "calls",
     "tasks",
     "arcade",
-    "servers"
+    "servers",
+    "gameTime",
+    "gameVariety"
 ] as const;
 const UNITS = ["days", "messages", "minutes", "tasks", "games", "hours"] as const;
 
