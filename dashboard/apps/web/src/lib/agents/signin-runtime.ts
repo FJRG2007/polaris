@@ -1095,15 +1095,23 @@ export function credentialFileScript(file: string): string {
  * What a capture read, checked before anything is kept.
  *
  * Pure. The value stored is the file's base64, the same shape the session boot
- * decodes back into the home. It has to decode to a JSON object no larger than
- * the bound: anything else - an empty answer, a file cut short, a login still
- * half way - is "not signed in yet", never a credential stored broken.
+ * decodes back into the home. It has to decode to a whole file no larger than
+ * the bound, in the format its name says: a JSON object for a `.json` file,
+ * and for a `.toml` one (Devin's) text with at least one `key = value` line.
+ * Anything else - an empty answer, a file cut short, a login still half way -
+ * is "not signed in yet", never a credential stored broken.
  */
-export function parseCredentialFile(output: string): string | null {
+export function parseCredentialFile(output: string, file = "credentials.json"): string | null {
     const value = output.trim();
     if (!value || !/^[A-Za-z0-9+/]+={0,2}$/.test(value)) return null;
     const text = Buffer.from(value, "base64").toString("utf8");
     if (!text || text.length > CREDENTIAL_FILE_MAX) return null;
+    if (file.endsWith(".toml")) {
+        // Not a TOML parser: enough to tell a written file from an empty or
+        // binary one. A table header alone is not a credential.
+        if (text.includes("\u0000") || text.includes("�")) return null;
+        return /^\s*[A-Za-z0-9_.\-"]+\s*=\s*\S/m.test(text) ? value : null;
+    }
     try {
         const parsed: unknown = JSON.parse(text);
         if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
@@ -1138,7 +1146,7 @@ export async function captureSignin(userId: string, id: string, env: string): Pr
         if (pending.userId !== userId) throw new Error("That sign-in is no longer open.");
         return pending.value;
     }
-    return parseCredentialFile(await runIn(userId, id, credentialFileScript(file)));
+    return parseCredentialFile(await runIn(userId, id, credentialFileScript(file)), file);
 }
 
 // ---------------------------------------------------------------------------

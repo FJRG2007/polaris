@@ -290,6 +290,18 @@ describe("keeping a login that is a file", () => {
         expect(parseCredentialFile(b64(`{"a":"${"x".repeat(CREDENTIAL_FILE_MAX)}"}`))).toBeNull();
     });
 
+    it("keeps a TOML credential file, Devin's, by its name rather than as JSON", () => {
+        const file = ".local/share/devin/credentials.toml";
+        const value = b64('[auth]\ntoken = "t-123"\n');
+        expect(parseCredentialFile(value, file)).toBe(value);
+        // The same file read as JSON is refused, which is what made every
+        // stored Devin account read as never signed in.
+        expect(parseCredentialFile(value)).toBeNull();
+        expect(parseCredentialFile(b64("[auth]\n"), file)).toBeNull();
+        expect(parseCredentialFile(b64(""), file)).toBeNull();
+        expect(parseCredentialFile(b64("token = \u0000"), file)).toBeNull();
+    });
+
     it("fits what it keeps in a sign-in row, but never in a provider key", () => {
         const secret = b64(`{"a":"${"x".repeat(CREDENTIAL_FILE_MAX - 10)}"}`);
         const base = { name: "work", secret, expiresAt: null };
