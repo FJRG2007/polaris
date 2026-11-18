@@ -31,5 +31,6 @@ limit and allows TestFlight.
 
 ## Build
 
-`mobile/android` is a plain Java Android project and `mobile/ios` a Swift one generated from `project.yml`; both are, built and tested in CI (`.github/workflows/mobile.yml`). A
-release is published when `versionName` in `app/build.gradle` changes on `main`; bump `versionCode` with it.
+`mobile/android` is a plain Java Android project and `mobile/ios` a Swift one generated from `project.yml`; both
+are built in CI (`.github/workflows/mobile.yml`). An Android release is published when `versionName` in
+`android/app/build.gradle` changes on `main`; bump `versionCode` with it.
