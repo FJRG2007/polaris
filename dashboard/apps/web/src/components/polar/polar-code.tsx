@@ -165,6 +165,7 @@ import {
     X
 } from "lucide-react";
 import * as answerActions from "@/components/polar/polar-answer-actions";
+import type { PolarMark } from "@/lib/polar/answer-feedback";
 import { pickedContext, PICKS_MAX, type PickedElement } from "@/lib/agents/preview-picker";
 import { PickedChips } from "@/components/preview/picked-chips";
 import dynamic from "next/dynamic";
@@ -1892,6 +1893,7 @@ function CodeThread({
     const canRetry = live && !!thread?.canManage && canPrompt && !busy && !turning && !pending;
     const askAgain = () => retry.ask && sendText(parseVoiceDelegation(retry.ask.text) ?? retry.ask.text);
     useEffect(() => () => answerActions.stopReading(), []);
+    const answerMarks = answerActions.useAnswerMarks({ session: sessionId });
     const messageActions = (entry: PolarCodeEntry): CodeMessageActions => ({
         onCompose: setReply,
         onResend: canRetry && entry === retry.ask ? askAgain : undefined,
@@ -1901,7 +1903,15 @@ function CodeThread({
                 prompt: (parseVoiceDelegation(entry.text) ?? entry.text).slice(0, POLAR_COMMAND_PROMPT_MAX)
             }),
         speech: voiceKit.voice.speech,
-        payer: voiceKit.payer
+        payer: voiceKit.payer,
+        // Only a stored message can be marked: a thread cached before entries
+        // had ids has none, and only the person who started it may mark it.
+        ...(UUID.test(entry.id ?? "") && thread?.canManage
+            ? {
+                  mark: answerMarks.marks[entry.id] ?? null,
+                  onMark: (change: answerActions.MarkChange) => answerMarks.mark(entry.id, change)
+              }
+            : {})
     });
 
     /** Carry on in a new session on the same branch, with the conversation so
@@ -2454,6 +2464,8 @@ const ISO_TIME = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g;
 
 /** A message of the session, in Chat's bubbles: the person's words as typed,
  *  the agent's as Markdown. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 /** What a Code message's row can do beyond copy, reply and edit; an absent
  *  action is not drawn. */
 export interface CodeMessageActions {
@@ -2468,6 +2480,10 @@ export interface CodeMessageActions {
     /** Whether a voice can read an answer aloud, and who pays for it. */
     readonly speech: boolean;
     readonly payer: string | null;
+    /** The person's mark on an agent answer, and how to change it; absent
+     *  where it cannot be marked. */
+    readonly mark?: PolarMark | null;
+    readonly onMark?: (change: answerActions.MarkChange) => Promise<boolean>;
 }
 
 /**
@@ -2531,6 +2547,9 @@ function CodeMessage({ entry, actions }: { entry: PolarCodeEntry; actions: CodeM
                 >
                     <CopyIcon copied={copied} />
                 </MessageAction>
+                {from === "assistant" && actions.onMark ? (
+                    <answerActions.AnswerMarks mark={actions.mark ?? null} onMark={actions.onMark} />
+                ) : null}
                 {from === "assistant" && actions.speech && entry.text.trim() ? (
                     <MessageAction
                         label={reading.active ? t("actions.stopReading") : t("actions.readAloud")}

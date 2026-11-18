@@ -10,6 +10,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const OWNER = "11111111-1111-4111-8111-111111111111";
 const THREAD = "22222222-2222-4222-8222-222222222222";
+const SESSION = "33333333-3333-4333-8333-333333333333";
+const AGENT_ANSWER = "44444444-4444-4444-8444-444444444444";
 
 type Saved = { rating: string; reasons: string[]; note: string | null; model: string | null };
 
@@ -41,6 +43,16 @@ vi.mock("@/lib/rate-limit-service", () => ({
 }));
 vi.mock("@polaris/db", () => ({
     prisma: {
+        agentSessionMessage: {
+            findFirst: async ({
+                where
+            }: {
+                where: { id: string; role: string; session: { startedById: string } };
+            }) =>
+                where.id === AGENT_ANSWER && where.role === "agent" && where.session.startedById === OWNER
+                    ? { session: { model: "claude-test" } }
+                    : null
+        },
         polarMessage: {
             findFirst: async ({
                 where
@@ -56,10 +68,15 @@ vi.mock("@polaris/db", () => ({
                 where,
                 create
             }: {
-                where: { userId_messageId: { messageId: string } };
+                where: {
+                    userId_messageId?: { messageId: string };
+                    userId_sessionMessageId?: { sessionMessageId: string };
+                };
                 create: Saved;
             }) => {
-                state.marks.set(where.userId_messageId.messageId, {
+                const key =
+                    where.userId_messageId?.messageId ?? where.userId_sessionMessageId?.sessionMessageId ?? "";
+                state.marks.set(key, {
                     rating: create.rating,
                     reasons: create.reasons,
                     note: create.note,
@@ -67,8 +84,8 @@ vi.mock("@polaris/db", () => ({
                 });
                 return create;
             },
-            deleteMany: async ({ where }: { where: { messageId: string } }) => {
-                state.marks.delete(where.messageId);
+            deleteMany: async ({ where }: { where: { messageId?: string; sessionMessageId?: string } }) => {
+                state.marks.delete(where.messageId ?? where.sessionMessageId ?? "");
                 return { count: 1 };
             },
             findMany: async () =>
@@ -159,6 +176,34 @@ describe("PUT /api/polar/feedback", () => {
         state.user = { id: OWNER, viewingAs: null };
         state.limited = true;
         expect((await put({ messageId: "answer", rating: "good" })).status).toBe(429);
+    });
+});
+
+describe("marks on a Polar Code session's answers", () => {
+    it("saves one on an agent answer of a session this person started, with its model", async () => {
+        const response = await put({ sessionMessageId: AGENT_ANSWER, rating: "good" });
+        expect(response.status).toBe(200);
+        expect(state.marks.get(AGENT_ANSWER)).toEqual({
+            rating: "good",
+            reasons: [],
+            note: null,
+            model: "claude-test"
+        });
+        await put({ sessionMessageId: AGENT_ANSWER, rating: null });
+        expect(state.marks.has(AGENT_ANSWER)).toBe(false);
+    });
+
+    it("answers somebody else's session, or an id that is not one, as not there", async () => {
+        state.user = { id: "55555555-5555-4555-8555-555555555555", viewingAs: null };
+        expect((await put({ sessionMessageId: AGENT_ANSWER, rating: "good" })).status).toBe(404);
+        expect((await put({ sessionMessageId: "answer", rating: "good" })).status).toBe(400);
+    });
+
+    it("reads the marks of one session", async () => {
+        const response = await feedback.GET(
+            new Request(`http://polaris.test/api/polar/feedback?session=${SESSION}`)
+        );
+        expect(response.status).toBe(200);
     });
 });
 

@@ -897,7 +897,6 @@ export function PolarChat({
     /** How the next answer asked again from its row should change; read once. */
     const refine = useRef<PolarRefine | null>(null);
     /** This person's marks on the answers of the open chat, by message id. */
-    const [marks, setMarks] = useState<Record<string, PolarMark>>({});
     /** The answer a share is being made from. */
     const [sharingFrom, setSharingFrom] = useState<string | null>(null);
     const [sharingChat, setSharingChat] = useState(false);
@@ -1299,54 +1298,7 @@ export function PolarChat({
     useEffect(() => () => answerActions.stopReading(), []);
 
     // This person's marks on the open chat's answers, read once per chat.
-    useEffect(() => {
-        setMarks({});
-        let current = true;
-        fetch(`/api/polar/feedback?thread=${threadId}`)
-            .then((response) => (response.ok ? response.json() : null))
-            .then((data: { marks?: Record<string, PolarMark> } | null) => {
-                if (current && data?.marks) setMarks(data.marks);
-            })
-            .catch(() => undefined);
-        return () => {
-            current = false;
-        };
-    }, [threadId]);
-
-    /** Marks an answer at once, and puts the mark back if the server refuses. */
-    const markAnswer = async (
-        messageId: string,
-        change: answerActions.MarkChange
-    ): Promise<boolean> => {
-        const before = marks[messageId];
-        const next = change.rating
-            ? {
-                  rating: change.rating,
-                  reasons: change.rating === "bad" ? (change.reasons ?? []) : [],
-                  note: change.rating === "bad" ? (change.note ?? null) : null
-              }
-            : null;
-        const put = (mark: PolarMark | null | undefined) =>
-            setMarks((current) => {
-                const { [messageId]: _gone, ...rest } = current;
-                return mark ? { ...rest, [messageId]: mark } : rest;
-            });
-        put(next);
-        const response = await fetch("/api/polar/feedback", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ messageId, ...(next ?? { rating: null }) })
-        }).catch(() => null);
-        if (!response?.ok) {
-            put(before);
-            toast.show({ title: t("feedback.failed") });
-            return false;
-        }
-        if (next?.rating === "bad" && (next.reasons.length > 0 || next.note)) {
-            toast.show({ title: t("feedback.thanks") });
-        }
-        return true;
-    };
+    const { marks, mark: markAnswer } = answerActions.useAnswerMarks({ thread: threadId });
 
     /** The last answer again: as it was, longer, shorter, or on another model
      *  for this turn only (the chat stays on the one chosen). */

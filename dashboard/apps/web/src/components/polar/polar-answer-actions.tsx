@@ -11,7 +11,7 @@
  *   or on another model for this turn only.
  */
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Bot, Check, ListMinus, ListPlus, RotateCcw, ThumbsDown, ThumbsUp, X } from "lucide-react";
 import {
     Button,
@@ -31,6 +31,7 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
     Textarea,
+    useToast,
     cn
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -239,6 +240,69 @@ function BadAnswerDialog({
             </DialogContent>
         </Dialog>
     );
+}
+
+/** Whose answers are marked: a chat's, or a Polar Code session's. */
+export type MarksScope = { thread: string } | { session: string };
+
+/**
+ * This person's marks on the answers of one chat or Code session, read once
+ * per scope, and `mark`, which changes one at once and puts it back if the
+ * server refuses. False when it was put back.
+ */
+export function useAnswerMarks(scope: MarksScope): {
+    marks: Record<string, PolarMark>;
+    mark: (messageId: string, change: MarkChange) => Promise<boolean>;
+} {
+    const t = useTranslations("polar");
+    const toast = useToast();
+    const [marks, setMarks] = useState<Record<string, PolarMark>>({});
+    const query = "thread" in scope ? `thread=${scope.thread}` : `session=${scope.session}`;
+    useEffect(() => {
+        setMarks({});
+        let current = true;
+        fetch(`/api/polar/feedback?${query}`)
+            .then((response) => (response.ok ? response.json() : null))
+            .then((data: { marks?: Record<string, PolarMark> } | null) => {
+                if (current && data?.marks) setMarks(data.marks);
+            })
+            .catch(() => undefined);
+        return () => {
+            current = false;
+        };
+    }, [query]);
+    const mark = async (messageId: string, change: MarkChange): Promise<boolean> => {
+        const before = marks[messageId];
+        const next = change.rating
+            ? {
+                  rating: change.rating,
+                  reasons: change.rating === "bad" ? (change.reasons ?? []) : [],
+                  note: change.rating === "bad" ? (change.note ?? null) : null
+              }
+            : null;
+        const put = (value: PolarMark | null | undefined) =>
+            setMarks((current) => {
+                const { [messageId]: _gone, ...rest } = current;
+                return value ? { ...rest, [messageId]: value } : rest;
+            });
+        put(next);
+        const id = "thread" in scope ? { messageId } : { sessionMessageId: messageId };
+        const response = await fetch("/api/polar/feedback", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...id, ...(next ?? { rating: null }) })
+        }).catch(() => null);
+        if (!response?.ok) {
+            put(before);
+            toast.show({ title: t("feedback.failed") });
+            return false;
+        }
+        if (next?.rating === "bad" && (next.reasons.length > 0 || next.note)) {
+            toast.show({ title: t("feedback.thanks") });
+        }
+        return true;
+    };
+    return { marks, mark };
 }
 
 // ---------------------------------------------------------------------------

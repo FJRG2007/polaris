@@ -9862,7 +9862,9 @@ model AgentSessionMessage {
     vendorId  String?
     createdAt DateTime @default(now())
 
-    session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+    session  AgentSession          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+    // Good and bad marks on an agent answer, read in Polar Code.
+    feedback PolarAnswerFeedback[]
 
     @@unique([sessionId, vendorId])
     @@index([sessionId, createdAt])
@@ -17544,8 +17546,13 @@ model PolarAnswerFeedback {
     id        String       @id @default(uuid(7)) @db.Uuid
     userId    String       @db.Uuid
     user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-    messageId String
-    message   PolarMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+    // A chat answer, or (sessionMessageId) an agent session's answer in Polar
+    // Code: exactly one of the two is set (a CHECK in migration
+    // 20271120000600_polar_code_answer_marks).
+    messageId        String?
+    message          PolarMessage?        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+    sessionMessageId String?              @db.Uuid
+    sessionMessage   AgentSessionMessage? @relation(fields: [sessionMessageId], references: [id], onDelete: Cascade)
     // "good" or "bad".
     rating    String
     reasons   String[]     @default([])
@@ -17556,6 +17563,7 @@ model PolarAnswerFeedback {
     updatedAt DateTime     @updatedAt
 
     @@unique([userId, messageId])
+    @@unique([userId, sessionMessageId])
     @@index([updatedAt(sort: Desc)])
 }
 

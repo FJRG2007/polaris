@@ -72,7 +72,52 @@ export async function polarMarksOf(
         select: { messageId: true, rating: true, reasons: true, note: true },
         take: THREAD_MARKS_MOST
     });
-    return Object.fromEntries(rows.map((row) => [row.messageId, markOf(row)]));
+    return Object.fromEntries(rows.map((row) => [row.messageId ?? "", markOf(row)]));
+}
+
+/**
+ * Marks an agent's answer in a Polar Code session this person started, or
+ * takes the mark back. Null when the message is not such an answer. The model
+ * is the one the session runs on.
+ */
+export async function setCodeMark(
+    userId: string,
+    sessionMessageId: string,
+    body: PolarFeedbackBody
+): Promise<PolarMark | { rating: null } | null> {
+    const message = await prisma.agentSessionMessage.findFirst({
+        where: { id: sessionMessageId, role: "agent", kind: "text", session: { startedById: userId } },
+        select: { session: { select: { model: true } } }
+    });
+    if (!message) return null;
+    if (body.rating === null) {
+        await prisma.polarAnswerFeedback.deleteMany({ where: { userId, sessionMessageId } });
+        return { rating: null };
+    }
+    const data = {
+        rating: body.rating,
+        reasons: body.reasons,
+        note: body.note,
+        model: message.session.model ? message.session.model.slice(0, 200) : null
+    };
+    const row = await prisma.polarAnswerFeedback.upsert({
+        where: { userId_sessionMessageId: { userId, sessionMessageId } },
+        create: { userId, sessionMessageId, ...data },
+        update: data,
+        select: { rating: true, reasons: true, note: true }
+    });
+    return markOf(row);
+}
+
+/** This person's marks on the answers of a Polar Code session they started,
+ *  by the session message's id. */
+export async function codeMarksOf(userId: string, sessionId: string): Promise<Record<string, PolarMark>> {
+    const rows = await prisma.polarAnswerFeedback.findMany({
+        where: { userId, sessionMessage: { sessionId, session: { startedById: userId } } },
+        select: { sessionMessageId: true, rating: true, reasons: true, note: true },
+        take: THREAD_MARKS_MOST
+    });
+    return Object.fromEntries(rows.map((row) => [row.sessionMessageId ?? "", markOf(row)]));
 }
 
 /**
