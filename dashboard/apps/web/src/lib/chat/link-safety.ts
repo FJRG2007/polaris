@@ -38,7 +38,10 @@ import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-ser
 import { takeServedLookup } from "@/lib/integrations/provider-pause";
 import { resetLookupBudget } from "@/lib/reputation-budget";
 
-export const LINK_SAFETY_PROVIDERS = ["virustotal", "dymo"] as const;
+/** In the order they are asked and listed: Dymo first, since it reads the page
+ *  itself and answers from one call, and a flag from it means VirusTotal is not
+ *  asked at all. */
+export const LINK_SAFETY_PROVIDERS = ["dymo", "virustotal"] as const;
 export type LinkSafetyProvider = (typeof LINK_SAFETY_PROVIDERS)[number];
 
 const linkSafetySettingsSchema = z.object({
@@ -188,15 +191,18 @@ export interface FlaggedLink {
 
 /**
  * The providers that will be asked: chosen for chat by the administrator, and
- * switched on with a key in Integrations. Asked in that order so turning a
- * provider off stops it counting at once, and so the usual case - nothing on -
- * is one settings read.
+ * switched on with a key in Integrations. Asked in `LINK_SAFETY_PROVIDERS`'s
+ * order whatever order a saved setting lists them in, so a setting saved before
+ * Dymo went first asks it first too; checked one by one so turning a provider
+ * off stops it counting at once, and so the usual case - nothing on - is one
+ * settings read.
  */
 async function activeProviders(): Promise<LinkSafetyProvider[]> {
     const settings = await linkSafetySettings();
     if (!settings.enabled) return [];
     const active: LinkSafetyProvider[] = [];
-    for (const provider of settings.providers) {
+    for (const provider of LINK_SAFETY_PROVIDERS) {
+        if (!settings.providers.includes(provider)) continue;
         if (await providerConfigured(provider)) active.push(provider);
     }
     return active;

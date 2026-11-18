@@ -204,6 +204,15 @@ describe("checkMessageLinks", () => {
         ]);
     });
 
+    it("asks Dymo first, even where a saved setting lists VirusTotal first", async () => {
+        turnOn(["virustotal", "dymo"]);
+        state.bodies.set(MESSAGE, ["https://bad.example/scam"]);
+        await checkMessageLinks(MESSAGE);
+        // Dymo flagged it, so VirusTotal was never asked.
+        expect((await flaggedLinksFor([MESSAGE])).get(MESSAGE)?.[0]?.provider).toBe("dymo");
+        expect(lookupDomain).not.toHaveBeenCalled();
+    });
+
     it("asks once for a link however many messages carry it", async () => {
         turnOn(["virustotal", "dymo"]);
         state.bodies.set("m1", ["https://good.example/page"]);
