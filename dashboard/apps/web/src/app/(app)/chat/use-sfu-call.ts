@@ -139,6 +139,9 @@ import {
  *  inside the window it sweeps on. */
 const KEEPALIVE_MS = 10_000;
 
+/** The longest wait between attempts to join again after the call server dropped the room. */
+const REJOIN_MAX_MS = 15_000;
+
 /** How long after the roster changes this browser starts listening for the other
  *  devices in the room. Long enough for whoever caused the change to have
  *  finished joining, so they are playing their tone while everybody listens. */
@@ -162,10 +165,12 @@ const ARRIVAL_BATCH_MS = 600;
  * everybody off the roster and ended the call. The route is the same in every
  * build, so an update no longer fails the beat at all.
  *
- * Three, so half a minute of failure ends it. A blip shorter than that recovers
- * on the next beat; anything longer is a tab that has lost its server or its seat.
+ * It never gives up while the call is on screen. It used to stop after three
+ * misses - half a minute - and an update that took longer than that to come back
+ * left every tab silent for good, so the new server swept every seat and closed
+ * every call. A seat swept while the server was away is taken back by the next
+ * beat that lands (`holdSeat`).
  */
-const KEEPALIVE_GIVE_UP = 3;
 
 /**
  * The client for the media server, fetched at the moment a call needs it.
@@ -1590,6 +1595,26 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
 
         rejoin.current = () => void connect();
 
+        /** Join again after the call server dropped the room, waiting longer
+         *  each time - 1, 2, 4... up to 15 seconds - until it is back. */
+        let rejoinAttempt = 0;
+        let rejoinTimer: ReturnType<typeof setTimeout> | null = null;
+        function rejoinLater(): void {
+            if (stopped || rejoinTimer) return;
+            const wait = Math.min(REJOIN_MAX_MS, 1_000 * 2 ** rejoinAttempt);
+            rejoinAttempt += 1;
+            rejoinTimer = setTimeout(() => {
+                rejoinTimer = null;
+                if (stopped || restingRef.current || removed.current || displaced.current) return;
+                const held = room.current;
+                if (held && held.state !== DISCONNECTED) return;
+                room.current = null;
+                void connect().then(() => {
+                    if (!stopped && !room.current) rejoinLater();
+                });
+            }, wait);
+        }
+
         // This is a different call, so nothing about the last one is true of it.
         // `ended` in particular: it is only ever set, never cleared, so a second
         // call in the same tab opened straight onto "the call has ended" - the
@@ -1876,6 +1901,11 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     setRemote(new Map());
                     setScreens(new Map());
                     report(SERVER_LOST);
+                    // The client has given up on this connection, not on the call:
+                    // an update or a restart of the call server drops every room at
+                    // once. Joined again on a backoff until it takes, with whatever
+                    // this browser had open - microphone, camera, screen.
+                    rejoinLater();
                 });
 
             /**
@@ -1926,6 +1956,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 return;
             }
             connected();
+            rejoinAttempt = 0;
 
             // Everything this browser already had open goes up now. Nothing was
             // published before the connection existed, so this is the one place
@@ -2223,24 +2254,16 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 if (frame.data.kind === "ended") setEnded(true);
             };
 
-            let missed = 0;
             beat = setInterval(() => {
                 void holdSeat(
                     inCall,
                     voiceRef.current,
                     () => !stopped && !removed.current && !displaced.current
-                )
-                    .then(() => {
-                        missed = 0;
-                    })
-                    .catch(() => {
-                        // Not shown to anybody. The call itself is still up - it
-                        // is held by the media server, not by this - and the
-                        // person on it does not need a dialog about a heartbeat.
-                        if (++missed < KEEPALIVE_GIVE_UP || !beat) return;
-                        clearInterval(beat);
-                        beat = null;
-                    });
+                ).catch(() => {
+                    // Not shown to anybody, and the next beat tries again. The
+                    // call itself is held by the media server, not by this, and
+                    // the person on it does not need a dialog about a heartbeat.
+                });
             }, KEEPALIVE_MS);
             refresh();
             await connect();
@@ -2251,6 +2274,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         return () => {
             stopped = true;
             rejoin.current = null;
+            if (rejoinTimer) clearTimeout(rejoinTimer);
             if (beat) clearInterval(beat);
             source?.close();
             // A scan plays a tone into the room on a timer of its own. Left
