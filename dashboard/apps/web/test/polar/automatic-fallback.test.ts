@@ -406,3 +406,35 @@ describe("models that cannot call tools", () => {
         expect(rows.map((row) => row.modelId)).toEqual(["llama-3.3-70b-versatile"]);
     });
 });
+
+describe("the models a failed turn lists", () => {
+    const planned = (provider: string, model: string, keyId: string, keyName: string) => ({
+        provider,
+        modelId: model,
+        keyId,
+        option: { provider, providerName: provider, model, name: model },
+        credential: { provider, source: "own", secret: "x", keyId, keyName }
+    });
+
+    it("lists a step refused twice once, and names the key when one model was asked on two", () => {
+        const groq = planned("groq", "qwen", "k1", "groq-main");
+        const cerebrasA = planned("cerebras", "qwen-3.8", "k2", "work");
+        const cerebrasB = planned("cerebras", "qwen-3.8", "k3", "home");
+        const trail = [
+            { step: groq, kind: "model" },
+            { step: cerebrasA, kind: "credit" },
+            { step: cerebrasB, kind: "credit" },
+            { step: groq, kind: "model" }
+        ];
+        const failed = models.failedTurn({
+            option: groq.option,
+            credential: groq.credential,
+            routed: { answered: () => null, refusals: () => trail }
+        } as never);
+        expect(failed.tried).toEqual([
+            { provider: "groq", model: "qwen", kind: "model" },
+            { provider: "cerebras", model: "qwen-3.8", kind: "credit", key: "work" },
+            { provider: "cerebras", model: "qwen-3.8", kind: "credit", key: "home" }
+        ]);
+    });
+});

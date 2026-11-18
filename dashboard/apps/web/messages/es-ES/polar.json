@@ -185,6 +185,7 @@
             "allTried": "Ninguno de los {count} modelos que probó Polar pudo responder. Reintenta en unos minutos o revisa tus claves.",
             "triedList": "Qué dijo cada uno",
             "triedEntry": "{provider} - {model}: {reason}",
+            "triedEntryKey": "{provider} - {model} (clave {key}): {reason}",
             "reasons": {
                 "key": "rechazó la clave",
                 "credit": "sin crédito",

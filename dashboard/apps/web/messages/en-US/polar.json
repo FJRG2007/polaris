@@ -185,6 +185,7 @@
             "allTried": "None of the {count} models Polar tried could answer. Try again in a few minutes, or check your keys.",
             "triedList": "What each one said",
             "triedEntry": "{provider} - {model}: {reason}",
+            "triedEntryKey": "{provider} - {model} (key {key}): {reason}",
             "reasons": {
                 "key": "refused the key",
                 "credit": "out of credit",

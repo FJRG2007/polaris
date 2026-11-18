@@ -114,11 +114,18 @@ export function PolarFailureNotice({
                     <ul className="mt-1 flex flex-col gap-0.5">
                         {failure.tried.map((entry, index) => (
                             <li key={index} className="min-w-0 break-words">
-                                {t("errors.provider.triedEntry", {
-                                    provider: entry.provider,
-                                    model: entry.model,
-                                    reason: t(`errors.provider.reasons.${entry.kind}`)
-                                })}
+                                {entry.key
+                                    ? t("errors.provider.triedEntryKey", {
+                                          provider: entry.provider,
+                                          model: entry.model,
+                                          key: entry.key,
+                                          reason: t(`errors.provider.reasons.${entry.kind}`)
+                                      })
+                                    : t("errors.provider.triedEntry", {
+                                          provider: entry.provider,
+                                          model: entry.model,
+                                          reason: t(`errors.provider.reasons.${entry.kind}`)
+                                      })}
                             </li>
                         ))}
                     </ul>

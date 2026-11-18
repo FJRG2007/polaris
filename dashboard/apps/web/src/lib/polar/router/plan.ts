@@ -144,7 +144,8 @@ export interface RoutedModel {
     answered: () => PlannedStep | null;
     /** The refusal that moved the call off the first step, when one did. */
     firstRefusal: () => FailureKind | null;
-    /** Every refusal of the turn so far, in order, with the step it came from. */
+    /** Every refusal of the turn since the last answer, in order, with the
+     *  step it came from. */
     refusals: () => ReadonlyArray<{ step: PlannedStep; kind: FailureKind }>;
 }
 
@@ -166,6 +167,9 @@ export function routedModel(
             onAnswered: (index, first) => {
                 answeredAt = index;
                 refusal = first;
+                // What was refused before this answer did not stop the turn:
+                // a later failure lists only what refused after it.
+                trail.length = 0;
             },
             onRefused: (kind, index) => {
                 refusal ??= kind;

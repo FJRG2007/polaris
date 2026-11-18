@@ -114,6 +114,12 @@ export class EmptyAnswer extends Error {
     }
 }
 
+/** The refusals that stay true for the rest of the turn: a key refused, an
+ *  account that cannot pay, a model the key cannot have. A later call of the
+ *  same turn - the round after a tool call - is not sent to them again: it
+ *  would only answer the same refusal, listed once more under a failed turn. */
+const SETTLED: ReadonlySet<FailureKind> = new Set(["key", "credit", "paid", "model"]);
+
 /** The refusals worth asking the same step again after a wait. */
 const RETRYABLE: ReadonlySet<FailureKind> = new Set(["rate", "busy", "down"]);
 
@@ -433,6 +439,26 @@ function ruleOut(ruled: Ruled, step: RouteStep, kind: FailureKind): void {
     else ruled.keyModels.add(`${key}/${step.modelId}`);
 }
 
+function noRuling(): Ruled {
+    return {
+        keys: new Set(),
+        providers: new Set(),
+        keyModels: new Set(),
+        providerModels: new Set(),
+        unpaid: new Set()
+    };
+}
+
+function copyRuling(from: Ruled): Ruled {
+    return {
+        keys: new Set(from.keys),
+        providers: new Set(from.providers),
+        keyModels: new Set(from.keyModels),
+        providerModels: new Set(from.providerModels),
+        unpaid: new Set(from.unpaid)
+    };
+}
+
 function ruledOut(ruled: Ruled, step: RouteStep): boolean {
     const key = step.keyId ?? `${step.provider}#`;
     return (
@@ -456,11 +482,19 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
     /** The step whose answer the turn's later calls carry, reasoning and all:
      *  the chosen one until another answers. */
     let producedBy = 0;
+    /** What the turn's refusals settled (`SETTLED`): every call starts from it. */
+    const settled = noRuling();
+    /** The last of those refusals, for a later call that finds nothing left. */
+    let settledError: unknown = null;
 
     /** A step refused: remembered, logged with what the provider said, and
      *  reported, before the next step is tried. */
     const refused = (index: number, failure: ProviderFailure, error: unknown) => {
         const step = steps[index]!;
+        if (SETTLED.has(failure.kind)) {
+            ruleOut(settled, step, failure.kind);
+            settledError = error;
+        }
         void noteRefusal(subjectOf(step), failure.kind, error);
         console.warn(refusalLogLine(step.provider, step.modelId, failure, error));
         hooks.onRefused?.(failure.kind, index);
@@ -511,16 +545,12 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
             }
         };
 
-        const ruled: Ruled = {
-            keys: new Set(),
-            providers: new Set(),
-            keyModels: new Set(),
-            providerModels: new Set(),
-            unpaid: new Set()
-        };
+        const ruled = copyRuling(settled);
         // The step whose stream broke is out for the continuation, as a refusal
         // would put it; a dropped connection leaves it in, to be asked again.
         if (broke?.kind) ruleOut(ruled, steps[broke.index]!, broke.kind);
+        let lastError: unknown = null;
+        let lastKind: FailureKind | null = null;
 
         // A later step of the turn goes to the step that answered the first.
         // If that one is refused now - a tool loop that ran into a rate limit
@@ -538,10 +568,11 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
                 ruleOut(ruled, steps[held]!, kind);
                 refused(held, failure, error);
                 standing = null;
+                // The reason this call ends on if nothing else answers.
+                lastError = error;
+                lastKind = kind;
             }
         }
-        let lastError: unknown = null;
-        let lastKind: FailureKind | null = null;
         const cooled: number[] = [];
         const crowded: Array<{ index: number; retryInMs: number }> = [];
 
@@ -651,6 +682,9 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
             if (done) return done.value;
         }
         if (lastError) throw lastError;
+        // Every step left was settled out by an earlier call of this turn: its
+        // refusal is the reason, not a limit nobody hit.
+        if (settledError) throw settledError;
         throw new NoRouteError(lastKind);
     }
 

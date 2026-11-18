@@ -237,6 +237,39 @@ describe("a turn that asked many models remembers each refusal", () => {
             ["cerebras", "credit"]
         ]);
     });
+
+    it("lists only what refused after the last answer, each once", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const planned = (model: ReturnType<typeof fakeModel>, provider: string, keyId: string) => ({
+            ...step(model, provider, keyId),
+            option: { provider, providerName: provider, name: model.modelId } as never,
+            credential: { provider, keyId, source: "own" } as never
+        });
+        const anthropic = fakeModel("claude-sonnet", () =>
+            Promise.reject(refusal(401, { type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } }))
+        );
+        // Answers the round before a tool call, then is rate limited.
+        let rounds = 0;
+        const subscription = fakeModel("sonnet", () =>
+            rounds++ === 0 ? Promise.resolve("answer") : Promise.reject(refusal(429, { message: "Too many requests" }))
+        );
+        const routed = routedModel([
+            planned(anthropic, "anthropic", "k1"),
+            planned(subscription, "claude-subscription", "k2")
+        ]);
+        const call = () =>
+            (routed.model as unknown as { doGenerate: (p: unknown) => Promise<unknown> }).doGenerate({
+                prompt: []
+            });
+        await call();
+        await expect(call()).rejects.toBeTruthy();
+        warn.mockRestore();
+        // The refused key is not asked again by the round after the tool call.
+        expect(anthropic.doGenerate).toHaveBeenCalledOnce();
+        expect(routed.refusals().map((entry) => [entry.step.provider, entry.kind])).toEqual([
+            ["claude-subscription", "rate"]
+        ]);
+    });
 });
 
 describe("an earlier turn's reasoning is never replayed", () => {

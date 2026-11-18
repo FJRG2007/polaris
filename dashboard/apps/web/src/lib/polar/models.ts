@@ -518,6 +518,7 @@ export interface TriedModel {
     provider: string;
     model: string;
     kind: FailureKind;
+    key?: string;
 }
 
 /**
@@ -535,13 +536,29 @@ export function failedTurn(
     const refusals = routed?.refusals() ?? [];
     const named = routed?.answered() ?? refusals.at(-1)?.step ?? resolved;
     const asked = new Set(refusals.map((entry) => entry.step));
+    // One step refused twice for the same reason is one entry; the same model
+    // on two keys is two, each named by its key.
+    const once = refusals.filter(
+        (entry, index) =>
+            refusals.findIndex((other) => other.step === entry.step && other.kind === entry.kind) === index
+    );
+    const keysOf = new Map<string, Set<string>>();
+    for (const { step } of once) {
+        const id = `${step.provider}/${step.modelId}`;
+        keysOf.set(id, (keysOf.get(id) ?? new Set()).add(step.keyId ?? ""));
+    }
     const tried =
         asked.size > 1
-            ? refusals.slice(-TRIED_MOST).map(({ step, kind }) => ({
-                  provider: step.option.providerName,
-                  model: step.option.name,
-                  kind
-              }))
+            ? once.slice(-TRIED_MOST).map(({ step, kind }) => {
+                  const shared = (keysOf.get(`${step.provider}/${step.modelId}`)?.size ?? 0) > 1;
+                  const key = shared ? step.credential.keyName?.slice(0, 40) : undefined;
+                  return {
+                      provider: step.option.providerName,
+                      model: step.option.name,
+                      kind,
+                      ...(key ? { key } : {})
+                  };
+              })
             : [];
     return { option: named.option, credential: named.credential, tried };
 }

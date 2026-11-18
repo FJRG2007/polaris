@@ -314,7 +314,10 @@ export const polarFailureSchema = z.object({
             z.object({
                 provider: z.string().max(80),
                 model: z.string().max(160),
-                kind: z.enum(FAILURE_KINDS)
+                kind: z.enum(FAILURE_KINDS),
+                /** The key's name, set only when the same model was asked on
+                 *  more than one key, so the entries do not read as repeats. */
+                key: z.string().max(40).optional()
             })
         )
         .max(TRIED_MOST)

@@ -634,3 +634,44 @@ describe("a turn that says nothing, or breaks for no named reason", () => {
         expect(parts.some((part) => part.delta === "Apagado.")).toBe(true);
     });
 });
+
+describe("a refusal that does not pass by itself", () => {
+    const GROQ_NO_MODEL = refusal(404, {
+        error: {
+            message: "The model `qwen/qwen3.6-27b` does not exist or you do not have access to it.",
+            type: "invalid_request_error",
+            code: "model_not_found"
+        }
+    });
+
+    it("is not asked again by a later call of the same turn", async () => {
+        const gone = fakeModel("qwen", () => Promise.reject(GROQ_NO_MODEL));
+        const spentKey = fakeModel("deepseek-chat", () => Promise.reject(DEEPSEEK_BALANCE));
+        // Answers the round before the tool call, then is rate limited.
+        let rounds = 0;
+        const answers = fakeModel("llama", () =>
+            rounds++ === 0 ? Promise.resolve("answer") : Promise.reject(GROQ_RATE)
+        );
+        const middleware = routeMiddleware(
+            [
+                step(gone, "groq", { keyId: "k1" }),
+                step(spentKey, "deepseek", { keyId: "k2" }),
+                step(answers, "mistral", { keyId: "k3" })
+            ],
+            noWait
+        );
+        // The round before a tool call, then the round after it.
+        expect(await generate(middleware)).toBe("answer");
+        await expect(generate(middleware)).rejects.toBe(GROQ_RATE);
+        expect(gone.doGenerate).toHaveBeenCalledOnce();
+        expect(spentKey.doGenerate).toHaveBeenCalledOnce();
+    });
+
+    it("throws the turn's own refusal when a later call finds every step settled out", async () => {
+        const refused = fakeModel("llama", () => Promise.reject(GROQ_KEY));
+        const middleware = routeMiddleware([step(refused, "groq", { keyId: "k1" })], noWait);
+        await expect(generate(middleware)).rejects.toBe(GROQ_KEY);
+        await expect(generate(middleware)).rejects.toBe(GROQ_KEY);
+        expect(refused.doGenerate).toHaveBeenCalledOnce();
+    });
+});
