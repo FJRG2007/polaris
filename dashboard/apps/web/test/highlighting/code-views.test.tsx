@@ -81,6 +81,35 @@ describe("Polar's tool call", () => {
         expect(container.textContent).toContain('"rows"');
     });
 
+    it("paints a result of JSON lines, or one cut short, as JSON", async () => {
+        for (const text of [
+            '{"id":1}\n{"id":2}',
+            '{"rows":[{"id":1},{"id":\n[cut at 16000 characters]'
+        ]) {
+            const { container, unmount } = render(
+                <MessagesWrapper>
+                    <ToolOutput output={{ ok: true, text }} />
+                </MessagesWrapper>
+            );
+            await painted(container);
+            expect(container.textContent).toContain('"id"');
+            unmount();
+        }
+    });
+
+    it("names the connector a fenced result came from and paints what is inside", async () => {
+        const { container } = render(
+            <MessagesWrapper>
+                <ToolOutput
+                    output={'<untrusted_connector_output connector="Stripe">\n{"id":"acct_1"}\n</untrusted_connector_output>'}
+                />
+            </MessagesWrapper>
+        );
+        await painted(container);
+        expect(container.textContent).toContain("Stripe");
+        expect(container.textContent).not.toContain("untrusted_connector_output");
+    });
+
     it("leaves a tool's sentence as prose", () => {
         const { container } = render(
             <MessagesWrapper>

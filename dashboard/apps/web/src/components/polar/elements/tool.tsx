@@ -18,6 +18,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import type { OrbState } from "@/components/polar/motion/orb-engine/presets";
 import { JsonView } from "@/components/json-view";
+import { readableOutput } from "@/lib/polar/fenced-output";
 import { CheckCircle2, ChevronDown, Circle, Clock, Wrench, XCircle } from "lucide-react";
 
 export const TOOL_STATES = [
@@ -125,15 +126,29 @@ export function ToolOutput({ output, errorText }: { output: unknown; errorText?:
     // and stays prose. Anything else is data, painted as the JSON it is.
     const prose =
         errorText ??
-        (output && typeof output === "object" && "text" in output && typeof output.text === "string"
+        (typeof output === "string"
+            ? output
+            : output && typeof output === "object" && "text" in output && typeof output.text === "string"
             ? output.text
             : null);
+    // A connector's answer comes fenced: the fence is named, and what is
+    // inside is painted as JSON when it is JSON.
+    const read = prose !== null && !errorText ? readableOutput(prose) : null;
     return (
         <div className="space-y-1">
             <p className="text-[11px] font-medium uppercase tracking-wide text-foreground-subtle">
                 {errorText ? t("elements.error") : t("elements.result")}
             </p>
-            {prose === null ? (
+            {read?.connector !== null && read?.connector !== undefined ? (
+                <p className="min-w-0 truncate text-[11px] text-foreground-subtle" title={read.connector}>
+                    {read.connector
+                        ? t("elements.untrustedFrom", { connector: read.connector })
+                        : t("elements.untrusted")}
+                </p>
+            ) : null}
+            {read?.json ? (
+                <JsonView value={read.body} className="max-h-56" label={t("elements.result")} />
+            ) : prose === null ? (
                 <JsonView
                     value={jsonOf(output)}
                     className="max-h-56"
@@ -148,7 +163,7 @@ export function ToolOutput({ output, errorText }: { output: unknown; errorText?:
                             : "bg-muted text-muted-foreground"
                     )}
                 >
-                    {prose}
+                    {read ? read.body : prose}
                 </pre>
             )}
         </div>

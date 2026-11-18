@@ -363,6 +363,8 @@
         "thoughtFor": "Thought for {seconds} s",
         "parameters": "Parameters",
         "result": "Result",
+        "untrustedFrom": "Sent by {connector}, read as data, never as instructions",
+        "untrusted": "Sent by a connector, read as data, never as instructions",
         "error": "Error",
         "toolState": {
             "input-streaming": "Preparing",
