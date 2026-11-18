@@ -11549,25 +11549,30 @@ model LinkPreview {
 // dropdown and a radio group that happen to sit together.
 model UserPrivacy {
     userId String @id @db.Uuid
+    // Every audience below is nullable, and null is "this person never chose":
+    // it resolves to the administrator's default for the field (Setting
+    // `privacy.defaults.<field>`, `profiles.followers.default` for followers),
+    // and to the code's default where the administrator set none. A row made
+    // because somebody changed one thing must not freeze the rest.
     // everyone | friends | nobody
     //
     // Whether the account turns up when somebody searches for people. Not a
     // detail of their presence like the three below it but a fact about the
     // account, and the one setting here that decides whether two people who
     // share an instance can find each other at all.
-    discoverable String   @default("everyone")
+    discoverable String?
     // Who may read the profile itself - what they wrote, their links, their
     // banner. Everybody else gets the name and the photo. Open by default, which
     // is what every account had before this existed.
-    profile      String   @default("everyone")
-    lastSeen     String   @default("everyone")
-    readReceipts String   @default("everyone")
-    avatar       String   @default("everyone")
+    profile      String?
+    lastSeen     String?
+    readReceipts String?
+    avatar       String?
     // Whether the photo can be opened and looked at full size, which is a
     // separate question from whether it is shown at all: being recognisable in a
     // list is what a photo is for, and it is not the same as offering it to be
     // studied. Open by default like the rest.
-    photoFullSize String  @default("everyone")
+    photoFullSize String?
     // The three that are shut until somebody opens them, and the only ones. An
     // address and a number are not details of a presence: they are what spam,
     // password resets and impersonation start from, and nothing in Polaris needs
@@ -11577,14 +11582,14 @@ model UserPrivacy {
     // display name exists at all: the name an account shows is the one it chose
     // to be known by, and the name on its documents is a different fact about a
     // person that being in a conversation with them is not consent to.
-    fullName     String   @default("nobody")
-    email        String   @default("nobody")
-    phone        String   @default("nobody")
+    fullName     String?
+    email        String?
+    phone        String?
     // Where somebody works: the line they typed and the organizations here they
     // marked as theirs. Open by default, unlike the three above it, because it is
     // the one thing on this list that exists in order to be seen - and which
     // organizations it covers is a separate choice nobody has made yet.
-    companies    String   @default("everyone")
+    companies    String?
     // The disappearing-message timer a new direct message starts with, in
     // seconds. 0 is off.
     chatVanishAfter Int   @default(0)
@@ -11597,34 +11602,39 @@ model UserPrivacy {
     // Who may ask to be this account's friend. Open unless it says otherwise: a
     // request is the mildest thing one account can do to another, and nothing
     // happens until it is answered.
-    friendRequests String @default("everyone")
+    friendRequests String?
     // Who may offer this account a file or a folder. Friends by default, and the
     // only setting here whose default is the middle answer rather than an end of
     // it: a friend request is a line of text, while a transfer is somebody else's
     // files landing in your Drive and taking your space. Somebody in the same
     // organization counts as a friend for this and nothing else. Nothing lands
     // without being accepted whatever this says - it decides who may ASK.
-    fileTransfers  String @default("friends")
+    fileTransfers  String?
     // Who may ring this account. Friends by default, and for the same reason the
     // transfer above it is: a call is the loudest thing one account can do to
     // another - it takes over the screen of whatever they were doing and makes a
     // noise in the room they are in. Joining a voice channel is a different
     // question and is not this: that is a room somebody walked into, not a
     // person being rung.
-    calls          String @default("friends")
+    calls          String?
     // Who may send something this account wrote into another conversation. Open
     // by default, like the rest: a messenger where nothing can be passed on is
     // not what anybody expects, and a default that removed a button would read
     // as a bug rather than as a setting.
-    forwarding   String   @default("everyone")
+    forwarding   String?
     // Who sees what somebody is doing - the game, the song, the server - beside
     // their face. Open by default, like the dot it rides on: it is only ever
     // shown to a reader who can already see that they are here, so this narrows
     // that audience and never widens it.
-    activity     String   @default("everyone")
+    activity     String?
     // Who sees the badges on the profile, and the progress behind them. A badge
     // may narrow this for itself on its BadgePreference row, never widen it.
-    badges       String   @default("everyone")
+    badges       String?
+    // When somebody was last online, as a time. Separate from `lastSeen`,
+    // which is whether they are shown online at all.
+    lastActive   String?
+    // Who sees the dots while this account is writing a message.
+    typing       String?
     updatedAt    DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -17,6 +17,8 @@ const successorDeleteMany = vi.fn(async (_args: unknown) => ({ count: 1 }));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // No administrator defaults: every field falls to the code's own.
+        setting: { findUnique: async () => null, findMany: async () => [] },
         user: { findFirst: userFindFirst, findMany: userFindMany },
         accountSuccessor: {
             upsert: successorUpsert,

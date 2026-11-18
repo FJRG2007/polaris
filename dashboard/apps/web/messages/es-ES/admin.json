@@ -2707,7 +2707,7 @@
             },
             "privacy": {
                 "title": "Privacidad",
-                "description": "Perfiles públicos y cómo se encuentran las personas."
+                "description": "Perfiles públicos, valores de privacidad y cómo se encuentran las personas."
             },
             "storage": {
                 "title": "Ubicaciones de datos",
@@ -4271,14 +4271,11 @@
             "title": "Perfiles",
             "description": "Quién puede leer la página de una persona.",
             "publicLabel": "Perfiles públicos",
-            "publicHint": "Las páginas en <code>/u/usuario</code> se abren sin iniciar sesión. Los visitantes solo ven lo que la cuenta muestra a todos.",
-            "followersLabel": "Seguidores visibles a",
-            "followersHint": "El valor inicial de las cuentas nuevas. Las que ya eligieron conservan su elección.",
-            "audiences": {
-                "everyone": "Todos",
-                "friends": "Amigos",
-                "nobody": "Nadie"
-            }
+            "publicHint": "Las páginas en <code>/u/usuario</code> se abren sin iniciar sesión. Los visitantes solo ven lo que la cuenta muestra a todos."
+        },
+        "defaults": {
+            "title": "Por defecto",
+            "description": "Con qué empieza cada ajuste en las cuentas que nunca lo cambiaron, también las existentes. Quien lo cambió conserva su elección."
         },
         "discovery": {
             "title": "Encontrar personas",

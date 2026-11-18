@@ -14,7 +14,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("@/app/(app)/admin/privacy/actions", () => ({
     setDiscoveryPolicyAction: async () => ({}),
-    setFollowerDefaultAction: async () => ({}),
+    setPrivacyDefaultAction: async () => ({}),
     setPublicProfilesAction: async () => ({})
 }));
 
@@ -39,13 +39,20 @@ const { PrivacySections } = await import("@/app/(app)/admin/privacy/privacy-sect
 const { PublicProfilesForm } = await import("@/app/(app)/admin/privacy/public-profiles-form");
 const { PeopleDiscoveryForm } = await import("@/app/(app)/admin/privacy/people-discovery-form");
 
+const { PrivacyDefaultsForm } = await import("@/app/(app)/admin/privacy/privacy-defaults-form");
+const core = await import("@polaris/core");
+const DEFAULTS = Object.fromEntries(
+    core.PRIVACY_FIELDS.map((field) => [field, core.DEFAULT_PRIVACY[field].audience])
+) as Record<(typeof core.PRIVACY_FIELDS)[number], (typeof core.PRIVACY_AUDIENCES)[number]>;
+
 const POLICY = { usernameExact: true, usernamePartial: false, namePartial: false, emailExact: false };
 
 function screen(locale?: "es-ES") {
     return renderToStaticMarkup(
         withMessages(
             <PrivacySections
-                profiles={<PublicProfilesForm enabled={false} followerDefault="friends" />}
+                profiles={<PublicProfilesForm enabled={false} />}
+                defaults={<PrivacyDefaultsForm defaults={DEFAULTS} />}
                 discovery={<PeopleDiscoveryForm policy={POLICY} />}
             />,
             locale
@@ -64,7 +71,9 @@ describe("privacy screen", () => {
         const html = screen();
         expect(html).toContain("Profiles");
         expect(html).toContain("Public profiles");
-        expect(html).toContain("Followers shown to");
+        expect(html).toContain("Defaults");
+        expect(html).toContain("The names behind your follower counts");
+        expect(html).toContain("When you were last online");
         expect(html).toContain("Finding people");
         expect(html).toContain("Whole username");
         expect(html).toContain("Whole email address");
@@ -75,6 +84,7 @@ describe("privacy screen", () => {
         const html = screen("es-ES");
         expect(html).toContain("Perfiles públicos");
         expect(html).toContain("Encontrar personas");
+        expect(html).toContain("Por defecto");
         expect(html).not.toContain("privacy.");
     });
 

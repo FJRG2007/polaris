@@ -23,7 +23,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { friendIds } from "@/lib/friends-service";
 import { memberOrgIds } from "@/lib/orgs/org-service";
-import { getSetting, setSetting } from "@/lib/setting-store";
+import { getSetting, getSettings, setSetting } from "@/lib/setting-store";
 
 /**
  * What a new account's follower lists are visible to.
@@ -40,12 +40,51 @@ import { getSetting, setSetting } from "@/lib/setting-store";
  */
 export const FOLLOWERS_DEFAULT_KEY = "profiles.followers.default";
 
+/**
+ * Where the administrator's default for one field is kept.
+ *
+ * The follower lists were the first field with one and keep the key they had,
+ * so an instance that already set it keeps what it set. Every other field
+ * followed the same rule from then on: a null column is "never chosen", and
+ * resolves to this.
+ */
+export function privacyDefaultKey(field: core.PrivacyField): string {
+    return field === "followers" ? FOLLOWERS_DEFAULT_KEY : `privacy.defaults.${field}`;
+}
+
+/** Every field's administrator default as stored, in one read. A field with
+ *  none is absent, and `core.resolvedAudience` falls back to the code's. */
+export async function privacyDefaults(): Promise<Map<core.PrivacyField, string>> {
+    const stored = await getSettings(core.PRIVACY_FIELDS.map(privacyDefaultKey));
+    const answer = new Map<core.PrivacyField, string>();
+    for (const field of core.PRIVACY_FIELDS) {
+        const value = stored.get(privacyDefaultKey(field));
+        if (value !== undefined) answer.set(field, value);
+    }
+    return answer;
+}
+
+/** What one field resolves to for an account that never chose it. */
+export async function defaultAudience(field: core.PrivacyField): Promise<core.PrivacyAudience> {
+    return core.resolvedAudience(field, null, await getSetting(privacyDefaultKey(field)));
+}
+
+export async function setDefaultAudience(
+    field: core.PrivacyField,
+    audience: core.PrivacyAudience
+): Promise<void> {
+    if (!core.defaultAudiencesFor(field).includes(audience)) {
+        throw new PrivacyError("That audience cannot be a default.");
+    }
+    await setSetting(privacyDefaultKey(field), audience);
+}
+
 export async function defaultFollowerAudience(): Promise<core.PrivacyAudience> {
-    return core.storedAudience("followers", await getSetting(FOLLOWERS_DEFAULT_KEY));
+    return defaultAudience("followers");
 }
 
 export async function setDefaultFollowerAudience(audience: core.PrivacyAudience): Promise<void> {
-    await setSetting(FOLLOWERS_DEFAULT_KEY, audience);
+    await setDefaultAudience("followers", audience);
 }
 
 /** Something the person doing it can be told about, in a sentence. */
@@ -74,11 +113,13 @@ const AUDIENCE_COLUMNS = {
     fileTransfers: true,
     calls: true,
     discoverable: true,
-    readReceipts: true
+    readReceipts: true,
+    lastActive: true,
+    typing: true
 } as const;
 
 export async function privacyFor(userId: string): Promise<core.PrivacySettings> {
-    const [row, links] = await Promise.all([
+    const [row, links, defaults] = await Promise.all([
         prisma.userPrivacy.findUnique({ where: { userId }, select: AUDIENCE_COLUMNS }),
         prisma.privacyFieldList.findMany({
             where: { userId },
@@ -87,20 +128,9 @@ export async function privacyFor(userId: string): Promise<core.PrivacySettings> 
                 listId: true,
                 list: { select: { name: true, members: { select: { userId: true } } } }
             }
-        })
+        }),
+        privacyDefaults()
     ]);
-    // Read whether or not there is a row: a `null` column and a missing row both
-    // mean nobody has chosen, and both resolve to what the operator set.
-    const followers = core.storedAudience(
-        "followers",
-        row?.followers ?? (await defaultFollowerAudience())
-    );
-    if (!row && links.length === 0) {
-        return {
-            ...core.DEFAULT_PRIVACY,
-            followers: { audience: followers, listId: null, people: [] }
-        };
-    }
 
     // A named list comes back as the id it is; a setting's own unnamed one comes
     // back as the people on it, because that is what its row draws and the id is
@@ -118,13 +148,9 @@ export async function privacyFor(userId: string): Promise<core.PrivacySettings> 
             core.PRIVACY_FIELDS.map((field) => [
                 field,
                 {
-                    // The follower lists are the one field whose "unset" answer
-                    // is the operator's rather than the schema's - see
-                    // `defaultFollowerAudience`.
-                    audience:
-                        field === "followers"
-                            ? core.storedAudience(field, row?.followers ?? followers)
-                            : core.storedAudience(field, row?.[field]),
+                    // A `null` column and a missing row both mean nobody has
+                    // chosen, and both resolve to what the operator set.
+                    audience: core.resolvedAudience(field, row?.[field], defaults.get(field)),
                     ...(linked.get(field) ?? {})
                 }
             ])
@@ -231,17 +257,19 @@ export async function allowedBy(
         where: { userId: { in: wanted } },
         select: { userId: true, ...AUDIENCE_COLUMNS }
     });
-    const stored = new Map(rows.map((row) => [row.userId, row[field]]));
-    // The follower lists fall to the operator's default rather than the schema's
-    // when nobody has chosen - the one field on this screen where "unset" is an
-    // instance decision. Asked once, and only for the field it is about.
-    const unset = field === "followers" ? await defaultFollowerAudience() : null;
-    // An account with no row of its own falls to the field's own default, which
-    // for an address and a number is nobody. Read through `storedAudience` and
-    // never by parsing a rule around it: a default on the whole rule does not
-    // fire for a rule that is present with an empty audience.
+    const stored = new Map(rows.map((row) => [row.userId, row[field] ?? null]));
+    // Anybody who never chose - no row, or a null column - falls to the
+    // operator's default for the field, and to the code's where there is none:
+    // for an address and a number that is nobody. Asked once, and only when
+    // somebody here actually needs it.
+    const unset = wanted.some((userId) => (stored.get(userId) ?? null) === null)
+        ? await getSetting(privacyDefaultKey(field))
+        : null;
     const audiences = new Map(
-        wanted.map((userId) => [userId, core.storedAudience(field, stored.get(userId) ?? unset)])
+        wanted.map((userId) => [
+            userId,
+            core.resolvedAudience(field, stored.get(userId) ?? null, unset)
+        ])
     );
     // Only what an audience in play actually asks for. A page of results whose
     // settings are all "everybody" costs the one read above and nothing else.
@@ -571,9 +599,24 @@ export async function setPrivacy(userId: string, settings: core.PrivacySettings)
     }
 
     const named = [...saved, ...own];
+    // Only what the person actually chose is written. A field they never set is
+    // left null - following the operator's default, now and after it changes -
+    // unless this save moves it off that default. A form sends every row, and
+    // writing them all would freeze the untouched ones at today's default.
+    const [current, defaults] = await Promise.all([
+        prisma.userPrivacy.findUnique({ where: { userId }, select: AUDIENCE_COLUMNS }),
+        privacyDefaults()
+    ]);
     const audiences = Object.fromEntries(
-        core.PRIVACY_FIELDS.map((field) => [field, settings[field].audience])
-    ) as Record<core.PrivacyField, core.PrivacyAudience>;
+        core.PRIVACY_FIELDS.map((field) => {
+            const audience = settings[field].audience;
+            const chosen =
+                (current?.[field] ?? null) !== null ||
+                core.audienceNeedsList(audience) ||
+                audience !== core.resolvedAudience(field, null, defaults.get(field));
+            return [field, chosen ? audience : null];
+        })
+    ) as Record<core.PrivacyField, core.PrivacyAudience | null>;
 
     await prisma.$transaction([
         prisma.userPrivacy.upsert({
@@ -687,20 +730,54 @@ export async function receiptsAmong(
     viewer: PrivacyViewer,
     otherIds: readonly string[]
 ): Promise<Set<string>> {
+    return reciprocalAmong(viewer, "readReceipts", otherIds);
+}
+
+/**
+ * The reciprocal rule the ticks follow, for any field that follows it: which of
+ * these people show the viewer this, AND are shown the viewer's own. "Last seen"
+ * and typing are the other two - hide yours and you see nobody's, the way every
+ * messenger with these settled it. An administrator sees through, as everywhere.
+ *
+ * Batched: one read for their side, one for the viewer's own setting, and only
+ * an audience that depends on who is asking costs more.
+ */
+export async function reciprocalAmong(
+    viewer: PrivacyViewer,
+    field: core.PrivacyField,
+    otherIds: readonly string[]
+): Promise<Set<string>> {
     const wanted = [...new Set(otherIds)];
     if (viewer.isAdmin) return new Set(wanted);
     const [theirs, row] = await Promise.all([
-        allowedBy(viewer, "readReceipts", wanted),
+        allowedBy(viewer, field, wanted),
         prisma.userPrivacy.findUnique({
             where: { userId: viewer.id },
-            select: { readReceipts: true }
+            select: AUDIENCE_COLUMNS
         })
     ]);
     const candidates = wanted.filter((id) => theirs.has(id));
-    const audience = core.storedAudience("readReceipts", row?.readReceipts ?? null);
+    if (candidates.length === 0) return new Set();
+    const own = row?.[field] ?? null;
+    const audience = core.resolvedAudience(
+        field,
+        own,
+        own === null ? await getSetting(privacyDefaultKey(field)) : null
+    );
     if (audience === "nobody") return new Set();
     if (audience === "everyone") return new Set(candidates);
-    return admittedBy(viewer.id, "readReceipts", audience, candidates);
+    return admittedBy(viewer.id, field, audience, candidates);
+}
+
+/**
+ * Whether the viewer may be told this person is typing.
+ *
+ * Reciprocal like the ticks. The one place the answer is made, so a rule kept
+ * per conversation later narrows it here rather than beside every publisher.
+ */
+export async function typingAllowed(viewer: PrivacyViewer, typerId: string): Promise<boolean> {
+    if (viewer.isAdmin || viewer.id === typerId) return true;
+    return (await reciprocalAmong(viewer, "typing", [typerId])).has(typerId);
 }
 
 /**

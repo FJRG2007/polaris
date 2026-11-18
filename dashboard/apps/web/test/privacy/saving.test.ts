@@ -24,7 +24,10 @@ const state = vi.hoisted(() => ({
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // No administrator defaults: every field falls to the code's own.
+        setting: { findUnique: async () => null, findMany: async () => [] },
         userPrivacy: {
+            findUnique: async () => null,
             upsert: async () => {
                 state.written.push("privacy.upsert");
                 return {};

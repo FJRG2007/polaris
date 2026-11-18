@@ -40,7 +40,7 @@ import { getProfileStyle } from "@/lib/profile-style-service";
 import { followCounts, followsPerson } from "@/lib/people-follow";
 import {
     allowedBy,
-    defaultFollowerAudience,
+    privacyDefaults,
     maySee,
     type PrivacyViewer
 } from "@/lib/privacy-service";
@@ -499,13 +499,12 @@ async function visible(
             followers: true
         }
     });
-    // `storedAudience` is the one way to read one off a row: a column holds a
-    // string written years ago, a row may not exist at all, and neither may be
-    // allowed to resolve to something more open than the field's own default.
-    const open = (field: keyof Fields) => core.storedAudience(field, row?.[field]) === "everyone";
-    // The follower lists are the one field whose unset answer is the operator's
-    // rather than the schema's, so it is filled in before it is read.
-    const followers = row?.followers ?? (await defaultFollowerAudience());
+    // `resolvedAudience` is the one way to read one off a row: a column holds a
+    // string written years ago, or null for "never chosen", which is the
+    // operator's default for the field.
+    const defaults = await privacyDefaults();
+    const open = (field: keyof Fields) =>
+        core.resolvedAudience(field, row?.[field], defaults.get(field)) === "everyone";
     return {
         discoverable: open("discoverable"),
         profile: open("profile"),
@@ -513,7 +512,7 @@ async function visible(
         fullName: open("fullName"),
         email: open("email"),
         companies: open("companies"),
-        followers: core.storedAudience("followers", followers) === "everyone"
+        followers: open("followers")
     };
 }
 

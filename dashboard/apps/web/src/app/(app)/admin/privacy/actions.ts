@@ -14,7 +14,8 @@ import { getTranslations } from "@/lib/i18n/request";
 import { setDiscoveryPolicy } from "@/lib/people-search";
 import { setProfilesPublic } from "@/lib/profile-service";
 import { DISCOVERY_POLICY_KEY, discoveryPolicySchema } from "@/lib/discovery-policy";
-import { FOLLOWERS_DEFAULT_KEY, setDefaultFollowerAudience } from "@/lib/privacy-service";
+import * as core from "@polaris/core";
+import { privacyDefaultKey, setDefaultAudience } from "@/lib/privacy-service";
 
 /**
  * Whether somebody's page may be read without signing in.
@@ -40,24 +41,33 @@ export async function setPublicProfilesAction(allowed: unknown): Promise<{ error
 }
 
 /**
- * What a new account's follower lists are shown to.
+ * What one privacy field starts on for every account that never chose it -
+ * existing accounts included. Somebody who set the field keeps theirs.
  *
- * Only the three that name nobody in particular. "Everybody except" and "only"
- * each carry a list of people, and a list belongs to an account - there is no
- * account yet for a default to have one of.
+ * Only audiences that name nobody in particular, and only those the field
+ * offers: a list belongs to an account, and there is none yet to have one.
  */
-export async function setFollowerDefaultAction(audience: unknown): Promise<{ error?: string }> {
+export async function setPrivacyDefaultAction(
+    field: unknown,
+    audience: unknown
+): Promise<{ error?: string }> {
     const admin = await requireAdmin();
-    const parsed = z.enum(["everyone", "friends", "nobody"]).safeParse(audience);
-    if (!parsed.success)
+    const parsedField = z.enum(core.PRIVACY_FIELDS).safeParse(field);
+    const parsedAudience = z.enum(core.PRIVACY_AUDIENCES).safeParse(audience);
+    if (
+        !parsedField.success ||
+        !parsedAudience.success ||
+        !core.defaultAudiencesFor(parsedField.data).includes(parsedAudience.data)
+    ) {
         return { error: (await getTranslations("admin"))("privacy.errors.audience") };
-    await setDefaultFollowerAudience(parsed.data);
+    }
+    await setDefaultAudience(parsedField.data, parsedAudience.data);
     await recordAudit({
         actorId: admin.id,
-        action: "settings.follower-default",
+        action: "settings.privacy-default",
         targetType: "setting",
-        targetId: FOLLOWERS_DEFAULT_KEY,
-        metadata: { audience: parsed.data }
+        targetId: privacyDefaultKey(parsedField.data),
+        metadata: { field: parsedField.data, audience: parsedAudience.data }
     });
     revalidatePath("/admin/privacy");
     return {};

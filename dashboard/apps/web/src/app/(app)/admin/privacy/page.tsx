@@ -7,6 +7,7 @@
 import { PageHeader } from "@polaris/ui";
 import { readPrivacy } from "./read";
 import { PrivacyLoader } from "./loader";
+import { Messages } from "@/components/i18n/messages";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 
@@ -20,7 +21,10 @@ export default async function PrivacyPage() {
         <div className="mx-auto flex w-full max-w-2xl flex-col">
             <PageHeader title={t("privacy.page.title")} description={t("privacy.page.description")} />
             {/* Started, not awaited: streamed in the same response as the shell. */}
-            <PrivacyLoader revision={Date.now()} streamed={readPrivacy()} />
+            {/* The defaults are worded as the account's own privacy screen is. */}
+            <Messages namespaces={["accountPrivacy"]}>
+                <PrivacyLoader revision={Date.now()} streamed={readPrivacy()} />
+            </Messages>
         </div>
     );
 }

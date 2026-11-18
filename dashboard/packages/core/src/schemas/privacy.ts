@@ -128,10 +128,12 @@ export function audienceNeedsList(audience: PrivacyAudience): boolean {
 export const PRIVACY_FIELD_LABELS = {
     profile: "Who can see your profile",
     discoverable: "Whether people can find you",
-    lastSeen: "When you were last here",
+    lastSeen: "Whether you are shown online",
+    lastActive: "When you were last online",
     activity: "What you are playing or listening to",
     badges: "Your badges",
     readReceipts: "That you have read a message",
+    typing: "That you are typing",
     avatar: "Your photo",
     photoFullSize: "Opening your photo",
     fullName: "Your full name",
@@ -150,7 +152,9 @@ export const PRIVACY_FIELD_NOTES = {
         "Your bio, links, pronouns and banner. Anybody else sees only your name and photo. Small servers are those with fewer than 200 members.",
     discoverable:
         "Who finds your account when they look for somebody. Anybody who cannot has to know your exact username to ask to be added, and is never told whether it exists.",
-    lastSeen: "Whether other people can see that you are here now, or when you last were.",
+    lastSeen: "The dot beside your name and the status under it. Anybody who cannot see it sees you as offline.",
+    lastActive:
+        "The time shown under your name while you are away, such as last seen today at 14:32. Turning this down also stops you seeing anybody else's.",
     badges: "Who sees the badges on your profile and how far you are with each. A badge can have its own rule, set on its row under Badges.",
     activity:
         "The game or song shown beside your name. Only ever shown to people who can also see that you are here, and never while you appear offline.",
@@ -169,6 +173,8 @@ export const PRIVACY_FIELD_NOTES = {
         "Who can open the two lists of names on your profile. The counts are always shown - how many follow you is a fact about you, and it is on your page the way the day you joined is - so this is about the several other people in the lists, who never chose to be on your page. Your administrator sets what a new account starts on; this is yours.",
     friendRequests:
         "Who may ask. Anybody turned down here is not told they were - the button is simply not offered - and nobody is ever stopped from following you, which asks nothing of you. Set to nobody, only the requests already waiting can still be answered.",
+    typing:
+        "The dots shown while you write. Turning this down also stops you seeing anybody else's.",
     forwarding:
         "Who may forward something you wrote into another conversation. Anybody who cannot is not offered it, and they can still copy the text - this is a rule about the button, not a lock on your words.",
     calls: "Who may ring you. A call takes over the screen of whatever you were doing and makes a noise in the room you are in, which is why this starts at your friends rather than at everybody. Joining a voice channel is not this: that is a room somebody walked into, and who may be in it is the room's own question. Anybody who cannot call you is simply not offered the button.",
@@ -191,9 +197,11 @@ export const PRIVACY_FIELDS = [
     "fileTransfers",
     "calls",
     "lastSeen",
+    "lastActive",
     "activity",
     "badges",
     "readReceipts",
+    "typing",
     "forwarding"
 ] as const;
 
@@ -235,12 +243,12 @@ export const PRIVACY_SECTIONS = [
     {
         id: "presence",
         label: "Presence",
-        fields: ["lastSeen", "activity", "badges"]
+        fields: ["lastSeen", "lastActive", "activity", "badges"]
     },
     {
         id: "messages",
         label: "Messages",
-        fields: ["readReceipts", "forwarding"]
+        fields: ["readReceipts", "typing", "forwarding"]
     }
 ] as const satisfies readonly {
     id: string;
@@ -325,7 +333,21 @@ export const privacySettingsSchema = z.object({
      * messengers with this setting draw.
      */
     profile: open,
+    /**
+     * Whether somebody is shown online at all: the dot and the status under it.
+     * The key predates the time below and is kept so no stored row moves.
+     */
     lastSeen: open,
+    /**
+     * When somebody was last here, as a time - "last seen today at 14:32".
+     *
+     * Separate from the dot because they are two disclosures: being seen to be
+     * here now is one, and a record of when you stopped being here is another
+     * that people turn off on its own in every messenger that has both.
+     * Reciprocal like the ticks, and only ever shown to a reader who may see the
+     * dot - somebody hidden or invisible has no time either.
+     */
+    lastActive: open,
     /**
      * Who sees what somebody is doing: the game, the song, the server.
      *
@@ -339,6 +361,9 @@ export const privacySettingsSchema = z.object({
     activity: open,
     badges: open,
     readReceipts: open,
+    /** Whether the dots that say somebody is writing reach a reader.
+     *  Reciprocal like the ticks: hide yours and you see nobody's. */
+    typing: open,
     avatar: open,
     /**
      * Whether somebody may open the photo and look at it full size.
@@ -514,6 +539,44 @@ export const DEFAULT_PRIVACY: PrivacySettings = privacySettingsSchema.parse({});
 export function storedAudience(field: PrivacyField, stored: unknown): PrivacyAudience {
     const parsed = z.enum(PRIVACY_AUDIENCES).safeParse(stored);
     return parsed.success ? parsed.data : DEFAULT_PRIVACY[field].audience;
+}
+
+/**
+ * What an administrator may set a field to for accounts that never chose.
+ *
+ * Only the audiences that name nobody in particular: a list belongs to an
+ * account, and a default is set before there is one to have it. The profile
+ * offers the narrower set its own row does.
+ */
+export const PRIVACY_DEFAULT_AUDIENCES = PRIVACY_AUDIENCES.filter(
+    (audience) => !audienceNeedsList(audience)
+);
+
+export function defaultAudiencesFor(field: PrivacyField): readonly PrivacyAudience[] {
+    return field === "profile" ? PROFILE_AUDIENCES : PRIVACY_DEFAULT_AUDIENCES;
+}
+
+/**
+ * What one field resolves to for one account.
+ *
+ * A stored value is the person's own choice. A null column - or no row at all -
+ * means they never chose, and then the administrator's default decides, and the
+ * code's own default only where the administrator never set one. An operator
+ * default that names a list, or that the field does not offer, is ignored
+ * rather than trusted.
+ */
+export function resolvedAudience(
+    field: PrivacyField,
+    stored: unknown,
+    operatorDefault: unknown
+): PrivacyAudience {
+    const own = z.enum(PRIVACY_AUDIENCES).safeParse(stored);
+    if (own.success) return own.data;
+    const operator = z.enum(PRIVACY_AUDIENCES).safeParse(operatorDefault);
+    if (operator.success && defaultAudiencesFor(field).includes(operator.data)) {
+        return operator.data;
+    }
+    return DEFAULT_PRIVACY[field].audience;
 }
 
 /** What one account's list is called and who is on it. */

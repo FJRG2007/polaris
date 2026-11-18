@@ -2707,7 +2707,7 @@
             },
             "privacy": {
                 "title": "Privacy",
-                "description": "Public profiles and how people find each other."
+                "description": "Public profiles, privacy defaults and how people find each other."
             },
             "storage": {
                 "title": "Storage locations",
@@ -4271,14 +4271,11 @@
             "title": "Profiles",
             "description": "Who can read a person's page.",
             "publicLabel": "Public profiles",
-            "publicHint": "Pages at <code>/u/username</code> open without signing in. Visitors see only what an account shows to everybody.",
-            "followersLabel": "Followers shown to",
-            "followersHint": "The default for new accounts. Accounts that already chose keep their choice.",
-            "audiences": {
-                "everyone": "Everybody",
-                "friends": "Friends",
-                "nobody": "Nobody"
-            }
+            "publicHint": "Pages at <code>/u/username</code> open without signing in. Visitors see only what an account shows to everybody."
+        },
+        "defaults": {
+            "title": "Defaults",
+            "description": "What each setting starts on for accounts that never changed it, existing ones included. A setting someone changed keeps their choice."
         },
         "discovery": {
             "title": "Finding people",

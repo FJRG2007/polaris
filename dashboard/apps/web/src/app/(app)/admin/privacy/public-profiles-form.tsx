@@ -19,29 +19,14 @@
  * invisible to them.
  */
 
-import { useState, useTransition } from "react";
-import { Card, CardBody, Select, Switch, useOptimisticToggle } from "@polaris/ui";
-import { setFollowerDefaultAction, setPublicProfilesAction } from "./actions";
+import { useState } from "react";
+import { Card, CardBody, Switch, useOptimisticToggle } from "@polaris/ui";
+import { setPublicProfilesAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { PrivacyAudience } from "@polaris/core";
 
-/** The audiences a default can be. The ones that name a list of people cannot:
- *  the list belongs to an account, and there is no account yet to have one. */
-const DEFAULT_AUDIENCES = ["everyone", "friends", "nobody"] as const;
-
-export function PublicProfilesForm({
-    enabled,
-    followerDefault
-}: {
-    enabled: boolean;
-    /** What a new account's follower lists are shown to, until it says
-     *  otherwise. */
-    followerDefault: PrivacyAudience;
-}) {
+export function PublicProfilesForm({ enabled }: { enabled: boolean }) {
     const t = useTranslations("admin");
-    const [audience, setAudience] = useState<PrivacyAudience>(followerDefault);
     const [error, setError] = useState<string | null>(null);
-    const [pending, startTransition] = useTransition();
     // Applied on the press and put back if the server refuses it, so the switch
     // never reads as saved when it is not - this one decides what leaves the box.
     const [on, toggle] = useOptimisticToggle(
@@ -72,39 +57,6 @@ export function PublicProfilesForm({
                         onChange={toggle}
                     />
                 </div>
-                <div className="flex flex-wrap items-start justify-between gap-3 py-3">
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="text-sm">{t("privacy.profiles.followersLabel")}</span>
-                        <span className="text-xs text-muted-foreground">
-                            {t("privacy.profiles.followersHint")}
-                        </span>
-                    </div>
-                    <div className="w-full sm:w-44">
-                        <Select
-                            value={audience}
-                            disabled={pending}
-                            aria-label={t("privacy.profiles.followersLabel")}
-                            options={DEFAULT_AUDIENCES.map((value) => ({
-                                value,
-                                label: t(`privacy.profiles.audiences.${value}`)
-                            }))}
-                            onValueChange={(value) => {
-                                const next = value as PrivacyAudience;
-                                const before = audience;
-                                setAudience(next);
-                                setError(null);
-                                startTransition(async () => {
-                                    const result = await setFollowerDefaultAction(next);
-                                    if (result.error) {
-                                        setAudience(before);
-                                        setError(result.error);
-                                    }
-                                });
-                            }}
-                        />
-                    </div>
-                </div>
-
                 {error ? <p className="py-3 text-sm text-danger">{error}</p> : null}
             </CardBody>
         </Card>

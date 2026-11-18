@@ -23,6 +23,8 @@ let friends = false;
 
 vi.mock("@polaris/db", () => ({
     prisma: {
+        // No administrator defaults: every field falls to the code's own.
+        setting: { findUnique: async () => null, findMany: async () => [] },
         userPrivacy: {
             findMany: async ({ where }: { where: { userId: { in: string[] } } }) =>
                 where.userId.in
