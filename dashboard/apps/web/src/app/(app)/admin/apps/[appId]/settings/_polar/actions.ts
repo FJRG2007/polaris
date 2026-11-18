@@ -1,6 +1,7 @@
 "use server";
 
-/** Saving where Polar Code sessions run and how spares are kept. */
+/** Saving Polar's deployment-wide settings: what its chats may reach, its
+ *  default routing, and where Polar Code sessions run. */
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
@@ -10,7 +11,11 @@ import { appSettingsPath } from "@/lib/apps/app-settings";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
 import { setSetting } from "@/lib/setting-store";
-import { INSTANCE_KEY } from "@/lib/agents/session-capacity";
+import { INSTANCE_KEY, SHARED_WORKSPACE_KEY } from "@/lib/agents/session-capacity";
+import { instanceRouteKeys } from "@/lib/polar/routing-screen";
+import { checkRouting, pinnedKeyIds } from "@/lib/polar/routing-keys";
+import { instanceRouting, setInstanceRouting } from "@/lib/polar/router/store";
+import { polarOptionsSchema, savePolarPolicyPart } from "@/lib/polar/access";
 import { poolSchema, writePool } from "@/lib/agents/session-placement";
 import { warmSchema, writeWarm } from "@/lib/agents/session-spares";
 import { checkReach } from "@/lib/agents/pool-reach";
@@ -73,4 +78,79 @@ export async function checkPoolReachAction(hostId: unknown): Promise<{ reach?: R
     const pool = await readPool();
     const ids = pool.servers.map((server) => server.hostId);
     return { reach: await checkReach(host.id, ids.includes(host.id) ? ids : []) };
+}
+
+/**
+ * What Polar's chats may reach: the web, the free models, the free stand-in
+ * and people's own MCP servers. Saved over the stored policy, so the audiences
+ * edited under Management > Roles are left as they are.
+ */
+export async function setPolarOptionsAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = polarOptionsSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("agents.errors.pickSetting") };
+
+    const saved = await savePolarPolicyPart(parsed.data);
+    await recordAudit({
+        actorId: admin.id,
+        action: "polar.access.update",
+        metadata: {
+            web: saved.web,
+            connectors: saved.connectors.who,
+            connectorHosts: saved.connectors.hosts.length,
+            connectorPrivateNetwork: saved.connectors.privateNetwork,
+            freeModels: saved.freeModels,
+            zenStandInEveryone: saved.zenStandInEveryone
+        }
+    });
+    revalidatePath(appSettingsPath("polar"));
+    return {};
+}
+
+/**
+ * The deployment's default routing: what every account that set none of its
+ * own falls back through, and what a coding tool's request lands on. Held to
+ * the deployment's own keys.
+ */
+export async function saveInstanceRoutingAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const [keys, current] = await Promise.all([instanceRouteKeys(), instanceRouting()]);
+    const checked = checkRouting(input, keys, pinnedKeyIds(current));
+    if (!checked.ok) {
+        return { error: (await getTranslations("polar"))(`routing.errors.${checked.refusal}`) };
+    }
+    await setInstanceRouting(checked.routing);
+    await recordAudit({
+        actorId: admin.id,
+        action: "agents.polar.routing",
+        metadata: { fallbacks: checked.routing.fallbacks.length }
+    });
+    revalidatePath(appSettingsPath("polar"));
+    return {};
+}
+
+/**
+ * Whether this deployment offers a machine everybody shares.
+ *
+ * Off by default and only ever turned on here, because it is the one setting
+ * that puts several accounts on one home: what is signed in on that machine is
+ * signed in for everybody who can open it. Right for a team on one
+ * subscription, wrong for a deployment of separate people, and only an
+ * administrator knows which of those this is.
+ */
+export async function setSharedWorkspaceAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = z.object({ allowed: z.boolean() }).safeParse(input);
+    if (!parsed.success)
+        return { error: (await getTranslations("admin"))("agents.errors.pickSetting") };
+
+    await setSetting(SHARED_WORKSPACE_KEY, parsed.data.allowed ? "true" : "false");
+    await recordAudit({
+        actorId: admin.id,
+        action: "agents.sessions.sharedWorkspace",
+        metadata: { allowed: parsed.data.allowed }
+    });
+    revalidatePath(appSettingsPath("polar"));
+    return {};
 }

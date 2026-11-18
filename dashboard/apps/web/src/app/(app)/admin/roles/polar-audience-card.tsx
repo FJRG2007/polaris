@@ -1,31 +1,23 @@
 "use client";
 
 /**
- * Who may use Polar, and who may spend this deployment's provider keys in it.
+ * Who may use Polar, and who may spend this deployment's provider keys in it,
+ * when nothing else decides: the default behind `polar.use` and `polar.spend`.
  *
- * Two audiences side by side, each saved the moment it changes and put back if
- * the save is refused. The server reads the same policy on every Polar route,
- * so what this card says is what happens.
+ * Here beside the roles because it is permission management: a role, a group
+ * policy or one account's Capabilities that names either permission decides
+ * over it (`decidePolarAccess`). Two audiences side by side, each saved the
+ * moment it changes and put back if the save is refused.
  */
 
 import { runAction } from "@/lib/run-action";
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { findPolarGroupsAction, findPolarPeopleAction, setPolarAccessAction } from "./actions";
-import { Card, CardBody, Input, SegmentedControl, Switch, cn } from "@polaris/ui";
+import { findPolarGroupsAction, findPolarPeopleAction, setPolarAudiencesAction } from "./polar-actions";
+import { Card, CardBody, CardHeader, CardTitle, Input, SegmentedControl, Switch, cn } from "@polaris/ui";
 import { useOptimisticValue } from "@polaris/ui";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
-import {
-    CONNECTOR_AUDIENCES,
-    DEFAULT_CONNECTOR_POLICY,
-    normalizeHostEntry
-} from "@/lib/polar/connectors/shared";
-import type {
-    AudienceKind,
-    PolarAudience,
-    PolarConnectorPolicy,
-    PolarPolicy
-} from "@/lib/polar/access";
+import type { AudienceKind, PolarAudience, PolarAudiences } from "@/lib/polar/access";
 
 type Part = "use" | "spend";
 type Group = { id: string; name: string };
@@ -33,14 +25,14 @@ type Group = { id: string; name: string };
 /** How long the group search sits still before it asks. */
 const SEARCH_AFTER = 220;
 
-export function PolarAccessCard({
+export function PolarAudienceCard({
     policy,
     groups,
     moreGroups = false,
     chosenGroups = [],
     people
 }: {
-    policy: PolarPolicy;
+    policy: PolarAudiences;
     groups: readonly Group[];
     /** Whether the deployment has more groups than `groups` lists, so the rest
      *  are found by searching. */
@@ -56,9 +48,11 @@ export function PolarAccessCard({
     // policy, and a refusal puts back what the server last held.
     const [current, save] = useOptimisticValue(
         policy,
-        async (next: PolarPolicy) => {
+        async (next: PolarAudiences) => {
             setError(null);
-            return (await runAction(() => setPolarAccessAction(next), setError)) ?? { error: true };
+            return (
+                (await runAction(() => setPolarAudiencesAction(next), setError)) ?? { error: true }
+            );
         },
         { onRefused: setError }
     );
@@ -68,8 +62,6 @@ export function PolarAccessCard({
         ...groups
     ]);
     const [groupQuery, setGroupQuery] = useState("");
-    const connectors = current.connectors ?? DEFAULT_CONNECTOR_POLICY;
-    const [hostsDraft, setHostsDraft] = useState(connectors.hosts.join(", "));
     const [foundGroups, setFoundGroups] = useState<readonly Group[] | null>(null);
 
     useEffect(() => {
@@ -99,25 +91,6 @@ export function PolarAccessCard({
 
     const change = (part: Part, patch: Partial<PolarAudience>) =>
         save((now) => ({ ...now, [part]: { ...now[part], ...patch } }));
-
-    const changeConnectors = (patch: Partial<PolarConnectorPolicy>) =>
-        save((now) => ({
-            ...now,
-            connectors: { ...(now.connectors ?? DEFAULT_CONNECTOR_POLICY), ...patch }
-        }));
-    /** The typed hosts, each normalized; an entry that is no host is dropped. */
-    const commitHosts = () => {
-        const hosts = [
-            ...new Set(
-                hostsDraft
-                    .split(/[\s,]+/)
-                    .map(normalizeHostEntry)
-                    .filter((host): host is string => Boolean(host))
-            )
-        ].slice(0, 100);
-        setHostsDraft(hosts.join(", "));
-        if (hosts.join(",") !== connectors.hosts.join(",")) changeConnectors({ hosts });
-    };
 
     const options = (["admins", "chosen", "everyone"] as const).map((value) => ({
         value,
@@ -245,104 +218,13 @@ export function PolarAccessCard({
 
     return (
         <Card>
+            <CardHeader>
+                <CardTitle>{t("roles.polarDefault.title")}</CardTitle>
+                <p className="text-muted-foreground text-xs">{t("roles.polarDefault.intro")}</p>
+            </CardHeader>
             <CardBody className="space-y-4">
                 {audience("use")}
                 {audience("spend")}
-                <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium">{t("agents.polarAccess.web.label")}</p>
-                        <p className="text-muted-foreground text-xs">
-                            {t("agents.polarAccess.web.hint")}
-                        </p>
-                    </div>
-                    <Switch
-                        checked={current.web}
-                        onChange={(web) => save({ ...current, web })}
-                        aria-label={t("agents.polarAccess.web.label")}
-                    />
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium">{t("agents.polarAccess.freeModels.label")}</p>
-                        <p className="text-muted-foreground text-xs">
-                            {t("agents.polarAccess.freeModels.hint")}
-                        </p>
-                    </div>
-                    <Switch
-                        checked={current.freeModels}
-                        onChange={(freeModels) => save({ ...current, freeModels })}
-                        aria-label={t("agents.polarAccess.freeModels.label")}
-                    />
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium">
-                            {t("agents.polarAccess.zenStandInEveryone.label")}
-                        </p>
-                        <p className="text-muted-foreground text-xs">
-                            {t(
-                                current.freeModels
-                                    ? "agents.polarAccess.zenStandInEveryone.hint"
-                                    : "agents.polarAccess.zenStandInEveryone.off"
-                            )}
-                        </p>
-                    </div>
-                    <Switch
-                        checked={current.freeModels && current.zenStandInEveryone}
-                        disabled={!current.freeModels}
-                        onChange={(zenStandInEveryone) => save({ ...current, zenStandInEveryone })}
-                        aria-label={t("agents.polarAccess.zenStandInEveryone.label")}
-                    />
-                </div>
-                <div className="space-y-2">
-                    <div className="min-w-0 space-y-1">
-                        <p className="text-sm font-medium">
-                            {t("agents.polarAccess.connectors.label")}
-                        </p>
-                        <p className="text-muted-foreground text-xs">
-                            {t("agents.polarAccess.connectors.hint")}
-                        </p>
-                    </div>
-                    <SegmentedControl<PolarConnectorPolicy["who"]>
-                        size="sm"
-                        value={connectors.who}
-                        options={CONNECTOR_AUDIENCES.map((value) => ({
-                            value,
-                            label: t(`agents.polarAccess.connectors.who.${value}`)
-                        }))}
-                        aria-label={t("agents.polarAccess.connectors.label")}
-                        onValueChange={(who) => changeConnectors({ who })}
-                    />
-                    {connectors.who !== "off" ? (
-                        <>
-                            <Input
-                                value={hostsDraft}
-                                onChange={(event) => setHostsDraft(event.target.value)}
-                                onBlur={commitHosts}
-                                onKeyDown={(event) => {
-                                    if (event.key === "Enter") commitHosts();
-                                }}
-                                placeholder={t("agents.polarAccess.connectors.hostsPlaceholder")}
-                                aria-label={t("agents.polarAccess.connectors.hosts")}
-                            />
-                            <p className="text-muted-foreground text-xs">
-                                {t("agents.polarAccess.connectors.hostsHint")}
-                            </p>
-                            <div className="flex items-center justify-between gap-3">
-                                <p className="min-w-0 text-xs text-muted-foreground">
-                                    {t("agents.polarAccess.connectors.privateNetwork")}
-                                </p>
-                                <Switch
-                                    checked={connectors.privateNetwork}
-                                    onChange={(privateNetwork) =>
-                                        changeConnectors({ privateNetwork })
-                                    }
-                                    aria-label={t("agents.polarAccess.connectors.privateNetwork")}
-                                />
-                            </div>
-                        </>
-                    ) : null}
-                </div>
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
             </CardBody>
         </Card>

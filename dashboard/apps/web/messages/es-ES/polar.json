@@ -1973,7 +1973,7 @@
         "code": {
             "page": {
                 "title": "Polar",
-                "description": "Dónde se ejecutan las sesiones de Code y lo rápido que arrancan."
+                "description": "Lo que alcanzan los chats de Polar, su enrutado base y dónde se ejecutan las sesiones de Code."
             },
             "pool": {
                 "title": "Dónde se ejecutan",
@@ -2015,6 +2015,10 @@
                 "down": "Polaris no pudo conectarse a este servidor para comprobarlo.",
                 "check": "Comprobar"
             }
+        },
+        "links": {
+            "access": "Quién puede usar Polar y gastar las claves del despliegue es un permiso: <link>Roles</link>, o las Capacidades de cada persona en Usuarios.",
+            "shared": "Las claves de proveedor, los límites de uso y el catálogo de modelos se comparten con Agentes, en <link>Ajustes de agentes</link>."
         }
     },
     "routing": {

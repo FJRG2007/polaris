@@ -46,7 +46,8 @@ vi.mock("@/app/(app)/admin/apps/[appId]/settings/_chat/chat-settings", () => ({
     ChatAdminSettings
 }));
 vi.mock("@/app/(app)/admin/apps/[appId]/settings/_polar/polar-settings", () => ({
-    PolarAdminSettings: () => null
+    PolarAdminSettings: () => null,
+    PolarChatSettings: () => null
 }));
 
 import config from "../../next.config.mjs";

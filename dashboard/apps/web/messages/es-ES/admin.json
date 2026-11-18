@@ -29,7 +29,8 @@
     "agents": {
         "page": {
             "title": "Ajustes de agentes",
-            "description": "Lo que hacen las ejecuciones de agentes en todo el despliegue. Cada cuenta puede acotarlo en Apps > Agentes, y un repositorio puede sobrescribirlo de nuevo."
+            "description": "Lo que hacen las ejecuciones de agentes en cada repositorio, quién las paga y cuánto pueden gastar. Cada cuenta puede acotarlo en Apps > Agentes, y un repositorio puede sobrescribirlo de nuevo.",
+            "polar": "Los ajustes propios de Polar están en <link>Apps de Polaris > Polar > Ajustes</link>."
         },
         "defaults": {
             "title": "Todos los repositorios de este despliegue",
@@ -3126,6 +3127,10 @@
             "alerts": {
                 "topics": "Recibir alertas de otros sistemas"
             }
+        },
+        "polarDefault": {
+            "title": "Polar cuando nada más decide",
+            "intro": "Quién puede usar Polar y gastar las claves del despliegue cuando ningún rol, política de grupo o Capacidad lo dice. Una denegación siempre gana; los administradores siempre pueden."
         }
     },
     "safety": {

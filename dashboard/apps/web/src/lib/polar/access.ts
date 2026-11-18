@@ -90,6 +90,15 @@ export const polarPolicySchema = z.object({
 });
 export type PolarPolicy = z.infer<typeof polarPolicySchema>;
 
+/** The two audiences: the default for `polar.use` and `polar.spend`, edited
+ *  beside the roles under Management > Roles. */
+export const polarAudiencesSchema = polarPolicySchema.pick({ use: true, spend: true });
+export type PolarAudiences = z.infer<typeof polarAudiencesSchema>;
+
+/** Everything else in the policy, edited in Polar's own settings. */
+export const polarOptionsSchema = polarPolicySchema.omit({ use: true, spend: true });
+export type PolarOptions = z.infer<typeof polarOptionsSchema>;
+
 /**
  * What a deployment that never saved a policy gets when its keys are not
  * shared, and what a stored policy that no longer reads falls back to.
@@ -134,6 +143,20 @@ export async function readPolarPolicy(): Promise<PolarPolicy> {
 
 export async function savePolarPolicy(policy: PolarPolicy): Promise<void> {
     await setSetting(POLICY_KEY, JSON.stringify(polarPolicySchema.parse(policy)));
+}
+
+/**
+ * Store one part of the policy over the rest as it reads now. The audiences and
+ * the options are edited on two screens, so neither may write back the other's
+ * part from a stale copy. A deployment that never saved one stores what it was
+ * already reading, which is what saving the whole policy did before.
+ */
+export async function savePolarPolicyPart(
+    part: PolarAudiences | PolarOptions
+): Promise<PolarPolicy> {
+    const next = polarPolicySchema.parse({ ...(await readPolarPolicy()), ...part });
+    await savePolarPolicy(next);
+    return next;
 }
 
 /** What the policy needs to know about one account. */

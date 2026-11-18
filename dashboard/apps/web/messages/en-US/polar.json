@@ -1973,7 +1973,7 @@
         "code": {
             "page": {
                 "title": "Polar",
-                "description": "Where Code sessions run and how fast they start."
+                "description": "What Polar's chats may reach, their default routing, and where Code sessions run."
             },
             "pool": {
                 "title": "Where sessions run",
@@ -2015,6 +2015,10 @@
                 "down": "Polaris could not connect to this server to check.",
                 "check": "Check again"
             }
+        },
+        "links": {
+            "access": "Who may use Polar and spend this deployment's keys is a permission: <link>Roles</link>, or a person's Capabilities under Users.",
+            "shared": "Provider keys, usage limits and the model catalog are shared with Agents, under <link>Agent defaults</link>."
         }
     },
     "routing": {

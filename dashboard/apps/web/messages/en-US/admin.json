@@ -29,7 +29,8 @@
     "agents": {
         "page": {
             "title": "Agent defaults",
-            "description": "What agent runs do across the whole deployment. Each account can narrow it under Apps > Agents, and a repository can override it again."
+            "description": "What agent runs do on every repository, who pays for them and how much they may spend. Each account can narrow it under Apps > Agents, and a repository can override it again.",
+            "polar": "Polar's own settings are under <link>Polaris apps > Polar > Settings</link>."
         },
         "defaults": {
             "title": "Every repository on this deployment",
@@ -3126,6 +3127,10 @@
             "alerts": {
                 "topics": "Receive alerts from other systems"
             }
+        },
+        "polarDefault": {
+            "title": "Polar when nothing else decides",
+            "intro": "Who may use Polar and spend this deployment's keys when no role, group policy or Capabilities override says. A deny anywhere wins; administrators always can."
         }
     },
     "safety": {

@@ -1,9 +1,13 @@
 /**
- * What Polar Code's administrator settings show: where sessions run, how full
- * each machine is, and how spares are kept. Read for an administrator only.
+ * What Polar's administrator settings show: what its chats may reach, its
+ * default routing, and for Polar Code where sessions run, how full each machine
+ * is and how spares are kept. Read for an administrator only.
  */
 
 import { prisma } from "@polaris/db";
+import { polarOptionsSchema, readPolarPolicy } from "@/lib/polar/access";
+import { instanceRouting } from "@/lib/polar/router/store";
+import { instanceRouteKeys } from "@/lib/polar/routing-screen";
 import { ALIVE_STATES, totalCeiling } from "@/lib/agents/session-capacity";
 import { readPool } from "@/lib/agents/session-placement";
 import { readWarm, type WarmSettings } from "@/lib/agents/session-spares";
@@ -83,4 +87,16 @@ export async function polarCodeAdmin(): Promise<PolarCodeAdmin> {
             ];
         })
     };
+}
+
+/** What Polar's chats may reach and its default routing: the settings above
+ *  Polar Code's. */
+export async function polarChatAdmin() {
+    const [policy, routing, routingKeys] = await Promise.all([
+        readPolarPolicy(),
+        instanceRouting(),
+        instanceRouteKeys()
+    ]);
+    // The audiences are permissions, edited under Management > Roles.
+    return { options: polarOptionsSchema.parse(policy), routing, routingKeys };
 }

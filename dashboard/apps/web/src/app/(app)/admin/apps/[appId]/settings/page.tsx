@@ -14,7 +14,7 @@ import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { builtInHasSettings } from "@/lib/apps/app-settings";
 import { ChatSettingsPage } from "./_chat/chat-screen";
-import { PolarAdminSettings } from "./_polar/polar-settings";
+import { PolarAdminSettings, PolarChatSettings } from "./_polar/polar-settings";
 import { Suspense } from "react";
 import { PageHeader, Skeleton } from "@polaris/ui";
 import { VpnAdminSettings } from "@/app/(app)/vpn/vpn-admin-settings";
@@ -110,6 +110,32 @@ async function PolarSettings() {
                     title={polar("admin.code.page.title")}
                     description={polar("admin.code.page.description")}
                 />
+                {/* Who may use Polar is a permission, and the keys, limits and
+                    catalogue are the Agents app's too: each said once, where it
+                    is edited. */}
+                <div className="text-muted-foreground space-y-1 text-xs">
+                    <p>
+                        {polar.rich("admin.links.access", {
+                            link: (chunks) => (
+                                <Link key="roles" href="/admin/roles" className="text-primary hover:underline">
+                                    {chunks}
+                                </Link>
+                            )
+                        })}
+                    </p>
+                    <p>
+                        {polar.rich("admin.links.shared", {
+                            link: (chunks) => (
+                                <Link key="agents" href="/admin/agents" className="text-primary hover:underline">
+                                    {chunks}
+                                </Link>
+                            )
+                        })}
+                    </p>
+                </div>
+                <Suspense fallback={<Skeleton className="h-64 w-full max-w-2xl rounded-lg" />}>
+                    <PolarChatSettings />
+                </Suspense>
                 <Suspense fallback={<Skeleton className="h-96 w-full max-w-2xl rounded-lg" />}>
                     <PolarAdminSettings />
                 </Suspense>

@@ -12,12 +12,6 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
-import { polarPolicySchema, savePolarPolicy } from "@/lib/polar/access";
-import { setSetting } from "@/lib/setting-store";
-import { instanceRouteKeys } from "@/lib/polar/routing-screen";
-import { checkRouting, pinnedKeyIds } from "@/lib/polar/routing-keys";
-import { instanceRouting, setInstanceRouting } from "@/lib/polar/router/store";
-import { SHARED_WORKSPACE_KEY } from "@/lib/agents/session-capacity";
 import { providerIndexState } from "@/lib/integrations/provider-catalog";
 import type { PickerModel } from "@/components/model-picker";
 import { savePlatformAgentDefaults } from "@/lib/agents/agent-defaults-service";
@@ -73,31 +67,6 @@ export async function setInstanceKeySharingAction(input: unknown): Promise<{ err
         actorId: admin.id,
         action: "agents.keys.share",
         metadata: { shared: parsed.data.shared }
-    });
-    revalidatePath("/admin/agents");
-    return {};
-}
-
-/**
- * Whether this deployment offers a machine everybody shares.
- *
- * Off by default and only ever turned on here, because it is the one setting
- * that puts several accounts on one home: what is signed in on that machine is
- * signed in for everybody who can open it. Right for a team on one
- * subscription, wrong for a deployment of separate people, and only an
- * administrator knows which of those this is.
- */
-export async function setSharedWorkspaceAction(input: unknown): Promise<{ error?: string }> {
-    const admin = await requireAdmin();
-    const parsed = z.object({ allowed: z.boolean() }).safeParse(input);
-    if (!parsed.success)
-        return { error: (await getTranslations("admin"))("agents.errors.pickSetting") };
-
-    await setSetting(SHARED_WORKSPACE_KEY, parsed.data.allowed ? "true" : "false");
-    await recordAudit({
-        actorId: admin.id,
-        action: "agents.sessions.sharedWorkspace",
-        metadata: { allowed: parsed.data.allowed }
     });
     revalidatePath("/admin/agents");
     return {};
@@ -231,92 +200,5 @@ export async function savePlatformAgentDefaultsAction(input: unknown): Promise<{
     await recordAudit({ actorId: admin.id, action: "admin.agents.defaults.updated" });
     revalidatePath("/admin/agents");
     revalidatePath("/automations/code-review/settings");
-    return {};
-}
-
-/**
- * Who may use Polar, and who may spend this deployment's keys in it.
- *
- * Saved whole: the card sends both audiences every time, so a half-saved policy
- * is not a state anybody can reach.
- */
-export async function setPolarAccessAction(input: unknown): Promise<{ error?: string }> {
-    const admin = await requireAdmin();
-    const parsed = polarPolicySchema.safeParse(input);
-    if (!parsed.success)
-        return { error: (await getTranslations("admin"))("agents.errors.pickSetting") };
-
-    await savePolarPolicy(parsed.data);
-    await recordAudit({
-        actorId: admin.id,
-        action: "polar.access.update",
-        metadata: {
-            use: parsed.data.use.who,
-            spend: parsed.data.spend.who,
-            web: parsed.data.web,
-            connectors: parsed.data.connectors.who,
-            connectorHosts: parsed.data.connectors.hosts.length,
-            connectorPrivateNetwork: parsed.data.connectors.privateNetwork,
-            people: parsed.data.use.userIds.length + parsed.data.spend.userIds.length,
-            groups: parsed.data.use.groupIds.length + parsed.data.spend.groupIds.length
-        }
-    });
-    revalidatePath("/admin/agents");
-    return {};
-}
-
-/** People an administrator may name in a Polar audience. */
-export async function findPolarPeopleAction(
-    query: unknown
-): Promise<{ results: { id: string; name: string }[] }> {
-    await requireAdmin();
-    const term = z.string().trim().min(2).max(100).safeParse(query);
-    if (!term.success) return { results: [] };
-    const contains = { contains: term.data, mode: "insensitive" as const };
-    const found = await prisma.user.findMany({
-        where: { OR: [{ name: contains }, { email: contains }, { username: contains }] },
-        select: { id: true, name: true },
-        orderBy: [{ name: "asc" }, { id: "asc" }],
-        take: 20
-    });
-    return { results: found };
-}
-
-/** Groups an administrator may name in a Polar audience, for a deployment with
- *  more of them than the card lists. */
-export async function findPolarGroupsAction(
-    query: unknown
-): Promise<{ results: { id: string; name: string }[] }> {
-    await requireAdmin();
-    const term = z.string().trim().min(2).max(100).safeParse(query);
-    if (!term.success) return { results: [] };
-    const found = await prisma.group.findMany({
-        where: { name: { contains: term.data, mode: "insensitive" } },
-        select: { id: true, name: true },
-        orderBy: [{ name: "asc" }, { id: "asc" }],
-        take: 20
-    });
-    return { results: found };
-}
-
-/**
- * The deployment's default routing: what every account that set none of its
- * own falls back through, and what a coding tool's request lands on. Held to
- * the deployment's own keys.
- */
-export async function saveInstanceRoutingAction(input: unknown): Promise<{ error?: string }> {
-    const admin = await requireAdmin();
-    const [keys, current] = await Promise.all([instanceRouteKeys(), instanceRouting()]);
-    const checked = checkRouting(input, keys, pinnedKeyIds(current));
-    if (!checked.ok) {
-        return { error: (await getTranslations("polar"))(`routing.errors.${checked.refusal}`) };
-    }
-    await setInstanceRouting(checked.routing);
-    await recordAudit({
-        actorId: admin.id,
-        action: "agents.polar.routing",
-        metadata: { fallbacks: checked.routing.fallbacks.length }
-    });
-    revalidatePath("/admin/agents");
     return {};
 }
