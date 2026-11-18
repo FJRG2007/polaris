@@ -27,16 +27,31 @@ describe("the rules in force", () => {
     const stored = { vanishAfter: 604_800, deleteForAll: false, rulesAgreedAt: null };
 
     it("open: the stored timer, and delete for both always allowed", () => {
-        expect(rules.effectiveRules("open", stored)).toEqual({ vanishAfter: 604_800, deleteForAll: true });
+        expect(rules.effectiveRules("open", stored)).toEqual({
+            vanishAfter: 604_800,
+            deleteForAll: true,
+            receipts: "follow",
+            typing: "follow"
+        });
     });
 
     it("agreement without an agreement: no timer and no delete for both", () => {
-        expect(rules.effectiveRules("agreement", stored)).toEqual({ vanishAfter: 0, deleteForAll: false });
+        expect(rules.effectiveRules("agreement", stored)).toEqual({
+            vanishAfter: 0,
+            deleteForAll: false,
+            receipts: "follow",
+            typing: "follow"
+        });
     });
 
     it("agreement with one: exactly what was agreed", () => {
         const agreed = { ...stored, deleteForAll: true, rulesAgreedAt: new Date() };
-        expect(rules.effectiveRules("agreement", agreed)).toEqual({ vanishAfter: 604_800, deleteForAll: true });
+        expect(rules.effectiveRules("agreement", agreed)).toEqual({
+            vanishAfter: 604_800,
+            deleteForAll: true,
+            receipts: "follow",
+            typing: "follow"
+        });
     });
 
     it("only direct conversations outside a space have these rules", () => {

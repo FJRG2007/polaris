@@ -77,6 +77,7 @@ import type { RosterModeration } from "./call-moderation-menu";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
 import type { KeptPick } from "@/components/file-picker/as-files";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
+import { ChatPrivacySection, type ChatRulesChange } from "./chat-privacy-section";
 import { unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import { callBandHeight, callBandLimit, callBandSize, type CallPlace } from "./call-band";
 import {
@@ -2125,7 +2126,8 @@ export function ChannelView({
         if (!before) return;
         // In the open mode it takes effect at once; in the agreement mode it is
         // a proposal, which the bar under the messages shows once it is made.
-        if (before.mode === "open") vanish.setRules({ ...before, vanishAfter: seconds });
+        if (!before.mayChange) return;
+        if (!before.proposes) vanish.setRules({ ...before, vanishAfter: seconds });
         void runAction(() => vanishActions.setVanishTimerAction(channelId, seconds), setError).then(
             (result) => {
                 if (!result || result.error) {
@@ -2152,6 +2154,38 @@ export function ChannelView({
             void reloadRules();
         });
     };
+    /** A change from the privacy section. Shown at once where it applies at
+     *  once, and put back with the reason on a refusal; a proposal shows once
+     *  the server has it. */
+    const changeRules = (change: ChatRulesChange) => {
+        const before = vanish.rules;
+        if (!before || !before.mayChange) return;
+        if (!before.proposes) vanish.setRules({ ...before, ...change });
+        void runAction(() => vanishActions.changeRulesAction(channelId, change), setError).then(
+            (result) => {
+                if (!result || result.error) {
+                    if (result?.error) setError(result.error);
+                    vanish.setRules(before);
+                    return;
+                }
+                void reloadRules();
+            }
+        );
+    };
+    const withdrawProposal = async (proposalId: string) => {
+        const before = vanish.rules;
+        if (before) vanish.setRules({ ...before, proposal: null });
+        const result = await runAction(
+            () => vanishActions.withdrawProposalAction(proposalId),
+            setError
+        );
+        if (!result || result.error) {
+            if (result?.error) setError(result.error);
+            vanish.setRules(before);
+            return;
+        }
+        void reloadRules();
+    };
     const answerProposal = async (proposalId: string, accept: boolean) => {
         const before = vanish.rules;
         // The bar goes at once; it comes back with the reason on a refusal.
@@ -2167,6 +2201,19 @@ export function ChannelView({
         }
         void reloadRules();
     };
+    const privacySection =
+        direct && vanish.rules ? (
+            <ChatPrivacySection
+                rules={vanish.rules}
+                proposerName={
+                    channel?.others.find((person) => person.id === vanish.rules?.proposal?.proposedById)
+                        ?.name ?? viewerName
+                }
+                onChange={changeRules}
+                onAnswer={answerProposal}
+                onWithdraw={withdrawProposal}
+            />
+        ) : null;
     /** Empties the screen at once and puts it back on a refusal, which the
      *  dialog then shows. */
     const deleteChat = async (everybody: boolean): Promise<string | null> => {
@@ -2429,6 +2476,7 @@ export function ChannelView({
 
             {direct && vanish.rules?.proposal && (
                 <ProposalBar
+                    onWithdraw={withdrawProposal}
                     rules={vanish.rules}
                     proposerName={
                         channel.others.find(
@@ -2980,6 +3028,7 @@ export function ChannelView({
                         setInserting((current) => ({ token: (current?.token ?? 0) + 1, text }))
                     }
                     search={besideSearch}
+                    privacy={privacySection}
                 />
             )}
 
@@ -2992,6 +3041,7 @@ export function ChannelView({
                         setInserting((current) => ({ token: (current?.token ?? 0) + 1, text }))
                     }
                     search={besideSearch}
+                    privacy={privacySection}
                 />
             )}
 

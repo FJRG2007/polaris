@@ -14,6 +14,9 @@
  * everybody.
  */
 
+import * as core from "@polaris/core";
+import { groupOwnerId } from "./ownership";
+
 /** How long a message may last, in seconds: off, 24 h, 7 d, 30 d, 90 d. */
 export const VANISH_DURATIONS = [0, 86_400, 604_800, 2_592_000, 7_776_000] as const;
 export type VanishDuration = (typeof VANISH_DURATIONS)[number];
@@ -39,24 +42,84 @@ export function hasDirectRules(channel: {
     return !channel.spaceId && (channel.kind === "dm" || channel.kind === "group");
 }
 
+/** A conversation's own rule for read receipts or typing: "follow" leaves it
+ *  to each person's account setting, "on" and "off" decide it for everybody in
+ *  the conversation. */
+export const CHAT_PRIVACY_RULES = core.CHAT_PRIVACY_RULES;
+export type ChatPrivacyRule = core.ChatPrivacyRule;
+
+export function isChatPrivacyRule(value: unknown): value is ChatPrivacyRule {
+    return core.chatPrivacyRuleSchema.safeParse(value).success;
+}
+
+/** A stored rule read back, anything unknown being "follow". */
+export function chatPrivacyRule(value: unknown): ChatPrivacyRule {
+    return isChatPrivacyRule(value) ? value : "follow";
+}
+
 /** What a channel stores about its rules. */
 export interface StoredDirectRules {
     readonly vanishAfter: number;
     readonly deleteForAll: boolean;
     readonly rulesAgreedAt: Date | null;
+    readonly receipts?: string;
+    readonly typing?: string;
 }
 
 /** The rules in force, under the instance's mode. */
 export interface DirectRules {
     readonly vanishAfter: number;
     readonly deleteForAll: boolean;
+    readonly receipts: ChatPrivacyRule;
+    readonly typing: ChatPrivacyRule;
 }
 
 export function effectiveRules(mode: DmRuleMode, stored: StoredDirectRules): DirectRules {
     const vanishAfter = isVanishDuration(stored.vanishAfter) ? stored.vanishAfter : 0;
-    if (mode === "open") return { vanishAfter, deleteForAll: true };
-    if (!stored.rulesAgreedAt) return { vanishAfter: 0, deleteForAll: false };
-    return { vanishAfter, deleteForAll: stored.deleteForAll };
+    const receipts = chatPrivacyRule(stored.receipts);
+    const typing = chatPrivacyRule(stored.typing);
+    if (mode === "open") return { vanishAfter, deleteForAll: true, receipts, typing };
+    if (!stored.rulesAgreedAt) {
+        return { vanishAfter: 0, deleteForAll: false, receipts: "follow", typing: "follow" };
+    }
+    return { vanishAfter, deleteForAll: stored.deleteForAll, receipts, typing };
+}
+
+/**
+ * Whether this person may change a conversation's rules. In a one-to-one,
+ * either of the two - how, the instance's mode decides. In a group, only its
+ * owner and the members made its admins, and the change is announced rather
+ * than proposed: a group of thirty that has to agree unanimously never changes
+ * anything.
+ */
+export function mayChangeRules(
+    channel: { readonly kind: string; readonly ownerId?: string | null; readonly createdById?: string | null },
+    role: string | null,
+    actorId: string
+): boolean {
+    if (channel.kind !== "group") return true;
+    if (role === "admin") return true;
+    const owner = groupOwnerId({ ownerId: channel.ownerId ?? null, createdById: channel.createdById });
+    return owner !== null && owner.toLowerCase() === actorId.toLowerCase();
+}
+
+/** Whether a change in this conversation waits for the others to accept it:
+ *  only a one-to-one, and only in the agreement mode. */
+export function changeIsProposal(mode: DmRuleMode, kind: string): boolean {
+    return mode === "agreement" && kind === "dm";
+}
+
+/** Whether a chat's rule lets this be shown, given what the two account
+ *  settings answered: the chat's "on" and "off" win inside the chat. */
+export function underChatRule(rule: ChatPrivacyRule, accountAllows: boolean): boolean {
+    if (rule === "on") return true;
+    if (rule === "off") return false;
+    return accountAllows;
+}
+
+/** The rule as English words, for the system line written into the chat. */
+export function spokenRule(rule: ChatPrivacyRule): string {
+    return rule === "on" ? "on" : rule === "off" ? "off" : "following each person's settings";
 }
 
 /** When a message sent at `sentAt` under this timer disappears, or null. */

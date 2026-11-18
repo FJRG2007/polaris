@@ -25,6 +25,11 @@ import { ChatAccessError, ChatRuleError, requireChannel, type ChatActor } from "
 
 const MODE_KEY = "chat.dmRules";
 const LINE_KEY = "chat.deleteChatLine";
+/** What a new conversation starts with, as the administrator chose. No row is
+ *  "follow" for receipts and typing, and the starter's own default timer. */
+const START_RECEIPTS_KEY = "chat.defaults.receipts";
+const START_TYPING_KEY = "chat.defaults.typing";
+const START_TIMER_KEY = "chat.defaults.vanishAfter";
 
 /** How the instance decides direct-message rules. Open unless an
  *  administrator chose otherwise: no row is the default. */
@@ -38,6 +43,46 @@ export async function setDmRuleMode(mode: rules.DmRuleMode): Promise<void> {
     // come back answerable the day the instance returns to agreement, about
     // rules nobody is discussing any more.
     if (mode === "open") await withdrawProposals({});
+}
+
+/** The rules a new conversation starts with. `vanishAfter` null is the
+ *  starter's own default timer, which is how every chat began before an
+ *  administrator could choose. */
+export interface StartingRules {
+    readonly receipts: rules.ChatPrivacyRule;
+    readonly typing: rules.ChatPrivacyRule;
+    readonly vanishAfter: number | null;
+}
+
+export async function startingRules(): Promise<StartingRules> {
+    const [receipts, typing, timer] = await Promise.all([
+        getSetting(START_RECEIPTS_KEY),
+        getSetting(START_TYPING_KEY),
+        getSetting(START_TIMER_KEY)
+    ]);
+    const seconds = timer === null ? null : Number(timer);
+    return {
+        receipts: rules.chatPrivacyRule(receipts),
+        typing: rules.chatPrivacyRule(typing),
+        vanishAfter: seconds !== null && rules.isVanishDuration(seconds) ? seconds : null
+    };
+}
+
+/** Store the administrator's starting rules. A default value removes its row. */
+export async function setStartingRules(next: Partial<StartingRules>): Promise<void> {
+    if (next.receipts !== undefined) {
+        await setSetting(START_RECEIPTS_KEY, next.receipts === "follow" ? null : next.receipts);
+    }
+    if (next.typing !== undefined) {
+        await setSetting(START_TYPING_KEY, next.typing === "follow" ? null : next.typing);
+    }
+    if (next.vanishAfter !== undefined) {
+        const seconds = next.vanishAfter;
+        await setSetting(
+            START_TIMER_KEY,
+            seconds !== null && rules.isVanishDuration(seconds) ? String(seconds) : null
+        );
+    }
 }
 
 /** Close every proposal still waiting, in one conversation or everywhere. */
@@ -64,21 +109,32 @@ export interface RuleProposalView {
     readonly proposedById: string;
     readonly vanishAfter: number;
     readonly deleteForAll: boolean;
+    readonly receipts: rules.ChatPrivacyRule;
+    readonly typing: rules.ChatPrivacyRule;
     /** Whether this reader may accept or decline it. */
     readonly mayAnswer: boolean;
-    /** Whether this reader proposed it, and so may withdraw it by proposing
-     *  again or wait. */
+    /** Whether this reader proposed it, and so may withdraw it. */
     readonly mine: boolean;
 }
 
 /** What a conversation's screen needs to draw and offer the rules. */
 export interface DirectRulesView {
     readonly mode: rules.DmRuleMode;
+    /** "dm" or "group": a group's rules are changed by its admins only, and
+     *  never proposed. */
+    readonly kind: string;
     readonly vanishAfter: number;
     /** Whether "also delete for everybody" may be used here now. */
     readonly deleteForAll: boolean;
+    readonly receipts: rules.ChatPrivacyRule;
+    readonly typing: rules.ChatPrivacyRule;
     /** Whether the members have agreed rules (agreement mode only). */
     readonly agreed: boolean;
+    /** Whether this reader may change the rules - the same question every
+     *  write asks. False only in a group, for somebody who does not run it. */
+    readonly mayChange: boolean;
+    /** Whether a change this reader makes waits for the other person. */
+    readonly proposes: boolean;
     readonly proposal: RuleProposalView | null;
 }
 
@@ -86,18 +142,26 @@ interface DirectChannel {
     readonly id: string;
     readonly kind: string;
     readonly spaceId: string | null;
+    readonly ownerId: string | null;
+    readonly createdById: string | null;
     readonly vanishAfter: number;
     readonly deleteForAll: boolean;
     readonly rulesAgreedAt: Date | null;
+    readonly receipts: string;
+    readonly typing: string;
 }
 
 const CHANNEL_SELECT = {
     id: true,
     kind: true,
     spaceId: true,
+    ownerId: true,
+    createdById: true,
     vanishAfter: true,
     deleteForAll: true,
-    rulesAgreedAt: true
+    rulesAgreedAt: true,
+    receipts: true,
+    typing: true
 } as const;
 
 /** The conversation, refused unless the reader is one of its members and it
@@ -113,6 +177,24 @@ async function requireDirect(actor: ChatActor, channelId: string): Promise<Direc
         throw new ChatRuleError({ key: "errors.vanishNotHere" });
     }
     return channel;
+}
+
+/** This reader's role in a group, which only a group asks for. */
+async function roleIn(channel: DirectChannel, actor: ChatActor): Promise<string | null> {
+    if (channel.kind !== "group") return null;
+    const row = await prisma.chatChannelMember.findUnique({
+        where: { channelId_userId: { channelId: channel.id, userId: actor.id } },
+        select: { role: true }
+    });
+    return row?.role ?? null;
+}
+
+/** Refused unless this reader may change the rules here: in a group, its
+ *  owner and admins only. */
+async function requireMayChange(actor: ChatActor, channel: DirectChannel): Promise<void> {
+    if (!rules.mayChangeRules(channel, await roleIn(channel, actor), actor.id)) {
+        throw new ChatRuleError({ key: "errors.rulesGroupAdminsOnly" });
+    }
 }
 
 async function memberIds(channelId: string): Promise<string[]> {
@@ -146,6 +228,54 @@ export async function expiryForChannel(channelId: string, sentAt: Date): Promise
     return rules.expiryFor(sentAt, current.vanishAfter);
 }
 
+/** A conversation's own rules for read receipts and typing. */
+export interface ChatPrivacyRules {
+    readonly receipts: rules.ChatPrivacyRule;
+    readonly typing: rules.ChatPrivacyRule;
+}
+
+const FOLLOW: ChatPrivacyRules = { receipts: "follow", typing: "follow" };
+
+/**
+ * The receipts and typing rules in force in each of these conversations, in
+ * one read whatever their number. A conversation that is not a direct one, or
+ * is not found, follows each person's account setting.
+ */
+export async function chatPrivacyIn(
+    channelIds: readonly string[]
+): Promise<Map<string, ChatPrivacyRules>> {
+    const wanted = [...new Set(channelIds)];
+    const found = new Map<string, ChatPrivacyRules>();
+    if (wanted.length === 0) return found;
+    const [rows, mode] = await Promise.all([
+        prisma.chatChannel.findMany({
+            where: { id: { in: wanted } },
+            select: {
+                id: true,
+                kind: true,
+                spaceId: true,
+                vanishAfter: true,
+                deleteForAll: true,
+                rulesAgreedAt: true,
+                receipts: true,
+                typing: true
+            }
+        }),
+        dmRuleMode()
+    ]);
+    for (const row of rows) {
+        if (!rules.hasDirectRules(row)) continue;
+        const current = rules.effectiveRules(mode, row);
+        found.set(row.id, { receipts: current.receipts, typing: current.typing });
+    }
+    return found;
+}
+
+/** `chatPrivacyIn` for one conversation. */
+export async function chatPrivacyOf(channelId: string): Promise<ChatPrivacyRules> {
+    return (await chatPrivacyIn([channelId])).get(channelId) ?? FOLLOW;
+}
+
 /** The rules of one conversation as this reader sees them, or null where the
  *  conversation has none (a space's channel). */
 export async function directRulesFor(
@@ -166,6 +296,8 @@ export async function directRulesFor(
                     proposedById: true,
                     vanishAfter: true,
                     deleteForAll: true,
+                    receipts: true,
+                    typing: true,
                     acceptedBy: true,
                     status: true
                 }
@@ -175,19 +307,27 @@ export async function directRulesFor(
     if (!channel || !rules.hasDirectRules(channel) || !access.member) return null;
     const mode = await dmRuleMode();
     const current = rules.effectiveRules(mode, channel);
-    const pending = mode === "agreement" ? (channel.ruleProposals[0] ?? null) : null;
+    const proposes = rules.changeIsProposal(mode, channel.kind);
+    const pending = proposes ? (channel.ruleProposals[0] ?? null) : null;
     const members = pending ? await memberIds(channelId) : [];
     return {
         mode,
+        kind: channel.kind,
         vanishAfter: current.vanishAfter,
         deleteForAll: current.deleteForAll,
+        receipts: current.receipts,
+        typing: current.typing,
         agreed: channel.rulesAgreedAt !== null,
+        mayChange: rules.mayChangeRules(channel, await roleIn(channel, actor), actor.id),
+        proposes,
         proposal: pending
             ? {
                   id: pending.id,
                   proposedById: pending.proposedById,
                   vanishAfter: pending.vanishAfter,
                   deleteForAll: pending.deleteForAll,
+                  receipts: rules.chatPrivacyRule(pending.receipts),
+                  typing: rules.chatPrivacyRule(pending.typing),
                   mayAnswer: rules.mayAnswerProposal(pending, actor.id, members),
                   mine: pending.proposedById.toLowerCase() === actor.id.toLowerCase()
               }
@@ -195,38 +335,107 @@ export async function directRulesFor(
     };
 }
 
+/** One change to a conversation's rules; whatever is left out stays. */
+export interface RulesChange {
+    readonly vanishAfter?: number;
+    readonly receipts?: rules.ChatPrivacyRule;
+    readonly typing?: rules.ChatPrivacyRule;
+}
+
+function checkChange(change: RulesChange): void {
+    if (change.vanishAfter !== undefined && !rules.isVanishDuration(change.vanishAfter)) {
+        throw new ChatRuleError({ key: "errors.vanishBadDuration" });
+    }
+    if (
+        (change.receipts !== undefined && !rules.isChatPrivacyRule(change.receipts)) ||
+        (change.typing !== undefined && !rules.isChatPrivacyRule(change.typing))
+    ) {
+        throw new ChatRuleError({ key: "errors.rulesBadValue" });
+    }
+}
+
 /**
- * Change the timer, in the open mode. In the agreement mode this is a proposal
- * instead, keeping the agreed delete rule as it is.
+ * Change a conversation's rules - its timer, read receipts, typing.
+ *
+ * A one-to-one in the agreement mode turns it into a proposal the other person
+ * accepts. Anywhere else it applies at once and a line in the chat says who
+ * changed what: either person in a one-to-one, a group's owner and admins in a
+ * group, whatever the screen offered.
  */
+export async function changeRules(
+    actor: ChatActor,
+    channelId: string,
+    change: RulesChange
+): Promise<void> {
+    checkChange(change);
+    const channel = await requireDirect(actor, channelId);
+    await requireMayChange(actor, channel);
+    const mode = await dmRuleMode();
+    const current = rules.effectiveRules(mode, channel);
+    if (rules.changeIsProposal(mode, channel.kind)) {
+        await proposeRules(actor, channelId, {
+            vanishAfter: change.vanishAfter ?? current.vanishAfter,
+            deleteForAll: current.deleteForAll,
+            receipts: change.receipts ?? current.receipts,
+            typing: change.typing ?? current.typing
+        });
+        return;
+    }
+    await requireNotTooFast(actor);
+    const data: { vanishAfter?: number; receipts?: string; typing?: string } = {};
+    if (change.vanishAfter !== undefined && change.vanishAfter !== current.vanishAfter) {
+        data.vanishAfter = change.vanishAfter;
+    }
+    if (change.receipts !== undefined && change.receipts !== current.receipts) {
+        data.receipts = change.receipts;
+    }
+    if (change.typing !== undefined && change.typing !== current.typing) data.typing = change.typing;
+    if (Object.keys(data).length === 0) return;
+    // The rules changed under anything still proposed, so nothing proposed
+    // before now may be accepted later.
+    await withdrawProposals({ channelId });
+    await prisma.chatChannel.update({
+        where: { id: channelId },
+        // In a one-to-one, a change nobody agreed to is not an agreement: the
+        // agreement mode, if the instance goes back to it, starts this
+        // conversation over. A group's admins decide for the group, so what
+        // they set is what the group has agreed in either mode.
+        data: { ...data, rulesAgreedAt: channel.kind === "group" ? new Date() : null }
+    });
+    const who = await mentionOf(actor.id);
+    for (const line of changeLines(who, data)) await postNoticeBody(channelId, line, actor.id);
+}
+
+/** The lines a change writes into the chat, one per rule that moved. */
+function changeLines(
+    who: string,
+    data: { vanishAfter?: number; receipts?: string; typing?: string }
+): string[] {
+    const lines: string[] = [];
+    if (data.vanishAfter !== undefined) lines.push(timerLine(who, data.vanishAfter));
+    if (data.receipts !== undefined) {
+        lines.push(ruleLine(who, "read receipts", rules.chatPrivacyRule(data.receipts)));
+    }
+    if (data.typing !== undefined) {
+        lines.push(ruleLine(who, "the typing indicator", rules.chatPrivacyRule(data.typing)));
+    }
+    return lines;
+}
+
+function ruleLine(who: string, what: string, rule: rules.ChatPrivacyRule): string {
+    return rule === "follow"
+        ? `${who} set ${what} to follow each person's settings`
+        : `${who} turned ${what} ${rule} for everyone in this chat`;
+}
+
+/** Change the timer. See `changeRules`. */
 export async function setVanishTimer(
     actor: ChatActor,
     channelId: string,
     seconds: number
 ): Promise<void> {
     if (!rules.isVanishDuration(seconds)) throw new ChatRuleError({ key: "errors.vanishBadDuration" });
-    const channel = await requireDirect(actor, channelId);
-    const mode = await dmRuleMode();
-    if (mode === "agreement") {
-        const current = rules.effectiveRules(mode, channel);
-        await proposeRules(actor, channelId, {
-            vanishAfter: seconds,
-            deleteForAll: current.deleteForAll
-        });
-        return;
-    }
-    await requireNotTooFast(actor);
-    if (rules.effectiveRules(mode, channel).vanishAfter === seconds) return;
-    // The rules changed under anything still proposed, so nothing proposed
-    // before now may be accepted later.
-    await withdrawProposals({ channelId });
-    await prisma.chatChannel.update({
-        where: { id: channelId },
-        // A change nobody agreed to is not an agreement: the agreement mode, if
-        // the instance goes back to it, starts this conversation over.
-        data: { vanishAfter: seconds, rulesAgreedAt: null }
-    });
-    await postNoticeBody(channelId, timerLine(await mentionOf(actor.id), seconds), actor.id);
+    await changeRules(actor, channelId, { vanishAfter: seconds });
 }
 
 function timerLine(who: string, seconds: number): string {
@@ -235,21 +444,63 @@ function timerLine(who: string, seconds: number): string {
         : `${who} set messages to disappear after ${rules.spokenVanish(seconds)}`;
 }
 
-/** Propose new rules, in the agreement mode. Replaces a proposal still
- *  waiting; the one proposing has accepted it by proposing. */
+/** A whole rule set, in words, for the lines that announce it. */
+function spokenRules(proposed: {
+    readonly vanishAfter: number;
+    readonly deleteForAll: boolean;
+    readonly receipts: rules.ChatPrivacyRule;
+    readonly typing: rules.ChatPrivacyRule;
+}): string {
+    const timer =
+        proposed.vanishAfter === 0
+            ? "no disappearing messages"
+            : `messages that disappear after ${rules.spokenVanish(proposed.vanishAfter)}`;
+    const deletion = proposed.deleteForAll
+        ? "deleting the chat for everybody allowed"
+        : "deleting the chat for everybody off";
+    const receipts = rules.spokenRule(proposed.receipts);
+    const typing = rules.spokenRule(proposed.typing);
+    return `${timer}, read receipts ${receipts}, typing indicator ${typing}, with ${deletion}`;
+}
+
+/**
+ * Propose new rules, in the agreement mode. Replaces a proposal still
+ * waiting; the one proposing has accepted it by proposing. A group never
+ * proposes: its admins' change applies at once, with a line saying so.
+ */
 export async function proposeRules(
     actor: ChatActor,
     channelId: string,
-    proposed: { readonly vanishAfter: number; readonly deleteForAll: boolean }
+    proposed: {
+        readonly vanishAfter: number;
+        readonly deleteForAll: boolean;
+        readonly receipts?: rules.ChatPrivacyRule;
+        readonly typing?: rules.ChatPrivacyRule;
+    }
 ): Promise<void> {
-    if (!rules.isVanishDuration(proposed.vanishAfter)) {
-        throw new ChatRuleError({ key: "errors.vanishBadDuration" });
-    }
-    await requireDirect(actor, channelId);
-    if ((await dmRuleMode()) !== "agreement") {
-        throw new ChatRuleError({ key: "errors.vanishNoAgreement" });
-    }
+    checkChange(proposed);
+    const channel = await requireDirect(actor, channelId);
+    await requireMayChange(actor, channel);
+    const mode = await dmRuleMode();
+    if (mode !== "agreement") throw new ChatRuleError({ key: "errors.vanishNoAgreement" });
+    const current = rules.effectiveRules(mode, channel);
+    const full = {
+        vanishAfter: proposed.vanishAfter,
+        deleteForAll: proposed.deleteForAll,
+        receipts: proposed.receipts ?? current.receipts,
+        typing: proposed.typing ?? current.typing
+    };
     await requireNotTooFast(actor);
+    const who = await mentionOf(actor.id);
+    if (!rules.changeIsProposal(mode, channel.kind)) {
+        await withdrawProposals({ channelId });
+        await prisma.chatChannel.update({
+            where: { id: channelId },
+            data: { ...full, rulesAgreedAt: new Date() }
+        });
+        await postNoticeBody(channelId, `${who} set the chat rules: ${spokenRules(full)}`, actor.id);
+        return;
+    }
     // Proposing is accepting, so a conversation with nobody else left in it
     // agrees at once.
     const done = rules.proposalAccepted([actor.id], await memberIds(channelId));
@@ -263,8 +514,7 @@ export async function proposeRules(
             data: {
                 channelId,
                 proposedById: actor.id,
-                vanishAfter: proposed.vanishAfter,
-                deleteForAll: proposed.deleteForAll,
+                ...full,
                 acceptedBy: [actor.id],
                 ...(done ? { status: "accepted", decidedAt: now } : {})
             }
@@ -273,28 +523,41 @@ export async function proposeRules(
             ? [
                   prisma.chatChannel.update({
                       where: { id: channelId },
-                      data: {
-                          vanishAfter: proposed.vanishAfter,
-                          deleteForAll: proposed.deleteForAll,
-                          rulesAgreedAt: now
-                      }
+                      data: { ...full, rulesAgreedAt: now }
                   })
               ]
             : [])
     ]);
-    const who = await mentionOf(actor.id);
     if (done) {
-        await postNoticeBody(channelId, acceptedLine(who, proposed.vanishAfter), actor.id);
+        await postNoticeBody(channelId, acceptedLine(who, full), actor.id);
         return;
     }
-    const timer =
-        proposed.vanishAfter === 0
-            ? "no disappearing messages"
-            : `messages that disappear after ${rules.spokenVanish(proposed.vanishAfter)}`;
-    const deletion = proposed.deleteForAll
-        ? "deleting the chat for everybody allowed"
-        : "deleting the chat for everybody off";
-    await postNoticeBody(channelId, `${who} proposed ${timer}, with ${deletion}`, actor.id);
+    await postNoticeBody(channelId, `${who} proposed ${spokenRules(full)}`, actor.id);
+}
+
+/** Withdraw a proposal still waiting. Only the one who made it may. */
+export async function withdrawProposal(actor: ChatActor, proposalId: string): Promise<void> {
+    const proposal = await prisma.chatRuleProposal.findUnique({
+        where: { id: proposalId },
+        select: { id: true, channelId: true, status: true, proposedById: true }
+    });
+    if (!proposal) throw new ChatRuleError({ key: "errors.proposalGone" });
+    await requireDirect(actor, proposal.channelId);
+    if (proposal.status !== "pending") throw new ChatRuleError({ key: "errors.proposalGone" });
+    if (proposal.proposedById.toLowerCase() !== actor.id.toLowerCase()) {
+        throw new ChatRuleError({ key: "errors.proposalNotYours" });
+    }
+    await requireNotTooFast(actor);
+    const closed = await prisma.chatRuleProposal.updateMany({
+        where: { id: proposal.id, status: "pending" },
+        data: { status: "withdrawn", decidedAt: new Date() }
+    });
+    if (closed.count === 0) throw new ChatRuleError({ key: "errors.proposalGone" });
+    await postNoticeBody(
+        proposal.channelId,
+        `${await mentionOf(actor.id)} withdrew the proposed chat rules`,
+        actor.id
+    );
 }
 
 /** Accept or decline a proposal. Only another member who has not accepted it
@@ -312,12 +575,17 @@ export async function answerProposal(
             status: true,
             acceptedBy: true,
             vanishAfter: true,
-            deleteForAll: true
+            deleteForAll: true,
+            receipts: true,
+            typing: true
         }
     });
     if (!proposal) throw new ChatRuleError({ key: "errors.proposalGone" });
-    await requireDirect(actor, proposal.channelId);
-    if ((await dmRuleMode()) !== "agreement" || proposal.status !== "pending") {
+    const channel = await requireDirect(actor, proposal.channelId);
+    // A group's proposal left from before its admins decided alone is not
+    // answerable any more: nothing on the screen shows it.
+    const mode = await dmRuleMode();
+    if (!rules.changeIsProposal(mode, channel.kind) || proposal.status !== "pending") {
         throw new ChatRuleError({ key: "errors.proposalGone" });
     }
     const members = await memberIds(proposal.channelId);
@@ -335,6 +603,12 @@ export async function answerProposal(
         await postNoticeBody(proposal.channelId, `${who} declined the proposed chat rules`, actor.id);
         return;
     }
+    const agreed = {
+        vanishAfter: proposal.vanishAfter,
+        deleteForAll: proposal.deleteForAll,
+        receipts: rules.chatPrivacyRule(proposal.receipts),
+        typing: rules.chatPrivacyRule(proposal.typing)
+    };
     const now = new Date();
     // The vote is appended in SQL rather than written back as the list read
     // above, and the update holds the row until the transaction ends: two
@@ -360,11 +634,7 @@ export async function answerProposal(
         if (done) {
             await tx.chatChannel.update({
                 where: { id: proposal.channelId },
-                data: {
-                    vanishAfter: proposal.vanishAfter,
-                    deleteForAll: proposal.deleteForAll,
-                    rulesAgreedAt: now
-                }
+                data: { ...agreed, rulesAgreedAt: now }
             });
         }
         return { done };
@@ -372,15 +642,26 @@ export async function answerProposal(
     if (!settled) throw new ChatRuleError({ key: "errors.proposalGone" });
     await postNoticeBody(
         proposal.channelId,
-        settled.done ? acceptedLine(who, proposal.vanishAfter) : `${who} accepted the proposed chat rules`,
+        settled.done ? acceptedLine(who, agreed) : `${who} accepted the proposed chat rules`,
         actor.id
     );
 }
 
-function acceptedLine(who: string, seconds: number): string {
-    return `${who} accepted the chat rules: ${
-        seconds === 0 ? "messages no longer disappear" : `messages disappear after ${rules.spokenVanish(seconds)}`
-    }`;
+function acceptedLine(
+    who: string,
+    agreed: {
+        readonly vanishAfter: number;
+        readonly receipts: rules.ChatPrivacyRule;
+        readonly typing: rules.ChatPrivacyRule;
+    }
+): string {
+    const timer =
+        agreed.vanishAfter === 0
+            ? "messages no longer disappear"
+            : `messages disappear after ${rules.spokenVanish(agreed.vanishAfter)}`;
+    const receipts = rules.spokenRule(agreed.receipts);
+    const typing = rules.spokenRule(agreed.typing);
+    return `${who} accepted the chat rules: ${timer}, read receipts ${receipts}, typing indicator ${typing}`;
 }
 
 /** Delete one message for this reader only. Anybody's, mine or not. */
@@ -447,10 +728,31 @@ export async function deleteChatForAll(actor: ChatActor, channelId: string): Pro
     );
 }
 
-/** The timer a new direct message starts with: its starter's default, in the
- *  open mode. In the agreement mode it is proposed instead. Never throws. */
+/**
+ * What a new direct message or group starts with: the administrator's
+ * starting rules for read receipts and typing, and their timer - or, where
+ * they left the timer to each person, the starter's own default, which in a
+ * one-to-one under the agreement mode is proposed rather than set. Never
+ * throws: the conversation stands either way, and the rules can be changed by
+ * hand.
+ */
 export async function applyDefaultTimer(actor: ChatActor, channelId: string): Promise<void> {
     try {
+        const start = await startingRules();
+        if (start.receipts !== "follow" || start.typing !== "follow" || start.vanishAfter) {
+            // The instance's starting values rather than anybody's change, so
+            // they count as agreed from the first message and say nothing.
+            await prisma.chatChannel.update({
+                where: { id: channelId },
+                data: {
+                    receipts: start.receipts,
+                    typing: start.typing,
+                    ...(start.vanishAfter ? { vanishAfter: start.vanishAfter } : {}),
+                    rulesAgreedAt: new Date()
+                }
+            });
+        }
+        if (start.vanishAfter !== null) return;
         const privacy = await prisma.userPrivacy.findUnique({
             where: { userId: actor.id },
             select: { chatVanishAfter: true }
@@ -460,7 +762,7 @@ export async function applyDefaultTimer(actor: ChatActor, channelId: string): Pr
         await setVanishTimer(actor, channelId, seconds);
     } catch (error) {
         // The conversation stands either way; the default can be set by hand.
-        console.error("[chat] could not apply the default disappearing timer:", error);
+        console.error("[chat] could not apply the starting chat rules:", error);
     }
 }
 

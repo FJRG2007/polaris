@@ -77,14 +77,15 @@ describe("the groups read", () => {
 });
 
 describe("the privacy read", () => {
-    it("reads the three settings in one query", async () => {
+    it("reads every setting it shows in one query", async () => {
         db.settingFindMany.mockResolvedValue([{ key: "profiles.public", value: "true" }]);
 
         const data = await readPrivacy();
 
         expect(db.settingFindMany).toHaveBeenCalledTimes(1);
         expect(db.settingFindUnique).not.toHaveBeenCalled();
-        expect(db.settingFindMany.mock.calls[0]![0].where.key.in).toHaveLength(3);
+        // The public-profile switches and every privacy field's default.
+        expect(db.settingFindMany.mock.calls[0]![0].where.key.in).toContain("profiles.public");
         expect(data.publicProfiles).toBe(true);
     });
 });

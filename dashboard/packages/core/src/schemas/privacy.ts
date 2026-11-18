@@ -691,3 +691,28 @@ export const blockSchema = z.object({
 });
 
 export type BlockInput = z.infer<typeof blockSchema>;
+
+/**
+ * A conversation's own rule for read receipts and for the typing indicator:
+ * "follow" leaves it to each person's account setting, "on" shows it to
+ * everybody in the conversation, "off" to nobody. Inside that conversation the
+ * conversation's rule wins over the account's.
+ */
+export const CHAT_PRIVACY_RULES = ["follow", "on", "off"] as const;
+export type ChatPrivacyRule = (typeof CHAT_PRIVACY_RULES)[number];
+export const chatPrivacyRuleSchema = z.enum(CHAT_PRIVACY_RULES);
+
+/** One change to a conversation's privacy rules: any of the three, at least one. */
+export const chatPrivacyChangeSchema = z
+    .object({
+        receipts: chatPrivacyRuleSchema.optional(),
+        typing: chatPrivacyRuleSchema.optional(),
+        vanishAfter: z.number().int().min(0).optional()
+    })
+    .strict()
+    .refine(
+        (change) =>
+            change.receipts !== undefined || change.typing !== undefined || change.vanishAfter !== undefined,
+        { message: "Nothing to change" }
+    );
+export type ChatPrivacyChange = z.infer<typeof chatPrivacyChangeSchema>;

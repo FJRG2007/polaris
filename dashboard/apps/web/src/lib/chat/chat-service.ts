@@ -48,7 +48,7 @@ import {
 import * as history from "./history-visibility";
 import { concealedFrom, listedFor } from "./chat-lock";
 import { badgeClearedAt, laterMark } from "@/lib/badge-seen";
-import { applyDefaultTimer } from "./vanish";
+import { applyDefaultTimer, chatPrivacyIn, type ChatPrivacyRules } from "./vanish";
 
 /** A space as the rail draws it. */
 export interface ChatSpaceView {
@@ -916,9 +916,20 @@ export async function listChannels(
         const others = channel.members.filter((member) => member.userId !== actor.id);
         if (others.length > 0) ticked.set(channel.id, { kind: channel.kind, others });
     }
+    // A conversation's own receipts rule wins inside it; only the ones that
+    // follow each person's setting are asked about the people in them.
+    const chatRules = await chatPrivacyIn([...ticked.keys()]).catch(
+        () => new Map<string, ChatPrivacyRules>()
+    );
+    const ruleOf = (channelId: string) => chatRules.get(channelId)?.receipts ?? "follow";
+    for (const channelId of [...ticked.keys()]) {
+        if (ruleOf(channelId) === "off") ticked.delete(channelId);
+    }
     const allowed = await receiptsAmong(
         { id: actor.id, isAdmin: false },
-        [...ticked.values()].flatMap(({ others }) => others.map((member) => member.userId))
+        [...ticked]
+            .filter(([channelId]) => ruleOf(channelId) === "follow")
+            .flatMap(([, { others }]) => others.map((member) => member.userId))
     ).catch(() => new Set<string>());
     // A one-to-one keeps the marks its message carries; a group's are worked
     // out from the members', because nothing on a group message is stamped.
@@ -928,7 +939,7 @@ export async function listChannels(
             userId: member.userId,
             readAt: groupReceipts.seenAt(member),
             deliveredAt: member.lastDeliveredAt,
-            allowed: allowed.has(member.userId)
+            allowed: ruleOf(channelId) === "on" || allowed.has(member.userId)
         }));
         if (kind === "dm") {
             if (marks[0]!.allowed) receipts.set(channelId, true);

@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import * as core from "@polaris/core";
 import * as vanish from "@/lib/chat/vanish";
 import { guardChat } from "@/lib/chat/chat-guard";
 import { requirePermission } from "@/lib/session";
@@ -20,9 +21,23 @@ async function actor(): Promise<{ id: string; name: string }> {
 
 const idSchema = z.string().uuid();
 const durationSchema = z.number().int().refine((value) => (VANISH_DURATIONS as readonly number[]).includes(value));
-const proposalSchema = z.object({ vanishAfter: durationSchema, deleteForAll: z.boolean() }).strict();
+const proposalSchema = z
+    .object({
+        vanishAfter: durationSchema,
+        deleteForAll: z.boolean(),
+        receipts: core.chatPrivacyRuleSchema.optional(),
+        typing: core.chatPrivacyRuleSchema.optional()
+    })
+    .strict();
 
-async function refused(key: "errors.notInConversation" | "errors.messageGone" | "errors.vanishBadDuration" | "errors.proposalGone") {
+async function refused(
+    key:
+        | "errors.notInConversation"
+        | "errors.messageGone"
+        | "errors.vanishBadDuration"
+        | "errors.proposalGone"
+        | "errors.rulesBadValue"
+) {
     return { error: (await getTranslations("chat"))(key) };
 }
 
@@ -48,6 +63,32 @@ export async function setVanishTimerAction(
     const duration = durationSchema.safeParse(seconds);
     if (!duration.success) return refused("errors.vanishBadDuration");
     return guardChat(() => vanish.setVanishTimer(me, channel.data, duration.data));
+}
+
+/** Change a conversation's timer, read receipts or typing rule. Applied at
+ *  once and announced, or proposed where the instance decides one-to-one rules
+ *  by agreement; in a group, only its owner and admins may. */
+export async function changeRulesAction(
+    channelId: unknown,
+    change: unknown
+): Promise<{ error?: string }> {
+    const me = await actor();
+    const channel = idSchema.safeParse(channelId);
+    if (!channel.success) return refused("errors.notInConversation");
+    const parsed = core.chatPrivacyChangeSchema.safeParse(change);
+    if (!parsed.success) return refused("errors.rulesBadValue");
+    if (parsed.data.vanishAfter !== undefined && !durationSchema.safeParse(parsed.data.vanishAfter).success) {
+        return refused("errors.vanishBadDuration");
+    }
+    return guardChat(() => vanish.changeRules(me, channel.data, parsed.data));
+}
+
+/** Withdraw a proposal this reader made and nobody has settled yet. */
+export async function withdrawProposalAction(proposalId: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const id = idSchema.safeParse(proposalId);
+    if (!id.success) return refused("errors.proposalGone");
+    return guardChat(() => vanish.withdrawProposal(me, id.data));
 }
 
 export async function proposeRulesAction(

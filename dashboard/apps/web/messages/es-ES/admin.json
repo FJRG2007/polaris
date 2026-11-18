@@ -386,15 +386,26 @@
             "invalid": "Esa opción no está disponible",
             "open": {
                 "label": "Abierto",
-                "hint": "Cualquiera activa los mensajes temporales y puede borrar el chat para ambos."
+                "hint": "Cualquiera de los dos cambia los mensajes temporales, las confirmaciones y la escritura al momento, con un aviso en el chat. Grupos: solo propietario y administradores."
             },
             "agreement": {
                 "label": "Acuerdo",
-                "hint": "Los cambios esperan a que todos en el chat los acepten."
+                "hint": "En un mensaje directo, el cambio es una propuesta que el otro acepta. Grupos: propietario y administradores, al momento."
             },
             "line": {
                 "label": "Mostrar una línea al borrar un chat para ambos",
                 "hint": "Apagado: el chat se vacía sin dejar ninguna línea."
+            },
+            "starting": {
+                "title": "Los chats nuevos usan",
+                "hint": "Con qué empieza un mensaje directo o grupo nuevo. Quienes estén en el chat pueden cambiarlo después.",
+                "receipts": "Avisos de lectura",
+                "typing": "Aviso de escritura",
+                "timer": "Mensajes temporales",
+                "follow": "Seguir los ajustes de cada persona",
+                "on": "Sí",
+                "off": "No",
+                "timerAccount": "El de cada persona"
             }
         }
     },

@@ -53,6 +53,13 @@ function findMany(args: {
     return args.take === undefined ? rows : rows.slice(0, args.take);
 }
 
+// Every conversation here follows each person's own settings.
+vi.mock("@/lib/chat/vanish", () => ({
+    expiryForChannel: async () => null,
+    chatPrivacyOf: async () => ({ receipts: "follow", typing: "follow" }),
+    chatPrivacyIn: async () => new Map()
+}));
+
 vi.mock("@polaris/db", () => ({
     prisma: {
         chatMessage: {

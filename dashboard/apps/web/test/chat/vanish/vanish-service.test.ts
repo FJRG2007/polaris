@@ -5,10 +5,16 @@ const channel = {
     id: "c1",
     kind: "dm",
     spaceId: null as string | null,
+    ownerId: "me" as string | null,
+    createdById: "me" as string | null,
     vanishAfter: 0,
     deleteForAll: false,
-    rulesAgreedAt: null as Date | null
+    rulesAgreedAt: null as Date | null,
+    receipts: "follow",
+    typing: "follow"
 };
+/** The reader's role in a group. */
+let role = "member";
 let members = ["me", "other"];
 let proposal: Record<string, unknown> | null = null;
 let due: { id: string; channelId: string; parentId: string | null }[][] = [];
@@ -45,6 +51,7 @@ const prisma = {
     },
     chatChannelMember: {
         findMany: vi.fn(async () => members.map((userId) => ({ userId }))),
+        findUnique: vi.fn(async () => ({ role })),
         updateMany: vi.fn(async () => ({ count: 1 }))
     },
     chatRuleProposal: {
@@ -134,10 +141,15 @@ beforeEach(() => {
     Object.assign(channel, {
         kind: "dm",
         spaceId: null,
+        ownerId: "me",
+        createdById: "me",
         vanishAfter: 0,
         deleteForAll: false,
-        rulesAgreedAt: null
+        rulesAgreedAt: null,
+        receipts: "follow",
+        typing: "follow"
     });
+    role = "member";
     members = ["me", "other"];
     proposal = null;
     access = { member: true };
@@ -218,18 +230,19 @@ describe("permissions", () => {
         expect(notices[0]).toContain("declined");
     });
 
-    it("a group's proposal waits for every member", async () => {
+    it("a group's proposal left from before its admins decided alone is not answerable", async () => {
         settings.set("chat.dmRules", "agreement");
         channel.kind = "group";
         members = ["me", "other", "third"];
         proposal = pending();
-        await vanish.answerProposal(other, "p1", true);
+        await expect(vanish.answerProposal(other, "p1", true)).rejects.toThrow("errors.proposalGone");
         expect(tx.chatChannel.update).not.toHaveBeenCalled();
     });
 
     it("two members accepting at once both count, and the last one settles it", async () => {
+        // The vote is appended in SQL however many it waits on; three members
+        // are what make two answers at once possible.
         settings.set("chat.dmRules", "agreement");
-        channel.kind = "group";
         members = ["me", "other", "third"];
         proposal = pending();
         // Both read the proposal before either vote lands.
@@ -257,19 +270,17 @@ describe("permissions", () => {
         expect(proposal?.acceptedBy).toEqual(["me"]);
     });
 
-    it("a group with nobody else in it agrees as soon as it proposes", async () => {
+    it("a group never proposes: its owner's rules apply at once", async () => {
         settings.set("chat.dmRules", "agreement");
         channel.kind = "group";
         members = ["me"];
         await vanish.proposeRules(me, "c1", { vanishAfter: 604_800, deleteForAll: true });
-        expect(prisma.chatRuleProposal.create).toHaveBeenCalledWith({
-            data: expect.objectContaining({ status: "accepted" })
-        });
+        expect(prisma.chatRuleProposal.create).not.toHaveBeenCalled();
         expect(prisma.chatChannel.update).toHaveBeenCalledWith({
             where: { id: "c1" },
             data: expect.objectContaining({ vanishAfter: 604_800, deleteForAll: true })
         });
-        expect(notices[0]).toContain("accepted the chat rules");
+        expect(notices[0]).toContain("set the chat rules");
     });
 
     it("going back to the open mode closes every proposal still waiting", async () => {
@@ -358,5 +369,174 @@ describe("the per-user default", () => {
         prisma.userPrivacy.findUnique.mockResolvedValueOnce({ chatVanishAfter: 86_400 });
         await vanish.applyDefaultTimer(me, "c1");
         expect(prisma.chatChannel.update).toHaveBeenCalled();
+    });
+});
+describe("a chat's own read receipts and typing", () => {
+    it("announced: either person in a one-to-one changes it at once, with a line", async () => {
+        await vanish.changeRules(other, "c1", { receipts: "off" });
+        expect(prisma.chatChannel.update).toHaveBeenCalledWith({
+            where: { id: "c1" },
+            data: { receipts: "off", rulesAgreedAt: null }
+        });
+        expect(notices[0]).toContain("turned read receipts off for everyone in this chat");
+    });
+
+    it("announced: a value it already has writes nothing and says nothing", async () => {
+        channel.typing = "on";
+        await vanish.changeRules(me, "c1", { typing: "on" });
+        expect(prisma.chatChannel.update).not.toHaveBeenCalled();
+        expect(notices).toEqual([]);
+    });
+
+    it("agreement: a change is a proposal carrying the whole rule set", async () => {
+        settings.set("chat.dmRules", "agreement");
+        await vanish.changeRules(me, "c1", { typing: "off" });
+        expect(prisma.chatChannel.update).not.toHaveBeenCalled();
+        expect(prisma.chatRuleProposal.create).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                proposedById: "me",
+                typing: "off",
+                receipts: "follow",
+                vanishAfter: 0,
+                acceptedBy: ["me"]
+            })
+        });
+        expect(notices[0]).toContain("proposed");
+        expect(notices[0]).toContain("typing indicator off");
+    });
+
+    it("agreement: accepting applies receipts and typing too, and says so", async () => {
+        settings.set("chat.dmRules", "agreement");
+        proposal = pending({ receipts: "on", typing: "off", vanishAfter: 0, deleteForAll: false });
+        await vanish.answerProposal(other, "p1", true);
+        expect(tx.chatChannel.update).toHaveBeenCalledWith({
+            where: { id: "c1" },
+            data: expect.objectContaining({ receipts: "on", typing: "off" })
+        });
+        expect(notices[0]).toContain("read receipts on, typing indicator off");
+    });
+
+    it("agreement: declining changes nothing and is announced", async () => {
+        settings.set("chat.dmRules", "agreement");
+        proposal = pending({ receipts: "on" });
+        await vanish.answerProposal(other, "p1", false);
+        expect(tx.chatChannel.update).not.toHaveBeenCalled();
+        expect(prisma.chatChannel.update).not.toHaveBeenCalled();
+        expect(notices[0]).toContain("declined");
+    });
+
+    it("agreement: the proposer withdraws it, nobody else may", async () => {
+        settings.set("chat.dmRules", "agreement");
+        proposal = { ...pending(), proposedById: "me" };
+        await expect(vanish.withdrawProposal(other, "p1")).rejects.toThrow("errors.proposalNotYours");
+        await vanish.withdrawProposal(me, "p1");
+        expect(prisma.chatRuleProposal.updateMany).toHaveBeenCalledWith({
+            where: { id: "p1", status: "pending" },
+            data: expect.objectContaining({ status: "withdrawn" })
+        });
+        expect(notices.at(-1)).toContain("withdrew the proposed chat rules");
+    });
+
+    it("agreement: a settled proposal cannot be withdrawn", async () => {
+        settings.set("chat.dmRules", "agreement");
+        proposal = { ...pending({ status: "accepted" }), proposedById: "me" };
+        await expect(vanish.withdrawProposal(me, "p1")).rejects.toThrow("errors.proposalGone");
+    });
+
+    it("a group: a member who does not run it is refused, in either mode", async () => {
+        channel.kind = "group";
+        channel.ownerId = "somebody-else";
+        await expect(vanish.changeRules(me, "c1", { receipts: "on" })).rejects.toThrow(
+            "errors.rulesGroupAdminsOnly"
+        );
+        settings.set("chat.dmRules", "agreement");
+        await expect(vanish.changeRules(me, "c1", { receipts: "on" })).rejects.toThrow(
+            "errors.rulesGroupAdminsOnly"
+        );
+        await expect(vanish.setVanishTimer(me, "c1", 86_400)).rejects.toThrow(
+            "errors.rulesGroupAdminsOnly"
+        );
+        expect(prisma.chatChannel.update).not.toHaveBeenCalled();
+    });
+
+    it("a group: an admin changes it at once even in the agreement mode, and it counts as agreed", async () => {
+        settings.set("chat.dmRules", "agreement");
+        channel.kind = "group";
+        channel.ownerId = "somebody-else";
+        role = "admin";
+        await vanish.changeRules(me, "c1", { typing: "off" });
+        expect(prisma.chatRuleProposal.create).not.toHaveBeenCalled();
+        expect(prisma.chatChannel.update).toHaveBeenCalledWith({
+            where: { id: "c1" },
+            data: { typing: "off", rulesAgreedAt: expect.any(Date) }
+        });
+        expect(notices[0]).toContain("turned the typing indicator off");
+    });
+
+    it("refuses a value that is not a rule", async () => {
+        await expect(
+            vanish.changeRules(me, "c1", { receipts: "maybe" as unknown as "on" })
+        ).rejects.toThrow("errors.rulesBadValue");
+    });
+
+    it("tells readers the rules in force, and who may change them", async () => {
+        channel.kind = "group";
+        channel.ownerId = "somebody-else";
+        channel.receipts = "on";
+        const seen = await vanish.directRulesFor(me, "c1");
+        expect(seen).toMatchObject({ receipts: "on", typing: "follow", mayChange: false, proposes: false });
+    });
+
+    it("the timer a chat sets is stamped on what is sent in it", async () => {
+        channel.vanishAfter = 86_400;
+        const sent = new Date("2026-11-18T10:00:00Z");
+        expect(await vanish.expiryForChannel("c1", sent)).toEqual(new Date("2026-11-19T10:00:00Z"));
+        settings.set("chat.dmRules", "agreement");
+        expect(await vanish.expiryForChannel("c1", sent)).toBeNull();
+    });
+});
+
+describe("the administrator's starting rules", () => {
+    it("start a new chat with the chosen receipts, typing and timer, agreed", async () => {
+        await vanish.setStartingRules({ receipts: "on", typing: "off", vanishAfter: 604_800 });
+        await vanish.applyDefaultTimer(me, "c1");
+        expect(prisma.chatChannel.update).toHaveBeenCalledWith({
+            where: { id: "c1" },
+            data: { receipts: "on", typing: "off", vanishAfter: 604_800, rulesAgreedAt: expect.any(Date) }
+        });
+        // The administrator's timer wins over the starter's own default.
+        expect(prisma.userPrivacy.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("left at their defaults, write nothing and keep the starter's own timer", async () => {
+        await vanish.setStartingRules({ receipts: "follow", typing: "follow", vanishAfter: null });
+        expect(settings.size).toBe(0);
+        expect(await vanish.startingRules()).toEqual({ receipts: "follow", typing: "follow", vanishAfter: null });
+        prisma.userPrivacy.findUnique.mockResolvedValueOnce({ chatVanishAfter: 86_400 });
+        await vanish.applyDefaultTimer(me, "c1");
+        expect(prisma.chatChannel.update).toHaveBeenCalledTimes(1);
+        expect(prisma.chatChannel.update).toHaveBeenCalledWith({
+            where: { id: "c1" },
+            data: { vanishAfter: 86_400, rulesAgreedAt: null }
+        });
+    });
+
+    it("ignore a stored timer that is not one of the durations", async () => {
+        settings.set("chat.defaults.vanishAfter", "3600");
+        expect((await vanish.startingRules()).vanishAfter).toBeNull();
+    });
+});
+
+describe("which rule each conversation has", () => {
+    it("reads many in one query, and a space's channel follows the accounts", async () => {
+        const findMany = vi.fn(async () => [
+            { ...channel, id: "a", receipts: "on", typing: "off" },
+            { ...channel, id: "b", spaceId: "s1", receipts: "off" }
+        ]);
+        (prisma.chatChannel as unknown as { findMany: typeof findMany }).findMany = findMany;
+        const found = await vanish.chatPrivacyIn(["a", "b", "a"]);
+        expect(findMany).toHaveBeenCalledTimes(1);
+        expect(found.get("a")).toEqual({ receipts: "on", typing: "off" });
+        expect(found.has("b")).toBe(false);
     });
 });

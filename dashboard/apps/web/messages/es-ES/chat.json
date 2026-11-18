@@ -244,7 +244,9 @@
         "vanishTooFast": "Demasiados cambios. Prueba en unos minutos",
         "proposalGone": "Esa propuesta ya no está abierta",
         "proposalNotYours": "Solo los demás del chat pueden responderla",
-        "deleteForAllOff": "Aquí no se permite borrar el chat para todos"
+        "deleteForAllOff": "Aquí no se permite borrar el chat para todos",
+        "rulesGroupAdminsOnly": "Solo el propietario y los administradores del grupo pueden cambiarlo",
+        "rulesBadValue": "Esa opción no está disponible"
     },
     "media": {
         "refused": {
@@ -2401,13 +2403,30 @@
         "alsoFor": "Borrar también para {name}",
         "alsoForHint": "Borra todos los mensajes para todos en el chat.",
         "alsoForOff": "No se permite hasta que todos en el chat lo acepten",
-        "proposalTimer": "{name} propone: los mensajes desaparecen tras {duration}",
-        "proposalTimerOff": "{name} propone: los mensajes no desaparecen",
         "proposalDeleteYes": "Se permite borrar el chat para todos",
         "proposalDeleteNo": "No se permite borrar el chat para todos",
         "waiting": "Esperando a que los demás acepten tu propuesta",
         "accept": "Aceptar",
         "decline": "Rechazar",
         "deleteFailed": "No se pudo borrar el chat. Inténtalo de nuevo."
+    },
+    "chatPrivacy": {
+        "title": "Privacidad",
+        "receipts": "Avisos de lectura",
+        "typing": "Aviso de escritura",
+        "timer": "Mensajes temporales",
+        "follow": "Sigue los ajustes de cada persona",
+        "on": "Sí",
+        "off": "No",
+        "announced": "Los cambios se aplican al momento y se anuncian en el chat.",
+        "proposed": "Los cambios se proponen y se aplican al aceptarse.",
+        "groupAdmins": "Los cambios se aplican al momento y se anuncian en el chat.",
+        "groupAdminsOnly": "Solo el propietario y los administradores del grupo pueden cambiarlos.",
+        "proposal": "Propuesto: {value}",
+        "proposalBy": "{name} ha propuesto un cambio",
+        "proposalMine": "Esperando a que la otra persona acepte",
+        "withdraw": "Retirar",
+        "accept": "Aceptar",
+        "decline": "Rechazar"
     }
 }

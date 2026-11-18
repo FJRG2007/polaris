@@ -8,6 +8,7 @@
  * and silently replaced by a default.
  */
 
+import { z } from "zod";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/session";
@@ -20,8 +21,8 @@ import * as calls from "@/lib/chat/call-server";
 import { recordAudit } from "@/lib/audit-service";
 import { syncCallServerRoute } from "@/lib/chat/call-edge";
 import { saveLinkSafetySettings } from "@/lib/chat/link-safety";
-import { isDmRuleMode } from "@/lib/chat/vanish-rules";
-import { setDeleteChatLineShown, setDmRuleMode } from "@/lib/chat/vanish";
+import { isDmRuleMode, isVanishDuration } from "@/lib/chat/vanish-rules";
+import { setDeleteChatLineShown, setDmRuleMode, setStartingRules } from "@/lib/chat/vanish";
 
 export async function setChatRulesAction(
     scope: unknown,
@@ -178,6 +179,38 @@ export async function setDmRuleModeAction(mode: unknown): Promise<{ error?: stri
         targetType: "setting",
         targetId: "chat.dmRules",
         metadata: { mode }
+    });
+    revalidatePath(CHAT_SETTINGS_PATH);
+    return {};
+}
+
+const startingRulesSchema = z
+    .object({
+        receipts: core.chatPrivacyRuleSchema.optional(),
+        typing: core.chatPrivacyRuleSchema.optional(),
+        // Null is each person's own default timer.
+        vanishAfter: z
+            .number()
+            .int()
+            .refine((value) => isVanishDuration(value))
+            .nullable()
+            .optional()
+    })
+    .strict();
+
+/** What a new direct message or group starts with: read receipts, typing and
+ *  the disappearing-messages timer. Existing chats keep what they have. */
+export async function setStartingRulesAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = startingRulesSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("admin"))("chat.directRules.invalid") };
+    await setStartingRules(parsed.data);
+    await recordAudit({
+        actorId: admin.id,
+        action: "chat.startingRules.set",
+        targetType: "setting",
+        targetId: "chat.defaults",
+        metadata: { ...parsed.data }
     });
     revalidatePath(CHAT_SETTINGS_PATH);
     return {};

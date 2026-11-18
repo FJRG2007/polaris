@@ -386,15 +386,26 @@
             "invalid": "That choice is not available",
             "open": {
                 "label": "Open",
-                "hint": "Either person sets disappearing messages and may delete the chat for both."
+                "hint": "Either person changes disappearing messages, read receipts and typing at once, with a line in the chat. Groups: owner and admins only."
             },
             "agreement": {
                 "label": "Agreement",
-                "hint": "Changes wait until everyone in the chat accepts them."
+                "hint": "A direct message's change is a proposal the other person accepts. Groups: owner and admins, at once."
             },
             "line": {
                 "label": "Show a line when someone deletes a chat for both",
                 "hint": "Off: the chat is emptied with no line left in it."
+            },
+            "starting": {
+                "title": "New chats start with",
+                "hint": "What a new direct message or group starts with. People in the chat can change it later.",
+                "receipts": "Read receipts",
+                "typing": "Typing indicator",
+                "timer": "Disappearing messages",
+                "follow": "Follow each person's settings",
+                "on": "On",
+                "off": "Off",
+                "timerAccount": "Each person's own default"
             }
         }
     },

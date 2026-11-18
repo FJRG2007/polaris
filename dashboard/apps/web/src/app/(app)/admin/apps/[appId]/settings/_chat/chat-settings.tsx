@@ -16,7 +16,7 @@ import { DriveShareView } from "./drive-share-view";
 import { linkSafetyOverview } from "@/lib/chat/link-safety";
 import { LinkSafetyView } from "./link-safety-view";
 import { DirectRulesView } from "./direct-rules-view";
-import { deleteChatLineShown, dmRuleMode } from "@/lib/chat/vanish";
+import { deleteChatLineShown, dmRuleMode, startingRules } from "@/lib/chat/vanish";
 
 /** The screens, by the path segment after `settings` ("" is the first). */
 export const CHAT_ADMIN_SCREENS = ["", "files", "organizations", "links", "calls"] as const;
@@ -34,7 +34,11 @@ export async function ChatAdminSettings({ screen }: { screen: ChatAdminScreen })
         <div className="flex w-full max-w-2xl flex-col">
             {screen === "" ? <ChatRulesView initial={await allChatRules()} /> : null}
             {screen === "" ? (
-                <DirectRulesView mode={await dmRuleMode()} line={await deleteChatLineShown()} />
+                <DirectRulesView
+                    mode={await dmRuleMode()}
+                    line={await deleteChatLineShown()}
+                    starting={await startingRules()}
+                />
             ) : null}
             {screen === "files" ? <DriveShareView how={await driveShare()} /> : null}
             {screen === "organizations" ? <OrgChatView offered={await orgChatOffered()} /> : null}

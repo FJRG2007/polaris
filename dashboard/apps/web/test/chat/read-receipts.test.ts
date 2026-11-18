@@ -80,10 +80,24 @@ vi.mock("@/lib/chat/live", () => ({
 
 vi.mock("@/lib/privacy-service", () => ({
     receiptsBetween: async () => receiptsAllowed,
-    receiptsAmong: async (_viewer: unknown, ids: readonly string[]) =>
-        new Set(receiptsAllowed ? ids.filter((id) => !hidden.has(id)) : []),
+    // The conversation's own rule wins, as `privacy-service` does it.
+    receiptsAmong: async (_viewer: unknown, ids: readonly string[], rule = "follow") =>
+        rule === "on"
+            ? new Set(ids)
+            : rule === "off"
+              ? new Set<string>()
+              : new Set(receiptsAllowed ? ids.filter((id) => !hidden.has(id)) : []),
     maySee: async () => true,
     allowedBy: async () => new Set<string>()
+}));
+
+/** The conversation's own read-receipts rule. */
+let chatRule: "follow" | "on" | "off" = "follow";
+vi.mock("@/lib/chat/vanish", () => ({
+    expiryForChannel: async () => null,
+    chatPrivacyOf: async () => ({ receipts: chatRule, typing: "follow" }),
+    chatPrivacyIn: async (ids: readonly string[]) =>
+        new Map(ids.map((id) => [id, { receipts: chatRule, typing: "follow" }]))
 }));
 
 vi.mock("@polaris/db", () => ({
@@ -155,6 +169,7 @@ function message(id: string, authorId: string | null, minutes: number): MessageR
 
 beforeEach(() => {
     kind = "dm";
+    chatRule = "follow";
     receiptsAllowed = true;
     hidden = new Set();
     announced = [];
@@ -333,5 +348,35 @@ describe("in a group", () => {
         expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({});
         await markRead(ada, { channelId: "c1", messageId: "m3" });
         expect(announced.at(-1)?.audience).toEqual(["ada"]);
+    });
+});
+
+describe("the conversation's own rule", () => {
+    it("on: shows the ticks and tells the other person even when an account says nobody", async () => {
+        receiptsAllowed = false;
+        chatRule = "on";
+        others = [{ userId: "grace", lastReadAt: messages[1]!.createdAt, lastDeliveredAt: null }];
+        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({ m2: "read" });
+        await markRead(ada, { channelId: "c1", messageId: "m3" });
+        expect(announced.at(-1)?.audience).toEqual(["ada", "grace"]);
+    });
+
+    it("off: hides them for everybody even when both accounts allow them", async () => {
+        chatRule = "off";
+        others = [{ userId: "grace", lastReadAt: messages[1]!.createdAt, lastDeliveredAt: null }];
+        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({});
+        expect(await deliveryOf(ada, "m2")).toBeNull();
+        await markRead(ada, { channelId: "c1", messageId: "m3" });
+        expect(announced.at(-1)?.audience).toEqual(["ada"]);
+    });
+
+    it("off in a group: no member's ticks reach anybody", async () => {
+        kind = "group";
+        chatRule = "off";
+        others = [
+            { userId: "grace", lastReadAt: messages[1]!.createdAt, lastDeliveredAt: null },
+            { userId: "linus", lastReadAt: messages[1]!.createdAt, lastDeliveredAt: null }
+        ];
+        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({});
     });
 });

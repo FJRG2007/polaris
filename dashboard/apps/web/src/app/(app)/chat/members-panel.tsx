@@ -524,7 +524,8 @@ export function ChannelMembers({
     open,
     onOpenChange,
     onMention,
-    search
+    search,
+    privacy
 }: {
     channel: ChatChannelView;
     open: boolean;
@@ -535,6 +536,8 @@ export function ChannelMembers({
     /** The search box Discord keeps at the top of this column, drawn there
      *  only while the panel is a column - not in the phone's dialog. */
     search?: ReactNode;
+    /** A group's own privacy section, drawn below the roster. */
+    privacy?: ReactNode;
 }) {
     const t = useTranslations("chat");
     const { viewerId, refresh } = useChat();
@@ -569,6 +572,7 @@ export function ChannelMembers({
                         onMention={onMention}
                         onChanged={refresh}
                     />
+                    {privacy}
                 </DialogContent>
             </Dialog>
         );
@@ -636,6 +640,11 @@ export function ChannelMembers({
                     onMention={onMention}
                     onChanged={refresh}
                 />
+                {privacy ? (
+                    <div className="max-h-[50%] shrink-0 overflow-y-auto overscroll-contain border-t border-border">
+                        {privacy}
+                    </div>
+                ) : null}
             </aside>
         </>
     );

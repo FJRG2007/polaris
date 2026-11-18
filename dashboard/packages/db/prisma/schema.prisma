@@ -10614,6 +10614,12 @@ model ChatChannel {
     /// When the members last agreed to these rules. Null is no agreement, which
     /// in the agreement mode means no timer and no delete for everybody.
     rulesAgreedAt DateTime?
+    /// Read receipts and the typing indicator in this conversation: "follow"
+    /// (each person's account setting decides), "on" (shown to everybody in
+    /// it, whatever their account says) or "off" (shown to nobody). Changed
+    /// under the same rules as the timer. Only read for a dm or a group.
+    receipts      String    @default("follow")
+    typing        String    @default("follow")
     createdAt     DateTime  @default(now())
     updatedAt     DateTime  @updatedAt
 
@@ -10912,6 +10918,10 @@ model ChatRuleProposal {
     proposedById String    @db.Uuid
     vanishAfter  Int       @default(0)
     deleteForAll Boolean   @default(false)
+    // The whole rule set proposed, read receipts and typing included, so an
+    // accepted proposal is copied onto the channel as it stands.
+    receipts     String    @default("follow")
+    typing       String    @default("follow")
     acceptedBy   String[]  @db.Uuid
     // pending | accepted | declined | replaced | withdrawn
     status       String    @default("pending")

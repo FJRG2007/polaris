@@ -728,8 +728,13 @@ export async function receiptsBetween(viewer: PrivacyViewer, otherId: string): P
  */
 export async function receiptsAmong(
     viewer: PrivacyViewer,
-    otherIds: readonly string[]
+    otherIds: readonly string[],
+    chatRule: core.ChatPrivacyRule = "follow"
 ): Promise<Set<string>> {
+    // A conversation's own rule wins inside it: "on" shows everybody's, even
+    // to somebody whose account says nobody, and "off" shows nobody's.
+    if (chatRule === "on") return new Set(otherIds);
+    if (chatRule === "off") return new Set();
     return reciprocalAmong(viewer, "readReceipts", otherIds);
 }
 
@@ -772,11 +777,20 @@ export async function reciprocalAmong(
 /**
  * Whether the viewer may be told this person is typing.
  *
- * Reciprocal like the ticks. The one place the answer is made, so a rule kept
- * per conversation later narrows it here rather than beside every publisher.
+ * Reciprocal like the ticks. The one place the answer is made: the
+ * conversation's own rule (`lib/chat/vanish` `chatPrivacyOf`) is passed in and
+ * wins inside that conversation - "on" for everybody in it, "off" for nobody,
+ * an administrator included, since the conversation decided it for everyone.
  */
-export async function typingAllowed(viewer: PrivacyViewer, typerId: string): Promise<boolean> {
-    if (viewer.isAdmin || viewer.id === typerId) return true;
+export async function typingAllowed(
+    viewer: PrivacyViewer,
+    typerId: string,
+    chatRule: core.ChatPrivacyRule = "follow"
+): Promise<boolean> {
+    if (viewer.id === typerId) return true;
+    if (chatRule === "on") return true;
+    if (chatRule === "off") return false;
+    if (viewer.isAdmin) return true;
     return (await reciprocalAmong(viewer, "typing", [typerId])).has(typerId);
 }
 

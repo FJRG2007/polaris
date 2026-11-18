@@ -44,6 +44,13 @@ vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds: async () => [] }));
 const ADA = "11111111-1111-4111-8111-111111111111";
 const TEAM = "22222222-2222-4222-8222-222222222222";
 
+// Every conversation here follows each person's own settings.
+vi.mock("@/lib/chat/vanish", () => ({
+    expiryForChannel: async () => null,
+    chatPrivacyOf: async () => ({ receipts: "follow", typing: "follow" }),
+    chatPrivacyIn: async () => new Map()
+}));
+
 vi.mock("@polaris/db", () => ({
     prisma: {
         userBlock: { findMany: async () => [] },

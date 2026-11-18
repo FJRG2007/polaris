@@ -58,7 +58,7 @@ import { ageClearedWhere, requireAgeCleared } from "./age-gate";
 import { MAX_REREAD } from "./reread-limit";
 import * as history from "./history-visibility";
 import { webhookFace } from "./webhook-face";
-import { expiryForChannel } from "./vanish";
+import { chatPrivacyIn, chatPrivacyOf, expiryForChannel } from "./vanish";
 import { hasDirectRules } from "./vanish-rules";
 import { concealedFor, requireUnlocked, unhideOnMessage } from "./chat-lock";
 
@@ -1639,15 +1639,22 @@ async function readAudiences(
         list.push(row.userId);
         others.set(row.channelId, list);
     }
-    const shown = [...others.values()].filter((list) => list.length <= max - 1).flat();
-    if (shown.length === 0) return { audience, others };
+    const within = [...others].filter(([, list]) => list.length <= max - 1);
+    if (within.length === 0) return { audience, others };
+    // A conversation's own receipts rule wins inside it, so only the ones that
+    // follow each person's setting are asked about it.
+    const chatRules = await chatPrivacyIn(within.map(([channelId]) => channelId));
+    const ruleOf = (channelId: string) => chatRules.get(channelId)?.receipts ?? "follow";
+    const shown = within.filter(([channelId]) => ruleOf(channelId) === "follow").flatMap(([, list]) => list);
     // Not resolved as an administrator, for the same reason `receiptStateIn` is
     // not: these are the ticks under somebody's own messages, and the admin
     // exception is about reading somebody else's.
-    const allowed = await receiptsAmong({ id: actor.id, isAdmin: false }, shown);
-    for (const [channelId, list] of others) {
-        if (list.length > max - 1) continue;
-        audience.set(channelId, [actor.id, ...list.filter((id) => allowed.has(id))]);
+    const allowed =
+        shown.length > 0 ? await receiptsAmong({ id: actor.id, isAdmin: false }, shown) : new Set<string>();
+    for (const [channelId, list] of within) {
+        const rule = ruleOf(channelId);
+        const told = rule === "follow" ? list.filter((id) => allowed.has(id)) : rule === "on" ? list : [];
+        audience.set(channelId, [actor.id, ...told]);
     }
     return { audience, others };
 }
@@ -2372,12 +2379,18 @@ async function receiptStateFor(
 /** The same question asked of a conversation rather than of a page of it, for the
  *  screen that only wants the marks. */
 async function receiptStateIn(actor: ChatActor, channelId: string): Promise<ReceiptState | null> {
-    const channel = await prisma.chatChannel.findUnique({
-        where: { id: channelId },
-        select: { kind: true, spaceId: true }
-    });
+    const [channel, chatRules] = await Promise.all([
+        prisma.chatChannel.findUnique({
+            where: { id: channelId },
+            select: { kind: true, spaceId: true }
+        }),
+        chatPrivacyOf(channelId)
+    ]);
     if (!channel || channel.spaceId) return null;
     if (channel.kind !== "dm" && channel.kind !== "group") return null;
+    // The conversation's own rule wins inside it: "off" draws no ticks for
+    // anybody, "on" draws everybody's whatever their accounts say.
+    if (chatRules.receipts === "off") return null;
 
     // One past the cap, so a conversation over it is recognised without reading
     // all of it.
@@ -2394,7 +2407,8 @@ async function receiptStateIn(actor: ChatActor, channelId: string): Promise<Rece
     // reading somebody else's.
     const allowed = await receiptsAmong(
         { id: actor.id, isAdmin: false },
-        others.map((other) => other.userId)
+        others.map((other) => other.userId),
+        chatRules.receipts
     );
 
     const marks = others.map((other) => ({

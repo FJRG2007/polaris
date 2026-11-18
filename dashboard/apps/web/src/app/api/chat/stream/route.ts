@@ -17,6 +17,7 @@
 
 import { subscribeChatChanges } from "@/lib/chat/live";
 import { typingAllowed } from "@/lib/privacy-service";
+import { chatPrivacyOf } from "@/lib/chat/vanish";
 import { holdStreamScope } from "@/lib/chat/stream-scope";
 import { backgroundUser, sessionCan } from "@/lib/session";
 
@@ -69,15 +70,23 @@ export async function GET(request: Request): Promise<Response> {
      * one check per pair a minute is what keeps a busy room cheap.
      */
     const typingAnswers = new Map<string, { allowed: boolean; at: number }>();
-    const typingFor = async (typerId: string): Promise<boolean> => {
+    const typingFor = async (channelId: string, typerId: string): Promise<boolean> => {
         if (!ACCOUNT_ID.test(typerId)) return true;
-        const known = typingAnswers.get(typerId);
+        // Per conversation as well as per typist: a conversation's own typing
+        // rule wins inside it, so the same person may be shown in one and not
+        // in another.
+        const key = `${channelId}:${typerId}`;
+        const known = typingAnswers.get(key);
         if (known && Date.now() - known.at < TYPING_TRUST_MS) return known.allowed;
-        const allowed = await typingAllowed(viewer, typerId).catch((caught: unknown) => {
-            console.error("polaris: could not check a typing setting:", caught);
-            return false;
-        });
-        typingAnswers.set(typerId, { allowed, at: Date.now() });
+        const allowed = await chatPrivacyOf(channelId)
+            .then((rules) => typingAllowed(viewer, typerId, rules.typing))
+            .catch((caught: unknown) => {
+                console.error("polaris: could not check a typing setting:", caught);
+                return false;
+            });
+        // Bounded: a stream that outlives many conversations forgets the oldest.
+        if (typingAnswers.size >= 500) typingAnswers.delete(typingAnswers.keys().next().value!);
+        typingAnswers.set(key, { allowed, at: Date.now() });
         return allowed;
     };
     const encoder = new TextEncoder();
@@ -359,10 +368,16 @@ export async function GET(request: Request): Promise<Response> {
                             activity: change.activity ?? "typing"
                         } as const;
                         // Only to a reader both sides' typing setting allows.
-                        void typingFor(change.actorId).then((allowed) => {
+                        void typingFor(channelId, change.actorId).then((allowed) => {
                             if (allowed && !closed) send(frame);
                         });
                     } else {
+                        // Every change of a conversation's rules writes a line
+                        // into it, so anything new there may be one: what was
+                        // remembered about its typing is asked again.
+                        for (const key of typingAnswers.keys()) {
+                            if (key.startsWith(`${channelId}:`)) typingAnswers.delete(key);
+                        }
                         wake(channelId, change.messageIds);
                     }
                     return;

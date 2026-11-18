@@ -204,41 +204,46 @@ export function VanishMenu({
     return (
         <>
             <DropdownMenuSeparator />
-            <DropdownMenuSub>
-                <DropdownMenuSubTrigger>
-                    <Timer className="size-3.5" />
-                    {t("vanish.timer")}
-                </DropdownMenuSubTrigger>
-                <DropdownMenuSubContent>
-                    {agreement && (
-                        <p className="max-w-56 px-2 py-1 text-[0.6875rem] text-foreground-subtle">
-                            {t("vanish.proposeHint")}
-                        </p>
-                    )}
-                    {VANISH_DURATIONS.map((seconds) => (
-                        <DropdownMenuItem key={seconds} onSelect={() => onTimer(seconds)}>
-                            <Check
-                                className={cn(
-                                    "size-3.5",
-                                    rules.vanishAfter !== seconds && "invisible"
-                                )}
-                            />
-                            {t(`vanish.duration.${durationName(seconds)}`)}
-                        </DropdownMenuItem>
-                    ))}
-                    {agreement && (
-                        <>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onSelect={() => onAllowDelete(!rules.deleteForAll)}>
+            {/* A group member who does not run it reads the timer in the
+                privacy section, with the reason; the menu offers only what
+                they may do. */}
+            {rules.mayChange && (
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                        <Timer className="size-3.5" />
+                        {t("vanish.timer")}
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuSubContent>
+                        {rules.proposes && (
+                            <p className="max-w-56 px-2 py-1 text-[0.6875rem] text-foreground-subtle">
+                                {t("vanish.proposeHint")}
+                            </p>
+                        )}
+                        {VANISH_DURATIONS.map((seconds) => (
+                            <DropdownMenuItem key={seconds} onSelect={() => onTimer(seconds)}>
                                 <Check
-                                    className={cn("size-3.5", !rules.deleteForAll && "invisible")}
+                                    className={cn(
+                                        "size-3.5",
+                                        rules.vanishAfter !== seconds && "invisible"
+                                    )}
                                 />
-                                {t("vanish.allowDeleteForAll")}
+                                {t(`vanish.duration.${durationName(seconds)}`)}
                             </DropdownMenuItem>
-                        </>
-                    )}
-                </DropdownMenuSubContent>
-            </DropdownMenuSub>
+                        ))}
+                        {agreement && (
+                            <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onSelect={() => onAllowDelete(!rules.deleteForAll)}>
+                                    <Check
+                                        className={cn("size-3.5", !rules.deleteForAll && "invisible")}
+                                    />
+                                    {t("vanish.allowDeleteForAll")}
+                                </DropdownMenuItem>
+                            </>
+                        )}
+                    </DropdownMenuSubContent>
+                </DropdownMenuSub>
+            )}
             <DropdownMenuItem variant="danger" onSelect={onDeleteChat}>
                 <Trash2 className="size-3.5" />
                 {t("vanish.deleteChat")}
@@ -329,26 +334,39 @@ export function DeleteChatDialog({
 export function ProposalBar({
     rules,
     proposerName,
-    onAnswer
+    onAnswer,
+    onWithdraw
 }: {
     rules: DirectRulesView;
     proposerName: string;
     onAnswer: (proposalId: string, accept: boolean) => Promise<void>;
+    /** Take back a proposal this reader made. */
+    onWithdraw?: (proposalId: string) => Promise<void>;
 }) {
     const t = useTranslations("chat");
     const [busy, setBusy] = useState(false);
     const proposal = rules.proposal;
     if (!proposal || (!proposal.mayAnswer && !proposal.mine)) return null;
-    const timer = proposal.vanishAfter
-        ? t("vanish.proposalTimer", {
-              name: proposerName,
-              duration: t(`vanish.duration.${durationName(proposal.vanishAfter)}`)
-          })
-        : t("vanish.proposalTimerOff", { name: proposerName });
-    const deletion = proposal.deleteForAll ? t("vanish.proposalDeleteYes") : t("vanish.proposalDeleteNo");
-    const answer = (accept: boolean) => {
+    // What the proposal changes, each as "what: to what"; the whole set when
+    // it changes nothing but the delete rule.
+    const changes: string[] = [];
+    if (proposal.vanishAfter !== rules.vanishAfter) {
+        changes.push(
+            `${t("chatPrivacy.timer")}: ${t(`vanish.duration.${durationName(proposal.vanishAfter)}`)}`
+        );
+    }
+    if (proposal.receipts !== rules.receipts) {
+        changes.push(`${t("chatPrivacy.receipts")}: ${t(`chatPrivacy.${proposal.receipts}`)}`);
+    }
+    if (proposal.typing !== rules.typing) {
+        changes.push(`${t("chatPrivacy.typing")}: ${t(`chatPrivacy.${proposal.typing}`)}`);
+    }
+    if (proposal.deleteForAll !== rules.deleteForAll || changes.length === 0) {
+        changes.push(proposal.deleteForAll ? t("vanish.proposalDeleteYes") : t("vanish.proposalDeleteNo"));
+    }
+    const settle = (work: Promise<void>) => {
         setBusy(true);
-        void onAnswer(proposal.id, accept).finally(() => setBusy(false));
+        void work.finally(() => setBusy(false));
     };
     return (
         <div
@@ -357,17 +375,32 @@ export function ProposalBar({
         >
             <Timer className="size-4 shrink-0 text-muted-foreground" aria-hidden />
             <p className="min-w-0 flex-1 text-xs">
-                <span className="block break-words">{timer}</span>
-                <span className="block break-words text-muted-foreground">
-                    {proposal.mine ? t("vanish.waiting") : deletion}
+                <span className="block break-words">
+                    {proposal.mine ? t("vanish.waiting") : t("chatPrivacy.proposalBy", { name: proposerName })}
                 </span>
+                <span className="block break-words text-muted-foreground">{changes.join(" - ")}</span>
             </p>
+            {proposal.mine && onWithdraw ? (
+                <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => settle(onWithdraw(proposal.id))}
+                >
+                    {t("chatPrivacy.withdraw")}
+                </Button>
+            ) : null}
             {proposal.mayAnswer && (
                 <div className="flex shrink-0 gap-2">
-                    <Button size="sm" variant="outline" disabled={busy} onClick={() => answer(false)}>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => settle(onAnswer(proposal.id, false))}
+                    >
                         {t("vanish.decline")}
                     </Button>
-                    <Button size="sm" disabled={busy} onClick={() => answer(true)}>
+                    <Button size="sm" disabled={busy} onClick={() => settle(onAnswer(proposal.id, true))}>
                         {t("vanish.accept")}
                     </Button>
                 </div>

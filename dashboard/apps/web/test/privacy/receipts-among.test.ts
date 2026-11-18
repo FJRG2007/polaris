@@ -51,7 +51,7 @@ const friendIds = vi.fn(async (userId: string) => new Set(friendsOf.get(userId) 
 
 vi.mock("@/lib/friends-service", () => ({ friendIds: (userId: string) => friendIds(userId) }));
 
-const { receiptsAmong } = await import("@/lib/privacy-service");
+const { receiptsAmong, typingAllowed } = await import("@/lib/privacy-service");
 
 const viewer = { id: "me", isAdmin: false };
 
@@ -110,5 +110,41 @@ describe("receiptsAmong", () => {
         expect(await receiptsAmong({ id: "me", isAdmin: true }, ["a", "b"])).toEqual(
             new Set(["a", "b"])
         );
+    });
+});
+
+describe("a conversation's own rule", () => {
+    it("on: shows everybody's ticks even to a viewer whose account says nobody", async () => {
+        stored = new Map([
+            ["me", "nobody"],
+            ["a", "nobody"]
+        ]);
+        expect(await receiptsAmong(viewer, ["a", "b"], "on")).toEqual(new Set(["a", "b"]));
+        expect(findUnique).not.toHaveBeenCalled();
+    });
+
+    it("off: shows nobody's even when both accounts allow them", async () => {
+        stored = new Map([
+            ["me", "everyone"],
+            ["a", "everyone"]
+        ]);
+        expect(await receiptsAmong(viewer, ["a"], "off")).toEqual(new Set());
+    });
+
+    it("follow: the accounts decide, as before", async () => {
+        stored = new Map([
+            ["me", "nobody"],
+            ["a", "everyone"]
+        ]);
+        expect(await receiptsAmong(viewer, ["a"], "follow")).toEqual(new Set());
+    });
+
+    it("typing: on shows it, off hides it from everybody, an administrator included", async () => {
+        expect(await typingAllowed(viewer, "a", "on")).toBe(true);
+        expect(await typingAllowed(viewer, "a", "off")).toBe(false);
+        expect(await typingAllowed({ id: "admin", isAdmin: true }, "a", "off")).toBe(false);
+        expect(await typingAllowed({ id: "admin", isAdmin: true }, "a", "follow")).toBe(true);
+        // Your own dots are yours whatever the chat says.
+        expect(await typingAllowed(viewer, "me", "off")).toBe(true);
     });
 });

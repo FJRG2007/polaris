@@ -244,7 +244,9 @@
         "vanishTooFast": "Too many changes. Try again in a few minutes",
         "proposalGone": "That proposal is no longer open",
         "proposalNotYours": "Only the other people in the chat can answer it",
-        "deleteForAllOff": "Deleting this chat for everyone is not allowed here"
+        "deleteForAllOff": "Deleting this chat for everyone is not allowed here",
+        "rulesGroupAdminsOnly": "Only the group's owner and admins can change this",
+        "rulesBadValue": "That choice is not available"
     },
     "media": {
         "refused": {
@@ -2401,13 +2403,30 @@
         "alsoFor": "Also delete for {name}",
         "alsoForHint": "Removes every message for everyone in the chat.",
         "alsoForOff": "Not allowed until everyone in the chat agrees to it",
-        "proposalTimer": "{name} proposes: messages disappear after {duration}",
-        "proposalTimerOff": "{name} proposes: messages do not disappear",
         "proposalDeleteYes": "Deleting the chat for everyone allowed",
         "proposalDeleteNo": "Deleting the chat for everyone not allowed",
         "waiting": "Waiting for the others to accept your proposal",
         "accept": "Accept",
         "decline": "Decline",
         "deleteFailed": "The chat could not be deleted. Try again."
+    },
+    "chatPrivacy": {
+        "title": "Privacy",
+        "receipts": "Read receipts",
+        "typing": "Typing indicator",
+        "timer": "Disappearing messages",
+        "follow": "Follows each person's settings",
+        "on": "On",
+        "off": "Off",
+        "announced": "Changes apply at once and are announced in the chat.",
+        "proposed": "Changes are proposed and apply once accepted.",
+        "groupAdmins": "Changes apply at once and are announced in the chat.",
+        "groupAdminsOnly": "Only the group's owner and admins can change these.",
+        "proposal": "Proposed: {value}",
+        "proposalBy": "{name} proposed a change",
+        "proposalMine": "Waiting for the other person to accept",
+        "withdraw": "Withdraw",
+        "accept": "Accept",
+        "decline": "Decline"
     }
 }

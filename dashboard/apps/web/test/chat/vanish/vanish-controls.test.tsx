@@ -33,9 +33,14 @@ function message(id: string, expiresAt?: string): ChatMessageView {
 function rules(overrides: Partial<DirectRulesView> = {}): DirectRulesView {
     return {
         mode: "open",
+        kind: "dm",
         vanishAfter: 0,
         deleteForAll: true,
+        receipts: "follow",
+        typing: "follow",
         agreed: false,
+        mayChange: true,
+        proposes: false,
         proposal: null,
         ...overrides
     };
@@ -137,6 +142,8 @@ describe("a proposal", () => {
         proposedById: "grace",
         vanishAfter: 604_800,
         deleteForAll: true,
+        receipts: "follow" as const,
+        typing: "follow" as const,
         mayAnswer: true,
         mine: false
     };
@@ -151,7 +158,8 @@ describe("a proposal", () => {
 
     it("is answered by the people it waits on", async () => {
         const onAnswer = bar(rules({ mode: "agreement", proposal }));
-        expect(screen.getByText("Grace proposes: messages disappear after 7 days")).toBeTruthy();
+        expect(screen.getByText("Grace proposed a change")).toBeTruthy();
+        expect(screen.getByText("Disappearing messages: 7 days")).toBeTruthy();
         fireEvent.click(screen.getByRole("button", { name: "Accept" }));
         await waitFor(() => expect(onAnswer).toHaveBeenCalledWith("p1", true));
     });
@@ -160,8 +168,55 @@ describe("a proposal", () => {
         expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
         expect(screen.getByText("Waiting for the others to accept your proposal")).toBeTruthy();
     });
+    it("may be withdrawn by the one who proposed it", async () => {
+        const onWithdraw = vi.fn(async () => undefined);
+        render(
+            <MessagesWrapper>
+                <ProposalBar
+                    rules={rules({ mode: "agreement", proposal: { ...proposal, mayAnswer: false, mine: true } })}
+                    proposerName="Ada"
+                    onAnswer={vi.fn(async () => undefined)}
+                    onWithdraw={onWithdraw}
+                />
+            </MessagesWrapper>
+        );
+        fireEvent.click(screen.getByRole("button", { name: "Withdraw" }));
+        await waitFor(() => expect(onWithdraw).toHaveBeenCalledWith("p1"));
+    });
     it("is nothing without one", () => {
         bar(rules({ mode: "agreement" }));
         expect(screen.queryByRole("status")).toBeNull();
+    });
+});
+
+const { ChatPrivacySection } = await import("@/app/(app)/chat/chat-privacy-section");
+
+describe("the conversation's privacy section", () => {
+    function section(current: DirectRulesView) {
+        render(
+            <MessagesWrapper>
+                <ChatPrivacySection
+                    rules={current}
+                    proposerName="Grace"
+                    onChange={vi.fn()}
+                    onAnswer={vi.fn(async () => undefined)}
+                    onWithdraw={vi.fn(async () => undefined)}
+                />
+            </MessagesWrapper>
+        );
+    }
+
+    it("shows a group member the values and the reason, with nothing to change", () => {
+        section(rules({ kind: "group", mayChange: false, receipts: "on" }));
+        expect(screen.getByText("Only the group's owner and admins can change these.")).toBeTruthy();
+        expect(screen.getByText("On")).toBeTruthy();
+        expect(screen.getAllByText("Follows each person's settings")).toHaveLength(1);
+        expect(screen.queryByRole("combobox")).toBeNull();
+    });
+
+    it("offers the controls, and says a change is proposed in the agreement mode", () => {
+        section(rules({ mode: "agreement", proposes: true }));
+        expect(screen.getByText("Changes are proposed and apply once accepted.")).toBeTruthy();
+        expect(screen.getByRole("combobox", { name: "Read receipts" })).toBeTruthy();
     });
 });
