@@ -41,6 +41,7 @@ import { useChat } from "./chat-context";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import {
+    useRef,
     useState,
     type ComponentType,
     type KeyboardEvent as ReactKeyboardEvent,
@@ -239,6 +240,11 @@ export function MemberMenu({
     // State rather than a ref: the menu's items are drawn from this render, and
     // a ref set by the right-click would not draw them again.
     const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+    /** The card to open once this menu is gone. Opened from the item itself, the
+     *  card mounted while the menu was still closing, and the menu's departure
+     *  - its focus trap and its dismissal - closed the card in the same moment:
+     *  "Profile" looked like it did nothing. */
+    const afterClose = useRef<(() => void) | null>(null);
     const { spaces, blocked, friends, refresh } = useChat();
     const [removeFriend, removeFriendDialog, removingFriend] = useRemoveFriend(onError);
     const [busy, setBusy] = useState(false);
@@ -337,7 +343,12 @@ export function MemberMenu({
                 // Only ever read by the pressed menu: a right-click menu is
                 // placed where the pointer was, and has nothing to align to.
                 align={openWith === "press" ? "end" : undefined}
-                onCloseAutoFocus={keepFocusOnClose}
+                onCloseAutoFocus={(event) => {
+                    keepFocusOnClose(event);
+                    const next = afterClose.current;
+                    afterClose.current = null;
+                    next?.();
+                }}
             >
                 <menu.Label className="truncate">
                     <PersonName id={member.userId} name={member.name} />
@@ -350,7 +361,8 @@ export function MemberMenu({
                 {press && anchor && (
                     <menu.Item
                         onSelect={() => {
-                            press({ id: member.userId, name: member.name }, anchor);
+                            afterClose.current = () =>
+                                press({ id: member.userId, name: member.name }, anchor);
                         }}
                     >
                         <UserRound className="size-3.5" />

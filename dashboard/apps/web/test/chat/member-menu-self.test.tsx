@@ -12,7 +12,7 @@
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PersonPressContext } from "@/components/person-press";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const pushed: string[] = [];
 
@@ -72,7 +72,7 @@ function open(viewerId: string, onMention?: (text: string) => void) {
 }
 
 describe("the menu on your own row", () => {
-    it("offers your card, a mention and your profile", () => {
+    it("offers your card, a mention and your profile", async () => {
         const mentions: string[] = [];
         const cards = open("me", (text) => mentions.push(text));
         fireEvent.click(screen.getByText("Mention"));
@@ -80,7 +80,10 @@ describe("the menu on your own row", () => {
 
         fireEvent.contextMenu(screen.getByText("Ana row"));
         fireEvent.click(screen.getByText("Profile"));
-        expect(cards).toEqual(["me"]);
+        // Only once the menu is gone: a card opened while it was still closing
+        // was closed by it in the same moment.
+        await waitFor(() => expect(cards).toEqual(["me"]));
+        expect(screen.queryByText("Profile")).toBeNull();
 
         fireEvent.contextMenu(screen.getByText("Ana row"));
         fireEvent.click(screen.getByText("Edit your profile"));
@@ -103,7 +106,7 @@ describe("the menu on your own row", () => {
 });
 
 describe("the menu opened without a right-click", () => {
-    it("still offers the card when pressed, as a touch or a button opens it", () => {
+    it("still offers the card when pressed, as a touch or a button opens it", async () => {
         const cards: string[] = [];
         render(
             <PersonPressContext.Provider value={(person) => cards.push(person.id)}>
@@ -127,6 +130,9 @@ describe("the menu opened without a right-click", () => {
             pointerType: "mouse"
         });
         fireEvent.click(screen.getByText("Profile"));
-        expect(cards).toEqual(["me"]);
+        // Only once the menu is gone: a card opened while it was still closing
+        // was closed by it in the same moment.
+        await waitFor(() => expect(cards).toEqual(["me"]));
+        expect(screen.queryByText("Profile")).toBeNull();
     });
 });
