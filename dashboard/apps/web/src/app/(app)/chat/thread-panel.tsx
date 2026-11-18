@@ -29,10 +29,11 @@ import { useChatPane } from "./use-chat-pane";
 import type { PollDraft } from "./poll-dialog";
 import { useChatStream } from "./use-chat-stream";
 import { PersonCardProvider } from "./person-card";
-import { ResizeHandle, Skeleton } from "@polaris/ui";
+import { ResizeHandle } from "@polaris/ui";
 import { resetPaneLayout } from "./pane-preferences";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { MessagesSkeleton } from "./messages-skeleton";
 
 /**
  * What the thread may be narrowed and widened to.
@@ -190,11 +191,7 @@ export function ThreadPanel({
 
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-2">
                     {messages === null ? (
-                        <div className="flex flex-col gap-3 p-4" aria-hidden="true">
-                            {[0, 1].map((row) => (
-                                <Skeleton key={row} className="h-8 w-2/3" />
-                            ))}
-                        </div>
+                        <MessagesSkeleton turns={2} />
                     ) : (
                         <MessageList
                             emoji={emoji}

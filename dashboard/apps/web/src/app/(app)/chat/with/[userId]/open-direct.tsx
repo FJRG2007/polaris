@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { openDirectAction } from "../../actions";
-import { Button, EmptyState, Skeleton } from "@polaris/ui";
+import { Button, EmptyState } from "@polaris/ui";
+import { ConversationSkeleton } from "../../messages-skeleton";
 
 export function OpenDirect({
     userId,
@@ -56,10 +57,6 @@ export function OpenDirect({
     }
 
     return (
-        <div className="flex flex-1 flex-col">
-            <div className="flex h-header shrink-0 items-center gap-2 border-b border-border px-4">
-                <Skeleton className="h-4 w-40" />
-            </div>
-        </div>
+        <ConversationSkeleton />
     );
 }
