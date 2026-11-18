@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Holding the icon: the way to another Polaris, even while this one does not answer. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutId="change_server"
+        android:shortcutShortLabel="@string/change_server_short"
+        android:shortcutLongLabel="@string/change_server">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetClass="app.polaris.mobile.ServerActivity"
+            android:targetPackage="app.polaris.mobile" />
+    </shortcut>
+</shortcuts>

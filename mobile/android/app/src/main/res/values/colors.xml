@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The dashboard's dark tokens (packages/ui/src/styles/tokens.css), so nothing flashes white on open. -->
+    <color name="background">#0B0C0E</color>
+    <color name="foreground">#F3F4F6</color>
+    <color name="muted">#A0A5B1</color>
+    <color name="danger">#DC4751</color>
+    <color name="primary">#7E4FEE</color>
+</resources>

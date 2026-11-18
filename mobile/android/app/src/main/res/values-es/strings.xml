@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="server_title">Conecta con tu Polaris</string>
+    <string name="server_hint">La dirección con la que abres Polaris en el navegador.</string>
+    <string name="connect">Conectar</string>
+    <string name="server_invalid">Eso no es una dirección web. Escríbela como en el navegador.</string>
+    <string name="server_not_polaris">Esa dirección responde, pero no es Polaris.</string>
+    <string name="server_starting">Polaris está arrancando ahí. Prueba en un minuto.</string>
+    <string name="server_redirects">Esa dirección te lleva a otra. Usa la dirección donde abre Polaris.</string>
+    <string name="server_unreachable">Nada responde en esa dirección. Revísala y que el móvil tenga conexión.</string>
+    <string name="page_unreachable_title">Polaris no responde</string>
+    <string name="page_unreachable">No se puede llegar a %1$s desde este móvil ahora mismo.</string>
+    <string name="retry">Reintentar</string>
+    <string name="change_server">Usar otro Polaris</string>
+    <string name="change_server_short">Otro Polaris</string>
+    <string name="download_started">Descargando %1$s</string>
+    <string name="download_unsupported">Este archivo aún no se puede guardar desde la app.</string>
+    <string name="link_unsupported">Ninguna app de este móvil abre ese enlace.</string>
+    <string name="update_title">Polaris %1$s está disponible</string>
+    <string name="update_message">Descárgalo y abre el archivo para instalarlo encima de esta versión.</string>
+    <string name="update_download">Descargar</string>
+    <string name="update_later">Luego</string>
+</resources>

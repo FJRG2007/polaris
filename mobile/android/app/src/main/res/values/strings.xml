@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Polaris</string>
+    <string name="server_title">Connect to your Polaris</string>
+    <string name="server_hint">The address you open Polaris at in a browser.</string>
+    <string name="server_placeholder" translatable="false">polaris.example.com</string>
+    <string name="connect">Connect</string>
+    <string name="server_invalid">That isn\'t a web address. Type it as you would in a browser.</string>
+    <string name="server_not_polaris">That address answers, but it isn\'t Polaris.</string>
+    <string name="server_starting">Polaris is starting there. Try again in a minute.</string>
+    <string name="server_redirects">That address sends you somewhere else. Use the address Polaris opens at.</string>
+    <string name="server_unreachable">Nothing answers at that address. Check it, and that this phone is online.</string>
+    <string name="page_unreachable_title">Polaris isn\'t answering</string>
+    <string name="page_unreachable">%1$s can\'t be reached from this phone right now.</string>
+    <string name="retry">Try again</string>
+    <string name="change_server">Use another Polaris</string>
+    <string name="change_server_short">Other Polaris</string>
+    <string name="download_started">Downloading %1$s</string>
+    <string name="download_unsupported">This file can\'t be saved from the app yet.</string>
+    <string name="link_unsupported">No app on this phone opens that link.</string>
+    <string name="update_title">Polaris %1$s is available</string>
+    <string name="update_message">Download it and open the file to install it over this version.</string>
+    <string name="update_download">Download</string>
+    <string name="update_later">Later</string>
+</resources>
