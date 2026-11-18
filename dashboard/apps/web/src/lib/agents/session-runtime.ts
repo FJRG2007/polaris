@@ -1339,7 +1339,12 @@ export async function snapshotTypedPrompt(sessionId: string, text: string): Prom
 export async function promptSession(
     sessionId: string,
     text: string,
-    options: { fromChat?: boolean } = {}
+    options: {
+        fromChat?: boolean;
+        /** Held in Chat: a Chat that will not start hands the turn to the
+         *  terminal instead of failing it (`remoteTurn`). Never hands off. */
+        chatFallback?: boolean;
+    } = {}
 ): Promise<void> {
     // Before the prompt is queued, so the turn it starts reads the credentials
     // as they are now rather than as they were when the machine booted.
@@ -1356,7 +1361,8 @@ export async function promptSession(
     if (placement.place === "computer")
         return computer.promptOnComputer(sessionId, await snapshotBeforeTurn(sessionId, placement, text));
     const sent = await snapshotBeforeTurn(sessionId, placement, text);
-    if (options.fromChat && (await remoteTurn(sessionId, placement, sent))) return;
+    const viaChat = options.fromChat || (options.chatFallback && placement.surface === "chat");
+    if (viaChat && (await remoteTurn(sessionId, placement, sent))) return;
     if (acpProviders.usesAcp(placement)) return acpPrompt(sessionId, placement.cli, sent);
     const queued = await runInSession(
         sessionId,
@@ -1418,7 +1424,10 @@ export async function deliverFirstPrompt(
         }
         // Once the agent is up, the checkout is there to write into.
         if (files) await placeAttachments(files.session, files.userId, files.files);
-        await promptSession(sessionId, withCues(await repoCuesFor(sessionId), text));
+        // A session held in Chat from its start (Polar Code holds Claude and
+        // Codex there) whose Chat will not start falls back to its terminal
+        // rather than losing the first prompt, as a later message does.
+        await promptSession(sessionId, withCues(await repoCuesFor(sessionId), text), { chatFallback: true });
     } catch (error) {
         await addSessionMessage(
             sessionId,

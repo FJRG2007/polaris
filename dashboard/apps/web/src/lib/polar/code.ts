@@ -21,6 +21,7 @@ import { GOAL_CONDITION_MAX, readGoal, type PolarGoal } from "@/lib/polar/goals"
 import { clearSessionGoal, setSessionGoal } from "@/lib/agents/session-goal";
 import { prisma } from "@polaris/db";
 import * as acpProviders from "@/lib/agents/acp/providers";
+import * as acpHandoff from "@/lib/agents/acp/handoff";
 import { polarCredentialFor } from "@/lib/polar/access";
 import {
     githubApiToken,
@@ -712,16 +713,37 @@ export async function polarCodeStart(
 const startSurfaceSchema = z.enum(acpProviders.SESSION_SURFACES);
 
 /**
- * Holds the session just created in Chat when that was asked for and its agent
- * can be driven there. Before its first prompt, which waits for the machine:
+ * Where a session started from Polar Code holds its conversation. Pure.
+ *
+ * Chat where it was picked and the agent can be driven there. A Terminal pick
+ * for an agent whose terminal and Chat share one conversation (Claude, Codex,
+ * `acp/handoff.ts`) is Chat too: every later message from Code already hands
+ * such a session to Chat (`remoteTurn` in `session-runtime.ts`), and only the
+ * first prompt stayed behind. That one went to the terminal's runner, which
+ * runs `claude -p` as a fresh process for the turn and prints the answer only
+ * when it exits, so Code waited for the process to boot and then drew the
+ * reply in one piece. The terminal still takes the conversation back on a key.
+ */
+export function startSurfaceFor(
+    cli: string,
+    place: core.AgentSessionPlace,
+    picked: acpProviders.SessionSurface
+): acpProviders.SessionSurface {
+    if (picked === "chat") return acpProviders.chatAvailable(cli, place) ? "chat" : "terminal";
+    return acpHandoff.handsOff(cli, place) ? "chat" : "terminal";
+}
+
+/**
+ * Holds the session just created in Chat when that is where Code answers it
+ * (`startSurfaceFor`). Before its first prompt, which waits for the machine:
  * that prompt then opens the Chat connection rather than the terminal's turn.
  */
 async function withSurface<T extends { id?: string }>(started: T, surface: acpProviders.SessionSurface): Promise<T> {
-    if (!started.id || surface !== "chat") return started;
+    if (!started.id) return started;
     const row = await prisma.agentSession.findUnique({ where: { id: started.id }, select: { cli: true, place: true } });
     const place = core.AGENT_SESSION_PLACES.find((known) => known === row?.place);
-    if (!row || !place || !acpProviders.chatAvailable(row.cli, place)) return started;
-    await prisma.agentSession.update({ where: { id: started.id }, data: { surface }, select: { id: true } });
+    if (!row || !place || startSurfaceFor(row.cli, place, surface) !== "chat") return started;
+    await prisma.agentSession.update({ where: { id: started.id }, data: { surface: "chat" }, select: { id: true } });
     return started;
 }
 
