@@ -138,7 +138,7 @@ export async function listSessionsAction(
 export async function sessionDetailAction(sessionId: string): Promise<{
     session: sessions.SessionView;
     events: { kind: string; detail: string; subject: string; at: string }[];
-    messages: { role: string; body: string; authorId: string | null; at: string }[];
+    messages: { id: string; role: string; body: string; authorId: string | null; at: string }[];
 } | null> {
     const user = await requirePermission("agents.read");
     const session = await sessions.getSession(sessionId, user.id);

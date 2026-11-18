@@ -956,15 +956,16 @@ export async function addSessionMessage(
 export async function sessionMessages(
     sessionId: string,
     limit = 100
-): Promise<{ role: string; body: string; authorId: string | null; at: string }[]> {
+): Promise<{ id: string; role: string; body: string; authorId: string | null; at: string }[]> {
     const records = await prisma.agentSessionMessage.findMany({
         where: { sessionId, kind: "text" },
         orderBy: { createdAt: "desc" },
         take: limit,
-        select: { role: true, body: true, authorId: true, createdAt: true }
+        select: { id: true, role: true, body: true, authorId: true, createdAt: true }
     });
     return records
         .map((record) => ({
+            id: record.id,
             role: record.role,
             body: record.body,
             authorId: record.authorId,

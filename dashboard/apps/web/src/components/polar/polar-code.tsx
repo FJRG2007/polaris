@@ -2189,7 +2189,8 @@ function CodeThread({
                         {blocks.map((block, index) =>
                             block.kind === "message" ? (
                                 <CodeMessage
-                                    key={`${block.entry.at}-${index}`}
+                                    // A thread cached before entries had ids has none.
+                                    key={block.entry.id || `${block.entry.at}-${index}`}
                                     entry={block.entry}
                                     onCompose={setReply}
                                 />

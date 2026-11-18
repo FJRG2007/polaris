@@ -121,6 +121,8 @@ export interface PolarCodeOverview {
 }
 
 export interface PolarCodeEntry {
+    /** Stable across reads: a message's own row id, an event's kind and time. */
+    readonly id: string;
     readonly at: string;
     /** A message somebody said, or a line of what the agent did. */
     readonly type: "message" | "event";
@@ -347,6 +349,7 @@ export async function polarCodeThread(
             : null;
     const permission = asked && (await getSession(sessionId, user.id)) ? asked : null;
     const messages: PolarCodeEntry[] = detail.messages.map((message) => ({
+        id: message.id,
         at: message.at,
         type: "message",
         role: message.role,
@@ -354,9 +357,10 @@ export async function polarCodeThread(
         text: message.role === "system" ? agentText(t, message.body) : message.body,
         detail: ""
     }));
-    const events: PolarCodeEntry[] = threadEvents(detail.events).map((event) => {
+    const events: PolarCodeEntry[] = threadEvents(detail.events).map((event, index) => {
         const key = SESSION_EVENT_KEYS[event.kind];
         return {
+            id: `event:${event.kind}:${event.at}:${index}`,
             at: event.at,
             type: "event",
             role: event.kind,
