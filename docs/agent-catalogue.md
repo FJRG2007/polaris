@@ -103,6 +103,7 @@ documents one; it is never inferred from the login.
 | Gemini CLI | `gemini` with Google sign-in selected | - | existing entry |
 | GitHub Copilot | `copilot login --device-code` | - | existing entry |
 | Auggie | `auggie auth login --headless` | `auggie auth logout` | docs.augmentcode.com/cli/setup-auggie/authentication |
+| Devin (stored account) | `devin auth login --force-manual-token-flow` | `devin auth logout` | docs.devin.ai/cli/reference/commands, file from docs.devin.ai/cli/enterprise/devin-auth |
 
 Kept in the home (`home: true`): the login lands in the person's persistent
 home, which every session mounts, and nothing is stored. Used where the vendor
@@ -159,6 +160,40 @@ Apache-2.0). With no known marker, or one that never shows, the dialog offers a
 
 None of the above has been exercised: this machine has no Docker. The commands
 are the vendors' documented ones; what each draws on screen was not seen.
+
+## More than one account
+
+How each home-login tool can hold a second account on the same machine, read
+from the vendor's own documentation or package README on 2026-11-18. A tool
+with a stored mechanism Polaris uses takes as many rows as somebody adds in
+Add connection, each encrypted like every other credential, and a session
+started on one is handed that one. The existing home login stays one row
+beside them, so nothing an install already has is lost.
+
+| Tool | More than one | Mechanism | Source |
+| --- | --- | --- | --- |
+| Cursor | yes | `CURSOR_API_KEY` (or `--api-key`); one stored key per account | cursor.com/docs/cli/reference/authentication |
+| Kiro | yes, when the home is not signed in | `KIRO_API_KEY`; the browser login from `kiro-cli login` is checked first, so the key is only used while the home has none | kiro.dev/docs/getting-started/authentication |
+| Grok Build | yes | `XAI_API_KEY`, filled from the xAI provider keys | docs.x.ai/build/overview |
+| Devin | yes | `devin auth login` writes `$XDG_DATA_HOME/devin/credentials.toml`, else `~/.local/share/devin/credentials.toml`; stored per account as `DEVIN_ACCOUNT_AUTH`, as Auggie's file is | docs.devin.ai/cli/enterprise/devin-auth |
+| Amp | yes | `AMP_API_KEY`, an access token from Settings (`sgamp_`); the docs say the CLI rejects the session token `amp login` stores | ampcode.com/docs/cli/execute-mode |
+| Droid | yes | `FACTORY_API_KEY` | docs.factory.com/cli/configuration/cli-reference |
+| fx | yes | `AI_GATEWAY_API_KEY` ("for a script or CI job"), filled from the Vercel AI Gateway provider keys | fx.sh/docs/getting-started/authentication |
+| Kimi Code | no (not yet) | `KIMI_CODE_HOME` moves the data root, OAuth credentials included; no credential file is named. `KIMI_API_KEY` is only read from `config.toml`, never from the shell, so the catalogue's key does not sign it in | moonshotai.github.io/kimi-code/en/configuration/env-vars.html |
+| Pi | no (not yet) | `PI_CODING_AGENT_DIR` overrides `~/.pi/agent`; the credential file is not named in the README. Provider keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) already take several rows | npm `@earendil-works/pi-coding-agent` README |
+| Autohand | no (not yet) | `AUTOHAND_HOME` moves `~/.autohand`; where `autohand login` keeps the credential is not documented (`--bare` mentions keychain reads), and no key variable is documented | docs.autohand.ai/working-with-autohand-code/cli-reference |
+| MiMo Code | no | nothing documented: no variable, credential path or key; "No manual API Key configuration is required" | mimo.mi.com/docs/en-US/tokenplan/integration/mimo-code |
+| MiniMax Code | no | no config-dir variable or credential path; `MCODE_PROVIDER_API_KEY` is read once by `mcode provider set-minimax-key`, not at each start | code.minimax.io/docs/cli/features.md |
+
+"No (not yet)": a variable that moves the tool's whole data directory is
+documented, but using it means a sign-in container and a session pointed at a
+per-account directory, which Polaris does not do yet for these three. Until it
+does, their Add connection card says that one account is held at a time, as it
+does for MiMo Code and MiniMax Code (`single` in `LOGIN_COMMANDS`).
+
+`KIMI_API_KEY`, `AUTOHAND_API_KEY` and `MINIMAX_API_KEY` stay in the catalogue
+as Agent Orchestrator has them; none of the three is named by its vendor's
+documentation as a variable the CLI reads.
 
 Not listed, and why (checked 2026-11-15):
 

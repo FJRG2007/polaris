@@ -1074,6 +1074,7 @@
                 "login": "Sign in with {name}",
                 "cloud": "{name} account"
             },
+            "single": "One account at a time: signing in again replaces it.",
             "change": "Change",
             "how": "How to connect it",
             "continue": "Continue",

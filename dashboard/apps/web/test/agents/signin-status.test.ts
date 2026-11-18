@@ -16,7 +16,16 @@ import {
     recordSigninOutcome,
     STATUS_TTL_MS
 } from "@/lib/agents/signin-status";
-import { LOGIN_COMMANDS, signinStatusCommand, statusScript } from "@/lib/agents/signin-runtime";
+import {
+    LOGIN_COMMANDS,
+    assistedSignins,
+    homeSignins,
+    isHomeSignin,
+    signinCredentialFile,
+    signinStatusCommand,
+    statusScript
+} from "@/lib/agents/signin-runtime";
+import { agentSignins } from "@/lib/agents/agent-signins";
 
 const b64 = (text: string) => Buffer.from(text, "utf8").toString("base64");
 
@@ -133,5 +142,64 @@ describe("status commands", () => {
         expect(script).toContain("printf 'polaris-status %s %s %s\\n' 'CURSOR_HOME_LOGIN'");
         // The preamble's own output never reaches the parsed lines.
         expect(script.indexOf("} >/dev/null 2>&1")).toBeLessThan(script.indexOf("polaris-status"));
+    });
+});
+
+describe("more than one account per agent", () => {
+    // Sourced in docs/agent-catalogue.md ("More than one account"). A home login
+    // is marked single only where no variable, credential file or key lets a
+    // second account sit beside it, or Polaris does not use the one documented.
+    const SINGLE = ["AUTOHAND_HOME_LOGIN", "KIMI_HOME_LOGIN", "MIMO_HOME_LOGIN", "MINIMAX_HOME_LOGIN", "PI_HOME_LOGIN"];
+
+    it("marks exactly the home logins that hold one account", () => {
+        const single = Object.entries(LOGIN_COMMANDS)
+            .filter(([, login]) => login.single)
+            .map(([env]) => env)
+            .sort();
+        expect(single).toEqual(SINGLE);
+        for (const env of single) expect(isHomeSignin(env)).toBe(true);
+        const flagged = homeSignins().filter((signin) => signin.single).map((signin) => signin.env).sort();
+        expect(flagged).toEqual(SINGLE);
+    });
+
+    it("keeps every existing home login, so an install's sign-in is still one row", () => {
+        const homes = homeSignins().map((signin) => signin.env);
+        for (const env of [
+            "CURSOR_HOME_LOGIN",
+            "KIRO_HOME_LOGIN",
+            "GROK_HOME_LOGIN",
+            "DEVIN_HOME_LOGIN",
+            "AMP_HOME_LOGIN",
+            "AUTOHAND_HOME_LOGIN",
+            "FX_HOME_LOGIN",
+            "MIMO_HOME_LOGIN",
+            "MINIMAX_HOME_LOGIN",
+            "KIMI_HOME_LOGIN",
+            "PI_HOME_LOGIN",
+            "DROID_HOME_LOGIN"
+        ])
+            expect(homes, env).toContain(env);
+    });
+
+    it("stores Devin accounts as rows, from the documented credentials file", () => {
+        expect(isHomeSignin("DEVIN_ACCOUNT_AUTH")).toBe(false);
+        expect(signinCredentialFile("DEVIN_ACCOUNT_AUTH")).toBe(".local/share/devin/credentials.toml");
+        expect(LOGIN_COMMANDS.DEVIN_ACCOUNT_AUTH?.command).toBe(LOGIN_COMMANDS.DEVIN_HOME_LOGIN?.command);
+        const stored = assistedSignins().find((signin) => signin.env === "DEVIN_ACCOUNT_AUTH");
+        expect(stored?.home).toBeUndefined();
+        expect(stored?.signout).toBe(true);
+        expect(stored?.serves.map((tool) => tool.id)).toEqual(["devin"]);
+    });
+
+    it("signs the multi-account agents in with a stored row each", () => {
+        // A key or token the tool reads from the environment: each stored row
+        // is one account, and a session is handed the one it was started on.
+        const stored = new Set(agentSignins().map((signin) => signin.env));
+        for (const env of ["CURSOR_API_KEY", "KIRO_API_KEY", "AMP_API_KEY", "FACTORY_API_KEY", "DEVIN_ACCOUNT_AUTH"])
+            expect(stored, env).toContain(env);
+        // Served by the provider keys instead (xAI, Vercel AI Gateway), which
+        // already hold as many as somebody adds.
+        expect(stored.has("XAI_API_KEY")).toBe(false);
+        expect(stored.has("AI_GATEWAY_API_KEY")).toBe(false);
     });
 });

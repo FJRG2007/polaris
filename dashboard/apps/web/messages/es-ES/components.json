@@ -1074,6 +1074,7 @@
                 "login": "Entrar con {name}",
                 "cloud": "Cuenta de {name}"
             },
+            "single": "Una cuenta a la vez: iniciar sesión de nuevo la sustituye.",
             "change": "Cambiar",
             "how": "Cómo conectarlo",
             "continue": "Continuar",

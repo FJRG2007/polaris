@@ -251,6 +251,7 @@ export function AddConnectionDialog({
                 key: group.key,
                 logo: <IntegrationLogo slug={group.logo} name={group.name} className="size-6 shrink-0 object-contain" />,
                 title: group.name,
+                lines: group.ways.some((one) => one.option.single) ? [t("modelKeys.connect.single")] : undefined,
                 tags: [...new Set(group.ways.map((one) => t(`modelKeys.connect.short.${one.option.method}`)))]
             })),
         [groups, t]
@@ -305,7 +306,11 @@ export function AddConnectionDialog({
                                             onSelect={() => setWay(one)}
                                             logo={<IntegrationLogo slug={one.option.slug} name={one.option.name} className="size-4 shrink-0 object-contain" />}
                                             title={<span className="min-w-0 truncate">{wayLabel(t, one)}</span>}
-                                            summary={t(`modelKeys.connect.methods.${one.option.method}`)}
+                                            summary={
+                                                one.option.single
+                                                    ? t("modelKeys.connect.single")
+                                                    : t(`modelKeys.connect.methods.${one.option.method}`)
+                                            }
                                         />
                                     ))}
                                 </div>

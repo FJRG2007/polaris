@@ -41,4 +41,13 @@ describe("Add connection", () => {
         expect(matchesConnection(options[2]!, "claude code")).toBe(true);
         expect(matchesConnection(options[2]!, "gemini")).toBe(false);
     });
+
+    it("carries a single-account sign-in's flag onto its way", () => {
+        const single = groupConnections(
+            [{ method: "home", slug: "mimo", name: "MiMo Code", vendor: "Xiaomi", single: true }],
+            []
+        );
+        expect(single[0]?.ways[0]?.option.single).toBe(true);
+        expect(find("Cursor")?.ways[0]?.option.single).toBeUndefined();
+    });
 });

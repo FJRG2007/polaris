@@ -1785,6 +1785,8 @@
             "xaiKey": "xAI API key",
             "kimiKey": "Kimi API key",
             "devinKey": "Devin API key",
+            "devinAccount": "Devin account",
+            "vercelGatewayKey": "Vercel AI Gateway key",
             "kiroKey": "Kiro API key",
             "kiloKey": "Kilo API key",
             "mistralKey": "Mistral API key",

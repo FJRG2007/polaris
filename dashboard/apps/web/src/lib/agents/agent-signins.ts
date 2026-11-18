@@ -97,6 +97,8 @@ export interface AgentSignin {
     readonly home?: boolean;
     /** The vendor documents a sign-out Polaris can run in that home. */
     readonly signout?: boolean;
+    /** A home login the tool can hold only one of at a time. */
+    readonly single?: boolean;
 }
 
 /**

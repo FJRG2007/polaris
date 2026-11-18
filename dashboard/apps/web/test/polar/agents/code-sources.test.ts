@@ -50,6 +50,8 @@ describe("the rule table", () => {
         AUGGIE_ACCOUNT_AUTH: "auggie",
         KIMI_API_KEY: "kimi",
         DEVIN_API_KEY: "devin",
+        DEVIN_ACCOUNT_AUTH: "devin",
+        AI_GATEWAY_API_KEY: "fx",
         KIRO_API_KEY: "kiro",
         KILO_API_KEY: "kilocode",
         MISTRAL_API_KEY: "vibe",

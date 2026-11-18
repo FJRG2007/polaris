@@ -1785,6 +1785,8 @@
             "xaiKey": "Clave de xAI",
             "kimiKey": "Clave de Kimi",
             "devinKey": "Clave de Devin",
+            "devinAccount": "Cuenta de Devin",
+            "vercelGatewayKey": "Clave de Vercel AI Gateway",
             "kiroKey": "Clave de Kiro",
             "kiloKey": "Clave de Kilo",
             "mistralKey": "Clave de Mistral",

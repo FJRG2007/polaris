@@ -29,6 +29,8 @@ export interface ConnectionOption {
     vendor: string;
     /** What else somebody might type looking for it. */
     aliases?: readonly string[];
+    /** An agent sign-in that holds one account at a time. */
+    single?: boolean;
 }
 
 /** Opens one flow, optionally on a slug: a provider row for a key, a login, a cloud. */

@@ -66,6 +66,8 @@ export const SOURCE_RULES: Readonly<Record<string, SourceRule>> = {
     XAI_API_KEY: { id: "xaiKey", kind: "apiKey", vendor: "xAI", logo: null, engines: ["grok"] },
     KIMI_API_KEY: { id: "kimiKey", kind: "apiKey", vendor: "Moonshot AI", logo: null, engines: ["kimi"] },
     DEVIN_API_KEY: { id: "devinKey", kind: "apiKey", vendor: "Cognition", logo: null, engines: ["devin"] },
+    DEVIN_ACCOUNT_AUTH: { id: "devinAccount", kind: "subscription", vendor: "Cognition", logo: null, engines: ["devin"] },
+    AI_GATEWAY_API_KEY: { id: "vercelGatewayKey", kind: "apiKey", vendor: "Vercel", logo: null, engines: ["fx"] },
     KIRO_API_KEY: { id: "kiroKey", kind: "apiKey", vendor: "Amazon", logo: null, engines: ["kiro"] },
     KILO_API_KEY: { id: "kiloKey", kind: "apiKey", vendor: "Kilo Code", logo: null, engines: ["kilocode"] },
     MISTRAL_API_KEY: { id: "mistralKey", kind: "apiKey", vendor: "Mistral AI", logo: null, engines: ["vibe"] },

@@ -123,6 +123,13 @@ export interface LoginCommand {
      * known, the dialog offers it as a button instead of guessing when.
      */
     readonly input?: { readonly text: string; readonly after?: readonly string[] };
+    /**
+     * A home login the tool can hold only one of: its vendor documents no
+     * variable, credential file or key that would let a second account sit
+     * beside the first, so signing in again replaces it. The reason for each is
+     * in docs/agent-catalogue.md ("More than one account").
+     */
+    readonly single?: true;
 }
 
 /** "device" prints an address and a code; "paste" asks for something typed
@@ -192,6 +199,16 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
         logout: "auggie auth logout",
         flow: "paste"
     },
+    // The same login as DEVIN_HOME_LOGIN below, kept as a stored account: the
+    // token lands in ~/.local/share/devin/credentials.toml
+    // (docs.devin.ai/cli/enterprise/devin-auth), which is captured, so each
+    // account is a row of its own, as Auggie's are.
+    DEVIN_ACCOUNT_AUTH: {
+        cli: "devin",
+        command: "devin auth login --force-manual-token-flow",
+        logout: "devin auth logout",
+        flow: "paste"
+    },
 
     // Logins kept in the home (`home: true`): documented commands whose
     // credential location the vendor does not name. Each source is in
@@ -250,14 +267,15 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
         command: "autohand login",
         logout: "autohand logout",
         flow: "paste",
-        home: true
+        home: true,
+        single: true
     },
     // fx.sh/docs/getting-started/authentication: without a provider name,
     // `fx login` signs in to Vercel and `fx logout` signs out of it.
     FX_HOME_LOGIN: { cli: "fx", command: "fx login", logout: "fx logout", flow: "paste", home: true },
     // mimo.mi.com/docs/en-US/tokenplan/integration/mimo-code: `mimo auth login`,
     // then MiMo chosen on the screen. No logout is documented.
-    MIMO_HOME_LOGIN: { cli: "mimo-code", command: "mimo auth login", flow: "paste", home: true },
+    MIMO_HOME_LOGIN: { cli: "mimo-code", command: "mimo auth login", flow: "paste", home: true, single: true },
     // code.minimax.io/docs/cli/quick-start: `mcode login --region global` for a
     // Global account (the bare command is the Mainland China one), and
     // `mcode logout`.
@@ -266,7 +284,8 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
         command: "mcode login --region global",
         logout: "mcode logout",
         flow: "paste",
-        home: true
+        home: true,
+        single: true
     },
 
     // Logins typed into the tool itself once it is ready. The ready markers are
@@ -281,6 +300,7 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
         command: "kimi",
         flow: "paste",
         home: true,
+        single: true,
         input: { text: "/login", after: ["Run /login or /provider to get started."] }
     },
     // github.com/earendil-works/pi README: "run `/login` inside Pi to connect a
@@ -290,6 +310,7 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
         command: "pi",
         flow: "paste",
         home: true,
+        single: true,
         input: { text: "/login", after: ["0.0%/", "Pi can explain its own features"] }
     },
     // docs.factory.com/cli/configuration/cli-reference: `/login` signs in to
@@ -377,7 +398,8 @@ export function homeSignins(): AgentSignin[] {
                 onScreen: false,
                 serves: [{ id: cli.id, label: cli.label }],
                 home: true,
-                signout: canSignout(env)
+                signout: canSignout(env),
+                single: login.single === true
             }
         ];
     });

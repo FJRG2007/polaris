@@ -1135,7 +1135,21 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         home: null,
         observe: "hooks",
         docs: "https://docs.devin.ai/get-started/devin-intro",
-        credentials: [apiKey("DEVIN_API_KEY", "Devin API key", "https://docs.devin.ai/get-started/devin-intro")],
+        credentials: [
+            apiKey("DEVIN_API_KEY", "Devin API key", "https://docs.devin.ai/get-started/devin-intro"),
+            // `devin auth login` keeps the token in
+            // ~/.local/share/devin/credentials.toml when XDG_DATA_HOME is unset
+            // (docs.devin.ai/cli/enterprise/devin-auth). Polaris keeps a copy of
+            // that file per account, as it does Auggie's.
+            {
+                env: "DEVIN_ACCOUNT_AUTH",
+                label: "Devin account",
+                url: "https://docs.devin.ai/cli/enterprise/devin-auth",
+                howto: null,
+                subscription: true,
+                file: ".local/share/devin/credentials.toml"
+            }
+        ],
         autonomyArgs: ["--permission-mode", "dangerous"],
         autonomyEnv: {},
         firstRun: hookFileAnswers("devin")
@@ -1305,7 +1319,12 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         home: ".fx",
         observe: "output",
         docs: "https://fx.sh/docs",
-        credentials: [],
+        // "For a script or CI job, set `AI_GATEWAY_API_KEY`"
+        // (fx.sh/docs/getting-started/authentication). The Vercel AI Gateway
+        // keys already stored are what fills it.
+        credentials: [
+            apiKey("AI_GATEWAY_API_KEY", "Vercel AI Gateway key", "https://fx.sh/docs/getting-started/authentication")
+        ],
         autonomyArgs: [],
         autonomyEnv: {},
         firstRun: []

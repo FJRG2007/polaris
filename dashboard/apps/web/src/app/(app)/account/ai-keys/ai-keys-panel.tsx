@@ -174,7 +174,8 @@ function connectOptions(assisted: readonly AgentSignin[]): ConnectionOption[] {
             slug: signin.slug,
             name: signin.serves[0]?.label ?? signin.label,
             vendor: vendorOf(signin.serves[0]?.id),
-            aliases: [signin.label]
+            aliases: [signin.label],
+            ...(signin.single ? { single: true } : {})
         }));
     return [...accounts, ...homes];
 }
