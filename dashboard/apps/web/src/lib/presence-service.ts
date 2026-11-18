@@ -29,7 +29,7 @@
 
 import { prisma, type Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { allowedBy } from "@/lib/privacy-service";
+import { allowedBy, reciprocalAmong } from "@/lib/privacy-service";
 import { reachableChannelIds } from "@/lib/chat/access";
 import { activitiesFor } from "@/lib/presence-activity/service";
 import { PARTICIPANT_TTL_MS } from "@/lib/chat/meetings";
@@ -86,6 +86,14 @@ export interface PresenceView {
      * or when it ends.
      */
     readonly auto: core.AutoPresenceView | null;
+    /**
+     * When they were last here, as an ISO time, for somebody drawn as offline -
+     * "last seen today at 14:32". Null whenever it may not be said: they are
+     * here, they chose to appear offline, the reader may not see their
+     * presence at all, either side's `lastActive` setting keeps it between them
+     * (it is reciprocal), or there is no activity on record.
+     */
+    readonly lastActive: string | null;
 }
 
 /**
@@ -161,6 +169,7 @@ export async function presenceFor(
     // Gone by their sessions alone, with nothing chosen to say so - the only
     // people a game server here can speak for.
     const away = new Set<string>();
+    const lapsed = new Set<string>();
     for (const person of people) {
         const mine = person.id === viewer.id;
         const inCall = calls.joinable.get(person.id) ?? null;
@@ -172,7 +181,8 @@ export async function presenceFor(
                 note: "",
                 inCall,
                 activity: [],
-                auto: null
+                auto: null,
+                lastActive: null
             });
             continue;
         }
@@ -186,6 +196,11 @@ export async function presenceFor(
             at
         );
         const status = statusOf(held.choice, seen.get(person.id), now);
+        // Offline by their sessions rather than by saying so: the only people
+        // a "last seen" time can be told about.
+        if (!mine && status === "offline" && held.choice !== "invisible" && seen.has(person.id)) {
+            lapsed.add(person.id);
+        }
         if (status === "offline" && held.choice === "auto") away.add(person.id);
         if (status !== "offline" && held.choice === "auto") {
             automatic.push({ person, settings: core.parseAutoPresence(person.autoPresence) });
@@ -201,7 +216,8 @@ export async function presenceFor(
                     : "",
             inCall,
             activity: [],
-            auto: null
+            auto: null,
+            lastActive: null
         });
     }
 
@@ -271,6 +287,18 @@ export async function presenceFor(
                 note: person && core.statusInForce(person, at) ? person.statusText.trim() : "",
                 activity: playing
             });
+        }
+    }
+
+    // "Last seen" for whoever is still drawn offline, in one batched check of
+    // both sides' setting. Somebody a game server turned idle above is here.
+    const gone = [...lapsed].filter((id) => answer.get(id)?.status === "offline");
+    if (gone.length > 0) {
+        const told = await reciprocalAmong(viewer, "lastActive", gone);
+        for (const id of told) {
+            const view = answer.get(id);
+            const at = seen.get(id);
+            if (view && at) answer.set(id, { ...view, lastActive: at.toISOString() });
         }
     }
     return answer;

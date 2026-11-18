@@ -23,6 +23,7 @@ import { Button, cn } from "@polaris/ui";
 import * as core from "@polaris/core";
 import { useState, type ComponentType, type ReactNode } from "react";
 import { useNow } from "@/components/presence";
+import { lastSeenLine } from "@/components/last-seen";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useSessionScope } from "@/components/session-scope";
@@ -75,12 +76,15 @@ function heading(activity: core.ActivityView, t: NamespaceTranslator<"components
  */
 export function presenceLine(
     where: PresenceOf | null | undefined,
-    t: NamespaceTranslator<"components">
+    t: NamespaceTranslator<"components">,
+    format?: core.DisplayFormat
 ): string {
     const said = where?.note?.trim();
     if (said) return said;
     const first = where?.activity?.[0];
-    return first ? activityLine(first, t) : "";
+    if (first) return activityLine(first, t);
+    // Offline: when they were last here, if they and the reader allow it.
+    return format ? lastSeenLine(where, t, format) : "";
 }
 
 /** What one person is doing, as one short line with its icon. Nothing when

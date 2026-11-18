@@ -89,8 +89,12 @@
             "note": "Quién encuentra tu cuenta cuando busca a alguien. Quien no pueda tendrá que saber tu nombre de usuario exacto para pedirte que le añadas, y nunca se le dice si existe."
         },
         "lastSeen": {
-            "label": "Cuándo estuviste aquí",
-            "note": "Si otras personas pueden ver que estás aquí ahora, o cuándo estuviste por última vez."
+            "label": "Si se te muestra en línea",
+            "note": "El punto junto a tu nombre y el estado debajo. Quien no pueda verlo te ve desconectado."
+        },
+        "lastActive": {
+            "label": "Tu última vez en línea",
+            "note": "La hora bajo tu nombre cuando no estás, como «última vez hoy a las 14:32». Si lo restringes, tampoco verás la de los demás."
         },
         "activity": {
             "label": "A qué juegas o qué escuchas",
@@ -99,6 +103,10 @@
         "readReceipts": {
             "label": "Que has leído un mensaje",
             "note": "Los ticks bajo un mensaje en una conversación directa. Si lo restringes, tampoco verás los de los demás, y «solo» es la forma de dejarlos activados para una persona."
+        },
+        "typing": {
+            "label": "Que estás escribiendo",
+            "note": "Los puntos que aparecen mientras escribes. Si lo restringes, tampoco verás los de los demás."
         },
         "avatar": {
             "label": "Tu foto",

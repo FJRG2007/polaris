@@ -41,7 +41,8 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@/lib/privacy-service", () => ({
     allowedBy: async (_viewer: unknown, _field: string, ids: readonly string[]) =>
-        new Set(ids.filter((id) => !lastSeenHidden.has(id)))
+        new Set(ids.filter((id) => !lastSeenHidden.has(id))),
+    reciprocalAmong: async () => new Set<string>()
 }));
 vi.mock("@/lib/presence-activity/service", () => ({
     activitiesFor: async (_viewer: unknown, ids: readonly string[]) => {

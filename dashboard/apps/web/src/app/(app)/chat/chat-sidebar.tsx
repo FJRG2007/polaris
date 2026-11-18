@@ -27,6 +27,7 @@ import { useChat } from "./chat-context";
 import { Elsewhere } from "./elsewhere";
 import { usePresence } from "@/components/presence-store";
 import { presenceLine } from "@/components/activity-card";
+import { useDisplayFormat } from "@/components/display-format";
 import { rememberChannel } from "./recents";
 import { Avatar } from "@/components/avatar";
 import { RelativeTime } from "@/components/relative-time";
@@ -1435,7 +1436,11 @@ function Row({
      * that grows to three lines pushes the conversation below it off the screen.
      */
     // Or, when they said nothing, what they are playing or listening to.
-    const said = presenceLine(usePresence(personId), useTranslations("components"));
+    const said = presenceLine(
+        usePresence(personId),
+        useTranslations("components"),
+        useDisplayFormat()
+    );
     const row = (
         <PersonRow
             as={Link}

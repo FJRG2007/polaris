@@ -89,8 +89,12 @@
             "note": "Who finds your account when they look for somebody. Anybody who cannot has to know your exact username to ask to be added, and is never told whether it exists."
         },
         "lastSeen": {
-            "label": "When you were last here",
-            "note": "Whether other people can see that you are here now, or when you last were."
+            "label": "Whether you are shown online",
+            "note": "The dot beside your name and the status under it. Anybody who cannot see it sees you as offline."
+        },
+        "lastActive": {
+            "label": "When you were last online",
+            "note": "The time under your name while you are away, such as \"last seen today at 14:32\". Turning this down also stops you seeing anybody else's."
         },
         "activity": {
             "label": "What you are playing or listening to",
@@ -99,6 +103,10 @@
         "readReceipts": {
             "label": "That you have read a message",
             "note": "The ticks under a message in a direct conversation. Turning this down also stops you seeing anybody else's, and \"only\" is how you leave them on for one person."
+        },
+        "typing": {
+            "label": "That you are typing",
+            "note": "The dots shown while you write. Turning this down also stops you seeing anybody else's."
         },
         "avatar": {
             "label": "Your photo",

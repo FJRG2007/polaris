@@ -46,6 +46,7 @@ import { NicknameDialog } from "./nickname-dialog";
 import { nameplateCss } from "@/lib/profile-style-css";
 import { useKnownPresence, usePresence } from "@/components/presence-store";
 import { presenceLine } from "@/components/activity-card";
+import { useDisplayFormat } from "@/components/display-format";
 import { MemberMenu, type MenuPerson } from "./member-menu";
 import { useWideScreen, WIDE_ENOUGH } from "./use-wide-screen";
 import type { ChatChannelView, ChatMemberView } from "@/lib/chat/chat-service";
@@ -385,6 +386,7 @@ export function MemberRow({
     // What they are showing right now. Already on screen for the avatar's dot,
     // so this costs nothing: the store asked about them either way.
     const where = usePresence(member.userId);
+    const format = useDisplayFormat();
     // The line wins over the role when there is one. A role is a fact that does
     // not change; a status is what somebody is doing this afternoon, and two
     // lines under a name in a 14rem column is a wall.
@@ -392,7 +394,7 @@ export function MemberRow({
     // the same reason: it is this afternoon, and the role is every afternoon.
     // Being in a voice room wins over all of it while it lasts: it is the one
     // thing on this list somebody can act on by walking in.
-    const under = presenceLine(where, tc) || role;
+    const under = presenceLine(where, tc, format) || role;
     const inVoice = voice ? t("members.inVoiceIn", { channel: voice.channelName }) : "";
     // Asked from the same store the face asked, so it is one request for the
     // panel rather than one per member.

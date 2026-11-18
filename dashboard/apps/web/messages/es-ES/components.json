@@ -50,7 +50,12 @@
         "online": "En línea",
         "idle": "Ausente",
         "busy": "No molestar",
-        "offline": "Desconectado"
+        "offline": "Desconectado",
+        "lastSeen": {
+            "today": "Última vez hoy a las {time}",
+            "yesterday": "Última vez ayer a las {time}",
+            "date": "Última vez el {date}"
+        }
     },
     "avatar": {
         "openPhoto": "Abrir la foto de {name}",

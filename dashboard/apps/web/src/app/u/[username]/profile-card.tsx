@@ -37,6 +37,7 @@ import { ProfileActions } from "./profile-actions";
 import { Avatar, OrgAvatar } from "@/components/avatar";
 import { MutualPanel } from "@/components/mutual-panel";
 import { ProfileLink } from "@/components/profile-link";
+import { LastSeen } from "@/components/last-seen";
 import { usePresence } from "@/components/presence-store";
 import { ActivityCards } from "@/components/activity-card";
 import type { PublicProfile } from "@/lib/profile-service";
@@ -195,6 +196,8 @@ export function ProfileCard({
                     The note is not the same fact. It is what this person chose to
                     say, and nothing else on screen carries it. It is only ever
                     there while they actually are here; see `presence-service`. */}
+                {/* Away: when they were last here, if they and the reader allow it. */}
+                <LastSeen personId={profile.id} />
                 {where?.note ? (
                     <p className="w-full whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
                         {where.note}

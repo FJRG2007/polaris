@@ -58,6 +58,9 @@ export interface PresenceOf {
     /** Why they are showing what they are - on a call, in a meeting - when
      *  automatic status says so. Absent from a server that predates it. */
     readonly auto?: AutoPresenceView | null;
+    /** When somebody drawn as offline was last here (ISO), when both sides'
+     *  settings allow it. Absent from a server that predates it. */
+    readonly lastActive?: string | null;
 }
 
 /** The event `announcePresence` raises, heard by the provider. */

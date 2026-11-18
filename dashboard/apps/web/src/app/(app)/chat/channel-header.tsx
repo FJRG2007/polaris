@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { Avatar } from "@/components/avatar";
 import { ActivityLine } from "@/components/activity-card";
+import { LastSeen } from "@/components/last-seen";
 import { PersonName, PersonRealName } from "@/components/person-name";
 import { LeaveDialog } from "./leave-dialog";
 import { NicknameDialog } from "./nickname-dialog";
@@ -282,6 +283,13 @@ export function ChannelHeader({
                     <ActivityLine
                         personId={channel.others[0].id}
                         className="hidden max-w-[16rem] shrink sm:flex"
+                    />
+                ) : null}
+                {/* Or, while they are away, when they were last here. */}
+                {!named && channel.others.length === 1 && channel.others[0] ? (
+                    <LastSeen
+                        personId={channel.others[0].id}
+                        className="hidden max-w-[16rem] shrink sm:block"
                     />
                 ) : null}
                 {/* Which game server talks through this conversation, and the

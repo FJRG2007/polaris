@@ -53,7 +53,8 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@/lib/privacy-service", () => ({
     allowedBy: async (_viewer: unknown, _field: string, userIds: readonly string[]) =>
-        new Set(userIds)
+        new Set(userIds),
+    reciprocalAmong: async () => new Set<string>()
 }));
 vi.mock("@/lib/chat/access", () => ({ reachableChannelIds: async () => new Set<string>() }));
 vi.mock("@/lib/presence-activity/service", () => ({ activitiesFor: async () => new Map() }));

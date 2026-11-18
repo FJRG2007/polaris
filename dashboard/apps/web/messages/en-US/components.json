@@ -50,7 +50,12 @@
         "online": "Online",
         "idle": "Away",
         "busy": "Do not disturb",
-        "offline": "Offline"
+        "offline": "Offline",
+        "lastSeen": {
+            "today": "Last seen today at {time}",
+            "yesterday": "Last seen yesterday at {time}",
+            "date": "Last seen {date}"
+        }
     },
     "avatar": {
         "openPhoto": "Open {name}'s photo",

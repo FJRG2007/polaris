@@ -21,6 +21,8 @@ import { createPortal } from "react-dom";
 import { useState, useCallback, useRef, type CSSProperties } from "react";
 import { ImageViewer } from "@/components/image-viewer";
 import { usePresence } from "@/components/presence-store";
+import { lastSeenLine } from "@/components/last-seen";
+import { useDisplayFormat } from "@/components/display-format";
 import { avatarUrl, orgAvatarUrl } from "@/lib/avatar-url";
 import { useNamesArePlain } from "@/components/person-name";
 import { HeadphoneOff, MicOff, Volume2 } from "lucide-react";
@@ -263,6 +265,9 @@ export function Avatar({
     // tells somebody whether to wait a minute or an afternoon.
     const auto = presence ? null : (known?.auto ?? null);
     const autoWord = auto ? t(`presenceAuto.${autoPresenceWord(auto)}`) : null;
+    // Hovering a grey dot says when they were last here, where both sides allow it.
+    const format = useDisplayFormat();
+    const seenWord = presence ? "" : lastSeenLine(known, t, format);
     // A 404 is the ordinary answer for somebody with no picture anywhere, so it
     // is not an error state - it just means the initials underneath stay.
     const [failed, setFailed] = useState(false);
@@ -489,8 +494,8 @@ export function Avatar({
                 </span>
             ) : (
                 <span
-                    aria-label={autoWord ?? t(`presence.${where.status}`)}
-                    title={autoWord ?? t(`presence.${where.status}`)}
+                    aria-label={autoWord ?? (seenWord || t(`presence.${where.status}`))}
+                    title={autoWord ?? (seenWord || t(`presence.${where.status}`))}
                     className={cn(
                         "absolute -bottom-0.5 -end-0.5 rounded-full ring-2 ring-background",
                         PRESENCE_COLOURS[where.status]

@@ -30,6 +30,7 @@ import { ProfileLink } from "@/components/profile-link";
 import { useRouter } from "next/navigation";
 import { useChat } from "./chat-context";
 import type { ChatProfile } from "@/lib/chat/profiles";
+import { LastSeen } from "@/components/last-seen";
 import { usePresence } from "@/components/presence-store";
 import { ActivityCards } from "@/components/activity-card";
 import { ProfileBanner } from "@/components/profile-banner";
@@ -247,6 +248,8 @@ export function ProfileDetails({
                 {/* What they are showing, and only that. Where they are is
                     already on the face above; the note is what this person chose
                     to say, and only there while they are here. */}
+                {/* Away: when they were last here, if they and the reader allow it. */}
+                <LastSeen personId={person.id} />
                 {where?.note && (
                     <p className="w-full whitespace-pre-wrap break-words rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground">
                         {where.note}
