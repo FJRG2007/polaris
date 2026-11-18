@@ -16,6 +16,7 @@ export const POLAR_SETTINGS_SECTIONS = [
     "agents",
     "browser",
     "coding-tools",
+    "providers",
     "routing",
     "usage",
     "permissions",

@@ -1,6 +1,6 @@
 /**
  * How much of its OpenCode Go allowance each of a person's Console sign-ins
- * has used, for the sign-in card on /account/ai-keys.
+ * has used, for the sign-in card on /polar/settings/providers.
  *
  * Read when the card asks, never in the background, and kept for a minute per
  * sign-in so a screen opened twice asks OpenCode once.
@@ -8,7 +8,7 @@
  * Server-only.
  */
 
-import { chatCredentialsFor } from "@/lib/agents/model-keys";
+import { chatCredentialsFor, type KeyOwner } from "@/lib/agents/model-keys";
 import { loginRequest, type LoginRequest } from "@/lib/agents/provider-login-http";
 import { readGoUsage, type GoUsage } from "@/lib/agents/signin-opencode";
 
@@ -28,11 +28,11 @@ const MAX_CACHED = 1000;
 const cache = new Map<string, { until: number; row: GoUsageRow }>();
 
 export async function goUsageFor(
-    userId: string,
+    userId: KeyOwner,
     request: LoginRequest = loginRequest,
     now = Date.now()
 ): Promise<GoUsageRow[]> {
-    const held = (await Promise.all(CONSOLE_SLUGS.map((slug) => chatCredentialsFor(userId, slug, "own")))).flat();
+    const held = (await Promise.all(CONSOLE_SLUGS.map((slug) => chatCredentialsFor(userId, slug, userId === null ? "instance" : "own")))).flat();
     // A pasted Console key has no workspace to ask about; only sign-ins do.
     const logins = held.filter((credential) => credential.oauth && credential.keyId);
     return Promise.all(

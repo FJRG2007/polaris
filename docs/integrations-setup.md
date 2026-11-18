@@ -133,9 +133,9 @@ the API key from the My Information page.
 ## AI providers
 
 Anthropic, OpenAI, Google Gemini, xAI, DeepSeek, Moonshot AI, Groq, Cerebras
-and OpenRouter have their own list. Each person adds keys under **Account > AI
-provider keys**, and an administrator adds the deployment's under **Management
-> Integrations & AI > AI provider keys**. Keys are tried from the top; the first
+and OpenRouter have their own list. Each person adds keys under **Polar > AI
+providers**, and an administrator adds the deployment's under **Management
+> Integrations & AI > AI providers**. Keys are tried from the top; the first
 one whose provider serves the model is used. The same page holds agent
 accounts, which sign a coding agent in for its sessions.
 

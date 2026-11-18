@@ -1,4 +1,13 @@
 {
+    "polarBot": {
+        "badge": "IA",
+        "badgeHint": "Un asistente, no una persona",
+        "role": "Asistente de Polaris",
+        "about": "Menciona @polar en una conversación para preguntarle. Responde ahí, para todos.",
+        "open": "Abrir Polar",
+        "unavailable": "Polar no está disponible en tu cuenta. Un administrador decide quién lo usa.",
+        "mentionHint": "Aquí se preguntó a Polar"
+    },
     "actions": {
         "ok": "Vale",
         "confirm": "Confirmar",
@@ -1195,7 +1204,7 @@
                 "key": "Claves API",
                 "account": "Cuentas de agente",
                 "agent": "Sesiones de agente",
-                "deployment": "Claves del despliegue"
+                "deployment": "Compartidas"
             },
             "statusLabel": "Estado",
             "statuses": {
@@ -1209,11 +1218,11 @@
             "filteredNote": "Borra la búsqueda y los filtros para mover conexiones.",
             "sortByOrder": "Ordenar por orden",
             "noMatch": "Ninguna conexión coincide.",
-            "deploymentName": "Clave del despliegue",
-            "deploymentHint": "Solo lectura. Tus ejecuciones la usan donde no tienes clave propia.",
+            "deploymentName": "Compartida por Polaris",
+            "deploymentHint": "La añadió quien administra Polaris. Se usa mientras no tengas clave propia.",
             "readOnly": "Solo lectura",
             "usingYours": "Se usa tu clave",
-            "usingDeployment": "Se usa la del despliegue",
+            "usingDeployment": "Disponible para ti",
             "agentKey": "Sesión iniciada en la máquina de tus sesiones"
         }
     },
@@ -1618,10 +1627,10 @@
         "apiKeyHint": "Usa esta clave API, de pago por uso, en vez de una suscripción.",
         "providedAccount": "La aporta este Polaris: {account}",
         "nothingSigns": "Nada de aquí inicia sesión en {agent}.",
-        "loginPrompt": "En esta máquina arrancaría y se quedaría en su propia pantalla de inicio de sesión, donde nadie le respondería nunca. Inicia sesión en Claves de IA (Polaris hace el inicio de sesión por ti y pone la máquina) o ejecútalo en un servidor donde ya lo tengas con sesión iniciada.",
+        "loginPrompt": "En esta máquina arrancaría y se quedaría en su propia pantalla de inicio de sesión, donde nadie le respondería nunca. Inicia sesión en Proveedores de IA (Polaris hace el inicio de sesión por ti y pone la máquina) o ejecútalo en un servidor donde ya lo tengas con sesión iniciada.",
         "takes": "Necesita {ways}.",
         "or": "o",
-        "signIn": "Entrar en Claves de IA"
+        "signIn": "Entrar en Proveedores de IA"
     },
     "modelPicker": {
         "inherit": "Heredar",

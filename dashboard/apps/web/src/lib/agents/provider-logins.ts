@@ -15,7 +15,7 @@ import * as copilot from "@/lib/agents/signin-copilot";
 import * as opencode from "@/lib/agents/signin-opencode";
 import { DirectSigninError } from "@/lib/agents/signin-direct";
 import { writeOAuthSecret } from "@/lib/agents/provider-oauth";
-import { createModelKey, ownerHasModelKeyName } from "@/lib/agents/model-keys";
+import { createModelKey, ownerHasModelKeyName, type KeyOwner } from "@/lib/agents/model-keys";
 import { asDirectPost, loginRequest, type LoginRequest } from "@/lib/agents/provider-login-http";
 import type { GitlabInstance } from "@/lib/agents/login-instances";
 
@@ -41,7 +41,7 @@ type Pending =
     | { kind: "opencode"; slug: ConsoleSlug; device: opencode.OpencodeDevice };
 
 interface Attempt {
-    userId: string;
+    userId: KeyOwner;
     pending: Pending;
     startedAt: number;
     nextPollAt: number;
@@ -87,7 +87,7 @@ export interface LoginPlace {
 }
 
 export async function startProviderLogin(
-    userId: string,
+    userId: KeyOwner,
     provider: ProviderLogin,
     request: LoginRequest = loginRequest,
     now = Date.now(),
@@ -122,7 +122,7 @@ export async function startProviderLogin(
     return { id, ...start };
 }
 
-async function store(userId: string, provider: ProviderLogin, secret: string): Promise<string> {
+async function store(userId: KeyOwner, provider: ProviderLogin, secret: string): Promise<string> {
     const base = KEY_NAME[provider];
     let name = base;
     for (let n = 2; n < 50 && (await ownerHasModelKeyName(userId, name)); n++) name = `${base} ${n}`;
@@ -135,7 +135,7 @@ async function store(userId: string, provider: ProviderLogin, secret: string): P
  * passed, so a screen asking every second costs the vendor nothing extra.
  */
 export async function pollProviderLogin(
-    userId: string,
+    userId: KeyOwner,
     id: string,
     request: LoginRequest = loginRequest,
     now = Date.now()
@@ -201,7 +201,7 @@ function settle(id: string, attempt: Attempt, state: "pending" | "slower" | "den
 
 /** GitLab: the address the browser landed on, pasted back. */
 export async function finishGitlabLogin(
-    userId: string,
+    userId: KeyOwner,
     id: string,
     pasted: string,
     request: LoginRequest = loginRequest,

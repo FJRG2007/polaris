@@ -21,7 +21,7 @@ Automations and Settings.
    [Setting up integrations](../integrations-setup.md#github)).
 2. **A model provider.** Your own key with Anthropic, OpenAI, Google, xAI,
    DeepSeek, Moonshot, Groq, Cerebras or OpenRouter, or an OpenAI-compatible
-   gateway, added under **AI provider keys**. The key stays in Polaris and is
+   gateway, added under **AI providers**. The key stays in Polaris and is
    never copied into your repositories.
 3. **A repository**, and where its runs happen.
 
@@ -82,7 +82,7 @@ committing anything not yet committed. If a push fails the work is kept, to try
 again or discard. When a session ends its branch is still there. Sessions can be
 shared with other people.
 
-An agent signs in with an account under **AI provider keys > Your agent
+An agent signs in with an account under **AI providers > Your agent
 accounts**: a subscription costs nothing extra, an API key is metered. A machine
 keeps its home between sessions, so installs and sign-ins happen once.
 

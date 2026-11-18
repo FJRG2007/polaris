@@ -111,7 +111,7 @@ documents one; it is never inferred from the login.
 Kept in the home (`home: true`): the login lands in the person's persistent
 home, which every session mounts, and nothing is stored. Used where the vendor
 documents the command but not where the login is kept. Listed under "Signed in
-on your sessions' machine" on Account > AI keys, each with a Sign out button
+on your sessions' machine" under Polar > AI providers, each with a Sign out button
 when the vendor documents one. A removed stored sign-in whose tool has a logout
 is offered the same sign-out.
 

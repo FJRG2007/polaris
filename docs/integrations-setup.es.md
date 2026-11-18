@@ -139,9 +139,9 @@ caché. Pega la clave de API de la página My Information.
 ## Proveedores de IA
 
 Anthropic, OpenAI, Google Gemini, xAI, DeepSeek, Moonshot AI, Groq, Cerebras y
-OpenRouter tienen su propia lista. Cada persona añade sus claves en **Cuenta >
-Claves de IA**, y un administrador añade las del despliegue en **Gestión >
-Integraciones e IA > Claves de IA**. Las claves se prueban de arriba abajo; se
+OpenRouter tienen su propia lista. Cada persona añade sus claves en **Polar >
+Proveedores de IA**, y un administrador añade las del despliegue en **Gestión >
+Integraciones e IA > Proveedores de IA**. Las claves se prueban de arriba abajo; se
 usa la primera cuyo proveedor sirve el modelo. La misma página guarda las
 cuentas de agente, que inician sesión de un agente de programación en sus
 sesiones.

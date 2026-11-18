@@ -1126,7 +1126,7 @@ const ADMIN_AREAS: AppSubapp[] = [
                 keywords: ["github", "cloudflare", "connect"]
             },
             {
-                label: "AI provider keys", // i18n-ignore
+                label: "AI providers", // i18n-ignore
                 href: "/admin/integrations/models",
                 adminOnly: true,
                 icon: Sparkles,
@@ -1813,6 +1813,15 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             ]
         },
         {
+            // The makers' clouds, bridges and hubs the devices come from: kept
+            // apart from the devices, which are what somebody works day to day.
+            label: "Accounts", // i18n-ignore
+            group: DEVICES_GROUP,
+            href: "/places/devices/accounts",
+            icon: Link2,
+            keywords: ["connected accounts", "integrations", "tuya", "smart life", "nuki", "bridge", "hub", "reconnect", "sign in again"]
+        },
+        {
             // Full-screen boards of cards for a tablet on the wall: the devices
             // and rooms somebody picked, with a link for a screen nobody signs in on.
             label: "Wall panels", // i18n-ignore
@@ -2279,6 +2288,33 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         },
         // What Polar may do without asking first: the "Always allow" answers
         // from its approval card, each with Revoke.
+        // The keys, subscriptions and clouds Polar's work runs on: Polar's own
+        // settings, where every other choice about its models is made.
+        {
+            label: "AI providers", // i18n-ignore
+            href: "/polar/settings/providers",
+            icon: Sparkles,
+            keywords: [
+                "byok",
+                "bring your own key",
+                "models",
+                "anthropic",
+                "claude",
+                "openai",
+                "gemini",
+                "grok",
+                "deepseek",
+                "kimi",
+                "groq",
+                "cerebras",
+                "openrouter",
+                "provider",
+                "billing",
+                "agents",
+                "api key"
+            ],
+            hidden: true
+        },
         {
             label: "Polar permissions", // i18n-ignore
             href: "/polar/settings/permissions",
@@ -2607,30 +2643,6 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["computer", "pc", "runner", "pair", "this computer", "claude code", "codex"],
             group: DEVELOPERS_GROUP,
             needs: "agents.manage"
-        },
-        {
-            label: "AI provider keys", // i18n-ignore
-            href: "/account/ai-keys",
-            icon: Sparkles,
-            keywords: [
-                "byok",
-                "bring your own key",
-                "models",
-                "anthropic",
-                "claude",
-                "openai",
-                "gemini",
-                "grok",
-                "deepseek",
-                "kimi",
-                "groq",
-                "cerebras",
-                "openrouter",
-                "provider",
-                "billing",
-                "agents"
-            ],
-            group: DEVELOPERS_GROUP
         },
         {
             label: "Domains", // i18n-ignore

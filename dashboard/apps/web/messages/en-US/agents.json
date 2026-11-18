@@ -98,7 +98,7 @@
         "acceptStep": "Press Review request, then Accept new permissions.",
         "on": "On",
         "openOnGithub": "Open it under Settings, Applications, on GitHub, then press Review request, then Accept new permissions.",
-        "noProvider": "No model provider is connected, so a run has nothing to think with. Add one under <link>AI provider keys</link>. The key stays here and is never copied into your repositories."
+        "noProvider": "No model provider is connected, so a run has nothing to think with. Add one under <link>AI providers</link>. The key stays here and is never copied into your repositories."
     },
     "overview": {
         "repositories": "Repositories",
@@ -220,13 +220,13 @@
             "noSharedMachine": "This Polaris does not offer a shared machine.",
             "serverNotYours": "That server is not one of yours.",
             "computerNotYours": "That computer is not one of yours.",
-            "signInHost": "Nothing here signs {agent} in. Either sign it in on that server yourself, or add {ways} under AI keys.",
-            "noModelKey": "There is no key for the model you picked. Add one under AI keys, or pick another model.",
+            "signInHost": "Nothing here signs {agent} in. Either sign it in on that server yourself, or add {ways} under AI providers.",
+            "noModelKey": "There is no key for the model you picked. Add one under AI providers, or pick another model.",
             "files": {
                 "missing": "One of the files is gone. Attach it again.",
                 "tooLarge": "The files add up to more than 10 MB. Send fewer."
             },
-            "signInLocal": "Nothing here signs {agent} in, so it would start and sit at its own login prompt. Add {ways} under AI keys.",
+            "signInLocal": "Nothing here signs {agent} in, so it would start and sit at its own login prompt. Add {ways} under AI providers.",
             "or": "or",
             "taskUnreachable": "That task is not one you can reach.",
             "saySomething": "Say something",

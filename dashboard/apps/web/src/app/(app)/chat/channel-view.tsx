@@ -100,7 +100,8 @@ import {
     useDropExpired,
     useHide
 } from "./vanish-controls";
-import { Button, EmptyState, ResizeHandle, Skeleton, cn, useToast } from "@polaris/ui";
+import { Button, EmptyState, ResizeHandle, cn, useToast } from "@polaris/ui";
+import { ConversationSkeleton, MessagesSkeleton } from "./messages-skeleton";
 import { PersonCardProvider } from "./person-card";
 import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
 import { AgeGate } from "./age-gate";
@@ -2244,24 +2245,7 @@ export function ChannelView({
     // conversation is not theirs until the list catches up was a refusal that
     // flashed on every such open.
     if (!channel && (messages === null || !loaded)) {
-        return (
-            <div className="flex flex-1 flex-col">
-                <div className="flex h-header shrink-0 items-center gap-2 border-b border-border px-4">
-                    <Skeleton className="h-4 w-40" />
-                </div>
-                <div className="flex flex-1 flex-col justify-end gap-3 p-4" aria-hidden="true">
-                    {[0, 1, 2, 3].map((row) => (
-                        <div key={row} className="flex gap-2">
-                            <Skeleton className="size-7 rounded-full" />
-                            <div className="flex flex-1 flex-col gap-1">
-                                <Skeleton className="h-3 w-32" />
-                                <Skeleton className="h-3 w-2/3" />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        );
+        return <ConversationSkeleton />;
     }
 
     if (!channel) {
@@ -2340,11 +2324,7 @@ export function ChannelView({
                 )}
 
                 {messages === null ? (
-                    <div className="flex flex-col gap-3 p-4" aria-hidden="true">
-                        {[0, 1, 2].map((row) => (
-                            <Skeleton key={row} className="h-8 w-2/3" />
-                        ))}
-                    </div>
+                    <MessagesSkeleton className="h-full" />
                 ) : shown.length === 0 ? (
                     <div className="flex h-full items-center justify-center p-6">
                         <EmptyState
@@ -2777,7 +2757,9 @@ export function ChannelView({
                                   rules: vanish.rules,
                                   onTimer: setTimer,
                                   onAllowDelete: allowDeleteForAll,
-                                  onDeleteChat: () => setDeletingChat(true)
+                                  onRules: changeRules,
+                                  onDeleteChat: () => setDeletingChat(true),
+                                  privacy: privacySection
                               }
                             : undefined
                     }

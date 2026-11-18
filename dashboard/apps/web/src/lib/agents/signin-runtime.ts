@@ -37,6 +37,7 @@ import * as screens from "./signin-screen";
 import * as direct from "./signin-direct";
 import { configuredRequest, readCapped } from "@/lib/safe-fetch";
 import * as status from "./signin-status";
+import * as homes from "./home-signins";
 import * as folders from "./account-folders";
 
 /** Stamped on every container this starts, so the sweep finds them by label
@@ -781,7 +782,7 @@ export async function signinScreen(userId: string, id: string): Promise<SigninVi
     const pending = directAttempts.get(id);
     if (pending) {
         const view = await directView(id, attempt.env, pending);
-        if (view.finished && view.exitCode === 0) status.recordSigninOutcome(userId, attempt.env, "login");
+        if (view.finished && view.exitCode === 0) recordOutcome(userId, attempt.env, "login");
         return view;
     }
     if (starting.has(id)) {
@@ -822,7 +823,7 @@ export async function signinScreen(userId: string, id: string): Promise<SigninVi
     }
 
     if (progress.finished && progress.exitCode === 0) {
-        status.recordSigninOutcome(userId, attempt.env, signingOut.has(id) ? "logout" : "login");
+        recordOutcome(userId, attempt.env, signingOut.has(id) ? "logout" : "login");
     }
 
     return {
@@ -1258,6 +1259,22 @@ export async function clearAccountFolder(userId: string, env: string, folderId: 
     }
 }
 
+/** The agents a status read found signed in. */
+function inOf(statuses: Record<string, status.SigninStatus>): string[] {
+    return Object.entries(statuses)
+        .filter(([, one]) => one.state === "in")
+        .map(([env]) => env);
+}
+
+/** A sign-in or sign-out that finished: remembered for the status, and kept in
+ *  the person's list of connected agents (`home-signins`). */
+function recordOutcome(userId: string, env: string, mode: "login" | "logout"): void {
+    status.recordSigninOutcome(userId, env, mode);
+    void homes.markHomeSignin(userId, env, mode === "login").catch((error: unknown) =>
+        console.warn("[agent-signin] could not record a connected agent:", error instanceof Error ? error.name : "unknown")
+    );
+}
+
 /**
  * Each home login's status, by variable.
  *
@@ -1272,18 +1289,30 @@ export async function signinStatuses(
     const now = Date.now();
     const out: Record<string, status.SigninStatus> = {};
     const toCheck: { env: string; command: string }[] = [];
+    // Only what the person connected is asked about; the rest of the catalogue
+    // is not theirs and costs a container to ask. An account from before the
+    // list is checked in full once, and the answer becomes its list.
+    const connected = await homes.homeSigninsOf(userId).catch(() => null);
     for (const env of new Set(envs)) {
         if (!isHomeSignin(env)) continue;
+        if (connected && !connected.has(env)) {
+            out[env] = { state: "out", lastKnown: true };
+            continue;
+        }
         const command = signinStatusCommand(env);
         if (!command) {
-            out[env] = status.lastKnownStatus(userId, env);
+            const known = status.lastKnownStatus(userId, env);
+            out[env] = known.state === "unknown" && connected?.has(env) ? { state: "in", lastKnown: true } : known;
             continue;
         }
         const hit = status.cachedStatus(userId, env, now);
         if (hit) out[env] = hit;
         else toCheck.push({ env, command });
     }
-    if (toCheck.length === 0) return out;
+    if (toCheck.length === 0) {
+        if (connected === null) await homes.setHomeSignins(userId, inOf(out)).catch(() => undefined);
+        return out;
+    }
 
     let run = statusRuns.get(userId);
     if (!run && statusRuns.size < STATUS_CONCURRENCY) {
@@ -1307,6 +1336,17 @@ export async function signinStatuses(
         status.cacheStatus(userId, env, state, at);
         // An unanswered check falls back to what the last sign-in said.
         out[env] = state === "unknown" ? status.lastKnownStatus(userId, env) : { state, lastKnown: false };
+    }
+    if (connected === null) {
+        await homes
+            .setHomeSignins(userId, inOf(out))
+            .catch(() => undefined);
+    } else {
+        // A login signed in or out outside Polaris, seen by a check.
+        for (const { env } of toCheck) {
+            const state = answers.get(env);
+            if (state === "out") await homes.markHomeSignin(userId, env, false).catch(() => undefined);
+        }
     }
     return out;
 }

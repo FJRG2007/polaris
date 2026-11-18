@@ -2912,7 +2912,7 @@ export function PolarChat({
                                     </p>
                                     <div className="mt-2 flex flex-wrap gap-3">
                                         <Link
-                                            href="/account/ai-keys"
+                                            href="/polar/settings/providers"
                                             className="text-primary hover:underline"
                                         >
                                             {t("noKeys.own")}

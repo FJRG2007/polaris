@@ -153,7 +153,7 @@ show a recurrence is listed).
 - The session showed only a failed turn; nothing said to link the account again.
 - Fix: a failed turn whose text is a credential refusal marks that account
   refused (as a refused key is) and the session shows which account and a
-  button to AI keys. Saving a new secret on the account clears the mark, and
+  button to AI providers. Saving a new secret on the account clears the mark, and
   thanks to PC-7 a session already open uses it on its next prompt.
 
 ## How to diagnose a failing session

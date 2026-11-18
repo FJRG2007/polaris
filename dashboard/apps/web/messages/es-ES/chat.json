@@ -707,6 +707,7 @@
         "soundboard": "Botonera"
     },
     "channelView": {
+        "loadingMessages": "Cargando mensajes",
         "thisConversationIsNotYours": "Esta conversación no es tuya para abrirla.",
         "itMayHaveBeenDeleted": "Puede que se haya borrado o que te hayan quitado de ella.",
         "loadingEarlierMessages": "Cargando mensajes anteriores",
@@ -2350,9 +2351,8 @@
         "noProvider": "Necesito una clave de un proveedor de IA para responderte. Añade una tuya o pide a un administrador que comparta las de este Polaris.",
         "noProviderOwnOnly": "Necesito una clave de un proveedor de IA para responderte, y las de este Polaris no están compartidas contigo. Añade una tuya.",
         "addKey": "Añadir clave",
-        "limitReached": "Has llegado a tu límite con la clave compartida de este Polaris. [Añade una clave tuya](/account/ai-keys) para seguir preguntando.",
-        "failed": "No he podido responder ahora mismo. Inténtalo de nuevo en un momento.",
-        "badge": "IA"
+        "limitReached": "Has llegado a tu límite con la clave compartida de este Polaris. [Añade una clave tuya](/polar/settings/providers) para seguir preguntando.",
+        "failed": "No he podido responder ahora mismo. Inténtalo de nuevo en un momento."
     },
     "gameServerCard": {
         "gameServer": "Servidor",

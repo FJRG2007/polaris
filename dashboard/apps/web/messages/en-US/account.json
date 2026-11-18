@@ -1289,7 +1289,7 @@
     },
     "aiKeys": {
         "page": {
-            "title": "AI provider keys",
+            "title": "AI providers",
             "intro": "The provider accounts your AI work bills to. A key you add here is used before anything the deployment holds."
         },
         "keys": {
@@ -2131,11 +2131,13 @@
         "pair": {
             "button": "Pair a computer",
             "title": "Pair a computer",
-            "description": "Enter this code on the computer, or scan it. It works once, for 10 minutes.",
-            "waiting": "Waiting for the computer...",
-            "expired": "This code expired.",
-            "again": "New code",
-            "close": "Close"
+            "close": "Close",
+            "description": "Sessions can run on a computer of yours that has Polaris Desktop.",
+            "stepInstall": "Install Polaris Desktop on that computer.",
+            "stepSignIn": "Open it and sign in with this account.",
+            "stepUse": "In Your computers, press Use this computer.",
+            "after": "It shows up in this list once it is paired.",
+            "download": "Get Polaris Desktop"
         },
         "list": {
             "empty": "No computers yet. Pair one to run sessions on it.",

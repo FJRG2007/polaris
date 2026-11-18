@@ -9,7 +9,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
 import {
     Button,
@@ -38,12 +38,7 @@ import {
     gitlabInstanceUrl,
     type GitlabInstance
 } from "@/lib/agents/login-instances";
-import {
-    finishGitlabLoginAction,
-    goUsageAction,
-    pollProviderLoginAction,
-    startProviderLoginAction
-} from "@/app/(app)/account/ai-keys/login-actions";
+import type * as loginActions from "@/app/(app)/polar/settings/providers/login-actions";
 
 const LOGINS: readonly { provider: ProviderLogin; name: string }[] = [
     { provider: "xai", name: "SuperGrok" }, // i18n-ignore: product name
@@ -69,7 +64,35 @@ const LOGIN_OPTIONS: readonly ConnectionOption[] = LOGINS.map((login) => ({
     vendor: login.name
 }));
 
-export function ProviderLogins() {
+/**
+ * The server actions a login runs through: an account's own, or the
+ * deployment's on Management. Handed in by the page, so one set of screens
+ * serves both and each owner's actions check their own permission.
+ */
+export interface ProviderLoginActions {
+    startProviderLoginAction: typeof loginActions.startProviderLoginAction;
+    pollProviderLoginAction: typeof loginActions.pollProviderLoginAction;
+    finishGitlabLoginAction: typeof loginActions.finishGitlabLoginAction;
+    goUsageAction: typeof loginActions.goUsageAction;
+}
+
+const ProviderLoginActionsContext = createContext<ProviderLoginActions | null>(null);
+
+function useProviderLoginActions(): ProviderLoginActions {
+    const actions = useContext(ProviderLoginActionsContext);
+    if (!actions) throw new Error("ProviderLogins draws its parts");
+    return actions;
+}
+
+export function ProviderLogins({ actions }: { actions: ProviderLoginActions }) {
+    return (
+        <ProviderLoginActionsContext.Provider value={actions}>
+            <ProviderLoginsBody />
+        </ProviderLoginActionsContext.Provider>
+    );
+}
+
+function ProviderLoginsBody() {
     const t = useTranslations("account");
     const [open, setOpen] = useState<ProviderLogin | null>(null);
     // Inside a connection hub, Add connection opens these. What stays is the Go
@@ -132,6 +155,7 @@ const METERS = ["rolling", "weekly", "monthly"] as const;
  * for a minute). Renders nothing for somebody with no Console sign-in.
  */
 function GoUsageList() {
+    const { goUsageAction } = useProviderLoginActions();
     const t = useTranslations("account");
     const format = useDisplayFormat();
     const [rows, setRows] = useState<GoUsageRow[] | null>(null);
@@ -212,6 +236,7 @@ function GoUsageList() {
 }
 
 function LoginDialog({ provider, name, onClose }: { provider: ProviderLogin; name: string; onClose: () => void }) {
+    const { startProviderLoginAction, pollProviderLoginAction, finishGitlabLoginAction } = useProviderLoginActions();
     const t = useTranslations("account");
     const router = useRouter();
     const [start, setStart] = useState<LoginStart | null>(null);

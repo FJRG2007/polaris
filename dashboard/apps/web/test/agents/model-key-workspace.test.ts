@@ -57,7 +57,7 @@ const { addKey, editKey } = await import("@/lib/agents/model-key-actions");
 const scope = {
     owner: "user-1",
     actorId: "user-1",
-    path: "/account/ai-keys",
+    path: "/polar/settings/providers",
     audit: "account" as const
 };
 const WORKSPACE = "wrkspc_01JwQvzr7rXLA5AGx3HKfFUJ";

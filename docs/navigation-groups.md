@@ -37,7 +37,7 @@ ungrouped; People, Access and Communication are as they were.
 | Display defaults | `/admin/display` | Platform | General |
 | Domains | `/admin/domains` | Platform | General |
 | Integrations | `/admin/integrations` | Platform | Integrations & AI |
-| AI provider keys | `/admin/integrations/models` | Platform | Integrations & AI |
+| AI providers | `/admin/integrations/models` | Platform | Integrations & AI |
 | Agent defaults | `/admin/agents` | Platform | Integrations & AI |
 | Storage locations | `/admin/storage` | Platform | Storage & data |
 | Uploads | `/admin/uploads` | Platform | Storage & data |

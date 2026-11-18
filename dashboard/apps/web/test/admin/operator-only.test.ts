@@ -82,11 +82,17 @@ describe("management", () => {
             const source = readFileSync(path, "utf8");
             // A file whose actions all go through one guarded helper says so once.
             const helper = /async function scope\(\)[^}]*requireAdmin\(\)/s.test(source);
+            // Or through the screen's own `instanceScope()`, kept in a `scope.ts`
+            // beside it so every action file of the screen shares one check.
+            const shared =
+                /import \{ instanceScope \} from "\.\/scope"/.test(source) &&
+                /\brequireAdmin\(\)/.test(readFileSync(join(path, "..", "scope.ts"), "utf8"));
             for (const action of exported(source)) {
                 const guarded =
                     /\brequireAdmin\(\)/.test(action.body) ||
                     /\brequirePermission\("inbox\.(read|manage)"\)/.test(action.body) ||
-                    (helper && /\bscope\(\)/.test(action.body));
+                    (helper && /\bscope\(\)/.test(action.body)) ||
+                    (shared && /\b(instanceScope|scope)\(\)/.test(action.body));
                 if (!guarded) open.push(`${label(path)}: ${action.name}`);
             }
         }

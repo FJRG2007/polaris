@@ -13,7 +13,7 @@ import { Suspense, type ReactNode } from "react";
 import { CardSkeleton } from "@/app/(app)/admin/region-skeletons";
 import { Messages } from "@/components/i18n/messages";
 import { getTranslations } from "@/lib/i18n/request";
-import { AiKeysPanel } from "@/app/(app)/account/ai-keys/ai-keys-panel";
+import { AccountProvidersPanel } from "@/app/(app)/polar/settings/providers/account-panel";
 import { listTrackers } from "@/lib/tasks/trackers/service";
 import { sessionCan, type SessionUser } from "@/lib/session";
 import { AI_KEYS_SECTION, TASK_TRACKERS_SECTION } from "@/lib/connections/hub-href";
@@ -49,7 +49,7 @@ export async function hubCoreSections(user: SessionUser): Promise<HubCoreSection
         // Streamed, so the rest of Connected accounts does not wait on it.
         body: (
             <Suspense fallback={<CardSkeleton lines={4} />}>
-                <AiKeysPanel userId={user.id} narrow />
+                <AccountProvidersPanel userId={user.id} narrow />
             </Suspense>
         )
     });

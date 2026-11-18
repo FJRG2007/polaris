@@ -10,7 +10,7 @@
 
 import { useRouter } from "next/navigation";
 import { ExternalLink, Loader2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import {
     Button,
     Card,
@@ -32,12 +32,8 @@ import { useHubFlow, type ConnectionOption } from "./connection-hub";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { cloudCredentialSchema, type CloudProvider } from "@/lib/agents/cloud-credentials";
-import {
-    addCloudAccountAction,
-    finishDigitaloceanLoginAction,
-    startDigitaloceanLoginAction,
-    type CloudAddResult
-} from "@/app/(app)/account/ai-keys/cloud-actions";
+import type * as cloudActions from "@/app/(app)/polar/settings/providers/cloud-actions";
+import type { CloudAddResult } from "@/lib/agents/connection-actions";
 
 const CLOUDS: readonly { provider: CloudProvider; name: string }[] = [
     { provider: "amazon-bedrock", name: "Amazon Bedrock" }, // i18n-ignore: product name
@@ -158,7 +154,31 @@ const CLOUD_OPTIONS: readonly ConnectionOption[] = CLOUDS.map((cloud) => ({
     vendor: cloud.name
 }));
 
-export function CloudAccounts() {
+/** The server actions a cloud account is added through: an account's own, or
+ *  the deployment's on Management. */
+export interface CloudAccountActions {
+    addCloudAccountAction: typeof cloudActions.addCloudAccountAction;
+    startDigitaloceanLoginAction: typeof cloudActions.startDigitaloceanLoginAction;
+    finishDigitaloceanLoginAction: typeof cloudActions.finishDigitaloceanLoginAction;
+}
+
+const CloudAccountActionsContext = createContext<CloudAccountActions | null>(null);
+
+function useCloudAccountActions(): CloudAccountActions {
+    const actions = useContext(CloudAccountActionsContext);
+    if (!actions) throw new Error("CloudAccounts draws its parts");
+    return actions;
+}
+
+export function CloudAccounts({ actions }: { actions: CloudAccountActions }) {
+    return (
+        <CloudAccountActionsContext.Provider value={actions}>
+            <CloudAccountsBody />
+        </CloudAccountActionsContext.Provider>
+    );
+}
+
+function CloudAccountsBody() {
     const t = useTranslations("account");
     const [open, setOpen] = useState<CloudProvider | null>(null);
     // Inside a connection hub, Add connection opens these and the card goes.
@@ -198,6 +218,7 @@ export function CloudAccounts() {
 }
 
 function CloudDialog({ provider, name, onClose }: { provider: CloudProvider; name: string; onClose: () => void }) {
+    const { addCloudAccountAction, startDigitaloceanLoginAction, finishDigitaloceanLoginAction } = useCloudAccountActions();
     const t = useTranslations("account");
     const router = useRouter();
     const methods = Object.keys(METHODS[provider]) as MethodKey[];

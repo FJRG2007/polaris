@@ -382,7 +382,7 @@ export function CodeModelPicker({
                                     </SheetMenuItem>
                                 ) : null}
                                 <SheetMenuItem asChild>
-                                    <Link href="/account/ai-keys">{t("picker.manage")}</Link>
+                                    <Link href="/polar/settings/providers">{t("picker.manage")}</Link>
                                 </SheetMenuItem>
                             </>
                         )}

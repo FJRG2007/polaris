@@ -139,7 +139,7 @@ export function PolarFailureNotice({
                     <Link
                         href={
                             failure.payer === "own"
-                                ? "/account/ai-keys"
+                                ? "/polar/settings/providers"
                                 : "/admin/integrations/models"
                         }
                         className="font-medium underline"

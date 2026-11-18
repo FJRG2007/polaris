@@ -82,7 +82,7 @@ describe("voice in the composer", () => {
         const alert = screen.getByRole("alert");
         expect(alert.textContent).toContain(UNAVAILABLE);
         expect(screen.getByRole("link", { name: "Add your own key" }).getAttribute("href")).toBe(
-            "/account/ai-keys"
+            "/polar/settings/providers"
         );
         expect(
             screen.getByRole("link", { name: "Manage this Polaris's keys" }).getAttribute("href")

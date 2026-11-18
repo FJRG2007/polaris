@@ -9,15 +9,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ProviderRow } from "@/lib/agents/model-key-providers";
 import type { ProviderReader } from "@/components/model-keys/provider-select";
+import { forgetProviderPages } from "@/components/model-keys/add-connection";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
-vi.mock("@/app/(app)/account/ai-keys/login-actions", () => ({
+// Handed in by the page, as each screen hands in its own owner's actions.
+const LOGINS = {
     finishGitlabLoginAction: vi.fn(),
     goUsageAction: async () => [],
     pollProviderLoginAction: vi.fn(),
     startProviderLoginAction: vi.fn(async () => new Promise(() => undefined))
-}));
-vi.mock("@/app/(app)/account/ai-keys/cloud-actions", () => ({}));
+} as never;
+const CLOUDS = {} as never;
 
 const { ModelKeysView } = await import("@/components/model-keys/model-keys-view");
 const { ConnectionHub } = await import("@/components/model-keys/connection-hub");
@@ -47,8 +49,8 @@ function open(searchProviders: ProviderReader = async () => ({ items: [XAI], nex
     render(
         <MessagesWrapper>
             <ConnectionHub>
-                <ProviderLogins />
-                <CloudAccounts />
+                <ProviderLogins actions={LOGINS} />
+                <CloudAccounts actions={CLOUDS} />
                 <ModelKeysView
                     providers={[XAI]}
                     searchProviders={searchProviders}
@@ -61,7 +63,10 @@ function open(searchProviders: ProviderReader = async () => ({ items: [XAI], nex
     );
 }
 
-afterEach(cleanup);
+afterEach(() => {
+    cleanup();
+    forgetProviderPages();
+});
 
 describe("Add connection", () => {
     it("replaces the sign-in and cloud cards with one button", () => {
@@ -85,10 +90,13 @@ describe("Add connection", () => {
         expect(screen.getByRole("dialog")).toBeTruthy();
     });
 
-    it("opens a cloud account straight away, as its only way in", async () => {
+    it("shows what was picked with a way back, then opens its only way in", async () => {
         open();
         fireEvent.click(screen.getByRole("button", { name: "Add connection" }));
         fireEvent.click(await screen.findByRole("button", { name: /Amazon Bedrock/ }));
+        fireEvent.click(screen.getByRole("button", { name: "Change" }));
+        fireEvent.click(await screen.findByRole("button", { name: /Amazon Bedrock/ }));
+        fireEvent.click(screen.getByRole("button", { name: "Continue" }));
         expect(await screen.findByText("Add Amazon Bedrock")).toBeTruthy();
         expect(screen.getByText("Access key ID", { exact: false })).toBeTruthy();
     });
@@ -157,7 +165,7 @@ describe("One connections table", () => {
         limits: null
     });
 
-    function draw() {
+    function draw(connected: string[] = [CURSOR.env]) {
         render(
             <MessagesWrapper>
                 <ModelKeysView
@@ -165,7 +173,7 @@ describe("One connections table", () => {
                     keys={[key("a", "First"), key("b", "Second")] as never}
                     actions={actions}
                     copy={{ title: "Connections", hint: "", empty: "None", adding: "" }}
-                    assist={{ signins: [CURSOR], actions: { status: async () => ({ statuses: {} }) } } as never}
+                    assist={{ signins: [CURSOR], connected, actions: { status: async () => ({ statuses: {} }) } } as never}
                     deployment={{ rows: [{ slug: "groq", name: "Groq", yours: false }] }}
                 />
             </MessagesWrapper>
@@ -179,8 +187,14 @@ describe("One connections table", () => {
         const text = rows.map((row) => row.textContent ?? "");
         expect(text.findIndex((one) => one.includes("Cursor"))).toBeGreaterThan(text.findIndex((one) => one.includes("Second")));
         expect(text.at(-1)).toContain("Groq");
-        expect(text.at(-1)).toContain("Deployment's key in use");
+        expect(text.at(-1)).toContain("Available to you");
         expect(screen.getByRole("button", { name: /Sign in/ })).toBeTruthy();
+    });
+
+    it("leaves out an agent nobody connected; Add connection offers it", () => {
+        draw([]);
+        expect(screen.getAllByRole("row").some((row) => (row.textContent ?? "").includes("Cursor"))).toBe(false);
+        expect(screen.queryByRole("button", { name: /Sign in/ })).toBeNull();
     });
 
     it("turns moving off while another sort is active, and says why", () => {

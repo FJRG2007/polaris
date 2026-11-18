@@ -307,7 +307,7 @@
         "instance": "Compartida por Polaris",
         "signin": "Sesión de agente",
         "signinReason": "Las sesiones solo se usan en Code; Polar usa claves de API.",
-        "manage": "Gestionar claves de IA",
+        "manage": "Gestionar proveedores IA",
         "noReasoning": "Este modelo tiene un único nivel",
         "search": "Buscar modelo",
         "noMatch": "Sin coincidencias",
@@ -579,6 +579,7 @@
             "connectors": "Conectores",
             "routing": "Respaldos",
             "codingTools": "Herramientas",
+            "providers": "Proveedores IA",
             "usage": "Uso",
             "skills": "Skills",
             "agents": "Agentes"
@@ -855,7 +856,7 @@
             "work": {
                 "body": "La cuenta con la que entra y los modelos que puede usar.",
                 "account": "Cuenta",
-                "accountHint": "Las cuentas y claves se añaden en Cuenta > Claves de IA.",
+                "accountHint": "Las cuentas y claves se añaden en Polar > Proveedores de IA.",
                 "manageAccounts": "Gestionar cuentas",
                 "anyAccount": "La que funcione",
                 "machine": "Sesión propia de esta máquina",

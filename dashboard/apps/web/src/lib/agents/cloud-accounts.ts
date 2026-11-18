@@ -11,7 +11,7 @@
 
 import { randomBytes, randomUUID } from "node:crypto";
 import type { TokenFetch } from "@/lib/agents/cloud-tokens";
-import { createModelKey, ownerHasModelKeyName } from "@/lib/agents/model-keys";
+import { createModelKey, ownerHasModelKeyName, type KeyOwner } from "@/lib/agents/model-keys";
 import { checkCloudCredential, type CloudCheck } from "@/lib/polar/cloud-models";
 import {
     digitaloceanAuthorizeUrl,
@@ -32,7 +32,7 @@ const KEY_NAME: Record<CloudProvider, string> = {
 export type CloudAdd = { ok: true; keyId: string } | Extract<CloudCheck, { ok: false }>;
 
 export async function addCloudAccount(
-    userId: string,
+    userId: KeyOwner,
     credential: CloudCredential,
     request?: TokenFetch
 ): Promise<CloudAdd> {
@@ -53,7 +53,7 @@ export async function addCloudAccount(
 }
 
 interface Attempt {
-    userId: string;
+    userId: KeyOwner;
     state: string;
     startedAt: number;
 }
@@ -62,7 +62,7 @@ const ATTEMPT_LIFETIME_MS = 15 * 60_000;
 const MAX_ATTEMPTS = 500;
 const attempts = new Map<string, Attempt>();
 
-export function startDigitaloceanLogin(userId: string, now = Date.now()): { id: string; url: string } {
+export function startDigitaloceanLogin(userId: KeyOwner, now = Date.now()): { id: string; url: string } {
     for (const [id, attempt] of attempts) {
         if (now - attempt.startedAt > ATTEMPT_LIFETIME_MS) attempts.delete(id);
     }
@@ -80,7 +80,7 @@ export function startDigitaloceanLogin(userId: string, now = Date.now()): { id: 
 export type DigitaloceanFinish = CloudAdd | { ok: false; reason: "gone" | "bad-paste" | "denied" };
 
 export async function finishDigitaloceanLogin(
-    userId: string,
+    userId: KeyOwner,
     id: string,
     pasted: string,
     request?: TokenFetch,

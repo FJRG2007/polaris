@@ -21,7 +21,7 @@ import {
     type CustomProviderRefusal,
     type CustomProviderView
 } from "@/lib/integrations/provider-catalog";
-import { INSTANCE } from "@/lib/agents/model-keys";
+import { instanceScope } from "./scope";
 import {
     addKey,
     editKey,
@@ -30,20 +30,10 @@ import {
     reorderKeys,
     reviveKey,
     toggleKey,
-    type KeyActionResult,
-    type KeyScope
+    type KeyActionResult
 } from "@/lib/agents/model-key-actions";
 
-/** The deployment's keys, written by whichever administrator is signed in. */
-async function scope(): Promise<KeyScope> {
-    const admin = await requireAdmin();
-    return {
-        owner: INSTANCE,
-        actorId: admin.id,
-        path: "/admin/integrations/models",
-        audit: "instance"
-    };
-}
+const scope = instanceScope;
 
 export async function addInstanceModelKeyAction(input: unknown): Promise<KeyActionResult> {
     return addKey(await scope(), input);

@@ -187,10 +187,10 @@ describe("Polar's answer in Chat", () => {
     it("asks for a provider key, with the link, when no model can answer", async () => {
         resolved = "no_key";
         await answerPolarMention(mention);
-        expect(posted[0]?.body).toBe("polar.noProvider [polar.addKey](/account/ai-keys)");
+        expect(posted[0]?.body).toBe("polar.noProvider [polar.addKey](/polar/settings/providers)");
         access = { ...access, spend: false };
         await answerPolarMention(mention);
-        expect(posted[1]?.body).toBe("polar.noProviderOwnOnly [polar.addKey](/account/ai-keys)");
+        expect(posted[1]?.body).toBe("polar.noProviderOwnOnly [polar.addKey](/polar/settings/providers)");
     });
 
     it("stops at the shared key's limit, but never at a key of the person's own", async () => {

@@ -19,7 +19,6 @@ import * as diagnostics from "./diagnostics/data";
 import * as email from "./integrations/email/data";
 import * as messaging from "./integrations/messaging/data";
 import * as integrations from "./integrations/data";
-import * as models from "./integrations/models/data";
 import * as retention from "./retention/data";
 import * as safety from "./safety/data";
 import * as seasonal from "./seasonal-themes/data";
@@ -57,7 +56,6 @@ export const PAINT_READS = {
     email: read(none, () => email.loadEmailAdminAction(), true),
     integrations: read(none, () => integrations.loadIntegrationsAction()),
     "integrations.runners": read(none, () => integrations.loadRunnerAccessAction()),
-    "integrations.models": read(none, () => models.loadModelProvidersAction()),
     messaging: read(none, () => messaging.loadMessagingAdminAction()),
     retention: read(none, () => retention.loadRetentionAction()),
     safety: read(z.object({ status: z.string().trim().max(40).optional() }), ({ status }) =>

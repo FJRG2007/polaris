@@ -1289,7 +1289,7 @@
     },
     "aiKeys": {
         "page": {
-            "title": "Claves de IA",
+            "title": "Proveedores IA",
             "intro": "Las cuentas de proveedor a las que se factura tu trabajo con IA. Una clave que añadas aquí se usa antes que cualquiera de las del despliegue."
         },
         "keys": {
@@ -2131,11 +2131,13 @@
         "pair": {
             "button": "Vincular equipo",
             "title": "Vincular equipo",
-            "description": "Escribe este código en el equipo o escanéalo. Sirve una vez, 10 minutos.",
-            "waiting": "Esperando al equipo...",
-            "expired": "El código caducó.",
-            "again": "Otro código",
-            "close": "Cerrar"
+            "close": "Cerrar",
+            "description": "Las sesiones pueden ejecutarse en un equipo tuyo con Polaris Desktop.",
+            "stepInstall": "Instala Polaris Desktop en ese equipo.",
+            "stepSignIn": "Ábrelo e inicia sesión con esta cuenta.",
+            "stepUse": "En Tus equipos, pulsa Usar este equipo.",
+            "after": "Aparece en esta lista en cuanto queda vinculado.",
+            "download": "Bajar Polaris Desktop"
         },
         "list": {
             "empty": "Aún no hay equipos. Vincula uno para usarlo.",

@@ -35,7 +35,7 @@ const SECURITY_SCREENS = [
     "/account/access"
 ];
 
-const DEVELOPER_SCREENS = ["/account/api-keys", "/account/ai-keys", "/account/domains"];
+const DEVELOPER_SCREENS = ["/account/api-keys", "/account/domains"];
 
 describe("the account rail", () => {
     it("keeps every credential screen in the Security group", () => {

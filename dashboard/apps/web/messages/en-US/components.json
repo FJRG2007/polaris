@@ -1,4 +1,13 @@
 {
+    "polarBot": {
+        "badge": "AI",
+        "badgeHint": "An assistant, not a person",
+        "role": "Polaris assistant",
+        "about": "Mention @polar in a conversation to ask it something. It answers there, for everyone in it.",
+        "open": "Open Polar",
+        "unavailable": "Polar isn't available to your account. An administrator decides who can use it.",
+        "mentionHint": "Polar was asked here"
+    },
     "actions": {
         "ok": "OK",
         "confirm": "Confirm",
@@ -1195,7 +1204,7 @@
                 "key": "API keys",
                 "account": "Agent accounts",
                 "agent": "Agent sign-ins",
-                "deployment": "Deployment's keys"
+                "deployment": "Shared keys"
             },
             "statusLabel": "Status",
             "statuses": {
@@ -1209,11 +1218,11 @@
             "filteredNote": "Clear the search and filters to move connections.",
             "sortByOrder": "Sort by order",
             "noMatch": "No connection matches.",
-            "deploymentName": "Deployment's key",
-            "deploymentHint": "Read-only. Your runs use it where you have no key of your own.",
+            "deploymentName": "Shared by Polaris",
+            "deploymentHint": "Added by your Polaris admin. Used while you have no key of your own here.",
             "readOnly": "Read-only",
             "usingYours": "Your key is used",
-            "usingDeployment": "Deployment's key in use",
+            "usingDeployment": "Available to you",
             "agentKey": "Signed in on your sessions' machine"
         }
     },
@@ -1618,10 +1627,10 @@
         "apiKeyHint": "Runs on this API key, billed per use, instead of a subscription.",
         "providedAccount": "Provided by this Polaris: {account}",
         "nothingSigns": "Nothing here signs {agent} in.",
-        "loginPrompt": "On this box it would start and sit at its own login prompt, where nobody would ever answer it. Sign it in under AI keys - Polaris runs the sign-in for you and supplies the machine - or run it on a server you have already signed it in on.",
+        "loginPrompt": "On this box it would start and sit at its own login prompt, where nobody would ever answer it. Sign it in under AI providers - Polaris runs the sign-in for you and supplies the machine - or run it on a server you have already signed it in on.",
         "takes": "It takes {ways}.",
         "or": "or",
-        "signIn": "Sign in under AI keys"
+        "signIn": "Sign in under AI providers"
     },
     "modelPicker": {
         "inherit": "Inherit",

@@ -165,7 +165,7 @@ export async function answerPolarMention(mention: PolarMention): Promise<string 
 function noProviderText(words: Words, spendsShared: boolean): string {
     return [
         words(spendsShared ? "polar.noProvider" : "polar.noProviderOwnOnly"),
-        `[${words("polar.addKey")}](/account/ai-keys)`
+        `[${words("polar.addKey")}](/polar/settings/providers)`
     ].join(" ");
 }
 

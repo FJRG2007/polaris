@@ -804,7 +804,7 @@ export async function chatCredentialFor(
  * them used: the router does, for the one that answered.
  */
 export async function chatCredentialsFor(
-    userId: string,
+    userId: KeyOwner,
     provider: string,
     payer: KeySource | null = null,
     most = Number.POSITIVE_INFINITY
@@ -812,8 +812,13 @@ export async function chatCredentialsFor(
     const found: ChatCredential[] = [];
     try {
         const owners: Array<[KeySource, KeyOwner]> = [];
-        if (payer !== "instance") owners.push(["own", userId]);
-        if (payer !== "own" && (await instanceKeysAreShared())) owners.push(["instance", INSTANCE]);
+        // The deployment asking about its own keys reads them whether or not
+        // members share them.
+        if (userId === INSTANCE) owners.push(["instance", INSTANCE]);
+        else {
+            if (payer !== "instance") owners.push(["own", userId]);
+            if (payer !== "own" && (await instanceKeysAreShared())) owners.push(["instance", INSTANCE]);
+        }
         for (const [source, owner] of owners) {
             for (const row of await storedKeys(owner)) {
                 if (found.length >= most) return found;

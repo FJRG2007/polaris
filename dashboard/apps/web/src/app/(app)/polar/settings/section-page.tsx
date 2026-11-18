@@ -13,6 +13,7 @@ import { redirect } from "next/navigation";
 import { homePathForUser, requireUser } from "@/lib/session";
 import { mcpTools } from "@/lib/mcp/catalog";
 import { PolarUsageSettings } from "./polar-usage";
+import { AccountProvidersPanel } from "./providers/account-panel";
 import { polarAccessFor } from "@/lib/polar/access";
 import { PolarConnectors } from "./polar-connectors";
 import { getTranslations } from "@/lib/i18n/request";
@@ -67,6 +68,7 @@ export async function sectionMetadata(id: PolarSettingsSection): Promise<Metadat
         writing: t("settings.writing.title"),
         routing: t("settings.nav.routing"),
         "coding-tools": t("settings.nav.codingTools"),
+        providers: t("settings.nav.providers"),
         usage: t("settings.nav.usage"),
         data: t("settings.data.title")
     };
@@ -325,11 +327,33 @@ export async function SettingsSectionPage({
                     <PolarRoutingSettings part="tools" />
                 </div>
             );
+        case "providers":
+            return <ProvidersSection userId={user.id} />;
         case "usage":
             return <PolarUsageSettings />;
         case "data":
             return <DataSettings />;
     }
+}
+
+/**
+ * The person's AI providers: the table Management shows for the deployment's
+ * defaults, here for their own. Its words are the account's, where the screen
+ * lived before it moved under Polar.
+ */
+async function ProvidersSection({ userId }: { userId: string }) {
+    const t = await getTranslations("account");
+    return (
+        <section className="flex flex-col gap-2">
+            <div className="min-w-0">
+                <h2 className="text-sm font-medium text-foreground">{t("aiKeys.page.title")}</h2>
+                <p className="text-xs text-muted-foreground">{t("aiKeys.page.intro")}</p>
+            </div>
+            <Suspense fallback={<ListSkeleton />}>
+                <AccountProvidersPanel userId={userId} narrow />
+            </Suspense>
+        </section>
+    );
 }
 
 /** The person's custom tools and plugins, read on the server. */

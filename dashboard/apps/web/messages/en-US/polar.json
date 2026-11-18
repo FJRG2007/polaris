@@ -307,7 +307,7 @@
         "instance": "Shared by this Polaris",
         "signin": "Agent sign-in",
         "signinReason": "Sign-ins only run inside Code sessions; Polar uses API keys.",
-        "manage": "Manage AI provider keys",
+        "manage": "Manage AI providers",
         "noReasoning": "This model has one fixed level",
         "search": "Find a model",
         "noMatch": "No models match",
@@ -579,6 +579,7 @@
             "connectors": "Connectors",
             "routing": "Fallbacks",
             "codingTools": "Coding tools",
+            "providers": "AI providers",
             "usage": "Usage",
             "skills": "Skills",
             "agents": "Agents"
@@ -855,7 +856,7 @@
             "work": {
                 "body": "The account it signs in with and the models it may use.",
                 "account": "Account",
-                "accountHint": "Accounts and keys are added on Account > AI keys.",
+                "accountHint": "Accounts and keys are added under Polar > AI providers.",
                 "manageAccounts": "Manage accounts",
                 "anyAccount": "First that works",
                 "machine": "This machine's own sign-in",

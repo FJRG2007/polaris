@@ -12,39 +12,21 @@
  */
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { Card, CardBody } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
-import { signinProviderRows } from "@/lib/agents/agent-signins";
-import { ModelProvidersLoader } from "./loader";
-import {
-    addInstanceModelKeyAction,
-    deleteInstanceModelKeyAction,
-    limitInstanceModelKeyAction,
-    reorderInstanceModelKeysAction,
-    reviveInstanceModelKeyAction,
-    toggleInstanceModelKeyAction,
-    updateInstanceModelKeyAction
-} from "./actions";
+import { listCustomProviders } from "@/lib/integrations/provider-catalog";
+import { AiProvidersPanel } from "@/components/model-keys/ai-providers-panel";
+import { CardSkeleton } from "@/app/(app)/admin/region-skeletons";
+import { CustomProvidersCard } from "./custom-providers-card";
+import { INSTANCE_ACTIONS } from "./instance-actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function ModelProvidersPage() {
     await requireAdmin();
     const t = await getTranslations("admin");
-    // Two listings rather than one filtered afterwards: agent sign-ins share this
-    // table and would otherwise appear in the provider list as a credential for a
-    // provider that does not exist.
-    const actions = {
-        add: addInstanceModelKeyAction,
-        update: updateInstanceModelKeyAction,
-        remove: deleteInstanceModelKeyAction,
-        reorder: reorderInstanceModelKeysAction,
-        toggle: toggleInstanceModelKeyAction,
-        limit: limitInstanceModelKeyAction,
-        revive: reviveInstanceModelKeyAction
-    };
     // Both readings of the sharing note, so the region can show the one that is
     // true once it knows, without a translation of its own.
     const agentsLink = (chunks: ReactNode) => (
@@ -62,43 +44,44 @@ export default async function ModelProvidersPage() {
                 </h1>
                 <p className="text-muted-foreground text-sm">{t("integrationsModels.intro")}</p>
             </div>
-            {/* The deployment's own agent accounts, in the same table and for the
-                same reason the provider keys are in one: everything about them is
-                a key - named, reordered, renamed, given an end date, shown with
-                its last use - and a card of its own would have had to grow every
-                one of those separately and still look like a different feature.
-                No assisted sign-in here: an administrator would be asked to
-                authorise a subscription that is not theirs, in their own browser. */}
-            <ModelProvidersLoader
-                signinProviders={signinProviderRows()}
-                actions={actions}
-                keysCopy={{
-                    title: t("integrationsModels.keys.title"),
-                    hint: t("integrationsModels.keys.hint"),
-                    empty: t("integrationsModels.keys.empty"),
-                    adding: t("integrationsModels.keys.adding")
-                }}
-                accountsCopy={{
-                    title: t("integrationsModels.accounts.title"),
-                    action: t("integrationsModels.accounts.action"),
-                    hint: t("integrationsModels.accounts.hint"),
-                    empty: t("integrationsModels.accounts.empty"),
-                    adding: t("integrationsModels.accounts.adding")
-                }}
-                sharedFooter={
-                    <SharingCard
-                        title={sharingTitle}
-                        body={t.rich("integrationsModels.sharing.shared", { link: agentsLink })}
-                    />
+            {/* The same panel an account gets under Polar's settings: the
+                deployment's keys, plans, clouds and agent accounts are the
+                defaults every account falls back to, and they are kept the
+                same way. Streamed, so the heading paints before the read. */}
+            <Suspense
+                fallback={
+                    <>
+                        <CardSkeleton lines={4} />
+                        <CardSkeleton lines={2} />
+                    </>
                 }
-                privateFooter={
-                    <SharingCard
-                        title={sharingTitle}
-                        body={t.rich("integrationsModels.sharing.private", { link: agentsLink })}
-                    />
-                }
-                revision={Date.now()}
-            />
+            >
+                <AiProvidersPanel
+                    owner={{
+                        kind: "deployment",
+                        sharedFooter: (
+                            <SharingCard
+                                title={sharingTitle}
+                                body={t.rich("integrationsModels.sharing.shared", { link: agentsLink })}
+                            />
+                        ),
+                        privateFooter: (
+                            <SharingCard
+                                title={sharingTitle}
+                                body={t.rich("integrationsModels.sharing.private", { link: agentsLink })}
+                            />
+                        )
+                    }}
+                    actions={INSTANCE_ACTIONS}
+                    copy={{
+                        title: t("integrationsModels.keys.title"),
+                        hint: t("integrationsModels.keys.hint"),
+                        empty: t("integrationsModels.keys.empty"),
+                        adding: t("integrationsModels.keys.adding")
+                    }}
+                    after={<CustomProviders />}
+                />
+            </Suspense>
             <p className="text-muted-foreground text-sm">
                 {t.rich("integrationsModels.elsewhere", {
                     link: (chunks) => (
@@ -114,6 +97,11 @@ export default async function ModelProvidersPage() {
             </p>
         </div>
     );
+}
+
+/** The providers this deployment added by address, under the table. */
+async function CustomProviders() {
+    return <CustomProvidersCard initial={await listCustomProviders()} />;
 }
 
 /** Who actually spends these. The switch itself is one of the agent defaults, so

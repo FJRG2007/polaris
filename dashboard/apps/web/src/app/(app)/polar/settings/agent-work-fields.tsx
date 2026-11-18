@@ -160,7 +160,7 @@ export function AgentWorkFields({
                     />
                     <span className="text-xs text-muted-foreground">
                         {t("settings.agents.work.accountHint")}{" "}
-                        <Link href="/account/ai-keys" className="text-primary hover:underline">
+                        <Link href="/polar/settings/providers" className="text-primary hover:underline">
                             {t("settings.agents.work.manageAccounts")}
                         </Link>
                     </span>
@@ -252,7 +252,7 @@ export function AgentWorkFields({
                         ) : options.length === 0 ? (
                             <span className="text-xs text-muted-foreground">
                                 {t("settings.agents.work.noModels")}{" "}
-                                <Link href="/account/ai-keys" className="text-primary hover:underline">
+                                <Link href="/polar/settings/providers" className="text-primary hover:underline">
                                     {t("settings.agents.work.manageAccounts")}
                                 </Link>
                             </span>

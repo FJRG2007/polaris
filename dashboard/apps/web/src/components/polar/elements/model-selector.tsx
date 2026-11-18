@@ -466,7 +466,7 @@ export function ModelSelector({
                             </DropdownMenuItem>
                         ) : null}
                         <DropdownMenuItem asChild>
-                            <Link href="/account/ai-keys">{t("picker.manage")}</Link>
+                            <Link href="/polar/settings/providers">{t("picker.manage")}</Link>
                         </DropdownMenuItem>
                     </>
                 )}

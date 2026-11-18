@@ -10,6 +10,7 @@
  */
 
 import { requireUser } from "@/lib/session";
+import { accountScope } from "./scope";
 import { getTranslations } from "@/lib/i18n/request";
 import {
     canAssistSignin,
@@ -38,15 +39,11 @@ import {
     reorderKeys,
     reviveKey,
     toggleKey,
-    type KeyActionResult,
-    type KeyScope
+    type KeyActionResult
 } from "@/lib/agents/model-key-actions";
 
 /** This person's own keys, read on their own screen. */
-async function scope(): Promise<KeyScope> {
-    const user = await requireUser();
-    return { owner: user.id, actorId: user.id, path: "/account/ai-keys", audit: "account" };
-}
+const scope = accountScope;
 
 export async function addModelKeyAction(input: unknown): Promise<KeyActionResult> {
     return addKey(await scope(), input);

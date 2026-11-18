@@ -17,7 +17,7 @@ vi.mock("@/lib/session", () => ({
         permission === "tasks.manage" && canManageTasks
 }));
 vi.mock("@/lib/tasks/trackers/service", () => ({ listTrackers }));
-vi.mock("@/app/(app)/account/ai-keys/ai-keys-panel", () => ({ AiKeysPanel: () => null }));
+vi.mock("@/app/(app)/polar/settings/providers/account-panel", () => ({ AccountProvidersPanel: () => null }));
 vi.mock("@/app/(app)/tasks/trackers/trackers-view", () => ({ TrackersView: () => null }));
 
 const { default: nextConfig } = await import("../../next.config.mjs");

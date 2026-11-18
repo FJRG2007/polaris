@@ -33,6 +33,19 @@ describe("Add connection", () => {
         expect(find("Cursor")?.ways.map((way) => way.option.slug)).toEqual(["cursor"]);
     });
 
+    it("puts one maker's ways together when no provider row is theirs", () => {
+        const github = groupConnections(
+            [
+                { method: "account", slug: "copilot-plan", name: "GitHub Copilot plan", vendor: "GitHub" },
+                { method: "account", slug: "github-token", name: "GitHub token", vendor: "GitHub" }
+            ],
+            []
+        );
+        expect(github).toHaveLength(1);
+        expect(github[0]?.name).toBe("GitHub");
+        expect(github[0]?.ways.map((way) => way.option.slug)).toEqual(["copilot-plan", "github-token"]);
+    });
+
     it("hands a key the provider row it opens on", () => {
         expect(find("xAI")?.ways.find((way) => way.option.method === "key")?.row?.slug).toBe("xai");
     });

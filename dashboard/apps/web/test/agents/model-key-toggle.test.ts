@@ -86,7 +86,7 @@ describe("toggleKey", () => {
         const own = {
             owner: "user-1",
             actorId: "user-1",
-            path: "/account/ai-keys",
+            path: "/polar/settings/providers",
             audit: "account" as const
         };
         state.rows.set(ID, { userId: "user-1", enabled: true });

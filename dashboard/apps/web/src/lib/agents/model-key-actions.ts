@@ -2,7 +2,7 @@
  * Adding, renaming, replacing, removing and reordering a provider key.
  *
  * The same four writes serve both screens: an account's own keys under
- * /account/ai-keys and the deployment's under /integrations/models. Only who is
+ * /polar/settings/providers and the deployment's under /integrations/models. Only who is
  * allowed to ask differs, and that is settled by the caller before it gets here
  * - each screen's actions file is the gate, and passes the owner it just
  * established. Nothing in this module decides who anybody is.

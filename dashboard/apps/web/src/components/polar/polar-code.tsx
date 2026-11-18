@@ -879,7 +879,7 @@ export function SignInRefusedNotice({ account }: { account: string | null }) {
         <Notice error>
             {account ? t("code.signInRefused", { account }) : t("code.signInRefusedUnnamed")}{" "}
             <Button asChild size="sm" variant="outline" className="ms-1 align-middle">
-                <Link href="/account/ai-keys">{t("code.linkAgain")}</Link>
+                <Link href="/polar/settings/providers">{t("code.linkAgain")}</Link>
             </Button>
         </Notice>
     );
@@ -1418,7 +1418,7 @@ function CodeStart({
             {noModel ? (
                 <Notice>
                     {t("code.noModel")}{" "}
-                    <Link href="/account/ai-keys" className="text-primary hover:underline">
+                    <Link href="/polar/settings/providers" className="text-primary hover:underline">
                         {t("code.addKey")}
                     </Link>
                 </Notice>

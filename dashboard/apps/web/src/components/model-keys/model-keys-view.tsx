@@ -3,7 +3,7 @@
 /**
  * The provider keys an owner brought, in the order they want them tried.
  *
- * One screen serving two owners: the account under /account/ai-keys and the
+ * One screen serving two owners: the account under /polar/settings/providers and the
  * deployment under /integrations/models. They ask for the same things and behave
  * the same way, so they are the same component - the caller supplies the writes,
  * the wording around the table, and whatever belongs under it.
@@ -54,7 +54,6 @@ import {
     Gauge,
     GripVertical,
     LogIn,
-    Lock,
     LogOut,
     MoreHorizontal,
     Pencil,
@@ -124,6 +123,10 @@ export interface ModelKeyActions {
 export interface AssistedSignin {
     /** The credentials there is a login for, by the slug the table stores. */
     signins: AgentSignin[];
+    /** The agents this person connected on their sessions' machine, by
+     *  variable - the ones that get a row. Null for an account from before the
+     *  list was kept, whose rows come from the first status read. */
+    connected?: readonly string[] | null;
     actions: Omit<SigninDialogActions, "save"> & {
         /** Starts the vendor's own sign-out, for a sign-in whose docs name one. */
         signout?: (env: unknown) => Promise<{ id?: string; error?: string }>;
@@ -426,7 +429,13 @@ export function ModelKeysView({
                 position
             };
         });
-        const agents = homeSignins.map<ConnectionEntry>((signin, index) => {
+        // Only the agents this person connected - not every agent there is a
+        // login for. Add connection is where the rest are offered.
+        const connectedHomes = new Set(assist?.connected ?? []);
+        const shown = homeSignins.filter(
+            (signin) => connectedHomes.has(signin.env) || homeStatus?.[signin.env]?.state === "in"
+        );
+        const agents = shown.map<ConnectionEntry>((signin, index) => {
             const known = homeStatus?.[signin.env];
             return {
                 id: `${HOME_PREFIX}${signin.env}`,
@@ -438,16 +447,16 @@ export function ModelKeysView({
                     ? "working"
                     : homeStatus === null
                       ? "checking"
-                      : known?.state === "in"
-                        ? "working"
-                        : known?.state === "out"
-                          ? "off"
-                          : "problem",
+                      : known?.state === "out"
+                        ? "off"
+                        : "working",
                 lastUsedAt: null,
                 position: rows.length + index
             };
         });
-        const held = (deployment?.rows ?? []).map<ConnectionEntry>((one, index) => ({
+        // A shared key is listed only where it is the one used: where the person
+        // has a key of their own, that key's row already says so.
+        const held = (deployment?.rows ?? []).filter((one) => !one.yours).map<ConnectionEntry>((one, index) => ({
             id: `deployment:${one.slug}`,
             kind: "deployment",
             provider: one.slug,
@@ -455,10 +464,10 @@ export function ModelKeysView({
             name: t("modelKeys.table.deploymentName"),
             status: one.yours ? "off" : "working",
             lastUsedAt: null,
-            position: rows.length + homeSignins.length + index
+            position: rows.length + shown.length + index
         }));
         return [...stored, ...agents, ...held];
-    }, [rows, statuses, accountSlugs, byslug, homeSignins, homeStatus, askStatus, deployment, t]);
+    }, [rows, statuses, accountSlugs, byslug, homeSignins, homeStatus, askStatus, deployment, assist, t]);
 
     const [search, setSearch] = useState("");
     const typed = useDeferredValue(search);
@@ -1072,7 +1081,7 @@ function DeploymentRow({
     return (
         <tr className="border-t border-border bg-surface/30" title={t("modelKeys.table.deploymentHint")}>
             <td className="px-2 py-2">
-                <Lock className="text-muted-foreground size-4 shrink-0" aria-label={t("modelKeys.table.readOnly")} />
+                <span className="sr-only">{t("modelKeys.table.readOnly")}</span>
             </td>
             <td className="px-3 py-2">
                 <div className="flex max-w-40 items-center gap-2">

@@ -14,6 +14,7 @@ import {
     Brain,
     Database,
     Gauge,
+    KeyRound,
     Globe,
     Menu,
     PenLine,
@@ -48,6 +49,7 @@ const ICONS: Record<PolarSettingsSection, ComponentType<{ className?: string }>>
     display: MessageSquare,
     extras: Sparkles,
     writing: PenLine,
+    providers: KeyRound,
     routing: Shuffle,
     "coding-tools": SquareTerminal,
     usage: Gauge,
@@ -62,7 +64,7 @@ const GROUPS: readonly { id: GroupId; sections: readonly PolarSettingsSection[] 
         id: "abilities",
         sections: ["tools", "connectors", "skills", "agents", "browser", "coding-tools"]
     },
-    { id: "models", sections: ["routing", "usage"] },
+    { id: "models", sections: ["providers", "routing", "usage"] },
     { id: "privacy", sections: ["permissions", "data"] }
 ];
 
@@ -88,6 +90,7 @@ function SettingsNav({
         writing: t("settings.writing.title"),
         routing: t("settings.nav.routing"),
         "coding-tools": t("settings.nav.codingTools"),
+        providers: t("settings.nav.providers"),
         usage: t("settings.nav.usage"),
         data: t("settings.data.title")
     };

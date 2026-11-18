@@ -140,8 +140,8 @@ const SECURITY_CHANGES: Readonly<Record<string, SecurityChange>> = {
         key: "security.account_api_key_deleted",
         href: "/account/api-keys"
     },
-    "account.ai-key.added": { key: "security.account_ai_key_added", href: "/account/ai-keys" },
-    "account.ai-key.deleted": { key: "security.account_ai_key_deleted", href: "/account/ai-keys" },
+    "account.ai-key.added": { key: "security.account_ai_key_added", href: "/polar/settings/providers" },
+    "account.ai-key.deleted": { key: "security.account_ai_key_deleted", href: "/polar/settings/providers" },
     // An assistant connected over MCP is a credential like a key, made by a
     // different door; one ended because its token turned up twice means
     // somebody else held it.

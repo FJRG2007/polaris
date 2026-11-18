@@ -101,9 +101,23 @@ export function groupConnections(options: readonly ConnectionOption[], rows: rea
         add(option.slug, into?.name ?? option.name, option.slug, { option });
     }
     for (const option of options.filter((one) => one.method === "account" || one.method === "home")) {
-        const into = byVendor.get(vendorKey(option.vendor));
+        const vendor = vendorKey(option.vendor);
+        const into = vendor ? byVendor.get(vendor) : undefined;
         if (into) add(into, groups.get(into)!.name, groups.get(into)!.logo, { option });
+        // No provider of that name: the maker's ways still sit together, under
+        // the maker - GitHub's plan and its token are one entry with two ways
+        // in, not two entries that look like duplicates.
+        else if (vendor) add(`vendor:${vendor}`, option.vendor.trim(), vendor, { option });
         else add(`${option.method}:${option.slug}`, option.name, option.slug, { option });
+    }
+    // A maker with one way in is named and drawn as that way: "Cursor", not
+    // the company behind it.
+    for (const group of groups.values()) {
+        const only = group.ways[0]?.option;
+        if (group.key.startsWith("vendor:") && group.ways.length === 1 && only) {
+            group.name = only.name;
+            group.logo = only.slug;
+        }
     }
     for (const group of groups.values())
         group.ways.sort((a, b) => METHOD_ORDER.indexOf(a.option.method) - METHOD_ORDER.indexOf(b.option.method));
@@ -133,6 +147,11 @@ function remember(key: string, page: { items: ProviderRow[]; next: string | null
     pageCache.delete(key);
     pageCache.set(key, page);
     if (pageCache.size > CACHE_LIMIT) pageCache.delete(pageCache.keys().next().value!);
+}
+
+/** Drops every page read so far, so each test starts from an empty tab. */
+export function forgetProviderPages() {
+    pageCache.clear();
 }
 
 export function AddConnectionDialog({
@@ -266,7 +285,8 @@ export function AddConnectionDialog({
     function pick(key: string) {
         const group = byKey.get(key);
         if (!group) return;
-        if (group.ways.length === 1) return start(group.ways[0]!);
+        // Even a maker with one way in gets the picked step, as Places draws it:
+        // what was picked, a Change back to the list, and what happens next.
         setChosen(group);
         setWay(group.ways[0]!);
     }
@@ -290,6 +310,9 @@ export function AddConnectionDialog({
                             <CatalogPicked
                                 logo={<IntegrationLogo slug={chosen.logo} name={chosen.name} className="size-6 shrink-0 object-contain" />}
                                 title={chosen.name}
+                                lines={[
+                                    [...new Set(chosen.ways.map((one) => t(`modelKeys.connect.short.${one.option.method}`)))].join(", ")
+                                ]}
                                 action={
                                     <Button variant="ghost" size="sm" onClick={() => setChosen(null)}>
                                         {t("modelKeys.connect.change")}
@@ -340,7 +363,9 @@ export function AddConnectionDialog({
                             aria-label={t("modelKeys.connect.search")}
                             maxLength={200}
                         />
-                        <div className="min-w-0 max-w-full overflow-x-auto">
+                        {/* shrink-0: a scrolling box has no minimum height, so
+                            the list under it squeezed the filters to a sliver. */}
+                        <div className="min-w-0 max-w-full shrink-0 overflow-x-auto">
                             <SegmentedControl<ConnectionCategory>
                                 size="sm"
                                 value={category}
@@ -353,7 +378,7 @@ export function AddConnectionDialog({
                             />
                         </div>
                         {category === "providers" ? (
-                            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <div className="flex min-w-0 shrink-0 flex-wrap items-center gap-2">
                                 <div className="min-w-0 max-w-full overflow-x-auto">
                                     <SegmentedControl<KindFilter>
                                         size="sm"

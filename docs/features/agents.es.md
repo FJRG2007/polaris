@@ -23,7 +23,7 @@ La **preparación** lista las tres cosas que tienen que cumplirse:
    [Configurar integraciones](../integrations-setup.es.md#github)).
 2. **Un proveedor de modelos.** Tu propia clave de Anthropic, OpenAI, Google,
    xAI, DeepSeek, Moonshot, Groq, Cerebras u OpenRouter, o una pasarela
-   compatible con OpenAI, añadida en **Claves de IA**. La clave se queda en
+   compatible con OpenAI, añadida en **Proveedores de IA**. La clave se queda en
    Polaris y nunca se copia a tus repositorios.
 3. **Un repositorio**, y dónde ocurren sus ejecuciones.
 
@@ -87,7 +87,7 @@ rama y abre una, haciendo commit de lo que falte. Si un push falla, el trabajo
 se conserva para reintentarlo o descartarlo. Cuando una sesión termina, su rama
 sigue ahí. Las sesiones se pueden compartir con otras personas.
 
-Un agente inicia sesión con una cuenta de **Claves de IA > Tus cuentas de
+Un agente inicia sesión con una cuenta de **Proveedores de IA > Tus cuentas de
 agente**: una suscripción no cuesta nada extra, una clave API se mide. Una
 máquina conserva su carpeta personal entre sesiones, así que las instalaciones
 y los inicios de sesión ocurren una sola vez.

@@ -166,7 +166,7 @@ describe("an empty panel", () => {
             expect(screen.getByText("Polar needs an AI provider key")).toBeTruthy()
         );
         const link = screen.getByText("Add your own key").closest("a");
-        expect(link?.getAttribute("href")).toBe("/account/ai-keys");
+        expect(link?.getAttribute("href")).toBe("/polar/settings/providers");
         expect(screen.queryByText("Manage this Polaris's keys")).toBeNull();
     });
 

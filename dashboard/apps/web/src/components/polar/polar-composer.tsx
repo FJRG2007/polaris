@@ -310,7 +310,7 @@ function VoiceNoticeLine({
             </span>
             {notice === "unavailable" ? (
                 <>
-                    <Link href="/account/ai-keys" className="text-primary hover:underline">
+                    <Link href="/polar/settings/providers" className="text-primary hover:underline">
                         {t("noKeys.own")}
                     </Link>
                     {isAdmin ? (
