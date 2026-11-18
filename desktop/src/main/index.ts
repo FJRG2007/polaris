@@ -727,7 +727,16 @@ let accelerated = true;
 function start(): void {
     // Windows reports a window behind a full-screen game as gone, and Chromium then
     // starves it, along with the call inside.
-    app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion");
+    //
+    // WebRtcHideLocalIpsWithMdns makes a call answer mDNS for its own local
+    // addresses, which opens UDP 5353 on every interface the moment a call
+    // starts. Windows asks to let that through the firewall, and asks again
+    // after every update, because each version runs from its own app-<version>
+    // folder and the firewall remembers a program by its path. The names only
+    // hide this computer's LAN address from the page making the call, and that
+    // page is the Polaris this app was set up for.
+    // One switch, both features: a second --disable-features replaces the first.
+    app.commandLine.appendSwitch("disable-features", "CalculateNativeWinOcclusion,WebRtcHideLocalIpsWithMdns");
     app.commandLine.appendSwitch("disable-renderer-backgrounding");
     app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
     // Electron takes this only before the app is ready, so a change waits for a restart.
