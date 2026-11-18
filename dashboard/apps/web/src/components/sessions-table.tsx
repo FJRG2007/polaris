@@ -363,7 +363,15 @@ export function SessionsTable({
                                                 <span className="min-w-0 truncate font-medium">
                                                     {session.name}
                                                 </span>
-                                                <span className="min-w-0 truncate text-muted-foreground">
+                                                {/* "Brave on Windows" is the App and System
+                                                    columns again; said here only where the
+                                                    layout drops them. */}
+                                                <span
+                                                    className={cn(
+                                                        "min-w-0 truncate text-muted-foreground",
+                                                        !compact && "md:hidden"
+                                                    )}
+                                                >
                                                     {session.device}
                                                 </span>
                                                 {session.current ? (
@@ -645,13 +653,18 @@ export function SessionsTable({
                                                     {device.browser}
                                                 </span>
                                                 {device.os ? (
-                                                    <span className="min-w-0 truncate text-muted-foreground">
+                                                    <span
+                                                        className={cn(
+                                                            "min-w-0 truncate text-muted-foreground",
+                                                            !compact && "md:hidden"
+                                                        )}
+                                                    >
                                                         {device.os}
                                                     </span>
                                                 ) : null}
                                                 <Badge
                                                     variant="neutral"
-                                                    className="max-w-full"
+                                                    className={cn("max-w-full", !compact && "md:hidden")}
                                                     title={kind}
                                                 >
                                                     <span className="min-w-0 truncate">{kind}</span>
@@ -788,13 +801,17 @@ export function ActivityLink({ href, device }: { href: string; device: string })
 }
 
 /**
- * The address lock on one session, as three states rather than two.
+ * The address lock on one session: pressed, it locks or unlocks it.
  *
- * A switch would have to lie about the third: nearly every session says "follow
- * the account", and a two-way toggle showing that as either on or off would make
- * the account-wide setting stop meaning anything the moment anybody touched a
- * row. So the button cycles, and its title always says what the current answer
- * actually is and what pressing will do.
+ * Stored as three answers - locked, unlocked, or "follow the account" - but
+ * drawn and pressed as the two a person sees: the icon and its colour say
+ * whether this session is locked right now, and a press turns that over. The
+ * row goes back to following the account whenever the answer it wants is the
+ * account's own, so the account-wide setting keeps meaning something and no
+ * row is left holding an answer nobody can see. The title says which it is.
+ *
+ * It used to cycle through all three, coloured whenever the row had an answer
+ * of its own - so unlocking a session left a purple lock on it.
  */
 export function PinButton({
     label,
@@ -813,7 +830,9 @@ export function PinButton({
     const t = useTranslations("components");
     const state = pinToAddress;
     const effective = state ?? pinnedByRule;
-    const next = state === null ? true : state === true ? false : null;
+    // The opposite of what holds now, as the account's own answer where that
+    // is the same - see above.
+    const next = effective ? (pinnedByRule ? false : null) : pinnedByRule ? null : true;
     const says =
         state === null
             ? pinnedByRule
@@ -822,12 +841,7 @@ export function PinButton({
             : state
               ? t("sessionsTable.pin.locked")
               : t("sessionsTable.pin.unlocked");
-    const then =
-        next === true
-            ? t("sessionsTable.pin.lockIt")
-            : next === false
-              ? t("sessionsTable.pin.leaveUnlocked")
-              : t("sessionsTable.pin.follow");
+    const then = effective ? t("sessionsTable.pin.leaveUnlocked") : t("sessionsTable.pin.lockIt");
 
     return (
         <Button
@@ -839,9 +853,9 @@ export function PinButton({
             onClick={() => onPin(next)}
         >
             {effective ? (
-                <Lock className={cn("size-4", state !== null && "text-primary")} />
+                <Lock className="size-4 text-primary" />
             ) : (
-                <LockOpen className={cn("size-4", state !== null && "text-primary")} />
+                <LockOpen className="size-4" />
             )}
         </Button>
     );

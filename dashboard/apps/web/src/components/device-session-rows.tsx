@@ -81,10 +81,22 @@ export function DeviceSessionRows({
                                         >
                                             {session.name}
                                         </span>
-                                        <span className="min-w-0 truncate text-muted-foreground">
+                                        {/* The App and System columns again; said
+                                            here only where the layout drops them. */}
+                                        <span
+                                            className={cn(
+                                                "min-w-0 truncate text-muted-foreground",
+                                                !compact && "md:hidden"
+                                            )}
+                                        >
                                             {session.os}
                                         </span>
-                                        <Badge variant="neutral">{app}</Badge>
+                                        <Badge
+                                            variant="neutral"
+                                            className={cn(!compact && "md:hidden")}
+                                        >
+                                            {app}
+                                        </Badge>
                                         <MachineBadge
                                             machine={machines?.get(session.id)}
                                             named={session.name}
