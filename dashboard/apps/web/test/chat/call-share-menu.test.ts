@@ -39,9 +39,9 @@ describe("sharePress", () => {
         expect(sharePress({ sharing: false, canShare: true })).toBe("start");
     });
 
-    it("opens the menu while sharing", () => {
-        expect(sharePress({ sharing: true, canShare: true })).toBe("menu");
-        expect(sharePress({ sharing: true, canShare: false })).toBe("menu");
+    it("stops the share while sharing", () => {
+        expect(sharePress({ sharing: true, canShare: true })).toBe("stop");
+        expect(sharePress({ sharing: true, canShare: false })).toBe("stop");
     });
 
     it("does nothing where the browser cannot share", () => {

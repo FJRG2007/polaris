@@ -1,5 +1,5 @@
 /**
- * The menu the share button opens while a screen is going out: stop, change
+ * The menu beside the share button while a screen is going out: stop, change
  * what is shared, how much picture, and whether its sound goes with it.
  *
  * Kept apart from the hook so the parts that decide something - what a press
@@ -8,15 +8,16 @@
  */
 
 /** What pressing the share button does right now. */
-export type SharePress = "start" | "menu" | "none";
+export type SharePress = "start" | "stop" | "none";
 
 /**
- * Not sharing, it opens the picker as it always has; sharing, it opens the
- * menu. A browser that cannot share at all - every phone - has nothing to
- * start, though a share already running still gets its menu.
+ * Not sharing, it opens the picker; sharing, it stops - the button does what
+ * its icon says, and the rest of the stream's options are behind the arrow
+ * beside it. A browser that cannot share at all - every phone - has nothing to
+ * start, though a share already running can always be stopped.
  */
 export function sharePress(state: { sharing: boolean; canShare: boolean }): SharePress {
-    if (state.sharing) return "menu";
+    if (state.sharing) return "stop";
     return state.canShare ? "start" : "none";
 }
 
