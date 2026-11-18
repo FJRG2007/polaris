@@ -25,7 +25,7 @@
 
 import { AppWindow, Monitor, Video } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { DesktopShareSources, PolarisDesktop } from "@/lib/desktop-bridge";
 import {
     Button,
@@ -174,6 +174,9 @@ function Picker({ request }: { request: Request }) {
     const [listed, setListed] = useState<DesktopShareSources | null>(lastListed);
     const [devices, setDevices] = useState<readonly CaptureDevice[] | null>(null);
     const [selected, setSelected] = useState<string | null>(null);
+    /** Read by the refresh, which outlives renders. */
+    const picked = useRef(false);
+    picked.current = selected !== null;
     const [sound, setSound] = useState(true);
     // Off until asked: a webcam's own microphone would send the voice twice.
     const [deviceSound, setDeviceSound] = useState(false);
@@ -184,8 +187,11 @@ function Picker({ request }: { request: Request }) {
         let first = true;
         let timer: ReturnType<typeof setTimeout> | undefined;
         const read = async (thumbnails: boolean) => {
-            // Nobody is looking at pictures in a window that is not on screen.
-            if (thumbnails && !first && document.visibilityState === "hidden") {
+            // Nobody is looking at pictures in a window that is not on screen,
+            // and once something is picked the next press is Share: a round
+            // costs the app a second or more, and landing then is the freeze
+            // between choosing and sharing.
+            if (thumbnails && !first && (document.visibilityState === "hidden" || picked.current)) {
                 timer = setTimeout(() => void read(true), REFRESH_MS);
                 return;
             }

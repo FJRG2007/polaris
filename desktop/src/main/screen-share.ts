@@ -54,6 +54,18 @@ let pick: { readonly id: string; readonly sound: boolean; readonly until: number
 let known = new Map<string, { readonly name: string; readonly displayId: string; readonly icon: string | null; }>();
 let iconsReadAt = 0;
 
+/** This app's own helper windows - the voice widget, the drawing overlay. They
+ *  are kept out of captures already, so offering one in the picker offers a
+ *  blank tile somebody could only pick by mistake. */
+const hidden = new Set<string>();
+
+/** Keep one of this app's windows out of the picker for as long as it lives. */
+export function hideFromSharing(window: { getMediaSourceId(): string; once(event: "closed", listener: () => void): unknown; }): void {
+    const id = window.getMediaSourceId();
+    hidden.add(id);
+    window.once("closed", () => hidden.delete(id));
+}
+
 /** What is being shared now, for drawing on it: the source and its display. */
 let shared: { readonly id: string; readonly displayId: string; } | null = null;
 
@@ -92,7 +104,9 @@ export async function listShareSources(
     );
     if (icons) iconsReadAt = now;
     const screens = sources.filter((source) => source.id.startsWith("screen:"));
-    const windows = sources.filter((source) => !source.id.startsWith("screen:")).slice(0, MAX_WINDOWS);
+    const windows = sources
+        .filter((source) => !source.id.startsWith("screen:") && !hidden.has(source.id))
+        .slice(0, MAX_WINDOWS);
     const shape = (source: DesktopCapturerSource): ShareSource => ({
         id: source.id,
         name: source.name.trim().slice(0, 200),
@@ -143,7 +157,7 @@ async function choose(frame: WebFrameMain | null): Promise<{ source: Chosen; sou
     if (process.platform === "linux" && sources.length === 1) return sources[0] ? { source: sources[0], sound: false } : null;
 
     const screens = sources.filter((source) => source.id.startsWith("screen:"));
-    const windows = sources.filter((source) => !source.id.startsWith("screen:"));
+    const windows = sources.filter((source) => !source.id.startsWith("screen:") && !hidden.has(source.id));
     const offered = [...screens, ...windows].slice(0, Math.max(MAX_CHOICES, screens.length));
     const contents = frame ? webContents.fromFrame(frame) : undefined;
     const parent = contents ? BrowserWindow.fromWebContents(contents) : null;

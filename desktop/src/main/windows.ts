@@ -19,6 +19,7 @@
 import { join } from "node:path";
 import { release } from "node:os";
 import { textSize } from "./settings";
+import { hideFromSharing } from "./screen-share";
 import { CHANNELS, TEXT_SIZE_ARGUMENT, VERSION_ARGUMENT } from "@/shared/bridge";
 import { defaultTitleBarColors, foreignPageCss, overlayHeight } from "@/shared/title-bar";
 import { openExternal } from "./open-external";
@@ -279,6 +280,7 @@ export function openOverlayWindow(bounds: { readonly x: number; readonly y: numb
         webPreferences: localPreferences()
     });
     register(window.webContents, "overlay");
+    hideFromSharing(window);
     window.setIgnoreMouseEvents(true);
     // Before Windows 10 2004 a protected window is captured black rather than
     // left out, which would black out the whole share.
@@ -317,6 +319,7 @@ export function openVoiceWidgetWindow(bounds: { readonly x: number; readonly y: 
         webPreferences: localPreferences()
     });
     register(window.webContents, "voice-widget");
+    hideFromSharing(window);
     window.setIgnoreMouseEvents(true, { forward: true });
     if (process.platform !== "win32" || windowsBuild() >= 19041) window.setContentProtection(true);
     window.setAlwaysOnTop(true, "screen-saver");

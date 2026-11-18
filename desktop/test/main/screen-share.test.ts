@@ -18,7 +18,7 @@ vi.mock("electron", () => ({
 }));
 vi.mock("@/main/permissions", () => ({ allowPermission: () => true }));
 
-const { chooseShare, installScreenShare, listShareSources } = await import("@/main/screen-share");
+const { chooseShare, hideFromSharing, installScreenShare, listShareSources } = await import("@/main/screen-share");
 
 const image = (empty: boolean) => ({
     isEmpty: () => empty,
@@ -42,6 +42,16 @@ describe.runIf(process.platform !== "darwin")("listing what can be shared", () =
             ["screen:0:0", "screen", "Screen 1", null],
             ["window:1:0", "window", "Editor", null]
         ]);
+    });
+
+    it("leaves this app's own helper windows out, for as long as they are open", async () => {
+        let close = () => undefined as unknown;
+        hideFromSharing({ getMediaSourceId: () => "window:1:0", once: (_event, listener) => (close = listener) });
+        const listed = await listShareSources({ thumbnails: false });
+        expect(listed?.sources.map((source) => source.id)).toEqual(["screen:0:0"]);
+        close();
+        const after = await listShareSources({ thumbnails: false });
+        expect(after?.sources.map((source) => source.id)).toEqual(["screen:0:0", "window:1:0"]);
     });
 
     it("asks for pictures and icons by default, as an older page expects", async () => {
