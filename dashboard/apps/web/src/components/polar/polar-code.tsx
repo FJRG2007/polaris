@@ -57,10 +57,16 @@ import { CodeBootLine } from "@/components/polar/polar-code-boot";
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
-import { Button, cn, SegmentedControl } from "@polaris/ui";
+import { Button, cn, CopyIcon, SegmentedControl, useCopied } from "@polaris/ui";
 import { ConversationEmptyState } from "@/components/polar/elements/conversation";
 import { PolarThreadFrame, PolarWelcome } from "@/components/polar/polar-layout";
-import { Message, MessageContent, MessageResponse } from "@/components/polar/elements/message";
+import {
+    Message,
+    MessageAction,
+    MessageActions,
+    MessageContent,
+    MessageResponse
+} from "@/components/polar/elements/message";
 import {
     useCallback,
     useEffect,
@@ -142,7 +148,7 @@ import type {
     PolarCodeThread
 } from "@/lib/polar/code";
 import type { SessionView } from "@/lib/agents/session-service";
-import { Code2, Keyboard, MessageSquare, PanelRight, ShieldCheck, TriangleAlert, X } from "lucide-react";
+import { Code2, Keyboard, MessageSquare, PanelRight, Pencil, Reply, ShieldCheck, TriangleAlert, X } from "lucide-react";
 import { pickedContext, PICKS_MAX, type PickedElement } from "@/lib/agents/preview-picker";
 import { PickedChips } from "@/components/preview/picked-chips";
 import dynamic from "next/dynamic";
@@ -2185,6 +2191,7 @@ function CodeThread({
                                 <CodeMessage
                                     key={`${block.entry.at}-${index}`}
                                     entry={block.entry}
+                                    onCompose={setReply}
                                 />
                             ) : (
                                 <Work
@@ -2378,8 +2385,15 @@ const ISO_TIME = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g;
 
 /** A message of the session, in Chat's bubbles: the person's words as typed,
  *  the agent's as Markdown. */
-function CodeMessage({ entry }: { entry: PolarCodeEntry }) {
+/**
+ * One line of a Code session, with the chat's own actions under it: copy,
+ * reply (quoted into the composer) and, on the person's own message, edit
+ * (back into the composer to send again). `onCompose` replaces the draft.
+ */
+function CodeMessage({ entry, onCompose }: { entry: PolarCodeEntry; onCompose: (text: string) => void }) {
+    const t = useTranslations("polar");
     const format = useDisplayFormat();
+    const { copied, copy } = useCopied();
     // Polaris's own line (an account switch, a wait): quiet, not a reply. Its
     // times travel as ISO and are written in the reader's zone and format.
     if (entry.role === "system")
@@ -2399,6 +2413,31 @@ function CodeMessage({ entry }: { entry: PolarCodeEntry }) {
                     <MessageResponse>{entry.text}</MessageResponse>
                 )}
             </MessageContent>
+            <MessageActions className="opacity-0 transition-opacity duration-fast focus-within:opacity-100 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
+                {from === "user" ? (
+                    <MessageAction
+                        label={t("actions.edit")}
+                        onClick={() => onCompose(parseVoiceDelegation(entry.text) ?? entry.text)}
+                    >
+                        <Pencil />
+                    </MessageAction>
+                ) : null}
+                <MessageAction label={t("actions.reply")} onClick={() => onCompose(quoteOf(entry.text))}>
+                    <Reply />
+                </MessageAction>
+                <MessageAction
+                    label={copied ? t("actions.copied") : t("actions.copy")}
+                    onClick={() => void copy(entry.text)}
+                >
+                    <CopyIcon copied={copied} />
+                </MessageAction>
+            </MessageActions>
         </Message>
     );
+}
+
+/** A message quoted at the head of a reply, as Markdown, its first 200 characters. */
+export function quoteOf(text: string): string {
+    const quoted = text.trim().slice(0, 200).split("\n").map((line) => `> ${line}`).join("\n");
+    return `${quoted}\n\n`;
 }
