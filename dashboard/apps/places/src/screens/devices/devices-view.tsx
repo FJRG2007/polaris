@@ -31,6 +31,7 @@ import { ConnectDialog, type Connected } from "./connect-dialog";
 import { NukiLocalDialog } from "./nuki-local-dialog";
 import { RoomsDialog } from "./rooms-dialog";
 import { AccountOptionsDialog } from "./account-options-dialog";
+import { AccountsTable, AccountsTableSkeleton } from "./accounts-table";
 import { GoneDevices, HandoverNotes } from "./handover-notes";
 import * as kinds from "../../lib/device-kinds";
 import { batteryLine, batteryLow } from "../../lib/automation-kinds";
@@ -48,11 +49,7 @@ import {
     HardDrive,
     MoreHorizontal,
     Plus,
-    Radio,
     RefreshCw,
-    Search,
-    Settings2,
-    Unplug,
     Video,
     Workflow
 } from "lucide-react";
@@ -88,8 +85,8 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
     EmptyState,
-    Input,
     Skeleton,
+    SearchField,
     cn
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
@@ -105,8 +102,6 @@ import {
 import { markSeen, useDeviceStream, useSeenAt } from "./use-device-stream";
 
 const { runAction } = hostUi.runAction;
-const { useDisplayFormat } = hostUi.displayFormat;
-const { IntegrationLogo } = hostUi.logos;
 const { RelativeTime } = hostUi.relativeTime;
 
 /** Record when each device in a full list was read. */
@@ -144,7 +139,6 @@ export function DevicesView({
     canControl: boolean;
     canManage: boolean;
 }) {
-    const format = useDisplayFormat();
     const t = usePlacesT();
     const [devices, setDevices] = useState<DeviceView[] | null>(null);
     const [accounts, setAccounts] = useState<DeviceAccountView[]>([]);
@@ -179,19 +173,26 @@ export function DevicesView({
         () => new Map((rooms ?? []).map((room) => [room.id, room.name] as const)),
         [rooms]
     );
-    const filtered = useMemo(
-        () =>
-            list.filterEntries(entries, { groups: kindsShown, query }, t, (id) =>
-                roomNames.get(id)
-            ),
-        [entries, kindsShown, query, t, roomNames]
-    );
+    /** The account a row of the accounts table narrowed the list to. One that
+     *  has since gone narrows nothing. */
+    const [accountPicked, setAccountPicked] = useState<string | null>(null);
+    const accountShown = accounts.find((account) => account.id === accountPicked) ?? null;
+    const filtered = useMemo(() => {
+        const found = list.filterEntries(entries, { groups: kindsShown, query }, t, (id) =>
+            roomNames.get(id)
+        );
+        return accountShown
+            ? found.filter(
+                  (entry) => entry.type === "device" && entry.device.accountId === accountShown.id
+              )
+            : found;
+    }, [entries, kindsShown, query, t, roomNames, accountShown]);
     const groups = useMemo(
         () => list.groupEntries(filtered.slice(0, limit), t),
         [filtered, limit, t]
     );
     // A new search starts from the top of the list rather than deep in it.
-    useEffect(() => setLimit(PAGE), [query, kindsShown]);
+    useEffect(() => setLimit(PAGE), [query, kindsShown, accountPicked]);
 
     /** When each device was last pushed, so a full read that began before a
      *  push cannot put the older state back. */
@@ -510,7 +511,7 @@ export function DevicesView({
                             </Button>
                         )}
                     </div>
-                    <Skeleton className="h-20 w-full" />
+                    <AccountsTableSkeleton />
                     <Skeleton className="h-20 w-full" />
                 </div>
                 {connectDialog}
@@ -545,75 +546,6 @@ export function DevicesView({
     const view = (
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
-                {accounts.map((account) => (
-                    <span
-                        key={account.id}
-                        className="flex items-center gap-1.5 rounded-lg border border-border bg-card py-1 ps-2.5 pe-1"
-                    >
-                        <IntegrationLogo
-                            slug={registry.deviceConnection(account.connection)?.logo ?? ""}
-                            className="size-4 w-5 shrink-0 object-contain"
-                        />
-                        <span className="text-xs font-medium">{account.label}</span>
-                        <span className="text-[0.6875rem] text-foreground-subtle">
-                            {account.status === "ok"
-                                ? account.lastSyncedAt
-                                    ? format.time(account.lastSyncedAt)
-                                    : t("devicesView.notChecked")
-                                : account.status === "unauthorized"
-                                  ? t("devicesView.refusing")
-                                  : account.status === "lapsed"
-                                    ? t("devicesView.planEnded")
-                                    : t("devicesView.notAnswering")}
-                        </span>
-                        {canManage && account.connection === "nuki-web" && (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                className="size-6 p-0"
-                                aria-label={t("devicesView.connectLocally", {
-                                    name: account.label
-                                })}
-                                title={t("devicesView.connectLocally", { name: account.label })}
-                                onClick={() => setLinking(account)}
-                            >
-                                <Radio className="size-3.5 shrink-0" />
-                            </Button>
-                        )}
-                        {canManage &&
-                            (registry.deviceConnection(account.connection)?.options?.length ?? 0) >
-                                0 && (
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="size-6 p-0"
-                                    aria-label={t("devicesView.accountSettings", {
-                                        name: account.label
-                                    })}
-                                    title={t("devicesView.accountSettings", {
-                                        name: account.label
-                                    })}
-                                    onClick={() => setAdjusting(account.id)}
-                                >
-                                    <Settings2 className="size-3.5 shrink-0" />
-                                </Button>
-                            )}
-                        {canManage && (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                className="size-6 p-0"
-                                aria-label={t("devicesView.disconnectName", {
-                                    name: account.label
-                                })}
-                                title={t("devicesView.disconnectName", { name: account.label })}
-                                onClick={() => setDisconnecting(account)}
-                            >
-                                <Unplug className="size-3.5" />
-                            </Button>
-                        )}
-                    </span>
-                ))}
                 <span className="flex-1" />
                 {canManage && (
                     <Button size="sm" variant="outline" onClick={() => setArranging(true)}>
@@ -639,11 +571,32 @@ export function DevicesView({
                 </Button>
             </div>
 
-            <HandoverNotes
-                accounts={accounts}
-                canManage={canManage}
-                onRemove={setDisconnecting}
-            />
+            {accounts.length > 0 && (
+                <AccountsTable
+                    accounts={accounts}
+                    canManage={canManage}
+                    shownAccountId={accountShown?.id ?? null}
+                    onShowDevices={setAccountPicked}
+                    onReconnect={setReconnecting}
+                    onConnect={() => setConnecting(true)}
+                    onLink={setLinking}
+                    onAdjust={setAdjusting}
+                    onDisconnect={setDisconnecting}
+                />
+            )}
+
+            {accountShown && (
+                <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+                    <span className="min-w-0 truncate font-medium" title={accountShown.label}>
+                        {t("devicesView.devicesOf", { name: accountShown.label })}
+                    </span>
+                    <Button size="sm" variant="ghost" onClick={() => setAccountPicked(null)}>
+                        {t("devicesView.showAllDevices")}
+                    </Button>
+                </div>
+            )}
+
+            <HandoverNotes accounts={accounts} canManage={canManage} onRemove={setDisconnecting} />
 
             {accounts
                 // One left empty by a move says so above, with its own button.
@@ -725,17 +678,13 @@ export function DevicesView({
 
             {entries.length > 0 && (present.length > 1 || entries.length > 8) && (
                 <div className="flex flex-wrap items-center gap-2">
-                    <div className="relative min-w-0 flex-1 sm:max-w-xs">
-                        <Search className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 shrink-0 text-foreground-subtle" />
-                        <Input
-                            type="search"
-                            value={query}
-                            onChange={(event) => setQuery(event.target.value)}
-                            placeholder={t("devicesView.search")}
-                            aria-label={t("devicesView.search")}
-                            className="ps-8"
-                        />
-                    </div>
+                    <SearchField
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder={t("devicesView.search")}
+                        aria-label={t("devicesView.search")}
+                        wrapperClassName="flex-1 sm:max-w-xs"
+                    />
                     {present.length > 1 && (
                         <div
                             role="group"
