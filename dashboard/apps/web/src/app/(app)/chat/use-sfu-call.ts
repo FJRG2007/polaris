@@ -1550,6 +1550,19 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
          * is what keeps it from being repeated afterwards as well.
          */
         let connecting = false;
+
+        /**
+         * Settled once this browser's microphone and camera are open (or could
+         * not be). The seat, the ticket and the call server are reached while
+         * they open rather than after: the join used to be a chain of the
+         * permission prompt, the noise filter and the background model, and
+         * only then the seat - seconds of a Join that showed nothing. Only the
+         * first publication waits for this.
+         */
+        let mediaReady!: () => void;
+        const media = new Promise<void>((resolve) => {
+            mediaReady = resolve;
+        });
         /**
          * What a failed attempt put on screen, so the attempt that succeeds can
          * take it back down.
@@ -1957,6 +1970,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             }
             connected();
             rejoinAttempt = 0;
+            await media;
+            if (stopped || room.current !== joined) return;
 
             // Everything this browser already had open goes up now. Nothing was
             // published before the connection existed, so this is the one place
@@ -2097,86 +2112,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             setSpeaking(new Set(speakers.map((speaker) => speaker.identity)));
         }
 
-        async function start(): Promise<void> {
-            const [filter, seatVoice] = await Promise.all([
-                callRequests.licensedFilter(inCall).catch(() => null),
-                callRequests.ownVoice(inCall).catch(() => null)
-            ]);
-            licensed.current = filter;
-            setLicensedFilter(licensed.current !== null);
-
-            // What this tab had asked for before it reloaded, or else what the
-            // seat it is taking back was left with - read before anything is
-            // opened, so nothing is published live first.
-            const resumed = startingVoice(takeRememberedVoice(inCall), seatVoice, !callMuted());
-            if (resumed?.deafened && !deafenedRef.current) {
-                deafenedRef.current = true;
-                setDeafened(true);
-            }
-            const opened = await openMedia(
-                withVideo,
-                quality.cameraConstraints(levelNow("camera"))
-            );
-            if (stopped) {
-                for (const track of opened.stream?.getTracks() ?? []) track.stop();
-                return;
-            }
-            if (opened.stream) {
-                mic.current = opened.stream.getAudioTracks()[0] ?? null;
-                setMicTrack(mic.current);
-                camera.current = opened.stream.getVideoTracks()[0] ?? null;
-                setHasCamera(camera.current !== null);
-                setMicOn(mic.current !== null);
-                setCameraOn(camera.current !== null);
-                // Muted the way this browser was left, before anything is
-                // published. Opening a voice channel is now a single press, so
-                // without this a press opens a microphone - see `call-muted`.
-                if (mic.current && (resumed ? !resumed.micOn : callMuted())) {
-                    mic.current.enabled = false;
-                    setMicOn(false);
-                }
-                // Deafened already - pressed while the microphone was still
-                // opening, or carried over from the last call - is muted too, as
-                // it is when deafening mid-call. Opening it live left a person
-                // shown as not listening talking into the room; undeafening
-                // gives back what they would have opened with.
-                if (mic.current && deafenedRef.current) {
-                    micBeforeDeafen.current = resumed?.deafened
-                        ? resumed.micBeforeDeafen
-                        : mic.current.enabled;
-                    mic.current.enabled = false;
-                    micOnRef.current = false;
-                    setMicOn(false);
-                }
-                setMicrophoneId(mic.current?.getSettings().deviceId ?? null);
-                setCameraId(camera.current?.getSettings().deviceId ?? null);
-                setCameraFacing(camera.current?.getSettings().facingMode ?? null);
-                publishLocalPreview();
-                void listDevices();
-                // Built before anything is published, so the first packet already
-                // carries the filtered track and nobody hears the raw room for
-                // the second it would take to swap.
-                await startFilter();
-                // The same for the picture, and the stakes are higher: the
-                // second of raw camera a later swap would cost is a second of
-                // somebody's room going out to the call they turned a background
-                // on to keep it out of.
-                await startBackground();
-                publishLocalPreview();
-            }
-            // A call with no camera, or none with no microphone, is still a call.
-            // What could not be opened is said out loud, because sitting in a
-            // room where nobody can hear you and nothing says so is the worst
-            // version of this.
-            //
-            // A permission that was refused is not that: it is a question only
-            // the reader can answer, and until they do nothing they try will
-            // work. It stands until the devices open.
-            if (opened.denied && !opened.stream) blocked = opened.note;
-            if (opened.note) setError(opened.note);
-
-            if (stopped) return;
-
+        /** Take the seat and follow the call: the roster, the ticket, and what
+         *  happens to this browser in it. */
+        function follow(): void {
             source = new EventSource(`/api/chat/meetings/${inCall}/stream`);
             source.onmessage = (event) => {
                 let raw: unknown;
@@ -2266,7 +2204,98 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 });
             }, KEEPALIVE_MS);
             refresh();
-            await connect();
+            void connect();
+        }
+
+        async function start(): Promise<void> {
+            // Everything that does not need the devices starts now: the seat,
+            // the call client's code, and the two answers about this person's
+            // voice - all while the browser asks for the microphone.
+            void livekit().catch(() => undefined);
+            follow();
+            try {
+                await openDevices();
+            } finally {
+                mediaReady();
+            }
+        }
+
+        async function openDevices(): Promise<void> {
+            const voices = Promise.all([
+                callRequests.licensedFilter(inCall).catch(() => null),
+                callRequests.ownVoice(inCall).catch(() => null)
+            ]);
+            const opening = openMedia(withVideo, quality.cameraConstraints(levelNow("camera")));
+            const [filter, seatVoice] = await voices;
+            licensed.current = filter;
+            setLicensedFilter(licensed.current !== null);
+
+            // What this tab had asked for before it reloaded, or else what the
+            // seat it is taking back was left with - read before anything is
+            // opened, so nothing is published live first.
+            const resumed = startingVoice(takeRememberedVoice(inCall), seatVoice, !callMuted());
+            if (resumed?.deafened && !deafenedRef.current) {
+                deafenedRef.current = true;
+                setDeafened(true);
+            }
+            const opened = await opening;
+            if (stopped) {
+                for (const track of opened.stream?.getTracks() ?? []) track.stop();
+                return;
+            }
+            if (opened.stream) {
+                mic.current = opened.stream.getAudioTracks()[0] ?? null;
+                setMicTrack(mic.current);
+                camera.current = opened.stream.getVideoTracks()[0] ?? null;
+                setHasCamera(camera.current !== null);
+                setMicOn(mic.current !== null);
+                setCameraOn(camera.current !== null);
+                // Muted the way this browser was left, before anything is
+                // published. Opening a voice channel is now a single press, so
+                // without this a press opens a microphone - see `call-muted`.
+                if (mic.current && (resumed ? !resumed.micOn : callMuted())) {
+                    mic.current.enabled = false;
+                    setMicOn(false);
+                }
+                // Deafened already - pressed while the microphone was still
+                // opening, or carried over from the last call - is muted too, as
+                // it is when deafening mid-call. Opening it live left a person
+                // shown as not listening talking into the room; undeafening
+                // gives back what they would have opened with.
+                if (mic.current && deafenedRef.current) {
+                    micBeforeDeafen.current = resumed?.deafened
+                        ? resumed.micBeforeDeafen
+                        : mic.current.enabled;
+                    mic.current.enabled = false;
+                    micOnRef.current = false;
+                    setMicOn(false);
+                }
+                setMicrophoneId(mic.current?.getSettings().deviceId ?? null);
+                setCameraId(camera.current?.getSettings().deviceId ?? null);
+                setCameraFacing(camera.current?.getSettings().facingMode ?? null);
+                publishLocalPreview();
+                void listDevices();
+                // Built before anything is published, so the first packet already
+                // carries the filtered track and nobody hears the raw room for
+                // the second it would take to swap.
+                await startFilter();
+                // The same for the picture, and the stakes are higher: the
+                // second of raw camera a later swap would cost is a second of
+                // somebody's room going out to the call they turned a background
+                // on to keep it out of.
+                await startBackground();
+                publishLocalPreview();
+            }
+            // A call with no camera, or none with no microphone, is still a call.
+            // What could not be opened is said out loud, because sitting in a
+            // room where nobody can hear you and nothing says so is the worst
+            // version of this.
+            //
+            // A permission that was refused is not that: it is a question only
+            // the reader can answer, and until they do nothing they try will
+            // work. It stands until the devices open.
+            if (opened.denied && !opened.stream) blocked = opened.note;
+            if (opened.note) setError(opened.note);
         }
 
         void start();
