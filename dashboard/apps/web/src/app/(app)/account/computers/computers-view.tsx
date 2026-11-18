@@ -6,8 +6,6 @@
  * list; the list itself refreshes every half minute so online state follows.
  */
 
-import { QRCodeSVG } from "qrcode.react";
-import { CopyButton } from "@/components/copy-button";
 import { useCallback, useEffect, useState } from "react";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
@@ -33,13 +31,11 @@ import {
 import {
     listComputersAction,
     openPairingAction,
-    pairingWaitingAction,
     renameComputerAction,
     revokeComputerAction,
     setLanHostsAction
 } from "./actions";
 
-const POLL_PAIRING_MS = 3_000;
 const POLL_LIST_MS = 30_000;
 const NAME_MAX = 60;
 
@@ -187,13 +183,7 @@ export function ComputersView({ initial }: { initial: ComputerView[] }) {
                 </ul>
             )}
             {pairing ? (
-                <PairDialog
-                    onClose={() => setPairing(false)}
-                    onPaired={() => {
-                        setPairing(false);
-                        reload();
-                    }}
-                />
+                <PairDialog onClose={() => setPairing(false)} />
             ) : null}
             {modelsOf ? (
                 <LocalModelsDialog
@@ -222,74 +212,39 @@ export function ComputersView({ initial }: { initial: ComputerView[] }) {
     );
 }
 
-function PairDialog({ onClose, onPaired }: { onClose: () => void; onPaired: () => void }) {
+/**
+ * How a computer of somebody's joins: Polaris Desktop on it, signed in to this
+ * account, pairs itself with one press. A code shown here had nowhere to be
+ * typed - nothing on the other computer asks for one - so this says what to do
+ * there instead, and the list under it picks the computer up on its own.
+ */
+function PairDialog({ onClose }: { onClose: () => void }) {
     const t = useTranslations("account");
-    const [code, setCode] = useState<{ code: string; display: string; expiresAt: string } | null>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [expired, setExpired] = useState(false);
-
-    const open = useCallback(() => {
-        setError(null);
-        setExpired(false);
-        setCode(null);
-        void openPairingAction()
-            .then((result) => ("error" in result ? setError(result.error) : setCode(result)))
-            .catch(() => setError(t("computers.errors.pair")));
-    }, [t]);
-    useEffect(open, [open]);
-
-    useEffect(() => {
-        if (!code || expired) return;
-        const timer = setInterval(() => {
-            if (Date.parse(code.expiresAt) <= Date.now()) {
-                setExpired(true);
-                return;
-            }
-            void pairingWaitingAction(code.code)
-                .then((waiting) => {
-                    // Gone before it expired: a computer used it.
-                    if (!waiting && Date.parse(code.expiresAt) > Date.now()) onPaired();
-                })
-                .catch(() => undefined);
-        }, POLL_PAIRING_MS);
-        return () => clearInterval(timer);
-    }, [code, expired, onPaired]);
-
+    const steps = [t("computers.pair.stepInstall"), t("computers.pair.stepSignIn"), t("computers.pair.stepUse")];
     return (
         <Dialog open onOpenChange={(next) => !next && onClose()}>
-            <DialogContent className="max-w-sm">
+            <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>{t("computers.pair.title")}</DialogTitle>
                     <DialogDescription>{t("computers.pair.description")}</DialogDescription>
                 </DialogHeader>
-                <div className="flex flex-col items-center gap-3">
-                    {error ? (
-                        <p role="alert" className="text-sm text-destructive">
-                            {error}
-                        </p>
-                    ) : code === null ? (
-                        <div className="size-[164px] animate-pulse rounded-md bg-muted" aria-hidden />
-                    ) : expired ? (
-                        <p className="text-sm text-muted-foreground">{t("computers.pair.expired")}</p>
-                    ) : (
-                        <>
-                            <div className="rounded-md bg-white p-2">
-                                <QRCodeSVG value={code.code} size={148} bgColor="#ffffff" fgColor="#000000" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="font-mono text-2xl tracking-widest">{code.display}</span>
-                                <CopyButton value={code.code} />
-                            </div>
-                            <p className="text-xs text-muted-foreground" role="status">
-                                {t("computers.pair.waiting")}
-                            </p>
-                        </>
-                    )}
-                </div>
+                <ol className="flex flex-col gap-2">
+                    {steps.map((step, index) => (
+                        <li key={index} className="flex min-w-0 items-start gap-3 text-sm">
+                            <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                                {index + 1}
+                            </span>
+                            <span className="min-w-0 pt-0.5">{step}</span>
+                        </li>
+                    ))}
+                </ol>
+                <p className="text-xs text-muted-foreground">{t("computers.pair.after")}</p>
                 <div className="flex justify-end gap-2">
-                    {error || expired ? <Button onClick={open}>{t("computers.pair.again")}</Button> : null}
                     <Button variant="ghost" onClick={onClose}>
                         {t("computers.pair.close")}
+                    </Button>
+                    <Button asChild>
+                        <a href="/account/downloads">{t("computers.pair.download")}</a>
                     </Button>
                 </div>
             </DialogContent>
