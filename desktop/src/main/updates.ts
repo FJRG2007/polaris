@@ -1,8 +1,9 @@
 /**
  * Keeping this app up to date.
  *
- * Asked of GitHub as the app starts and every few hours after, without
- * credentials. When the answer comes straight away, the app updates before it
+ * Asked of GitHub as the app starts, every half hour after, and again when the
+ * computer wakes, is unlocked or the app is brought forward after a while away,
+ * without credentials. When the answer comes straight away, the app updates before it
  * opens (`index.ts`), so opening it is all an update asks of anybody. What happens with a newer release depends on what the
  * system lets an app do to itself:
  *
@@ -30,14 +31,19 @@
 import { existsSync } from "node:fs";
 import { replaceAppImage } from "./appimage";
 import { repository } from "../../package.json";
-import { app, autoUpdater, net } from "electron";
+import { app, autoUpdater, net, powerMonitor } from "electron";
 import { developerSigned } from "./mac-signature";
 import type { UpdateCheck } from "@/shared/update-check";
 import { describeNetError, netErrorCode } from "./reachability";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { appImageAsset, CHECKSUMS, macFeedName, newerRelease, parseChecksums, releaseSource, type Release } from "./releases";
 
-const EVERY_MS = 6 * 60 * 60_000;
+/** Often enough that a release reaches an app left open all day the same
+ *  afternoon, and well inside GitHub's sixty unauthenticated asks an hour. */
+export const EVERY_MS = 30 * 60_000;
+/** A computer asleep runs no timers, so waking it, unlocking it or coming back
+ *  to the app asks again - once this long has passed since the last ask. */
+export const AWAY_MS = 10 * 60_000;
 /** Squirrel.Windows holds a lock on the first launch after an install, and asks
  *  made during it fail. */
 const AFTER_FIRST_RUN_MS = 30_000;
@@ -177,7 +183,9 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
         });
     };
 
+    let lastAsked = 0;
     const check = async (): Promise<UpdateCheck> => {
+        lastAsked = Date.now();
         try {
             if (!how) {
                 how = installer().catch((): Installer => ({ kind: "page" }));
@@ -242,5 +250,16 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
         void check().finally(settle);
     }
     setInterval(() => void check(), EVERY_MS);
+    const back = () => {
+        if (dueAgain(lastAsked, Date.now())) void checkNow();
+    };
+    powerMonitor.on("resume", back);
+    powerMonitor.on("unlock-screen", back);
+    app.on("browser-window-focus", back);
     return first;
+}
+
+/** Whether coming back to the app is reason enough to ask again. */
+export function dueAgain(lastAsked: number, now: number): boolean {
+    return now - lastAsked >= AWAY_MS;
 }

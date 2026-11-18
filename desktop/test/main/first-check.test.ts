@@ -14,7 +14,8 @@ const electron = vi.hoisted(() => ({
 }));
 
 vi.mock("electron", () => ({
-    app: { isPackaged: true, getVersion: () => "0.1.1" },
+    app: { isPackaged: true, getVersion: () => "0.1.1", on: () => undefined },
+    powerMonitor: { on: () => undefined },
     net: { fetch: electron.fetch },
     autoUpdater: {
         on: (name: string, listener: () => void) => electron.listeners.set(name, listener),
