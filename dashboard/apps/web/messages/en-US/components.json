@@ -1175,7 +1175,6 @@
         "signoutBody": "Runs {tool}'s own sign-out on the machine your sessions use. They stop being signed in until you sign in again.",
         "signoutOffer": "Removed. {tool} may still be signed in on your sessions' machine.",
         "signoutKeep": "Keep it",
-        "homeHint": "These agents keep their own sign-in on the machine your sessions use.",
         "homeSignin": "Sign in",
         "statusIn": "Signed in",
         "statusOut": "Not signed in",
@@ -1183,7 +1182,38 @@
         "statusChecking": "Checking sign-in",
         "statusLastKnown": "{status}, last known",
         "statusLastKnownHint": "From the last sign-in or sign-out run here, not from the tool itself.",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "table": {
+            "search": "Search connections",
+            "providerLabel": "Provider",
+            "allProviders": "All providers",
+            "kindLabel": "Kind",
+            "kinds": {
+                "all": "All kinds",
+                "key": "API keys",
+                "account": "Agent accounts",
+                "agent": "Agent sign-ins",
+                "deployment": "Deployment's keys"
+            },
+            "statusLabel": "Status",
+            "statuses": {
+                "all": "Any status",
+                "working": "Working",
+                "problem": "Needs attention",
+                "checking": "Checking",
+                "off": "Off"
+            },
+            "sortedNote": "Sorted by another column. Sort by order to move connections.",
+            "filteredNote": "Clear the search and filters to move connections.",
+            "sortByOrder": "Sort by order",
+            "noMatch": "No connection matches.",
+            "deploymentName": "Deployment's key",
+            "deploymentHint": "Read-only. Your runs use it where you have no key of your own.",
+            "readOnly": "Read-only",
+            "usingYours": "Your key is used",
+            "usingDeployment": "Deployment's key in use",
+            "agentKey": "Signed in on your sessions' machine"
+        }
     },
     "signinDialog": {
         "title": "Sign in to {tool}",

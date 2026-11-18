@@ -25,7 +25,7 @@ import { IntegrationLogo } from "@/components/logos";
 import type { AgentSignin } from "@/lib/agents/agent-signins";
 import { SigninDialog, type SigninDialogActions, type SigninDialogMode } from "./signin-dialog";
 import { useConfirm } from "@/components/confirm-dialog";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SigninStatus } from "@/lib/agents/signin-status";
 import { RelativeTime } from "@/components/relative-time";
 import type { ModelKeyView } from "@/lib/agents/model-keys";
@@ -41,11 +41,20 @@ import { KeyLimitsDialog, KeyStanding } from "@/components/model-keys/key-standi
 import { AddConnectionDialog } from "@/components/model-keys/add-connection";
 import { useHubFlow, type ConnectionOption } from "@/components/model-keys/connection-hub";
 import {
+    arrangeConnections,
+    isNarrowed,
+    NO_FILTERS,
+    type ConnectionEntry,
+    type ConnectionFilters,
+    type ConnectionSort
+} from "@/components/model-keys/connection-rows";
+import {
     ChevronDown,
     ChevronUp,
     Gauge,
     GripVertical,
     LogIn,
+    Lock,
     LogOut,
     MoreHorizontal,
     Pencil,
@@ -69,11 +78,24 @@ import {
     DropdownMenuTrigger,
     Input,
     isDirty,
+    nextSort,
     SearchableSelect,
+    SearchField,
+    Select,
     Skeleton,
+    SortHeader,
     Switch,
-    DateInput
+    DateInput,
+    type TableSortDirection
 } from "@polaris/ui";
+
+/** A provider the deployment holds a key for, and whether this owner's own
+ *  key is the one a run spends instead. */
+export interface DeploymentKey {
+    slug: string;
+    name: string;
+    yours: boolean;
+}
 
 /** The four writes, as the screen that owns them exposes them. Each one is a
  *  server action that has already established who may call it. */
@@ -221,6 +243,7 @@ export function ModelKeysView({
     footer,
     health,
     connectOptions,
+    deployment,
     narrow = false
 }: {
     /** The providers the table names: the ones its keys belong to, or - with no
@@ -252,6 +275,12 @@ export function ModelKeysView({
     /** The agent accounts and agent sign-ins this table can add, as Add
      *  connection lists them, when it is mounted inside a connection hub. */
     connectOptions?: readonly ConnectionOption[];
+    /**
+     * The providers the deployment holds a key for, drawn read-only under the
+     * account's own rows with whose key a run spends, and the line said under
+     * the table where there are none.
+     */
+    deployment?: { rows: readonly DeploymentKey[]; note?: string };
 }) {
     const router = useRouter();
     const columns = narrow ? NARROW_COLUMNS : WIDE_COLUMNS;
@@ -290,7 +319,7 @@ export function ModelKeysView({
     // The sign-in dialog opened from this table rather than from Add: a login
     // kept in the home, or a sign-out.
     const [running, setRunning] = useState<{ signin: AgentSignin; mode: SigninDialogMode } | null>(null);
-    const homeSignins = assist?.signins.filter((signin) => signin.home) ?? [];
+    const homeSignins = useMemo(() => assist?.signins.filter((signin) => signin.home) ?? [], [assist]);
 
     // Inside a connection hub, Add connection is the one way in: it opens this
     // table's key dialog on the provider picked, and the sign-in dialog for an
@@ -300,7 +329,7 @@ export function ModelKeysView({
         setAddingRow(known);
         setAdding(true);
     };
-    const options = connectOptions ?? [];
+    const options = useMemo(() => connectOptions ?? [], [connectOptions]);
     const inHub = useHubFlow("key", openKey, []);
     useHubFlow("account", openKey, options.filter((option) => option.method === "account"));
     useHubFlow(
@@ -360,6 +389,110 @@ export function ModelKeysView({
         () => new Map(providers.map((provider) => [provider.slug, provider])),
         [providers]
     );
+
+    // The one table: stored keys and agent accounts in their order, then the
+    // agents signed in on the sessions' machine, then - read-only and last,
+    // since they are the fallback - the keys the deployment holds.
+    const accountSlugs = useMemo(
+        () =>
+            new Set([
+                ...(assist?.signins ?? []).map((signin) => signin.slug),
+                ...options.filter((option) => option.method === "account").map((option) => option.slug)
+            ]),
+        [assist, options]
+    );
+    const homeByEnv = useMemo(() => new Map(homeSignins.map((signin) => [signin.env, signin])), [homeSignins]);
+    const deploymentBySlug = useMemo(
+        () => new Map((deployment?.rows ?? []).map((held) => [held.slug, held])),
+        [deployment]
+    );
+    const rowById = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows]);
+    const entries = useMemo<ConnectionEntry[]>(() => {
+        const stored = rows.map<ConnectionEntry>((row, position) => {
+            const health = statuses?.[row.id];
+            const expired = expiryStanding(row.expiresAt, t)?.tone === "danger";
+            return {
+                id: row.id,
+                kind: accountSlugs.has(row.provider) ? "account" : "key",
+                provider: row.provider,
+                providerName: byslug.get(row.provider)?.name ?? row.provider,
+                name: row.name,
+                status: !row.enabled
+                    ? "off"
+                    : expired || (health && health.state !== "ready")
+                      ? "problem"
+                      : "working",
+                lastUsedAt: row.lastUsedAt,
+                position
+            };
+        });
+        const agents = homeSignins.map<ConnectionEntry>((signin, index) => {
+            const known = homeStatus?.[signin.env];
+            return {
+                id: `${HOME_PREFIX}${signin.env}`,
+                kind: "agent",
+                provider: signin.slug,
+                providerName: signin.serves[0]?.label ?? signin.label,
+                name: signin.serves[0]?.label ?? signin.label,
+                status: !askStatus
+                    ? "working"
+                    : homeStatus === null
+                      ? "checking"
+                      : known?.state === "in"
+                        ? "working"
+                        : known?.state === "out"
+                          ? "off"
+                          : "problem",
+                lastUsedAt: null,
+                position: rows.length + index
+            };
+        });
+        const held = (deployment?.rows ?? []).map<ConnectionEntry>((one, index) => ({
+            id: `deployment:${one.slug}`,
+            kind: "deployment",
+            provider: one.slug,
+            providerName: one.name,
+            name: t("modelKeys.table.deploymentName"),
+            status: one.yours ? "off" : "working",
+            lastUsedAt: null,
+            position: rows.length + homeSignins.length + index
+        }));
+        return [...stored, ...agents, ...held];
+    }, [rows, statuses, accountSlugs, byslug, homeSignins, homeStatus, askStatus, deployment, t]);
+
+    const [search, setSearch] = useState("");
+    const typed = useDeferredValue(search);
+    const [filters, setFilters] = useState<ConnectionFilters>(NO_FILTERS);
+    const [sort, setSort] = useState<{ order: ConnectionSort; direction: TableSortDirection }>({
+        order: "priority",
+        direction: "asc"
+    });
+    const sortBy = (order: ConnectionSort) => setSort((current) => nextSort(current, order));
+    const applied = useMemo(() => ({ ...filters, query: typed }), [filters, typed]);
+    const arranged = useMemo(() => arrangeConnections(entries, applied, sort), [entries, applied, sort]);
+    // A row can only be moved where the table shows the order it moves in.
+    const sortedOtherwise = sort.order !== "priority" || sort.direction !== "asc";
+    const reorderable = !sortedOtherwise && !isNarrowed({ ...filters, query: search });
+    const reorderReason = sortedOtherwise
+        ? t("modelKeys.table.sortedNote")
+        : t("modelKeys.table.filteredNote");
+    const showStatus = Boolean(statuses) || homeSignins.length > 0 || (deployment?.rows.length ?? 0) > 0;
+
+    const providerOptions = useMemo(() => {
+        const names = new Map(entries.map((entry) => [entry.provider, entry.providerName]));
+        return [
+            { value: "all", label: t("modelKeys.table.allProviders") },
+            ...[...names.entries()]
+                .sort((a, b) => a[1].localeCompare(b[1]))
+                .map(([value, label]) => ({ value, label }))
+        ];
+    }, [entries, t]);
+    const kindOptions = useMemo(() => {
+        const present = new Set(entries.map((entry) => entry.kind));
+        return (["all", "key", "account", "agent", "deployment"] as const)
+            .filter((kind) => kind === "all" || present.has(kind))
+            .map((value) => ({ value, label: t(`modelKeys.table.kinds.${value}`) }));
+    }, [entries, t]);
 
     const persistOrder = (next: ModelKeyView[]) => {
         const previous = rows;
@@ -510,11 +643,77 @@ export function ModelKeysView({
                         <h2 className="text-sm font-medium">{copy.title}</h2>
                         <p className="text-muted-foreground text-xs">{copy.hint}</p>
                     </div>
-                    <Button size="sm" onClick={() => (inHub ? setConnecting(true) : setAdding(true))}>
+                    <Button size="sm" className="shrink-0" onClick={() => (inHub ? setConnecting(true) : setAdding(true))}>
                         <Plus className="size-4 shrink-0" />
                         {inHub ? t("modelKeys.connect.addConnection") : (copy.action ?? t("modelKeys.addKey"))}
                     </Button>
                 </div>
+
+                {/* The toolbar every Polaris list has: search, then filters. A
+                    filter only appears where the table holds more than one of
+                    what it filters by. */}
+                {entries.length > 1 ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <SearchField
+                            wrapperClassName="flex-1 basis-48"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder={t("modelKeys.table.search")}
+                            aria-label={t("modelKeys.table.search")}
+                            maxLength={200}
+                        />
+                        {providerOptions.length > 2 ? (
+                            <Select
+                                value={filters.provider}
+                                onValueChange={(value) => setFilters((current) => ({ ...current, provider: value }))}
+                                aria-label={t("modelKeys.table.providerLabel")}
+                                className="w-44"
+                                options={providerOptions}
+                            />
+                        ) : null}
+                        {kindOptions.length > 2 ? (
+                            <Select
+                                value={filters.kind}
+                                onValueChange={(value) =>
+                                    setFilters((current) => ({ ...current, kind: value as ConnectionFilters["kind"] }))
+                                }
+                                aria-label={t("modelKeys.table.kindLabel")}
+                                className="w-44"
+                                options={kindOptions}
+                            />
+                        ) : null}
+                        <Select
+                            value={filters.status}
+                            onValueChange={(value) =>
+                                setFilters((current) => ({ ...current, status: value as ConnectionFilters["status"] }))
+                            }
+                            aria-label={t("modelKeys.table.statusLabel")}
+                            className="w-44"
+                            options={STATUS_FILTERS.map((value) => ({
+                                value,
+                                label: t(`modelKeys.table.statuses.${value}`)
+                            }))}
+                        />
+                    </div>
+                ) : null}
+
+                {!reorderable && rows.length > 1 ? (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span className="min-w-0 flex-1">{reorderReason}</span>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            className="shrink-0"
+                            onClick={() => {
+                                setSort({ order: "priority", direction: "asc" });
+                                setSearch("");
+                                setFilters(NO_FILTERS);
+                            }}
+                        >
+                            {t("modelKeys.table.sortByOrder")}
+                        </Button>
+                    </div>
+                ) : null}
 
                 <div className="overflow-x-auto rounded-lg border border-border">
                     <table className="w-full text-sm">
@@ -524,167 +723,119 @@ export function ModelKeysView({
                             earlier. */}
                         <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                             <tr>
-                                <th
-                                    className="w-10 px-2 py-2 font-medium"
-                                    aria-label={t("modelKeys.order")}
+                                <SortHeader
+                                    className="w-10"
+                                    label={<span className="sr-only sm:not-sr-only">#</span>}
+                                    order="priority"
+                                    sort={sort}
+                                    onSort={sortBy}
                                 />
-                                <th className="px-3 py-2 font-medium">
-                                    {t("modelKeys.provider")}
-                                </th>
+                                <SortHeader label={t("modelKeys.provider")} order="provider" sort={sort} onSort={sortBy} />
                                 {/* w-full max-w-0: the name is the column that gives, so
                                     a long one truncates instead of spilling the table
                                     sideways. */}
-                                <th className="w-full min-w-24 max-w-0 whitespace-nowrap px-3 py-2 font-medium">
-                                    {t("modelKeys.name")}
-                                </th>
+                                <SortHeader
+                                    className="w-full min-w-24 max-w-0"
+                                    label={t("modelKeys.name")}
+                                    order="name"
+                                    sort={sort}
+                                    onSort={sortBy}
+                                />
                                 <th className={`${columns.key.cell} whitespace-nowrap px-3 py-2 font-medium`}>
                                     {t("modelKeys.key")}
                                 </th>
-                                {statuses ? (
-                                    <th className={`${columns.status.cell} whitespace-nowrap px-3 py-2 font-medium`}>
-                                        {t("modelKeys.status.title")}
-                                    </th>
+                                {showStatus ? (
+                                    <SortHeader
+                                        className={columns.status.cell}
+                                        label={t("modelKeys.status.title")}
+                                        order="status"
+                                        sort={sort}
+                                        onSort={sortBy}
+                                    />
                                 ) : null}
                                 <th className={`${columns.expires.cell} whitespace-nowrap px-3 py-2 font-medium`}>
                                     {t("modelKeys.expires")}
                                 </th>
-                                <th className={`${columns.lastUsed.cell} whitespace-nowrap px-3 py-2 font-medium`}>
-                                    {t("modelKeys.lastUsed")}
-                                </th>
+                                <SortHeader
+                                    className={columns.lastUsed.cell}
+                                    label={t("modelKeys.lastUsed")}
+                                    order="lastUsed"
+                                    sort={sort}
+                                    onSort={sortBy}
+                                />
                                 <th className="px-3 py-2" />
                             </tr>
                         </thead>
                         <tbody>
-                            {rows.length === 0 ? (
+                            {arranged.length === 0 ? (
                                 <tr>
-                                    <td
-                                        colSpan={statuses ? 8 : 7}
-                                        className="text-muted-foreground px-3 py-8 text-center"
-                                    >
-                                        {copy.empty}
+                                    <td colSpan={showStatus ? 8 : 7} className="text-muted-foreground px-3 py-8 text-center">
+                                        {entries.length === 0 ? copy.empty : t("modelKeys.table.noMatch")}
                                     </td>
                                 </tr>
                             ) : (
-                                rows.map((row, index) => (
-                                    <KeyRow
-                                        key={row.id}
-                                        row={row}
-                                        columns={columns}
-                                        provider={byslug.get(row.provider) ?? null}
-                                        index={index}
-                                        total={rows.length}
-                                        onMove={move}
-                                        onEdit={() => setEditing(row)}
-                                        onRemove={() => void remove(row)}
-                                        onToggle={
-                                            toggle
-                                                ? (enabled) => void toggle(row, enabled)
-                                                : null
-                                        }
-                                        status={
-                                            statuses ? (statuses[row.id] ?? null) : undefined
-                                        }
-                                        onLimits={
-                                            // Only a key the router spends has limits: an agent's
-                                            // account in the same list is not one.
-                                            actions.limit && statuses && row.id in statuses
-                                                ? () => setLimiting(row)
-                                                : null
-                                        }
-                                        onRevive={revive ? () => void revive(row) : null}
-                                    />
-                                ))
+                                arranged.map((entry) => {
+                                    if (entry.kind === "agent") {
+                                        const signin = homeByEnv.get(entry.id.slice(HOME_PREFIX.length))!;
+                                        return (
+                                            <AgentRow
+                                                key={entry.id}
+                                                signin={signin}
+                                                columns={columns}
+                                                showStatus={showStatus}
+                                                status={askStatus ? (homeStatus ? (homeStatus[signin.env] ?? null) : undefined) : null}
+                                                canSignOut={canSignOut(signin)}
+                                                onSignIn={() => setRunning({ signin, mode: "login" })}
+                                                onSignOut={() => void signOut(signin)}
+                                            />
+                                        );
+                                    }
+                                    if (entry.kind === "deployment") {
+                                        const held = deploymentBySlug.get(entry.provider)!;
+                                        return (
+                                            <DeploymentRow
+                                                key={entry.id}
+                                                slug={held.slug}
+                                                name={held.name}
+                                                yours={held.yours}
+                                                columns={columns}
+                                                showStatus={showStatus}
+                                            />
+                                        );
+                                    }
+                                    const row = rowById.get(entry.id)!;
+                                    return (
+                                        <KeyRow
+                                            key={row.id}
+                                            row={row}
+                                            columns={columns}
+                                            provider={byslug.get(row.provider) ?? null}
+                                            index={entry.position}
+                                            total={rows.length}
+                                            reorderable={reorderable}
+                                            reorderReason={reorderReason}
+                                            onMove={move}
+                                            onEdit={() => setEditing(row)}
+                                            onRemove={() => void remove(row)}
+                                            onToggle={toggle ? (enabled) => void toggle(row, enabled) : null}
+                                            status={showStatus ? (statuses?.[row.id] ?? null) : undefined}
+                                            onLimits={
+                                                // Only a key the router spends has limits: an agent's
+                                                // account in the same list is not one.
+                                                actions.limit && statuses && row.id in statuses
+                                                    ? () => setLimiting(row)
+                                                    : null
+                                            }
+                                            onRevive={revive ? () => void revive(row) : null}
+                                        />
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>
                 </div>
-
-                {/* The agents whose login stays on the sessions' machine sit with
-                    the accounts, one row per agent: they answer the same question
-                    - which account signs this agent in - and a section of their
-                    own read as a category nobody could place. One action per row;
-                    the vendor's sign-out, where there is one, is in its menu. */}
-                {homeSignins.length > 0 && assist ? (
-                    <div className="flex flex-col gap-2">
-                        <p className="text-muted-foreground text-xs">{t("modelKeys.homeHint")}</p>
-                        <ul className="divide-y divide-border rounded-lg border border-border">
-                            {homeSignins.map((signin) => {
-                                const tool = signin.serves[0]?.label ?? signin.label;
-                                const known = homeStatus?.[signin.env];
-                                // One action: Sign out once it is signed in and
-                                // the vendor has a sign-out, Sign in otherwise.
-                                // The other one, where there is one, is in "...".
-                                const signedIn = known?.state === "in" && canSignOut(signin);
-                                const signInAction = (
-                                    <>
-                                        <LogIn className="size-4 shrink-0" />
-                                        <span className="truncate">{t("modelKeys.homeSignin")}</span>
-                                    </>
-                                );
-                                const signOutAction = (
-                                    <>
-                                        <LogOut className="size-4 shrink-0" />
-                                        <span className="truncate">{t("modelKeys.signout")}</span>
-                                    </>
-                                );
-                                const other = signedIn ? "login" : canSignOut(signin) ? "logout" : null;
-                                return (
-                                    <li key={signin.env} className="flex items-center gap-2 px-3 py-2">
-                                        <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
-                                            <span className="max-w-full truncate text-sm" title={tool}>
-                                                {tool}
-                                            </span>
-                                            {askStatus ? (
-                                                <HomeStatusBadge
-                                                    status={homeStatus ? (known ?? null) : undefined}
-                                                    t={t}
-                                                />
-                                            ) : null}
-                                        </div>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="shrink-0"
-                                            onClick={() =>
-                                                signedIn ? void signOut(signin) : setRunning({ signin, mode: "login" })
-                                            }
-                                        >
-                                            {signedIn ? signOutAction : signInAction}
-                                        </Button>
-                                        {other ? (
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button
-                                                        size="icon-sm"
-                                                        variant="ghost"
-                                                        className="shrink-0"
-                                                        aria-label={t("modelKeys.moreNamed", { name: tool })}
-                                                        title={t("modelKeys.more")}
-                                                    >
-                                                        <MoreHorizontal className="size-4 shrink-0" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem
-                                                        onSelect={() =>
-                                                            other === "logout"
-                                                                ? void signOut(signin)
-                                                                : setRunning({ signin, mode: "login" })
-                                                        }
-                                                    >
-                                                        {other === "logout" ? signOutAction : signInAction}
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        ) : null}
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    </div>
-                ) : null}
+                {deployment?.note ? <p className="text-muted-foreground text-xs">{deployment.note}</p> : null}
             </section>
-
             {running && assist ? (
                 <SigninDialog
                     key={`${running.signin.env}-${running.mode}`}
@@ -781,6 +932,172 @@ export function ModelKeysView({
     );
 }
 
+/** The id prefix of an agent signed in on the sessions' machine. */
+const HOME_PREFIX = "home:";
+
+/** The status filter's values, in the order the menu offers them. */
+const STATUS_FILTERS = ["all", "working", "problem", "checking", "off"] as const;
+
+/**
+ * An agent whose login lives on the sessions' machine: nothing is stored, so
+ * the row cannot be moved, and its actions are the vendor's sign-in and, where
+ * the vendor documents one, sign-out.
+ */
+function AgentRow({
+    signin,
+    columns,
+    showStatus,
+    status,
+    canSignOut,
+    onSignIn,
+    onSignOut
+}: {
+    signin: AgentSignin;
+    columns: Columns;
+    showStatus: boolean;
+    /** Undefined while asked, null where nothing is known. */
+    status: SigninStatus | null | undefined;
+    canSignOut: boolean;
+    onSignIn: () => void;
+    onSignOut: () => void;
+}) {
+    const t = useTranslations("components");
+    const tool = signin.serves[0]?.label ?? signin.label;
+    const signedIn = status?.state === "in" && canSignOut;
+    const other = signedIn ? "login" : canSignOut ? "logout" : null;
+    const signInAction = (
+        <>
+            <LogIn className="size-4 shrink-0" />
+            <span className="truncate">{t("modelKeys.homeSignin")}</span>
+        </>
+    );
+    const signOutAction = (
+        <>
+            <LogOut className="size-4 shrink-0" />
+            <span className="truncate">{t("modelKeys.signout")}</span>
+        </>
+    );
+    return (
+        <tr className="border-t border-border">
+            <td className="px-2 py-2" />
+            <td className="px-3 py-2">
+                <div className="flex max-w-40 items-center gap-2">
+                    <IntegrationLogo slug={signin.serves[0]?.id ?? signin.slug} name={tool} className="size-4 shrink-0" />
+                    <span className="min-w-0 truncate whitespace-nowrap" title={tool}>
+                        {tool}
+                    </span>
+                </div>
+            </td>
+            <td className="w-full max-w-0 px-3 py-2">
+                <span className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 truncate font-medium" title={tool}>
+                        {tool}
+                    </span>
+                    {showStatus ? null : <HomeStatusBadge status={status} t={t} />}
+                </span>
+                <span
+                    className={`text-muted-foreground block truncate text-xs ${columns.key.fold}`}
+                    title={t("modelKeys.table.agentKey")}
+                >
+                    {t("modelKeys.table.agentKey")}
+                </span>
+            </td>
+            <td className={`text-muted-foreground ${columns.key.cell} whitespace-nowrap px-3 py-2 text-xs`}>
+                {t("modelKeys.table.agentKey")}
+            </td>
+            {showStatus ? (
+                <td className={`${columns.status.cell} px-3 py-2`}>
+                    <HomeStatusBadge status={status} t={t} />
+                </td>
+            ) : null}
+            <td className={`${columns.expires.cell} text-muted-foreground whitespace-nowrap px-3 py-2`}>-</td>
+            <td className={`${columns.lastUsed.cell} text-muted-foreground whitespace-nowrap px-3 py-2`}>-</td>
+            <td className="px-3 py-2">
+                <div className="flex items-center justify-end gap-1">
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        className="max-w-40 shrink-0"
+                        onClick={signedIn ? onSignOut : onSignIn}
+                    >
+                        {signedIn ? signOutAction : signInAction}
+                    </Button>
+                    {other ? (
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="shrink-0"
+                                    aria-label={t("modelKeys.moreNamed", { name: tool })}
+                                    title={t("modelKeys.more")}
+                                >
+                                    <MoreHorizontal className="size-4 shrink-0" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onSelect={other === "logout" ? onSignOut : onSignIn}>
+                                    {other === "logout" ? signOutAction : signInAction}
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    ) : null}
+                </div>
+            </td>
+        </tr>
+    );
+}
+
+/** A key the deployment holds: read-only, and whose key a run actually spends. */
+function DeploymentRow({
+    slug,
+    name,
+    yours,
+    columns,
+    showStatus
+}: {
+    slug: string;
+    name: string;
+    yours: boolean;
+    columns: Columns;
+    showStatus: boolean;
+}) {
+    const t = useTranslations("components");
+    const label = yours ? t("modelKeys.table.usingYours") : t("modelKeys.table.usingDeployment");
+    const badge = (
+        <Badge variant={yours ? "neutral" : "primary"} className="min-w-0 shrink truncate" title={label}>
+            {label}
+        </Badge>
+    );
+    return (
+        <tr className="border-t border-border bg-surface/30" title={t("modelKeys.table.deploymentHint")}>
+            <td className="px-2 py-2">
+                <Lock className="text-muted-foreground size-4 shrink-0" aria-label={t("modelKeys.table.readOnly")} />
+            </td>
+            <td className="px-3 py-2">
+                <div className="flex max-w-40 items-center gap-2">
+                    <IntegrationLogo slug={slug} name={name} className="size-4 shrink-0" />
+                    <span className="min-w-0 truncate whitespace-nowrap" title={name}>
+                        {name}
+                    </span>
+                </div>
+            </td>
+            <td className="w-full max-w-0 px-3 py-2">
+                <span className="flex min-w-0 items-center gap-2">
+                    <span className="text-muted-foreground min-w-0 truncate" title={t("modelKeys.table.deploymentName")}>
+                        {t("modelKeys.table.deploymentName")}
+                    </span>
+                    {showStatus ? <span className={`flex min-w-0 ${columns.status.fold}`}>{badge}</span> : badge}
+                </span>
+            </td>
+            <td className={`${columns.key.cell} px-3 py-2`} />
+            {showStatus ? <td className={`${columns.status.cell} px-3 py-2`}>{badge}</td> : null}
+            <td className={`${columns.expires.cell} px-3 py-2`} />
+            <td className={`${columns.lastUsed.cell} px-3 py-2`} />
+            <td className="px-3 py-2" />
+        </tr>
+    );
+}
 /**
  * A home login's status: a skeleton while it is asked (undefined), unknown when
  * nothing came back for it (null), and "last known" when the answer is the last
@@ -820,6 +1137,8 @@ function KeyRow({
     provider,
     index,
     total,
+    reorderable,
+    reorderReason,
     onMove,
     onEdit,
     onRemove,
@@ -833,6 +1152,9 @@ function KeyRow({
     provider: ProviderRow | null;
     index: number;
     total: number;
+    /** Whether the table shows the stored order, which is when a row can move. */
+    reorderable: boolean;
+    reorderReason: string;
     onMove: (from: number, to: number) => void;
     onEdit: () => void;
     onRemove: () => void;
@@ -850,9 +1172,10 @@ function KeyRow({
 
     return (
         <tr
-            draggable
+            draggable={reorderable}
             onDragStart={(event) => event.dataTransfer.setData("text/plain", String(index))}
             onDragOver={(event) => {
+                if (!reorderable) return;
                 // Without this the drop never fires: the default handling of a
                 // dragover is to refuse the drop.
                 event.preventDefault();
@@ -867,10 +1190,10 @@ function KeyRow({
             }}
             className={`border-t border-border ${over ? "bg-muted/40" : ""} ${expired || !row.enabled ? "opacity-60" : ""}`}
         >
-            <td className="px-2 py-2">
+            <td className="px-2 py-2" title={reorderable ? undefined : reorderReason}>
                 <div className="flex items-center gap-1">
                     <GripVertical
-                        className="text-muted-foreground size-4 shrink-0 cursor-grab"
+                        className={`text-muted-foreground size-4 shrink-0 ${reorderable ? "cursor-grab" : "opacity-30"}`}
                         aria-hidden
                     />
                     <span className="text-muted-foreground w-4 shrink-0 text-xs tabular-nums">
@@ -995,19 +1318,22 @@ function KeyRow({
                                 </DropdownMenuItem>
                             ) : null}
                             <DropdownMenuItem
-                                disabled={index === 0}
+                                disabled={!reorderable || index === 0}
                                 onSelect={() => onMove(index, index - 1)}
                             >
                                 <ChevronUp />
                                 {t("modelKeys.moveUp")}
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                                disabled={index === total - 1}
+                                disabled={!reorderable || index === total - 1}
                                 onSelect={() => onMove(index, index + 1)}
                             >
                                 <ChevronDown />
                                 {t("modelKeys.moveDown")}
                             </DropdownMenuItem>
+                            {reorderable ? null : (
+                                <p className="max-w-56 px-2 py-1 text-xs text-muted-foreground">{reorderReason}</p>
+                            )}
                             {onLimits ? (
                                 <DropdownMenuItem onSelect={onLimits}>
                                     <Gauge />

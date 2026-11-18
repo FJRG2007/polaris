@@ -129,4 +129,67 @@ describe("Add connection", () => {
         expect(screen.getByRole("button", { name: /Amazon Bedrock/ })).toBeTruthy();
         expect(screen.queryByRole("button", { name: /SuperGrok|^xAI/ })).toBeNull();
     });
+
+});
+
+describe("One connections table", () => {
+    const CURSOR = {
+        env: "CURSOR_HOME_LOGIN",
+        slug: "cursor-home-login",
+        label: "Cursor",
+        url: "",
+        howto: null,
+        subscription: true,
+        file: null,
+        onScreen: false,
+        serves: [{ id: "cursor", label: "Cursor" }],
+        home: true,
+        signout: true
+    };
+    const key = (id: string, name: string) => ({
+        id,
+        provider: "xai",
+        name,
+        keyHint: "...abcd",
+        enabled: true,
+        expiresAt: null,
+        lastUsedAt: null,
+        limits: null
+    });
+
+    function draw() {
+        render(
+            <MessagesWrapper>
+                <ModelKeysView
+                    providers={[XAI]}
+                    keys={[key("a", "First"), key("b", "Second")] as never}
+                    actions={actions}
+                    copy={{ title: "Connections", hint: "", empty: "None", adding: "" }}
+                    assist={{ signins: [CURSOR], actions: { status: async () => ({ statuses: {} }) } } as never}
+                    deployment={{ rows: [{ slug: "groq", name: "Groq", yours: false }] }}
+                />
+            </MessagesWrapper>
+        );
+    }
+
+    it("lists agent sign-ins and the deployment's keys as rows of the table", () => {
+        draw();
+        expect(screen.queryByText("These agents keep their own sign-in on the machine your sessions use.")).toBeNull();
+        const rows = screen.getAllByRole("row");
+        const text = rows.map((row) => row.textContent ?? "");
+        expect(text.findIndex((one) => one.includes("Cursor"))).toBeGreaterThan(text.findIndex((one) => one.includes("Second")));
+        expect(text.at(-1)).toContain("Groq");
+        expect(text.at(-1)).toContain("Deployment's key in use");
+        expect(screen.getByRole("button", { name: /Sign in/ })).toBeTruthy();
+    });
+
+    it("turns moving off while another sort is active, and says why", () => {
+        draw();
+        expect(screen.queryByText("Sorted by another column. Sort by order to move connections.")).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Name" }));
+        expect(screen.getByText("Sorted by another column. Sort by order to move connections.")).toBeTruthy();
+        expect(screen.getAllByRole("row").some((row) => row.getAttribute("draggable") === "true")).toBe(false);
+        fireEvent.click(screen.getByRole("button", { name: "Sort by order" }));
+        expect(screen.getAllByRole("row").some((row) => row.getAttribute("draggable") === "true")).toBe(true);
+    });
 });

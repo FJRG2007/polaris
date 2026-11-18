@@ -6,9 +6,6 @@
  */
 
 import { getTranslations } from "@/lib/i18n/request";
-import { Badge } from "@polaris/ui";
-import { IntegrationLogo } from "@/components/logos";
-import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { assistedSignins } from "@/lib/agents/signin-runtime";
 import { AGENT_CLIS } from "@polaris/core";
 import { agentSignins, isSigninRow, signinProviderRows, type AgentSignin } from "@/lib/agents/agent-signins";
@@ -139,7 +136,14 @@ export async function AiKeysPanel({
                             end: endAgentSigninAction
                         }
                     }}
-                    footer={<FallbackCard providers={deploymentRows} shared={shared} t={t} />}
+                    deployment={{
+                        rows: shared ? deploymentRows : [],
+                        note: !shared
+                            ? t("aiKeys.fallback.notShared")
+                            : deploymentRows.length > 0
+                              ? t("aiKeys.fallback.shared")
+                              : t("aiKeys.fallback.noKeys")
+                    }}
                 />
             </div>
         </ConnectionHub>
@@ -173,50 +177,4 @@ function connectOptions(assisted: readonly AgentSignin[]): ConnectionOption[] {
             aliases: [signin.label]
         }));
     return [...accounts, ...homes];
-}
-
-/**
- * The providers the deployment holds a key for, under the account's own keys:
- * each by name, with whose key a run of this account spends - its own where it
- * added one, the deployment's otherwise. Read-only; who may spend the
- * deployment's keys is set under /admin.
- */
-function FallbackCard({
-    providers,
-    shared,
-    t
-}: {
-    providers: Array<{ slug: string; name: string; yours: boolean }>;
-    shared: boolean;
-    t: NamespaceTranslator<"account">;
-}) {
-    return (
-        <section className="flex flex-col gap-2">
-            <div className="min-w-0">
-                <h2 className="text-sm font-medium">{t("aiKeys.fallback.title")}</h2>
-                <p className="text-muted-foreground text-xs">
-                    {!shared
-                        ? t("aiKeys.fallback.notShared")
-                        : providers.length > 0
-                          ? t("aiKeys.fallback.shared")
-                          : t("aiKeys.fallback.noKeys")}
-                </p>
-            </div>
-            {shared && providers.length > 0 ? (
-                <ul className="divide-y divide-border rounded-lg border border-border">
-                    {providers.map((provider) => (
-                        <li key={provider.slug} className="flex items-center gap-2 px-3 py-2">
-                            <IntegrationLogo slug={provider.slug} name={provider.name} className="size-4 shrink-0" />
-                            <span className="min-w-0 flex-1 truncate text-sm" title={provider.name}>
-                                {provider.name}
-                            </span>
-                            <Badge variant={provider.yours ? "neutral" : "primary"} className="min-w-0 shrink truncate">
-                                {provider.yours ? t("aiKeys.fallback.usingYours") : t("aiKeys.fallback.usingDeployment")}
-                            </Badge>
-                        </li>
-                    ))}
-                </ul>
-            ) : null}
-        </section>
-    );
 }

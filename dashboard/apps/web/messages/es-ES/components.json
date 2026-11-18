@@ -1175,7 +1175,6 @@
         "signoutBody": "Ejecuta el cierre de sesión de {tool} en la máquina de tus sesiones. Dejan de tener sesión hasta que vuelvas a entrar.",
         "signoutOffer": "Eliminada. {tool} puede seguir con sesión en la máquina de tus sesiones.",
         "signoutKeep": "Dejarla",
-        "homeHint": "Estos agentes guardan su acceso en la máquina de tus sesiones.",
         "homeSignin": "Entrar",
         "statusIn": "Con sesión",
         "statusOut": "Sin sesión",
@@ -1183,7 +1182,38 @@
         "statusChecking": "Comprobando acceso",
         "statusLastKnown": "{status}, último dato",
         "statusLastKnownHint": "Del último acceso o cierre hecho aquí, no de la propia herramienta.",
-        "cancel": "Cancelar"
+        "cancel": "Cancelar",
+        "table": {
+            "search": "Buscar conexiones",
+            "providerLabel": "Proveedor",
+            "allProviders": "Proveedores",
+            "kindLabel": "Tipo",
+            "kinds": {
+                "all": "Todos",
+                "key": "Claves API",
+                "account": "Cuentas de agente",
+                "agent": "Sesiones de agente",
+                "deployment": "Claves del despliegue"
+            },
+            "statusLabel": "Estado",
+            "statuses": {
+                "all": "Todos",
+                "working": "Funciona",
+                "problem": "Requiere atención",
+                "checking": "Comprobando",
+                "off": "No"
+            },
+            "sortedNote": "Ordenada por otra columna. Ordena por orden para mover conexiones.",
+            "filteredNote": "Borra la búsqueda y los filtros para mover conexiones.",
+            "sortByOrder": "Ordenar por orden",
+            "noMatch": "Ninguna conexión coincide.",
+            "deploymentName": "Clave del despliegue",
+            "deploymentHint": "Solo lectura. Tus ejecuciones la usan donde no tienes clave propia.",
+            "readOnly": "Solo lectura",
+            "usingYours": "Se usa tu clave",
+            "usingDeployment": "Se usa la del despliegue",
+            "agentKey": "Sesión iniciada en la máquina de tus sesiones"
+        }
     },
     "signinDialog": {
         "title": "Iniciar sesión en {tool}",
