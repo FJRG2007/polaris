@@ -22,6 +22,7 @@
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { sessionClient } from "@/lib/session-device";
+import { followClientVersion } from "@/lib/session-client-version";
 import { restoreAccount } from "@/lib/account-lifecycle";
 import { notifySessionCompromised } from "@/lib/notifications/session-breach";
 import {
@@ -334,6 +335,7 @@ export async function guardSession({
             }
             return { ok: false, redirect: "/oauth/login?compromised=1" };
         }
+        await followClientVersion(sessionId, state, asked);
     }
 
     // 3. First sight of this session, or a move to a new address: re-run the
