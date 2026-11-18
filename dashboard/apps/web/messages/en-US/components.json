@@ -940,7 +940,8 @@
         }
     },
     "messageTime": {
-        "yesterdayAt": "Yesterday at {time}"
+        "yesterdayAt": "Yesterday at {time}",
+        "yesterdayAtInline": "yesterday at {time}"
     },
     "readJson": {
         "unreachable": "Polaris could not be reached. Check the connection and try again.",

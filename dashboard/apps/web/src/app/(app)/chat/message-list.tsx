@@ -862,7 +862,7 @@ function Message({
         if (server) return <GameServerCard serverId={server} message={message} />;
         return (
             <p className="py-1 ps-14 pe-4 text-xs text-muted-foreground">
-                <NoticeText message={message} /> <MessageTime iso={message.createdAt} />
+                <NoticeText message={message} /> <MessageTime iso={message.createdAt} inline />
             </p>
         );
     }

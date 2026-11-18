@@ -79,7 +79,7 @@ export function GameServerCard({
                             <p className="text-sm">{t("gameServerCard.denied")}</p>
                         )}
                         <p className="truncate text-xs text-muted-foreground">
-                            {facts} <MessageTime iso={message.createdAt} />
+                            {facts} <MessageTime iso={message.createdAt} inline />
                         </p>
                     </div>
                     {ready?.joinLink && (

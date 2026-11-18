@@ -102,7 +102,7 @@ export function ActivityCard({
                                       count: view.playing,
                                       max: view.max
                                   })}{" "}
-                            <MessageTime iso={message.createdAt} />
+                            <MessageTime iso={message.createdAt} inline />
                         </p>
                     )}
                     {view && !view.ended && view.players.length > 0 && (

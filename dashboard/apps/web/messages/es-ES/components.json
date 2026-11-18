@@ -940,7 +940,8 @@
         }
     },
     "messageTime": {
-        "yesterdayAt": "Ayer a las {time}"
+        "yesterdayAt": "Ayer a las {time}",
+        "yesterdayAtInline": "ayer a las {time}"
     },
     "readJson": {
         "unreachable": "No se pudo contactar con Polaris. Revisa la conexión e inténtalo de nuevo.",

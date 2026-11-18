@@ -38,7 +38,20 @@ function subscribe(listener: () => void): () => void {
     };
 }
 
-export function MessageTime({ iso, className }: { iso: string; className?: string }) {
+/**
+ * `inline` is for a stamp that follows other words on the same line ("You
+ * turned off disappearing messages yesterday at 15:47"), where a capital in the
+ * middle of the sentence reads as a mistake. On its own, it starts a capital.
+ */
+export function MessageTime({
+    iso,
+    className,
+    inline = false
+}: {
+    iso: string;
+    className?: string;
+    inline?: boolean;
+}) {
     const format = useDisplayFormat();
     const t = useTranslations("components");
     // Read only to re-render on each tick; the stamp takes the time itself.
@@ -55,7 +68,9 @@ export function MessageTime({ iso, className }: { iso: string; className?: strin
             // The server and the browser can straddle midnight.
             suppressHydrationWarning
         >
-            {messageStamp(format, iso, (time) => t("messageTime.yesterdayAt", { time }))}
+            {messageStamp(format, iso, (time) =>
+                t(inline ? "messageTime.yesterdayAtInline" : "messageTime.yesterdayAt", { time })
+            )}
         </time>
     );
 }
