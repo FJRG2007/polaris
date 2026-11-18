@@ -2492,7 +2492,7 @@ export interface CodeMessageActions {
  * (back into the composer), send again and save as a command; on the agent's,
  * read aloud and, on the last one, answer again.
  */
-function CodeMessage({ entry, actions }: { entry: PolarCodeEntry; actions: CodeMessageActions }) {
+export function CodeMessage({ entry, actions }: { entry: PolarCodeEntry; actions: CodeMessageActions }) {
     const t = useTranslations("polar");
     const toast = useToast();
     const format = useDisplayFormat();
