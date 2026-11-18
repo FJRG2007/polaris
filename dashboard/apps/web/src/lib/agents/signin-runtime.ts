@@ -37,6 +37,7 @@ import * as screens from "./signin-screen";
 import * as direct from "./signin-direct";
 import { configuredRequest, readCapped } from "@/lib/safe-fetch";
 import * as status from "./signin-status";
+import * as folders from "./account-folders";
 
 /** Stamped on every container this starts, so the sweep finds them by label
  *  rather than by matching names it does not own. */
@@ -267,9 +268,12 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
         command: "autohand login",
         logout: "autohand logout",
         flow: "paste",
-        home: true,
-        single: true
+        home: true
     },
+    // The same login, run with AUTOHAND_HOME pointed at a folder of the
+    // account's own (`account-folders.ts`), so each account is a row. No
+    // logout: removing the row clears the folder, which is the sign-out.
+    AUTOHAND_ACCOUNT_HOME: { cli: "autohand", command: "autohand login", flow: "paste" },
     // fx.sh/docs/getting-started/authentication: without a provider name,
     // `fx login` signs in to Vercel and `fx logout` signs out of it.
     FX_HOME_LOGIN: { cli: "fx", command: "fx login", logout: "fx logout", flow: "paste", home: true },
@@ -300,7 +304,14 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
         command: "kimi",
         flow: "paste",
         home: true,
-        single: true,
+        input: { text: "/login", after: ["Run /login or /provider to get started."] }
+    },
+    // The same login, run with KIMI_CODE_HOME pointed at a folder of the
+    // account's own (`account-folders.ts`), so each account is a row.
+    KIMI_ACCOUNT_HOME: {
+        cli: "kimi",
+        command: "kimi",
+        flow: "paste",
         input: { text: "/login", after: ["Run /login or /provider to get started."] }
     },
     // github.com/earendil-works/pi README: "run `/login` inside Pi to connect a
@@ -310,7 +321,14 @@ export const LOGIN_COMMANDS: Readonly<Record<string, LoginCommand>> = {
         command: "pi",
         flow: "paste",
         home: true,
-        single: true,
+        input: { text: "/login", after: ["0.0%/", "Pi can explain its own features"] }
+    },
+    // The same login, run with PI_CODING_AGENT_DIR pointed at a folder of the
+    // account's own (`account-folders.ts`), so each account is a row.
+    PI_ACCOUNT_HOME: {
+        cli: "pi",
+        command: "pi",
+        flow: "paste",
         input: { text: "/login", after: ["0.0%/", "Pi can explain its own features"] }
     },
     // docs.factory.com/cli/configuration/cli-reference: `/login` signs in to
@@ -359,12 +377,28 @@ export function signinCredentialFile(env: string): string | null {
  * written down. Empty for a tool the catalogue does not hold, which is the same
  * "nothing sourced" answer as everywhere else.
  */
-export function signinFirstRun(env: string): readonly core.AgentFirstRunAnswer[] {
-    return [...(cliOf(env)?.firstRun ?? []), ...(LOGIN_COMMANDS[env]?.firstRun ?? [])];
+export function signinFirstRun(env: string, folderId?: string): readonly core.AgentFirstRunAnswer[] {
+    const answers = [...(cliOf(env)?.firstRun ?? []), ...(LOGIN_COMMANDS[env]?.firstRun ?? [])];
+    // A login kept in an account folder reads its configuration from there.
+    const folder = folderId ? folders.folderLoginFor(env) : null;
+    return folder && folderId ? folders.folderFirstRun(answers, folder.credential, folder.cli.id, folderId) : answers;
 }
 
-function firstRunFor(env: string): string {
-    return Buffer.from(commands.firstRunScript(signinFirstRun(env)), "utf8").toString("base64");
+function firstRunFor(env: string, folderId?: string): string {
+    return Buffer.from(commands.firstRunScript(signinFirstRun(env, folderId)), "utf8").toString("base64");
+}
+
+/**
+ * The variables a login kept in an account folder runs with: the tool's own
+ * pointed at the folder, and the same path for the boot to create. Empty for
+ * every other login. The folder is the attempt's row id, so the stored row
+ * that comes out of it names the folder its login landed in.
+ */
+export function signinFolderEnv(env: string, attemptId: string): Record<string, string> {
+    const folder = folders.folderLoginFor(env);
+    if (!folder) return {};
+    const path = folders.accountFolder(commands.AGENT_HOME, folder.cli.id, attemptId);
+    return { [folder.credential.dir.env]: path, POLARIS_ACCOUNT_DIR: path };
 }
 
 /** Whether Polaris can run this one's login for somebody, or only take a paste. */
@@ -437,6 +471,11 @@ export const SIGNIN_BOOT = [
     // token is also useful somewhere this home does not reach, but it stopped
     // being the only thing this produces.
     commands.AGENT_ACCOUNT_SETUP,
+    // A login kept in an account folder (`account-folders.ts`) gets that
+    // folder made first, as the agent and private to it.
+    'if [ -n "$POLARIS_ACCOUNT_DIR" ]; then',
+    `  as_agent 'umask 077; mkdir -p "$POLARIS_ACCOUNT_DIR"' || true`,
+    "fi",
     // Into that home's npm prefix, so a tool installed here is one the next
     // session finds already installed.
     'as_agent "$POLARIS_INSTALL" >/dev/null 2>&1 || true',
@@ -616,10 +655,13 @@ async function startContainer(userId: string, attempt: SigninAttempt, command: s
                             POLARIS_COLS: String(commands.SIGNIN_COLS),
                             POLARIS_ROWS: String(commands.SIGNIN_ROWS),
                             POLARIS_INSTALL: signinInstall(attempt.env),
-                            POLARIS_FIRST_RUN: firstRunFor(attempt.env),
+                            POLARIS_FIRST_RUN: firstRunFor(attempt.env, attempt.id),
                             POLARIS_LOGIN: command,
                             POLARIS_RUNAS: commands.CONTAINER_USER,
-                            POLARIS_HOME: commands.AGENT_HOME
+                            POLARIS_HOME: commands.AGENT_HOME,
+                            // Empty unless the login is kept in an account folder.
+                            POLARIS_ACCOUNT_DIR: "",
+                            ...signinFolderEnv(attempt.env, attempt.id)
                         },
                         ports: [],
                         // This person's own home, the one their sessions run in.
@@ -1078,6 +1120,13 @@ export function parseCredentialFile(output: string): string | null {
  */
 export async function captureSignin(userId: string, id: string, env: string): Promise<string | null> {
     if (!(env in LOGIN_COMMANDS) || isHomeSignin(env) || signingOut.has(id)) return null;
+    // A login kept in an account folder is kept as the folder: its id is what
+    // is stored, once the folder is there.
+    const folder = folders.folderLoginFor(env);
+    if (folder) {
+        const output = await runIn(userId, id, whoamiScript(folders.folderPresentCommand(folder.cli.id, id)));
+        return output.trim() === id ? id : null;
+    }
     if (screens.hasScreenToken(env)) {
         const screen = await runIn(userId, id, signinCaptureCommand());
         return screens.screenTokenIn(env, screens.readSigninScreen(screen).screen);
@@ -1131,13 +1180,10 @@ export function statusScript(checks: readonly { env: string; command: string }[]
     return ["{", commands.AGENT_ACCOUNT_SETUP, "} >/dev/null 2>&1", ...lines].join("\n");
 }
 
-/** Start a short-lived container on this person's home, run every status
- *  command in it at once, and take it away. */
-async function runStatusChecks(
-    userId: string,
-    checks: readonly { env: string; command: string }[]
-): Promise<Map<string, status.SigninState>> {
-    const name = `polaris-signin-status-${crypto.randomUUID().slice(0, 12)}`;
+/** Start a short-lived container on this person's home, run one script in it
+ *  as root, and take it away. */
+async function runOnHome(userId: string, prefix: string, script: string): Promise<string> {
+    const name = `${prefix}-${crypto.randomUUID().slice(0, 12)}`;
     const hostd = new HostdPorts();
     try {
         await upWithFreshImage((pullPolicy) =>
@@ -1169,10 +1215,38 @@ async function runStatusChecks(
             }),
             () => new HostdPorts().pull(commands.SESSION_IMAGE)
         );
-        const result = await hostd.runIn(name, commands.shellArgv(statusScript(checks)));
-        return status.parseStatusLines(result.output);
+        const result = await hostd.runIn(name, commands.shellArgv(script));
+        return result.output;
     } finally {
         await new HostdPorts().composeDown(name).catch(() => undefined);
+    }
+}
+
+/** Run every status command at once in one container on this person's home. */
+async function runStatusChecks(
+    userId: string,
+    checks: readonly { env: string; command: string }[]
+): Promise<Map<string, status.SigninState>> {
+    return status.parseStatusLines(await runOnHome(userId, "polaris-signin-status", statusScript(checks)));
+}
+
+/**
+ * Clear a stored account's folder (`account-folders.ts`) out of this person's
+ * home, as the agent: the sign-out of a login kept in one. Best effort and
+ * never throws - the row is already gone, and a folder left behind is a login
+ * nothing hands out any more. The id is checked before it is part of a path.
+ */
+export async function clearAccountFolder(userId: string, env: string, folderId: string): Promise<void> {
+    const folder = folders.folderLoginFor(env);
+    if (!folder || !folders.isFolderId(folderId)) return;
+    try {
+        await runOnHome(
+            userId,
+            "polaris-signin-clear",
+            whoamiScript(folders.clearFolderCommand(folder.cli.id, folderId))
+        );
+    } catch (error) {
+        console.warn("[agent-signin] could not clear an account folder:", error instanceof Error ? error.name : "unknown");
     }
 }
 

@@ -187,6 +187,7 @@
             "catalogEmpty": "The catalog listed no usable models.",
             "checkKey": "Check the key",
             "notAProvider": "That is not a model provider.",
+            "signInHere": "Sign this account in from Add connection. There is nothing to paste.",
             "keyGone": "That key is gone.",
             "pickKey": "Pick a key",
             "orderUnreadable": "Could not read the new order.",

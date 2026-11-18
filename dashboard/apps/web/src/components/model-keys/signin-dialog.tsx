@@ -135,7 +135,7 @@ export function SigninDialog({
     // home store nothing: they are over when the tool says it is done.
     const keeps = mode === "login" && !signin.home;
     const done = linked || (!keeps && finished);
-    const capture = keeps && (signin.file || signin.onScreen) && !manual ? actions.capture : undefined;
+    const capture = keeps && (signin.file || signin.onScreen || signin.folder) && !manual ? actions.capture : undefined;
     // Folded while Polaris drives the login itself; open where the person has
     // to read something off it.
     const terminalOpen = showTerminal ?? (!device && !capture);
@@ -493,7 +493,11 @@ export function SigninDialog({
 
                     {!keeps || linked || device ? null : capture ? (
                         <p className="text-xs text-muted-foreground">
-                            {signin.onScreen ? t("signinDialog.tokenHint") : t("signinDialog.fileHint")}
+                            {signin.onScreen
+                                ? t("signinDialog.tokenHint")
+                                : signin.folder
+                                  ? t("signinDialog.folderHint")
+                                  : t("signinDialog.fileHint")}
                         </p>
                     ) : (
                         <label className="block space-y-1">

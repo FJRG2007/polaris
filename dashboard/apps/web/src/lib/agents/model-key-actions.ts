@@ -36,6 +36,9 @@ import {
 } from "@/lib/agents/model-keys";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { keyLimitsSchema } from "@/lib/agents/key-limits";
+import { agentSignins } from "@/lib/agents/agent-signins";
+import { isFolderId } from "@/lib/agents/account-folders";
+import { clearAccountFolder } from "@/lib/agents/signin-runtime";
 import { reachable, safeUrl } from "@/lib/safe-fetch";
 
 /** What a write reports back. `warning` is the case that is neither: the key was
@@ -125,6 +128,11 @@ export async function addKey(scope: KeyScope, input: unknown): Promise<KeyAction
     await ensureProviderCatalog();
     if (!isStorableProvider(parsed.data.provider))
         return { error: (await readerWords("api"))("refusals.aiKeys.notAProvider") };
+    // A login kept in an account folder is stored by its sign-in, as the id of
+    // the folder it made in this person's home: nothing typed can be one.
+    const folderLogin = agentSignins().find((signin) => signin.slug === parsed.data.provider && signin.folder);
+    if (folderLogin && (scope.owner === null || !isFolderId(parsed.data.secret)))
+        return { error: (await readerWords("api"))("refusals.aiKeys.signInHere") };
 
     if (await ownerHasModelKeyName(scope.owner, parsed.data.name)) return { error: NAME_TAKEN };
 
@@ -290,8 +298,12 @@ export async function removeKey(scope: KeyScope, input: unknown): Promise<KeyAct
     const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
     if (!parsed.success) return { error: (await readerWords("api"))("refusals.aiKeys.pickKey") };
 
+    // A login kept in an account folder: read which folder before the row goes,
+    // so its sign-out - clearing that folder - can follow.
+    const folder = scope.owner ? await accountFolderOf(scope.owner, parsed.data.id) : null;
     if (!(await deleteModelKey(scope.owner, parsed.data.id)))
         return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
+    if (folder && scope.owner) void clearAccountFolder(scope.owner, folder.env, folder.id);
     await recordAudit({
         actorId: scope.actorId,
         action: `${scope.audit}.ai-key.deleted`,
@@ -300,6 +312,16 @@ export async function removeKey(scope: KeyScope, input: unknown): Promise<KeyAct
     });
     revalidatePath(scope.path);
     return {};
+}
+
+/** The account folder a stored row names (`account-folders.ts`), or null for
+ *  any other row. */
+async function accountFolderOf(owner: string, id: string): Promise<{ env: string; id: string } | null> {
+    const provider = await providerOfModelKey(owner, id);
+    const signin = provider ? agentSignins().find((one) => one.slug === provider && one.folder) : undefined;
+    if (!signin) return null;
+    const held = await heldModelKey(owner, id);
+    return held?.secret && isFolderId(held.secret) ? { env: signin.env, id: held.secret } : null;
 }
 
 /** Switch one on or off. Off keeps the key and its place; no run spends it. */

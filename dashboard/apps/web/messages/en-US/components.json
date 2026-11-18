@@ -1229,6 +1229,7 @@
         "namePlaceholder": "Work subscription",
         "copyIn": "When it prints your login, copy it in here. Polaris does not read it off the screen for you - storing the wrong line would not show up until a session failed to sign in.",
         "fileHint": "When the terminal says you are signed in, press Link it. Polaris keeps the login the tool saved, encrypted, and puts it back for any session that needs it.",
+        "folderHint": "When the terminal says you are signed in, press Link it. This account keeps a folder of its own, and every session started on it uses that folder.",
         "link": "Link it",
         "deviceOpen": "Open {host}",
         "deviceStepOpen": "Open the sign-in page and sign in.",

@@ -187,6 +187,7 @@
             "catalogEmpty": "El catálogo no incluía ningún modelo utilizable.",
             "checkKey": "Revisa la clave",
             "notAProvider": "Eso no es un proveedor de modelos.",
+            "signInHere": "Inicia sesión en esta cuenta desde Añadir conexión. No hay nada que pegar.",
             "keyGone": "Esa clave ya no existe.",
             "pickKey": "Elige una clave",
             "orderUnreadable": "No se pudo leer el nuevo orden.",

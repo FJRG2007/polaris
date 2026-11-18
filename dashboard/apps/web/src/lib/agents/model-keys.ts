@@ -969,7 +969,10 @@ export async function sessionSecretsFor(
         const instance = shared ? await storedKeys(INSTANCE) : [];
         const used: string[] = [];
         for (const signin of agentSignins()) {
-            const picked = firstUsable(own, signin.slug) ?? firstUsable(instance, signin.slug);
+            // A login kept in an account folder lives in its owner's home, which
+            // nobody else's session mounts: only the person's own rows count.
+            const picked =
+                firstUsable(own, signin.slug) ?? (signin.folder ? null : firstUsable(instance, signin.slug));
             if (!picked || !picked.secret) continue;
             secrets[signin.env] = (await unwrapLogin(picked.row, picked.secret)).secret;
             used.push(picked.row.id);
@@ -1206,6 +1209,7 @@ export async function secretForAccount(
             },
             select: {
                 id: true,
+                userId: true,
                 provider: true,
                 config: true,
                 encryptedSecret: true,
@@ -1214,7 +1218,10 @@ export async function secretForAccount(
             }
         });
         if (!row) return null;
-        const signin = agentSignins().find((entry) => entry.slug === row.provider)?.env;
+        const held = agentSignins().find((entry) => entry.slug === row.provider);
+        // A login kept in an account folder is only in its owner's home.
+        if (held?.folder && row.userId !== userId) return null;
+        const signin = held?.env;
         const provider = signin
             ? null
             : modelProviders().find(

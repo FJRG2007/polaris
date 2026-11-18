@@ -4,9 +4,11 @@
  * Every command here is one its vendor documents; a logout is never inferred
  * from a login, and a tool with no documented one has none. A login that writes
  * a file is only worth running if that file is the credential captured for the
- * next container, so every login without a token on its screen names a file.
+ * next container, so every login without a token on its screen names a file
+ * or keeps an account folder of its own.
  */
 
+import { folderLoginFor } from "@/lib/agents/account-folders";
 import * as core from "@polaris/core";
 import { describe, expect, it } from "vitest";
 import {
@@ -27,7 +29,9 @@ describe("sign-in commands", () => {
     it("captures something from every login that is stored", () => {
         for (const env of Object.keys(LOGIN_COMMANDS)) {
             if (isHomeSignin(env)) continue;
-            const captured = hasScreenToken(env) || signinCredentialFile(env) !== null;
+            // A login kept in an account folder is captured as the folder.
+            const captured =
+                hasScreenToken(env) || signinCredentialFile(env) !== null || folderLoginFor(env) !== null;
             expect(captured, env).toBe(true);
         }
     });

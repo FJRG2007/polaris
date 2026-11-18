@@ -99,6 +99,9 @@ export interface AgentSignin {
     readonly signout?: boolean;
     /** A home login the tool can hold only one of at a time. */
     readonly single?: boolean;
+    /** Kept in a data folder of the account's own (`account-folders.ts`): the
+     *  login lands in that folder and the row stores which folder it is. */
+    readonly folder?: boolean;
 }
 
 /**
@@ -133,7 +136,8 @@ export function agentSignins(): AgentSignin[] {
                 subscription: credential.subscription,
                 file: credential.file ?? null,
                 onScreen: hasScreenToken(credential.env),
-                serves: [{ id: cli.id, label: cli.label }]
+                serves: [{ id: cli.id, label: cli.label }],
+                ...(credential.dir ? { folder: true } : {})
             });
         }
     }

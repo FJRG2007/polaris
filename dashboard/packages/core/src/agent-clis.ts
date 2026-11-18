@@ -95,6 +95,19 @@ export interface AgentCredential {
      * once survives a home that was cleared.
      */
     readonly file?: string;
+    /**
+     * A login kept in a data folder of its own per account, for a tool whose
+     * vendor documents a variable that moves its whole data folder but names no
+     * credential file inside it.
+     *
+     * Present, the `env` is Polaris's own name for the stored row - no tool
+     * reads it - and the stored value is the id of that account's folder.
+     * The sign-in runs with `dir.env` pointed at the folder, so the vendor's
+     * login lands there whatever file it writes, and a session started on the
+     * account gets `dir.env` pointed at the same folder. `dir.path` is where
+     * the tool keeps its data without the variable, relative to the home.
+     */
+    readonly dir?: { readonly env: string; readonly path: string };
 }
 
 /**
@@ -447,6 +460,11 @@ export interface AgentCli {
  *  sign-ins. */
 function apiKey(env: string, label: string, url: string): AgentCredential {
     return { env, label, url, howto: null, subscription: false };
+}
+
+/** A login kept in an account folder of its own (`AgentCredential.dir`). */
+function folderLogin(env: string, label: string, url: string, dirEnv: string, path: string): AgentCredential {
+    return { env, label, url, howto: null, subscription: true, dir: { env: dirEnv, path } };
 }
 
 /** The two provider keys every multi-provider tool below reads. */
@@ -1061,7 +1079,19 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         home: ".kimi",
         observe: "hooks",
         docs: "https://moonshotai.github.io/kimi-code/en/",
-        credentials: [apiKey("KIMI_API_KEY", "Kimi API key", "https://moonshotai.github.io/kimi-code/en/")],
+        credentials: [
+            apiKey("KIMI_API_KEY", "Kimi API key", "https://moonshotai.github.io/kimi-code/en/"),
+            // `KIMI_CODE_HOME` moves the data root, OAuth credentials included
+            // (moonshotai.github.io/kimi-code/en/configuration/env-vars.html),
+            // so each account signs in inside a folder of its own.
+            folderLogin(
+                "KIMI_ACCOUNT_HOME",
+                "Kimi Code account",
+                "https://moonshotai.github.io/kimi-code/en/configuration/env-vars.html",
+                "KIMI_CODE_HOME",
+                ".kimi-code"
+            )
+        ],
         autonomyArgs: ["-y"],
         autonomyEnv: {},
         firstRun: hookFileAnswers("kimi"),
@@ -1076,7 +1106,20 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         home: ".pi",
         observe: "hooks",
         docs: "https://github.com/earendil-works/pi",
-        credentials: [ANTHROPIC_KEY, OPENAI_KEY],
+        credentials: [
+            ANTHROPIC_KEY,
+            OPENAI_KEY,
+            // `PI_CODING_AGENT_DIR` overrides `~/.pi/agent` (npm
+            // @earendil-works/pi-coding-agent README), so each account signs in
+            // inside a folder of its own.
+            folderLogin(
+                "PI_ACCOUNT_HOME",
+                "Pi account",
+                "https://www.npmjs.com/package/@earendil-works/pi-coding-agent",
+                "PI_CODING_AGENT_DIR",
+                ".pi/agent"
+            )
+        ],
         // Pi has no permission prompt to skip.
         autonomyArgs: [],
         autonomyEnv: {},
@@ -1248,7 +1291,17 @@ export const AGENT_CLIS: readonly AgentCli[] = [
         credentials: [
             apiKey("AUTOHAND_API_KEY", "Autohand API key", "https://docs.autohand.ai/working-with-autohand-code/cli"),
             ANTHROPIC_KEY,
-            OPENAI_KEY
+            OPENAI_KEY,
+            // `AUTOHAND_HOME` moves `~/.autohand`
+            // (docs.autohand.ai/working-with-autohand-code/cli-reference), so
+            // each account signs in inside a folder of its own.
+            folderLogin(
+                "AUTOHAND_ACCOUNT_HOME",
+                "Autohand account",
+                "https://docs.autohand.ai/working-with-autohand-code/cli-reference",
+                "AUTOHAND_HOME",
+                ".autohand"
+            )
         ],
         autonomyArgs: ["--unrestricted"],
         autonomyEnv: {},

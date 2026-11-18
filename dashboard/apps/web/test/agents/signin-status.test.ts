@@ -18,13 +18,19 @@ import {
 } from "@/lib/agents/signin-status";
 import {
     LOGIN_COMMANDS,
+    SIGNIN_BOOT,
     assistedSignins,
+    canSignout,
     homeSignins,
     isHomeSignin,
     signinCredentialFile,
+    signinFirstRun,
+    signinFolderEnv,
     signinStatusCommand,
     statusScript
 } from "@/lib/agents/signin-runtime";
+import * as folders from "@/lib/agents/account-folders";
+import * as core from "@polaris/core";
 import { agentSignins } from "@/lib/agents/agent-signins";
 
 const b64 = (text: string) => Buffer.from(text, "utf8").toString("base64");
@@ -149,7 +155,7 @@ describe("more than one account per agent", () => {
     // Sourced in docs/agent-catalogue.md ("More than one account"). A home login
     // is marked single only where no variable, credential file or key lets a
     // second account sit beside it, or Polaris does not use the one documented.
-    const SINGLE = ["AUTOHAND_HOME_LOGIN", "KIMI_HOME_LOGIN", "MIMO_HOME_LOGIN", "MINIMAX_HOME_LOGIN", "PI_HOME_LOGIN"];
+    const SINGLE = ["MIMO_HOME_LOGIN", "MINIMAX_HOME_LOGIN"];
 
     it("marks exactly the home logins that hold one account", () => {
         const single = Object.entries(LOGIN_COMMANDS)
@@ -195,11 +201,99 @@ describe("more than one account per agent", () => {
         // A key or token the tool reads from the environment: each stored row
         // is one account, and a session is handed the one it was started on.
         const stored = new Set(agentSignins().map((signin) => signin.env));
-        for (const env of ["CURSOR_API_KEY", "KIRO_API_KEY", "AMP_API_KEY", "FACTORY_API_KEY", "DEVIN_ACCOUNT_AUTH"])
+        for (const env of [
+            "CURSOR_API_KEY",
+            "KIRO_API_KEY",
+            "AMP_API_KEY",
+            "FACTORY_API_KEY",
+            "DEVIN_ACCOUNT_AUTH",
+            "KIMI_ACCOUNT_HOME",
+            "PI_ACCOUNT_HOME",
+            "AUTOHAND_ACCOUNT_HOME"
+        ])
             expect(stored, env).toContain(env);
         // Served by the provider keys instead (xAI, Vercel AI Gateway), which
         // already hold as many as somebody adds.
         expect(stored.has("XAI_API_KEY")).toBe(false);
         expect(stored.has("AI_GATEWAY_API_KEY")).toBe(false);
+    });
+});
+
+describe("accounts kept in a folder of their own", () => {
+    const HOME = "/home/node";
+    const ID = "01937b5e-8f00-7000-8000-000000000001";
+    // Each tool's documented data-folder variable and its default folder.
+    const FOLDERS = [
+        { env: "KIMI_ACCOUNT_HOME", home: "KIMI_HOME_LOGIN", cli: "kimi", variable: "KIMI_CODE_HOME", path: ".kimi-code" },
+        { env: "PI_ACCOUNT_HOME", home: "PI_HOME_LOGIN", cli: "pi", variable: "PI_CODING_AGENT_DIR", path: ".pi/agent" },
+        { env: "AUTOHAND_ACCOUNT_HOME", home: "AUTOHAND_HOME_LOGIN", cli: "autohand", variable: "AUTOHAND_HOME", path: ".autohand" }
+    ];
+    const cliOf = (id: string) => core.agentCliById(id)!;
+
+    it.each(FOLDERS)("stores $cli accounts as rows beside the home login", ({ env, home, cli, variable, path }) => {
+        expect(isHomeSignin(env)).toBe(false);
+        expect(isHomeSignin(home)).toBe(true);
+        expect(LOGIN_COMMANDS[env]?.command).toBe(LOGIN_COMMANDS[home]?.command);
+        expect(LOGIN_COMMANDS[env]?.input).toEqual(LOGIN_COMMANDS[home]?.input);
+        // Removing the row clears the folder; no vendor logout runs in the home.
+        expect(canSignout(env)).toBe(false);
+        const stored = assistedSignins().find((signin) => signin.env === env);
+        expect(stored?.folder).toBe(true);
+        expect(stored?.home).toBeUndefined();
+        expect(stored?.serves.map((tool) => tool.id)).toEqual([cli]);
+        expect(folders.folderLoginFor(env)?.credential.dir).toEqual({ env: variable, path });
+    });
+
+    it.each(FOLDERS)("signs $cli in with its variable on the attempt's own folder", ({ env, home, cli, variable }) => {
+        const folder = `${HOME}/.polaris-accounts/${cli}/${ID}`;
+        expect(signinFolderEnv(env, ID)).toEqual({ [variable]: folder, POLARIS_ACCOUNT_DIR: folder });
+        expect(signinFolderEnv(home, ID)).toEqual({});
+        expect(() => signinFolderEnv(env, "../other")).toThrow();
+        expect(SIGNIN_BOOT).toContain('mkdir -p "$POLARIS_ACCOUNT_DIR"');
+    });
+
+    it("moves the hooks a sign-in writes into the account's folder", () => {
+        const plain = signinFirstRun("KIMI_HOME_LOGIN").map((answer) => answer.file);
+        expect(plain).toContain(".kimi-code/config.toml");
+        const moved = signinFirstRun("KIMI_ACCOUNT_HOME", ID).map((answer) => answer.file);
+        expect(moved).toContain(`.polaris-accounts/kimi/${ID}/config.toml`);
+        expect(moved).not.toContain(".kimi-code/config.toml");
+        expect(signinFirstRun("AUTOHAND_ACCOUNT_HOME", ID).map((answer) => answer.file)).toEqual([
+            `.polaris-accounts/autohand/${ID}/config.json`
+        ]);
+        // Pi's hook is in the checkout, which no folder moves.
+        expect(signinFirstRun("PI_ACCOUNT_HOME", ID)).toEqual(signinFirstRun("PI_HOME_LOGIN"));
+    });
+
+    it("hands a session the variable, never Polaris's name for the row", () => {
+        const kimi = cliOf("kimi");
+        const env = folders.withAccountFolders(kimi, { KIMI_ACCOUNT_HOME: ID }, HOME);
+        expect(env).toEqual({ KIMI_CODE_HOME: `${HOME}/.polaris-accounts/kimi/${ID}` });
+        expect(folders.sessionFirstRun(kimi, kimi.firstRun, env, HOME).map((answer) => answer.file)).toContain(
+            `.polaris-accounts/kimi/${ID}/config.toml`
+        );
+        // No folder where the session's home is not the person's own.
+        expect(folders.withAccountFolders(kimi, { KIMI_ACCOUNT_HOME: ID }, null)).toEqual({});
+        // A value that is not a folder id never becomes a path.
+        for (const bad of ["../../etc", "a/b", "", "x".repeat(65), "id with space"])
+            expect(folders.withAccountFolders(kimi, { KIMI_ACCOUNT_HOME: bad }, HOME), bad).toEqual({});
+        // Everything else passes through, and a session on no folder keeps the
+        // tool's default configuration.
+        expect(folders.withAccountFolders(kimi, { KIMI_API_KEY: "k" }, HOME)).toEqual({ KIMI_API_KEY: "k" });
+        expect(folders.sessionFirstRun(kimi, kimi.firstRun, {}, HOME)).toEqual(kimi.firstRun);
+        expect(folders.folderEnvs(kimi)).toEqual(["KIMI_CODE_HOME"]);
+        expect(folders.folderEnvs(cliOf("claude"))).toEqual([]);
+    });
+
+    it("reads and clears only the account's own folder", () => {
+        expect(folders.folderPresentCommand("pi", ID)).toBe(
+            `[ -d "$HOME/.polaris-accounts/pi/${ID}" ] && printf %s ${ID} || true`
+        );
+        expect(folders.clearFolderCommand("autohand", ID)).toBe(`rm -rf -- "$HOME/.polaris-accounts/autohand/${ID}"`);
+        for (const bad of ["..", "../x", "", "a b", "$(id)"]) {
+            expect(() => folders.clearFolderCommand("autohand", bad), bad).toThrow();
+            expect(() => folders.folderPresentCommand("autohand", bad), bad).toThrow();
+        }
+        expect(() => folders.accountFolder("/home/../root", "kimi", ID)).toThrow();
     });
 });

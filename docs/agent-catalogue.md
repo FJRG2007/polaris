@@ -104,6 +104,9 @@ documents one; it is never inferred from the login.
 | GitHub Copilot | `copilot login --device-code` | - | existing entry |
 | Auggie | `auggie auth login --headless` | `auggie auth logout` | docs.augmentcode.com/cli/setup-auggie/authentication |
 | Devin (stored account) | `devin auth login --force-manual-token-flow` | `devin auth logout` | docs.devin.ai/cli/reference/commands, file from docs.devin.ai/cli/enterprise/devin-auth |
+| Kimi Code (stored account) | `kimi`, then `/login`, with `KIMI_CODE_HOME` on the account's folder | - (removing the row clears the folder) | moonshotai.github.io/kimi-code/en/configuration/env-vars.html |
+| Pi (stored account) | `pi`, then `/login`, with `PI_CODING_AGENT_DIR` on the account's folder | - (removing the row clears the folder) | npm `@earendil-works/pi-coding-agent` README |
+| Autohand (stored account) | `autohand login` with `AUTOHAND_HOME` on the account's folder | - (removing the row clears the folder) | docs.autohand.ai/working-with-autohand-code/cli-reference |
 
 Kept in the home (`home: true`): the login lands in the person's persistent
 home, which every session mounts, and nothing is stored. Used where the vendor
@@ -179,17 +182,28 @@ beside them, so nothing an install already has is lost.
 | Amp | yes | `AMP_API_KEY`, an access token from Settings (`sgamp_`); the docs say the CLI rejects the session token `amp login` stores | ampcode.com/docs/cli/execute-mode |
 | Droid | yes | `FACTORY_API_KEY` | docs.factory.com/cli/configuration/cli-reference |
 | fx | yes | `AI_GATEWAY_API_KEY` ("for a script or CI job"), filled from the Vercel AI Gateway provider keys | fx.sh/docs/getting-started/authentication |
-| Kimi Code | no (not yet) | `KIMI_CODE_HOME` moves the data root, OAuth credentials included; no credential file is named. `KIMI_API_KEY` is only read from `config.toml`, never from the shell, so the catalogue's key does not sign it in | moonshotai.github.io/kimi-code/en/configuration/env-vars.html |
-| Pi | no (not yet) | `PI_CODING_AGENT_DIR` overrides `~/.pi/agent`; the credential file is not named in the README. Provider keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) already take several rows | npm `@earendil-works/pi-coding-agent` README |
-| Autohand | no (not yet) | `AUTOHAND_HOME` moves `~/.autohand`; where `autohand login` keeps the credential is not documented (`--bare` mentions keychain reads), and no key variable is documented | docs.autohand.ai/working-with-autohand-code/cli-reference |
+| Kimi Code | yes | `KIMI_CODE_HOME` moves the data root, OAuth credentials included; each stored account (`KIMI_ACCOUNT_HOME`) signs in inside a folder of its own and a session on it gets `KIMI_CODE_HOME` on that folder. `KIMI_API_KEY` is only read from `config.toml`, never from the shell, so the catalogue's key does not sign it in | moonshotai.github.io/kimi-code/en/configuration/env-vars.html |
+| Pi | yes | `PI_CODING_AGENT_DIR` overrides `~/.pi/agent`; each stored account (`PI_ACCOUNT_HOME`) signs in inside a folder of its own and a session on it gets `PI_CODING_AGENT_DIR` on that folder. Provider keys (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) already take several rows | npm `@earendil-works/pi-coding-agent` README |
+| Autohand | yes | `AUTOHAND_HOME` moves `~/.autohand`; each stored account (`AUTOHAND_ACCOUNT_HOME`) signs in inside a folder of its own and a session on it gets `AUTOHAND_HOME` on that folder. Where `autohand login` keeps the credential inside it is not documented (`--bare` mentions keychain reads) | docs.autohand.ai/working-with-autohand-code/cli-reference |
 | MiMo Code | no | nothing documented: no variable, credential path or key; "No manual API Key configuration is required" | mimo.mi.com/docs/en-US/tokenplan/integration/mimo-code |
 | MiniMax Code | no | no config-dir variable or credential path; `MCODE_PROVIDER_API_KEY` is read once by `mcode provider set-minimax-key`, not at each start | code.minimax.io/docs/cli/features.md |
 
-"No (not yet)": a variable that moves the tool's whole data directory is
-documented, but using it means a sign-in container and a session pointed at a
-per-account directory, which Polaris does not do yet for these three. Until it
-does, their Add connection card says that one account is held at a time, as it
-does for MiMo Code and MiniMax Code (`single` in `LOGIN_COMMANDS`).
+Kimi Code, Pi and Autohand document a variable that moves the tool's whole
+data folder but name no credential file inside it, so Polaris keeps a folder
+per account instead of a file (`dir` on the catalogue credential,
+`apps/web/src/lib/agents/account-folders.ts`). The folder is
+`~/.polaris-accounts/<tool>/<id>` in the person's agent home, the one
+directory both the sign-in container and every session container of that
+person mount and that the box keeps between them; `<id>` is the sign-in
+attempt's row id, checked against `[A-Za-z0-9_-]{1,64}` before it is part of a
+path. The sign-in runs with the tool's variable on that folder, so whatever the
+vendor's login writes lands there; the stored row holds only the id; a session
+started on the account gets the variable on the folder (only in a container on
+the person's own home: a shared workspace or a server gets the machine's own
+login), with Polaris's hooks written into it. Removing the row clears the
+folder. The existing home login of each stays its own row. MiMo Code and
+MiniMax Code still say on their Add connection card that one account is held at
+a time (`single` in `LOGIN_COMMANDS`).
 
 `KIMI_API_KEY`, `AUTOHAND_API_KEY` and `MINIMAX_API_KEY` stay in the catalogue
 as Agent Orchestrator has them; none of the three is named by its vendor's

@@ -50,4 +50,17 @@ describe("Add connection", () => {
         expect(single[0]?.ways[0]?.option.single).toBe(true);
         expect(find("Cursor")?.ways[0]?.option.single).toBeUndefined();
     });
+
+    it("offers a folder-kept account beside the home login, neither marked single", () => {
+        const kimi = groupConnections(
+            [
+                { method: "account", slug: "kimi-account", name: "Kimi Code account", vendor: "Moonshot AI", aliases: ["Kimi Code"] },
+                { method: "home", slug: "kimi", name: "Kimi Code", vendor: "Moonshot AI" }
+            ],
+            []
+        );
+        const ways = kimi.flatMap((group) => group.ways);
+        expect(ways.map((way) => way.option.method).sort()).toEqual(["account", "home"]);
+        expect(ways.some((way) => way.option.single)).toBe(false);
+    });
 });

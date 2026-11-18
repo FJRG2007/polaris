@@ -30,6 +30,7 @@ import * as core from "@polaris/core";
 import { execCommand } from "@polaris/ssh";
 import * as commands from "./session-commands";
 import * as accountHomes from "./account-homes";
+import * as accountFolders from "./account-folders";
 import * as acpPipe from "./acp/pipe-commands";
 import * as acpTransport from "./acp/transport";
 import * as acpProviders from "./acp/providers";
@@ -415,8 +416,17 @@ async function bootstrapFor(session: SessionView, token: string): Promise<Bootst
         // Only into a home Polaris made. A server's home is the person's own,
         // and the tool has been answering these questions there since long
         // before Polaris arrived.
+        // Moved into the account's own folder when the session runs on a login
+        // kept in one (`account-folders.ts`): the tool reads its configuration
+        // from there.
         firstRun:
-            session.place === "host" ? "" : asFile(commands.firstRunScript(agent.cli.firstRun)),
+            session.place === "host"
+                ? ""
+                : asFile(
+                      commands.firstRunScript(
+                          accountFolders.sessionFirstRun(agent.cli, agent.cli.firstRun, credentials, commands.AGENT_HOME)
+                      )
+                  ),
         credentialFiles: agent.cli.credentials
             .filter((credential) => credential.file)
             .map((credential) => `${credential.env}=${credential.file}`)
@@ -535,8 +545,15 @@ async function credentialEnvFor(
             "Polaris could not read the stored credentials just now. Try again in a moment."
         );
     }
+    // A login kept in an account folder (`account-folders.ts`) is that folder,
+    // which is only there in a container on this person's own home.
+    const folderHome = session.place === "local" && !session.sharedHome ? commands.AGENT_HOME : null;
     return {
-        ...sessionCredentials(cli, available, chosen, session.useMachineLogin),
+        ...accountFolders.withAccountFolders(
+            cli,
+            sessionCredentials(cli, available, chosen, session.useMachineLogin),
+            folderHome
+        ),
         // The provider and model picked on the form, last, so they win.
         ...withOpencodePermission(cli.id, await modelEnvFor(session), await agentRulesFor(session.id))
     };
@@ -633,7 +650,8 @@ export async function refreshCredentials(sessionId: string): Promise<void> {
         const cleared = [
             ...cli.credentials.map((entry) => entry.env),
             ANTHROPIC_HEADERS_ENV,
-            ...accountHomes.accountHomeEnvs()
+            ...accountHomes.accountHomeEnvs(),
+            ...accountFolders.folderEnvs(cli)
         ];
         const body = commands.credentialsFileBody(cleared, guardEnv(env));
         const part = `credentials.${randomBytes(8).toString("hex")}.part`;
