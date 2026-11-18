@@ -672,8 +672,10 @@ function ColumnChat({
         wasBusy.current = busy;
     }, [busy]);
     const last = chat.messages.at(-1);
-    const failure = last?.role === "assistant" ? polarFailure.messageFailure(last) : null;
-    const looseError = chat.error && !failure ? chat.error : null;
+    // An answer already written is not taken back by a later call that broke.
+    const spoke = last?.role === "assistant" && textOf(last) !== "";
+    const failure = last?.role === "assistant" && !spoke ? polarFailure.messageFailure(last) : null;
+    const looseError = chat.error && !failure && !spoke ? chat.error : null;
     const waiting = last?.parts.some(
         (part) => "state" in part && part.state === "approval-requested"
     );

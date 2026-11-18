@@ -31,8 +31,7 @@ import {
     isStepCount,
     safeValidateUIMessages,
     streamText,
-    type UIMessage,
-    type UIMessageChunk
+    type UIMessage
 } from "ai";
 import { polarAccessFor, polarCaller } from "@/lib/polar/access";
 import { polarTools } from "@/lib/polar/tools";
@@ -142,12 +141,10 @@ import { polarGoal, savePolarGoal, setPolarGoal } from "@/lib/polar/goal-store";
 import { noticePolarRunEnd } from "@/lib/polar/run-notices";
 import { polarOutputTokens } from "@/lib/polar/credit";
 import { withoutEarlierReasoning } from "@/lib/polar/reasoning-replay";
+import { failureIntoAnswer } from "@/lib/polar/unanswered";
 import {
     FAILURE_PART,
     classifyProviderFailure,
-    decodePolarFailure,
-    decodeSubscriptionFailure,
-    decodeLocalFailure,
     encodePolarFailure,
     failureLogLine,
     withoutFailures,
@@ -230,22 +227,6 @@ function refusedTurn(
             },
             onFinish: ({ messages: finished }) => save(finished)
         })
-    });
-}
-
-/**
- * A provider's refusal mid-answer is also written into the answer, just before
- * the stream's error, so the stored message says why it stopped.
- */
-function failureIntoAnswer(): TransformStream<UIMessageChunk, UIMessageChunk> {
-    return new TransformStream({
-        transform(chunk, controller) {
-            if (chunk.type === "error") {
-                const failure = decodePolarFailure(chunk.errorText) ?? decodeSubscriptionFailure(chunk.errorText) ?? decodeLocalFailure(chunk.errorText);
-                if (failure) controller.enqueue({ type: FAILURE_PART, data: failure });
-            }
-            controller.enqueue(chunk);
-        }
     });
 }
 

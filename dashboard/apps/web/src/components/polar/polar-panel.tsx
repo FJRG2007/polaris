@@ -151,7 +151,7 @@ import { orbForActivity, orbForTool } from "@/components/polar/motion/orb-activi
 import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion";
 import { WebSources } from "@/components/polar/elements/sources";
 import { citeSources, isWebTool, sourcesOf, webCallsOf, webStepOf } from "@/lib/polar/web-sources";
-import { answeredNothing } from "@/lib/polar/unanswered";
+import { answered, answeredNothing } from "@/lib/polar/unanswered";
 import { askAnswered, isAskPart, pendingAsk, POLAR_ASK_TOOL } from "@/lib/polar/ask";
 import { AskChip, PolarAskBar } from "@/components/polar/polar-ask";
 import { formOf, formRepliesIn, formReplyText, isFormPart, type FormValues } from "@/lib/polar/forms";
@@ -1088,8 +1088,14 @@ export function PolarChat({
     const avatarState = avatarStateFor({ open: true, online, busy });
     // A failure the answer itself carries is drawn with it; the error alone is
     // for a turn that never got an answer to carry one, a dropped connection.
+    // An answer already given is not taken back by a later call that broke.
+    const lastAnswer = chat.messages.at(-1);
     const looseError =
-        chat.error && !polarFailure.messageFailure(chat.messages.at(-1)) ? chat.error : null;
+        chat.error &&
+        !polarFailure.messageFailure(lastAnswer) &&
+        !(lastAnswer?.role === "assistant" && answered(lastAnswer.parts as never))
+            ? chat.error
+            : null;
     const stopTurn = () => {
         setStopped(chat.messages.at(-1)?.id ?? null);
         void stopAnswer();
@@ -3513,7 +3519,13 @@ function MessageView({
                 }
                 if (folded(part)) return null;
                 const failure = polarFailure.failureOf(part);
-                if (failure) return <div key={index}>{renderFailure(failure)}</div>;
+                // A stored answer that broke after it had answered keeps its
+                // answer, with no card saying it could not.
+                if (failure) {
+                    return answered(message.parts as never) ? null : (
+                        <div key={index}>{renderFailure(failure)}</div>
+                    );
+                }
                 if (part.type === "text") {
                     // A tool call a weak model wrote as text ran nothing and is not for reading.
                     const words = mine ? part.text : withoutPseudoToolCalls(part.text);
