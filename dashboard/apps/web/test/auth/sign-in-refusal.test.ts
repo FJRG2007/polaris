@@ -21,6 +21,7 @@ describe("sign-in refusals", () => {
         expect(signInRefusal({ code: "INVALID_ORIGIN", status: 403 })).toBe("address");
         expect(signInRefusal({ code: "INVALID_EMAIL_OR_PASSWORD", status: 401 })).toBe("credentials");
         expect(signInRefusal({ status: 500 })).toBe("failed");
+        expect(signInRefusal({ status: 429 })).toBe("throttled");
         expect(signInRefusal(null)).toBeNull();
     });
 
@@ -31,5 +32,6 @@ describe("sign-in refusals", () => {
     it("names the address sign-in works on", async () => {
         expect(await refusalMessage("address", t)).toBe("login.wrongAddress:http://polaris.local");
         expect(await refusalMessage("credentials", t)).toBe("login.invalid");
+        expect(await refusalMessage("throttled", t)).toBe("login.throttled");
     });
 });

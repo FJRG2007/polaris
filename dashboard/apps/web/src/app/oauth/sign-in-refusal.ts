@@ -3,29 +3,33 @@
  *
  * `INVALID_ORIGIN` means the page was opened on an address sign-in is not
  * accepted on - the password was never checked - and a 5xx is the server
- * failing; retyping the password fixes neither. Every other refusal keeps the
- * one "wrong email or password" sentence, so the screen tells nobody which
- * accounts exist.
+ * failing; retyping the password fixes neither. A 429 is the sign-in rate limit
+ * (a few tries in a few seconds): the password may well be right, and saying it
+ * is wrong sends the person retyping it into the same limit. Every other refusal
+ * keeps the one "wrong email or password" sentence, so the screen tells nobody
+ * which accounts exist.
  */
-export type SignInRefusal = "credentials" | "address" | "failed";
+export type SignInRefusal = "credentials" | "address" | "throttled" | "failed";
 
 export function signInRefusal(
     error: { code?: string; status?: number } | null | undefined
 ): SignInRefusal | null {
     if (!error) return null;
     if (error.code === "INVALID_ORIGIN") return "address";
+    if (error.status === 429) return "throttled";
     if ((error.status ?? 0) >= 500) return "failed";
     return "credentials";
 }
 
 type AuthWords = (
-    key: "login.invalid" | "login.wrongAddress" | "login.failed",
+    key: "login.invalid" | "login.wrongAddress" | "login.throttled" | "login.failed",
     values?: { address: string }
 ) => string;
 
 /** The sentence for a refusal. The address one names where sign-in does work. */
 export async function refusalMessage(refusal: SignInRefusal, t: AuthWords): Promise<string> {
     if (refusal === "credentials") return t("login.invalid");
+    if (refusal === "throttled") return t("login.throttled");
     if (refusal === "failed") return t("login.failed");
     const { signInAddressAction } = await import("./sign-in-address");
     const address = await signInAddressAction().catch(() => null);
