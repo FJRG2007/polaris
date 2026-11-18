@@ -1,4 +1,8 @@
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync } from "node:fs";
 import {
     ACP_LAUNCH_SCRIPT,
     ACP_READ_BYTES,
@@ -45,7 +49,40 @@ describe("acpLaunchCommand", () => {
         expect(ACP_LAUNCH_SCRIPT).toContain("unset GIT_AUTH_HEADER");
         expect(ACP_LAUNCH_SCRIPT).toContain('printf %s "$rc" > "$a/rc"');
     });
+
+    // Session b4dc374a on lirio-0 (2026-11-18): the window's environment is
+    // root's, `su -p` kept HOME=/root, and npx died on EACCES under /root/.npm
+    // before the adapter started, so Chat never answered.
+    it.runIf(hasSh())("runs the agent in its own home, not root's", () => {
+        const home = mkdtempSync(join(tmpdir(), "polaris-acp-home-"));
+        const lines = ACP_LAUNCH_SCRIPT.split("\n");
+        const before = lines.indexOf('a="$POLARIS_STATE_DIR/acp"');
+        expect(before).toBeGreaterThan(0);
+        const prefix = [...lines.slice(0, before), 'printf "%s|%s|%s" "$HOME" "$NPM_CONFIG_PREFIX" "$PATH"'].join("\n");
+        const output = execFileSync("sh", ["-c", prefix], {
+            encoding: "utf8",
+            env: { ...process.env, HOME: "/root", POLARIS_HOME: shPath(home), POLARIS_STATE_DIR: shPath(home) }
+        });
+        const [seenHome, prefixDir, path] = output.split("|");
+        expect(seenHome).toBe(shPath(home));
+        expect(prefixDir).toBe(`${shPath(home)}/.npm-global`);
+        expect(path!.startsWith(`${shPath(home)}/.local/bin:${shPath(home)}/.npm-global/bin:`)).toBe(true);
+    });
 });
+
+function hasSh(): boolean {
+    try {
+        execFileSync("sh", ["-c", "command -v base64"], { stdio: "ignore" });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/** A path sh can open on this machine: Git Bash takes `/c/...` for `C:\\...`. */
+function shPath(path: string): string {
+    return path.replace(/\\/g, "/").replace(/^([A-Za-z]):/, (_all, drive: string) => `/${drive.toLowerCase()}`);
+}
 
 describe("acpReadCommand", () => {
     it("reads after the offset, bounded under what a command answers", () => {

@@ -1881,9 +1881,12 @@ const RELAUNCH_READY_TIMEOUT_MS = 2 * 60 * 1000;
  * the person's to send.
  */
 export async function promptMovedAgent(sessionId: string, text: string): Promise<boolean> {
+    const placement = await sessionPlacement(sessionId);
+    if (!placement) return false;
+    const probe = commands.movedAgentReadyCommand(stateDirFor(placement));
     const deadline = Date.now() + RELAUNCH_READY_TIMEOUT_MS;
     for (;;) {
-        const ready = await runInSession(sessionId, commands.relaunchedReadyCommand()).catch(() => null);
+        const ready = await runInSession(sessionId, probe).catch(() => null);
         if (ready?.code === 0) break;
         if (Date.now() + AGENT_READY_POLL_MS >= deadline) return false;
         await new Promise((resolve) => setTimeout(resolve, AGENT_READY_POLL_MS));

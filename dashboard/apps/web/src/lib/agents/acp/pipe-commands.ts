@@ -103,6 +103,9 @@ export const ACP_LAUNCH_SCRIPT = [
     "# Written by Polaris. Runs this session's agent over the Agent Client Protocol, its input and output files beside the checkout.",
     ...commands.AGENT_ENV_SCRUB,
     commands.READ_CREDENTIALS,
+    // The agent's own home, as the terminal's launch has it: `su -p` below
+    // keeps this environment, and the tmux window's is root's.
+    ...commands.AGENT_HOME_ENV,
     'if [ -d "$POLARIS_STATE_DIR/bin" ]; then PATH="$POLARIS_STATE_DIR/bin:$PATH"; export PATH; fi',
     'a="$POLARIS_STATE_DIR/acp"',
     'line="$(cat "$a/argv")"',

@@ -86,3 +86,33 @@ describe.runIf(hasSh())("the relaunch script on a real shell", () => {
         expect(output).not.toContain("shell-after");
     });
 });
+
+describe.runIf(hasSh())("a turn handed to an agent that was just moved", () => {
+    function ready(withRunner: boolean): number {
+        const tmp = mkdtempSync(join(tmpdir(), "polaris-moved-tmp-"));
+        const state = mkdtempSync(join(tmpdir(), "polaris-moved-state-"));
+        // Written a moment ago, as the boot leaves it.
+        writeFileSync(join(tmp, "polaris-agent-started"), "");
+        if (withRunner) writeFileSync(join(state, commands.RUNNER_READY_FILE), "");
+        try {
+            execFileSync("sh", ["-c", commands.movedAgentReadyCommand(shPath(state))], {
+                stdio: "ignore",
+                env: { ...process.env, TMPDIR: shPath(tmp), PATH: `/nonexistent-tmux:${process.env.PATH ?? ""}` }
+            });
+            return 0;
+        } catch (error) {
+            return (error as { status?: number }).status ?? 1;
+        }
+    }
+
+    // Session b4dc374a on lirio-0 (2026-11-18): Chat would not start, the
+    // terminal took the message back, and the runner session waited out the
+    // minute a pane in canonical mode is given before the turn was queued.
+    it("goes to the runner at once, without waiting for a pane to settle", () => {
+        expect(ready(true)).toBe(0);
+    });
+
+    it("still waits for the agent's pane on a session with no runner", () => {
+        expect(ready(false)).not.toBe(0);
+    });
+});

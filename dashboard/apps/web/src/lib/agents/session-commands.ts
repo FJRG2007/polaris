@@ -191,6 +191,29 @@ const REQUIRE_TMUX = [
 ];
 
 /**
+ * The agent's home, npm prefix and PATH, as every script that starts the agent
+ * sets them. `su -p` keeps the environment it is given, so a script that skips
+ * this hands the agent root's HOME: npm then writes its cache under `/root`,
+ * which the agent cannot, and the agent reads root's sign-in instead of its own.
+ */
+export const AGENT_HOME_ENV: readonly string[] = [
+    // Empty on an enrolled server, where the home is the person's own and
+    // Polaris moves nothing into it.
+    'if [ -n "$POLARIS_HOME" ]; then',
+    '  mkdir -p "$POLARIS_HOME/.npm-global"',
+    '  HOME="$POLARIS_HOME"',
+    '  NPM_CONFIG_PREFIX="$POLARIS_HOME/.npm-global"',
+    '  PATH="$POLARIS_HOME/.npm-global/bin:$PATH"',
+    "  export HOME NPM_CONFIG_PREFIX PATH",
+    "fi",
+    // Where the vendors' own install scripts put their binary (Cursor, Kiro,
+    // fx and most of the curl installers in the catalogue), so a tool installed
+    // that way is found by the check that follows rather than reported missing.
+    'PATH="$HOME/.local/bin:$PATH"',
+    "export PATH"
+];
+
+/**
  * Who the agent will be, and the home it keeps.
  *
  * First, because everything after it depends on both. The account is decided
@@ -216,20 +239,7 @@ const AGENT_ACCOUNT: readonly string[] = [
     '    sh -c "$1"',
     "  fi",
     "}",
-    // Empty on an enrolled server, where the home is the person's own and
-    // Polaris moves nothing into it.
-    'if [ -n "$POLARIS_HOME" ]; then',
-    '  mkdir -p "$POLARIS_HOME/.npm-global"',
-    '  HOME="$POLARIS_HOME"',
-    '  NPM_CONFIG_PREFIX="$POLARIS_HOME/.npm-global"',
-    '  PATH="$POLARIS_HOME/.npm-global/bin:$PATH"',
-    "  export HOME NPM_CONFIG_PREFIX PATH",
-    "fi",
-    // Where the vendors' own install scripts put their binary (Cursor, Kiro,
-    // fx and most of the curl installers in the catalogue), so a tool installed
-    // that way is found by the check that follows rather than reported missing.
-    'PATH="$HOME/.local/bin:$PATH"',
-    "export PATH",
+    ...AGENT_HOME_ENV,
     'if [ "$POLARIS_AS_ROOT" = "yes" ]; then',
     "  command -v sudo >/dev/null 2>&1 || apt-get install -y -qq sudo >/dev/null 2>&1 || true",
     '  printf "%s ALL=(ALL) NOPASSWD:ALL\\n" "$POLARIS_RUNAS" > /etc/sudoers.d/polaris-agent 2>/dev/null || true',
@@ -1435,6 +1445,18 @@ export function relaunchAgentCommand(stateDir: string, vendorSessionId: string, 
         `rm -f ${AGENT_READY_FLAG}`,
         `tmux respawn-pane -k -t "$t" "sh \\"${stateDir}/relaunch.sh\\" ${vendorSessionId} $m"`
     ].join("\n");
+}
+
+/**
+ * Whether a turn can be handed to an agent that was just moved, stopped or
+ * resumed: the runner when it takes the session's prompts (its turns start
+ * their own agent, so there is nothing to wait for), else the agent holding
+ * its pane again (`relaunchedReadyCommand`). Without the runner's case a
+ * runner session waited out the minute `agentReadyCommand` gives a pane that
+ * never leaves canonical mode before the turn was sent.
+ */
+export function movedAgentReadyCommand(stateDir: string, session = TMUX_SESSION): string {
+    return `if ! ${interfaceOpen(session)} && ${runnerReadyCommand(stateDir)}; then :; else ${relaunchedReadyCommand(session)}; fi`;
 }
 
 /** Clear the ready flag before typing a resume into the shell the agent left,
