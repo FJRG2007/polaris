@@ -31,7 +31,7 @@ import { apiUser } from "@/lib/api-session";
 import type { SessionUser } from "@/lib/session";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { CONNECTOR_AUDIENCES, DEFAULT_CONNECTOR_POLICY } from "@/lib/polar/connectors/shared";
-import { ZEN_FREE_SLUG } from "@/lib/polar/shared";
+import { ZEN_FREE_SLUG, isSubscriptionToken } from "@/lib/polar/shared";
 import { zenCredential } from "@/lib/polar/zen-free";
 import {
     chatCredentialFor,
@@ -383,10 +383,13 @@ export async function polarCredentialFor(
     access?: PolarAccess
 ): Promise<ChatCredential | null> {
     if (provider === ZEN_FREE_SLUG) return (await zenCredentials(userId, payer, access))[0] ?? null;
-    if ((access ?? (await polarAccessFor(userId))).spend)
-        return chatCredentialFor(userId, provider, payer);
-    if (payer === "instance") return null;
-    return chatCredentialFor(userId, provider, "own");
+    const spend = (access ?? (await polarAccessFor(userId))).spend;
+    if (!spend && payer === "instance") return null;
+    const credential = await chatCredentialFor(userId, provider, spend ? payer : "own");
+    if (!credential || !isSubscriptionToken(credential)) return credential;
+    // The first is a subscription token: the next that is a key, if any.
+    const all = await chatCredentialsFor(userId, provider, spend ? payer : "own");
+    return all.find((entry) => !isSubscriptionToken(entry)) ?? null;
 }
 
 /** Every credential a Polar call may spend for one provider, in the order the
@@ -398,8 +401,8 @@ export async function polarCredentialsFor(
     access?: PolarAccess
 ): Promise<ChatCredential[]> {
     if (provider === ZEN_FREE_SLUG) return zenCredentials(userId, payer, access);
-    if ((access ?? (await polarAccessFor(userId))).spend)
-        return chatCredentialsFor(userId, provider, payer);
-    if (payer === "instance") return [];
-    return chatCredentialsFor(userId, provider, "own");
+    const spend = (access ?? (await polarAccessFor(userId))).spend;
+    if (!spend && payer === "instance") return [];
+    const all = await chatCredentialsFor(userId, provider, spend ? payer : "own");
+    return all.filter((entry) => !isSubscriptionToken(entry));
 }

@@ -753,3 +753,14 @@ export interface ReceivedPolarThread extends SharedPolarThread {
     from: string | null;
     note: string | null;
 }
+
+/**
+ * Whether a stored Anthropic key is in fact a Claude subscription token (what
+ * `claude setup-token` prints, `sk-ant-oat...`). It signs Claude Code in; the
+ * API refuses it as a key ("invalid x-api-key"), so Polar never spends it on a
+ * call and reaches the subscription through Claude on the person's computer
+ * instead (`claude-subscription/`). Pure.
+ */
+export function isSubscriptionToken(credential: { provider: string; secret: string }): boolean {
+    return credential.provider === "anthropic" && credential.secret.trim().startsWith("sk-ant-oat");
+}

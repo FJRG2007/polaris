@@ -206,6 +206,21 @@ export async function withSubscription(
     return [...options, ...(runner ? [subscriptionProvider(words?.name, words?.note)] : []), ...(served ? [served] : [])];
 }
 
+/**
+ * The subscription's model for an Anthropic one - `claude-sonnet-4-5` is
+ * Sonnet - when the catalogue carries the subscription (`withSubscription`),
+ * else null. Pure.
+ */
+export function subscriptionModelFor(
+    model: string,
+    catalogue: readonly PolarProviderOption[]
+): PolarModelOption | null {
+    const family = /opus|sonnet|haiku/i.exec(model)?.[0]?.toLowerCase();
+    if (!family) return null;
+    const served = catalogue.find((entry) => entry.provider === CLAUDE_SUBSCRIPTION_PROVIDER);
+    return served?.models.find((entry) => entry.model === family) ?? null;
+}
+
 /** Whether a provider is answered by the person's own computer, with no key. */
 function onComputer(provider: string): boolean {
     return provider === CLAUDE_SUBSCRIPTION_PROVIDER || provider === localModels.LOCAL_MODELS_PROVIDER;
@@ -603,12 +618,17 @@ export async function resolvePolarModel(
             ? [{ ...SUBSCRIPTION_CREDENTIAL, provider: choice.provider }]
             : await polarCredentialsFor(userId, choice.provider, choice.payer, granted);
     const credentials = options.keyId ? held.filter((key) => key.keyId === options.keyId) : held;
-    if (credentials.length === 0) return "no_key";
+    // The same Claude on the person's own subscription, right after their
+    // Anthropic keys, while a computer that runs it is online.
+    const subscription = choice.provider === "anthropic" ? subscriptionModelFor(option.model, catalogue) : null;
+    if (credentials.length === 0 && !subscription) return "no_key";
     const routing = await polarRouting(userId);
     const keysOf = credentialCache(userId, granted);
-    const entries: PlanEntry[] = [
-        entryOf(userId, option, credentials, catalogue, options.reasoning)
-    ];
+    const entries: PlanEntry[] = [];
+    if (credentials.length > 0) entries.push(entryOf(userId, option, credentials, catalogue, options.reasoning));
+    if (subscription) {
+        entries.push(entryOf(userId, subscription, [SUBSCRIPTION_CREDENTIAL], catalogue, options.reasoning));
+    }
     if (routing.pinnedFallsBack || options.fallBack) {
         entries.push(...(await fallbackEntries(userId, routing.fallbacks, catalogue, keysOf)));
     }
