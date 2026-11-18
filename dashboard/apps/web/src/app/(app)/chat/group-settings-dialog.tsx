@@ -14,7 +14,7 @@
  * whom either of these is a question.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
@@ -44,12 +44,15 @@ export function GroupSettingsDialog({
     channel,
     open,
     onOpenChange,
-    onChanged
+    onChanged,
+    privacy
 }: {
     channel: ChatChannelView;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onChanged: () => void;
+    /** The group's read receipts, typing and timer, as its profile draws them. */
+    privacy?: ReactNode;
 }) {
     const t = useTranslations("chat");
     const [members, setMembers] = useState<readonly ChatMemberView[]>([]);
@@ -264,6 +267,8 @@ export function GroupSettingsDialog({
                             </PlainNames>
                         )}
                     </div>
+
+                    {privacy}
 
                     {error && (
                         <p role="alert" className="text-sm text-danger">

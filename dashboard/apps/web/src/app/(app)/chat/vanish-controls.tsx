@@ -10,11 +10,18 @@
 
 import { runAction } from "@/lib/run-action";
 import * as vanishActions from "./vanish-actions";
-import { Check, Timer, Trash2 } from "lucide-react";
+import { Check, Eye, PenLine, Timer, Trash2 } from "lucide-react";
+import type { ChatRulesChange } from "./chat-privacy-section";
 import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { isExpired, VANISH_DURATIONS, type VanishDuration } from "@/lib/chat/vanish-rules";
+import {
+    CHAT_PRIVACY_RULES,
+    isExpired,
+    VANISH_DURATIONS,
+    type ChatPrivacyRule,
+    type VanishDuration
+} from "@/lib/chat/vanish-rules";
 import {
     createContext,
     useCallback,
@@ -192,18 +199,47 @@ export function VanishMenu({
     rules,
     onTimer,
     onAllowDelete,
+    onRules,
     onDeleteChat
 }: {
     rules: DirectRulesView;
     onTimer: (seconds: VanishDuration) => void;
     onAllowDelete: (allowed: boolean) => void;
+    /** Read receipts and the typing indicator, the same change the privacy
+     *  section makes. */
+    onRules: (change: ChatRulesChange) => void;
     onDeleteChat: () => void;
 }) {
     const t = useTranslations("chat");
     const agreement = rules.mode === "agreement";
+    const ruleMenu = (key: "receipts" | "typing", Icon: typeof Eye) => (
+        <DropdownMenuSub key={key}>
+            <DropdownMenuSubTrigger>
+                <Icon className="size-3.5" />
+                {t(`chatPrivacy.${key}`)}
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+                {rules.proposes && (
+                    <p className="max-w-56 px-2 py-1 text-[0.6875rem] text-foreground-subtle">
+                        {t("vanish.proposeHint")}
+                    </p>
+                )}
+                {CHAT_PRIVACY_RULES.map((rule: ChatPrivacyRule) => (
+                    <DropdownMenuItem key={rule} onSelect={() => onRules({ [key]: rule })}>
+                        <Check className={cn("size-3.5", rules[key] !== rule && "invisible")} />
+                        {t(`chatPrivacy.${rule}`)}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuSubContent>
+        </DropdownMenuSub>
+    );
     return (
         <>
             <DropdownMenuSeparator />
+            {/* The conversation's privacy, beside its timer: the same three
+                rows its profile panel draws, so neither place hides one. */}
+            {rules.mayChange && ruleMenu("receipts", Eye)}
+            {rules.mayChange && ruleMenu("typing", PenLine)}
             {/* A group member who does not run it reads the timer in the
                 privacy section, with the reason; the menu offers only what
                 they may do. */}

@@ -40,6 +40,7 @@ import type { ChatChannelView } from "@/lib/chat/chat-service";
 import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { VanishDuration } from "@/lib/chat/vanish-rules";
 import { VanishBadge, VanishMenu } from "./vanish-controls";
+import type { ChatRulesChange } from "./chat-privacy-section";
 import {
     ArrowLeft,
     Hash,
@@ -127,7 +128,11 @@ export function ChannelHeader({
         readonly rules: DirectRulesView;
         readonly onTimer: (seconds: VanishDuration) => void;
         readonly onAllowDelete: (allowed: boolean) => void;
+        readonly onRules: (change: ChatRulesChange) => void;
         readonly onDeleteChat: () => void;
+        /** The conversation's privacy section, drawn again in a group's
+         *  settings so its owner finds it where the rest of the group is. */
+        readonly privacy?: React.ReactNode;
     };
 }) {
     const t = useTranslations("chat");
@@ -562,6 +567,7 @@ export function ChannelHeader({
                                     rules={vanish.rules}
                                     onTimer={vanish.onTimer}
                                     onAllowDelete={vanish.onAllowDelete}
+                                    onRules={vanish.onRules}
                                     onDeleteChat={vanish.onDeleteChat}
                                 />
                             )}
@@ -693,6 +699,7 @@ export function ChannelHeader({
                     open={settings}
                     onOpenChange={setSettings}
                     onChanged={onChanged}
+                    privacy={vanish?.privacy}
                 />
             )}
 
