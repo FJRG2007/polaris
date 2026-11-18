@@ -325,6 +325,21 @@ jobs:
           sudo nohup rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
             /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/local/share/powershell \
             > /dev/null 2>&1 &
+      # The compile's peak outgrows the runner's memory: with a 10 GB heap it
+      # failed with "cannot allocate memory" on 2026-11-18, while the Dashboard
+      # cache build of the same commit, which has this swap, passed. On the
+      # runner's scratch disk when there is one, so it does not take the room the
+      # image and the caches need on / before the deletion above has finished.
+      - name: Add swap
+        continue-on-error: true
+        run: |
+          swap=/polaris-swap
+          if [ -d /mnt ] && [ "$(df --output=avail -k /mnt | tail -1)" -gt 16000000 ]; then swap=/mnt/polaris-swap; fi
+          sudo fallocate -l 12G "$swap"
+          sudo chmod 600 "$swap"
+          sudo mkswap "$swap"
+          sudo swapon "$swap"
+          free -h
       - uses: actions/checkout@v7
       # `cleanup: false` here and in every job: the runner VM is thrown away with
       # the job, and removing this builder first cost the web job 45 seconds.
