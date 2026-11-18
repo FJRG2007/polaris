@@ -1371,6 +1371,10 @@ export function Composer({
                     <RichTextEditor
                         key={generation}
                         framed
+                        // Grows with what is written, up to a part of the screen, and
+                        // scrolls after that: a long message on a phone must not push
+                        // the conversation it answers out of sight.
+                        className="max-h-[min(16rem,40dvh)] overflow-y-auto overscroll-contain"
                         value={body}
                         reveal={reveal}
                         insert={handed}

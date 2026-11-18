@@ -16,6 +16,7 @@
 import { ArrowUp, Paperclip, Square } from "lucide-react";
 import { Button, cn, type ButtonProps } from "@polaris/ui";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
+import { enterBreaksLine } from "@/lib/enter-key";
 import {
     forwardRef,
     useCallback,
@@ -93,8 +94,9 @@ export const PromptInputTextarea = forwardRef<
                 onKeyDown?.(event);
                 if (event.defaultPrevented) return;
                 // Enter sends, Shift+Enter is a new line, and a key held to
-                // compose an accented letter is never a send.
-                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                // compose an accented letter is never a send. A phone has no
+                // shift, so there Enter is the new line and the button sends.
+                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && !enterBreaksLine()) {
                     event.preventDefault();
                     onSubmitKey();
                 }

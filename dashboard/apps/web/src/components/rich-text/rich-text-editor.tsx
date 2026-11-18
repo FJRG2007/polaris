@@ -35,6 +35,7 @@ import type { CustomEmojiEntry } from "./custom-emoji";
 import { withCustomEmojiNodes } from "./custom-emoji-doc";
 import { CustomEmojiNode, emojiExtension } from "./emoji-suggestion";
 import { resolveReferencesAction, searchMentionsAction } from "@/app/(app)/mention-actions";
+import { enterBreaksLine, enterKeyHint } from "@/lib/enter-key";
 
 export interface RichTextEditorProps {
     /** The stored Markdown. */
@@ -381,7 +382,9 @@ export function RichTextEditor({
                     "[&_p.is-editor-empty:first-child::before]:text-muted-foreground",
                     "[&_p.is-editor-empty:first-child::before]:content-[attr(data-placeholder)]"
                 ),
-                ...(ariaLabel ? { "aria-label": ariaLabel } : {})
+                ...(ariaLabel ? { "aria-label": ariaLabel } : {}),
+                // The keyboard's own Enter key says what it will do here.
+                ...(onSubmit ? { enterkeyhint: enterKeyHint() } : {})
             },
             handleKeyDown: (view, event) => {
                 // Somebody is writing. Anything that puts a character in - a
@@ -408,6 +411,14 @@ export function RichTextEditor({
                 if (event.metaKey || event.ctrlKey) return send();
 
                 const { $from } = view.state.selection;
+                // On a phone Enter breaks the line and the send button sends.
+                // A line break rather than a new paragraph, the same as shift+Enter
+                // on a computer, so the message arrives with the lines it was
+                // written with; in a list it is still the next item.
+                if (enterBreaksLine()) {
+                    if ($from.parent.type.name !== "paragraph" || $from.node(-1).type.name === "listItem") return false;
+                    return editorRef.current?.commands.setHardBreak() ?? false;
+                }
                 // Inside a code block Enter is a newline. A composer where the
                 // only way to write two lines of code is to not press Enter is a
                 // composer nobody writes code in.

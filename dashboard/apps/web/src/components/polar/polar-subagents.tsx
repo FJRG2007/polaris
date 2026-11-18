@@ -26,6 +26,7 @@ import {
 } from "@polaris/ui";
 import * as shared from "@/lib/polar/subagents/shared";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { enterBreaksLine } from "@/lib/enter-key";
 
 /** How often a running subagent is read again. */
 const POLL_MS = 2_500;
@@ -399,7 +400,7 @@ export function SubagentDialog({
                             }
                             className="min-w-0 flex-1 resize-none"
                             onKeyDown={(event) => {
-                                if (event.key === "Enter" && !event.shiftKey) {
+                                if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing && !enterBreaksLine()) {
                                     event.preventDefault();
                                     void send();
                                 }
