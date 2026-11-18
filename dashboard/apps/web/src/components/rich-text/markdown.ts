@@ -655,6 +655,23 @@ function forEachProseText(markdown: string, visit: (text: string) => void): void
  * Returned as pieces rather than as markup: nothing here produces HTML, and the
  * text still goes to the screen as text.
  */
+/**
+ * A run of text cut at every `@polar`, the way `splitChannelMentions` cuts at a
+ * room mention, so the reader draws Polar as the mention of somebody.
+ */
+export function splitPolarMentions(text: string): { readonly text: string; readonly polar: boolean }[] {
+    const parts: { text: string; polar: boolean }[] = [];
+    let at = 0;
+    for (const match of text.matchAll(new RegExp(POLAR_MENTION.source, "gi"))) {
+        const start = (match.index ?? 0) + (match[1]?.length ?? 0);
+        if (start > at) parts.push({ text: text.slice(at, start), polar: false });
+        parts.push({ text: text.slice(start, start + "@polar".length), polar: true });
+        at = start + "@polar".length;
+    }
+    if (at < text.length) parts.push({ text: text.slice(at), polar: false });
+    return parts;
+}
+
 export function splitChannelMentions(
     text: string
 ): { readonly text: string; readonly mention: ChannelMention | null }[] {

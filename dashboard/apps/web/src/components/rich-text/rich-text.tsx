@@ -17,6 +17,7 @@ import { cn } from "@polaris/ui";
 import { CodeBlock } from "./code-block";
 import { RICH_TEXT_PROSE } from "./prose";
 import { Chip, TaskBox } from "./rich-text-client";
+import { PolarMention } from "@/components/polar/polar-bot";
 import {
     customEmojiAsText,
     emojiOnlyCount,
@@ -34,7 +35,8 @@ import {
     markdownToDoc,
     READER_TABLE,
     MARKDOWN_BLOCK,
-    splitChannelMentions
+    splitChannelMentions,
+    splitPolarMentions
 } from "./markdown";
 
 /**
@@ -414,13 +416,22 @@ function Inline({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
             }
             return <>{content}</>;
         }
-        const parts = splitChannelMentions(node.text ?? "");
+        const parts = splitChannelMentions(node.text ?? "").flatMap((part) =>
+            part.mention
+                ? [{ text: part.text, mention: part.mention as string }]
+                : splitPolarMentions(part.text).map((run) => ({
+                      text: run.text,
+                      mention: run.polar ? "polar" : null
+                  }))
+        );
         // Only when there is one to draw. Wrapping every run of text in an
         // element to find out would put a span around every word of every
         // message in Polaris for the sake of the handful that name a room.
         if (parts.some((part) => part.mention)) {
             content = parts.map((part, index) =>
-                part.mention ? (
+                part.mention === "polar" ? (
+                    <PolarMention key={index} text={part.text} />
+                ) : part.mention ? (
                     <span
                         key={index}
                         className="rounded bg-primary/15 px-1 py-0.5 font-medium text-primary"

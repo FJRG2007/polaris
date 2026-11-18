@@ -22,6 +22,7 @@ import { baseExtensions } from "./schema";
 import { RICH_TEXT_PROSE } from "./prose";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { usePolarAllowed } from "@/components/polar/polar-allowed";
 import { SelectionToolbar } from "./toolbar";
 import type { JSONContent } from "@tiptap/core";
 import { afterComposition } from "./composed-shortcuts";
@@ -287,6 +288,7 @@ export function RichTextEditor({
     const words = useRef(t);
     words.current = t;
     const hint = placeholder ?? t("editor.placeholder");
+    const polarAllowed = usePolarAllowed();
 
     const search = useCallback(
         async (kinds: readonly refs.ReferenceKind[], query: string) => {
@@ -324,10 +326,12 @@ export function RichTextEditor({
                 commands: () => commands.current ?? [],
                 say: () => (id) => words.current(`editor.blocks.${id}`)
             }),
-            mentionExtension(search, mentionsIn !== null && roomMentions, mentionsIn !== null),
+            // Polar only for whoever may ask it: offering a name that answers
+            // "not available to you" is a suggestion that leads nowhere.
+            mentionExtension(search, mentionsIn !== null && roomMentions, mentionsIn !== null && polarAllowed),
             ...(writesEmoji ? [CustomEmojiNode, emojiExtension(() => customEmoji.current)] : [])
         ],
-        [hint, search, mentionsIn, roomMentions, writesEmoji]
+        [hint, search, mentionsIn, roomMentions, writesEmoji, polarAllowed]
     );
 
     /** A document with the space's emoji drawn as pictures, where this box

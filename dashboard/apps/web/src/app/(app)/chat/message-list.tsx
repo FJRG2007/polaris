@@ -30,6 +30,7 @@ import { useHeldCall } from "./call-hold";
 import { Avatar } from "@/components/avatar";
 import { WebhookFace } from "./webhook-face";
 import { PersonName } from "@/components/person-name";
+import { PolarBadge, PolarBotCard, PolarFace, POLAR_NAME } from "@/components/polar/polar-bot";
 import { Spoiler } from "./spoiler";
 import { MessageMenu } from "./message-menu";
 import { deleteKeyWithShift, type DeleteMessage } from "./delete-message";
@@ -196,8 +197,7 @@ import {
     SmilePlus,
     Star,
     Trash2,
-    Volume2,
-    BotMessageSquare
+    Volume2
 } from "lucide-react";
 import * as polls from "./chat-reads";
 import { unlockProofFor } from "./lock-session";
@@ -1006,12 +1006,15 @@ function Message({
                                 )}
                             </Writer>
                         ) : message.fromAgent ? (
-                            <span
-                                className="inline-flex size-7 items-center justify-center rounded-full bg-primary text-primary-foreground"
-                                aria-hidden="true"
-                            >
-                                <BotMessageSquare className="size-4 shrink-0" />
-                            </span>
+                            <PolarBotCard>
+                                <button
+                                    type="button"
+                                    aria-label={POLAR_NAME}
+                                    className="rounded-full focus-visible:outline-2 focus-visible:outline-ring"
+                                >
+                                    <PolarFace size={28} />
+                                </button>
+                            </PolarBotCard>
                         ) : message.fromWebhook ? (
                             <WebhookFace src={message.webhookAvatar} />
                         ) : (
@@ -1073,19 +1076,26 @@ function Message({
                                             <PersonName id={message.authorId} name={author} />
                                         </button>
                                     </Writer>
+                                ) : message.fromAgent ? (
+                                    <PolarBotCard>
+                                        <button
+                                            type="button"
+                                            className="rounded text-start text-sm font-medium underline-offset-2 hover:underline focus-visible:underline"
+                                        >
+                                            {author}
+                                        </button>
+                                    </PolarBotCard>
                                 ) : (
                                     <span className="text-sm font-medium">
                                         <PersonName id={message.authorId} name={author} />
                                     </span>
                                 )}
+                                {/* Not a person: Polar, answering a mention. Its
+                                tag says so, as a bot's does on any platform. */}
+                                {message.fromAgent && <PolarBadge />}
                                 {/* Not a person: something outside Polaris posting
                                 through one of the channel's webhooks, under a name
                                 it chose. Discord's APP tag says the same. */}
-                                {message.fromAgent && (
-                                    <span className="min-w-0 max-w-full shrink-0 truncate self-center rounded bg-primary px-1 text-[0.625rem] font-semibold uppercase leading-4 text-primary-foreground" title={t("polar.badge")}>
-                                        {t("polar.badge")}
-                                    </span>
-                                )}
                                 {message.fromWebhook && (
                                     <span
                                         className="shrink-0 self-center rounded bg-primary px-1 text-[0.625rem] font-semibold uppercase leading-4 text-primary-foreground"

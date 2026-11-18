@@ -15,7 +15,8 @@
 
 import { keepOwnScroll } from "@/lib/keep-own-scroll";
 import * as refs from "./references";
-import { AtSign, BotMessageSquare } from "lucide-react";
+import { AtSign } from "lucide-react";
+import { PolarFace } from "@/components/polar/polar-bot";
 import { REFERENCE } from "./markdown";
 import { Extension } from "@tiptap/core";
 import { cn, Skeleton } from "@polaris/ui";
@@ -243,13 +244,11 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
                                     person={{ id: item.id, name: item.label, image: item.image }}
                                     size={20}
                                 />
+                            ) : item.kind === "room" && item.id === "polar" ? (
+                                <PolarFace size={20} />
                             ) : item.kind === "room" ? (
                                 <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-primary/10 text-[0.6875rem] text-primary">
-                                    {item.id === "polar" ? (
-                                        <BotMessageSquare className="size-3 shrink-0" />
-                                    ) : (
-                                        <AtSign className="size-3 shrink-0" />
-                                    )}
+                                    <AtSign className="size-3 shrink-0" />
                                 </span>
                             ) : (
                                 <span className="inline-flex size-5 shrink-0 items-center justify-center rounded bg-muted text-[0.625rem] uppercase text-muted-foreground">
