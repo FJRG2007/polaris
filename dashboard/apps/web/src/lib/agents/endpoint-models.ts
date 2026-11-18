@@ -12,9 +12,10 @@
  * Bounded everywhere, because the address is somebody else's choice: at most
  * `MAX_PROVIDERS` endpoints, `MAX_MODELS` models each, `MAX_BYTES` of answer,
  * and every request through the guarded fetch, so a name that resolves to a
- * private address is refused when it is asked. No key is sent: a refresh runs
- * for nobody in particular, and an endpoint that only lists models to a key
- * keeps offering the model its row names.
+ * private address is refused when it is asked. The daily refresh sends no key: it
+ * runs for nobody in particular. An endpoint that only lists models to a key
+ * (Numes) is read with one instead when a key for it is saved and passes its
+ * check, and the keyless refresh that it then refuses keeps that list.
  *
  * Server-only.
  */
@@ -85,11 +86,13 @@ export function endpointProviders(only?: readonly string[]): Array<{ slug: strin
 }
 
 /** One endpoint's model list, or null when it could not be read. */
-async function readEndpoint(provider: { slug: string; baseUrl: string }) {
+async function readEndpoint(provider: { slug: string; baseUrl: string }, apiKey?: string) {
     try {
+        const headers: Record<string, string> = { accept: "application/json" };
+        if (apiKey) headers.authorization = `Bearer ${apiKey}`;
         const response = await configuredRequest(
             `${provider.baseUrl}/models`,
-            { method: "GET", headers: { accept: "application/json" }, timeoutMs: TIMEOUT_MS },
+            { method: "GET", headers, timeoutMs: TIMEOUT_MS },
             { allowPrivate: false }
         );
         if (!response.ok) {
@@ -118,28 +121,45 @@ export async function refreshEndpointModels(only?: readonly string[]): Promise<n
     let stored = 0;
     for (let i = 0; i < providers.length; i += PARALLEL) {
         const batch = providers.slice(i, i + PARALLEL);
-        const lists = await Promise.all(batch.map(readEndpoint));
+        const lists = await Promise.all(batch.map((provider) => readEndpoint(provider)));
         for (const [index, rows] of lists.entries()) {
-            if (!rows || rows.length === 0) continue;
-            const provider = batch[index]!.slug;
-            const now = new Date();
-            await prisma
-                .$transaction([
-                    prisma.agentModel.deleteMany({ where: { provider } }),
-                    prisma.agentModel.createMany({
-                        data: rows.map((row) => ({ ...row, refreshedAt: now })),
-                        skipDuplicates: true
-                    })
-                ])
-                .then(() => {
-                    stored += rows.length;
-                })
-                .catch((error: unknown) =>
-                    console.error(`polar: could not store ${provider}'s models`, error)
-                );
+            stored += await storeEndpointModels(batch[index]!.slug, rows);
         }
     }
     return stored;
+}
+
+/**
+ * Read one provider's models with a key that was just saved for it, for an
+ * endpoint that lists nothing without one. Does nothing for a provider in the
+ * public index, whose models come from there. Returns how many were stored.
+ */
+export async function refreshEndpointModelsWithKey(slug: string, apiKey: string): Promise<number> {
+    const provider = endpointProviders([slug])[0];
+    if (!provider || !apiKey.trim()) return 0;
+    return storeEndpointModels(slug, await readEndpoint(provider, apiKey.trim()));
+}
+
+/** Replace what is stored for one provider, unless its read gave nothing. */
+async function storeEndpointModels(
+    provider: string,
+    rows: ReturnType<typeof parseEndpointModels> | null
+): Promise<number> {
+    if (!rows || rows.length === 0) return 0;
+    const now = new Date();
+    try {
+        await prisma.$transaction([
+            prisma.agentModel.deleteMany({ where: { provider } }),
+            prisma.agentModel.createMany({
+                data: rows.map((row) => ({ ...row, refreshedAt: now })),
+                skipDuplicates: true
+            })
+        ]);
+        return rows.length;
+    } catch (error) {
+        console.error(`polar: could not store ${provider}'s models`, error);
+        return 0;
+    }
 }
 
 /** Forget a removed provider's models. */

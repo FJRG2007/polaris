@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
     fetched: [] as string[],
+    keys: [] as Array<string | null>,
     bodies: new Map<string, { status: number; body: string }>(),
     deleted: [] as string[],
     created: [] as Array<{ slug: string }>
@@ -15,10 +16,13 @@ const state = vi.hoisted(() => ({
 
 vi.mock("undici", () => ({
     Agent: class {},
-    fetch: async (input: URL | string) => {
+    fetch: async (input: URL | string, init?: { headers?: HeadersInit }) => {
         const address = String(input);
         state.fetched.push(address);
-        const canned = state.bodies.get(address);
+        const key = new Headers(init?.headers).get("authorization");
+        state.keys.push(key);
+        // An endpoint that lists only to a key answers 401 to everybody else.
+        const canned = state.bodies.get(key ? `${address} ${key}` : address);
         if (!canned) throw new Error("nothing there");
         return new Response(canned.body, { status: canned.status });
     }
@@ -67,6 +71,7 @@ function row(slug: string, host: string): snapshot.CatalogProvider {
 
 beforeEach(() => {
     state.fetched.length = 0;
+    state.keys.length = 0;
     state.bodies.clear();
     state.deleted.length = 0;
     state.created.length = 0;
@@ -135,5 +140,34 @@ describe("refreshing the endpoints' models", () => {
         );
         // Coarena's seed row is kept beside them, and still counts toward the ceiling.
         expect(models.endpointProviders()).toHaveLength(models.MAX_PROVIDERS);
+    });
+});
+
+describe("an endpoint that lists its models only to a key", () => {
+    const list = "https://api.numes.ai/api/v1/models";
+
+    it("is read with the key just saved for it, and stored", async () => {
+        state.bodies.set(list, { status: 401, body: "{}" });
+        state.bodies.set(`${list} Bearer sk-numes`, {
+            status: 200,
+            body: JSON.stringify({ data: [{ id: "openai/gpt-6-luna" }, { id: "qwen/qwen-4" }] })
+        });
+        expect(await models.refreshEndpointModelsWithKey("numes", " sk-numes ")).toBe(2);
+        expect(state.created.map((entry) => entry.slug)).toEqual([
+            "numes/openai/gpt-6-luna",
+            "numes/qwen/qwen-4"
+        ]);
+    });
+
+    it("keeps that list when the keyless daily refresh is refused", async () => {
+        state.bodies.set(list, { status: 401, body: "{}" });
+        expect(await models.refreshEndpointModels(["numes"])).toBe(0);
+        expect(state.keys).toEqual([null]);
+        expect(state.deleted).toEqual([]);
+    });
+
+    it("sends no key to a provider in the public index", async () => {
+        expect(await models.refreshEndpointModelsWithKey("openai", "sk-x")).toBe(0);
+        expect(state.fetched).toEqual([]);
     });
 });

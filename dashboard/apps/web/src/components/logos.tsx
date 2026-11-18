@@ -73,6 +73,7 @@ const MODEL_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     opencode: models.OpenCodeMark,
     "opencode-go": models.OpenCodeMark,
     "cline-pass": models.ClineMark,
+    numes: models.NumesMark,
     // The gateway is not a provider, but it is a thing with a name and a mark,
     // and it sits in the same list.
     enigma: brand.EnigmaMark

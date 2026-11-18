@@ -1030,3 +1030,20 @@ export function AzureMark(props: SVGProps<SVGSVGElement>) {
         </svg>
     );
 }
+
+/** Numes's mark, from the favicon its own site serves. Monochrome there too
+ *  (near-black, lime in dark mode), so it follows the text colour here. */
+export function NumesMark(props: SVGProps<SVGSVGElement>) {
+    return (
+        <svg
+            viewBox="0 0 219 167"
+            xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
+            {...mark(props)}
+        >
+            <path fill="currentColor" d="M0 0L67 0L219 152L219 167L149 167L0 18Z" />
+            <path fill="currentColor" d="M158 0L173 0L219 45L219 167L158 167Z" />
+            <path fill="currentColor" d="M0 78L61 78L61 167L0 167Z" />
+        </svg>
+    );
+}

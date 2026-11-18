@@ -852,6 +852,25 @@ export const MODEL_PROVIDER_SEEDS: readonly ModelProviderSeed[] = [
         anthropicBaseUrl: "https://coarena.ai/api",
         defaultModel: { label: "Claude Sonnet 5.5 (Coarena)", slug: "coarena/claude-sonnet-5-5" }, // i18n-ignore
         free: { kind: "free", note: "Some models are free every day, with no card needed." }
+    },
+    {
+        // Not in the public index either. Every fact below is from its own docs
+        // (https://numes.ai/docs/api-reference/overview): an OpenAI-compatible
+        // API at /api/v1, a Bearer key, and a model list that answers 401
+        // without one - so it is the key check, and the list is read with the
+        // key once it is saved (`endpoint-models.ts`). The default is the model
+        // its own quickstart sends. Prepaid only, so no free tier.
+        slug: "numes",
+        name: "Numes",
+        kind: "gateway",
+        envVar: "NUMES_API_KEY",
+        summary: "A marketplace of independent hosts behind one key, paid in USD or Bitcoin.",
+        docsUrl: "https://numes.ai/docs/quickstart",
+        probe: "https://api.numes.ai/api/v1/models",
+        outsideIndex: true,
+        baseUrl: "https://api.numes.ai/api/v1",
+        wire: "openai",
+        defaultModel: { label: "GPT 6 Luna (Numes)", slug: "numes/openai/gpt-6-luna" } // i18n-ignore
     }
 ];
 

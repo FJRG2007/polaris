@@ -16,6 +16,7 @@ import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit-service";
 import { readGatewayConfig } from "@/lib/integrations/registry";
 import { checkProviderKey } from "@/lib/agents/provider-key-check";
+import { refreshEndpointModelsWithKey } from "@/lib/agents/endpoint-models";
 import { ensureProviderCatalog } from "@/lib/integrations/provider-catalog";
 import { createModelKeySchema, reorderModelKeysSchema, updateModelKeySchema } from "@polaris/core";
 import {
@@ -185,8 +186,21 @@ export async function addKey(scope: KeyScope, input: unknown): Promise<KeyAction
         targetId: parsed.data.provider,
         metadata: { name: parsed.data.name }
     });
+    listModelsWith(parsed.data.provider, parsed.data.secret, check.state);
     revalidatePath(scope.path);
     return check.state === "unverified" ? { warning: check.reason } : {};
+}
+
+/**
+ * A provider reached by its own endpoint that lists its models only to a key
+ * (Numes) offers nothing past its default model until one is saved, so the key
+ * that just passed its check is used once to read that list. Left running: the
+ * save does not wait on somebody else's endpoint, and a failure keeps the list
+ * there was.
+ */
+function listModelsWith(provider: string, secret: string, state: string): void {
+    if (state !== "valid") return;
+    void refreshEndpointModelsWithKey(provider, secret).catch(() => undefined);
 }
 
 export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActionResult> {
@@ -209,6 +223,8 @@ export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActio
     let warning: string | undefined;
     // Read once a key or a workspace changes: both are told apart by provider.
     let provider: string | null = null;
+    /** What the check said of a retyped key, which is the only one listed with. */
+    let retyped: string | undefined;
     if (parsed.data.secret !== undefined || parsed.data.workspaceId !== undefined) {
         provider = await providerOfModelKey(scope.owner, parsed.data.id);
         if (!provider) return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
@@ -228,6 +244,7 @@ export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActio
         const check = await checkProviderKey(provider, parsed.data.secret, { workspaceId });
         if (check.state === "rejected") return refusal(check);
         if (check.state === "unverified") warning = check.reason;
+        retyped = check.state;
     } else if (provider && workspaceId !== undefined) {
         // A new workspace is checked with the key already held: a mistyped one
         // would otherwise only show up as the next run's failure.
@@ -263,6 +280,8 @@ export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActio
         targetId: parsed.data.id,
         metadata: { name: parsed.data.name }
     });
+    if (provider && parsed.data.secret !== undefined && retyped)
+        listModelsWith(provider, parsed.data.secret, retyped);
     revalidatePath(scope.path);
     return warning ? { warning } : {};
 }
