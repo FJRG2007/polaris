@@ -205,7 +205,7 @@ export function AddConnectionDialog({
                             placeholder={t("modelKeys.connect.search")}
                             aria-label={t("modelKeys.connect.search")}
                         />
-                        <ul className="-mx-1 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-1">
+                        <ul className="-mx-1 flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain px-1">
                             {ordered.map((group) => (
                                 <li key={group.key}>
                                     <button
