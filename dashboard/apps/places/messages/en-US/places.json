@@ -172,6 +172,10 @@
             "description": "Recordings, newest first. Anything you keep survives the retention window.",
             "title": "Clips"
         },
+        "deviceAccounts": {
+            "description": "The makers' clouds, bridges and hubs the devices here come from.",
+            "title": "Accounts"
+        },
         "devices": {
             "description": "The locks, switches and lights at this place: what they are doing, who has used them, and the buttons to work them.",
             "title": "Devices"
@@ -1871,6 +1875,10 @@
         }
     },
     "devicesView": {
+        "accounts": "Accounts",
+        "noAccountsManage": "Connect a maker's account, a bridge or a hub to bring its devices in.",
+        "noAccountsTitle": "No accounts yet",
+        "noAccountsView": "Nobody has connected an account here yet.",
         "rooms": "Rooms",
         "disconnectName": "Disconnect {name}",
         "refused": "{name} is refusing what Polaris opens it with, so its devices are not being read. It was probably revoked.",

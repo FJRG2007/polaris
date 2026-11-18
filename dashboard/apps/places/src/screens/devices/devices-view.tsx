@@ -42,6 +42,7 @@ import * as registry from "../../lib/device-connections";
 import { BatteryMeter } from "./battery-meter";
 import {
     BatteryCharging,
+    Link2,
     BatteryLow,
     Check,
     DoorOpen,
@@ -129,7 +130,9 @@ export function DevicesView({
     placeId,
     cacheKey,
     canControl,
-    canManage
+    canManage,
+    section = "devices",
+    initialAccount = null
 }: {
     places: readonly PlaceView[];
     /** The place being looked at. */
@@ -138,8 +141,15 @@ export function DevicesView({
     cacheKey: string;
     canControl: boolean;
     canManage: boolean;
+    /** Which screen this is: the devices, or the accounts they come from. One
+     *  view for both, so both share one read, one live stream and one cache. */
+    section?: "devices" | "accounts";
+    /** The account the devices screen opens narrowed to (`?account=`). */
+    initialAccount?: string | null;
 }) {
     const t = usePlacesT();
+    const router = useRouter();
+    const onAccounts = section === "accounts";
     const [devices, setDevices] = useState<DeviceView[] | null>(null);
     const [accounts, setAccounts] = useState<DeviceAccountView[]>([]);
     const [connecting, setConnecting] = useState(false);
@@ -175,7 +185,7 @@ export function DevicesView({
     );
     /** The account a row of the accounts table narrowed the list to. One that
      *  has since gone narrows nothing. */
-    const [accountPicked, setAccountPicked] = useState<string | null>(null);
+    const [accountPicked, setAccountPicked] = useState<string | null>(initialAccount);
     const accountShown = accounts.find((account) => account.id === accountPicked) ?? null;
     const filtered = useMemo(() => {
         const found = list.filterEntries(entries, { groups: kindsShown, query }, t, (id) =>
@@ -511,8 +521,7 @@ export function DevicesView({
                             </Button>
                         )}
                     </div>
-                    <AccountsTableSkeleton />
-                    <Skeleton className="h-20 w-full" />
+                    {onAccounts ? <AccountsTableSkeleton /> : <Skeleton className="h-20 w-full" />}
                 </div>
                 {connectDialog}
             </>
@@ -547,7 +556,13 @@ export function DevicesView({
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center gap-2">
                 <span className="flex-1" />
-                {canManage && (
+                {!onAccounts && accounts.length > 0 && (
+                    <Button size="sm" variant="outline" onClick={() => router.push("/places/devices/accounts")}>
+                        <Link2 className="size-4 shrink-0" />
+                        {t("devicesView.accounts")}
+                    </Button>
+                )}
+                {canManage && !onAccounts && (
                     <Button size="sm" variant="outline" onClick={() => setArranging(true)}>
                         <DoorOpen className="size-4 shrink-0" />
                         {t("devicesView.rooms")}
@@ -571,12 +586,25 @@ export function DevicesView({
                 </Button>
             </div>
 
-            {accounts.length > 0 && (
+            {onAccounts && accounts.length === 0 && (
+                <EmptyState
+                    title={t("devicesView.noAccountsTitle")}
+                    description={
+                        canManage ? t("devicesView.noAccountsManage") : t("devicesView.noAccountsView")
+                    }
+                />
+            )}
+
+            {onAccounts && accounts.length > 0 && (
                 <AccountsTable
                     accounts={accounts}
                     canManage={canManage}
-                    shownAccountId={accountShown?.id ?? null}
-                    onShowDevices={setAccountPicked}
+                    shownAccountId={null}
+                    onShowDevices={(id) =>
+                        router.push(
+                            id ? `/places/devices?account=${encodeURIComponent(id)}` : "/places/devices"
+                        )
+                    }
                     onReconnect={setReconnecting}
                     onConnect={() => setConnecting(true)}
                     onLink={setLinking}
@@ -585,18 +613,27 @@ export function DevicesView({
                 />
             )}
 
-            {accountShown && (
+            {!onAccounts && accountShown && (
                 <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
                     <span className="min-w-0 truncate font-medium" title={accountShown.label}>
                         {t("devicesView.devicesOf", { name: accountShown.label })}
                     </span>
-                    <Button size="sm" variant="ghost" onClick={() => setAccountPicked(null)}>
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                            setAccountPicked(null);
+                            router.replace("/places/devices");
+                        }}
+                    >
                         {t("devicesView.showAllDevices")}
                     </Button>
                 </div>
             )}
 
-            <HandoverNotes accounts={accounts} canManage={canManage} onRemove={setDisconnecting} />
+            {onAccounts && (
+                <HandoverNotes accounts={accounts} canManage={canManage} onRemove={setDisconnecting} />
+            )}
 
             {accounts
                 // One left empty by a move says so above, with its own button.
@@ -663,6 +700,8 @@ export function DevicesView({
                 </p>
             )}
 
+            {!onAccounts && (
+                <>
             {devices.some((device) => device.placeId === null) && (
                 <p className="text-xs text-muted-foreground">{t("devicesView.unplacedNote")}</p>
             )}
@@ -793,6 +832,8 @@ export function DevicesView({
                         </Button>
                     )}
                 </div>
+            )}
+                </>
             )}
             <DevicePanel
                 device={opened}

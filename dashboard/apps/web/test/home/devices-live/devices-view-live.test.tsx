@@ -56,6 +56,11 @@ let release: () => void = () => undefined;
 let gate: Promise<void> = Promise.resolve();
 let answer: (value: { device?: DeviceView; error?: string }) => void = () => undefined;
 
+vi.mock("next/navigation", async (original) => ({
+    ...(await original<typeof import("next/navigation")>()),
+    useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined })
+}));
+
 vi.mock("@polaris-app/places/src/screens/actions", () => ({
     listRoomsAction: async () => ({ rooms: [] }),
     listPlaceHardwareAction: async () => ({ hardware: [] }),

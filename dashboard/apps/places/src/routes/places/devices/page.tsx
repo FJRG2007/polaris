@@ -17,7 +17,12 @@ import { LentActionsProvider } from "../../../screens/devices/lent-actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function DevicesPage() {
+export default async function DevicesPage({
+    searchParams
+}: {
+    searchParams: Promise<{ account?: string }>;
+}) {
+    const { account } = await searchParams;
     const t = await placesT();
     // Somebody lent one door reaches this screen, and sees that door.
     const { user, install, canControl, canManage, lent } = await requireHomeReach();
@@ -43,6 +48,7 @@ export default async function DevicesPage() {
                     cacheKey={`${user.id}:${place.current.id}`}
                     canControl={canControl}
                     canManage={canManage}
+                    initialAccount={typeof account === "string" ? account.slice(0, 64) : null}
                 />
             </LentActionsProvider>
         </div>

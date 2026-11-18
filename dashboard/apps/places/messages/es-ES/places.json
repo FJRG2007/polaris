@@ -172,6 +172,10 @@
             "description": "Grabaciones, de la más reciente a la más antigua. Lo que conserves sobrevive al periodo de retención.",
             "title": "Clips"
         },
+        "deviceAccounts": {
+            "description": "Las nubes de fabricante, puentes y hubs de los que vienen los dispositivos.",
+            "title": "Cuentas"
+        },
         "devices": {
             "description": "Las cerraduras, interruptores y luces de este sitio: qué están haciendo, quién los ha usado y los botones para manejarlos.",
             "title": "Aparatos"
@@ -1871,6 +1875,10 @@
         }
     },
     "devicesView": {
+        "accounts": "Cuentas",
+        "noAccountsManage": "Conecta la cuenta de un fabricante, un puente o un hub para traer sus dispositivos.",
+        "noAccountsTitle": "Aún no hay cuentas",
+        "noAccountsView": "Nadie ha conectado aún una cuenta aquí.",
         "rooms": "Salas",
         "disconnectName": "Desconectar {name}",
         "refused": "{name} rechaza lo que Polaris usa para abrirla, así que sus dispositivos no se están leyendo. Probablemente se revocó.",
