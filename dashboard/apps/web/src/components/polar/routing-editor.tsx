@@ -3,7 +3,7 @@
 /**
  * The routing editor: the ordered fallback list a failing call walks, and the
  * models a coding tool's request lands on. One component for a person's own
- * routing in Polar's settings and the deployment's default on /admin/agents;
+ * routing in Polar's settings and the deployment's default in Polar's admin settings;
  * Polar's settings show the two halves on pages of their own
  * (`FallbackEditor`, `CodingToolsEditor`).
  *

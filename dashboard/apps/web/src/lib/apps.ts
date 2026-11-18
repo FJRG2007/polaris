@@ -539,7 +539,7 @@ export const POLARIS_APPS: AppEntry[] = [
          * already do, and asks before any change. Who may open it is
          * `polarAccessFor` (closed per person in `accessFor`): the `polar.use`
          * permission where a role, a group or the account says so, else the
-         * deployment's Polar access under Management > Agents.
+         * deployment's default for it under Management > Roles.
          */
         id: "polar",
         notificationGroups: ["polar"],
