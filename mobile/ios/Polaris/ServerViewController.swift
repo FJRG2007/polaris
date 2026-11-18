@@ -4,8 +4,8 @@ import UIKit
 /// reason on screen when it is not one.
 final class ServerViewController: UIViewController, UITextFieldDelegate {
     private let done: () -> Void
-    private let field = UITextField()
-    private let connect = UIButton(type: .system)
+    private let field = PolarisField()
+    private var connect: UIButton!
     private let problem = UILabel()
     private let busy = UIActivityIndicatorView(style: .medium)
     private var attempt = 0
@@ -24,46 +24,50 @@ final class ServerViewController: UIViewController, UITextFieldDelegate {
 
         let title = UILabel()
         title.text = String(localized: "server.title")
-        title.font = .preferredFont(forTextStyle: .title2).bold
+        title.font = Plex.font(.semibold, 22, .title2)
         title.textColor = Palette.foreground
         title.numberOfLines = 0
         title.adjustsFontForContentSizeCategory = true
 
         let hint = UILabel()
         hint.text = String(localized: "server.hint")
-        hint.font = .preferredFont(forTextStyle: .subheadline)
+        hint.font = Plex.font(.regular, 15, .subheadline)
         hint.textColor = Palette.muted
         hint.numberOfLines = 0
         hint.adjustsFontForContentSizeCategory = true
 
         field.text = ServerStore.origin
-        field.placeholder = "polaris.example.com"
+        field.setHint("polaris.example.com")
         field.keyboardType = .URL
         field.textContentType = .URL
         field.autocapitalizationType = .none
         field.autocorrectionType = .no
         field.returnKeyType = .go
-        field.borderStyle = .roundedRect
-        field.textColor = Palette.foreground
         field.delegate = self
 
         problem.textColor = Palette.danger
-        problem.font = .preferredFont(forTextStyle: .footnote)
+        problem.font = Plex.font(.regular, 14, .footnote)
+        problem.adjustsFontForContentSizeCategory = true
         problem.numberOfLines = 0
         problem.isHidden = true
 
-        var style = UIButton.Configuration.filled()
-        style.baseBackgroundColor = Palette.primary
-        style.title = String(localized: "server.connect")
-        connect.configuration = style
-        connect.addAction(UIAction { [weak self] _ in self?.submit() }, for: .primaryActionTriggered)
+        connect = PolarisButton.primary(String(localized: "server.connect"), UIAction { [weak self] _ in self?.submit() })
 
         busy.color = Palette.primary
         busy.hidesWhenStopped = true
 
-        let stack = UIStackView(arrangedSubviews: [title, hint, field, problem, connect, busy])
+        let logo = UIImageView(image: UIImage(named: "Logo"))
+        logo.contentMode = .scaleAspectFit
+        logo.layer.cornerRadius = 16
+        logo.clipsToBounds = true
+        logo.widthAnchor.constraint(equalToConstant: 64).isActive = true
+        logo.heightAnchor.constraint(equalToConstant: 64).isActive = true
+        let logoRow = UIStackView(arrangedSubviews: [logo, UIView()])
+
+        let stack = UIStackView(arrangedSubviews: [logoRow, title, hint, field, problem, connect, busy])
         stack.axis = .vertical
         stack.spacing = 12
+        stack.setCustomSpacing(24, after: logoRow)
         stack.setCustomSpacing(24, after: hint)
         stack.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(stack)
@@ -127,12 +131,5 @@ final class ServerViewController: UIViewController, UITextFieldDelegate {
         problem.text = text
         problem.isHidden = false
         UIAccessibility.post(notification: .announcement, argument: text)
-    }
-}
-
-private extension UIFont {
-    var bold: UIFont {
-        guard let descriptor = fontDescriptor.withSymbolicTraits(.traitBold) else { return self }
-        return UIFont(descriptor: descriptor, size: 0)
     }
 }

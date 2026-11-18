@@ -6,8 +6,8 @@ options:
   developmentLanguage: en
 settings:
   base:
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.1.1"
+    CURRENT_PROJECT_VERSION: "2"
     SWIFT_VERSION: "5.0"
 targets:
   Polaris:
@@ -46,6 +46,10 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         UIUserInterfaceStyle: Dark
+        UIAppFonts:
+          - IBMPlexSans-Regular.ttf
+          - IBMPlexSans-Medium.ttf
+          - IBMPlexSans-SemiBold.ttf
         NSCameraUsageDescription: Polaris uses the camera in calls you join.
         NSMicrophoneUsageDescription: Polaris uses the microphone in calls you join.
         NSPhotoLibraryAddUsageDescription: Polaris saves the pictures you download to your library.

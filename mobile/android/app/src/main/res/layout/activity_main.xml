@@ -35,9 +35,9 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/page_unreachable_title"
+            android:fontFamily="@font/plex_sans_semibold"
             android:textColor="@color/foreground"
-            android:textSize="18sp"
-            android:textStyle="bold" />
+            android:textSize="18sp" />
 
         <TextView
             android:id="@+id/failure_text"
@@ -57,7 +57,8 @@
 
         <Button
             android:id="@+id/change_server"
-            style="@android:style/Widget.Material.Button.Borderless.Colored"
+            android:layout_marginTop="8dp"
+            style="@style/Widget.Polaris.Button.Ghost"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/change_server" />

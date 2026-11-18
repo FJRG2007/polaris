@@ -75,23 +75,18 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     private func buildFailure() {
         let title = UILabel()
         title.text = String(localized: "page.unreachableTitle")
-        title.font = .preferredFont(forTextStyle: .headline)
+        title.font = Plex.font(.semibold, 18, .headline)
         title.textColor = Palette.foreground
-        failureText.font = .preferredFont(forTextStyle: .subheadline)
+        failureText.font = Plex.font(.regular, 15, .subheadline)
         failureText.textColor = Palette.muted
         failureText.numberOfLines = 0
         failureText.textAlignment = .center
 
-        var retryStyle = UIButton.Configuration.filled()
-        retryStyle.baseBackgroundColor = Palette.primary
-        retryStyle.title = String(localized: "page.retry")
-        let retry = UIButton(configuration: retryStyle, primaryAction: UIAction { [weak self] _ in
+        let retry = PolarisButton.primary(String(localized: "page.retry"), UIAction { [weak self] _ in
             self?.failure.isHidden = true
             self?.web.reload()
         })
-        var otherStyle = UIButton.Configuration.plain()
-        otherStyle.title = String(localized: "page.changeServer")
-        let other = UIButton(configuration: otherStyle, primaryAction: UIAction { [weak self] _ in
+        let other = PolarisButton.ghost(String(localized: "page.changeServer"), UIAction { [weak self] _ in
             self?.changeServer()
         })
 

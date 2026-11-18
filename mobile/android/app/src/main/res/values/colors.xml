@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- The dashboard's dark tokens (packages/ui/src/styles/tokens.css), so nothing flashes white on open. -->
+    <!-- The dashboard's dark tokens (packages/ui/src/styles/tokens.css), so the app is drawn as Polaris is. -->
     <color name="background">#0B0C0E</color>
+    <color name="field">#101114</color>
+    <color name="card">#141619</color>
+    <color name="muted_surface">#202227</color>
+    <color name="border">#25272D</color>
+    <color name="border_strong">#373A43</color>
     <color name="foreground">#F3F4F6</color>
     <color name="muted">#A0A5B1</color>
     <color name="danger">#DC4751</color>
     <color name="primary">#7E4FEE</color>
+    <!-- bg-primary/80 over the background, the dashboard's pressed primary button. -->
+    <color name="primary_pressed">#6842C0</color>
+    <color name="primary_disabled">#457E4FEE</color>
+    <color name="primary_edge">#1AFFFFFF</color>
+    <color name="primary_foreground">#FFFFFF</color>
+    <!-- The mark's own tile, behind the adaptive icon's star. -->
+    <color name="icon_background">#7632EC</color>
 </resources>
