@@ -83,8 +83,8 @@ export function SessionBindingCard({
                         />
                     </label>
 
-                    <div className="flex items-start justify-between gap-4">
-                        <span className="min-w-0">
+                    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+                        <span className="min-w-[min(100%,16rem)] flex-1">
                             <span className="block text-sm">{t("binding.address.label")}</span>
                             <span className="block text-xs text-muted-foreground">
                                 {t(`binding.scopes.${scope}.note` as const)}

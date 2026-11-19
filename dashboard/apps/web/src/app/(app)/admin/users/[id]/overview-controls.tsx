@@ -85,8 +85,8 @@ export function OverviewControls({
 
                 <section className="flex flex-col gap-3 border-t border-border pt-4">
                     <h2 className="text-sm font-medium">{t("usersDetail.account.access.title")}</h2>
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                        <div className="min-w-[min(100%,16rem)] flex-1">
                             <p className="text-sm">{t("usersDetail.account.access.role")}</p>
                             <p className="text-xs text-muted-foreground">
                                 {t("usersDetail.account.access.roleHint")}
