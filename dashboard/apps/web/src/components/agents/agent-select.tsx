@@ -23,8 +23,7 @@ import { Badge, Button, Input } from "@polaris/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AgentOption } from "@/lib/agents/agent-readiness";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useConnectionsHref } from "@/components/use-connections-href";
-import { AI_KEYS_SECTION } from "@/lib/connections/hub-href";
+import { useAiProvidersHref } from "@/components/use-connections-href";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 
 type Words = NamespaceTranslator<"components">;
@@ -314,7 +313,7 @@ export function machineOf(value: string): boolean {
  */
 export function SignInNotice({ agent }: { agent: AgentOption }) {
     const t = useTranslations("components");
-    const keysLink = useConnectionsHref(AI_KEYS_SECTION);
+    const keysLink = useAiProvidersHref();
     return (
         <div className="space-y-2 rounded-md border border-warning-edge bg-warning-soft p-3">
             <p className="text-sm">{t("agentSelect.nothingSigns", { agent: labelOf(t, agent) })}</p>

@@ -4,7 +4,8 @@ import { providersFor } from "@/lib/agents/model-keys";
 import { getGithubStatus, githubPermissionGap } from "@/lib/github-service";
 import { permissionList } from "@/lib/integrations/github-permission-copy";
 import { getTranslations } from "@/lib/i18n/request";
-import { AI_KEYS_SECTION, connectionsHref } from "@/lib/connections/hub-href";
+import { aiProvidersHref } from "@/lib/connections/hub-href";
+import { polarAccessFor } from "@/lib/polar/access";
 
 /**
  * The one thing standing between here and a working agent, when there is one.
@@ -150,7 +151,12 @@ export async function SetupNotice() {
         return (
             <Notice>
                 {t.rich("notice.noProvider", {
-                    link: link(connectionsHref(AI_KEYS_SECTION, "/automations/code-review"))
+                    link: link(
+                        aiProvidersHref(
+                            (await polarAccessFor(user.id)).use,
+                            "/automations/code-review"
+                        )
+                    )
                 })}
             </Notice>
         );

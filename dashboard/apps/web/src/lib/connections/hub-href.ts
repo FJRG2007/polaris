@@ -12,6 +12,16 @@ export const CONNECTIONS_HUB = "/account/connections";
 export const TASK_TRACKERS_SECTION = "task-trackers";
 export const AI_KEYS_SECTION = "ai-keys";
 
+/** Where AI provider keys are managed: Polar's settings. Connected accounts
+ *  keeps its section only for an account Polar is not for, which has nowhere
+ *  else to add the keys code review and the agents spend. */
+export const AI_PROVIDERS_PAGE = "/polar/settings/providers";
+
+/** Where to send somebody to add an AI provider key. */
+export function aiProvidersHref(polarAllowed: boolean, returnTo?: string | null): string {
+    return polarAllowed ? AI_PROVIDERS_PAGE : connectionsHref(AI_KEYS_SECTION, returnTo);
+}
+
 /** The query parameter an app names its own screen in, to be sent back to it. */
 export const RETURN_PARAM = "return";
 

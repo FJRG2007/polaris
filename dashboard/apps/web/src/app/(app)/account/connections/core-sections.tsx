@@ -15,6 +15,7 @@ import { Messages } from "@/components/i18n/messages";
 import { getTranslations } from "@/lib/i18n/request";
 import { AccountProvidersPanel } from "@/app/(app)/polar/settings/providers/account-panel";
 import { listTrackers } from "@/lib/tasks/trackers/service";
+import { polarAccessFor } from "@/lib/polar/access";
 import { sessionCan, type SessionUser } from "@/lib/session";
 import { AI_KEYS_SECTION, TASK_TRACKERS_SECTION } from "@/lib/connections/hub-href";
 import { TrackersView } from "@/app/(app)/tasks/trackers/trackers-view";
@@ -28,7 +29,10 @@ export async function hubCoreSections(user: SessionUser): Promise<HubCoreSection
     const t = await getTranslations("account");
     // The same permission every tracker action asks for, so the section is never
     // offered to somebody its Connect would refuse.
-    const trackers = (await sessionCan(user, "tasks.manage")) ? await listTrackers(user.id) : null;
+    const [trackers, polar] = await Promise.all([
+        sessionCan(user, "tasks.manage").then((can) => (can ? listTrackers(user.id) : null)),
+        polarAccessFor(user.id)
+    ]);
     const sections: { id: string; title: string; intro: string; body: ReactNode }[] = [];
     if (trackers)
         sections.push({
@@ -42,17 +46,20 @@ export async function hubCoreSections(user: SessionUser): Promise<HubCoreSection
                 </Messages>
             )
         });
-    sections.push({
-        id: AI_KEYS_SECTION,
-        title: t("aiKeys.page.title"),
-        intro: t("aiKeys.page.intro"),
-        // Streamed, so the rest of Connected accounts does not wait on it.
-        body: (
-            <Suspense fallback={<CardSkeleton lines={4} />}>
-                <AccountProvidersPanel userId={user.id} narrow />
-            </Suspense>
-        )
-    });
+    // AI providers are Polar's: an account with Polar manages them in its
+    // settings, and only one Polar is not for finds them here.
+    if (!polar.use)
+        sections.push({
+            id: AI_KEYS_SECTION,
+            title: t("aiKeys.page.title"),
+            intro: t("aiKeys.page.intro"),
+            // Streamed, so the rest of Connected accounts does not wait on it.
+            body: (
+                <Suspense fallback={<CardSkeleton lines={4} />}>
+                    <AccountProvidersPanel userId={user.id} narrow />
+                </Suspense>
+            )
+        });
     return {
         ids: sections.map((section) => section.id),
         node: sections.map((section) => (

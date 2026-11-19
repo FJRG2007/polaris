@@ -264,6 +264,11 @@ interface PolarState {
 
 const PolarContext = createContext<PolarState | null>(null);
 
+/** Whether this account may use Polar, where it is asked outside the provider too. */
+export function usePolarAllowed(): boolean {
+    return useContext(PolarContext)?.allowed ?? false;
+}
+
 export function usePolar(): PolarState {
     const state = useContext(PolarContext);
     if (!state) throw new Error("usePolar outside PolarProvider");

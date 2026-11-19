@@ -4,9 +4,10 @@
  */
 
 import { requireUser } from "@/lib/session";
+import { AI_PROVIDERS_PAGE } from "@/lib/connections/hub-href";
 import type { KeyScope } from "@/lib/agents/model-key-actions";
 
-export const AI_PROVIDERS_PATH = "/polar/settings/providers";
+export const AI_PROVIDERS_PATH = AI_PROVIDERS_PAGE;
 
 export async function accountScope(): Promise<KeyScope> {
     const user = await requireUser();

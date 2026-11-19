@@ -6,7 +6,8 @@ import { providersFor } from "@/lib/agents/model-keys";
 import { listAgentRepos } from "@/lib/agents/agent-repo-service";
 import { Button, Card, CardBody, PageHeader } from "@polaris/ui";
 import { getTranslations } from "@/lib/i18n/request";
-import { AI_KEYS_SECTION, connectionsHref } from "@/lib/connections/hub-href";
+import { aiProvidersHref } from "@/lib/connections/hub-href";
+import { polarAccessFor } from "@/lib/polar/access";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +49,10 @@ export default async function AgentSetupPage() {
                         done={modelReady}
                         title={t("setup.model.title")}
                         body={t("setup.model.body")}
-                        href={connectionsHref(AI_KEYS_SECTION, "/automations/code-review/setup")}
+                        href={aiProvidersHref(
+                            (await polarAccessFor(user.id)).use,
+                            "/automations/code-review/setup"
+                        )}
                         action={t("setup.model.action")}
                     />
                     <Step
