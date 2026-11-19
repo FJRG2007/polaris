@@ -19,6 +19,7 @@ export function AppShell({
     account,
     sidebar,
     aside,
+    bottomBar,
     children
 }: {
     /** The wordmark in the top-left. Callers pass it wrapped in their router's
@@ -35,6 +36,10 @@ export function AppShell({
     sidebar?: ReactNode;
     /** A panel on the right of the content (Polar), which places itself. */
     aside?: ReactNode;
+    /** The tab bar along the bottom of a phone screen (see BottomTabs), under
+     *  the content. It pads itself clear of the home indicator, so while it is
+     *  drawn the content above it does not - see `data-shell-tabs`. */
+    bottomBar?: ReactNode;
     children: ReactNode;
 }) {
     return (
@@ -43,7 +48,7 @@ export function AppShell({
         // document scrolled under a sticky header, the window's scrollbar ran
         // the full height of the screen - up beside the header, as if the bar
         // itself were part of what scrolls.
-        <div className="relative flex h-[calc(100dvh-var(--connection-banner-height,0px))] flex-col overflow-hidden bg-background print:block print:h-auto print:overflow-visible">
+        <div className="group/shell relative flex h-[calc(100dvh-var(--connection-banner-height,0px))] flex-col overflow-hidden bg-background print:block print:h-auto print:overflow-visible">
             {/* The bar's background runs under the notch and the status bar; its
                 controls start below them and inside the side insets of a phone
                 held sideways (see --safe-top in tokens.css). */}
@@ -73,8 +78,11 @@ export function AppShell({
                 </div>
             </header>
             {/* Clear of a cutout at either side in landscape and of the home
-                indicator below; the strips they leave are the page's own colour. */}
-            <div className="flex min-h-0 flex-1 pb-[var(--safe-bottom)] pe-[var(--safe-end)] ps-[var(--safe-start)] print:block print:p-0">
+                indicator below; the strips they leave are the page's own colour.
+                On a phone with a tab bar at the bottom - the shell's or a
+                screen's own - the bar is what clears the home indicator, so the
+                content stops at the bar instead of doubling the inset. */}
+            <div className="flex min-h-0 flex-1 pb-[var(--safe-bottom)] pe-[var(--safe-end)] ps-[var(--safe-start)] max-sm:group-has-[[data-shell-tabs]]/shell:pb-0 print:block print:p-0">
                 {sidebar ? (
                     // Scrolling on its own beside the content, so the rail stays
                     // reachable however far down the content the user is. An app
@@ -102,9 +110,18 @@ export function AppShell({
                 </ShellMain>
                 {aside}
             </div>
+            {bottomBar}
         </div>
     );
 }
+
+/**
+ * For a header control the shell's phone tab bar also carries (the bell, your
+ * own face): hidden on a phone while that bar is drawn, so the header is not
+ * spending its little width twice on the same thing. Back the moment a screen
+ * takes the bottom bar for its own tabs, since the control is then nowhere else.
+ */
+export const PHONE_TABS_HIDE = "max-sm:group-has-[[data-shell-tabs=global]]/shell:hidden";
 
 /**
  * The box a screen inside the shell scrolls in, or null outside the shell.

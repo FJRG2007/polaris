@@ -126,6 +126,10 @@
             "busyCall": "No molestar - en llamada",
             "busyMeeting": "No molestar - en reunión",
             "untilTitle": "hasta {time} - {title}"
+        },
+        "sheet": {
+            "close": "Cerrar",
+            "status": "Estado"
         }
     },
     "apps": {
@@ -487,5 +491,11 @@
         "title": "{app} está bloqueada",
         "description": "Escribe tu PIN para abrirla.",
         "failed": "No se pudo comprobar el PIN. Reinténtalo."
+    },
+    "phoneTabs": {
+        "label": "Secciones",
+        "home": "Inicio",
+        "notifications": "Avisos",
+        "you": "Tú"
     }
 }

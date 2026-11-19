@@ -713,6 +713,42 @@ export function sectionOffered(section: AppSection, gate: SectionGate): boolean 
 }
 
 /**
+ * A list of sections as the rail draws it: the ungrouped ones under `heading`,
+ * then each named group in the order it first appears, so the list reads in the
+ * order it is declared. `label` is the reader's language for a group's name.
+ * One answer for the rail and the phone's account screen.
+ */
+export function sectionGroups(
+    items: readonly AppSection[],
+    heading: string,
+    label: (group: string) => string
+): { label: string; items: AppSection[] }[] {
+    const groups: { label: string; items: AppSection[] }[] = [];
+    for (const item of items) {
+        const title = item.group ? label(item.group) : heading;
+        const existing = groups.find((group) => group.label === title);
+        if (existing) existing.items.push(item);
+        else groups.push({ label: title, items: [item] });
+    }
+    return groups;
+}
+
+/**
+ * The face an app is listed under for this viewer: its guest one when they
+ * reach it only through a subject (`asGuest`), the subject to open instead when
+ * that subject needs an app this Polaris does not have (`asOtherwise`), or null
+ * for the app's own.
+ */
+export function guestFace(
+    app: AppEntry,
+    asGuest: boolean,
+    asOtherwise: boolean
+): { href: string; label: string; description: string } | null {
+    const otherwise = asOtherwise ? (app.guest?.otherwise ?? null) : null;
+    return otherwise ?? (asGuest && app.guest ? app.guest : null);
+}
+
+/**
  * The sections of each app, keyed by app id. Drives the left rail and the global
  * search index, so a page added here becomes navigable and findable at once.
  * Apps with no entry render no rail.

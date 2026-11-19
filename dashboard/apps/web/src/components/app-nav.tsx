@@ -107,7 +107,7 @@ export function AppNav({
     const apps = nav.POLARIS_APPS.filter((app) => allowed.has(app.id)).map((app) => {
         const category = CATEGORY_LABEL.get(app.category) ?? "";
         const otherwise = asOtherwise.has(app.id) ? (app.guest?.otherwise ?? null) : null;
-        const guest = otherwise ?? (asGuest.has(app.id) && app.guest ? app.guest : null);
+        const guest = nav.guestFace(app, asGuest.has(app.id), asOtherwise.has(app.id));
         const english = guest ? guest.label : app.label;
         const entry = {
             ...app,

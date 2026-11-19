@@ -26,9 +26,9 @@ describe("the notices above a page", () => {
         expect(tokens).toMatch(/--page-notice-height: 0px;/);
         expect(tokens).toMatch(/--connection-banner-height: 0px;/);
         // Also the screen edges a notch or a home indicator take, above and
-        // below the shell (see --safe-top in tokens.css).
+        // below the shell (see --safe-top in tokens.css), and the phone's tab bar.
         expect(tokens.replace(/\s+/g, " ")).toMatch(
-            /--notice-height: calc\( var\(--page-notice-height\) \+ var\(--connection-banner-height\) \+ var\(--header-safe-top\) \+ var\(--safe-bottom\) \);/
+            /--notice-height: calc\( var\(--page-notice-height\) \+ var\(--connection-banner-height\) \+ var\(--header-safe-top\) \+ var\(--safe-bottom\) \+ var\(--bottom-bar-height\) \);/
         );
     });
 

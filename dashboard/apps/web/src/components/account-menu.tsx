@@ -14,6 +14,10 @@ import { useDesktopBridge } from "@/components/desktop-app";
 import { usePresence, usePresenceRefresh } from "@/components/presence-store";
 import { openTourList } from "@/lib/tours/target";
 import { PRESENCE_CHOICE_DOTS } from "@/components/presence-dots";
+import { usePhone } from "@/components/use-phone";
+import { AccountSheet } from "@/components/account-sheet";
+import type { SectionGate } from "@/lib/apps";
+import { setAccountSheetOpen } from "@/components/account-sheet-state";
 import {
     setPresenceAction,
     setStatusAction,
@@ -118,7 +122,8 @@ export function AccountMenu({
     presenceScheduled,
     presenceNextChange,
     status,
-    statusUntil
+    statusUntil,
+    gate
 }: {
     id: string;
     name: string;
@@ -141,6 +146,9 @@ export function AccountMenu({
     status: string;
     /** When that line clears, or null for "until I clear it". */
     statusUntil: string | null;
+    /** What this account can open, for which screens of My account the phone's
+     *  account screen offers - the rail's own rule. */
+    gate?: SectionGate;
 }) {
     const router = useRouter();
     const t = useTranslations("nav");
@@ -151,6 +159,7 @@ export function AccountMenu({
     const format = useDisplayFormat();
     const refreshPresence = usePresenceRefresh();
     const [open, setOpen] = useState(false);
+    const phone = usePhone();
     /**
      * When this face was last pressed, for recognising the second press of a
      * double without the browser's help.
@@ -407,6 +416,17 @@ export function AccountMenu({
         refreshPresence();
     };
 
+    function editStatus() {
+        setLine(shownStatus);
+        // Reopened on what is already set: a status standing until it is
+        // cleared should not offer to start expiring because the dialog was
+        // opened again, and one that does expire says the moment it was
+        // actually set to rather than the offered length nearest to it.
+        setClears(null);
+        setClearsAt(shownStatusUntil ? localInput(new Date(shownStatusUntil)) : null);
+        setWriting(true);
+    }
+
     async function onSignOut() {
         // Only this account: any other signed in on this browser takes over.
         const refused = await signOut();
@@ -419,7 +439,14 @@ export function AccountMenu({
             modal menu takes the pointer away from everything behind it, its own
             trigger included, so the second press of a double never reaches the
             face it was aimed at. */}
-            <DropdownMenu open={open} onOpenChange={setOpen} modal={false}>
+            {/* On a phone the face opens the account screen instead (see
+            AccountSheet): the menu never opens there, and whatever would have
+            opened it opens that. */}
+            <DropdownMenu
+                open={open && !phone}
+                onOpenChange={(next) => (phone && next ? setAccountSheetOpen(true) : setOpen(next))}
+                modal={false}
+            >
                 <DropdownMenuTrigger
                     data-tour="shell.account"
                     aria-label={t("account.trigger")}
@@ -434,7 +461,7 @@ export function AccountMenu({
                         // through `onContextMenu` below, and letting it count
                         // towards a double would take somebody to their account
                         // for pressing twice with two different buttons.
-                        if (event.button !== 0) return;
+                        if (event.button !== 0 || phone) return;
                         const now = Date.now();
                         const quick = now - lastPress.current <= DOUBLE_PRESS_MS;
                         // Cleared on the press that completes a gesture, so three
@@ -450,7 +477,8 @@ export function AccountMenu({
                     // reach for - so it opens that one instead of the browser's.
                     onContextMenu={(event) => {
                         event.preventDefault();
-                        setOpen(true);
+                        if (phone) setAccountSheetOpen(true);
+                        else setOpen(true);
                     }}
                     className="rounded-full "
                 >
@@ -591,21 +619,7 @@ export function AccountMenu({
                     {/* Under the four dots and above everything else, because it is
                     the same question one answer further on: the dot says whether
                     to expect a reply and this says why. */}
-                    <DropdownMenuItem
-                        onSelect={() => {
-                            setLine(shownStatus);
-                            // Reopened on what is already set: a status standing
-                            // until it is cleared should not offer to start
-                            // expiring because the dialog was opened again, and one
-                            // that does expire says the moment it was actually set
-                            // to rather than the offered length nearest to it.
-                            setClears(null);
-                            setClearsAt(
-                                shownStatusUntil ? localInput(new Date(shownStatusUntil)) : null
-                            );
-                            setWriting(true);
-                        }}
-                    >
+                    <DropdownMenuItem onSelect={editStatus}>
                         <MessageSquareText className="size-4" />
                         <span className="min-w-0 truncate">
                             {shownStatus || t("account.setStatus")}
@@ -659,6 +673,20 @@ export function AccountMenu({
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
+            <AccountSheet
+                person={{ id, name }}
+                email={email}
+                detail={automaticLine}
+                presence={PRESENCE_CHOICES.map((choice) => ({ choice, label: presenceLabel(choice, t) }))}
+                shownChoice={shownChoice}
+                onChoose={(choice) => void choose(choice)}
+                status={shownStatus}
+                onStatus={editStatus}
+                onTours={openTourList}
+                onServers={desktop?.openServers ? () => void desktop.openServers?.() : undefined}
+                onSignOut={() => void onSignOut()}
+                gate={gate}
+            />
 
             {/* The exact end of a chosen state. Its own dialog rather than a field
             in the menu, because a menu that has to stay open while somebody

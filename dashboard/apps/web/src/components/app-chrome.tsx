@@ -33,6 +33,7 @@ import { AppUrlProvider } from "@/components/app-url";
 import { CallHolder } from "@/components/call-holder";
 import { accessFor, type SessionUser } from "@/lib/session";
 import { AccountMenu } from "@/components/account-menu";
+import { PhoneTabBar, PhoneTabsProvider } from "@/components/phone-tabs";
 import { DeniedNotice } from "@/components/denied-notice";
 import { AccessWatcher } from "@/components/access-watcher";
 import { Messages } from "@/components/i18n/messages";
@@ -72,6 +73,7 @@ import { DisplayFormatProvider } from "@/components/display-format";
 import { VisitRecorder } from "@/components/overview/visit-recorder";
 import {
     AppShell,
+    PHONE_TABS_HIDE,
     CapabilityProvider,
     KeyNamesProvider,
     OverlayPortal,
@@ -420,193 +422,207 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                         seasonPreview
                                                                                     }
                                                                                 >
-                                                                                    <AppShell
-                                                                                        mark={
-                                                                                            <Link
-                                                                                                href="/home"
-                                                                                                aria-label={t(
-                                                                                                    "shell.overview"
-                                                                                                )}
-                                                                                                className="hidden shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:block"
-                                                                                            >
-                                                                                                <span className="flex items-center gap-1.5">
-                                                                                                    <PolarisMark nameClassName="hidden sm:inline" />
-                                                                                                    <SeasonalBadge />
-                                                                                                </span>
-                                                                                            </Link>
-                                                                                        }
-                                                                                        switcher={
-                                                                                            <>
-                                                                                                <AppNav
+                                                                                    <PhoneTabsProvider>
+                                                                                        <AppShell
+                                                                                            mark={
+                                                                                                <Link
+                                                                                                    href="/home"
+                                                                                                    aria-label={t(
+                                                                                                        "shell.overview"
+                                                                                                    )}
+                                                                                                    className="hidden shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring sm:block"
+                                                                                                >
+                                                                                                    <span className="flex items-center gap-1.5">
+                                                                                                        <PolarisMark nameClassName="hidden sm:inline" />
+                                                                                                        <SeasonalBadge />
+                                                                                                    </span>
+                                                                                                </Link>
+                                                                                            }
+                                                                                            switcher={
+                                                                                                <>
+                                                                                                    <AppNav
+                                                                                                        appIds={
+                                                                                                            apps.ids
+                                                                                                        }
+                                                                                                        guestAppIds={
+                                                                                                            apps.guestIds
+                                                                                                        }
+                                                                                                        otherwiseAppIds={
+                                                                                                            apps.otherwiseIds
+                                                                                                        }
+                                                                                                        marketplace={apps.ids.includes(
+                                                                                                            "apps"
+                                                                                                        )}
+                                                                                                    />
+                                                                                                    <ScopeSwitcher
+                                                                                                        personalName={
+                                                                                                            user.name
+                                                                                                        }
+                                                                                                        organizations={
+                                                                                                            organizations
+                                                                                                        }
+                                                                                                        current={
+                                                                                                            scope.org
+                                                                                                        }
+                                                                                                    />
+                                                                                                </>
+                                                                                            }
+                                                                                            navButton={
+                                                                                                <AppNavDrawer
                                                                                                     appIds={
                                                                                                         apps.ids
                                                                                                     }
-                                                                                                    guestAppIds={
-                                                                                                        apps.guestIds
+                                                                                                    held={
+                                                                                                        held
                                                                                                     }
-                                                                                                    otherwiseAppIds={
-                                                                                                        apps.otherwiseIds
+                                                                                                    installed={
+                                                                                                        installed
                                                                                                     }
-                                                                                                    marketplace={apps.ids.includes(
-                                                                                                        "apps"
-                                                                                                    )}
-                                                                                                />
-                                                                                                <ScopeSwitcher
-                                                                                                    personalName={
-                                                                                                        user.name
-                                                                                                    }
-                                                                                                    organizations={
-                                                                                                        organizations
-                                                                                                    }
-                                                                                                    current={
-                                                                                                        scope.org
+                                                                                                    isAdmin={
+                                                                                                        user.isAdmin
                                                                                                     }
                                                                                                 />
-                                                                                            </>
-                                                                                        }
-                                                                                        navButton={
-                                                                                            <AppNavDrawer
-                                                                                                appIds={
-                                                                                                    apps.ids
-                                                                                                }
-                                                                                                held={
-                                                                                                    held
-                                                                                                }
-                                                                                                installed={
-                                                                                                    installed
-                                                                                                }
-                                                                                                isAdmin={
-                                                                                                    user.isAdmin
-                                                                                                }
-                                                                                            />
-                                                                                        }
-                                                                                        search={
-                                                                                            <CommandPalette
-                                                                                                isAdmin={
-                                                                                                    user.isAdmin
-                                                                                                }
-                                                                                                appIds={
-                                                                                                    apps.ids
-                                                                                                }
-                                                                                                held={
-                                                                                                    held
-                                                                                                }
-                                                                                                installed={
-                                                                                                    installed
-                                                                                                }
-                                                                                            />
-                                                                                        }
-                                                                                        aside={
-                                                                                            <PolarAside />
-                                                                                        }
-                                                                                        sidebar={
-                                                                                            <AppSidebar
-                                                                                                appIds={
-                                                                                                    apps.ids
-                                                                                                }
-                                                                                                held={
-                                                                                                    held
-                                                                                                }
-                                                                                                installed={
-                                                                                                    installed
-                                                                                                }
-                                                                                                isAdmin={
-                                                                                                    user.isAdmin
-                                                                                                }
-                                                                                            />
-                                                                                        }
-                                                                                        account={
-                                                                                            <>
-                                                                                                {user.isAdmin ? (
-                                                                                                    <UpdateIndicator />
-                                                                                                ) : null}
-                                                                                                {appHeader.map(
-                                                                                                    (
-                                                                                                        slot
-                                                                                                    ) => (
-                                                                                                        <AppSlotView
-                                                                                                            key={`${slot.app}:${slot.kind}`}
-                                                                                                            slot={
-                                                                                                                slot
-                                                                                                            }
-                                                                                                        />
-                                                                                                    )
-                                                                                                )}
-                                                                                                <PolarToggle />
-                                                                                                <DesktopUpdateButton />
-                                                                                                <NotificationBell />
-                                                                                                <AccountMenu
-                                                                                                    id={
-                                                                                                        user.id
-                                                                                                    }
-                                                                                                    name={
-                                                                                                        user.name
-                                                                                                    }
-                                                                                                    email={
-                                                                                                        user.email
-                                                                                                    }
-                                                                                                    presence={
-                                                                                                        presence.choice
-                                                                                                    }
-                                                                                                    presenceUntil={
-                                                                                                        presence.until
-                                                                                                    }
-                                                                                                    presenceScheduled={
-                                                                                                        presence.scheduled
-                                                                                                    }
-                                                                                                    presenceNextChange={
-                                                                                                        presence.nextChangeAt
-                                                                                                    }
-                                                                                                    status={
-                                                                                                        status.text
-                                                                                                    }
-                                                                                                    statusUntil={
-                                                                                                        status.until
-                                                                                                    }
-                                                                                                />
-                                                                                            </>
-                                                                                        }
-                                                                                    >
-                                                                                        <PageNotices>
-                                                                                            <DeniedNotice />
-                                                                                            <AnnouncementBanners
-                                                                                                user={
-                                                                                                    user
-                                                                                                }
-                                                                                            />
-                                                                                            {user.isAdmin &&
-                                                                                            !user.viewingAs ? (
-                                                                                                <>
-                                                                                                    <LanAddressBanner />
-                                                                                                    <DiskAlertBanner />
-                                                                                                </>
-                                                                                            ) : null}
-                                                                                        </PageNotices>
-                                                                                        <RouteSkeletonCapture>
-                                                                                            {
-                                                                                                children
                                                                                             }
-                                                                                        </RouteSkeletonCapture>
-                                                                                        {user.viewingAs ? (
-                                                                                            <ViewAsBanner
-                                                                                                mode={
-                                                                                                    user
-                                                                                                        .viewingAs
-                                                                                                        .mode
+                                                                                            search={
+                                                                                                <CommandPalette
+                                                                                                    isAdmin={
+                                                                                                        user.isAdmin
+                                                                                                    }
+                                                                                                    appIds={
+                                                                                                        apps.ids
+                                                                                                    }
+                                                                                                    held={
+                                                                                                        held
+                                                                                                    }
+                                                                                                    installed={
+                                                                                                        installed
+                                                                                                    }
+                                                                                                />
+                                                                                            }
+                                                                                            bottomBar={
+                                                                                                <PhoneTabBar
+                                                                                                    person={{ id: user.id, name: user.name }}
+                                                                                                    appIds={apps.ids}
+                                                                                                    guestAppIds={apps.guestIds}
+                                                                                                    otherwiseAppIds={apps.otherwiseIds}
+                                                                                                />
+                                                                                            }
+                                                                                            aside={
+                                                                                                <PolarAside />
+                                                                                            }
+                                                                                            sidebar={
+                                                                                                <AppSidebar
+                                                                                                    appIds={
+                                                                                                        apps.ids
+                                                                                                    }
+                                                                                                    held={
+                                                                                                        held
+                                                                                                    }
+                                                                                                    installed={
+                                                                                                        installed
+                                                                                                    }
+                                                                                                    isAdmin={
+                                                                                                        user.isAdmin
+                                                                                                    }
+                                                                                                />
+                                                                                            }
+                                                                                            account={
+                                                                                                <>
+                                                                                                    {user.isAdmin ? (
+                                                                                                        <UpdateIndicator />
+                                                                                                    ) : null}
+                                                                                                    {appHeader.map(
+                                                                                                        (
+                                                                                                            slot
+                                                                                                        ) => (
+                                                                                                            <AppSlotView
+                                                                                                                key={`${slot.app}:${slot.kind}`}
+                                                                                                                slot={
+                                                                                                                    slot
+                                                                                                                }
+                                                                                                            />
+                                                                                                        )
+                                                                                                    )}
+                                                                                                    <PolarToggle />
+                                                                                                    <DesktopUpdateButton />
+                                                                                                    {/* On a phone the tab bar carries both (see PhoneTabBar). */}
+                                                                                                    <span className={`contents ${PHONE_TABS_HIDE}`}>
+                                                                                                        <NotificationBell />
+                                                                                                        <AccountMenu
+                                                                                                            id={
+                                                                                                                user.id
+                                                                                                            }
+                                                                                                            name={
+                                                                                                                user.name
+                                                                                                            }
+                                                                                                            email={
+                                                                                                                user.email
+                                                                                                            }
+                                                                                                            presence={
+                                                                                                                presence.choice
+                                                                                                            }
+                                                                                                            presenceUntil={
+                                                                                                                presence.until
+                                                                                                            }
+                                                                                                            presenceScheduled={
+                                                                                                                presence.scheduled
+                                                                                                            }
+                                                                                                            presenceNextChange={
+                                                                                                                presence.nextChangeAt
+                                                                                                            }
+                                                                                                            status={
+                                                                                                                status.text
+                                                                                                            }
+                                                                                                            statusUntil={
+                                                                                                                status.until
+                                                                                                            }
+                                                                                                            gate={{ isAdmin: user.isAdmin, held, installed }}
+                                                                                                        />
+                                                                                                    </span>
+                                                                                                </>
+                                                                                            }
+                                                                                        >
+                                                                                            <PageNotices>
+                                                                                                <DeniedNotice />
+                                                                                                <AnnouncementBanners
+                                                                                                    user={
+                                                                                                        user
+                                                                                                    }
+                                                                                                />
+                                                                                                {user.isAdmin &&
+                                                                                                !user.viewingAs ? (
+                                                                                                    <>
+                                                                                                        <LanAddressBanner />
+                                                                                                        <DiskAlertBanner />
+                                                                                                    </>
+                                                                                                ) : null}
+                                                                                            </PageNotices>
+                                                                                            <RouteSkeletonCapture>
+                                                                                                {
+                                                                                                    children
                                                                                                 }
-                                                                                                label={
-                                                                                                    user
-                                                                                                        .viewingAs
-                                                                                                        .label
-                                                                                                }
-                                                                                                actorName={
-                                                                                                    user
-                                                                                                        .viewingAs
-                                                                                                        .actorName
-                                                                                                }
-                                                                                            />
-                                                                                        ) : null}
-                                                                                    </AppShell>
+                                                                                            </RouteSkeletonCapture>
+                                                                                            {user.viewingAs ? (
+                                                                                                <ViewAsBanner
+                                                                                                    mode={
+                                                                                                        user
+                                                                                                            .viewingAs
+                                                                                                            .mode
+                                                                                                    }
+                                                                                                    label={
+                                                                                                        user
+                                                                                                            .viewingAs
+                                                                                                            .label
+                                                                                                    }
+                                                                                                    actorName={
+                                                                                                        user
+                                                                                                            .viewingAs
+                                                                                                            .actorName
+                                                                                                    }
+                                                                                                />
+                                                                                            ) : null}
+                                                                                        </AppShell>
+                                                                                    </PhoneTabsProvider>
                                                                                 </SeasonalFrame>
                                                                             </CallHolder>
                                                                         </ProfileStyleProvider>

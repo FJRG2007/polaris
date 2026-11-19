@@ -227,6 +227,7 @@ export {
     PAGE_FILL,
     PAGE_BLEED,
     PAGE_NOTICES,
+    PHONE_TABS_HIDE,
     shellScroller
 } from "./shell/app-shell";
 export {

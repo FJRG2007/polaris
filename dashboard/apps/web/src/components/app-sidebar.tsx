@@ -142,13 +142,7 @@ export function AppSidebar({
         : onOverview && favorites.some((id) => railIds.includes(id))
           ? t("switcher.favorites")
           : label(app.id === nav.OVERVIEW_APP_ID ? "Apps" : app.label);
-    const groups: { label: string; items: nav.AppSection[] }[] = [];
-    for (const item of items) {
-        const title = item.group ? label(item.group) : heading;
-        const existing = groups.find((group) => group.label === title);
-        if (existing) existing.items.push(item);
-        else groups.push({ label: title, items: [item] });
-    }
+    const groups = nav.sectionGroups(items, heading, label);
 
     // Drawn unless the way back leads somewhere this account cannot go.
     const showParent =

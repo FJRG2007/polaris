@@ -126,6 +126,10 @@
             "busyCall": "Do not disturb - in a call",
             "busyMeeting": "Do not disturb - in a meeting",
             "untilTitle": "until {time} - {title}"
+        },
+        "sheet": {
+            "close": "Close",
+            "status": "Status"
         }
     },
     "apps": {
@@ -487,5 +491,11 @@
         "title": "{app} is locked",
         "description": "Enter your PIN to open it.",
         "failed": "Could not check the PIN. Try again."
+    },
+    "phoneTabs": {
+        "label": "Main sections",
+        "home": "Home",
+        "notifications": "Alerts",
+        "you": "You"
     }
 }

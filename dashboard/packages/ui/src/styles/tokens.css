@@ -147,10 +147,16 @@
     /* The top bar's share of the top inset: all of it, unless the connection
        strip is up and has already taken it (its measured height includes it). */
     --header-safe-top: max(0px, calc(var(--safe-top) - var(--connection-banner-height)));
-    /* Also the screen edges above and below the shell, so a screen that fills
-       the window is never taller than what is left of it. */
+    /* The shell's tab bar along the bottom of a phone, less the inset it pads
+       itself with (that one is --safe-bottom, already counted below): its
+       1px border over a 3.5rem row (see BottomTabs). 0px everywhere it is not
+       drawn - set below, from whether the bar is on the page. */
+    --bottom-bar-height: 0px;
+    /* Also the screen edges above and below the shell, and the phone's tab bar,
+       so a screen that fills the window is never taller than what is left of it. */
     --notice-height: calc(
-        var(--page-notice-height) + var(--connection-banner-height) + var(--header-safe-top) + var(--safe-bottom)
+        var(--page-notice-height) + var(--connection-banner-height) + var(--header-safe-top) + var(--safe-bottom) +
+            var(--bottom-bar-height)
     );
 
     /* Elevation. A popover reads as lifted; a modal reads as detached. */
@@ -166,6 +172,16 @@
        it is what renders before the font arrives and if it never does. */
     --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+}
+
+/* On the root rather than the shell, because --notice-height is worked out on
+   the root: a value set lower down would never reach the sum. Only the shell's
+   own bar counts - a screen drawing its own tabs inside the page already sits
+   inside the height it was given. */
+@media (max-width: 639px) {
+    :root:has([data-shell-tabs="global"]) {
+        --bottom-bar-height: calc(3.5rem + 1px);
+    }
 }
 
 [dir="rtl"] {
