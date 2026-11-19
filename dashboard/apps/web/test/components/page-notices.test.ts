@@ -25,8 +25,10 @@ describe("the notices above a page", () => {
         // throws the whole calc() away.
         expect(tokens).toMatch(/--page-notice-height: 0px;/);
         expect(tokens).toMatch(/--connection-banner-height: 0px;/);
-        expect(tokens).toMatch(
-            /--notice-height: calc\(var\(--page-notice-height\) \+ var\(--connection-banner-height\)\);/
+        // Also the screen edges a notch or a home indicator take, above and
+        // below the shell (see --safe-top in tokens.css).
+        expect(tokens.replace(/\s+/g, " ")).toMatch(
+            /--notice-height: calc\( var\(--page-notice-height\) \+ var\(--connection-banner-height\) \+ var\(--header-safe-top\) \+ var\(--safe-bottom\) \);/
         );
     });
 
