@@ -27,6 +27,7 @@ import { SigninDialog, type SigninDialogActions, type SigninDialogMode } from ".
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SigninStatus } from "@/lib/agents/signin-status";
+import { machineLoginEnv } from "@/lib/agents/machine-login-config";
 import { RelativeTime } from "@/components/relative-time";
 import type { ModelKeyView } from "@/lib/agents/model-keys";
 import type { ProviderRow } from "@/lib/agents/model-key-providers";
@@ -53,7 +54,6 @@ import {
     ChevronUp,
     Gauge,
     GripVertical,
-    Info,
     LogIn,
     LogOut,
     MoreHorizontal,
@@ -352,14 +352,28 @@ export function ModelKeysView({
     const [homeStatus, setHomeStatus] = useState<Record<string, SigninStatus> | null>(null);
     const [statusTick, setStatusTick] = useState(0);
     const askStatus = assist?.actions.status;
-    const homeEnvs = homeSignins.map((signin) => signin.env).join(",");
+    // The machine logins this person has a row for; every home login while an
+    // account from before those rows has never been checked, since its first
+    // read is what writes them.
+    const connectedList = assist?.connected;
+    const homeEnvs = useMemo(() => {
+        if (connectedList === null) return homeSignins.map((signin) => signin.env).join(",");
+        const known = new Set(homeSignins.map((signin) => signin.env));
+        return [...new Set(rows.map((row) => machineLoginEnv(row.config)))]
+            .filter((env): env is string => env !== null && known.has(env))
+            .join(",");
+    }, [connectedList, homeSignins, rows]);
     useEffect(() => {
         if (!askStatus || !homeEnvs) return;
         let live = true;
         setHomeStatus(null);
         askStatus(homeEnvs.split(","))
             .then((result) => {
-                if (live) setHomeStatus(result.statuses);
+                if (!live) return;
+                setHomeStatus(result.statuses);
+                // That first read wrote a row for each one signed in.
+                if (connectedList === null && Object.values(result.statuses).some((one) => one.state === "in"))
+                    router.refresh();
             })
             .catch(() => {
                 if (live) setHomeStatus({});
@@ -367,7 +381,7 @@ export function ModelKeysView({
         return () => {
             live = false;
         };
-    }, [askStatus, homeEnvs, statusTick]);
+    }, [askStatus, homeEnvs, statusTick, connectedList, router]);
 
     // The offer a sign-out replaced, put back if the sign-out does not finish.
     const offerBack = useRef<AgentSignin | null>(null);
@@ -415,44 +429,31 @@ export function ModelKeysView({
         const stored = rows.map<ConnectionEntry>((row, position) => {
             const health = statuses?.[row.id];
             const expired = expiryStanding(row.expiresAt, t)?.tone === "danger";
+            // The machine's own login: its state is the login's, asked after
+            // the first paint, and switched off is off whatever that says.
+            const machine = machineLoginEnv(row.config);
+            const known = machine ? homeStatus?.[machine] : undefined;
             return {
                 id: row.id,
-                kind: accountSlugs.has(row.provider) ? "account" : "key",
+                kind: machine ? "agent" : accountSlugs.has(row.provider) ? "account" : "key",
                 provider: row.provider,
                 providerName: byslug.get(row.provider)?.name ?? row.provider,
                 name: row.name,
                 status: !row.enabled
                     ? "off"
-                    : expired || (health && health.state !== "ready")
-                      ? "problem"
-                      : "working",
+                    : machine
+                      ? !askStatus
+                          ? "working"
+                          : homeStatus === null
+                            ? "checking"
+                            : known?.state === "out"
+                              ? "problem"
+                              : "working"
+                      : expired || (health && health.state !== "ready")
+                        ? "problem"
+                        : "working",
                 lastUsedAt: row.lastUsedAt,
                 position
-            };
-        });
-        // Only the agents this person connected - not every agent there is a
-        // login for. Add connection is where the rest are offered.
-        const connectedHomes = new Set(assist?.connected ?? []);
-        const shown = homeSignins.filter(
-            (signin) => connectedHomes.has(signin.env) || homeStatus?.[signin.env]?.state === "in"
-        );
-        const agents = shown.map<ConnectionEntry>((signin, index) => {
-            const known = homeStatus?.[signin.env];
-            return {
-                id: `${HOME_PREFIX}${signin.env}`,
-                kind: "agent",
-                provider: signin.slug,
-                providerName: signin.serves[0]?.label ?? signin.label,
-                name: signin.serves[0]?.label ?? signin.label,
-                status: !askStatus
-                    ? "working"
-                    : homeStatus === null
-                      ? "checking"
-                      : known?.state === "out"
-                        ? "off"
-                        : "working",
-                lastUsedAt: null,
-                position: rows.length + index
             };
         });
         // A shared key is listed only where it is the one used: where the person
@@ -465,10 +466,10 @@ export function ModelKeysView({
             name: t("modelKeys.table.deploymentName"),
             status: one.yours ? "off" : "working",
             lastUsedAt: null,
-            position: rows.length + shown.length + index
+            position: rows.length + index
         }));
-        return [...stored, ...agents, ...held];
-    }, [rows, statuses, accountSlugs, byslug, homeSignins, homeStatus, askStatus, deployment, assist, t]);
+        return [...stored, ...held];
+    }, [rows, statuses, accountSlugs, byslug, homeStatus, askStatus, deployment, t]);
 
     const [search, setSearch] = useState("");
     const typed = useDeferredValue(search);
@@ -785,21 +786,6 @@ export function ModelKeysView({
                                 </tr>
                             ) : (
                                 arranged.map((entry) => {
-                                    if (entry.kind === "agent") {
-                                        const signin = homeByEnv.get(entry.id.slice(HOME_PREFIX.length))!;
-                                        return (
-                                            <AgentRow
-                                                key={entry.id}
-                                                signin={signin}
-                                                columns={columns}
-                                                showStatus={showStatus}
-                                                status={askStatus ? (homeStatus ? (homeStatus[signin.env] ?? null) : undefined) : null}
-                                                canSignOut={canSignOut(signin)}
-                                                onSignIn={() => setRunning({ signin, mode: "login" })}
-                                                onSignOut={() => void signOut(signin)}
-                                            />
-                                        );
-                                    }
                                     if (entry.kind === "deployment") {
                                         const held = deploymentBySlug.get(entry.provider)!;
                                         return (
@@ -814,6 +800,8 @@ export function ModelKeysView({
                                         );
                                     }
                                     const row = rowById.get(entry.id)!;
+                                    const env = machineLoginEnv(row.config);
+                                    const signin = env ? homeByEnv.get(env) : undefined;
                                     return (
                                         <KeyRow
                                             key={row.id}
@@ -837,6 +825,21 @@ export function ModelKeysView({
                                                     : null
                                             }
                                             onRevive={revive ? () => void revive(row) : null}
+                                            machine={
+                                                signin
+                                                    ? {
+                                                          status: askStatus
+                                                              ? homeStatus
+                                                                  ? (homeStatus[signin.env] ?? null)
+                                                                  : undefined
+                                                              : null,
+                                                          onSignIn: () => setRunning({ signin, mode: "login" }),
+                                                          onSignOut: canSignOut(signin)
+                                                              ? () => void signOut(signin)
+                                                              : null
+                                                      }
+                                                    : null
+                                            }
                                         />
                                     );
                                 })
@@ -866,11 +869,14 @@ export function ModelKeysView({
                         offerBack.current = null;
                         setRunning(null);
                         setStatusTick((tick) => tick + 1);
+                        router.refresh();
                     }}
                     onDone={() => {
                         offerBack.current = null;
                         setRunning(null);
                         setStatusTick((tick) => tick + 1);
+                        // A sign-in that finished wrote the agent's row.
+                        router.refresh();
                     }}
                 />
             ) : null}
@@ -942,134 +948,8 @@ export function ModelKeysView({
     );
 }
 
-/** The id prefix of an agent signed in on the sessions' machine. */
-const HOME_PREFIX = "home:";
-
 /** The status filter's values, in the order the menu offers them. */
 const STATUS_FILTERS = ["all", "working", "problem", "checking", "off"] as const;
-
-/**
- * An agent whose login lives on the sessions' machine: nothing is stored, so
- * the row cannot be moved, and its actions are the vendor's sign-in and, where
- * the vendor documents one, sign-out.
- */
-function AgentRow({
-    signin,
-    columns,
-    showStatus,
-    status,
-    canSignOut,
-    onSignIn,
-    onSignOut
-}: {
-    signin: AgentSignin;
-    columns: Columns;
-    showStatus: boolean;
-    /** Undefined while asked, null where nothing is known. */
-    status: SigninStatus | null | undefined;
-    canSignOut: boolean;
-    onSignIn: () => void;
-    onSignOut: () => void;
-}) {
-    const t = useTranslations("components");
-    const tool = signin.serves[0]?.label ?? signin.label;
-    // Named for what it is - the agent's own login - so it does not read as a
-    // second "Cursor" beside the Cursor key.
-    const name = t("modelKeys.connect.ways.login", { name: tool });
-    const signedIn = status?.state === "in" && canSignOut;
-    const other = signedIn ? "login" : canSignOut ? "logout" : null;
-    const signInAction = (
-        <>
-            <LogIn className="size-4 shrink-0" />
-            <span className="truncate">{t("modelKeys.homeSignin")}</span>
-        </>
-    );
-    const signOutAction = (
-        <>
-            <LogOut className="size-4 shrink-0" />
-            <span className="truncate">{t("modelKeys.signout")}</span>
-        </>
-    );
-    return (
-        <tr className="border-t border-border">
-            {/* No handle: nothing is stored, so there is nothing to move. Says so
-                where the handle would be instead of leaving a blank. */}
-            <td className="px-2 py-2">
-                <span
-                    className="grid size-6 place-items-center text-muted-foreground/60"
-                    title={t("modelKeys.table.agentOrder", { tool })}
-                    aria-label={t("modelKeys.table.agentOrder", { tool })}
-                >
-                    <Info className="size-3.5 shrink-0" />
-                </span>
-            </td>
-            <td className="px-3 py-2">
-                <div className="flex max-w-40 items-center gap-2">
-                    <IntegrationLogo slug={signin.serves[0]?.id ?? signin.slug} name={tool} className="size-4 shrink-0" />
-                    <span className="min-w-0 truncate whitespace-nowrap" title={tool}>
-                        {tool}
-                    </span>
-                </div>
-            </td>
-            <td className="w-full max-w-0 px-3 py-2">
-                <span className="flex min-w-0 items-center gap-2">
-                    <span className="min-w-0 truncate font-medium" title={name}>
-                        {name}
-                    </span>
-                    {showStatus ? null : <HomeStatusBadge status={status} t={t} />}
-                </span>
-                <span
-                    className={`text-muted-foreground block truncate text-xs ${columns.key.fold}`}
-                    title={t("modelKeys.table.agentKey")}
-                >
-                    {t("modelKeys.table.agentKey")}
-                </span>
-            </td>
-            <td className={`text-muted-foreground ${columns.key.cell} whitespace-nowrap px-3 py-2 text-xs`}>
-                {t("modelKeys.table.agentKey")}
-            </td>
-            {showStatus ? (
-                <td className={`${columns.status.cell} px-3 py-2`}>
-                    <HomeStatusBadge status={status} t={t} />
-                </td>
-            ) : null}
-            <td className={`${columns.expires.cell} text-muted-foreground whitespace-nowrap px-3 py-2`}>-</td>
-            <td className={`${columns.lastUsed.cell} text-muted-foreground whitespace-nowrap px-3 py-2`}>-</td>
-            <td className="px-3 py-2">
-                <div className="flex items-center justify-end gap-1">
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        className="max-w-40 shrink-0"
-                        onClick={signedIn ? onSignOut : onSignIn}
-                    >
-                        {signedIn ? signOutAction : signInAction}
-                    </Button>
-                    {other ? (
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="shrink-0"
-                                    aria-label={t("modelKeys.moreNamed", { name: tool })}
-                                    title={t("modelKeys.more")}
-                                >
-                                    <MoreHorizontal className="size-4 shrink-0" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onSelect={other === "logout" ? onSignOut : onSignIn}>
-                                    {other === "logout" ? signOutAction : signInAction}
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-                    ) : null}
-                </div>
-            </td>
-        </tr>
-    );
-}
 
 /** A key the deployment holds: read-only, and whose key a run actually spends. */
 function DeploymentRow({
@@ -1168,7 +1048,8 @@ function KeyRow({
     onToggle,
     status,
     onLimits,
-    onRevive
+    onRevive,
+    machine = null
 }: {
     row: ModelKeyView;
     columns: Columns;
@@ -1186,10 +1067,22 @@ function KeyRow({
     status?: KeyHealthView | null;
     onLimits?: (() => void) | null;
     onRevive?: (() => void) | null;
+    /**
+     * The machine's own login: no key to show, its state is the login's
+     * (undefined while asked, null where nothing is known), and its menu
+     * carries the vendor's sign-in and, where documented, sign-out.
+     */
+    machine?: {
+        status: SigninStatus | null | undefined;
+        onSignIn: () => void;
+        onSignOut: (() => void) | null;
+    } | null;
 }) {
     const t = useTranslations("components");
     const [over, setOver] = useState(false);
     const label = provider?.name ?? row.provider;
+    const keyText = machine ? t("modelKeys.table.agentKey") : row.keyHint;
+    const signedIn = machine?.status?.state === "in";
     const standing = expiryStanding(row.expiresAt, t);
     const expired = standing?.tone === "danger";
 
@@ -1227,7 +1120,7 @@ function KeyRow({
             <td className="px-3 py-2">
                 {/* Capped, so one long vendor name cannot push the table sideways. */}
                 <div className="flex max-w-40 items-center gap-2">
-                    <IntegrationLogo slug={row.provider} name={label} className="size-4 shrink-0" />
+                    <IntegrationLogo slug={provider?.logo ?? row.provider} name={label} className="size-4 shrink-0" />
                     <span className="min-w-0 truncate whitespace-nowrap" title={label}>
                         {label}
                     </span>
@@ -1249,7 +1142,11 @@ function KeyRow({
                     {row.enabled ? null : <Badge className="shrink-0">{t("modelKeys.off")}</Badge>}
                     {/* The standing rides with the name below sm, where its own
                         column is dropped; a ready key says nothing there. */}
-                    {status && status.state !== "ready" ? (
+                    {machine ? (
+                        <span className={`shrink-0 ${status === undefined ? "" : columns.status.fold}`}>
+                            <HomeStatusBadge status={machine.status} t={t} />
+                        </span>
+                    ) : status && status.state !== "ready" ? (
                         <span className={`shrink-0 ${columns.status.fold}`}>
                             <KeyStanding status={status} compact />
                         </span>
@@ -1257,24 +1154,27 @@ function KeyRow({
                 </span>
                 {/* Under the name until its own column fits, so two keys of one
                     provider can still be told apart on a phone. */}
-                {row.keyHint ? (
+                {keyText ? (
                     <span
-                        className={`text-muted-foreground block truncate font-mono text-xs ${columns.key.fold}`}
+                        className={`text-muted-foreground block truncate text-xs ${machine ? "" : "font-mono"} ${columns.key.fold}`}
+                        title={keyText}
                     >
-                        {row.keyHint}
+                        {keyText}
                     </span>
                 ) : null}
             </td>
             <td
-                className={`text-muted-foreground ${columns.key.cell} whitespace-nowrap px-3 py-2 font-mono text-xs`}
+                className={`text-muted-foreground ${columns.key.cell} whitespace-nowrap px-3 py-2 text-xs ${machine ? "" : "font-mono"}`}
             >
-                {row.keyHint || null}
+                {keyText || null}
             </td>
             {status !== undefined ? (
                 <td className={`${columns.status.cell} px-3 py-2`}>
                     {/* The cap is on a block inside the cell: a max-width on an auto
                         table cell is ignored. */}
-                    {status ? (
+                    {machine ? (
+                        <HomeStatusBadge status={machine.status} t={t} />
+                    ) : status ? (
                         <div className="max-w-56">
                             <KeyStanding status={status} />
                         </div>
@@ -1334,6 +1234,19 @@ function KeyRow({
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="min-w-44">
+                            {machine && (!signedIn || !machine.onSignOut) ? (
+                                <DropdownMenuItem onSelect={machine.onSignIn}>
+                                    <LogIn />
+                                    {t("modelKeys.homeSignin")}
+                                </DropdownMenuItem>
+                            ) : null}
+                            {machine?.onSignOut && machine.status?.state !== "out" ? (
+                                <DropdownMenuItem onSelect={machine.onSignOut}>
+                                    <LogOut />
+                                    {t("modelKeys.signout")}
+                                </DropdownMenuItem>
+                            ) : null}
+                            {machine ? <DropdownMenuSeparator /> : null}
                             {onRevive && status && isCoolingState(status.state) ? (
                                 <DropdownMenuItem onSelect={onRevive}>
                                     <RotateCcw />
@@ -1444,6 +1357,8 @@ function KeyDialog({
         (picked?.slug === provider ? picked : null) ??
         providers.find((row) => row.slug === provider) ??
         null;
+    // The machine's own login holds no key: only its name and end date change.
+    const machine = existing !== null && machineLoginEnv(existing.config) !== null;
     const nameCheck = modelKeyNameSchema.safeParse(name);
     const taken = takenNames.has(name.trim().toLowerCase());
     const nameError =
@@ -1590,7 +1505,8 @@ function KeyDialog({
                             {existing ? (
                                 <span className="border-border bg-surface flex h-9 items-center gap-2 rounded-md border px-3 text-sm">
                                     <IntegrationLogo
-                                        slug={existing.provider}
+                                        slug={entry?.logo ?? existing.provider}
+                                        name={entry?.name ?? existing.provider}
                                         className="size-4 shrink-0"
                                     />
                                     <span
@@ -1734,44 +1650,46 @@ function KeyDialog({
                             </div>
                         ) : null}
 
-                        <label className="flex flex-col gap-1 text-sm">
-                            {entry?.apiKeyLabel ?? t("modelKeys.apiKey")}
-                            <Input
-                                type="password"
-                                value={secret}
-                                autoComplete="off"
-                                placeholder={
-                                    existing
-                                        ? t("modelKeys.keepStored")
-                                        : entry?.isGateway
-                                          ? t("modelKeys.gatewayNoKey")
-                                          : t("modelKeys.pasteKey")
-                                }
-                                onChange={(event) => setSecret(event.target.value)}
-                            />
-                            <span className="text-muted-foreground text-xs">
-                                {t("modelKeys.encrypted")}{" "}
-                                {entry?.checkable
-                                    ? t("modelKeys.validated", { provider: entry.name })
-                                    : t("modelKeys.provenByRun")}
-                            </span>
-                            {entry?.apiKeyHelp ? (
+                        {machine ? null : (
+                            <label className="flex flex-col gap-1 text-sm">
+                                {entry?.apiKeyLabel ?? t("modelKeys.apiKey")}
+                                <Input
+                                    type="password"
+                                    value={secret}
+                                    autoComplete="off"
+                                    placeholder={
+                                        existing
+                                            ? t("modelKeys.keepStored")
+                                            : entry?.isGateway
+                                              ? t("modelKeys.gatewayNoKey")
+                                              : t("modelKeys.pasteKey")
+                                    }
+                                    onChange={(event) => setSecret(event.target.value)}
+                                />
                                 <span className="text-muted-foreground text-xs">
-                                    {entry.apiKeyHelp}
+                                    {t("modelKeys.encrypted")}{" "}
+                                    {entry?.checkable
+                                        ? t("modelKeys.validated", { provider: entry.name })
+                                        : t("modelKeys.provenByRun")}
                                 </span>
-                            ) : null}
-                            {/* Said here rather than only on the row in the picker,
-                                because this is the moment somebody is deciding
-                                whether to go and make an account at all. */}
-                            {entry?.freeTier && !existing ? (
-                                <span className="text-success text-xs">
-                                    {entry.freeTier.kind === "free"
-                                        ? t("modelKeys.freeTier")
-                                        : t("modelKeys.freeTrial")}{" "}
-                                    {entry.freeTier.note}
-                                </span>
-                            ) : null}
-                        </label>
+                                {entry?.apiKeyHelp ? (
+                                    <span className="text-muted-foreground text-xs">
+                                        {entry.apiKeyHelp}
+                                    </span>
+                                ) : null}
+                                {/* Said here rather than only on the row in the picker,
+                                    because this is the moment somebody is deciding
+                                    whether to go and make an account at all. */}
+                                {entry?.freeTier && !existing ? (
+                                    <span className="text-success text-xs">
+                                        {entry.freeTier.kind === "free"
+                                            ? t("modelKeys.freeTier")
+                                            : t("modelKeys.freeTrial")}{" "}
+                                        {entry.freeTier.note}
+                                    </span>
+                                ) : null}
+                            </label>
+                        )}
 
                         {showWorkspace ? (
                             <label className="flex flex-col gap-1 text-sm">

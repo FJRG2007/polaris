@@ -1187,6 +1187,7 @@
         "signoutOffer": "Eliminada. {tool} puede seguir con sesión en la máquina de tus sesiones.",
         "signoutKeep": "Dejarla",
         "homeSignin": "Entrar",
+        "machineLoginName": "Sesión de {tool}",
         "statusIn": "Con sesión",
         "statusOut": "Sin sesión",
         "statusUnknown": "Sin datos",
@@ -1223,8 +1224,7 @@
             "readOnly": "Solo lectura",
             "usingYours": "Se usa tu clave",
             "usingDeployment": "Disponible para ti",
-            "agentKey": "Sesión iniciada en la máquina de tus sesiones",
-            "agentOrder": "Solo la usan las sesiones de {tool}. Aquí no se guarda nada, así que no tiene sitio en el orden."
+            "agentKey": "Sesión iniciada en la máquina de tus sesiones"
         }
     },
     "signinDialog": {

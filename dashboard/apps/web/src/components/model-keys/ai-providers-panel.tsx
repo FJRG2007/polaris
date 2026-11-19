@@ -18,7 +18,7 @@ import { Messages } from "@/components/i18n/messages";
 import type { ComponentProps, ReactNode } from "react";
 import { homeSigninsOf } from "@/lib/agents/home-signins";
 import { keyStatuses } from "@/lib/agents/key-status-read";
-import { assistedSignins } from "@/lib/agents/signin-runtime";
+import { assistedSignins, syncMachineLogins } from "@/lib/agents/signin-runtime";
 import { ModelKeysView, type AssistedSignin } from "./model-keys-view";
 import { ConnectionHub, type ConnectionOption } from "./connection-hub";
 import { CloudAccounts, type CloudAccountActions } from "./cloud-accounts";
@@ -70,6 +70,9 @@ export async function AiProvidersPanel({
     // One read, split below: agent sign-ins live in the same table as provider
     // keys and would otherwise be drawn as a credential for a provider that
     // does not exist.
+    // An agent signed in on the machine is a row like any account; an account
+    // from before those rows has its connected agents written as rows first.
+    if (account) await syncMachineLogins(account.userId);
     const [rows, shared] = await Promise.all([listModelKeys(keyOwner), instanceKeysAreShared(), ensureProviderCatalog()]);
     const keys = rows.filter((row) => !isSigninRow(row.provider));
     const [health, fallback] = await Promise.all([keyStatuses(keys), account ? accountFallback(account.userId, shared) : null]);
@@ -89,7 +92,11 @@ export async function AiProvidersPanel({
                     <ProviderLogins actions={actions.logins} />
                     <CloudAccounts actions={actions.clouds} />
                     <ModelKeysView
-                        providers={[...providerRowsFor(keys.map((key) => key.provider)), ...signinProviderRows()]}
+                        providers={[
+                            ...providerRowsFor(keys.map((key) => key.provider)),
+                            ...signinProviderRows(),
+                            ...machineProviderRows(assisted)
+                        ]}
                         searchProviders={searchKeyProvidersAction}
                         keys={rows}
                         health={health}
@@ -139,6 +146,24 @@ async function accountFallback(userId: string, shared: boolean) {
                   : t("aiKeys.fallback.noKeys")
         }
     };
+}
+
+/** The provider each machine login's row names: the agent, with its logo. */
+function machineProviderRows(assisted: readonly AgentSignin[]): ViewProps["providers"] {
+    return assisted
+        .filter((signin) => signin.home)
+        .map((signin) => ({
+            slug: signin.slug,
+            name: signin.serves[0]?.label ?? signin.label,
+            aliases: [signin.label],
+            apiKeyLabel: null,
+            apiKeyHelp: null,
+            createUrl: signin.url,
+            isGateway: false,
+            checkable: false,
+            freeTier: null,
+            ...(signin.serves[0] ? { logo: signin.serves[0].id } : {})
+        }));
 }
 
 /**

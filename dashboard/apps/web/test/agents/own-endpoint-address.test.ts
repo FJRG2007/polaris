@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
     updated: [] as Array<{ config?: Record<string, unknown> }>
 }));
 
+vi.mock("@/lib/agents/machine-logins", () => ({ machineLoginOf: async () => null }));
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/lib/auth", () => ({ auth: {} }));
 vi.mock("@/lib/session", () => ({}));

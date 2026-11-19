@@ -1187,6 +1187,7 @@
         "signoutOffer": "Removed. {tool} may still be signed in on your sessions' machine.",
         "signoutKeep": "Keep it",
         "homeSignin": "Sign in",
+        "machineLoginName": "{tool} login",
         "statusIn": "Signed in",
         "statusOut": "Not signed in",
         "statusUnknown": "Unknown",
@@ -1223,8 +1224,7 @@
             "readOnly": "Read-only",
             "usingYours": "Your key is used",
             "usingDeployment": "Available to you",
-            "agentKey": "Signed in on your sessions' machine",
-            "agentOrder": "Only {tool} sessions use it. Nothing is stored here, so it has no place in the order."
+            "agentKey": "Signed in on your sessions' machine"
         }
     },
     "signinDialog": {

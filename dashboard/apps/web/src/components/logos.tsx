@@ -300,6 +300,10 @@ export function IntegrationLogo({
         return <img src={image} alt="" className={cn("shrink-0 object-contain", className)} />;
     const Mark = SERVICE_MARKS[slug] ?? MODEL_MARKS[slug];
     if (Mark) return <Mark className={className} />;
+    // A coding agent named by its catalogue id: a login it keeps on the
+    // sessions' machine has no credential of its own to be looked up by.
+    const tool = AGENT_CLI_LABELS[slug];
+    if (tool) return <AgentLogo id={slug} label={tool} className={className} />;
     if (name) return <ProviderMonogram slug={slug} name={name} className={className} />;
     const speech = SPEECH_PROVIDER_SEEDS.find((seed) => seed.slug === slug);
     if (speech) return <ProviderMonogram slug={slug} name={speech.name} className={className} />;
@@ -409,6 +413,9 @@ export function AgentLogo({
  * is drawn here without anybody remembering to. Keyed by the stored slug, which
  * is what the table has.
  */
+/** Each coding agent's name, by catalogue id. */
+const AGENT_CLI_LABELS: Record<string, string> = Object.fromEntries(AGENT_CLIS.map((cli) => [cli.id, cli.label]));
+
 const AGENT_SIGNIN_MARKS: Record<string, { id: string; label: string }> = Object.fromEntries(
     AGENT_CLIS.flatMap((cli) =>
         cli.credentials.map((credential) => [

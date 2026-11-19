@@ -214,8 +214,10 @@ export function signinProviderRows(): Array<{
     isGateway: boolean;
     checkable: boolean;
     freeTier: null;
+    logo?: string;
 }> {
     return agentSignins().map((signin) => ({
+        ...(signin.serves[0] ? { logo: signin.serves[0].id } : {}),
         slug: signin.slug,
         name: signin.label,
         // What somebody types looking for it is the tool's name, not the

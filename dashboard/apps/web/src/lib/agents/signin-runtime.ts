@@ -38,6 +38,7 @@ import * as direct from "./signin-direct";
 import { configuredRequest, readCapped } from "@/lib/safe-fetch";
 import * as status from "./signin-status";
 import * as homes from "./home-signins";
+import * as machine from "./machine-login-rows";
 import * as folders from "./account-folders";
 
 /** Stamped on every container this starts, so the sweep finds them by label
@@ -438,6 +439,39 @@ export function homeSignins(): AgentSignin[] {
             }
         ];
     });
+}
+
+/** The row slugs of the logins a tool keeps on the machine. */
+export function homeSigninSlugs(cli: string): string[] {
+    return Object.entries(LOGIN_COMMANDS)
+        .filter(([, login]) => login.home === true && login.cli === cli)
+        .map(([env]) => signinSlug(env));
+}
+
+/** These home logins, shaped as their connection rows need them. */
+function machineSigninsOf(envs: Iterable<string>): machine.MachineSignin[] {
+    const wanted = new Set(envs);
+    return homeSignins()
+        .filter((signin) => wanted.has(signin.env))
+        .map((signin) => ({ env: signin.env, slug: signin.slug, label: signin.serves[0]?.label ?? signin.label }));
+}
+
+/** A connection row for each of these home logins that has none yet. Never
+ *  throws: a row that could not be written is written on the next read. */
+async function ensureMachineRows(userId: string, envs: Iterable<string>): Promise<void> {
+    await machine.ensureMachineLogins(userId, machineSigninsOf(envs)).catch((error: unknown) =>
+        console.warn("[agent-signin] could not write a machine login row:", error instanceof Error ? error.name : "unknown")
+    );
+}
+
+/**
+ * The person's connected home logins as connection rows, for the screen that
+ * lists them. An account from before the rows existed has only the list
+ * (`home-signins`): its first read writes a row for each, once.
+ */
+export async function syncMachineLogins(userId: string): Promise<void> {
+    const connected = await homes.homeSigninsOf(userId).catch(() => null);
+    if (connected && connected.size > 0) await ensureMachineRows(userId, connected);
 }
 
 /** The sign-ins Polaris can walk somebody through, for a screen that offers it. */
@@ -1259,6 +1293,13 @@ export async function clearAccountFolder(userId: string, env: string, folderId: 
     }
 }
 
+/** An older account's first status read: the logins it found signed in
+ *  become the list, and each gets its connection row. */
+async function firstList(userId: string, envs: string[]): Promise<void> {
+    await homes.setHomeSignins(userId, envs).catch(() => undefined);
+    await ensureMachineRows(userId, envs);
+}
+
 /** The agents a status read found signed in. */
 function inOf(statuses: Record<string, status.SigninStatus>): string[] {
     return Object.entries(statuses)
@@ -1273,6 +1314,8 @@ function recordOutcome(userId: string, env: string, mode: "login" | "logout"): v
     void homes.markHomeSignin(userId, env, mode === "login").catch((error: unknown) =>
         console.warn("[agent-signin] could not record a connected agent:", error instanceof Error ? error.name : "unknown")
     );
+    // A sign-out keeps the row: it reads signed out, and Sign in is on it.
+    if (mode === "login" && isHomeSignin(env)) void ensureMachineRows(userId, [env]);
 }
 
 /**
@@ -1310,7 +1353,7 @@ export async function signinStatuses(
         else toCheck.push({ env, command });
     }
     if (toCheck.length === 0) {
-        if (connected === null) await homes.setHomeSignins(userId, inOf(out)).catch(() => undefined);
+        if (connected === null) await firstList(userId, inOf(out));
         return out;
     }
 
@@ -1338,9 +1381,7 @@ export async function signinStatuses(
         out[env] = state === "unknown" ? status.lastKnownStatus(userId, env) : { state, lastKnown: false };
     }
     if (connected === null) {
-        await homes
-            .setHomeSignins(userId, inOf(out))
-            .catch(() => undefined);
+        await firstList(userId, inOf(out));
     } else {
         // A login signed in or out outside Polaris, seen by a check.
         for (const { env } of toCheck) {

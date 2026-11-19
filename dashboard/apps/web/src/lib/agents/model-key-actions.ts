@@ -11,6 +11,8 @@
  * back, so a screen cannot leak one and neither can a mistake in one.
  */
 
+import { machineLoginOf } from "@/lib/agents/machine-logins";
+import { markHomeSignin } from "@/lib/agents/home-signins";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit-service";
@@ -222,6 +224,10 @@ export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActio
 
     if (await ownerHasModelKeyName(scope.owner, parsed.data.name, parsed.data.id))
         return { error: NAME_TAKEN };
+    // The machine's own login holds no key: only its name and end date change.
+    const keyed = parsed.data.secret !== undefined || parsed.data.config !== undefined;
+    if (keyed && (await machineLoginOf(scope.owner, parsed.data.id)))
+        return { error: (await readerWords("api"))("refusals.aiKeys.checkKey") };
 
     const refusedEndpoint = await endpointRefusal(scope, parsed.data.config);
     if (refusedEndpoint) return { error: refusedEndpoint };
@@ -301,9 +307,13 @@ export async function removeKey(scope: KeyScope, input: unknown): Promise<KeyAct
     // A login kept in an account folder: read which folder before the row goes,
     // so its sign-out - clearing that folder - can follow.
     const folder = scope.owner ? await accountFolderOf(scope.owner, parsed.data.id) : null;
+    const machine = await machineLoginOf(scope.owner, parsed.data.id);
     if (!(await deleteModelKey(scope.owner, parsed.data.id)))
         return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
     if (folder && scope.owner) void clearAccountFolder(scope.owner, folder.env, folder.id);
+    // Off the list too, or the next read would write the row straight back. The
+    // login on the machine stays until it is signed out, which the screen offers.
+    if (machine && scope.owner) await markHomeSignin(scope.owner, machine, false).catch(() => undefined);
     await recordAudit({
         actorId: scope.actorId,
         action: `${scope.audit}.ai-key.deleted`,

@@ -35,7 +35,8 @@ import { moveAgentToAccount, promptMovedAgent, queueTurnAgain, type AgentMove } 
 import { instanceKeysAreShared } from "@/lib/agents/model-keys";
 import { refusedAccountName } from "@/lib/agents/signin-refusal";
 import { addSessionMessage } from "@/lib/agents/session-service";
-import { agentSignins, signinSlug } from "@/lib/agents/agent-signins";
+import { rotationSlugs } from "@/lib/agents/machine-logins";
+import { isMachineLogin } from "@/lib/agents/machine-login-config";
 import { noteLimitHit } from "@/lib/agents/limit-history";
 
 const SECOND = 1_000;
@@ -404,6 +405,9 @@ export async function rotationAccounts(
     const shared = await instanceKeysAreShared();
     const owners = [...(ownerId ? [{ userId: ownerId }] : []), ...(shared ? [{ userId: null }] : [])];
     if (owners.length === 0) return [];
+    // The tool's login on the machine is one more account of it
+    // (`machine-logins.ts`), so a session moves between it and the stored ones.
+    const slugs = rotationSlugs(cli);
     let providers: string[];
     if (accountId) {
         const current = await prisma.userModelKey.findFirst({
@@ -411,12 +415,11 @@ export async function rotationAccounts(
             select: { provider: true }
         });
         if (!current) return [];
-        providers = [current.provider];
+        providers = slugs.machine.includes(current.provider)
+            ? [...new Set([current.provider, ...slugs.stored])]
+            : [...new Set([current.provider, ...slugs.machine])];
     } else {
-        const signins = new Set(agentSignins().map((entry) => entry.slug));
-        providers = (core.agentCliById(cli)?.credentials ?? [])
-            .map((entry) => signinSlug(entry.env))
-            .filter((slug) => signins.has(slug));
+        providers = [...slugs.stored, ...slugs.machine];
     }
     if (providers.length === 0) return [];
     const now = new Date();
@@ -432,7 +435,8 @@ export async function rotationAccounts(
         take: 50
     });
     const own = rows.filter((row) => row.userId !== null);
-    const instance = rows.filter((row) => row.userId === null);
+    // A machine login is only ever its owner's: the deployment has no home.
+    const instance = rows.filter((row) => row.userId === null && !isMachineLogin(row.config));
     return [...own, ...instance].map((row) => ({
         id: row.id,
         name: accountLabel(row),

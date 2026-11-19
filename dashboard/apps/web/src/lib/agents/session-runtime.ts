@@ -48,6 +48,7 @@ import { Readable } from "node:stream";
 import { sessionCredentials } from "@/lib/agents/agent-readiness";
 import { ANTHROPIC_HEADERS_ENV } from "@/lib/agents/agent-providers";
 import { chatCredentialFor, secretForAccount, sessionSecretsFor } from "@/lib/agents/model-keys";
+import { machineLoginChosen } from "@/lib/agents/machine-logins";
 import { opencodeModelEnv } from "@/lib/agents/opencode-model";
 import * as attachments from "@/lib/agents/session-attachments";
 import {
@@ -527,7 +528,12 @@ async function credentialEnvFor(
     session: SessionView,
     cli: core.AgentCli
 ): Promise<Record<string, string>> {
-    const chosen = session.accountId
+    // The machine's own login, picked as an account or first in the owner's
+    // order (`machine-logins.ts`), is handed nothing, exactly as a session
+    // started on the machine's login is.
+    const machineLogin =
+        session.useMachineLogin || (await machineLoginChosen(session.ownerId, cli.id, session.accountId));
+    const chosen = session.accountId && !machineLogin
         ? await secretForAccount(session.ownerId, session.accountId)
         : null;
     // Null is the store failing to answer, and it is not the same as an account
@@ -537,7 +543,7 @@ async function credentialEnvFor(
     // Not asked at all when the machine answers for itself: that session wants
     // nothing out of the store, so a store that blinked would be refusing it
     // over credentials the person deliberately declined.
-    const available: Record<string, string> | null = session.useMachineLogin
+    const available: Record<string, string> | null = machineLogin
         ? {}
         : await sessionSecretsFor(session.ownerId);
     if (available === null) {
@@ -551,7 +557,7 @@ async function credentialEnvFor(
     return {
         ...accountFolders.withAccountFolders(
             cli,
-            sessionCredentials(cli, available, chosen, session.useMachineLogin),
+            sessionCredentials(cli, available, chosen, machineLogin),
             folderHome
         ),
         // The provider and model picked on the form, last, so they win.

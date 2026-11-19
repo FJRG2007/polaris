@@ -37,6 +37,9 @@ export interface ProviderRow {
     /** Whether a key can be had here without paying, and on what terms. Null for
      *  a provider that bills from the first token. */
     freeTier: FreeTier | null;
+    /** The logo to draw when the slug is not one (an agent's sign-in): the
+     *  agent's own id. */
+    logo?: string;
 }
 
 /**

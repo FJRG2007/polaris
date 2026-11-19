@@ -16,6 +16,7 @@ const state = vi.hoisted(() => ({
     } | null
 }));
 
+vi.mock("@/lib/agents/machine-logins", () => ({ machineLoginOf: async () => null }));
 vi.mock("@/lib/agents/model-keys", () => ({
     createModelKey: async (
         _owner: unknown,
