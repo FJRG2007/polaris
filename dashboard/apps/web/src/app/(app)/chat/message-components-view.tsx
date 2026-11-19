@@ -342,7 +342,7 @@ function ComponentSelect({
                 </Button>
             </PopoverTrigger>
             <PopoverContent align="start" className="flex max-h-80 w-72 max-w-[calc(100vw-2rem)] flex-col gap-1 p-1">
-                <div className="min-h-0 overflow-y-auto" role="listbox" aria-multiselectable={!single}>
+                <div className="min-h-0 overflow-y-auto overscroll-contain" role="listbox" aria-multiselectable={!single}>
                     {select.options.map((option) => {
                         const on = picked.includes(option.value);
                         return (

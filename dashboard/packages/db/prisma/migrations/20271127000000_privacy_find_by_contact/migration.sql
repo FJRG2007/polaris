@@ -51,7 +51,8 @@ members AS (
     JOIN "PrivacyListMember" member ON member."listId" = source."fromId"
 )
 INSERT INTO "PrivacyFieldList" ("userId", "field", "listId")
-SELECT "userId", "field", "toId" FROM source;
+SELECT "userId", "field", "toId" FROM source
+ON CONFLICT ("userId", "field") DO NOTHING;
 
 -- The audience itself.
 UPDATE "UserPrivacy" SET "findByEmail" = "discoverable"

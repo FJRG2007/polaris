@@ -141,7 +141,7 @@ export function CallStage({
                                     />
                                     <span
                                         aria-hidden
-                                        className="call-ring-pulse absolute -inset-1.5 rounded-full ring-2 ring-success/60"
+                                        className="call-ring-pulse absolute -inset-1.5 rounded-full ring-2 ring-success-edge"
                                     />
                                 </>
                             )}
