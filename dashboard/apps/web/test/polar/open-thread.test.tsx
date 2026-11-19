@@ -58,6 +58,8 @@ const PROVIDERS = [
 
 beforeEach(() => {
     chats.clear();
+    // The chat this tab had open is kept in its session storage; each test is a new tab.
+    window.sessionStorage.clear();
     vi.stubGlobal(
         "fetch",
         vi.fn(async (url: string) => {

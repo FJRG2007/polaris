@@ -74,11 +74,14 @@ beforeEach(() => {
     ownCommands = [];
     suggestionReply = null;
     suggestionAsks.length = 0;
-    try {
-        window.localStorage.clear();
-        window.sessionStorage.clear();
-    } catch {
-        // No storage in this environment.
+    // Each on its own: one area missing here must not leave the other's
+    // remembered chat for the next test.
+    for (const area of ["localStorage", "sessionStorage"] as const) {
+        try {
+            window[area].clear();
+        } catch {
+            // No storage in this environment.
+        }
     }
     vi.stubGlobal(
         "fetch",

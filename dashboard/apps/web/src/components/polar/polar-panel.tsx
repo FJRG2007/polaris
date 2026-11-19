@@ -355,6 +355,26 @@ export function scopedThreadKey(scope: string | null): string {
     return scope ? `${THREAD_KEY}:${scope}` : THREAD_KEY;
 }
 
+/** The chat to come back to: this tab's own first, so a chat opened in another
+ *  tab or window (/polar on its own beside this page) never takes over the
+ *  side panel when it opens again; the browser's shared one only while this
+ *  tab has none. An empty value is this tab having started a new chat. */
+export function rememberedThread(key: string): string | null {
+    return readStored(key, "session") ?? readStored(key);
+}
+
+/** Keeps the open chat for this tab and, for a new tab, for the browser. */
+function rememberThread(key: string, id: string): void {
+    writeStored(key, id);
+    writeStored(key, id, "session");
+}
+
+/** Lets go of a remembered chat that no longer opens, wherever it is kept. */
+function forgetThread(key: string, id: string): void {
+    if (readStored(key) === id) writeStored(key, "");
+    if (readStored(key, "session") === id) writeStored(key, "", "session");
+}
+
 /** Remember a scoped chat's key, forgetting the oldest beyond the most kept:
  *  a tab's key is never asked for again once it closes, so it would stay forever. */
 function keepScope(key: string): void {
@@ -370,6 +390,7 @@ function keepScope(key: string): void {
     for (const old of next.splice(0, Math.max(0, next.length - SCOPES_MOST))) {
         try {
             window.localStorage.removeItem(old);
+            window.sessionStorage.removeItem(old);
         } catch {
             // A private window: nothing was kept to let go of.
         }
@@ -1373,7 +1394,7 @@ export function PolarChat({
         setCodeTask(null);
         const response = await fetch(`/api/polar/threads/${id}`).catch(() => null);
         // A remembered chat that was deleted, or belongs to another account.
-        if (response?.status === 404 && readStored(threadKey) === id) writeStored(threadKey, "");
+        if (response?.status === 404) forgetThread(threadKey, id);
         if (!response?.ok) return;
         const { thread } = (await response.json().catch(() => ({}))) as {
             thread?: {
@@ -1470,7 +1491,7 @@ export function PolarChat({
             return;
         }
         const keep = chatScope || reloaded() || polarDisplayStore.get().reopenLastChat;
-        const reopen = named ?? (keep ? readStored(threadKey) : null);
+        const reopen = named ?? (keep ? rememberedThread(threadKey) : null);
         if (reopen) {
             void openThread(reopen, named !== null || session === null).finally(() =>
                 setReopened(true)
@@ -1485,7 +1506,7 @@ export function PolarChat({
         void polarDisplayStore.load().then((settings) => {
             if (gone || !settings.reopenLastChat) return;
             if (live.current.threadId !== first || messagesNow.current > 0) return;
-            const last = readStored(threadKey);
+            const last = rememberedThread(threadKey);
             if (last) void openThread(last, session === null);
         });
         return () => {
@@ -1496,7 +1517,7 @@ export function PolarChat({
     // the page goes, so there is nothing to come back to.
     useEffect(() => {
         if (temporary || chat.messages.length === 0) return;
-        writeStored(threadKey, threadId);
+        rememberThread(threadKey, threadId);
         if (chatScope) keepScope(threadKey);
     }, [threadId, temporary, chat.messages.length]);
 
@@ -1537,7 +1558,7 @@ export function PolarChat({
         tree.current = new Map();
         setOpening([]);
         setThreadId(newId());
-        writeStored(threadKey, "");
+        rememberThread(threadKey, "");
         setQueue([]);
         setInput("");
         setQuote(null);
@@ -2571,7 +2592,7 @@ export function PolarChat({
                                 question={input}
                                 hasFiles={files.length > 0}
                                 onStart={(choices) => {
-                                    writeStored(threadKey, "");
+                                    rememberThread(threadKey, "");
                                     setComparison({
                                         question: input.trim(),
                                         columns: choices.map((one) => ({
