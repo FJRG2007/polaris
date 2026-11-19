@@ -314,6 +314,11 @@
         }
     },
     "editor": {
+        "mentions": {
+            "everyone": "Everybody in this conversation",
+            "here": "Whoever is online now",
+            "polar": "Ask Polar"
+        },
         "blocks": {
             "text": "Text",
             "heading": "Heading",

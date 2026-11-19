@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { queryFits, roomMatches } from "@/components/rich-text/suggestion";
+import { matchesTyped, ordered, queryFits, roomMatches } from "@/components/rich-text/suggestion";
 
 describe("what keeps the mention picker open", () => {
     it("opens on the trigger alone, which is somebody asking for the list", () => {
@@ -75,5 +75,26 @@ describe("a room mention once it is written", () => {
     it("leaves names that only start like one alone", () => {
         expect(queryFits("@", "Allison Ruiz")).toBe(true);
         expect(queryFits("@", "Herenia")).toBe(true);
+    });
+});
+
+describe("mention picker order and narrowing", () => {
+    const person = (id: string, label: string) => ({ kind: "user" as const, id, label, detail: "", image: null });
+    const rooms = roomMatches("", { rooms: true, polar: true });
+
+    it("keeps people first until what is typed is plainly a room word or Polar", () => {
+        const people = [person("1", "Polina Ruiz")];
+        expect(ordered("", people, rooms).map((item) => item.id)).toEqual(["1", "everyone", "here", "polar"]);
+        expect(ordered("p", people, roomMatches("p", { rooms: true, polar: true })).map((item) => item.id)).toEqual(["1", "polar"]);
+        expect(ordered("pol", people, roomMatches("pol", { rooms: true, polar: true })).map((item) => item.id)).toEqual(["polar", "1"]);
+        expect(ordered("al", [], roomMatches("al", { rooms: true, polar: false })).map((item) => item.id)).toEqual(["everyone"]);
+    });
+
+    it("narrows rows already found by the start of any word, accents aside", () => {
+        expect(matchesTyped("José Ruiz", "jose")).toBe(true);
+        expect(matchesTyped("José Ruiz", "ru")).toBe(true);
+        expect(matchesTyped("José Ruiz", "jose ru")).toBe(true);
+        expect(matchesTyped("ana.garcia", "garc")).toBe(true);
+        expect(matchesTyped("José Ruiz", "uiz")).toBe(false);
     });
 });

@@ -19,7 +19,7 @@ import { AtSign } from "lucide-react";
 import { PolarFace } from "@/components/polar/polar-bot";
 import { REFERENCE, splitChannelMentions, splitPolarMentions } from "./markdown";
 import { Extension } from "@tiptap/core";
-import { cn, Skeleton } from "@polaris/ui";
+import { cn } from "@polaris/ui";
 import Suggestion from "@tiptap/suggestion";
 import { Avatar } from "@/components/avatar";
 import { ReactRenderer } from "@tiptap/react";
@@ -166,14 +166,18 @@ export type MentionSearch = (
     query: string
 ) => Promise<MentionCandidate[]>;
 
-/** The popup's own props on top of the ones the plugin supplies. */
-type ListProps = SuggestionProps<SuggestionItem> & { searching: boolean };
+/** The popup's own props: the plugin's, with the rows to draw already chosen. */
+type ListProps = SuggestionProps<SuggestionItem>;
 
 const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
     const [active, setActive] = useState(0);
     const items = props.items;
 
-    useEffect(() => setActive(0), [items]);
+    // Back to the top when the rows are a different list, not when the same
+    // rows come back from the server again: a highlight that jumps while
+    // somebody is pressing the arrows sends Enter to the wrong person.
+    const signature = items.map((item) => `${item.kind}-${item.id}`).join("|");
+    useEffect(() => setActive(0), [signature]);
 
     const choose = (index: number) => {
         const item = items[index];
@@ -200,14 +204,6 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
             return false;
         }
     }));
-
-    if (props.searching && items.length === 0) {
-        return (
-            <div className="w-72 rounded-lg border border-border-strong bg-elevated p-2 shadow-popover">
-                <Skeleton className="h-6 w-full" />
-            </div>
-        );
-    }
 
     // Nothing found is not a message. Somebody who typed "@" and kept writing an
     // ordinary sentence is not looking at a picker, and telling them their
@@ -318,7 +314,16 @@ export function wordMentionDecorations(doc: ProseNode, rooms: boolean, polar: bo
     return DecorationSet.create(doc, found);
 }
 
-export function mentionExtension(search: MentionSearch, rooms = false, polar = false) {
+/** The quieter words beside `@everyone`, `@here` and `@polar`, in the reader's
+ *  language. */
+export type RoomWords = (id: RoomSuggestion["id"]) => string;
+
+export function mentionExtension(
+    search: MentionSearch,
+    rooms = false,
+    polar = false,
+    words?: RoomWords
+) {
     return Extension.create({
         name: "polarisMentions",
         addProseMirrorPlugins() {
@@ -333,7 +338,7 @@ export function mentionExtension(search: MentionSearch, rooms = false, polar = f
                 Suggestion({
                     editor: this.editor,
                     pluginKey: POPUP_KEYS.people,
-                    ...mentionSuggestion("@", ["user", "team"], search, rooms, polar)
+                    ...mentionSuggestion("@", ["user", "team"], search, rooms, polar, words)
                 }),
                 Suggestion({
                     editor: this.editor,
@@ -393,6 +398,51 @@ export function queryFits(char: string, query: string): boolean {
     return query.length <= MAX_QUERY.work;
 }
 
+/** How many answers a picker keeps, and for how long one is trusted. */
+const ANSWERS_KEPT = 30;
+const ANSWER_TTL_MS = 30_000;
+
+/** Case and accents aside, so "jose" finds "José". */
+function folded(text: string): string {
+    return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+/** Whether a name answers what was typed: every typed word starts one of its
+ *  words. Only narrows rows already found while the server is asked again. */
+export function matchesTyped(label: string, query: string): boolean {
+    const typed = folded(query).split(/\s+/).filter(Boolean);
+    if (typed.length === 0) return true;
+    const parts = folded(label).split(/[\s._@-]+/).filter(Boolean);
+    return typed.every((word) => parts.some((part) => part.startsWith(word)));
+}
+
+/**
+ * People first and the room words after them, except when what is typed is
+ * plainly one of those words: "@pol" is somebody reaching for Polar, and
+ * leaving it under a column of names that merely contain the letters made Enter
+ * pick the wrong one.
+ *
+ * Naming somebody is what a mention is for nearly every time one is typed, and
+ * a fixed pair pinned to the top pushed the first real name down - so on an
+ * empty or one-letter query the room words stay at the bottom.
+ */
+export function ordered(
+    query: string,
+    people: readonly MentionCandidate[],
+    rooms: readonly RoomSuggestion[]
+): SuggestionItem[] {
+    const typed = query.trim().toLowerCase();
+    const reaching =
+        typed.length >= 2
+            ? rooms.filter(
+                  (room) =>
+                      room.id.startsWith(typed) || (room.id === "everyone" && "all".startsWith(typed))
+              )
+            : [];
+    if (reaching.length === 0) return [...people, ...rooms];
+    return [...reaching, ...people, ...rooms.filter((room) => !reaching.includes(room))];
+}
+
 /**
  * Wire one trigger character to the picker.
  *
@@ -407,12 +457,49 @@ function mentionSuggestion(
     /** Whether this surface is a conversation, and so has a room to name. */
     rooms = false,
     /** Whether Polar can be asked here, which any conversation allows. */
-    polar = false
+    polar = false,
+    words?: RoomWords
 ): Omit<SuggestionOptions<SuggestionItem>, "editor"> {
-    // Whether a lookup is in flight. The plugin opens the popup before the first
-    // answer arrives, and an empty list is otherwise indistinguishable from a
-    // search that genuinely found nothing.
-    let searching = true;
+    /** The room words matching a query, in the reader's language. Worked out
+     *  here rather than waited for: they never come from the server. */
+    const named = (query: string): RoomSuggestion[] =>
+        (rooms || polar) && char === "@"
+            ? roomMatches(query, { rooms, polar }).map((room) =>
+                  words ? { ...room, detail: words(room.id) } : room
+              )
+            : [];
+    /**
+     * Answers already had, by query, for a short while: typing back over a
+     * name, or opening the picker again, draws at once instead of waiting on
+     * the same search. Bounded, oldest first out.
+     */
+    const answers = new Map<string, { items: MentionCandidate[]; at: number }>();
+    const remember = (query: string, items: MentionCandidate[]) => {
+        answers.delete(query);
+        answers.set(query, { items, at: Date.now() });
+        while (answers.size > ANSWERS_KEPT) {
+            const oldest = answers.keys().next().value;
+            if (oldest === undefined) break;
+            answers.delete(oldest);
+        }
+    };
+    const fresh = (query: string): MentionCandidate[] | null => {
+        const kept = answers.get(query);
+        return kept && Date.now() - kept.at < ANSWER_TTL_MS ? kept.items : null;
+    };
+    /** The people last drawn, kept on screen while the next search runs. */
+    let lastPeople: MentionCandidate[] = [];
+    /**
+     * What to draw while a search is on its way: the last answer narrowed to
+     * what is typed now, and the room words, which need no answer. Never a
+     * skeleton - the list Discord draws under "@" is the one it already has,
+     * narrowed as you type, and it never blanks to wait.
+     */
+    const meanwhile = (query: string): SuggestionItem[] => {
+        const people =
+            fresh(query) ?? lastPeople.filter((person) => matchesTyped(person.label, query));
+        return ordered(query, people, named(query));
+    };
 
     return {
         char,
@@ -424,22 +511,10 @@ function mentionSuggestion(
         shouldShow: ({ query }) => queryFits(char, query),
         items: async ({ query }) => {
             if (!queryFits(char, query)) return [];
-            // The room mentions go after the people rather than above them.
-            //
-            // Naming somebody is what a mention is for nearly every time one is
-            // typed, and a fixed pair pinned to the top pushed the first real
-            // name down a list this size - so the common case paid for the rare
-            // one, and the rare one is the one everybody already knows the
-            // spelling of. They are still here, and typing enough of "everyone",
-            // "all" or "here" still narrows the list to them.
-            const named =
-                (rooms || polar) && char === "@" ? roomMatches(query, { rooms, polar }) : [];
-            searching = true;
-            try {
-                return [...(await search(kinds, query)), ...named];
-            } finally {
-                searching = false;
-            }
+            const people = fresh(query) ?? (await search(kinds, query));
+            remember(query, people);
+            lastPeople = people;
+            return ordered(query, people, named(query));
         },
 
         command: ({ editor, range, props }) => {
@@ -464,16 +539,23 @@ function mentionSuggestion(
             let renderer: ReactRenderer<SuggestionHandle, ListProps> | null = null;
             let unmount: (() => void) | null = null;
 
+            // While a search is out the plugin hands over an empty list; the
+            // rows drawn are the ones there is something to say about now.
+            const drawn = (props: SuggestionProps<SuggestionItem>): ListProps =>
+                props.loading && props.items.length === 0
+                    ? { ...props, items: meanwhile(props.query) }
+                    : props;
+
             return {
                 onStart: (props) => {
                     renderer = new ReactRenderer(List, {
-                        props: { ...props, searching },
+                        props: drawn(props),
                         editor: props.editor,
                         className: POPUP_LAYER_CLASS
                     });
                     unmount = mountPopup(props.mount, renderer.element as HTMLElement);
                 },
-                onUpdate: (props) => renderer?.updateProps({ ...props, searching }),
+                onUpdate: (props) => renderer?.updateProps(drawn(props)),
                 onKeyDown: (props) => {
                     if (props.event.key === "Escape") return false;
                     return renderer?.ref?.onKeyDown(props) ?? false;

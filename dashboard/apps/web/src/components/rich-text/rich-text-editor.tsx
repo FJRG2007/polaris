@@ -22,7 +22,6 @@ import { baseExtensions } from "./schema";
 import { RICH_TEXT_PROSE } from "./prose";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { usePolarAllowed } from "@/components/polar/polar-allowed";
 import { SelectionToolbar } from "./toolbar";
 import type { JSONContent } from "@tiptap/core";
 import { afterComposition } from "./composed-shortcuts";
@@ -293,7 +292,6 @@ export function RichTextEditor({
     const words = useRef(t);
     words.current = t;
     const hint = placeholder ?? t("editor.placeholder");
-    const polarAllowed = usePolarAllowed();
 
     const search = useCallback(
         async (kinds: readonly refs.ReferenceKind[], query: string) => {
@@ -331,16 +329,19 @@ export function RichTextEditor({
                 commands: () => commands.current ?? [],
                 say: () => (id) => words.current(`editor.blocks.${id}`)
             }),
-            // Polar only for whoever may ask it: offering a name that answers
-            // "not available to you" is a suggestion that leads nowhere.
+            // Polar is offered to everybody, as a bot is: it is somebody in the
+            // conversation whether or not this account may ask it, and the
+            // answer to somebody who may not - or who has no provider yet -
+            // says so in their language (`lib/polar/mention-answer`).
             mentionExtension(
                 search,
                 mentionsIn !== null && roomMentions,
-                (mentionsIn !== null || polarMentions) && polarAllowed
+                mentionsIn !== null || polarMentions,
+                (id) => words.current(`editor.mentions.${id}`)
             ),
             ...(writesEmoji ? [CustomEmojiNode, emojiExtension(() => customEmoji.current)] : [])
         ],
-        [hint, search, mentionsIn, polarMentions, roomMentions, writesEmoji, polarAllowed]
+        [hint, search, mentionsIn, polarMentions, roomMentions, writesEmoji]
     );
 
     /** A document with the space's emoji drawn as pictures, where this box

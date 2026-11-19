@@ -314,6 +314,11 @@
         }
     },
     "editor": {
+        "mentions": {
+            "everyone": "Todos en esta conversación",
+            "here": "Quien esté conectado ahora",
+            "polar": "Pide a Polar"
+        },
         "blocks": {
             "text": "Texto",
             "heading": "Título",
