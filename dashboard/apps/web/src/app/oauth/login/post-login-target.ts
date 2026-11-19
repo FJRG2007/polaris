@@ -17,5 +17,28 @@ export function postLoginTarget(): string {
     return safeRedirect(new URLSearchParams(window.location.search).get("redirect"));
 }
 
+/** What a sign-in screen moves with. */
+export interface SignInRouter {
+    push(href: string): void;
+    refresh(): void;
+}
+
+/**
+ * Go where a finished sign-in lands.
+ *
+ * Inside the phone app (`window.polarisMobile`) it is a whole page load rather
+ * than the router's: its web view left the screen blank after the router moved
+ * on from the sign-in page, until the app was closed and opened again - which
+ * is a whole page load with the new session. A browser keeps the faster move.
+ */
+export function landAfterSignIn(router: SignInRouter, target: string = postLoginTarget()): void {
+    if (typeof window !== "undefined" && "polarisMobile" in window) {
+        window.location.assign(target);
+        return;
+    }
+    router.push(target);
+    router.refresh();
+}
+
 /** Re-exported so the sign-in page keeps one import for both halves of the rule. */
 export { safeRedirect };

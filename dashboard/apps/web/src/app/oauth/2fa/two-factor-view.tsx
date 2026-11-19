@@ -14,6 +14,7 @@
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { abandonChallengeAction } from "./actions";
+import { landAfterSignIn } from "../login/post-login-target";
 import { KeyRound, Mail, Smartphone } from "lucide-react";
 import { WhatsAppLogo } from "./whatsapp-logo";
 import { TelegramLogo } from "./telegram-logo";
@@ -103,8 +104,7 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
             setError(backup ? t("twoFactor.backupInvalid") : t("twoFactor.codeInvalid"));
             return;
         }
-        router.push(target());
-        router.refresh();
+        landAfterSignIn(router, target());
     }
 
     function choose(next: TwoFactorMethod) {

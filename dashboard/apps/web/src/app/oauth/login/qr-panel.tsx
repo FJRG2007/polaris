@@ -18,7 +18,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useRouter } from "next/navigation";
 import { Button, Skeleton } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
-import { postLoginTarget } from "./post-login-target";
+import { landAfterSignIn } from "./post-login-target";
 import { pollQrSignIn, startQrSignIn } from "./actions";
 import type { QrSignInCode } from "@/lib/qr-sign-in-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -89,8 +89,7 @@ export function QrSignInPanel() {
             if (!live) return;
             if (status === "approved") {
                 window.clearInterval(timer);
-                router.push(postLoginTarget());
-                router.refresh();
+                landAfterSignIn(router);
                 return;
             }
             if (status === "denied" || status === "expired") {

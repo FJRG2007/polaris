@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { loginSchema } from "@polaris/core";
 import { useZodForm } from "@/lib/use-zod-form";
 import { IntegrationLogo } from "@/components/logos";
-import { postLoginTarget } from "./post-login-target";
+import { landAfterSignIn, postLoginTarget } from "./post-login-target";
 import { refusalMessage, signInRefusal } from "@/app/oauth/sign-in-refusal";
 import { authClient, signIn } from "@/lib/auth-client";
 import { useEffect, useState, type FormEvent } from "react";
@@ -246,8 +246,7 @@ export function LoginForm({
             return;
         }
         if (identifier) window.localStorage.setItem(LAST_IDENTIFIER_KEY, identifier);
-        router.push(postLoginTarget());
-        router.refresh();
+        landAfterSignIn(router);
     }
 
     // Ask for the passkey the moment the screen opens, when this browser has
@@ -281,8 +280,7 @@ export function LoginForm({
                 }
                 return;
             }
-            router.push(postLoginTarget());
-            router.refresh();
+            landAfterSignIn(router);
         })();
         return () => controller.abort();
     }, []);
@@ -367,8 +365,7 @@ export function LoginForm({
             setEnrollment(owed);
             return;
         }
-        router.push(postLoginTarget());
-        router.refresh();
+        landAfterSignIn(router);
     }
 
     if (enrollment) {
@@ -379,8 +376,7 @@ export function LoginForm({
                 options={enrollment.options}
                 password={values.password}
                 onDone={() => {
-                    router.push(postLoginTarget());
-                    router.refresh();
+                    landAfterSignIn(router);
                 }}
             />
         );
