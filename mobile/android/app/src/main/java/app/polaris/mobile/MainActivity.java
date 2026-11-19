@@ -3,6 +3,7 @@ package app.polaris.mobile;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
@@ -12,6 +13,8 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.view.View;
@@ -111,6 +114,35 @@ public final class MainActivity extends Activity {
             return;
         }
         NoticeService.start(this);
+        askToStayAwake();
+    }
+
+    /**
+     * Once: ask Android to leave Polaris out of battery optimisation. Without it the phone puts the connection the
+     * notices arrive on to sleep after a while in the pocket, and a message shows up only when the app is opened -
+     * the reason apps that do not go through Google's push (ntfy, Conversations, Signal without Play services) ask
+     * for exactly this.
+     */
+    private void askToStayAwake() {
+        PowerManager power = getSystemService(PowerManager.class);
+        if (power == null || power.isIgnoringBatteryOptimizations(getPackageName())) return;
+        android.content.SharedPreferences asked = getSharedPreferences("notices", MODE_PRIVATE);
+        if (asked.getBoolean("battery_asked", false)) return;
+        asked.edit().putBoolean("battery_asked", true).apply();
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.battery_title)
+                .setMessage(R.string.battery_body)
+                .setPositiveButton(R.string.battery_allow, (dialog, which) -> {
+                    try {
+                        startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                                .setData(Uri.parse("package:" + getPackageName())));
+                    } catch (ActivityNotFoundException missing) {
+                        // A phone without the prompt: its battery settings list the app instead.
+                        startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+                    }
+                })
+                .setNegativeButton(R.string.battery_later, null)
+                .show();
     }
 
     /** A link to this Polaris that opened the app (polaris-mobile://, a shared address) lands on its page. */
@@ -323,6 +355,7 @@ public final class MainActivity extends Activity {
     public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
         if (code == NOTIFICATIONS) {
             NoticeService.start(this);
+            askToStayAwake();
             return;
         }
         if (code == CAMERA_FOR_PICK) {

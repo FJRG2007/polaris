@@ -262,6 +262,27 @@ public final class ViewOnceActivity extends Activity {
         frame.setOnClickListener(view -> finish());
     }
 
+    /** Android 14 and later say when the screen is captured: the photo closes, as it does in Telegram. */
+    private final Object captured = android.os.Build.VERSION.SDK_INT >= 34
+            ? (Activity.ScreenCaptureCallback) this::finish
+            : null;
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (android.os.Build.VERSION.SDK_INT >= 34) {
+            registerScreenCaptureCallback(getMainExecutor(), (Activity.ScreenCaptureCallback) captured);
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        if (android.os.Build.VERSION.SDK_INT >= 34) {
+            unregisterScreenCaptureCallback((Activity.ScreenCaptureCallback) captured);
+        }
+        super.onStop();
+    }
+
     @Override
     protected void onPause() {
         super.onPause();

@@ -22,6 +22,10 @@
     <string name="update_later">Luego</string>
     <string name="view_once_audio">Reproduciendo audio</string>
     <string name="view_once_close">Cerrar</string>
+    <string name="battery_title">Recibe los mensajes al momento</string>
+    <string name="battery_body">Android duerme Polaris para ahorrar batería y los mensajes y llamadas pueden llegar tarde. Deja que funcione en segundo plano para recibirlos al instante.</string>
+    <string name="battery_allow">Permitir</string>
+    <string name="battery_later">Ahora no</string>
     <string name="view_once_failed">Ahora no se puede abrir. Vuelve a intentarlo en un momento.</string>
     <string name="notices_connected">Conectado para mensajes</string>
     <string name="notices_channel_connection">Conexión</string>
