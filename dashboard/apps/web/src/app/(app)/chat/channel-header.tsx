@@ -130,8 +130,8 @@ export function ChannelHeader({
         readonly onAllowDelete: (allowed: boolean) => void;
         readonly onRules: (change: ChatRulesChange) => void;
         readonly onDeleteChat: () => void;
-        /** The conversation's privacy section, drawn again in a group's
-         *  settings so its owner finds it where the rest of the group is. */
+        /** The conversation's privacy section, drawn in a group's settings
+         *  so its owner and admins set it where the rest of the group is. */
         readonly privacy?: React.ReactNode;
     };
 }) {

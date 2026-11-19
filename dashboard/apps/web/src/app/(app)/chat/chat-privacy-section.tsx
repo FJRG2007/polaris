@@ -2,7 +2,7 @@
 
 /**
  * A conversation's own privacy: read receipts, typing and disappearing
- * messages, drawn in its profile or members panel. Everything here follows the
+ * messages, drawn in a group's settings dialog. Everything here follows the
  * rules the server hands back (`directRulesAction`), which asks the same
  * questions every write does: a member of a group who does not run it sees the
  * values and the reason, never a control the server would refuse.
