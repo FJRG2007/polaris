@@ -5,12 +5,14 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
+import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
@@ -26,8 +28,10 @@ import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Polaris itself, in a window of its own: the instance the phone was pointed at, signed in like any browser and kept
@@ -38,6 +42,8 @@ import java.util.List;
 public final class MainActivity extends Activity {
     private static final int PICK_FILES = 1;
     private static final int MEDIA_PERMISSIONS = 2;
+    private static final int CAMERA_FOR_PICK = 3;
+    private static final int NOTIFICATIONS = 4;
 
     private WebView web;
     private View failure;
@@ -46,6 +52,10 @@ public final class MainActivity extends Activity {
     private String origin;
     private ValueCallback<Uri[]> picking;
     private PermissionRequest asking;
+    private Pick pendingPick;
+    private File photoTaken;
+    private File videoTaken;
+    private String pickSource = "";
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -73,6 +83,17 @@ public final class MainActivity extends Activity {
         if (saved != null) web.restoreState(saved);
         if (saved == null || web.getUrl() == null) web.loadUrl(start(getIntent()));
         UpdateCheck.maybeRun(this);
+        listenForNotices();
+    }
+
+    /** Messages and calls as notifications while the app is closed, once Android lets them through. */
+    private void listenForNotices() {
+        if (android.os.Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] {Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATIONS);
+            return;
+        }
+        NoticeService.start(this);
     }
 
     /** A link to this Polaris that opened the app (polaris-mobile://, a shared address) lands on its page. */
@@ -165,18 +186,92 @@ public final class MainActivity extends Activity {
         public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback, FileChooserParams params) {
             if (picking != null) picking.onReceiveValue(null);
             picking = callback;
-            Intent intent = params.createIntent();
-            if (params.getMode() == FileChooserParams.MODE_OPEN_MULTIPLE) {
-                intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            Pick pick = new Pick(params);
+            // The camera is offered beside the gallery for a photo or a video, which needs the camera permission
+            // first: Android refuses the camera app to an app that declares it and has not been given it.
+            if (pick.wantsMedia() && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                pendingPick = pick;
+                requestPermissions(new String[] {Manifest.permission.CAMERA}, CAMERA_FOR_PICK);
+                return true;
             }
-            try {
-                startActivityForResult(intent, PICK_FILES);
-            } catch (ActivityNotFoundException none) {
-                picking = null;
-                return false;
-            }
-            return true;
+            return choose(pick);
         }
+    }
+
+    /** What the page's file input asked for, kept while Android asks for the camera. */
+    private static final class Pick {
+        final Intent intent;
+        final boolean multiple;
+        final boolean images;
+        final boolean videos;
+
+        Pick(WebChromeClient.FileChooserParams params) {
+            intent = params.createIntent();
+            multiple = params.getMode() == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE;
+            boolean any = true;
+            boolean image = false;
+            boolean video = false;
+            for (String type : params.getAcceptTypes()) {
+                if (type == null || type.trim().isEmpty()) continue;
+                any = false;
+                for (String part : type.split(",")) {
+                    String accept = part.trim();
+                    if (accept.equals("*/*")) any = true;
+                    if (accept.startsWith("image/") || accept.matches("\\.(jpe?g|png|heic|webp)")) image = true;
+                    if (accept.startsWith("video/") || accept.matches("\\.(mp4|mov|webm)")) video = true;
+                }
+            }
+            images = any || image;
+            videos = any || video;
+        }
+
+        boolean wantsMedia() {
+            return images || videos;
+        }
+    }
+
+    private boolean choose(Pick pick) {
+        Intent gallery = pick.intent;
+        if (pick.multiple) gallery.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        photoTaken = null;
+        videoTaken = null;
+        List<Intent> cameras = new ArrayList<>();
+        if (pick.wantsMedia() && checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            if (pick.images) {
+                photoTaken = new File(CaptureProvider.folder(this), UUID.randomUUID() + ".jpg");
+                cameras.add(capture(MediaStore.ACTION_IMAGE_CAPTURE, photoTaken));
+            }
+            if (pick.videos) {
+                videoTaken = new File(CaptureProvider.folder(this), UUID.randomUUID() + ".mp4");
+                cameras.add(capture(MediaStore.ACTION_VIDEO_CAPTURE, videoTaken));
+            }
+        }
+        Intent chooser = Intent.createChooser(gallery, null);
+        if (!cameras.isEmpty()) chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, cameras.toArray(new Intent[0]));
+        try {
+            startActivityForResult(chooser, PICK_FILES);
+        } catch (ActivityNotFoundException none) {
+            picking.onReceiveValue(null);
+            picking = null;
+            return false;
+        }
+        return true;
+    }
+
+    private Intent capture(String action, File into) {
+        Uri uri = CaptureProvider.uriFor(into);
+        Intent intent = new Intent(action).putExtra(MediaStore.EXTRA_OUTPUT, uri);
+        intent.setClipData(ClipData.newRawUri("", uri));
+        intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        return intent;
+    }
+
+    String lastPickSource() {
+        return pickSource;
+    }
+
+    void openViewOnce(String attachmentId) {
+        startActivity(ViewOnceActivity.intent(this, origin, attachmentId));
     }
 
     /** Grants what Android already allows, and nothing it does not. */
@@ -194,6 +289,16 @@ public final class MainActivity extends Activity {
 
     @Override
     public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
+        if (code == NOTIFICATIONS) {
+            NoticeService.start(this);
+            return;
+        }
+        if (code == CAMERA_FOR_PICK) {
+            Pick pick = pendingPick;
+            pendingPick = null;
+            if (pick != null && picking != null) choose(pick);
+            return;
+        }
         if (code != MEDIA_PERMISSIONS || asking == null) return;
         PermissionRequest request = asking;
         asking = null;
@@ -207,16 +312,30 @@ public final class MainActivity extends Activity {
             return;
         }
         Uri[] files = null;
-        if (result == RESULT_OK && data != null) {
+        pickSource = "";
+        File taken = taken();
+        if (result == RESULT_OK && taken != null) {
+            // The camera wrote where it was told; what it returns in `data` varies between camera apps.
+            files = new Uri[] {CaptureProvider.uriFor(taken)};
+            pickSource = "camera";
+        } else if (result == RESULT_OK && data != null) {
             if (data.getClipData() != null) {
                 files = new Uri[data.getClipData().getItemCount()];
                 for (int i = 0; i < files.length; i++) files[i] = data.getClipData().getItemAt(i).getUri();
             } else if (data.getData() != null) {
                 files = new Uri[] {data.getData()};
             }
+            if (files != null) pickSource = "gallery";
         }
         picking.onReceiveValue(files);
         picking = null;
+    }
+
+    /** The photo or video the camera wrote, when it wrote one. */
+    private File taken() {
+        if (photoTaken != null && photoTaken.length() > 0) return photoTaken;
+        if (videoTaken != null && videoTaken.length() > 0) return videoTaken;
+        return null;
     }
 
     /** A file the page offers is saved to Downloads, signed in as the page is. */
@@ -269,8 +388,17 @@ public final class MainActivity extends Activity {
     }
 
     @Override
+    protected void onPause() {
+        NoticeService.pageVisible = false;
+        super.onPause();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
+        NoticeService.pageVisible = true;
+        // Signed in since the last time it ran, or stopped while signed out: it reconnects with the session now held.
+        NoticeService.start(this);
         String next = ServerStore.origin(this);
         if (web != null && next != null && !next.equals(origin)) {
             origin = next;

@@ -7,6 +7,11 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <!-- Messages and calls while the app is closed (NoticeService). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
@@ -38,5 +43,35 @@
             android:exported="false"
             android:label="@string/server_title"
             android:windowSoftInputMode="adjustResize" />
+
+        <!-- A photo or video sent to be seen once: its own window, kept out of screenshots (FLAG_SECURE). -->
+        <activity
+            android:name=".ViewOnceActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
+
+        <!-- One connection to the instance for messages and calls while the app is closed. -->
+        <service
+            android:name=".NoticeService"
+            android:exported="false"
+            android:foregroundServiceType="remoteMessaging" />
+
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Where the camera writes what is taken from the file picker; never exported, granted per capture. -->
+        <provider
+            android:name=".CaptureProvider"
+            android:authorities="app.polaris.mobile.capture"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

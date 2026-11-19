@@ -22,4 +22,9 @@
     <string name="update_message">Download it and open the file to install it over this version.</string>
     <string name="update_download">Download</string>
     <string name="update_later">Later</string>
+    <string name="view_once_failed">This cannot be opened right now. Try again in a moment.</string>
+    <string name="notices_connected">Connected for messages</string>
+    <string name="notices_channel_connection">Connection</string>
+    <string name="notices_channel_messages">Messages</string>
+    <string name="notices_channel_calls">Calls</string>
 </resources>
