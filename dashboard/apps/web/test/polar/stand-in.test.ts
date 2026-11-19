@@ -37,7 +37,7 @@ vi.mock("@/lib/agents/model-catalog", () => ({
         // Non-reasoning and paid: the fast route ranks it ahead of the free ones.
         catalogue("openai/gpt-mini", 0.1),
         catalogue("openai/gpt-nano", 0.2),
-        catalogue("liquid/lfm-3-1.7b:free", 0, true),
+        catalogue("liquid/lfm-3-8b:free", 0, true),
         catalogue("meta/llama:free", 0, true)
     ]
 }));
@@ -59,7 +59,7 @@ function upstreamBusy() {
             error: {
                 code: 429,
                 message:
-                    "liquid/lfm-3-1.7b:free is temporarily rate-limited upstream. Please retry shortly.",
+                    "liquid/lfm-3-8b:free is temporarily rate-limited upstream. Please retry shortly.",
                 metadata: {
                     provider_error_code: "model_rate_limit_exceeded",
                     limit_source: "upstream_provider",
@@ -179,7 +179,7 @@ describe("creditMiddleware", () => {
 
 describe("withStandIn and answeredBy", () => {
     it("names the stand-in only once it has answered", async () => {
-        const busy = fakeModel("liquid/lfm-3-1.7b:free", () => Promise.reject(upstreamBusy()));
+        const busy = fakeModel("liquid/lfm-3-8b:free", () => Promise.reject(upstreamBusy()));
         const other = fakeModel("meta/llama:free", async () => ({ content: [] }));
         const chosen = { model: busy as never, option: option(busy.modelId), credential };
         const wrapped = withStandIn(chosen, {
@@ -187,7 +187,7 @@ describe("withStandIn and answeredBy", () => {
             option: option(other.modelId),
             credential
         });
-        expect(answeredBy(wrapped).option.model).toBe("liquid/lfm-3-1.7b:free");
+        expect(answeredBy(wrapped).option.model).toBe("liquid/lfm-3-8b:free");
         await (
             wrapped.model as unknown as { doGenerate: (p: unknown) => Promise<unknown> }
         ).doGenerate(params);
@@ -201,7 +201,7 @@ describe("Automatic for a free OpenRouter account", () => {
         if (typeof resolved === "string") throw new Error(resolved);
         expect(resolved.option.model).toBe("openai/gpt-mini");
         expect(resolved.standIns?.map((entry) => entry.option.model)).toEqual([
-            "liquid/lfm-3-1.7b:free",
+            "liquid/lfm-3-8b:free",
             "openai/gpt-nano"
         ]);
     });
@@ -211,7 +211,7 @@ describe("Automatic for a free OpenRouter account", () => {
         expect(unpaidProviders("broke")).toEqual(new Set(["openrouter"]));
         const resolved = await resolvePolarModel("broke", automaticChoice("fast"), PLAIN_TURN);
         if (typeof resolved === "string") throw new Error(resolved);
-        expect(resolved.option.model).toBe("liquid/lfm-3-1.7b:free");
+        expect(resolved.option.model).toBe("liquid/lfm-3-8b:free");
         // A free first pick is backed by another free one, never a paid one.
         expect(resolved.standIns?.map((entry) => entry.option.model)).toEqual(["meta/llama:free"]);
     });
@@ -241,7 +241,7 @@ describe("the helper on a free account", () => {
         const chat = { model: chatModel as never, option: option("openai/gpt-mini"), credential };
         const helper = await polarHelperModel("helper-2", chat, null);
         expect(helper.resolved.standIns?.map((entry) => entry.option.model)).toEqual([
-            "liquid/lfm-3-1.7b:free",
+            "liquid/lfm-3-8b:free",
             "openai/gpt-nano"
         ]);
     });

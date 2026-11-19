@@ -54,10 +54,12 @@ import {
     currentModels,
     failingProviders,
     garbledModels,
+    noteModelGone,
     noteNoCredit,
     noteProviderFailure,
     PLAIN_TURN,
     unpaidProviders,
+    unusableModels,
     type AutoRoute,
     type TurnSignals
 } from "@/lib/polar/automatic";
@@ -502,10 +504,14 @@ export function followedBy(
  *  stand in, in order. */
 function resolvedOf(
     steps: readonly PlannedStep[],
-    onRefused?: (kind: FailureKind, provider: string) => void,
+    onRefused?: (kind: FailureKind, provider: string, model: string) => void,
     chosenByPolar = false
 ): ResolvedModel {
-    const routed = routedModel(steps, (kind, step) => onRefused?.(kind, step.provider), chosenByPolar);
+    const routed = routedModel(
+        steps,
+        (kind, step) => onRefused?.(kind, step.provider, step.option.model),
+        chosenByPolar
+    );
     const head = steps[0]!;
     return {
         model: routed.model,
@@ -581,8 +587,10 @@ export function failedTurn(
 /** What a refusal of `provider` teaches Automatic for this person's next
  *  turns: no credit offers only its free models for a while; a refused key,
  *  a rate limit or an outage puts the provider last for a few minutes. A
- *  model busy or gone is the model's, not the provider's. */
-export function rememberRefusal(userId: string, provider: string, kind: FailureKind): void {
+ *  model busy or gone is the model's, not the provider's: a gone one is left
+ *  out of Automatic for a day (`noteModelGone`). */
+export function rememberRefusal(userId: string, provider: string, kind: FailureKind, model?: string): void {
+    if (kind === "model" && model) noteModelGone(userId, provider, model);
     if (kind === "credit" || kind === "paid") noteNoCredit(userId, provider);
     else if (kind === "key" || kind === "rate" || kind === "down") {
         noteProviderFailure(userId, provider);
@@ -634,7 +642,7 @@ export async function resolvePolarModel(
     }
     await endOnZen(entries, userId, granted, signals, catalogue);
     const steps = await planSteps(entries, async () => !(await polarLimitReached(userId)));
-    return resolvedOf(steps, (kind, slug) => rememberRefusal(userId, slug, kind));
+    return resolvedOf(steps, (kind, slug, model) => rememberRefusal(userId, slug, kind, model));
 }
 
 /** OpenCode Zen's free tier as the last step of a plan (`zen-stand-in.ts`). */
@@ -901,7 +909,7 @@ export async function sameModelElsewhere(
     const entries = await sameModelEntries(userId, option, options, credentialCache(userId, access));
     if (entries.length === 0) return null;
     const steps = await planSteps(entries, async () => !(await polarLimitReached(userId)));
-    return steps.length > 0 ? resolvedOf(steps, (kind, slug) => rememberRefusal(userId, slug, kind)) : null;
+    return steps.length > 0 ? resolvedOf(steps, (kind, slug, model) => rememberRefusal(userId, slug, kind, model)) : null;
 }
 
 /**
@@ -927,7 +935,8 @@ async function resolveAutomatic(
         signals,
         failingProviders(userId),
         unpaidProviders(userId),
-        garbledModels(userId)
+        garbledModels(userId),
+        unusableModels(userId)
     );
     const route = autoRoute(signals);
     const keysOf = credentialCache(userId, access);
@@ -960,7 +969,7 @@ async function resolveAutomatic(
         await endOnZen(entries, userId, access, signals, options);
         const steps = await planSteps(entries, async () => !(await polarLimitReached(userId)));
         return {
-            ...resolvedOf(steps, (kind, slug) => rememberRefusal(userId, slug, kind), true),
+            ...resolvedOf(steps, (kind, slug, model) => rememberRefusal(userId, slug, kind, model), true),
             automatic: route,
             onRefused: (kind) => rememberRefusal(userId, option.provider, kind)
         };

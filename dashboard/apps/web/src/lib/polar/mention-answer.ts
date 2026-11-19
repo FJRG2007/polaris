@@ -32,7 +32,13 @@ export interface MentionTurn {
     readonly where: string;
     /** Shown while it writes, repeated until it is done. */
     readonly typing?: () => void;
+    /** The question and the names in the prompt, to tell an answer from the
+     *  prompt handed back (`echoesPrompt`); the prompt alone otherwise. */
+    readonly echo?: { readonly question: string; readonly names: readonly string[] };
 }
+
+/** Models asked at most for one mention when each answers with an echo. */
+export const ECHO_TRIES = 3;
 
 /** What Polar says when no model can answer for this person, with the way to fix it. */
 export function noProviderText(words: Words, spendsShared: boolean): string {
@@ -70,59 +76,81 @@ export async function answerMentionWithReason(turn: MentionTurn): Promise<Mentio
     const allowed = await rateLimit(`polar-chat:${userId}`, 30, 60_000);
     if (!allowed.ok) return fail("tooFast", words("polar.tooFast"));
 
-    const [{ resolvePolarModel, answeredBy }, { automaticChoice }, { PLAIN_TURN }, usage] = await Promise.all([
-        import("@/lib/polar/models"),
-        import("@/lib/polar/shared"),
-        import("@/lib/polar/automatic"),
-        import("@/lib/polar/usage")
-    ]);
-    const resolved = await resolvePolarModel(userId, automaticChoice(), PLAIN_TURN, access);
-    if (typeof resolved === "string") return fail("noProvider", noProviderText(words, access.spend));
-    if (resolved.credential.source === "instance" && (await usage.polarLimitReached(userId))) {
-        return fail("limitReached", words("polar.limitReached"));
-    }
+    const [{ resolvePolarModel, answeredBy }, { automaticChoice }, { PLAIN_TURN, noteModelEchoed }, usage, { echoesPrompt }] =
+        await Promise.all([
+            import("@/lib/polar/models"),
+            import("@/lib/polar/shared"),
+            import("@/lib/polar/automatic"),
+            import("@/lib/polar/usage"),
+            import("@/lib/polar/mention-echo")
+        ]);
+    const { withoutPseudoToolCalls } = await import("@/lib/polar/pseudo-tools");
+    const echo = { prompt: turn.prompt, question: turn.echo?.question ?? "", names: turn.echo?.names ?? [] };
 
     turn.typing?.();
     const dots = turn.typing ? setInterval(turn.typing, TYPING_EVERY_MS) : null;
-    let text: string;
-    let spent: Parameters<typeof usage.answerUsage>[0];
     try {
-        const answer = await generateText({
-            // The router retries and walks keys and fallbacks itself.
-            maxRetries: 0,
-            model: resolved.model,
-            maxOutputTokens: ANSWER_TOKENS,
-            system: turn.system,
-            prompt: turn.prompt
-        });
-        text = answer.text;
-        spent = answer.totalUsage;
-    } catch (error) {
-        const { classifyProviderFailure, failureLogLine } = await import("@/lib/polar/provider-failure");
-        console.warn(failureLogLine(turn.where, resolved.option.providerName, classifyProviderFailure(error), error));
-        return fail("failed", words("polar.failed"));
+        for (let tries = 0; tries < ECHO_TRIES; tries++) {
+            // Resolved again after an echo: Automatic leaves the model that
+            // echoed out (`noteModelEchoed`), so the next candidate answers.
+            const resolved = await resolvePolarModel(userId, automaticChoice(), PLAIN_TURN, access);
+            if (typeof resolved === "string") {
+                return tries === 0
+                    ? fail("noProvider", noProviderText(words, access.spend))
+                    : fail("failed", words("polar.failed"));
+            }
+            if (resolved.credential.source === "instance" && (await usage.polarLimitReached(userId))) {
+                return fail("limitReached", words("polar.limitReached"));
+            }
+            let text: string;
+            let spent: Parameters<typeof usage.answerUsage>[0];
+            try {
+                const answer = await generateText({
+                    // The router retries and walks keys and fallbacks itself.
+                    maxRetries: 0,
+                    model: resolved.model,
+                    maxOutputTokens: ANSWER_TOKENS,
+                    system: turn.system,
+                    prompt: turn.prompt
+                });
+                text = answer.text;
+                spent = answer.totalUsage;
+            } catch (error) {
+                const { classifyProviderFailure, failureLogLine } = await import("@/lib/polar/provider-failure");
+                console.warn(failureLogLine(turn.where, resolved.option.providerName, classifyProviderFailure(error), error));
+                return fail("failed", words("polar.failed"));
+            }
+
+            const answered = answeredBy(resolved);
+            const payer = answered.credential.source === "instance" ? "instance" : "own";
+            try {
+                await usage.recordPolarUsage({
+                    userId,
+                    threadId: null,
+                    messageId: null,
+                    provider: answered.option.provider,
+                    model: answered.option.model,
+                    payer,
+                    usage: usage.answerUsage(spent, answered.option),
+                    ...usage.routeRecord(resolved)
+                });
+            } catch (error) {
+                console.error(`polar: could not record the usage of ${turn.where}:`, error);
+            }
+            const said = withoutPseudoToolCalls(text).trim();
+            const who = `${answered.option.provider}/${answered.option.model}`;
+            if (said && !echoesPrompt(said, echo)) {
+                console.info(`polar: ${turn.where} answered by ${who} (${payer})`);
+                return { text: said, problem: null };
+            }
+            // Nothing, or the prompt handed back: that model failed this turn.
+            console.warn(`polar: ${who} ${said ? "echoed its prompt" : "answered nothing"} for ${turn.where}; asking the next model`);
+            noteModelEchoed(userId, answered.option.provider, answered.option.model);
+        }
     } finally {
         if (dots) clearInterval(dots);
     }
-
-    const answered = answeredBy(resolved);
-    try {
-        await usage.recordPolarUsage({
-            userId,
-            threadId: null,
-            messageId: null,
-            provider: answered.option.provider,
-            model: answered.option.model,
-            payer: answered.credential.source === "instance" ? "instance" : "own",
-            usage: usage.answerUsage(spent, answered.option),
-            ...usage.routeRecord(resolved)
-        });
-    } catch (error) {
-        console.error(`polar: could not record the usage of ${turn.where}:`, error);
-    }
-    const { withoutPseudoToolCalls } = await import("@/lib/polar/pseudo-tools");
-    const said = withoutPseudoToolCalls(text).trim();
-    return said ? { text: said, problem: null } : fail("failed", words("polar.failed"));
+    return fail("failed", words("polar.failed"));
 }
 
 /** The question with the mention taken out; empty when only the mention was written. */

@@ -98,6 +98,11 @@ const CODES: Readonly<Record<string, FailureKind>> = {
     model_not_found: "model",
     model_decommissioned: "model",
     model_not_available: "model",
+    // Mistral's 400 `invalid_model` (code 1500): a model its index lists but
+    // its API does not serve.
+    invalid_model: "model",
+    unknown_model: "model",
+    model_not_supported: "model",
     deploymentnotfound: "model",
     not_found_error: "model",
     not_found: "model",
@@ -135,7 +140,7 @@ const BUSY = /upstream|model[_ ]rate[_ ]limit|overloaded|over capacity|at capaci
  *  model "not found, try pulling it first", OpenAI's "does not exist or you do
  *  not have access to it", Groq's decommissioned models. */
 const MODEL =
-    /model[_ ]not[_ ]found|no such model|unknown model|decommissioned|no endpoints found|model\b[^.]{0,80}\b(not found|does not exist|is not supported)/i;
+    /model[_ ]not[_ ]found|no such model|unknown model|invalid model\b|decommissioned|no endpoints found|model\b[^.]{0,80}\b(not found|does not exist|is not supported)/i;
 /** The key is not set up for this call, in the words of a 400 that names no
  *  reason of its own: Anthropic's `invalid_request_error` "This API key is not
  *  scoped to a workspace, so this request must include the

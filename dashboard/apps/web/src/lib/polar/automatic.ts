@@ -133,6 +133,42 @@ export function statedBillions(model: Pick<PolarModelOption, "model" | "name">):
     return most;
 }
 
+/** A model whose name states fewer parameters than this (billions) does not
+ *  hold a conversation: it continues the transcript it is shown. */
+export const CHAT_MIN_BILLIONS = 3;
+/** A model whose catalogue window is smaller than this, in tokens, is a small
+ *  or special-purpose one, not a chat model. */
+export const CHAT_MIN_CONTEXT_TOKENS = 16_000;
+/** A model the catalogue says writes fewer tokens than this cannot answer. */
+export const CHAT_MIN_OUTPUT_TOKENS = 1_024;
+/**
+ * Model families that are not conversational, for the ones whose catalogue
+ * entry states no size: on-device "edge" and "tiny" models, safety
+ * classifiers, embedders, rerankers, OCR, speech and moderation models. The
+ * last of the checks in `holdsConversation`, after the catalogue's own fields.
+ */
+const NOT_CONVERSATIONAL =
+    /(?:^|[-_/ .:])(?:edge|tiny|guard|embed(?:ding)?s?|rerank(?:er)?|ocr|whisper|tts|transcribe|moderation)(?=$|[-_/ .:\d])/i;
+
+/**
+ * Whether a model can hold a conversation, from what the catalogue says of it:
+ * its stated size, its window, its longest answer, what it reads, and its
+ * family. A model the catalogue knows nothing about is given the benefit of
+ * the doubt. Pure.
+ */
+export function holdsConversation(
+    model: Pick<PolarModelOption, "model" | "name" | "contextTokens" | "outputTokens" | "inputs">
+): boolean {
+    const billions = statedBillions(model);
+    if (billions !== null && billions < CHAT_MIN_BILLIONS) return false;
+    if (model.contextTokens > 0 && model.contextTokens < CHAT_MIN_CONTEXT_TOKENS) return false;
+    if ((model.outputTokens ?? 0) > 0 && model.outputTokens! < CHAT_MIN_OUTPUT_TOKENS) return false;
+    const inputs = model.inputs ?? [];
+    if (inputs.length > 0 && !inputs.includes("text")) return false;
+    const id = model.model.toLowerCase().split("/").pop() ?? "";
+    return !NOT_CONVERSATIONAL.test(id) && !NOT_CONVERSATIONAL.test(model.name);
+}
+
 /** Cheapest first; an unknown price after every known one. */
 function byCostAsc(a: PolarModelOption, b: PolarModelOption): number {
     const left = a.costInput ?? Number.POSITIVE_INFINITY;
@@ -162,7 +198,10 @@ const byName = (a: PolarModelOption, b: PolarModelOption) =>
  * (`statedBillions`). A provider in
  * `unpaid` refused a call for want of credit a moment ago, so only its free
  * models are offered while it has any. Providers in `failing` go last, in the
- * same order among themselves.
+ * same order among themselves. Models that cannot hold a conversation
+ * (`holdsConversation`) and the `provider/model` pairs in `unusable` - a model
+ * its provider said it does not serve, one that answered with the transcript
+ * - are left out while anything else is left.
  */
 export function automaticCandidates(
     providers: readonly PolarProviderOption[],
@@ -171,7 +210,8 @@ export function automaticCandidates(
     unpaid: ReadonlySet<string> = new Set(),
     /** `provider/model` of models that wrote their tool calls out as text
      *  lately (`toolMarkupIn`); a turn offering tools skips them. */
-    garbled: ReadonlySet<string> = new Set()
+    garbled: ReadonlySet<string> = new Set(),
+    unusable: ReadonlySet<string> = new Set()
 ): PolarModelOption[] {
     const route = autoRoute(signals);
     let models = providers.flatMap((provider) =>
@@ -183,6 +223,11 @@ export function automaticCandidates(
         const kept = models.filter(test);
         if (kept.length > 0) models = kept;
     };
+    // The cheapest-first order of a fast turn would otherwise land on the
+    // smallest model listed. Like LiteLLM's router, a deployment that failed
+    // the way it will keep failing is out, not merely last.
+    keep((model) => !unusable.has(`${model.provider}/${model.model}`));
+    keep(holdsConversation);
     if (signals.files > 0) keep((model) => model.attachment);
     if (signals.agentic) {
         keep((model) => !garbled.has(`${model.provider}/${model.model}`));
@@ -266,6 +311,30 @@ export function garbledModels(userId: string, now = Date.now()): Set<string> {
     return garbled.list(userId, now);
 }
 const unpaid = providerMemo(UNPAID_MS);
+
+/** How long a model its provider said it does not serve stays out of
+ *  Automatic: its catalogue lists it, its API answers `invalid_model`. */
+export const GONE_MS = 24 * 60 * 60_000;
+/** How long a model that answered with the conversation it was shown, in
+ *  place of a reply, stays out of Automatic. */
+export const ECHOED_MS = 6 * 60 * 60_000;
+const gone = providerMemo(GONE_MS);
+const echoed = providerMemo(ECHOED_MS);
+
+/** Notes that this provider does not serve this model to this person. */
+export function noteModelGone(userId: string, provider: string, model: string, now = Date.now()): void {
+    gone.note(userId, `${provider}/${model}`, now);
+}
+
+/** Notes that this model answered this person with an echo of its prompt. */
+export function noteModelEchoed(userId: string, provider: string, model: string, now = Date.now()): void {
+    echoed.note(userId, `${provider}/${model}`, now);
+}
+
+/** The `provider/model` of models Automatic leaves out for this person now. */
+export function unusableModels(userId: string, now = Date.now()): Set<string> {
+    return new Set([...gone.list(userId, now), ...echoed.list(userId, now)]);
+}
 
 /** Notes that a call to this provider failed for this person just now. */
 export function noteProviderFailure(userId: string, provider: string, now = Date.now()): void {

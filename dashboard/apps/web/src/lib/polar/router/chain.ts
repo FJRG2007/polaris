@@ -679,8 +679,10 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
             if (done) return done.value;
         }
         // Everything left was cooling from an earlier refusal: ask them anyway,
-        // in order, rather than refuse on what may already have passed.
+        // in order, rather than refuse on what may already have passed - but
+        // never a model its provider said it does not serve: that has not passed.
         for (const index of cooled) {
+            if (coolingOf(subjectOf(steps[index]!), steps[index]!.free)?.kind === "model") continue;
             const done = await settle(index, true);
             if (done) return done.value;
         }
