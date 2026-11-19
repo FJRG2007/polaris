@@ -68,17 +68,17 @@
         "connectedAccounts": "Cuentas conectadas"
     },
     "browser": {
-        "title": "{clientKind, select, desktop {Avisos del sistema} other {Avisos del navegador}}",
+        "title": "{clientKind, select, desktop {Avisos del sistema} phone {Notificaciones} other {Avisos del navegador}}",
         "standing": {
             "app": "La app de Polaris las muestra por sí misma. No hay nada que permitir.",
-            "granted": "{clientKind, select, desktop {Polaris puede avisarte de esto mientras estás en otra ventana.} other {Polaris puede avisarte de esto mientras estás en otra pestaña.}}",
-            "denied": "{clientKind, select, desktop {El sistema las está bloqueando. Permite las notificaciones de Polaris en los ajustes del sistema para volver a activarlas.} other {Este navegador las está bloqueando. Permite las notificaciones de este sitio en sus ajustes para volver a activarlas.}}",
-            "askable": "{clientKind, select, desktop {Deja que Polaris te avise de una llamada o un mensaje mientras estás en otra ventana.} other {Deja que Polaris te avise de una llamada o un mensaje mientras estás en otra pestaña.}}",
-            "unsupported": "{clientKind, select, desktop {Esta app no puede mostrarlas.} other {Este navegador no puede mostrarlas.}}"
+            "granted": "{clientKind, select, desktop {Polaris puede avisarte de esto mientras estás en otra ventana.} phone {Polaris puede avisarte de esto mientras estás en otra app.} other {Polaris puede avisarte de esto mientras estás en otra pestaña.}}",
+            "denied": "{clientKind, select, desktop {El sistema las está bloqueando. Permite las notificaciones de Polaris en los ajustes del sistema para volver a activarlas.} phone {El móvil las está bloqueando. Permite las notificaciones de Polaris en los ajustes del móvil para volver a activarlas.} other {Este navegador las está bloqueando. Permite las notificaciones de este sitio en sus ajustes para volver a activarlas.}}",
+            "askable": "{clientKind, select, desktop {Deja que Polaris te avise de una llamada o un mensaje mientras estás en otra ventana.} phone {Deja que Polaris te avise de una llamada o un mensaje mientras estás en otra app.} other {Deja que Polaris te avise de una llamada o un mensaje mientras estás en otra pestaña.}}",
+            "unsupported": "{clientKind, select, desktop {Esta app no puede mostrarlas.} phone {Esta app no puede mostrarlas.} other {Este navegador no puede mostrarlas.}}"
         },
         "testBody": "Así es un aviso de Polaris.",
         "testSent": "Enviado. Si no ha aparecido nada, el sistema lo está reteniendo: revisa sus propios ajustes de notificaciones.",
-        "testRefused": "{clientKind, select, desktop {El sistema no ha querido mostrarlo.} other {Este navegador no ha querido mostrarlo.}}",
+        "testRefused": "{clientKind, select, desktop {El sistema no ha querido mostrarlo.} phone {El móvil no ha querido mostrarlo.} other {Este navegador no ha querido mostrarlo.}}",
         "allowed": "Permitidas",
         "on": "Sí",
         "blocked": "Bloqueadas",
@@ -103,7 +103,7 @@
             }
         },
         "outsideTab": "{surface, select, app {{kind} fuera de la ventana} other {{kind} fuera de la pestaña}}",
-        "keptHere": "{clientKind, select, desktop {Esto se guarda para esta app, no para tu cuenta, igual que el sonido de abajo. Lo que llega a la campana, a tu correo y a todo lo demás está más abajo.} other {Esto se guarda para este navegador, no para tu cuenta, igual que el sonido de abajo. Lo que llega a la campana, a tu correo y a todo lo demás está más abajo.}}"
+        "keptHere": "{clientKind, select, desktop {Esto se guarda para esta app, no para tu cuenta, igual que el sonido de abajo. Lo que llega a la campana, a tu correo y a todo lo demás está más abajo.} phone {Esto se guarda para este móvil, no para tu cuenta, igual que el sonido de abajo. Lo que llega a la campana, a tu correo y a todo lo demás está más abajo.} other {Esto se guarda para este navegador, no para tu cuenta, igual que el sonido de abajo. Lo que llega a la campana, a tu correo y a todo lo demás está más abajo.}}"
     },
     "sound": {
         "title": "Sonido",
@@ -844,8 +844,8 @@
         "standing": {
             "on": "Activado en este dispositivo.",
             "off": "Desactivado en este dispositivo.",
-            "denied": "{clientKind, select, desktop {El sistema bloquea los avisos de Polaris. Permítelos en la configuración del sistema.} other {Este navegador bloquea los avisos de Polaris. Permítelos en su configuración del sitio.}}",
-            "unsupported": "{clientKind, select, desktop {Esta app no puede recibir avisos con Polaris cerrado.} other {Este navegador no puede recibir avisos con Polaris cerrado.}}"
+            "denied": "{clientKind, select, desktop {El sistema bloquea los avisos de Polaris. Permítelos en la configuración del sistema.} phone {El móvil bloquea los avisos de Polaris. Permítelos en los ajustes del móvil.} other {Este navegador bloquea los avisos de Polaris. Permítelos en su configuración del sitio.}}",
+            "unsupported": "{clientKind, select, desktop {Esta app no puede recibir avisos con Polaris cerrado.} phone {Esta app no puede recibir avisos con Polaris cerrado.} other {Este navegador no puede recibir avisos con Polaris cerrado.}}"
         }
     },
     "appHolds": {

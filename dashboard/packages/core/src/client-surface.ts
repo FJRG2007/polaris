@@ -21,7 +21,7 @@
  * `clientFromUserAgent`.
  */
 
-export const CLIENTS = ["browser", "desktop", "installed"] as const;
+export const CLIENTS = ["browser", "desktop", "installed", "phone"] as const;
 export type Client = (typeof CLIENTS)[number];
 
 /** Whether a browser is wrapped around Polaris (tabs, site permissions, a
@@ -43,7 +43,10 @@ const FACTS: Readonly<Record<Client, ClientFacts>> = {
     desktop: { host: "app", notices: "system", badge: "app-icon" },
     // Installed from the browser's menu: its own window and icon, but the
     // browser still owns permissions and notices.
-    installed: { host: "app", notices: "browser-permission", badge: "app-icon" }
+    installed: { host: "app", notices: "browser-permission", badge: "app-icon" },
+    // The Polaris phone app: the page in its own WebView, notices shown by the
+    // app itself through the phone, permissions in the phone's settings.
+    phone: { host: "app", notices: "system", badge: "app-icon" }
 };
 
 export function clientFacts(client: Client): ClientFacts {
@@ -57,14 +60,17 @@ export function isClient(value: unknown): value is Client {
 /**
  * The client a request comes from, as far as its user-agent says.
  *
- * The desktop app is Electron, which writes its own product name and an
- * `Electron/` token into the user-agent; nothing else a person browses with
- * carries both. An installed web app cannot be told from its browser here - it
+ * The phone app names itself `PolarisMobile/<version>`. The desktop app is
+ * Electron, which writes its own product name and an `Electron/` token into
+ * the user-agent; nothing else a person browses with carries both. An installed web app cannot be told from its browser here - it
  * sends the same user-agent - so it starts as `browser` and the page corrects
  * itself once it can ask the display mode.
  */
 export function clientFromUserAgent(userAgent: string | null | undefined): Client {
     if (!userAgent) return "browser";
+    // The phone app appends its own product token to the WebView's agent
+    // (`mobile/android/.../AppAgent.java`).
+    if (/\bPolarisMobile\/\d/.test(userAgent)) return "phone";
     return /\bElectron\/\d/.test(userAgent) && /\b(?:Polaris|polaris-desktop)\/\d/.test(userAgent)
         ? "desktop"
         : "browser";

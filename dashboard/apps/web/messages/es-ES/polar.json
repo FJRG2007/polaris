@@ -415,7 +415,7 @@
         "transcribing": "Transcribiendo",
         "call": "Modo de voz",
         "unavailable": "Hablar con Polar requiere una clave de voz, como Groq u OpenAI.",
-        "micDenied": "{clientKind, select, desktop {Polar no puede usar tu micrófono. Permítelo para Polaris en los ajustes del sistema y vuelve a probar.} other {Polar no puede usar tu micrófono. Permítelo para este sitio en el navegador y vuelve a probar.}}",
+        "micDenied": "{clientKind, select, desktop {Polar no puede usar tu micrófono. Permítelo para Polaris en los ajustes del sistema y vuelve a probar.} phone {Polar no puede usar tu micrófono. Permítelo para Polaris en los ajustes del móvil y vuelve a probar.} other {Polar no puede usar tu micrófono. Permítelo para este sitio en el navegador y vuelve a probar.}}",
         "cannotRecord": "{surface, select, app {Esta app no puede grabar audio.} other {Este navegador no puede grabar audio.}}",
         "modelNotSaved": "No se ha guardado el modelo. Vuelve a probar.",
         "errors": {
@@ -429,7 +429,7 @@
         },
         "callTitle": "Modo de voz",
         "callDescription": "Habla y Polar te responde en voz alta. Háblale encima para pararlo.",
-        "browserVoice": "{clientKind, select, desktop {Hablando con la voz del sistema} other {Hablando con la voz del navegador}}",
+        "browserVoice": "{clientKind, select, desktop {Hablando con la voz del sistema} phone {Hablando con la voz del móvil} other {Hablando con la voz del navegador}}",
         "code": {
             "done": "Hecho.",
             "failed": "No se ha podido. Inténtalo de nuevo.",
@@ -467,7 +467,7 @@
             "microphone": "Micrófono",
             "systemDefault": "Del sistema",
             "allow": "Permite el micro para ver nombres",
-            "denied": "{clientKind, select, desktop {Bloqueado. Permítelo en los ajustes del sistema.} other {Bloqueado. Permítelo en el navegador.}}",
+            "denied": "{clientKind, select, desktop {Bloqueado. Permítelo en los ajustes del sistema.} phone {Bloqueado. Permítelo en los ajustes del móvil.} other {Bloqueado. Permítelo en el navegador.}}",
             "model": "Modelo"
         }
     },

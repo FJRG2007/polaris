@@ -19,7 +19,18 @@ const DESKTOP =
 const OTHER_ELECTRON =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Slack/4.41.0 Chrome/131.0.0.0 Electron/33.0.0 Safari/537.36";
 
+/** The phone app: Android's WebView agent with the app's own token after it. */
+const PHONE =
+    "Mozilla/5.0 (Linux; Android 16; Pixel 9 Build/BP2A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/141.0.0.0 Mobile Safari/537.36 PolarisMobile/0.1.4 (Android)";
+
 describe("clientFromUserAgent", () => {
+    it("knows the phone app by its own token", () => {
+        expect(clientFromUserAgent(PHONE)).toBe("phone");
+        expect(clientFromUserAgent(PHONE.replace(" PolarisMobile/0.1.4 (Android)", ""))).toBe(
+            "browser"
+        );
+    });
+
     it("knows the desktop app by its name and Electron together", () => {
         expect(clientFromUserAgent(DESKTOP)).toBe("desktop");
         expect(clientFromUserAgent(DESKTOP.replace("Polaris/", "polaris-desktop/"))).toBe(
@@ -79,5 +90,10 @@ describe("messages worded by client", () => {
             clientKind: "installed",
             surface: "app"
         });
+    });
+
+    it("words the phone app as an app whose notices the phone shows", () => {
+        expect(clientMessageValues("phone")).toEqual({ clientKind: "phone", surface: "app" });
+        expect(clientFacts("phone")).toEqual({ host: "app", notices: "system", badge: "app-icon" });
     });
 });

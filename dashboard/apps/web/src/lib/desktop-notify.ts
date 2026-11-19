@@ -27,6 +27,7 @@
  */
 
 import { desktopBridge } from "@/lib/desktop-bridge";
+import { inPhoneApp } from "@/lib/mobile-bridge";
 import { attending } from "@/components/use-attention";
 import { browserNoticePayload, desktopNoticePayload } from "@/lib/notice-payload";
 
@@ -186,7 +187,8 @@ export function canNotify(): boolean {
 export type NoticeStanding = "app" | "granted" | "denied" | "askable" | "unsupported";
 
 export function noticeStanding(): NoticeStanding {
-    if (desktopBridge()) return "app";
+    // The desktop app and the phone app both show notices themselves.
+    if (desktopBridge() || inPhoneApp()) return "app";
     if (!canNotify()) return "unsupported";
     if (Notification.permission === "granted") return "granted";
     return Notification.permission === "denied" ? "denied" : "askable";

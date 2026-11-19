@@ -15,7 +15,7 @@ import type { QuietHours } from "@polaris/core";
 import Link from "next/link";
 import { DeliveryLog } from "./delivery-log";
 import { EventGroups } from "./event-groups";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useClient, useTranslations } from "@/components/i18n/i18n-provider";
 import { useConnectionsHref } from "@/components/use-connections-href";
 import { DestinationsCard } from "./destinations-card";
 import { QuietHoursCard } from "./quiet-hours-card";
@@ -129,6 +129,7 @@ export function NotificationSettingsView({
     timeZone?: string;
 }) {
     const t = useTranslations("accountNotifications");
+    const phoneApp = useClient() === "phone";
     const [state, setState] = useState(
         () => new Map(rules.map((entry) => [entry.event, entry.rule]))
     );
@@ -200,9 +201,11 @@ export function NotificationSettingsView({
             ) : null}
 
             <BrowserNoticesCard />
-            <PushCard />
+            {/* The phone app shows its notices itself and has no tab, so the
+                browser's push and the tab's icon are nothing to set there. */}
+            {phoneApp ? null : <PushCard />}
             <SoundCard />
-            <TabIconCard />
+            {phoneApp ? null : <TabIconCard />}
             {badgesClearOnVisit !== null ? <BadgesCard initial={badgesClearOnVisit} /> : null}
 
             <EventGroups
@@ -275,8 +278,10 @@ function InGameRow({ initial, ready }: { initial: inGame.InGameChoice; ready: bo
 
     return (
         <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
+            {/* Wraps instead of squeezing: beside a three-way choice the
+                description would be a column of single words. */}
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                <div className="min-w-[min(100%,16rem)] flex-1">
                     <p className="text-sm font-medium">{t("inGame.title")}</p>
                     <p className="text-xs text-muted-foreground">
                         {ready
@@ -332,6 +337,9 @@ function InGameRow({ initial, ready }: { initial: inGame.InGameChoice; ready: bo
  */
 function BrowserNoticesCard() {
     const t = useTranslations("accountNotifications");
+    // The phone app draws its notices itself, for every kind, and the phone
+    // decides which: the switches and the sample here are the browser's.
+    const phoneApp = useClient() === "phone";
     const [standing, setStanding] = useState<NoticeStanding>("unsupported");
     const [asking, setAsking] = useState(false);
     const [kinds, setKinds] = useState<Record<NoticeKind, boolean>>(
@@ -419,7 +427,7 @@ function BrowserNoticesCard() {
                                 {t("browser.allow")}
                             </Button>
                         ) : null}
-                        {working ? (
+                        {working && !phoneApp ? (
                             <Button size="sm" variant="secondary" onClick={() => void test()}>
                                 {t("browser.showMe")}
                             </Button>
@@ -429,36 +437,45 @@ function BrowserNoticesCard() {
 
                 {shown ? <p className="text-xs text-muted-foreground">{shown}</p> : null}
 
-                <div className="flex flex-col divide-y divide-border rounded-md border border-border">
-                    {NOTICE_KINDS.map((kind) => (
-                        <div
-                            key={kind}
-                            className="flex items-center justify-between gap-3 px-3 py-2"
-                        >
-                            <div className="min-w-0">
-                                <p className={cn("text-sm", !working && "text-muted-foreground")}>
-                                    {t(`browser.kinds.${kind}.title` as const)}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    {t(`browser.kinds.${kind}.hint` as const)}
-                                </p>
+                {phoneApp ? null : (
+                    <div className="flex flex-col divide-y divide-border rounded-md border border-border">
+                        {NOTICE_KINDS.map((kind) => (
+                            <div
+                                key={kind}
+                                className="flex items-center justify-between gap-3 px-3 py-2"
+                            >
+                                <div className="min-w-0">
+                                    <p
+                                        className={cn(
+                                            "text-sm",
+                                            !working && "text-muted-foreground"
+                                        )}
+                                    >
+                                        {t(`browser.kinds.${kind}.title` as const)}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {t(`browser.kinds.${kind}.hint` as const)}
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={kinds[kind]}
+                                    // Left usable while the browser is refusing, on
+                                    // purpose: this is what will happen once it is
+                                    // allowed, and a row of dead switches teaches
+                                    // nobody which of them was on.
+                                    onChange={(next) => choose(kind, next)}
+                                    aria-label={t("browser.outsideTab", {
+                                        kind: t(`browser.kinds.${kind}.title` as const)
+                                    })}
+                                />
                             </div>
-                            <Switch
-                                checked={kinds[kind]}
-                                // Left usable while the browser is refusing, on
-                                // purpose: this is what will happen once it is
-                                // allowed, and a row of dead switches teaches
-                                // nobody which of them was on.
-                                onChange={(next) => choose(kind, next)}
-                                aria-label={t("browser.outsideTab", {
-                                    kind: t(`browser.kinds.${kind}.title` as const)
-                                })}
-                            />
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                )}
 
-                <p className="text-xs text-muted-foreground">{t("browser.keptHere")}</p>
+                {phoneApp ? null : (
+                    <p className="text-xs text-muted-foreground">{t("browser.keptHere")}</p>
+                )}
             </CardBody>
         </Card>
     );

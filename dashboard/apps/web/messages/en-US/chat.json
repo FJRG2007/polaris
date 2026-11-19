@@ -973,12 +973,12 @@
         "description": "Polaris records the screen or window you pick and puts the video in your message. Up to {time} and {size} MB.",
         "recorded": "{time}, {size} MB",
         "errors": {
-            "unsupported": "{clientKind, select, desktop {This app cannot record video. Try it from a browser.} other {This browser cannot record video. Try another browser.}}",
+            "unsupported": "{clientKind, select, desktop {This app cannot record video. Try it from a browser.} phone {This phone cannot record video here. Try it from a computer.} other {This browser cannot record video. Try another browser.}}",
             "withoutCamera": "Recording without the camera: it could not be opened.",
             "withoutMicrophone": "Recording without the microphone: it could not be opened.",
-            "noPicture": "{clientKind, select, desktop {This app could not put the picture together. Try again, or use a browser.} other {This browser could not put the picture together. Try again, or use another browser.}}",
-            "notStarted": "{clientKind, select, desktop {This app could not start recording the screen. Try again, or use a browser.} other {This browser could not start recording the screen. Try again, or use another browser.}}",
-            "notEncoded": "{clientKind, select, desktop {This app could not record the screen, so nothing was saved. Try again, or use a browser.} other {This browser could not record the screen, so nothing was saved. Try again, or use another browser.}}",
+            "noPicture": "{clientKind, select, desktop {This app could not put the picture together. Try again, or use a browser.} phone {This phone could not put the picture together. Try again, or use a computer.} other {This browser could not put the picture together. Try again, or use another browser.}}",
+            "notStarted": "{clientKind, select, desktop {This app could not start recording the screen. Try again, or use a browser.} phone {This phone could not start recording the screen. Try again, or use a computer.} other {This browser could not start recording the screen. Try again, or use another browser.}}",
+            "notEncoded": "{clientKind, select, desktop {This app could not record the screen, so nothing was saved. Try again, or use a browser.} phone {This phone could not record the screen, so nothing was saved. Try again, or use a computer.} other {This browser could not record the screen, so nothing was saved. Try again, or use another browser.}}",
             "tooLarge": "Stopped: the recording reached the size a message can carry."
         }
     },
@@ -1410,7 +1410,7 @@
         "sending": "Sending",
         "sendToTheConversation": "Send to the conversation",
         "notRecorded": "The call was not recorded",
-        "notRecordedWhy": "{clientKind, select, desktop {Try again, or record from a browser.} other {Try again, or record from another browser.}}",
+        "notRecordedWhy": "{clientKind, select, desktop {Try again, or record from a browser.} phone {Try again, or record from a computer.} other {Try again, or record from another browser.}}",
         "close": "Close",
         "errors": {
             "unsupported": "{surface, select, app {This app cannot record video.} other {This browser cannot record video.}}",
@@ -2144,7 +2144,7 @@
         "private": "Private dictation",
         "privateHelp": "{surface, select, app {Polaris writes it down instead of this app.} other {Polaris writes it down instead of your browser.}}",
         "problem": {
-            "micBlocked": "{clientKind, select, desktop {The microphone is blocked. Allow it for Polaris in the system settings, then try again.} other {The microphone is blocked. Allow it in the browser's site settings, then try again.}}",
+            "micBlocked": "{clientKind, select, desktop {The microphone is blocked. Allow it for Polaris in the system settings, then try again.} phone {The microphone is blocked. Allow it for Polaris in the phone's settings, then try again.} other {The microphone is blocked. Allow it in the browser's site settings, then try again.}}",
             "serviceBlocked": "{surface, select, app {This app turned dictation off.} other {This browser turned dictation off.}}",
             "noSpeech": "Nothing was heard. Tap the mic and speak.",
             "network": "Dictation needs a connection. Check it and try again.",

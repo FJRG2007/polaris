@@ -415,7 +415,7 @@
         "transcribing": "Transcribing",
         "call": "Voice mode",
         "unavailable": "Speaking to Polar needs a speech-to-text key, like Groq or OpenAI.",
-        "micDenied": "{clientKind, select, desktop {Polar can't use your microphone. Allow it for Polaris in the system settings, then try again.} other {Polar can't use your microphone. Allow it for this site in your browser, then try again.}}",
+        "micDenied": "{clientKind, select, desktop {Polar can't use your microphone. Allow it for Polaris in the system settings, then try again.} phone {Polar can't use your microphone. Allow it for Polaris in the phone's settings, then try again.} other {Polar can't use your microphone. Allow it for this site in your browser, then try again.}}",
         "cannotRecord": "{surface, select, app {This app can't record audio.} other {This browser can't record audio.}}",
         "modelNotSaved": "Your model choice wasn't saved. Try again.",
         "errors": {
@@ -429,7 +429,7 @@
         },
         "callTitle": "Voice mode",
         "callDescription": "Speak, and Polar answers out loud. Talk over it to stop it.",
-        "browserVoice": "{clientKind, select, desktop {Speaking with the system's voice} other {Speaking with your browser's voice}}",
+        "browserVoice": "{clientKind, select, desktop {Speaking with the system's voice} phone {Speaking with the phone's voice} other {Speaking with your browser's voice}}",
         "code": {
             "done": "Done.",
             "failed": "That didn't go through. Try again.",
@@ -467,7 +467,7 @@
             "microphone": "Microphone",
             "systemDefault": "System default",
             "allow": "Allow the microphone to see names",
-            "denied": "{clientKind, select, desktop {Blocked. Allow it in the system settings.} other {Blocked. Allow it in the browser.}}",
+            "denied": "{clientKind, select, desktop {Blocked. Allow it in the system settings.} phone {Blocked. Allow it in the phone's settings.} other {Blocked. Allow it in the browser.}}",
             "model": "Model"
         }
     },

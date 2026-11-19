@@ -973,12 +973,12 @@
         "description": "Polaris graba la pantalla o ventana que elijas y pone el vídeo en tu mensaje. Hasta {time} y {size} MB.",
         "recorded": "{time}, {size} MB",
         "errors": {
-            "unsupported": "{clientKind, select, desktop {Esta app no puede grabar vídeo. Prueba desde un navegador.} other {Este navegador no puede grabar vídeo. Prueba con otro navegador.}}",
+            "unsupported": "{clientKind, select, desktop {Esta app no puede grabar vídeo. Prueba desde un navegador.} phone {Este móvil no puede grabar vídeo aquí. Prueba desde un ordenador.} other {Este navegador no puede grabar vídeo. Prueba con otro navegador.}}",
             "withoutCamera": "Grabando sin la cámara: no se pudo abrir.",
             "withoutMicrophone": "Grabando sin el micrófono: no se pudo abrir.",
-            "noPicture": "{clientKind, select, desktop {Esta app no pudo componer la imagen. Vuelve a intentarlo o usa un navegador.} other {Este navegador no pudo componer la imagen. Vuelve a intentarlo o usa otro navegador.}}",
-            "notStarted": "{clientKind, select, desktop {Esta app no pudo empezar a grabar la pantalla. Vuelve a intentarlo o usa un navegador.} other {Este navegador no pudo empezar a grabar la pantalla. Vuelve a intentarlo o usa otro navegador.}}",
-            "notEncoded": "{clientKind, select, desktop {Esta app no pudo grabar la pantalla y no se guardó nada. Vuelve a intentarlo o usa un navegador.} other {Este navegador no pudo grabar la pantalla y no se guardó nada. Vuelve a intentarlo o usa otro navegador.}}",
+            "noPicture": "{clientKind, select, desktop {Esta app no pudo componer la imagen. Vuelve a intentarlo o usa un navegador.} phone {Este móvil no pudo componer la imagen. Vuelve a intentarlo o usa un ordenador.} other {Este navegador no pudo componer la imagen. Vuelve a intentarlo o usa otro navegador.}}",
+            "notStarted": "{clientKind, select, desktop {Esta app no pudo empezar a grabar la pantalla. Vuelve a intentarlo o usa un navegador.} phone {Este móvil no pudo empezar a grabar la pantalla. Vuelve a intentarlo o usa un ordenador.} other {Este navegador no pudo empezar a grabar la pantalla. Vuelve a intentarlo o usa otro navegador.}}",
+            "notEncoded": "{clientKind, select, desktop {Esta app no pudo grabar la pantalla y no se guardó nada. Vuelve a intentarlo o usa un navegador.} phone {Este móvil no pudo grabar la pantalla y no se guardó nada. Vuelve a intentarlo o usa un ordenador.} other {Este navegador no pudo grabar la pantalla y no se guardó nada. Vuelve a intentarlo o usa otro navegador.}}",
             "tooLarge": "Detenida: la grabación llegó al tamaño máximo de un mensaje."
         }
     },
@@ -1410,7 +1410,7 @@
         "sending": "Enviando",
         "sendToTheConversation": "Enviar a la conversación",
         "notRecorded": "No se grabó la llamada",
-        "notRecordedWhy": "{clientKind, select, desktop {Vuelve a intentarlo o graba desde un navegador.} other {Vuelve a intentarlo o graba desde otro navegador.}}",
+        "notRecordedWhy": "{clientKind, select, desktop {Vuelve a intentarlo o graba desde un navegador.} phone {Vuelve a intentarlo o graba desde un ordenador.} other {Vuelve a intentarlo o graba desde otro navegador.}}",
         "close": "Cerrar",
         "errors": {
             "unsupported": "{surface, select, app {Esta app no puede grabar vídeo.} other {Este navegador no puede grabar vídeo.}}",
@@ -2144,7 +2144,7 @@
         "private": "Dictado privado",
         "privateHelp": "{surface, select, app {Lo escribe Polaris en lugar de esta app.} other {Lo escribe Polaris en lugar de tu navegador.}}",
         "problem": {
-            "micBlocked": "{clientKind, select, desktop {El micrófono está bloqueado. Permítelo para Polaris en los ajustes del sistema y vuelve a intentarlo.} other {El micrófono está bloqueado. Permítelo en los ajustes del sitio del navegador y vuelve a intentarlo.}}",
+            "micBlocked": "{clientKind, select, desktop {El micrófono está bloqueado. Permítelo para Polaris en los ajustes del sistema y vuelve a intentarlo.} phone {El micrófono está bloqueado. Permítelo para Polaris en los ajustes del móvil y vuelve a intentarlo.} other {El micrófono está bloqueado. Permítelo en los ajustes del sitio del navegador y vuelve a intentarlo.}}",
             "serviceBlocked": "{surface, select, app {Esta app tiene el dictado desactivado.} other {Este navegador tiene el dictado desactivado.}}",
             "noSpeech": "No se ha oído nada. Toca el micrófono y habla.",
             "network": "El dictado necesita conexión. Revísala y vuelve a intentarlo.",

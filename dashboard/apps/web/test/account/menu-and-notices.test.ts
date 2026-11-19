@@ -76,6 +76,6 @@ describe("letting the browser draw a notice", () => {
         // a second thing to keep in step. So the app case is asserted where it
         // is now decided.
         expect(await settings).toContain("noticeStanding()");
-        expect(await notify).toContain('if (desktopBridge()) return "app";');
+        expect(await notify).toContain('if (desktopBridge() || inPhoneApp()) return "app";');
     });
 });

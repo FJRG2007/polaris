@@ -12,8 +12,8 @@
  * to follow it somewhere you did not want to go, or to clear the ones you had not
  * read with it.
  *
- * On a phone the same list opens as a sheet over the whole screen instead of a
- * menu hanging off the bar: rows a finger can hit, and room for more of them.
+ * On a phone the bell opens the notification centre itself: the full page,
+ * with rows a finger can hit.
  */
 
 import Link from "next/link";
@@ -30,9 +30,6 @@ import { describeAudience } from "@/components/notifications/notification-visual
 import { usePhone } from "@/components/use-phone";
 import type { NotificationView } from "@/lib/notification-service";
 import {
-    Dialog,
-    DialogTitle,
-    SheetContent,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -43,15 +40,13 @@ import {
 
 /** How many alerts the dropdown previews before sending the user to the page. */
 const PREVIEW_COUNT = 8;
-/** How many the phone's sheet lists: it has the whole screen to scroll. */
-const SHEET_COUNT = 30;
 
 /** Where a notice goes when it is pressed: its own page, or the full list. */
 function noticeHref(item: NotificationView): string {
     return item.href && item.href.startsWith("/") ? item.href : "/account/notifications";
 }
 
-/** A notice's face, title and the line under it: the same in the menu and the sheet. */
+/** A notice's face, title and the line under it, as the menu lists it. */
 function NoticeSummary({ item }: { item: NotificationView }) {
     const t = useTranslations("components");
     const audience = describeAudience(item.audience, item.audienceLabel, t);
@@ -91,79 +86,25 @@ export function NotificationBell() {
     const router = useRouter();
     const phone = usePhone();
 
+    // On a phone the bell IS the way into the notification centre, as it is in
+    // WhatsApp or Discord: one tap opens the page. A preview sheet over the
+    // screen asked for a second tap that a phone has no gesture for - a double
+    // tap on a modal lands on its overlay, so it never reached the bell.
     if (phone)
         return (
-            <>
-                <button
-                    type="button"
-                    data-tour="shell.notifications"
-                    className="relative grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground before:absolute before:-inset-1.5 before:content-['']"
-                    aria-label={t("bell.label", { unread })}
-                    aria-haspopup="dialog"
-                    onClick={() => setOpen(true)}
-                >
-                    <Bell className="size-4" />
-                    {badge ? (
-                        <span className="absolute -end-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] font-medium leading-4 text-white">
-                            {badge}
-                        </span>
-                    ) : null}
-                </button>
-                <Dialog open={open} onOpenChange={setOpen}>
-                    <SheetContent aria-describedby={undefined}>
-                        <div className="flex min-w-0 shrink-0 items-center gap-2 border-b border-border px-4 py-2 pe-14">
-                            <DialogTitle className="min-w-0 flex-1 truncate text-base">{t("bell.heading")}</DialogTitle>
-                            {unread > 0 ? (
-                                <button
-                                    type="button"
-                                    onClick={markAllRead}
-                                    className="min-h-11 shrink-0 px-2 text-sm text-primary hover:underline"
-                                >
-                                    {t("bell.markAllRead")}
-                                </button>
-                            ) : null}
-                        </div>
-                        {items.length === 0 ? (
-                            <p className="px-4 py-10 text-center text-sm text-muted-foreground">{t("bell.empty")}</p>
-                        ) : (
-                            <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-1">
-                                {items.slice(0, SHEET_COUNT).map((item) => (
-                                    <li key={item.id} className="flex min-w-0 items-stretch">
-                                        <Link
-                                            href={noticeHref(item)}
-                                            onClick={() => {
-                                                markRead(item.id);
-                                                setOpen(false);
-                                            }}
-                                            className="flex min-h-14 min-w-0 flex-1 items-start gap-2 px-4 py-2.5 hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
-                                        >
-                                            <NoticeSummary item={item} />
-                                        </Link>
-                                        {!item.read ? (
-                                            <button
-                                                type="button"
-                                                aria-label={t("bell.markReadNamed", { title: item.title })}
-                                                title={t("bell.markRead")}
-                                                onClick={() => markRead(item.id)}
-                                                className="grid size-11 shrink-0 place-items-center self-center text-muted-foreground/70 hover:text-success"
-                                            >
-                                                <Check className="size-4" />
-                                            </button>
-                                        ) : null}
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                        <Link
-                            href="/account/notifications"
-                            onClick={() => setOpen(false)}
-                            className="mt-auto flex min-h-12 shrink-0 items-center justify-center border-t border-border text-sm text-muted-foreground hover:text-foreground"
-                        >
-                            {t("bell.viewAll")}
-                        </Link>
-                    </SheetContent>
-                </Dialog>
-            </>
+            <Link
+                href="/account/notifications"
+                data-tour="shell.notifications"
+                className="relative grid size-8 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground before:absolute before:-inset-1.5 before:content-['']"
+                aria-label={t("bell.label", { unread })}
+            >
+                <Bell className="size-4" />
+                {badge ? (
+                    <span className="absolute -end-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.625rem] font-medium leading-4 text-white">
+                        {badge}
+                    </span>
+                ) : null}
+            </Link>
         );
 
     return (
