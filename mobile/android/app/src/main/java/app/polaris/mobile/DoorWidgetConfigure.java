@@ -59,7 +59,7 @@ public final class DoorWidgetConfigure extends Activity {
         loading = new ProgressBar(this);
         list.addView(loading, new LinearLayout.LayoutParams(-2, -2));
         ScrollView scroll = new ScrollView(this);
-        scroll.setFitsSystemWindows(true);
+        SystemInsets.pad(scroll);
         scroll.addView(list);
         setContentView(scroll);
 

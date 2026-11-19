@@ -39,8 +39,11 @@
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
 
+        <!-- configChanges on every screen: turning or unfolding the phone never restarts one, so an address being
+             typed, a check in flight and a photo seen once (which cannot be fetched twice) all survive it. -->
         <activity
             android:name=".ServerActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
             android:exported="false"
             android:label="@string/server_title"
             android:windowSoftInputMode="adjustResize" />
@@ -48,6 +51,7 @@
         <!-- A photo or video sent to be seen once: its own window, kept out of screenshots (FLAG_SECURE). -->
         <activity
             android:name=".ViewOnceActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
             android:exported="false"
             android:excludeFromRecents="true"
             android:noHistory="true"
@@ -72,6 +76,7 @@
 
         <activity
             android:name=".DoorWidgetConfigure"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
             android:exported="true"
             android:excludeFromRecents="true"
             android:theme="@style/Theme.Polaris">

@@ -73,6 +73,7 @@ public final class MainActivity extends Activity {
             return;
         }
         setContentView(R.layout.activity_main);
+        SystemInsets.pad(findViewById(R.id.root));
         web = findViewById(R.id.web);
         failure = findViewById(R.id.failure);
         failureText = findViewById(R.id.failure_text);

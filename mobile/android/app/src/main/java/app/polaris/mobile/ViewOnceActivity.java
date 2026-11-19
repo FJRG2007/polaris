@@ -61,6 +61,8 @@ public final class ViewOnceActivity extends Activity {
         loading = new ProgressBar(this);
         frame.addView(loading, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
         setContentView(frame);
+        // The countdown and the watermark stay clear of a cutout in landscape; the black runs on behind it.
+        SystemInsets.pad(frame);
 
         String origin = getIntent().getStringExtra(EXTRA_ORIGIN);
         String attachment = getIntent().getStringExtra(EXTRA_ATTACHMENT);

@@ -32,6 +32,7 @@ public final class ServerActivity extends Activity {
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         setContentView(R.layout.activity_server);
+        SystemInsets.pad(findViewById(R.id.root));
         address = findViewById(R.id.address);
         connect = findViewById(R.id.connect);
         busy = findViewById(R.id.busy);
