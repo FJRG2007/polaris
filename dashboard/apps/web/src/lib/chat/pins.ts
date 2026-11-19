@@ -13,6 +13,7 @@
  * conversation keeps a list of every pin in it, not only the newest few.
  */
 
+import { isEphemeral } from "./ephemeral";
 import { prisma } from "@polaris/db";
 import { ChatAccessError, pinsAllowed, requireChannel, type ChatActor } from "./access";
 import { postNotice } from "./notices";
@@ -76,7 +77,8 @@ export async function pin(actor: ChatActor, input: PinInput): Promise<void> {
             pinnedAt: true,
             pinExpiresAt: true,
             createdAt: true,
-            expiresAt: true
+            expiresAt: true,
+            audience: true
         }
     });
     if (!message || message.deletedAt) throw new ChatAccessError({ key: "errors.messageGone" });
@@ -95,6 +97,10 @@ export async function pin(actor: ChatActor, input: PinInput): Promise<void> {
     // is not in the conversation.
     if (message.kind === "system" || message.parentId) {
         throw new ChatAccessError({ key: "errors.pinNotAllowed" });
+    }
+    // Nor an ephemeral answer: it is one reader's, and a pin is the room's.
+    if (isEphemeral(message.audience)) {
+        throw new ChatAccessError({ key: "errors.messageGone" });
     }
     await requirePinnable(actor, message.channelId);
 

@@ -16,6 +16,7 @@
  */
 
 import { subscribeChatChanges } from "@/lib/chat/live";
+import { frameReaches } from "@/lib/chat/ephemeral";
 import { typingAllowed } from "@/lib/privacy-service";
 import { chatPrivacyOf } from "@/lib/chat/vanish";
 import { holdStreamScope } from "@/lib/chat/stream-scope";
@@ -326,6 +327,8 @@ export async function GET(request: Request): Promise<Response> {
                 // Everything left is about one conversation and names it.
                 const channelId = change.channelId;
                 if (!channelId) return;
+                // An ephemeral answer wakes only the screens of who it is for.
+                if (!frameReaches(change, actor.id)) return;
 
                 if (scope.reachable().has(channelId)) {
                     if (change.kind === "call") {

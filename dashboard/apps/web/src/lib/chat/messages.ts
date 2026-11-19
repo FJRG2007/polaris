@@ -67,6 +67,7 @@ import { spokenEditWindow, spokenWait } from "./durations";
 import { ageClearedWhere, requireAgeCleared } from "./age-gate";
 import { MAX_REREAD } from "./reread-limit";
 import * as history from "./history-visibility";
+import { isEphemeral } from "./ephemeral";
 import { webhookFace } from "./webhook-face";
 import { chatPrivacyIn, chatPrivacyOf, expiryForChannel } from "./vanish";
 import { hasDirectRules } from "./vanish-rules";
@@ -90,6 +91,9 @@ export interface ChatMessageView {
     readonly fromAgent?: string;
     /** Buttons and forms under a message Polar or an app wrote. Absent for nearly all. */
     readonly components?: readonly MessageComponent[];
+    /** Seen only by the people it was for ("Only you can see this"), never by
+     *  the rest of the conversation - see `ephemeral`. */
+    readonly ephemeral?: boolean;
     readonly kind: core.ChatMessageKind;
     /** Empty for a deleted message - the tombstone carries no text. */
     readonly body: string;
@@ -538,9 +542,10 @@ export async function send(
     if (input.parentId) {
         const parent = await prisma.chatMessage.findUnique({
             where: { id: input.parentId },
-            select: { channelId: true, parentId: true, deletedAt: true }
+            select: { channelId: true, parentId: true, deletedAt: true, audience: true }
         });
-        if (!parent || parent.channelId !== input.channelId) {
+        // An ephemeral answer is one reader's: nobody starts a thread under it.
+        if (!parent || parent.channelId !== input.channelId || isEphemeral(parent.audience)) {
             throw new ChatAccessError({ key: "errors.messageNotInConversation" });
         }
         if (parent.deletedAt) throw new ChatRuleError(GONE);
@@ -556,8 +561,10 @@ export async function send(
     if (quote) {
         const original = await prisma.chatMessage.findUnique({
             where: { id: quote.messageId },
-            select: { channelId: true, deletedAt: true }
+            select: { channelId: true, deletedAt: true, audience: true }
         });
+        // Nor quotes it into the room, or forwards it out of it.
+        if (original && isEphemeral(original.audience)) throw new ChatRuleError(GONE);
         // Answering something that is no longer there. The menus already hide
         // both actions on a deleted message, so this is the case they cannot
         // cover: the message was taken back while somebody had the reply box
@@ -1239,9 +1246,9 @@ export async function remove(
 export async function react(actor: ChatActor, input: core.ChatReactInput): Promise<boolean> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: input.messageId },
-        select: { channelId: true }
+        select: { channelId: true, audience: true }
     });
-    if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
+    if (!message || isEphemeral(message.audience)) throw new ChatAccessError({ key: "errors.messageGone" });
     const access = await requirePostable(actor, message.channelId);
     await history.requireReadable(actor, message.channelId, input.messageId);
 
@@ -1371,7 +1378,7 @@ export async function markChannelsRead(
             FROM unnest(${ids}::uuid[]) AS c("id")
             CROSS JOIN LATERAL (
                 SELECT "id", "createdAt" FROM "ChatMessage"
-                WHERE "channelId" = c."id" AND "parentId" IS NULL
+                WHERE "channelId" = c."id" AND "parentId" IS NULL AND cardinality("audience") = 0
                 ORDER BY "createdAt" DESC
                 LIMIT 1
             ) AS m`,
@@ -1849,10 +1856,13 @@ export async function forward(
             deletedAt: true,
             // A file meant to be seen once is not passed on, here any more than
             // from the menu that no longer offers it.
-            attachments: { where: { viewOnce: true }, select: { id: true }, take: 1 }
+            attachments: { where: { viewOnce: true }, select: { id: true }, take: 1 },
+            audience: true
         }
     });
-    if (!original || original.deletedAt) throw new ChatAccessError({ key: "errors.messageGone" });
+    if (!original || original.deletedAt || isEphemeral(original.audience)) {
+        throw new ChatAccessError({ key: "errors.messageGone" });
+    }
     if (original.attachments.length > 0) throw new ChatAccessError({ key: "errors.viewOnceNotForwarded" });
     await requireAgeCleared(actor, original.channelId);
     await history.requireReadable(actor, original.channelId, input.messageId);
@@ -1889,9 +1899,9 @@ export async function forward(
 export async function star(actor: ChatActor, messageId: string): Promise<boolean> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: messageId },
-        select: { channelId: true }
+        select: { channelId: true, audience: true }
     });
-    if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
+    if (!message || isEphemeral(message.audience)) throw new ChatAccessError({ key: "errors.messageGone" });
     await requireChannel(actor, message.channelId);
     await history.requireReadable(actor, message.channelId, messageId);
 
@@ -2012,7 +2022,8 @@ export const MESSAGE_SELECT = {
     authorAvatarUrl: true,
     agent: true,
     translation: true,
-    components: true
+    components: true,
+    audience: true
 } as const;
 
 interface Row {
@@ -2044,6 +2055,8 @@ interface Row {
     translation?: unknown;
     /** Buttons and forms under it - see `message-components`. */
     components?: unknown;
+    /** Who an ephemeral answer is for - see `ephemeral`. Empty is everybody. */
+    audience?: readonly string[];
 }
 
 /** The buttons and forms a message carries; none once it is deleted. */
@@ -2388,6 +2401,7 @@ export async function decorateMessages(
             ...faceOf(webhookFace(row, hookFaces)),
             ...(row.agent ? { fromAgent: row.agent } : {}),
             ...componentsView(row),
+            ...(isEphemeral(row.audience) ? { ephemeral: true } : {}),
             kind: row.kind as core.ChatMessageKind,
             body: row.deletedAt ? "" : notice ? noticeString(notice) : row.body,
             ...(notice ? { notice } : {}),

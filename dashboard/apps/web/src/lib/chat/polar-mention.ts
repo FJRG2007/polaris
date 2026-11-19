@@ -18,15 +18,15 @@
  * and never as a person. Server-only.
  */
 
-import { prisma, Prisma } from "@polaris/db";
+import { prisma } from "@polaris/db";
 import { chatWordsFor } from "./text";
 import { channelAccess } from "./access";
 import { publishChatChange } from "./live";
-import { postAgentMessage } from "./agent-message";
+import { postAgentMessage, updateAgentMessage } from "./agent-message";
 import * as history from "./history-visibility";
 import { polarMentioned } from "@/components/rich-text/markdown";
 import { answerMentionWithReason, questionOf, type MentionProblem } from "@/lib/polar/mention-answer";
-import { storedComponents, type MessageComponentInput } from "./message-components";
+import type { MessageComponentInput } from "./message-components";
 
 export const POLAR_AGENT = "polar";
 export const POLAR_LABEL = "Polar";
@@ -140,12 +140,8 @@ async function rewritePolarMessage(
     body: string,
     components: readonly MessageComponentInput[]
 ): Promise<string> {
-    const stored = storedComponents(components);
-    await prisma.chatMessage.updateMany({
-        where: { id: messageId, channelId, agent: POLAR_AGENT, deletedAt: null },
-        data: { body, components: stored.length ? stored : Prisma.DbNull }
-    });
-    publishChatChange({ channelId, kind: "posted", actorId: "", messageIds: [messageId] });
+    // Marked edited, and its earlier words kept, as any edit is.
+    await updateAgentMessage({ messageId, channelId, agent: POLAR_AGENT, body, components });
     return messageId;
 }
 

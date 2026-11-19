@@ -6,8 +6,10 @@
 import { describe, expect, it } from "vitest";
 import { appCommandIn } from "@/lib/chat/chat-command";
 import {
+    componentLook,
     formAnswersSchema,
     readComponents,
+    selectValuesSchema,
     storedComponents,
     type FormField
 } from "@/lib/chat/message-components";
@@ -78,5 +80,88 @@ describe("a message that runs an app command", () => {
         expect(appCommandIn("/online")).toBeNull();
         expect(appCommandIn("/polarbear hi")).toBeNull();
         expect(appCommandIn("ask /polar later")).toBeNull();
+    });
+});
+describe("button styles, as Discord's", () => {
+    it("maps each style onto the design system's buttons", () => {
+        const look = (style: string) =>
+            componentLook(readComponents([{ type: "button", label: "Go", action: "polar.retry", style }])[0]!);
+        expect(look("primary")).toEqual({ variant: "primary" });
+        expect(look("secondary")).toEqual({ variant: "secondary" });
+        expect(look("danger")).toEqual({ variant: "danger" });
+        // Green from the success tokens, never a colour of its own.
+        expect(look("success").className).toContain("bg-success");
+        expect(look("success").className).toContain("text-success-foreground");
+        expect(componentLook(readComponents([{ type: "link", label: "Open", href: "/tasks" }])[0]!)).toEqual({
+            variant: "secondary"
+        });
+    });
+
+    it("reads a style or an icon a newer version added as the plain button, not as no button", () => {
+        const [button] = readComponents([
+            { type: "button", label: "Go", action: "polar.retry", style: "premium", icon: "sparkles" }
+        ]);
+        expect(button).toMatchObject({ type: "button", style: "secondary" });
+        expect(button && "icon" in button ? button.icon : undefined).toBeUndefined();
+    });
+
+    it("keeps disabled and a known icon", () => {
+        const [button] = readComponents([
+            { type: "button", label: "Delete", action: "polar.retry", style: "danger", icon: "trash", disabled: true }
+        ]);
+        expect(button).toMatchObject({ style: "danger", icon: "trash", disabled: true });
+    });
+
+    it("still reads rows stored before styles grew", () => {
+        const old = [
+            { type: "button", label: "Try again", style: "secondary", action: "polar.retry", for: "u1" },
+            {
+                type: "form",
+                label: "New task",
+                style: "primary",
+                action: "tasks.create",
+                title: "New task",
+                submit: "Create",
+                fields: [{ name: "name", label: "Title", kind: "text", required: true, max: 200 }]
+            },
+            { type: "link", label: "Open task", href: "/tasks/t/1" }
+        ];
+        expect(readComponents(old).map((one) => one.type)).toEqual(["button", "form", "link"]);
+    });
+});
+
+describe("a select menu", () => {
+    const options = [
+        { value: "a", label: "A" },
+        { value: "b", label: "B", description: "The second one" },
+        { value: "c", label: "C", default: true }
+    ];
+
+    it("is stored with its options, a single choice by default", () => {
+        const [select] = storedComponents([{ type: "select", action: "tasks.pick", options }]);
+        expect(select).toMatchObject({ type: "select", min: 1, max: 1 });
+    });
+
+    it("is refused when it cannot be answered", () => {
+        expect(() => storedComponents([{ type: "select", action: "tasks.pick", options, min: 3, max: 2 }])).toThrow();
+        expect(() => storedComponents([{ type: "select", action: "tasks.pick", options, max: 4 }])).toThrow();
+        expect(() =>
+            storedComponents([
+                { type: "select", action: "tasks.pick", options: [...options, { value: "a", label: "Again" }] }
+            ])
+        ).toThrow();
+        expect(() => storedComponents([{ type: "select", action: "tasks.pick", options: [] }])).toThrow();
+        // Read back, one that is not well formed is dropped rather than drawn.
+        expect(readComponents([{ type: "select", action: "tasks.pick", options, min: 3, max: 2 }])).toEqual([]);
+    });
+
+    it("takes only offered values, within min and max, each once", () => {
+        const [select] = storedComponents([{ type: "select", action: "tasks.pick", options, min: 1, max: 2 }]);
+        if (select?.type !== "select") throw new Error("not a select");
+        const schema = selectValuesSchema(select);
+        expect(schema.parse(["a", "c"])).toEqual(["a", "c"]);
+        for (const values of [[], ["a", "b", "c"], ["a", "a"], ["z"], [1]]) {
+            expect(schema.safeParse(values).success).toBe(false);
+        }
     });
 });

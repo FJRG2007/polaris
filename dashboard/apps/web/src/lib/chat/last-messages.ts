@@ -73,6 +73,7 @@ export async function lastMessages(
             SELECT "authorId", kind, body, "createdAt", "deliveredAt", "readAt", "deletedAt"
             FROM "ChatMessage"
             WHERE "channelId" = c.id AND "parentId" IS NULL
+              AND cardinality("audience") = 0
               AND ("expiresAt" IS NULL OR "expiresAt" > now())
               AND NOT EXISTS (
                   SELECT 1 FROM "ChatMessageHidden" h

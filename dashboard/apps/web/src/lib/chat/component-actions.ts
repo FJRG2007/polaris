@@ -11,11 +11,17 @@
  */
 
 import { chatWordsFor } from "./text";
-import { publishChatChange } from "./live";
-import { prisma, Prisma } from "@polaris/db";
+import { prisma } from "@polaris/db";
+import { seesMessage } from "./ephemeral";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { channelAccess, ChatAccessError } from "./access";
-import { formAnswersSchema, readComponents, storedComponents } from "./message-components";
+import { postAgentMessage, updateAgentMessage } from "./agent-message";
+import {
+    formAnswersSchema,
+    readComponents,
+    selectValuesSchema,
+    type MessageComponentInput
+} from "./message-components";
 
 /** Presses one person makes a minute: each can be a model turn or a write. */
 const PRESSES_PER_MINUTE = 20;
@@ -23,23 +29,70 @@ const PRESSES_PER_MINUTE = 20;
 export interface ComponentPress {
     readonly messageId: string;
     readonly index: number;
-    /** A form's answers; ignored for a button. */
+    /** A form's answers; ignored for anything else. */
     readonly fields?: Readonly<Record<string, string>>;
+    /** A select's picked values; ignored for anything else. */
+    readonly values?: readonly string[];
 }
 
-interface Pressed {
+/** UPDATE_MESSAGE: what to change on the message the press came from. */
+export interface MessagePatch {
+    readonly body?: string;
+    readonly components?: readonly MessageComponentInput[];
+}
+
+/** A follow-up answer to the press: a new message, ephemeral to the presser when asked. */
+export interface FollowUp {
+    readonly body: string;
+    readonly components?: readonly MessageComponentInput[];
+    /** Only the one who pressed sees it (Discord's flag 64). */
+    readonly ephemeral?: boolean;
+}
+
+/**
+ * One press, as an action sees it - the interaction, in Discord's words. An
+ * action answers through `update` (Discord's UPDATE_MESSAGE: the message the
+ * press came from, changed in place, for everybody who sees it) and
+ * `followUp` (a new message, ephemeral to the presser when asked). Neither
+ * has to come before the action returns: a slow action can answer later, as a
+ * deferred interaction does.
+ */
+export interface Pressed {
     readonly user: { readonly id: string; readonly isAdmin: boolean };
-    readonly message: { readonly id: string; readonly channelId: string; readonly replyToId: string | null };
+    readonly message: {
+        readonly id: string;
+        readonly channelId: string;
+        readonly replyToId: string | null;
+        readonly parentId: string | null;
+        readonly agent: string | null;
+        readonly authorLabel: string | null;
+    };
     readonly value: string | null;
+    readonly values: readonly string[];
     readonly fields: Readonly<Record<string, string>>;
+    readonly update: (patch: MessagePatch) => Promise<void>;
+    readonly followUp: (answer: FollowUp) => Promise<string>;
 }
 
-type Action = (pressed: Pressed) => Promise<void>;
+export type Action = (pressed: Pressed) => Promise<void>;
 
 const ACTIONS: Record<string, Action> = {
     "polar.retry": retryPolar,
     "tasks.create": createTask
 };
+
+/**
+ * Adds an app's action under `<app>.<name>`. It runs only from a component on
+ * a message that app wrote, so it answers (and edits) only its own messages.
+ */
+export function registerComponentAction(name: string, action: Action): void {
+    ACTIONS[name] = action;
+}
+
+/** The app an action belongs to: `tasks` for `tasks.create`. */
+function ownerOf(action: string): string {
+    return action.slice(0, action.indexOf("."));
+}
 
 /** Run one press. Throws a `ChatAccessError` with the sentence for the presser. */
 export async function pressComponent(
@@ -48,16 +101,41 @@ export async function pressComponent(
 ): Promise<void> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: press.messageId },
-        select: { id: true, channelId: true, replyToId: true, components: true, deletedAt: true }
+        select: {
+            id: true,
+            channelId: true,
+            replyToId: true,
+            parentId: true,
+            agent: true,
+            authorLabel: true,
+            components: true,
+            deletedAt: true,
+            expiresAt: true,
+            audience: true
+        }
     });
-    if (!message || message.deletedAt || !(await channelAccess({ id: user.id }, message.channelId))) {
+    // The presser must still see the message: in the conversation, not past
+    // its timer, and in its audience when it is ephemeral.
+    if (
+        !message ||
+        message.deletedAt ||
+        (message.expiresAt && message.expiresAt.getTime() <= Date.now()) ||
+        !seesMessage(message.audience, user.id) ||
+        !(await channelAccess({ id: user.id }, message.channelId))
+    ) {
         throw new ChatAccessError({ key: "errors.componentGone" });
     }
     const component = readComponents(message.components)[press.index];
-    if (!component || component.type === "link") throw new ChatAccessError({ key: "errors.componentGone" });
+    if (!component || component.type === "link" || component.disabled) {
+        throw new ChatAccessError({ key: "errors.componentGone" });
+    }
     if (component.for && component.for !== user.id) throw new ChatAccessError({ key: "errors.componentNotYours" });
     const action = ACTIONS[component.action];
-    if (!action) throw new ChatAccessError({ key: "errors.componentGone" });
+    // An action answers only on its own app's messages: what `tasks.create`
+    // edits is a message Tasks wrote, never Polar's or a person's.
+    if (!action || ownerOf(component.action) !== message.agent) {
+        throw new ChatAccessError({ key: "errors.componentGone" });
+    }
     if (!(await rateLimit(`chat-component:${user.id}`, PRESSES_PER_MINUTE, 60_000)).ok) {
         throw new ChatAccessError({ key: "errors.componentTooFast" });
     }
@@ -67,11 +145,39 @@ export async function pressComponent(
         if (!parsed.success) throw new ChatAccessError({ key: "errors.componentInvalid" });
         fields = parsed.data as Record<string, string>;
     }
+    let values: string[] = [];
+    if (component.type === "select") {
+        const parsed = selectValuesSchema(component).safeParse(press.values ?? []);
+        if (!parsed.success) throw new ChatAccessError({ key: "errors.componentInvalid" });
+        values = parsed.data;
+    }
+    const agent = ownerOf(component.action);
     await action({
         user,
         message,
         value: component.type === "button" ? (component.value ?? null) : null,
-        fields
+        values,
+        fields,
+        update: async (patch) => {
+            const changed = await updateAgentMessage({
+                messageId: message.id,
+                channelId: message.channelId,
+                agent,
+                ...patch
+            });
+            if (!changed) throw new ChatAccessError({ key: "errors.componentGone" });
+        },
+        followUp: (answer) =>
+            postAgentMessage({
+                channelId: message.channelId,
+                parentId: message.parentId,
+                replyToId: message.id,
+                agent,
+                label: message.authorLabel ?? agent,
+                body: answer.body,
+                ...(answer.components ? { components: answer.components } : {}),
+                ...(answer.ephemeral ? { audience: [user.id] } : {})
+            })
     });
 }
 
@@ -106,7 +212,7 @@ async function retryPolar({ user, message }: Pressed): Promise<void> {
  * the Tasks screen makes, and the form replaced by what it made so it cannot
  * be sent twice.
  */
-async function createTask({ user, message, fields }: Pressed): Promise<void> {
+async function createTask({ user, message, fields, update }: Pressed): Promise<void> {
     // Claimed first: two presses at once make one task, not two.
     const claimed = await prisma.chatMessage.updateMany({
         where: { id: message.id, editedAt: null },
@@ -135,15 +241,8 @@ async function createTask({ user, message, fields }: Pressed): Promise<void> {
     }
     const words = await chatWordsFor(user.id);
     const reference = typeof made.reference === "string" ? made.reference : "";
-    const components = storedComponents([
-        { type: "link", label: words("appCommands.task.openTask"), href: `/tasks/t/${made.id}` }
-    ]);
-    await prisma.chatMessage.update({
-        where: { id: message.id },
-        data: {
-            body: words("appCommands.task.created", { reference, name: fields.name ?? "" }),
-            components: components as unknown as Prisma.InputJsonValue
-        }
+    await update({
+        body: words("appCommands.task.created", { reference, name: fields.name ?? "" }),
+        components: [{ type: "link", label: words("appCommands.task.openTask"), href: `/tasks/t/${made.id}` }]
     });
-    publishChatChange({ channelId: message.channelId, kind: "posted", actorId: "", messageIds: [message.id] });
 }

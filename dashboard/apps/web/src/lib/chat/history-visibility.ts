@@ -25,6 +25,7 @@
 
 import { prisma, type Prisma } from "@polaris/db";
 import { ChatAccessError, type ChatActor } from "./access";
+import { everyoneClause, seenByClause } from "./ephemeral";
 
 /** What a channel stores: follow the space (or, for a group, show), or say. */
 export const NEWCOMER_HISTORY = ["inherit", "on", "off"] as const;
@@ -156,7 +157,9 @@ export function sinceClause(
         AND: [
             floor ? { createdAt: { gte: floor } } : {},
             notExpiredClause(),
-            viewerId ? notHiddenClause(viewerId) : {}
+            viewerId ? notHiddenClause(viewerId) : {},
+            // The conversation itself: an ephemeral answer only to its audience.
+            viewerId ? seenByClause(viewerId) : everyoneClause()
         ]
     };
 }
@@ -179,7 +182,11 @@ export function readableWhere(
                       ...[...floors].map(([channelId, gte]) => ({ channelId, createdAt: { gte } }))
                   ]
               };
-    return { AND: [floored, notExpiredClause(), viewerId ? notHiddenClause(viewerId) : {}] };
+    // What speaks for the conversation - unread, search, toasts - never counts
+    // an ephemeral answer, not even for the one it was for (`lib/chat/ephemeral`).
+    return {
+        AND: [floored, notExpiredClause(), viewerId ? notHiddenClause(viewerId) : {}, everyoneClause()]
+    };
 }
 
 /** Whether a message written at `createdAt` is past this floor - and, when its
@@ -205,7 +212,7 @@ export async function requireReadable(
 ): Promise<void> {
     const floor = await readableSince(actor, channelId);
     const row = await prisma.chatMessage.findFirst({
-        where: { id: messageId, AND: [notHiddenClause(actor.id)] },
+        where: { id: messageId, AND: [notHiddenClause(actor.id), seenByClause(actor.id)] },
         select: { createdAt: true, expiresAt: true }
     });
     if (!row || !isReadable(floor, row.createdAt, row.expiresAt)) throw new ChatAccessError();

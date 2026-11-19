@@ -87,13 +87,13 @@ describe("historyFloor", () => {
 });
 
 describe("where clauses", () => {
-    it("adds only the expiry when nothing else is hidden", () => {
+    it("adds only the expiry, and leaves ephemeral answers out, when nothing else is hidden", () => {
         const now = new Date();
         vi.useFakeTimers({ now });
         try {
             const expiry = history.notExpiredClause(now);
-            expect(history.sinceClause(null)).toEqual({ AND: [{}, expiry, {}] });
-            expect(history.readableWhere(new Map())).toEqual({ AND: [{}, expiry, {}] });
+            expect(history.sinceClause(null)).toEqual({ AND: [{}, expiry, {}, { audience: { isEmpty: true } }] });
+            expect(history.readableWhere(new Map())).toEqual({ AND: [{}, expiry, {}, { audience: { isEmpty: true } }] });
         } finally {
             vi.useRealTimers();
         }

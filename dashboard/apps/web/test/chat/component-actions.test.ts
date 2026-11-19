@@ -49,6 +49,26 @@ vi.mock("@/lib/chat/text", async () => ({
     chatWordsFor: async () => (key: string) => key
 }));
 vi.mock("@/lib/chat/live", () => ({ publishChatChange: () => undefined }));
+const updates: Record<string, unknown>[] = [];
+const followUps: Record<string, unknown>[] = [];
+vi.mock("@/lib/chat/agent-message", async () => {
+    const { storedComponents } = await vi.importActual<typeof import("@/lib/chat/message-components")>(
+        "@/lib/chat/message-components"
+    );
+    return {
+        updateAgentMessage: async (input: Record<string, any>) => {
+            updates.push(input);
+            if (input.agent !== stored.agent) return false;
+            if (input.body !== undefined) stored.body = input.body;
+            if (input.components !== undefined) stored.components = storedComponents(input.components);
+            return true;
+        },
+        postAgentMessage: async (input: Record<string, unknown>) => {
+            followUps.push(input);
+            return "follow-up";
+        }
+    };
+});
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true }) }));
 vi.mock("@/lib/mcp/session-call", () => ({
     sessionCaller: async (user: { id: string }) => ({ userId: user.id, scopes: [] }),
@@ -64,7 +84,7 @@ vi.mock("@/lib/chat/polar-mention", () => ({
     }
 }));
 
-const { pressComponent } = await import("@/lib/chat/component-actions");
+const { pressComponent, registerComponentAction } = await import("@/lib/chat/component-actions");
 const { ChatAccessError } = await import("@/lib/chat/access");
 
 const asker = { id: ASKER, isAdmin: false };
@@ -75,7 +95,12 @@ function taskForm() {
         id: MESSAGE,
         channelId: "c1",
         replyToId: "q1",
+        parentId: null,
+        agent: "tasks",
+        authorLabel: "Tasks",
         deletedAt: null,
+        expiresAt: null,
+        audience: [] as string[],
         components: [
             {
                 type: "form",
@@ -117,6 +142,8 @@ beforeEach(() => {
     toolAnswer = { ok: true, structured: { id: "t1", reference: "WRK-7" } };
     toolCalls.length = 0;
     retried.length = 0;
+    updates.length = 0;
+    followUps.length = 0;
 });
 
 describe("a press", () => {
@@ -182,7 +209,12 @@ describe("Polar's Try again", () => {
             id: MESSAGE,
             channelId: "c1",
             replyToId: "asked",
+            parentId: null,
+            agent: "polar",
+            authorLabel: "Polar",
             deletedAt: null,
+            expiresAt: null,
+            audience: [],
             components: [{ type: "button", label: "Try again", action: "polar.retry", for: ASKER }]
         };
     });
@@ -201,5 +233,79 @@ describe("Polar's Try again", () => {
         stored = { ...stored, components: [{ type: "button", label: "Try again", action: "polar.retry" }] };
         expect(await refusal(pressComponent(other, { messageId: MESSAGE, index: 0 }))).toBe("errors.componentNotYours");
         expect(retried).toHaveLength(0);
+    });
+});
+
+describe("an answer to a press, as Discord's interaction responses", () => {
+    beforeEach(() => {
+        registerComponentAction("tasks.test-answer", async ({ update, followUp, values }) => {
+            await update({ body: `Picked ${values.join(", ")}`, components: [] });
+            await followUp({ body: "Saved", ephemeral: true });
+        });
+        stored = {
+            ...taskForm(),
+            components: [
+                {
+                    type: "select",
+                    action: "tasks.test-answer",
+                    min: 1,
+                    max: 2,
+                    options: [
+                        { value: "a", label: "A" },
+                        { value: "b", label: "B", description: "The second" },
+                        { value: "c", label: "C" }
+                    ]
+                }
+            ]
+        };
+    });
+
+    it("edits the message it came from in place (UPDATE_MESSAGE), as the app that wrote it", async () => {
+        await pressComponent(other, { messageId: MESSAGE, index: 0, values: ["a", "b"] });
+        expect(updates).toEqual([
+            { messageId: MESSAGE, channelId: "c1", agent: "tasks", body: "Picked a, b", components: [] }
+        ]);
+        expect(stored.body).toBe("Picked a, b");
+        expect(stored.components).toEqual([]);
+    });
+
+    it("follows up ephemerally, to the one who pressed only", async () => {
+        await pressComponent(other, { messageId: MESSAGE, index: 0, values: ["c"] });
+        expect(followUps).toEqual([
+            expect.objectContaining({ channelId: "c1", agent: "tasks", body: "Saved", audience: [OTHER], replyToId: MESSAGE })
+        ]);
+    });
+
+    it("checks the picked values against the stored select", async () => {
+        for (const values of [[], ["a", "b", "c"], ["a", "a"], ["z"]]) {
+            expect(await refusal(pressComponent(other, { messageId: MESSAGE, index: 0, values }))).toBe(
+                "errors.componentInvalid"
+            );
+        }
+        expect(updates).toHaveLength(0);
+    });
+
+    it("never runs one app's action on another's message", async () => {
+        stored = { ...stored, agent: "polar" };
+        expect(await refusal(pressComponent(other, { messageId: MESSAGE, index: 0, values: ["a"] }))).toBe(
+            "errors.componentGone"
+        );
+        expect(updates).toHaveLength(0);
+    });
+
+    it("is refused on an ephemeral message to anybody outside its audience", async () => {
+        stored = { ...stored, audience: [ASKER] };
+        expect(await refusal(pressComponent(other, { messageId: MESSAGE, index: 0, values: ["a"] }))).toBe(
+            "errors.componentGone"
+        );
+        await pressComponent(asker, { messageId: MESSAGE, index: 0, values: ["a"] });
+        expect(updates).toHaveLength(1);
+    });
+
+    it("never runs a disabled component", async () => {
+        stored = { ...stored, components: [{ ...stored.components[0], disabled: true }] };
+        expect(await refusal(pressComponent(other, { messageId: MESSAGE, index: 0, values: ["a"] }))).toBe(
+            "errors.componentGone"
+        );
     });
 });

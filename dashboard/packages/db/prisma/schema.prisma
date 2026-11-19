@@ -10884,6 +10884,12 @@ model ChatMessage {
     // components) - see `lib/chat/message-components`. Read through its
     // schema, so a row a newer version wrote never breaks an older screen.
     components   Json?
+    // Who may see it, for an ephemeral answer an app or Polar gave one person
+    // (Discord's ephemeral flag): only the ids listed. Empty is everybody, which
+    // is every message a person wrote and every one written before this
+    // existed. Never counted as unread, searched, notified or previewed - see
+    // `lib/chat/ephemeral`.
+    audience     String[]  @default([]) @db.Uuid
     // When this message disappears, stamped from the conversation's timer when
     // it was sent. Never served past it, and deleted for real by the sweep
     // (`lib/chat/vanish`). Null is forever.

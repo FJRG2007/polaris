@@ -2547,7 +2547,12 @@
         },
         "onlyFor": "Solo quien lo pidió puede usarlo.",
         "working": "Un momento...",
-        "cancel": "Cancelar"
+        "cancel": "Cancelar",
+        "onlyYou": "Solo tú puedes ver esto",
+        "dismiss": "Descartar",
+        "selectPlaceholder": "Elige una opción",
+        "selected": "{count} elegidas",
+        "apply": "Aplicar"
     },
     "mediaEditor": {
         "title": "Editar antes de enviar",

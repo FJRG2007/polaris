@@ -33,7 +33,9 @@ import { MAX_REREAD } from "@/lib/chat/reread-limit";
 import { allChatRules } from "@/lib/chat/rules";
 import { requirePermission } from "@/lib/session";
 import { pressComponent } from "@/lib/chat/component-actions";
-import { MOST_COMPONENTS } from "@/lib/chat/message-components";
+import { dismissEphemeral } from "@/lib/chat/ephemeral";
+import { publishChatChange } from "@/lib/chat/live";
+import { MOST_CHOICES, MOST_COMPONENTS } from "@/lib/chat/message-components";
 import { appCommandsFor, type AppCommandView } from "@/lib/chat/app-commands";
 import { getTranslations } from "@/lib/i18n/request";
 import { storeAttachment } from "@/lib/chat/attachments";
@@ -1776,7 +1778,8 @@ export async function appCommandsAction(): Promise<AppCommandView[]> {
 const componentPressSchema = z.object({
     messageId: z.string().uuid(),
     index: z.number().int().min(0).max(MOST_COMPONENTS - 1),
-    fields: z.record(z.string().max(32), z.string().max(4000)).optional()
+    fields: z.record(z.string().max(32), z.string().max(4000)).optional(),
+    values: z.array(z.string().max(100)).max(MOST_CHOICES).optional()
 });
 
 /** A button or a form under a message, pressed. */
@@ -1786,4 +1789,22 @@ export async function pressComponentAction(input: unknown): Promise<{ error?: st
     if (!parsed.success) return { error: (await getTranslations("chat"))("errors.componentGone") };
     const result = await guard(() => pressComponent({ id: user.id, isAdmin: user.isAdmin }, parsed.data));
     return result.error ? { error: result.error } : {};
+}
+
+/** "Only you can see this", dismissed: gone from this reader's screens, nobody else's. */
+export async function dismissEphemeralAction(messageId: unknown): Promise<{ error?: string }> {
+    const user = await requirePermission("chat.use");
+    const parsed = z.string().uuid().safeParse(messageId);
+    if (!parsed.success) return {};
+    const dismissed = await dismissEphemeral(user.id, parsed.data);
+    if (dismissed) {
+        publishChatChange({
+            channelId: dismissed.channelId,
+            kind: "posted",
+            actorId: user.id,
+            messageIds: [parsed.data],
+            audience: dismissed.audience
+        });
+    }
+    return {};
 }

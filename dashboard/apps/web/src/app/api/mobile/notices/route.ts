@@ -151,6 +151,9 @@ export async function GET(request: Request): Promise<Response> {
 
             if (chatAllowed) unsubscribe = subscribeChatChanges((change) => {
                 if (closed || !change.channelId || change.actorId === actor.id) return;
+                // An ephemeral answer is never a phone notice, not even for its
+                // audience: it is seen where it was asked for.
+                if (change.kind === "posted" && change.audience) return;
                 const channelId = change.channelId;
                 const handle = () => {
                     if (!scope.reachable().has(channelId)) return;

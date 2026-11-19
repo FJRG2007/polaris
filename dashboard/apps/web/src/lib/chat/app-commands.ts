@@ -180,6 +180,9 @@ async function offerTaskForm(
         agent: "tasks",
         label: words("appCommands.task.app"),
         body: lists.length ? words("appCommands.task.prompt") : words("appCommands.task.noLists"),
-        components
+        components,
+        // With no list to put a task in, the answer is only the asker's
+        // business: "Only you can see this", as a Discord command answers.
+        ...(lists.length ? {} : { audience: [actorId] })
     });
 }

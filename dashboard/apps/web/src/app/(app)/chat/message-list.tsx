@@ -39,7 +39,7 @@ import { copyText } from "./links";
 import { plainText } from "@/components/rich-text/excerpt";
 import { PollCard } from "./poll-card";
 import { POLARIS_APPS } from "@/lib/apps";
-import { MessageComponents } from "./message-components-view";
+import { EphemeralNote, MessageComponents } from "./message-components-view";
 import { hasCard, referenced } from "./message-references";
 import { ReportDialog } from "./report-dialog";
 import { NicknameDialog } from "./nickname-dialog";
@@ -910,8 +910,10 @@ function Message({
                 actions={{
                     message,
                     mine,
-                    canPost,
-                    canModerate,
+                    // Nothing is built on an ephemeral answer: no reply,
+                    // reaction, pin or forward (the server refuses them too).
+                    canPost: canPost && !message.ephemeral,
+                    canModerate: canModerate && !message.ephemeral,
                     onReply,
                     onReplyPrivately,
                     onForward,
@@ -1207,6 +1209,7 @@ function Message({
                                 onError={onError}
                             />
                         )}
+                        {message.ephemeral && <EphemeralNote messageId={message.id} onError={onError} />}
 
                         {/* A notice's mentions are its people, already drawn as
                         names - not links, references or invites to card. */}
