@@ -624,7 +624,19 @@ export function routeMiddleware(steps: readonly RouteStep[], hooks: RouteHooks =
                     if (signal?.aborted) throw error;
                     const failure = classifyProviderFailure(error);
                     const { kind } = failure;
-                    if (!routes(failure)) throw error;
+                    if (!routes(failure)) {
+                        // The first step to refuse the call that way ends it:
+                        // the call itself is what is wrong. A stand-in asked
+                        // only because an earlier step was refused is that
+                        // stand-in not taking it - a 400 from a model the
+                        // person never chose must not end a turn another step
+                        // can still answer - and the turn, if nothing does,
+                        // ends on the earlier refusal, the real reason.
+                        if (lastError === null) throw error;
+                        ruleOut(ruled, step, kind);
+                        refused(index, failure, error);
+                        return null;
+                    }
                     const retryAfter = retryAfterMs(error);
                     const pause = backoffMs(retry + 1, retryAfter);
                     // A failure nothing explains is asked once more on the same

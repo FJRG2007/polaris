@@ -315,6 +315,30 @@ describe("across providers", () => {
         expect(isRoutable(BAD_REQUEST)).toBe(false);
     });
 
+    it("walks past a stand-in that refuses the call once the chosen model was rate limited", async () => {
+        // The @polar mention in production: the chosen model answered 429, the
+        // stand-in after it a 400, and the turn ended there with a third step
+        // that would have answered.
+        const first = fakeModel("a", () => Promise.reject(GROQ_RATE));
+        const second = fakeModel("b", () => Promise.reject(BAD_REQUEST));
+        const third = fakeModel("c", async () => "c");
+        const middleware = routeMiddleware(
+            [step(first, "mistral"), step(second, "mistral"), step(third, "openrouter")],
+            noWait
+        );
+        expect(await generate(middleware)).toBe("c");
+        expect(second.doGenerate).toHaveBeenCalledTimes(1);
+    });
+
+    it("ends on the earlier refusal when the stand-ins all refuse the call", async () => {
+        const first = fakeModel("a", () => Promise.reject(GROQ_RATE));
+        const second = fakeModel("b", () => Promise.reject(BAD_REQUEST));
+        const failure = await generate(
+            routeMiddleware([step(first, "mistral"), step(second, "mistral")], noWait)
+        ).catch((error: unknown) => error);
+        expect(failure).toBe(GROQ_RATE);
+    });
+
     it("walks on when the step that answered is refused later in the turn", async () => {
         const first = fakeModel("a", async () => "a");
         first.doGenerate.mockResolvedValueOnce("a").mockRejectedValueOnce(GROQ_RATE);
