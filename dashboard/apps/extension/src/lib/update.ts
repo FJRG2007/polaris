@@ -86,22 +86,44 @@ export function isNewer(available: string, running: string): boolean {
 }
 
 /**
+ * Whether the browser itself fetches new versions of this copy.
+ *
+ * `normal` is an install from a store. Past that, the address the browser
+ * reports it updates from is what decides, not how the copy arrived: the
+ * desktop app adds the extension by pointing the browser at the store's update
+ * address, and the browser reports that as `sideload` while updating it from the
+ * store like any other. An unpacked load is never updated by the browser,
+ * whatever its manifest names.
+ */
+export function updatedByBrowser(installType: string | undefined | null, updateUrl?: string | null): boolean {
+    if (installType === "normal") return true;
+    if (installType === "development" || typeof updateUrl !== "string") return false;
+    try {
+        return new URL(updateUrl).protocol === "https:";
+    } catch {
+        return false;
+    }
+}
+
+/**
  * What `management.getSelf()` reported, reduced to the only distinction that
  * changes the advice.
  *
- * Only `normal` - installed from an install package - is a build something else
+ * Only a build the browser updates (`updatedByBrowser`) is one something else
  * keeps up to date. `development` is the unpacked or temporary load this warning
- * mostly exists for; `sideload` and `admin` were put there by other software or
- * by policy, and Polaris cannot promise either of those will ever be updated. So
- * everything that is not plainly a store install is told how to do it by hand,
- * which is the direction that leaves nobody stranded on an old build.
+ * mostly exists for; `sideload` and `admin` with no update address were put
+ * there by other software or by policy, and Polaris cannot promise either of
+ * those will ever be updated. So everything that is not plainly updated by the
+ * browser is told how to do it by hand, which is the direction that leaves
+ * nobody stranded on an old build.
  */
 export function installKind(
     installType: string | undefined | null,
     covered = false,
-    desktop = false
+    desktop = false,
+    updateUrl: string | null = null
 ): InstallKind {
-    if (installType === "normal") return "store";
+    if (updatedByBrowser(installType, updateUrl)) return "store";
     // Ahead of the updater's marker: once the desktop app looks after this copy,
     // it is the one that says when a new version is going in.
     if (desktop) return "desktop";
@@ -123,13 +145,14 @@ export function noticeFor(
     running: string,
     installType: string | undefined | null,
     covered = false,
-    desktop = false
+    desktop = false,
+    updateUrl: string | null = null
 ): UpdateNotice | null {
     const version = publishedVersion(answer);
     const url = answer?.url;
     if (version === null || typeof url !== "string" || url === "") return null;
     if (!isNewer(version, running)) return null;
-    return { version, url, kind: installKind(installType, covered, desktop) };
+    return { version, url, kind: installKind(installType, covered, desktop, updateUrl) };
 }
 
 /**

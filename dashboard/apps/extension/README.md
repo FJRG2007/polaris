@@ -316,9 +316,11 @@ new version and there is nothing for you to do. An unpacked folder the install
 script's job keeps current - it writes `polaris-updater.json` into the folder -
 is told the same, and is offered "Start it now" once the new files are in. Any
 other copy loaded by hand is updated by hand for now: the popup links to the steps
-on your own Polaris and never shows a command. Anything else - put there by other
-software, or by policy - is told the same as loaded-by-hand, because Polaris cannot
-promise those are being kept current. `managedByDesktop()` in `src/lib/update.ts`
+on your own Polaris and never shows a command. A copy put there by other software
+or by policy counts as the store's when the browser reports a store update address
+for it - the desktop app installs it exactly that way, and the browser reports it
+as `sideload` while updating it like any other - and as loaded-by-hand otherwise,
+because Polaris cannot promise those are being kept current. `managedByDesktop()` in `src/lib/update.ts`
 is where a future Polaris desktop app will take over; it answers no today.
 
 The toolbar badge counts the logins saved for the tab in front. On a tab with no

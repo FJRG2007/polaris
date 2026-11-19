@@ -12,6 +12,7 @@ import {
     publishedVersion,
     UPDATE_COLOR,
     upToDate,
+    updatedByBrowser,
     type UpdateNotice
 } from "../src/lib/update";
 
@@ -77,6 +78,31 @@ describe("how this build got here", () => {
         expect(installKind("other")).toBe("manual");
         expect(installKind(undefined)).toBe("manual");
         expect(installKind(null)).toBe("manual");
+    });
+
+    it("counts a copy another program added from the store as the store's", () => {
+        // The desktop app adds it through the browser's external-extension entry,
+        // which the browser reports as `sideload` and updates from the store.
+        const store = "https://clients2.google.com/service/update2/crx";
+        expect(installKind("sideload", false, false, store)).toBe("store");
+        expect(installKind("admin", false, false, store)).toBe("store");
+        expect(updatedByBrowser("sideload", store)).toBe(true);
+        expect(updatedByBrowser("normal")).toBe(true);
+    });
+
+    it("never counts an unpacked copy or a missing or odd address as updated by the browser", () => {
+        expect(updatedByBrowser("development", "https://clients2.google.com/service/update2/crx")).toBe(false);
+        expect(updatedByBrowser("sideload", null)).toBe(false);
+        expect(updatedByBrowser("sideload", "")).toBe(false);
+        expect(updatedByBrowser("sideload", "not an address")).toBe(false);
+        expect(updatedByBrowser("sideload", "file:///tmp/update.xml")).toBe(false);
+        expect(installKind("development", true, false, "https://clients2.google.com/service/update2/crx")).toBe("auto");
+    });
+
+    it("carries the update address into the notice", () => {
+        const answer = { version: "9.0.0", url: "https://example.com/release" };
+        expect(noticeFor(answer, "1.0.0", "sideload", false, false, "https://edge.microsoft.com/extensionwebstorebase/v1/crx")?.kind).toBe("store");
+        expect(noticeFor(answer, "1.0.0", "sideload")?.kind).toBe("manual");
     });
 
     it("counts an unpacked copy as kept current only when the updater marked its folder", () => {

@@ -3036,6 +3036,12 @@ async function installType(): Promise<string | null> {
     return (await browser.management.getSelf().catch(() => null))?.installType ?? null;
 }
 
+/** Where the browser fetches new versions of this copy from, or null when it names none. */
+async function updateUrl(): Promise<string | null> {
+    const self = (await browser.management.getSelf().catch(() => null)) as { updateUrl?: unknown } | null;
+    return typeof self?.updateUrl === "string" && self.updateUrl !== "" ? self.updateUrl : null;
+}
+
 /**
  * A newer version the updater has put on disk, waiting to be started, or null.
  *
@@ -3100,7 +3106,8 @@ async function currentNotice(): Promise<update.UpdateNotice | null> {
     const kind = update.installKind(
         await installType(),
         await updaterCovers(),
-        update.managedByDesktop()
+        update.managedByDesktop(),
+        await updateUrl()
     );
     if (kind === held.kind) return held;
     const current = { ...held, kind };
@@ -3147,7 +3154,8 @@ async function checkForUpdate(): Promise<boolean> {
                 browser.runtime.getManifest().version,
                 await installType(),
                 await updaterCovers(),
-                update.managedByDesktop()
+                update.managedByDesktop(),
+                await updateUrl()
             )
         );
         // The toolbar icon is where somebody with the popup closed finds out.
@@ -3177,7 +3185,10 @@ async function checkUpdateNow(): Promise<{
     };
     let store: "update_available" | "no_update" | "throttled" | null = null;
     let storeVersion: string | null = null;
-    if ((await installType()) === "normal" && typeof runtime.requestUpdateCheck === "function") {
+    if (
+        update.updatedByBrowser(await installType(), await updateUrl()) &&
+        typeof runtime.requestUpdateCheck === "function"
+    ) {
         try {
             const answer = await runtime.requestUpdateCheck();
             // Chrome answers an object; Firefox has answered `[status, details]`.
