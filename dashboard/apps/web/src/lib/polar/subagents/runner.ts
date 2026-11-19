@@ -251,7 +251,7 @@ export async function runSubagent(
         if (controller.signal.aborted) return finish("stopped", "", null);
         if (signal.aborted) return finish("budget", "", null);
         const failure = classifyProviderFailure(error);
-        console.warn(failureLogLine("a subagent", resolved.option.providerName, failure));
+        console.warn(failureLogLine("a subagent", resolved.option.providerName, failure, error));
         return finish("failed", "", failure.kind);
     }
 }

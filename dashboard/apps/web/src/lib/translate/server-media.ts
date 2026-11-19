@@ -133,7 +133,7 @@ export async function serverReadImage(
         }).catch((error: unknown) => console.error("translate: could not record usage", error));
     } catch (error) {
         console.warn(
-            failureLogLine("reading an image", option.providerName, classifyProviderFailure(error))
+            failureLogLine("reading an image", option.providerName, classifyProviderFailure(error), error)
         );
         throw new EngineRefusal("failed");
     }

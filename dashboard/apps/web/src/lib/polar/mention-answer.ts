@@ -99,7 +99,7 @@ export async function answerMentionWithReason(turn: MentionTurn): Promise<Mentio
         spent = answer.totalUsage;
     } catch (error) {
         const { classifyProviderFailure, failureLogLine } = await import("@/lib/polar/provider-failure");
-        console.warn(failureLogLine(turn.where, resolved.option.providerName, classifyProviderFailure(error)));
+        console.warn(failureLogLine(turn.where, resolved.option.providerName, classifyProviderFailure(error), error));
         return fail("failed", words("polar.failed"));
     } finally {
         if (dots) clearInterval(dots);

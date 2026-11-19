@@ -489,8 +489,16 @@ export function keepStoredFailures(incoming: readonly Part[], stored: unknown): 
 
 /** One log line for a failed call: provider, status and kind, never the body
  *  or a stack, so a key that keeps failing does not bury the log. */
-export function failureLogLine(what: string, provider: string, failure: ProviderFailure): string {
-    return `polar: ${what} failed at ${provider} (${failure.status ?? "no status"}, ${failure.kind})`;
+export function failureLogLine(
+    what: string,
+    provider: string,
+    failure: ProviderFailure,
+    error?: unknown
+): string {
+    const line = `polar: ${what} failed at ${provider} (${failure.status ?? "no status"}, ${failure.kind})`;
+    // What the provider said, scrubbed: "400, other" alone leaves a refusal
+    // nobody can act on without reproducing it.
+    return error === undefined ? line : `${line}: ${scrubbedBody(error)}`;
 }
 
 /** Characters of a refusal's body a log line keeps. */

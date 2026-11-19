@@ -138,7 +138,8 @@ export async function judgeGoalTranscript(
             failureLogLine(
                 "judging a goal",
                 helper.resolved.option.providerName,
-                classifyProviderFailure(error)
+                classifyProviderFailure(error),
+                error
             )
         );
         return null;

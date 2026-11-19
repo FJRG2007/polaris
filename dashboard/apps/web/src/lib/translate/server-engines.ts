@@ -218,7 +218,7 @@ async function polarAsk(
         }).catch((error: unknown) => console.error("translate: could not record usage", error));
     } catch (error) {
         console.warn(
-            failureLogLine("translating", option.providerName, classifyProviderFailure(error))
+            failureLogLine("translating", option.providerName, classifyProviderFailure(error), error)
         );
         throw new EngineRefusal("failed");
     }

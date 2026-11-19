@@ -87,7 +87,8 @@ export async function compactPolarThread(input: {
             failureLogLine(
                 "compacting a chat",
                 resolved.option.providerName,
-                classifyProviderFailure(error)
+                classifyProviderFailure(error),
+                error
             )
         );
         return "failed";

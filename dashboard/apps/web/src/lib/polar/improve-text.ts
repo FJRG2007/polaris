@@ -93,7 +93,8 @@ export async function improveText(
             failureLogLine(
                 "improving a draft",
                 helper.resolved.option.providerName,
-                classifyProviderFailure(error)
+                classifyProviderFailure(error),
+                error
             )
         );
         return { refusal: "failed" };

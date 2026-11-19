@@ -104,7 +104,8 @@ export async function polarAsker(
                     failureLogLine(
                         "an automation step",
                         resolved.option.providerName,
-                        classifyProviderFailure(error)
+                        classifyProviderFailure(error),
+                        error
                     )
                 );
                 throw new StepError("polarFailed");

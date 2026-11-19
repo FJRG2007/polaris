@@ -132,7 +132,7 @@ export async function titlePolarThread(
         // One line, not a stack: a key that is out of credit fails every turn,
         // and the reply already told the person why.
         console.warn(
-            failureLogLine("naming a thread", providerOf(model), classifyProviderFailure(error))
+            failureLogLine("naming a thread", providerOf(model), classifyProviderFailure(error), error)
         );
     }
     await prisma.polarThread.updateMany({

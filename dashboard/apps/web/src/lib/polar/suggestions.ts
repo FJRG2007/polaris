@@ -164,7 +164,8 @@ async function suggest(
             failureLogLine(
                 "suggesting a next message",
                 model.resolved.option.providerName,
-                classifyProviderFailure(error)
+                classifyProviderFailure(error),
+                error
             )
         );
         return null;
