@@ -813,7 +813,7 @@ function Message({
     const format = useDisplayFormat();
     const { channels } = useChat();
     // One other person: "opened" on a view-once file can only mean them.
-    const direct = channels.find((entry) => entry.id === message.channelId)?.kind === "dm";
+    const inDirect = channels.find((entry) => entry.id === message.channelId)?.kind === "dm";
     const emojiSet = emoji?.set ?? null;
     const baseUrl = useAppUrl();
     const [showingHistory, setShowingHistory] = useState(false);
@@ -1239,7 +1239,7 @@ function Message({
                                             <ViewOnceCard
                                                 file={{ ...file, viewOnce: file.viewOnce }}
                                                 mine={mine}
-                                                direct={direct}
+                                                direct={inDirect}
                                             />
                                         ) : (
                                         <>
