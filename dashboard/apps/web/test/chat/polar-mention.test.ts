@@ -184,13 +184,16 @@ describe("Polar's answer in Chat", () => {
         expect(asked).toHaveLength(0);
     });
 
-    it("asks for a provider key, with the link, when no model can answer", async () => {
+    it("asks for a provider key, with a button to the providers, when no model can answer", async () => {
         resolved = "no_key";
         await answerPolarMention(mention);
-        expect(posted[0]?.body).toBe("polar.noProvider [polar.addKey](/polar/settings/providers)");
+        expect(posted[0]?.body).toBe("polar.noProvider");
+        expect(posted[0]?.components).toEqual([
+            { type: "link", label: "polar.setUpProviders", href: "/polar/settings/providers" }
+        ]);
         access = { ...access, spend: false };
         await answerPolarMention(mention);
-        expect(posted[1]?.body).toBe("polar.noProviderOwnOnly [polar.addKey](/polar/settings/providers)");
+        expect(posted[1]?.body).toBe("polar.noProviderOwnOnly");
     });
 
     it("stops at the shared key's limit, but never at a key of the person's own", async () => {
@@ -200,6 +203,7 @@ describe("Polar's answer in Chat", () => {
         resolved = model("own");
         await answerPolarMention(mention);
         expect(posted[1]?.body).toBe("Use `git rebase`.");
+        expect(posted[1]?.components).toBeUndefined();
         expect(recorded.at(-1)).toMatchObject({ payer: "own" });
     });
 
@@ -208,6 +212,10 @@ describe("Polar's answer in Chat", () => {
         await answerPolarMention(mention);
         expect(posted[0]?.body).toBe("polar.failed");
         expect(recorded).toHaveLength(0);
+        // A way to ask again, for the one who asked: it spends their access.
+        expect(posted[0]?.components).toEqual([
+            { type: "button", label: "polar.tryAgain", style: "secondary", action: "polar.retry", for: "u1" }
+        ]);
     });
 
     it("answers a mention with nothing asked from the conversation before it", async () => {

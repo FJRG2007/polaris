@@ -14,11 +14,8 @@
  */
 
 import { z } from "zod";
-import { mcpTools } from "@/lib/mcp/catalog";
-import { scopesAvailableTo } from "@polaris/auth";
-import { MCP_ONLY_SCOPES, type McpScope } from "@/lib/mcp/scope-table";
-import { auditToolChange, spendToolBudget } from "@/lib/mcp/call-guard";
-import { callerMayUse, McpRefusal, type McpCaller } from "@/lib/mcp/protocol";
+import type { McpCaller } from "@/lib/mcp/protocol";
+import { callSessionTool, sessionCaller } from "@/lib/mcp/session-call";
 
 const WIDGET_SCOPES = ["places.read", "places.control"] as const;
 
@@ -48,29 +45,12 @@ const deviceRows = z.object({
 });
 
 /** The session as an MCP caller holding only the Places scopes its owner holds. */
-export async function phoneCaller(user: { readonly id: string; readonly isAdmin: boolean }): Promise<McpCaller> {
-    const held = new Set<string>(await scopesAvailableTo(user.id, user.isAdmin));
-    const scopes = WIDGET_SCOPES.filter((scope) => held.has(MCP_ONLY_SCOPES[scope].requires));
-    return { userId: user.id, isAdmin: user.isAdmin, keyId: null, scopes: scopes as McpScope[] };
+export function phoneCaller(user: { readonly id: string; readonly isAdmin: boolean }): Promise<McpCaller> {
+    return sessionCaller(user, WIDGET_SCOPES);
 }
 
-async function call(caller: McpCaller, name: string, input: unknown) {
-    const tool = (await mcpTools()).find((candidate) => candidate.name === name);
-    if (!tool || !callerMayUse(tool, caller)) return { ok: false as const, reason: "missing" as const, message: null };
-    const args = tool.input.safeParse(input);
-    if (!args.success) return { ok: false as const, reason: "refused" as const, message: null };
-    if (!tool.readOnly && (await spendToolBudget(tool, caller)) !== null) {
-        return { ok: false as const, reason: "throttled" as const, message: null };
-    }
-    try {
-        const structured = (await tool.run(args.data as never, caller)).structured ?? null;
-        await auditToolChange(tool, caller, "phone");
-        return { ok: true as const, structured };
-    } catch (caught) {
-        if (caught instanceof McpRefusal) return { ok: false as const, reason: "refused" as const, message: caught.message };
-        console.error(`phone widget: ${name} failed`, caught);
-        return { ok: false as const, reason: "refused" as const, message: null };
-    }
+function call(caller: McpCaller, name: string, input: unknown) {
+    return callSessionTool(caller, name, input, "phone");
 }
 
 /** The doors this person can open, for the widget's picker and its state. Null when Places is not theirs. */

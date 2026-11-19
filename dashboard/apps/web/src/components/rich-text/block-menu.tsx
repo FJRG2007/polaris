@@ -183,6 +183,10 @@ export interface SlashCommand {
     /** What is typed after the slash. */
     readonly name: string;
     readonly description: string;
+    /** What it takes after the name, as a word ("question"), shown beside it. */
+    readonly hint?: string | null;
+    /** The app that answers it, by name, for a command an app brings. */
+    readonly app?: string;
 }
 
 /** The commands as menu entries: picking one writes it, with a space after so
@@ -191,8 +195,8 @@ function commandEntries(commands: readonly SlashCommand[], term: string): BlockC
     return commands
         .filter((command) => !term || command.name.toLowerCase().startsWith(term))
         .map((command) => ({
-            label: `/${command.name}`,
-            detail: command.description,
+            label: command.hint ? `/${command.name} [${command.hint}]` : `/${command.name}`,
+            detail: command.app ? `${command.description} - ${command.app}` : command.description,
             keywords: command.description.toLowerCase(),
             icon: Terminal,
             run: (editor, range) =>

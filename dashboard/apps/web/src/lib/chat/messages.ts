@@ -11,12 +11,13 @@
  * rather than a channel id.
  */
 
+import { readComponents, type MessageComponent } from "./message-components";
 import { inviteCards, type ChatInviteCard } from "./invite-cards";
 import { prisma, Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
 import { rulesForChannel } from "./rules";
-import { commandIn } from "./chat-command";
+import { appCommandIn, commandIn } from "./chat-command";
 import { publishChatChange } from "./live";
 import { nicknamesFor } from "@/lib/contact-names";
 import { clearFriendNoticeAbout, clearFriendNoticesAbout } from "@/lib/friends-service";
@@ -78,6 +79,8 @@ export interface ChatMessageView {
     /** Written by an assistant answering a mention - "polar" - and drawn with
      *  its mark and an AI badge, never as a person. */
     readonly fromAgent?: string;
+    /** Buttons and forms under a message Polar or an app wrote. Absent for nearly all. */
+    readonly components?: readonly MessageComponent[];
     readonly kind: core.ChatMessageKind;
     /** Empty for a deleted message - the tombstone carries no text. */
     readonly body: string;
@@ -677,6 +680,15 @@ export async function send(
     if (!input.parentId && commandIn(input.body)) {
         void import("./game-links")
             .then((links) => links.answerCommand(id, actor.id))
+            .catch(() => undefined);
+    }
+    // `/polar` and `/task`, which Polaris's own apps answer anywhere - see
+    // `app-commands`. Not `/polar` with an `@polar` in it too: that one is
+    // answered as a mention above, and once is enough.
+    const appCommand = appCommandIn(input.body);
+    if (appCommand && !(appCommand.name === "polar" && /@polar/i.test(input.body))) {
+        void import("./app-commands")
+            .then((commands) => commands.runAppCommand(id, actor.id))
             .catch(() => undefined);
     }
     // Automations listening for messages, each only if the account it runs as
@@ -1984,7 +1996,8 @@ export const MESSAGE_SELECT = {
     authorLabel: true,
     authorAvatarUrl: true,
     agent: true,
-    translation: true
+    translation: true,
+    components: true
 } as const;
 
 interface Row {
@@ -2014,6 +2027,15 @@ interface Row {
     /** `{ from, to, original }` when it was sent translated - see
      *  `core.readSentTranslation`. Optional for the same reason as above. */
     translation?: unknown;
+    /** Buttons and forms under it - see `message-components`. */
+    components?: unknown;
+}
+
+/** The buttons and forms a message carries; none once it is deleted. */
+function componentsView(row: Pick<Row, "deletedAt" | "components">): { components?: MessageComponent[] } {
+    if (row.deletedAt || row.components == null) return {};
+    const components = readComponents(row.components);
+    return components.length ? { components } : {};
 }
 
 /** The translation note on a message, as one reader may see it. */
@@ -2342,6 +2364,7 @@ export async function decorateMessages(
             ...(row.webhookId ? { fromWebhook: true } : {}),
             ...faceOf(webhookFace(row, hookFaces)),
             ...(row.agent ? { fromAgent: row.agent } : {}),
+            ...componentsView(row),
             kind: row.kind as core.ChatMessageKind,
             body: row.deletedAt ? "" : notice ? noticeString(notice) : row.body,
             ...(notice ? { notice } : {}),

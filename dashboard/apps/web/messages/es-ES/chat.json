@@ -247,7 +247,12 @@
         "proposalNotYours": "Solo los demás del chat pueden responderla",
         "deleteForAllOff": "Aquí no se permite borrar el chat para todos",
         "rulesGroupAdminsOnly": "Solo el propietario y los administradores del grupo pueden cambiarlo",
-        "rulesBadValue": "Esa opción no está disponible"
+        "rulesBadValue": "Esa opción no está disponible",
+        "componentGone": "Esto ya no está disponible.",
+        "componentNotYours": "Solo quien lo pidió puede usarlo.",
+        "componentTooFast": "Demasiados intentos. Espera un poco.",
+        "componentInvalid": "Revisa los campos y vuelve a probar.",
+        "taskNotCreated": "No se pudo crear la tarea. Revisa la lista y prueba otra vez."
     },
     "media": {
         "refused": {
@@ -622,7 +627,8 @@
         "linkFlagged": {
             "yours": "{provider} marcó un enlace de tu mensaje. A los demás se les avisa antes de abrirlo.",
             "moderator": "{provider} marcó un enlace de este mensaje. A los demás se les avisa antes de abrirlo, y puedes borrarlo desde su menú."
-        }
+        },
+        "appHint": "Lo ha escrito una app de Polaris, no una persona"
     },
     "composer": {
         "replyingTo": "Respondiendo a",
@@ -2367,7 +2373,9 @@
         "noProviderOwnOnly": "Necesito una clave de un proveedor de IA para responderte, y las de este Polaris no están compartidas contigo. Añade una tuya.",
         "addKey": "Añadir clave",
         "limitReached": "Has llegado a tu límite con la clave compartida de este Polaris. [Añade una clave tuya](/polar/settings/providers) para seguir preguntando.",
-        "failed": "No he podido responder ahora mismo. Inténtalo de nuevo en un momento."
+        "failed": "No he podido responder ahora mismo. Inténtalo de nuevo en un momento.",
+        "setUpProviders": "Configurar proveedores",
+        "tryAgain": "Reintentar"
     },
     "gameServerCard": {
         "gameServer": "Servidor",
@@ -2511,5 +2519,29 @@
             "challenge": "Ha tardado demasiado. Vuelve a probar.",
             "signature": "Este móvil no ha podido demostrar que es tuyo. Vuelve a probar."
         }
+    },
+    "appCommands": {
+        "polar": {
+            "description": "Pregúntale",
+            "hint": "pregunta"
+        },
+        "task": {
+            "app": "Tareas",
+            "description": "Crea una tarea",
+            "hint": "título",
+            "prompt": "Rellena la tarea para crearla.",
+            "form": "Nueva tarea",
+            "create": "Crear",
+            "name": "Título",
+            "list": "Lista",
+            "details": "Descripción",
+            "noLists": "Aún no hay una lista donde puedas añadir.",
+            "openTasks": "Abrir Tareas",
+            "openTask": "Abrir tarea",
+            "created": "Creada {reference}: {name}"
+        },
+        "onlyFor": "Solo quien lo pidió puede usarlo.",
+        "working": "Un momento...",
+        "cancel": "Cancelar"
     }
 }

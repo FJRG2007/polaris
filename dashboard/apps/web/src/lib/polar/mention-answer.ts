@@ -42,18 +42,33 @@ export function noProviderText(words: Words, spendsShared: boolean): string {
     ].join(" ");
 }
 
+/** Why there is no answer, for a caller that offers the way out under it. */
+export type MentionProblem = "notAvailable" | "tooFast" | "noProvider" | "limitReached" | "failed";
+
+export interface MentionAnswer {
+    readonly text: string;
+    /** Null when Polar answered. */
+    readonly problem: MentionProblem | null;
+}
+
 /** Polar's answer to one mention, or the sentence that says why there is none. Never throws for a model failure. */
 export async function answerMention(turn: MentionTurn): Promise<string> {
+    return (await answerMentionWithReason(turn)).text;
+}
+
+/** The same, saying why when there is no answer. */
+export async function answerMentionWithReason(turn: MentionTurn): Promise<MentionAnswer> {
     const { userId, words } = turn;
+    const fail = (problem: MentionProblem, text: string): MentionAnswer => ({ text, problem });
     const [{ polarAccessFor }, { rateLimit }] = await Promise.all([
         import("@/lib/polar/access"),
         import("@/lib/rate-limit-service")
     ]);
     const access = await polarAccessFor(userId);
-    if (!access.use) return words("polar.notAvailable");
+    if (!access.use) return fail("notAvailable", words("polar.notAvailable"));
     // The panel's own ceiling: a mention is a Polar turn like any other.
     const allowed = await rateLimit(`polar-chat:${userId}`, 30, 60_000);
-    if (!allowed.ok) return words("polar.tooFast");
+    if (!allowed.ok) return fail("tooFast", words("polar.tooFast"));
 
     const [{ resolvePolarModel, answeredBy }, { automaticChoice }, { PLAIN_TURN }, usage] = await Promise.all([
         import("@/lib/polar/models"),
@@ -62,9 +77,9 @@ export async function answerMention(turn: MentionTurn): Promise<string> {
         import("@/lib/polar/usage")
     ]);
     const resolved = await resolvePolarModel(userId, automaticChoice(), PLAIN_TURN, access);
-    if (typeof resolved === "string") return noProviderText(words, access.spend);
+    if (typeof resolved === "string") return fail("noProvider", noProviderText(words, access.spend));
     if (resolved.credential.source === "instance" && (await usage.polarLimitReached(userId))) {
-        return words("polar.limitReached");
+        return fail("limitReached", words("polar.limitReached"));
     }
 
     turn.typing?.();
@@ -85,7 +100,7 @@ export async function answerMention(turn: MentionTurn): Promise<string> {
     } catch (error) {
         const { classifyProviderFailure, failureLogLine } = await import("@/lib/polar/provider-failure");
         console.warn(failureLogLine(turn.where, resolved.option.providerName, classifyProviderFailure(error)));
-        return words("polar.failed");
+        return fail("failed", words("polar.failed"));
     } finally {
         if (dots) clearInterval(dots);
     }
@@ -106,7 +121,8 @@ export async function answerMention(turn: MentionTurn): Promise<string> {
         console.error(`polar: could not record the usage of ${turn.where}:`, error);
     }
     const { withoutPseudoToolCalls } = await import("@/lib/polar/pseudo-tools");
-    return withoutPseudoToolCalls(text).trim() || words("polar.failed");
+    const said = withoutPseudoToolCalls(text).trim();
+    return said ? { text: said, problem: null } : fail("failed", words("polar.failed"));
 }
 
 /** The question with the mention taken out; empty when only the mention was written. */

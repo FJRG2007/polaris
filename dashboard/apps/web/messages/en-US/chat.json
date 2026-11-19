@@ -247,7 +247,12 @@
         "proposalNotYours": "Only the other people in the chat can answer it",
         "deleteForAllOff": "Deleting this chat for everyone is not allowed here",
         "rulesGroupAdminsOnly": "Only the group's owner and admins can change this",
-        "rulesBadValue": "That choice is not available"
+        "rulesBadValue": "That choice is not available",
+        "componentGone": "This is no longer available.",
+        "componentNotYours": "Only the person who asked can use this.",
+        "componentTooFast": "Too many tries. Wait a moment.",
+        "componentInvalid": "Check the fields and try again.",
+        "taskNotCreated": "The task could not be created. Check the list and try again."
     },
     "media": {
         "refused": {
@@ -622,7 +627,8 @@
         "linkFlagged": {
             "yours": "{provider} flagged a link in your message. Others are warned before they open it.",
             "moderator": "{provider} flagged a link in this message. Others are warned before they open it, and you can delete it from its menu."
-        }
+        },
+        "appHint": "Written by a Polaris app, not by a person"
     },
     "composer": {
         "replyingTo": "Replying to",
@@ -2367,7 +2373,9 @@
         "noProviderOwnOnly": "I need an AI provider key to answer you, and this Polaris's keys aren't shared with you. Add one of your own.",
         "addKey": "Add a key",
         "limitReached": "You've reached your limit on this Polaris's shared key. [Add a key of your own](/polar/settings/providers) to keep asking.",
-        "failed": "I couldn't answer that just now. Try again in a moment."
+        "failed": "I couldn't answer that just now. Try again in a moment.",
+        "setUpProviders": "Set up AI providers",
+        "tryAgain": "Try again"
     },
     "gameServerCard": {
         "gameServer": "Game server",
@@ -2511,5 +2519,29 @@
             "challenge": "That took too long. Try again.",
             "signature": "This phone could not prove it is yours. Try again."
         }
+    },
+    "appCommands": {
+        "polar": {
+            "description": "Ask Polar",
+            "hint": "question"
+        },
+        "task": {
+            "app": "Tasks",
+            "description": "Create a task",
+            "hint": "title",
+            "prompt": "Fill in the task to create it.",
+            "form": "New task",
+            "create": "Create",
+            "name": "Title",
+            "list": "List",
+            "details": "Description",
+            "noLists": "There is no task list you can add to yet.",
+            "openTasks": "Open Tasks",
+            "openTask": "Open task",
+            "created": "Created {reference}: {name}"
+        },
+        "onlyFor": "Only the person who asked can use this.",
+        "working": "Working...",
+        "cancel": "Cancel"
     }
 }

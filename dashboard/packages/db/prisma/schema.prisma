@@ -10866,6 +10866,10 @@ model ChatMessage {
     // only the author is shown. Null for everything else; cleared on an edit,
     // since the edited words are no longer a translation of the original.
     translation  Json?
+    // Buttons and forms under a message Polar or an app wrote (Discord-style
+    // components) - see `lib/chat/message-components`. Read through its
+    // schema, so a row a newer version wrote never breaks an older screen.
+    components   Json?
     // When this message disappears, stamped from the conversation's timer when
     // it was sent. Never served past it, and deleted for real by the sweep
     // (`lib/chat/vanish`). Null is forever.

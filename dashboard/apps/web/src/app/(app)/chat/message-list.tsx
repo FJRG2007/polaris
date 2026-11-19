@@ -38,6 +38,8 @@ import { deleteKeyWithShift, type DeleteMessage } from "./delete-message";
 import { copyText } from "./links";
 import { plainText } from "@/components/rich-text/excerpt";
 import { PollCard } from "./poll-card";
+import { POLARIS_APPS } from "@/lib/apps";
+import { MessageComponents } from "./message-components-view";
 import { hasCard, referenced } from "./message-references";
 import { ReportDialog } from "./report-dialog";
 import { NicknameDialog } from "./nickname-dialog";
@@ -183,6 +185,7 @@ import {
     matchShortcut
 } from "@polaris/ui";
 import {
+    Blocks,
     Check,
     CheckCheck,
     CornerUpLeft,
@@ -1006,6 +1009,8 @@ function Message({
                                     </span>
                                 )}
                             </Writer>
+                        ) : message.fromAgent && message.fromAgent !== "polar" ? (
+                            <AppAgentFace agent={message.fromAgent} />
                         ) : message.fromAgent ? (
                             <PolarBotCard>
                                 <button
@@ -1077,6 +1082,8 @@ function Message({
                                             <PersonName id={message.authorId} name={author} />
                                         </button>
                                     </Writer>
+                                ) : message.fromAgent && message.fromAgent !== "polar" ? (
+                                    <span className="min-w-0 truncate text-sm font-medium">{author}</span>
                                 ) : message.fromAgent ? (
                                     <PolarBotCard>
                                         <button
@@ -1093,14 +1100,14 @@ function Message({
                                 )}
                                 {/* Not a person: Polar, answering a mention. Its
                                 tag says so, as a bot's does on any platform. */}
-                                {message.fromAgent && <PolarBadge />}
+                                {message.fromAgent === "polar" && <PolarBadge />}
                                 {/* Not a person: something outside Polaris posting
                                 through one of the channel's webhooks, under a name
                                 it chose. Discord's APP tag says the same. */}
-                                {message.fromWebhook && (
+                                {(message.fromWebhook || (message.fromAgent && message.fromAgent !== "polar")) && (
                                     <span
                                         className="shrink-0 self-center rounded bg-primary px-1 text-[0.625rem] font-semibold uppercase leading-4 text-primary-foreground"
-                                        title={t("messageList.webhookHint")}
+                                        title={t(message.fromWebhook ? "messageList.webhookHint" : "messageList.appHint")}
                                     >
                                         {t("messageList.app")}
                                     </span>
@@ -1180,6 +1187,16 @@ function Message({
                                 // the asker has their answer, and the moderator has
                                 // a poll that should not be running.
                                 canEnd={mine || canModerate}
+                                onError={onError}
+                            />
+                        )}
+
+                        {/* What Polar or an app put under its message: a way
+                        to fix what it said, or a form it asked for. */}
+                        {message.components && message.components.length > 0 && (
+                            <MessageComponents
+                                messageId={message.id}
+                                components={message.components}
                                 onError={onError}
                             />
                         )}
@@ -2161,4 +2178,14 @@ function readableSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** The face of a message one of Polaris's own apps wrote: the app's mark. */
+function AppAgentFace({ agent }: { agent: string }) {
+    const Icon = POLARIS_APPS.find((app) => app.id === agent)?.icon ?? Blocks;
+    return (
+        <span className="inline-flex size-7 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <Icon className="size-4 shrink-0" aria-hidden />
+        </span>
+    );
 }

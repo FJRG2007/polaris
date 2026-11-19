@@ -18,15 +18,15 @@
  * and never as a person. Server-only.
  */
 
-import { prisma } from "@polaris/db";
+import { prisma, Prisma } from "@polaris/db";
 import { chatWordsFor } from "./text";
 import { channelAccess } from "./access";
 import { publishChatChange } from "./live";
-import { unhideOnMessage } from "./chat-lock";
-import { expiryForChannel } from "./vanish";
+import { postAgentMessage } from "./agent-message";
 import * as history from "./history-visibility";
 import { polarMentioned } from "@/components/rich-text/markdown";
-import { answerMention, questionOf } from "@/lib/polar/mention-answer";
+import { answerMentionWithReason, questionOf, type MentionProblem } from "@/lib/polar/mention-answer";
+import { storedComponents, type MessageComponentInput } from "./message-components";
 
 export const POLAR_AGENT = "polar";
 export const POLAR_LABEL = "Polar";
@@ -53,7 +53,20 @@ export function answerPolarLater(mention: PolarMention): void {
 }
 
 
-export async function answerPolarMention(mention: PolarMention): Promise<string | null> {
+/** `/polar` written as a command asks what follows it, the way `@polar` does. */
+export function polarCommandQuestion(body: string): string {
+    return body.replace(/^\s*\/polar(?![\w-])/i, "").trim();
+}
+
+/**
+ * Answer one mention. With `replace`, the answer is written over that earlier
+ * message of Polar's - the one whose "Try again" was pressed - instead of
+ * posting a second.
+ */
+export async function answerPolarMention(
+    mention: PolarMention,
+    replace: string | null = null
+): Promise<string | null> {
     // Still in the conversation: a message from somebody who has since left it
     // is answered nowhere.
     if (!(await channelAccess({ id: mention.authorId }, mention.channelId))) return null;
@@ -65,11 +78,11 @@ export async function answerPolarMention(mention: PolarMention): Promise<string 
     const askerName = author?.name || author?.username || "";
     const history = await conversationBefore(mention);
 
-    const text = await answerMention({
+    const answer = await answerMentionWithReason({
         userId: mention.authorId,
         words,
         system: mentionSystemPrompt(askerName),
-        prompt: mentionPrompt(history, askerName, mention.body),
+        prompt: mentionPrompt(history, askerName, polarCommandQuestion(mention.body)),
         where: "a chat mention",
         typing: () =>
             publishChatChange({
@@ -81,7 +94,52 @@ export async function answerPolarMention(mention: PolarMention): Promise<string 
             })
     });
     const rules = await import("./rules").then((module) => module.rulesForChannel(mention.channelId));
-    return postPolarMessage(mention, [...text].slice(0, rules.maxMessageLength).join(""));
+    const body = [...shownText(answer.text, answer.problem)].slice(0, rules.maxMessageLength).join("");
+    const components = problemComponents(answer.problem, words, mention.authorId);
+    return replace
+        ? rewritePolarMessage(mention.channelId, replace, body, components)
+        : postPolarMessage(mention, body, components);
+}
+
+type Words = Awaited<ReturnType<typeof chatWordsFor>>;
+
+/** The sentence as Chat shows it: the provider link moves to its button. */
+function shownText(text: string, problem: MentionProblem | null): string {
+    return problem === "noProvider" ? text.replace(/\s*\[[^\]]+\]\(\/polar\/settings\/providers\)\s*$/, "") : text;
+}
+
+/** What Polar offers under a reply that is not an answer: the way to fix it. */
+export function problemComponents(
+    problem: MentionProblem | null,
+    words: Words,
+    askerId: string
+): MessageComponentInput[] {
+    switch (problem) {
+        case "noProvider":
+        case "limitReached":
+            return [{ type: "link", label: words("polar.setUpProviders"), href: "/polar/settings/providers" }];
+        case "failed":
+        case "tooFast":
+            return [{ type: "button", label: words("polar.tryAgain"), action: "polar.retry", for: askerId }];
+        default:
+            return [];
+    }
+}
+
+/** Writes a new answer over Polar's earlier message, its buttons with it. */
+async function rewritePolarMessage(
+    channelId: string,
+    messageId: string,
+    body: string,
+    components: readonly MessageComponentInput[]
+): Promise<string> {
+    const stored = storedComponents(components);
+    await prisma.chatMessage.updateMany({
+        where: { id: messageId, channelId, agent: POLAR_AGENT, deletedAt: null },
+        data: { body, components: stored.length ? stored : Prisma.DbNull }
+    });
+    publishChatChange({ channelId, kind: "posted", actorId: "", messageIds: [messageId] });
+    return messageId;
 }
 
 export function mentionSystemPrompt(askerName: string): string {
@@ -158,37 +216,18 @@ async function conversationBefore(
 }
 
 /** Posts Polar's message, quoting the one that asked, in the same thread. */
-export async function postPolarMessage(mention: PolarMention, body: string): Promise<string> {
-    // An answer in a chat with a timer disappears like everything else in it.
-    const expiresAt = await expiryForChannel(mention.channelId, new Date());
-    const id = await prisma.$transaction(async (tx) => {
-        const message = await tx.chatMessage.create({
-            data: {
-                channelId: mention.channelId,
-                authorId: null,
-                kind: "text",
-                body,
-                agent: POLAR_AGENT,
-                authorLabel: POLAR_LABEL,
-                replyToId: mention.messageId,
-                parentId: mention.parentId,
-                ...(expiresAt ? { expiresAt } : {})
-            },
-            select: { id: true, createdAt: true }
-        });
-        await tx.chatChannel.update({
-            where: { id: mention.channelId },
-            data: { lastMessageAt: message.createdAt }
-        });
-        if (mention.parentId) {
-            await tx.chatMessage.update({
-                where: { id: mention.parentId },
-                data: { replyCount: { increment: 1 }, lastReplyAt: message.createdAt }
-            });
-        }
-        await unhideOnMessage(tx, mention.channelId, null, message.createdAt);
-        return message.id;
+export function postPolarMessage(
+    mention: PolarMention,
+    body: string,
+    components: readonly MessageComponentInput[] = []
+): Promise<string> {
+    return postAgentMessage({
+        channelId: mention.channelId,
+        parentId: mention.parentId,
+        replyToId: mention.messageId,
+        agent: POLAR_AGENT,
+        label: POLAR_LABEL,
+        body,
+        components
     });
-    publishChatChange({ channelId: mention.channelId, kind: "posted", actorId: "" });
-    return id;
 }

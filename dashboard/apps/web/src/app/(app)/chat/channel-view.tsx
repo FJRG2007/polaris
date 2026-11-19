@@ -21,6 +21,7 @@
  * did not read them.
  */
 
+import { useAppCommands } from "./use-app-commands";
 import type { ViewOnceChoice } from "@/lib/chat/view-once-choice";
 import * as actions from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -238,6 +239,7 @@ export function ChannelView({
     messageId?: string | null;
 }) {
     const t = useTranslations("chat");
+    const appCommands = useAppCommands();
     const router = useRouter();
     const params = useSearchParams();
     const { viewerId, viewerName, channels, spaces, loaded, refresh, rulesFor, may, callsOff } =
@@ -2524,9 +2526,8 @@ export function ChannelView({
                         // person - see `drafts`.
                         draftKey={channelDraftKey(channelId)}
                         roomMentions={channel.mayMentionRoom}
-                        // `/online` and the rest, where a game server is linked.
-                        commands={channel.gameLinks
-                            .flatMap((link) => link.commands)
+                        // `/polar`, `/task`, and `/online` and the rest where a game server is linked.
+                        commands={[...appCommands, ...channel.gameLinks.flatMap((link) => link.commands)]
                             .filter(
                                 (command, at, all) =>
                                     all.findIndex((one) => one.name === command.name) === at
