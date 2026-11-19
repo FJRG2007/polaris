@@ -117,8 +117,6 @@
         "transcribeFailed": "No se pudo transcribir la grabación. Vuelve a intentarlo."
     },
     "modes": {
-        "label": "Qué traducir",
-        "text": "Texto",
         "image": "Imágenes",
         "document": "Documentos",
         "audio": "Audio",

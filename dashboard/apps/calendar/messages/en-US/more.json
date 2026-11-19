@@ -54,7 +54,6 @@
             "search": "Search countries",
             "title": "Holidays"
         },
-        "inUse": "In use",
         "intervalFor": "How often {name} is refreshed",
         "intervals": {
             "d1": "Every day",
@@ -545,7 +544,6 @@
     "shareDialog": {
         "roles": "Share with a role",
         "add": "Share",
-        "close": "Close",
         "emailLabel": "Email the link",
         "emailPlaceholder": "name@example.com",
         "embedCode": "Embed code",

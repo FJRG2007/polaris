@@ -1028,7 +1028,6 @@
             "unlocked": "Not locked, whatever your account setting says",
             "lockIt": "lock it",
             "leaveUnlocked": "leave it unlocked",
-            "follow": "follow your account setting",
             "title": "{says}. Press to {then}.",
             "label": "Address lock for {label}: {says}"
         },
@@ -1064,7 +1063,6 @@
             "none": "Nothing matches that search.",
             "failed": "Providers couldn't be loaded. Try again.",
             "more": "Show more",
-            "back": "Back",
             "methods": {
                 "key": "Pay per use with an API key",
                 "login": "Use a plan you already pay for",
@@ -1097,16 +1095,13 @@
                 "agents": "Agents"
             }
         },
-        "order": "Order",
         "provider": "Provider",
         "name": "Name",
         "key": "Key",
         "expires": "Expires",
         "lastUsed": "Last used",
         "never": "Never",
-        "earlier": "Try {name} earlier",
         "moveUp": "Move up",
-        "later": "Try {name} later",
         "moveDown": "Move down",
         "editNamed": "Edit {name}",
         "more": "More",
@@ -1116,7 +1111,6 @@
         "turnOff": "Turn off",
         "turnOn": "Turn on",
         "useNamed": "Let runs use {name}",
-        "deleteNamed": "Delete {name}",
         "nameTaken": "There is already a key by that name.",
         "nameHint": "3-20 characters. Letters, numbers, hyphens, and underscores.",
         "providerKey": "provider key",

@@ -244,48 +244,23 @@
         "taskNoteWorkspace": "Pasada a un agente: [la sesión]({href}).",
         "start": "Iniciar una sesión",
         "none": "Aún no hay sesiones",
-        "noneHint": "Una sesión pone un agente de código en una rama propia, en una máquina que ya tienes. Puedes verlo trabajar, responder a sus preguntas y enviarle lo siguiente.",
         "workspace": "Un espacio",
-        "aServer": "un servidor",
-        "thisBox": "este equipo",
-        "queuePosition": "En cola, puesto {position}",
         "cancelQueued": "Cancelar",
         "stop": "Detener",
         "form": {
-            "model": "Modelo",
-            "noModel": "Añade una clave de IA para elegir modelo.",
-            "addKey": "Añadir clave",
             "title": "En qué trabaja",
-            "titlePlaceholder": "Arreglar la redirección",
             "repository": "Repositorio",
-            "noRepo": "Sin repositorio - solo abrir el agente",
             "repoSearch": "Buscar repositorios",
             "repoEmpty": "Ningún repositorio coincide",
-            "workspaceHint": "Se abre en una máquina propia con un directorio vacío y nada descargado. La máquina conserva su carpeta personal, así que lo que instales y donde inicies sesión se queda para la próxima vez.",
-            "noRepos": "Aún no hay nada conectado. Añade uno en <link>Repositorios</link> para que un agente trabaje en él.",
             "agent": "Agente",
-            "command": "El comando que lo inicia. Tiene que estar ya instalado en la máquina.",
-            "where": "Dónde se ejecuta",
-            "shared": "Usar la máquina compartida",
-            "sharedOn": "Una sola carpeta personal para todo el despliegue: lo que tenga la sesión iniciada ahí te la inicia a ti, y los archivos que deje cualquiera son los que encuentras. Inicia sesión con una clave de API o un plan de equipo: una suscripción personal usada por varias personas es lo que acaba suspendido.",
-            "sharedOff": "Se abre en una máquina propia, con tus sesiones y tus archivos. Nadie más llega a ella.",
-            "whichServer": "Qué servidor",
-            "pickServer": "Elige un servidor",
             "branch": "Rama de la que partir. Déjala vacía para usar la principal del repositorio.",
             "prompt": "Con qué empezar. Déjalo vacío para abrir el agente y escribirle tú.",
-            "promptPlaceholder": "Lee el test que falla en auth.test.ts y arregla lo que indica.",
-            "unattended": "Dejar que trabaje sin preguntar",
             "unattendedEnigma": "Enigma está activado, así que esto lo decide él: tus propias políticas deciden qué puede ejecutar el agente sin preguntar, y Polaris no añade nada encima.",
-            "unattendedHost": "Este servidor es tu máquina: el agente se ejecuta como la cuenta que inscribió Polaris, junto a todo lo que alcanza esa cuenta. Desactivado, pregunta antes de cada comando, lo que obliga a ir al terminal para responder.",
-            "unattendedContainer": "Se ejecuta en su propio contenedor con una copia del repositorio, que se elimina al terminar la sesión. Desactivado, espera en sus propias peticiones de permiso, y nadie está mirando un contenedor.",
             "enigma": "Trabajar con tus estándares de Enigma",
-            "enigmaHint": "Instala tus políticas, convenciones y guardarraíles en la sesión antes de que empiece el agente. Sus ajustes vienen de este repositorio y de los ajustes de Agentes.",
             "submit": "Iniciar"
         },
         "usage": {
-            "tokens": "{tokens} tokens",
-            "tokensCost": "{tokens} tokens, unos {cost}",
-            "detail": "{input} tokens de entrada, {output} de salida"
+            "tokens": "{tokens} tokens"
         }
     },
     "boot": {
@@ -340,7 +315,6 @@
             }
         },
         "share": "Compartir sesión",
-        "sharedWithYou": "Compartida contigo",
         "events": {
             "sessionStart": "Iniciada",
             "prompt": "Pregunta",
@@ -369,27 +343,16 @@
         "look": "Ver su pantalla",
         "interrupt": "Interrumpir",
         "resume": "Reanudar",
-        "resumeHint": "El agente se cerró. Reábrelo en la misma conversación.",
-        "gettingReady": "Preparando la máquina.",
-        "installsOnce": "Las instalaciones se hacen una vez. Esta máquina conserva su carpeta personal, así que tu próxima sesión se las salta y arranca en segundos.",
         "terminal": "El terminal del agente",
-        "signInHere": "Si el agente te pide iniciar sesión, hazlo aquí. Esta máquina conserva su carpeta personal entre sesiones, así que solo lo pide una vez.",
         "screen": "Lo que muestra el terminal del agente",
-        "screenEmpty": "Aún no muestra nada.",
         "conversation": "Conversación",
-        "nothingSaid": "Aún no se ha dicho nada. Lo que envíes abajo va directo al agente.",
         "you": "Tú",
         "activity": "Actividad",
         "noEvents": "El agente aún no ha informado de nada. Informa a través de sus propios hooks, que actúan una vez que ha arrancado.",
         "ended": "Esta sesión ha terminado. Su rama, {branch}, sigue ahí.",
-        "answerHere": "Te está esperando. Respóndele aquí.",
-        "sendNext": "Envíale lo siguiente.",
         "send": "Enviar",
         "work": {
-            "pushed": "{count, plural, one {Subido # commit a {branch}} other {Subidos # commits a {branch}}}",
-            "clean": "Nada que subir: todo estaba ya en GitHub.",
             "kept": "No se subió: trabajo guardado",
-            "keptMore": "La máquina sigue con el trabajo dentro hasta que lo subas o descartes.",
             "reasons": {
                 "rejected": "GitHub rechazó la subida; suele ser que la rama avanzó o está protegida.",
                 "policy": "El repositorio no deja a los agentes subir esta rama.",
@@ -397,11 +360,6 @@
                 "unreachable": "Polaris no alcanzó la máquina de la sesión.",
                 "other": "La subida no salió bien."
             },
-            "retry": "Reintentar la subida",
-            "discard": "Descartar",
-            "discardTitle": "¿Descartar el trabajo?",
-            "discardDescription": "Se borran la máquina y todo cambio sin subir. No se puede deshacer.",
-            "discarded": "Trabajo descartado",
             "retryFailed": "Sigue sin subirse. El trabajo se guarda."
         },
         "views": {
@@ -554,7 +512,6 @@
             "open": "Fusionar",
             "title": "Fusionar la pull request #{number}",
             "description": "Todos los checks pasaron. La rama se fusiona con su base en GitHub.",
-            "blocked": "GitHub indica que la protección de rama bloquea esta pull request. Puede rechazar la fusión.",
             "checksNotGreen": "Algunos checks fallaron o siguen en curso. Fusionar ahora los ignora.",
             "method": "Tipo de fusión",
             "methods": {
@@ -599,11 +556,8 @@
             "kept": "El trabajo de esta sesión aún no se subió. Súbelo de nuevo desde la sesión y continúa."
         },
         "fork": {
-            "action": "Bifurcar",
             "hint": "Abre una sesión nueva sobre este trabajo, con la conversación cuando el agente puede llevarla.",
-            "noRepo": "Un espacio de trabajo no tiene rama desde la que bifurcar.",
-            "from": "Bifurcada de",
-            "parent": "la sesión original"
+            "noRepo": "Un espacio de trabajo no tiene rama desde la que bifurcar."
         },
         "pr": {
             "refresh": "Leer de nuevo",
@@ -1017,12 +971,9 @@
         "repos": "En qué repositorios trabaja el agente y dónde ocurren las ejecuciones de cada uno. Polaris recomienda la opción más barata que encaje; la elección es tuya.",
         "runsTitle": "Ejecuciones",
         "runs": "Cada vez que se ejecutó un agente, qué lo inició y cómo terminó.",
-        "sessionsTitle": "Sesiones",
         "sessions": "Agentes en marcha ahora mismo, cada uno en su propia rama. Mira uno, respóndele o envíale lo siguiente.",
         "settingsTitle": "Ajustes",
-        "settings": "Lo que heredan tus repositorios. Defínelo una vez aquí, acótalo por cuenta y sobrescríbelo en los repositorios que necesiten algo distinto.",
-        "sessionOn": "{repo} en {branch}",
-        "sessionWorkspace": "Un espacio de trabajo propio, sin nada descargado"
+        "settings": "Lo que heredan tus repositorios. Defínelo una vez aquí, acótalo por cuenta y sobrescríbelo en los repositorios que necesiten algo distinto."
     },
     "setup": {
         "description": "Tres cosas tienen que cumplirse para que un agente pueda ejecutarse. Aquí están.",

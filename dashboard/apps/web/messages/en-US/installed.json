@@ -14,15 +14,12 @@
     "waitingOutput": "Waiting for output...",
     "notRunning": "The app is not running.",
     "kind": "app",
-    "uninstallDescription": "This tears down its container and removes it from your apps. Data on server-local volumes is lost; data on a NAS mount is kept.",
     "channels": {
         "title": "Channels",
         "hint": "Connect WhatsApp, Telegram, Discord or Slack. Each channel's token, phone number or QR is entered under Channels when you connect it.",
         "connect": "Connect a channel",
         "loading": "Loading channels...",
         "empty": "No channels connected yet. Connect one to start sending alerts and codes through it.",
-        "goToInbox": "Go to Channels",
-        "openInbox": "Open Channels",
         "status": {
             "connected": "connected",
             "connecting": "connecting",

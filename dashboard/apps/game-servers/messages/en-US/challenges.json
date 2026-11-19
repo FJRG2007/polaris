@@ -48,7 +48,6 @@
         "timezone": "That time zone is not one Polaris knows, for example Europe/Madrid"
     },
     "draw": {
-        "which": "Which draw",
         "today": "Today",
         "week": "This week",
         "tomorrow": "Tomorrow",

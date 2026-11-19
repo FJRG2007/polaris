@@ -54,7 +54,6 @@
             "search": "Buscar países",
             "title": "Festivos"
         },
-        "inUse": "En uso",
         "intervalFor": "Cada cuánto se refresca {name}",
         "intervals": {
             "d1": "Cada día",
@@ -545,7 +544,6 @@
     "shareDialog": {
         "roles": "Dar a un rol",
         "add": "Añadir",
-        "close": "Cerrar",
         "emailLabel": "Enviar el enlace",
         "emailPlaceholder": "nombre@ejemplo.com",
         "embedCode": "Código web",

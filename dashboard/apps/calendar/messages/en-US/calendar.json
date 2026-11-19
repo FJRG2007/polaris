@@ -538,7 +538,6 @@
     },
     "sidebar": {
         "add": "Add a calendar",
-        "addElsewhere": "From elsewhere",
         "calendars": "Calendars",
         "color": "Color",
         "colorFailed": "The color was not changed",

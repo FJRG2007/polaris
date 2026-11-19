@@ -50,7 +50,6 @@
         "change": "Cambiar",
         "theServerHasToBe": "El servidor tiene que estar en marcha para darle una nueva.",
         "serverKey": "Clave",
-        "aKeyIsTiedTo": ". Una clave va ligada a la dirección para la que se emitió, así que un servidor que se ha movido necesita otra. Nunca se vuelve a mostrar.",
         "replaceIt": "Sustituirla",
         "theServerPicksItUp": "El servidor la toma la próxima vez que arranque.",
         "save": "Guardar",

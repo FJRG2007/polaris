@@ -728,7 +728,6 @@
         "bedrockCannotAsk": "A los servidores Bedrock no se les puede preguntar esto desde aquí",
         "bedrockNoLink": "Los servidores Bedrock no informan de desde dónde se conecta un jugador, así que no se le puede ligar a sus inicios de sesión.",
         "bedrockNoXp": "La consola de Bedrock no tiene el comando que cambia la experiencia",
-        "firewallBlocked": "Bloqueado por el cortafuegos de Polaris",
         "chooseAudience": "Elige a quién va",
         "filesUnreadable": "No se pudieron leer los archivos del servidor",
         "createdServer": "Creó este servidor",
@@ -1237,8 +1236,7 @@
         "runFor": "Para quién",
         "everyPlayer": "Cada jugador conectado",
         "onePlayer": "Un jugador",
-        "player": "Jugador",
-        "playerPlaceholder": "Steve"
+        "player": "Jugador"
     },
     "consoleSchedule": {
         "errors": {

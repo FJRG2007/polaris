@@ -362,7 +362,6 @@
                 "create": "Create it there",
                 "openConsole": "Create it in the provider's console, then connect it here.",
                 "connectSubmit": "Test and connect",
-                "createSubmit": "Create in CloudAMQP",
                 "field_url": "Address",
                 "field_url_kafka": "Bootstrap servers",
                 "field_username": "User",

@@ -14,15 +14,12 @@
     "waitingOutput": "Esperando salida...",
     "notRunning": "La aplicación no está en marcha.",
     "kind": "app",
-    "uninstallDescription": "Esto elimina su contenedor y la quita de tus aplicaciones. Los datos en volúmenes locales del servidor se pierden; los que están en un montaje NAS se conservan.",
     "channels": {
         "title": "Canales",
         "hint": "Conecta WhatsApp, Telegram, Discord o Slack. El token, el número o el QR de cada canal se introduce en Canales al conectarlo.",
         "connect": "Conectar un canal",
         "loading": "Cargando canales...",
         "empty": "Aún no hay canales conectados. Conecta uno para enviar alertas y códigos por él.",
-        "goToInbox": "Ir a Canales",
-        "openInbox": "Abrir Canales",
         "status": {
             "connected": "conectado",
             "connecting": "conectando",

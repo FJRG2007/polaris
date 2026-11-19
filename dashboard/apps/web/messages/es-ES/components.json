@@ -1028,7 +1028,6 @@
             "unlocked": "Sin fijar, diga lo que diga el ajuste de tu cuenta",
             "lockIt": "fijarla",
             "leaveUnlocked": "dejarla sin fijar",
-            "follow": "seguir el ajuste de tu cuenta",
             "title": "{says}. Pulsa para {then}.",
             "label": "Fijación de dirección de {label}: {says}"
         },
@@ -1064,7 +1063,6 @@
             "none": "Nada coincide con esa búsqueda.",
             "failed": "No se pudieron cargar los proveedores. Reinténtalo.",
             "more": "Ver más",
-            "back": "Atrás",
             "methods": {
                 "key": "Pago por uso con una clave de API",
                 "login": "Usa un plan que ya pagas",
@@ -1097,16 +1095,13 @@
                 "agents": "Agentes"
             }
         },
-        "order": "Orden",
         "provider": "Proveedor",
         "name": "Nombre",
         "key": "Clave",
         "expires": "Caduca",
         "lastUsed": "Último uso",
         "never": "Nunca",
-        "earlier": "Probar {name} antes",
         "moveUp": "Subir",
-        "later": "Probar {name} después",
         "moveDown": "Bajar",
         "editNamed": "Editar {name}",
         "more": "Más",
@@ -1116,7 +1111,6 @@
         "turnOff": "Apagar",
         "turnOn": "Encender",
         "useNamed": "Permitir usar {name}",
-        "deleteNamed": "Eliminar {name}",
         "nameTaken": "Ya hay una clave con ese nombre.",
         "nameHint": "De 3 a 20 caracteres. Letras, números, guiones y guiones bajos.",
         "providerKey": "clave de proveedor",

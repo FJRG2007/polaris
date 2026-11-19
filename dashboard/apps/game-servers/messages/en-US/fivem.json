@@ -50,7 +50,6 @@
         "change": "Change",
         "theServerHasToBe": "The server has to be running to be told a new one.",
         "serverKey": "Server key",
-        "aKeyIsTiedTo": ". A key is tied to the address it was issued for, so a server that has moved needs a new one. It is never shown back.",
         "replaceIt": "Replace it",
         "theServerPicksItUp": "The server picks it up the next time it starts.",
         "save": "Save",

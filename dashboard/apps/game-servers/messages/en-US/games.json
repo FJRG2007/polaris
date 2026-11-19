@@ -728,7 +728,6 @@
         "bedrockCannotAsk": "Bedrock servers cannot be asked this from here",
         "bedrockNoLink": "Bedrock servers do not report where a player connects from, so a player cannot be tied to their sign-ins.",
         "bedrockNoXp": "Bedrock's console does not have the command that changes experience",
-        "firewallBlocked": "Blocked by the Polaris firewall",
         "chooseAudience": "Choose who it goes to",
         "filesUnreadable": "Could not read the server's files",
         "createdServer": "Created this server",
@@ -1237,8 +1236,7 @@
         "runFor": "Run it for",
         "everyPlayer": "Every player online",
         "onePlayer": "One player",
-        "player": "Player",
-        "playerPlaceholder": "Steve"
+        "player": "Player"
     },
     "consoleSchedule": {
         "errors": {

@@ -26,7 +26,6 @@
         "folder": "Solo esta carpeta (opcional)",
         "run": "Analizar",
         "found": "{count, plural, =0 {No se encontró nada} one {# archivo encontrado} other {# archivos encontrados}}",
-        "stale": "No se pudieron actualizar las firmas; el análisis usó las últimas descargadas.",
         "quarantine": "Aislar",
         "quarantined": "Archivos en cuarentena",
         "restore": "Restaurar",

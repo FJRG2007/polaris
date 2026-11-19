@@ -48,7 +48,6 @@
         "timezone": "Polaris no conoce esa zona horaria, por ejemplo Europe/Madrid"
     },
     "draw": {
-        "which": "Qué sorteo",
         "today": "Hoy",
         "week": "Esta semana",
         "tomorrow": "Mañana",

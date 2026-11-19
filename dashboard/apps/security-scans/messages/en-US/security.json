@@ -26,7 +26,6 @@
         "folder": "Only this folder (optional)",
         "run": "Scan selected",
         "found": "{count, plural, =0 {Nothing found} one {# file found} other {# files found}}",
-        "stale": "Signatures could not be refreshed; the scan used the last ones fetched.",
         "quarantine": "Quarantine",
         "quarantined": "Quarantined files",
         "restore": "Restore",

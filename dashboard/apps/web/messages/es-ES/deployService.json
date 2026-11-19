@@ -326,7 +326,6 @@
         "branch": "Rama",
         "commitFilter": "Filtro de commits",
         "watchPaths": "Vigilar rutas",
-        "watchPathsHint": "Un patrón glob por línea. Solo se despliega si el push tocó alguno, para que un repositorio con varios servicios recompile solo los que cambiaron. Empieza con ! para excluir. En blanco = cualquier cambio.",
         "releases": "Versiones",
         "keepReleases": "Conservar despliegues anteriores",
         "keepReleasesHint": "Mantén en marcha las últimas versiones, cada una en su propia dirección, mientras la dirección de este servicio sigue en la más reciente. Un servicio con un volumen o en otro servidor conserva el historial pero no los contenedores.",

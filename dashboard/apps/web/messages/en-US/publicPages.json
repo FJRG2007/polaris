@@ -312,10 +312,7 @@
         "tooMany": "Too many attempts. Wait a few minutes and try again.",
         "wrongPassword": "Incorrect password.",
         "sharedOn": "Shared on {date}",
-        "empty": "This conversation has no messages to show.",
         "readOnly": "A read-only copy of a conversation with Polar.",
-        "you": "You",
-        "assistant": "Polar",
         "busy": "Too many requests. Wait a minute and reload the page."
     },
     "guestLink": {

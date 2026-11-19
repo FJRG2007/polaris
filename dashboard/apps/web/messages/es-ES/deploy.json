@@ -362,7 +362,6 @@
                 "create": "Crearlo allí",
                 "openConsole": "Créalo en la consola del proveedor y conéctalo aquí.",
                 "connectSubmit": "Probar y conectar",
-                "createSubmit": "Crear en CloudAMQP",
                 "field_url": "Dirección",
                 "field_url_kafka": "Brokers de arranque",
                 "field_username": "Usuario",

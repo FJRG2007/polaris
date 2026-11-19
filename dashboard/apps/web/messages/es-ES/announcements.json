@@ -75,7 +75,6 @@
             "roles": "Roles",
             "groups": "Grupos",
             "orgs": "Organizaciones",
-            "people": "Personas",
             "peopleLabel": "Añadir gente",
             "reaches": "{count, plural, =0 {Aún no llega a nadie} one {Llega a # persona} other {Llega a # personas}}",
             "counting": "Contando...",

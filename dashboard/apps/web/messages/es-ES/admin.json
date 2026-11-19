@@ -2486,10 +2486,8 @@
         },
         "accounts": {
             "title": "Las cuentas de agente del despliegue",
-            "action": "Añadir cuenta",
             "hint": "Inicia sesión con un agente para quien no lo haga con su propia cuenta. Primero se prueba la de cada cuenta.",
-            "empty": "Aún no hay ninguna. Sin una, solo puede iniciar una sesión aquí quien traiga la suya.",
-            "adding": "La cuenta con la que las sesiones de este despliegue inician sesión en un agente."
+            "empty": "Aún no hay ninguna. Sin una, solo puede iniciar una sesión aquí quien traiga la suya."
         },
         "elsewhere": "Todo lo demás a lo que se conecta Polaris está en <link>Integraciones</link>.",
         "sharing": {

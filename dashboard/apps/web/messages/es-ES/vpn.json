@@ -309,7 +309,6 @@
             "title": "Tus propias VPN",
             "hint": "Importa un archivo WireGuard de un proveedor como Proton o Mullvad. Se conecta desde la app de Polaris en tu ordenador.",
             "import": "Importar",
-            "empty": "Aún no has importado nada.",
             "added": "{count, plural, one {# VPN añadida} other {# VPN añadidas}}",
             "rejected": "No son archivos WireGuard con un servidor: {names}",
             "remove": "Quitar {name}",

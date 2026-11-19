@@ -326,7 +326,6 @@
         "branch": "Branch",
         "commitFilter": "Commit filter",
         "watchPaths": "Watch paths",
-        "watchPathsHint": "One glob per line. Deploy only when the push touched one of them, so a repository holding several services rebuilds just the ones that changed. Prefix with ! to exclude. Blank = any change.",
         "releases": "Releases",
         "keepReleases": "Keep previous deployments",
         "keepReleasesHint": "Keep the last few versions running, each on its own address, while this service's own address stays on the newest. A service with a volume or on another server keeps the history but not the containers.",
