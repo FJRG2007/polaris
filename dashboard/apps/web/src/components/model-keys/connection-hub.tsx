@@ -31,6 +31,9 @@ export interface ConnectionOption {
     aliases?: readonly string[];
     /** An agent sign-in that holds one account at a time. */
     single?: boolean;
+    /** The logo to draw when the slug is not one: an agent sign-in is stored
+     *  under its variable, and drawn as the agent it signs in. */
+    logo?: string;
 }
 
 /** Opens one flow, optionally on a slug: a provider row for a key, a login, a cloud. */

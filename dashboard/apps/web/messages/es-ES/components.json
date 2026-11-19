@@ -1222,7 +1222,8 @@
             "readOnly": "Solo lectura",
             "usingYours": "Se usa tu clave",
             "usingDeployment": "Disponible para ti",
-            "agentKey": "Sesión iniciada en la máquina de tus sesiones"
+            "agentKey": "Sesión iniciada en la máquina de tus sesiones",
+            "agentOrder": "Solo la usan las sesiones de {tool}. Aquí no se guarda nada, así que no tiene sitio en el orden."
         }
     },
     "signinDialog": {

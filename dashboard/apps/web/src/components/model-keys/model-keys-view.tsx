@@ -53,6 +53,7 @@ import {
     ChevronUp,
     Gauge,
     GripVertical,
+    Info,
     LogIn,
     LogOut,
     MoreHorizontal,
@@ -972,6 +973,9 @@ function AgentRow({
 }) {
     const t = useTranslations("components");
     const tool = signin.serves[0]?.label ?? signin.label;
+    // Named for what it is - the agent's own login - so it does not read as a
+    // second "Cursor" beside the Cursor key.
+    const name = t("modelKeys.connect.ways.login", { name: tool });
     const signedIn = status?.state === "in" && canSignOut;
     const other = signedIn ? "login" : canSignOut ? "logout" : null;
     const signInAction = (
@@ -988,7 +992,17 @@ function AgentRow({
     );
     return (
         <tr className="border-t border-border">
-            <td className="px-2 py-2" />
+            {/* No handle: nothing is stored, so there is nothing to move. Says so
+                where the handle would be instead of leaving a blank. */}
+            <td className="px-2 py-2">
+                <span
+                    className="grid size-6 place-items-center text-muted-foreground/60"
+                    title={t("modelKeys.table.agentOrder", { tool })}
+                    aria-label={t("modelKeys.table.agentOrder", { tool })}
+                >
+                    <Info className="size-3.5 shrink-0" />
+                </span>
+            </td>
             <td className="px-3 py-2">
                 <div className="flex max-w-40 items-center gap-2">
                     <IntegrationLogo slug={signin.serves[0]?.id ?? signin.slug} name={tool} className="size-4 shrink-0" />
@@ -999,8 +1013,8 @@ function AgentRow({
             </td>
             <td className="w-full max-w-0 px-3 py-2">
                 <span className="flex min-w-0 items-center gap-2">
-                    <span className="min-w-0 truncate font-medium" title={tool}>
-                        {tool}
+                    <span className="min-w-0 truncate font-medium" title={name}>
+                        {name}
                     </span>
                     {showStatus ? null : <HomeStatusBadge status={status} t={t} />}
                 </span>

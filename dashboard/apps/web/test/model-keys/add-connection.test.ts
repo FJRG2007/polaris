@@ -76,4 +76,17 @@ describe("Add connection", () => {
         expect(ways.map((way) => way.option.method).sort()).toEqual(["account", "home"]);
         expect(ways.some((way) => way.option.single)).toBe(false);
     });
+
+    it("draws an agent sign-in as its agent, not by the variable it is stored under", () => {
+        const [cursor] = groupConnections(
+            [
+                { method: "home", slug: "signin-cursor-home", name: "Cursor", vendor: "Cursor", logo: "cursor" },
+                { method: "account", slug: "signin-cursor-api-key", name: "Cursor API key", vendor: "Cursor", logo: "cursor" }
+            ],
+            []
+        );
+        expect(cursor?.name).toBe("Cursor");
+        expect(cursor?.logo).toBe("cursor");
+        expect(cursor?.ways.map((way) => way.option.logo)).toEqual(["cursor", "cursor"]);
+    });
 });

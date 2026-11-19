@@ -1222,7 +1222,8 @@
             "readOnly": "Read-only",
             "usingYours": "Your key is used",
             "usingDeployment": "Available to you",
-            "agentKey": "Signed in on your sessions' machine"
+            "agentKey": "Signed in on your sessions' machine",
+            "agentOrder": "Only {tool} sessions use it. Nothing is stored here, so it has no place in the order."
         }
     },
     "signinDialog": {

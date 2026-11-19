@@ -108,7 +108,7 @@ export function groupConnections(options: readonly ConnectionOption[], rows: rea
         // the maker - GitHub's plan and its token are one entry with two ways
         // in, not two entries that look like duplicates.
         else if (vendor) add(`vendor:${vendor}`, option.vendor.trim(), vendor, { option });
-        else add(`${option.method}:${option.slug}`, option.name, option.slug, { option });
+        else add(`${option.method}:${option.slug}`, option.name, option.logo ?? option.slug, { option });
     }
     // A maker with one way in is named and drawn as that way: "Cursor", not
     // the company behind it.
@@ -116,7 +116,7 @@ export function groupConnections(options: readonly ConnectionOption[], rows: rea
         const only = group.ways[0]?.option;
         if (group.key.startsWith("vendor:") && group.ways.length === 1 && only) {
             group.name = only.name;
-            group.logo = only.slug;
+            group.logo = only.logo ?? only.slug;
         }
     }
     for (const group of groups.values())
@@ -327,7 +327,7 @@ export function AddConnectionDialog({
                                             key={`${one.option.method}:${one.option.slug}`}
                                             selected={one === way}
                                             onSelect={() => setWay(one)}
-                                            logo={<IntegrationLogo slug={one.option.slug} name={one.option.name} className="size-4 shrink-0 object-contain" />}
+                                            logo={<IntegrationLogo slug={one.option.logo ?? one.option.slug} name={one.option.name} className="size-4 shrink-0 object-contain" />}
                                             title={<span className="min-w-0 truncate">{wayLabel(t, one)}</span>}
                                             summary={
                                                 one.option.single
@@ -445,6 +445,9 @@ function wayLabel(t: NamespaceTranslator<"components">, one: Way): string {
         case "key":
             return t("modelKeys.connect.ways.key", { name: one.option.name });
         case "login":
+        // The agent's own login on the sessions' machine: "Sign in with Cursor",
+        // beside "Cursor API key", rather than two rows both called Cursor.
+        case "home":
             return t("modelKeys.connect.ways.login", { name: one.option.name });
         case "cloud":
             return t("modelKeys.connect.ways.cloud", { name: one.option.name });

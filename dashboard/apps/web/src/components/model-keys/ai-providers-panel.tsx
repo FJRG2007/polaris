@@ -156,7 +156,8 @@ function connectOptions(assisted: readonly AgentSignin[]): ConnectionOption[] {
             slug: signin.slug,
             name: signin.label,
             vendor: vendorOf(signin.serves[0]?.id),
-            aliases: signin.serves.map((tool) => tool.label)
+            aliases: signin.serves.map((tool) => tool.label),
+            ...(signin.serves[0] ? { logo: signin.serves[0].id } : {})
         }));
     const homes = assisted
         .filter((signin) => signin.home)
@@ -166,6 +167,7 @@ function connectOptions(assisted: readonly AgentSignin[]): ConnectionOption[] {
             name: signin.serves[0]?.label ?? signin.label,
             vendor: vendorOf(signin.serves[0]?.id),
             aliases: [signin.label],
+            ...(signin.serves[0] ? { logo: signin.serves[0].id } : {}),
             ...(signin.single ? { single: true } : {})
         }));
     return [...accounts, ...homes];
