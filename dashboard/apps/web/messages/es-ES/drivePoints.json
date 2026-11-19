@@ -107,8 +107,6 @@
         "minSize": "Mín. (MB)",
         "maxSize": "Máx. (MB)",
         "maxFiles": "Límite",
-        "cidrs": "Solo estas IP o rangos (opcional)",
-        "cidrsPlaceholder": "p. ej. 203.0.113.4, 10.0.0.0/24",
         "location": "Solo estos lugares (opcional)",
         "pin": "PIN de acceso",
         "removePin": "Quitar PIN",

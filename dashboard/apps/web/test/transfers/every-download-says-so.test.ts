@@ -69,6 +69,10 @@ function saysSo(source: string): boolean {
  */
 const NOT_DOWNLOADS = new Map<string, string>([
     [
+        "chat/attachments/[attachmentId]/once/route.ts",
+        "a photo or video meant to be seen once, fetched by the phone app's own viewer and never saved, rather than downloaded by a reader at a screen"
+    ],
+    [
         "system/local-ca/route.ts",
         "this instance's certificate, fetched by a machine being set up rather than by a reader waiting at a screen"
     ],
