@@ -1,0 +1,11 @@
+Polaris es un espacio de trabajo que instalas en tu propio servidor. Esta app abre el Polaris que le indiques y mantiene la sesión iniciada.
+
+<ul>
+<li>Chat y llamadas de voz y vídeo; la cámara y el micrófono se piden solo cuando una llamada los necesita</li>
+<li>Avisos de mensajes y llamadas con la app cerrada, directamente desde tu servidor</li>
+<li>Archivos elegidos desde el móvil y guardados en él</li>
+<li>Fotos y vídeos para ver una vez, protegidos de capturas de pantalla</li>
+<li>Un widget en la pantalla de inicio para tus puertas</li>
+</ul>
+
+La app necesita un servidor Polaris. Solo se conecta a la dirección que escribes. Instalada fuera de una tienda, además pregunta a GitHub si hay una versión nueva.

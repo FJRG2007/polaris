@@ -1,6 +1,7 @@
 package app.polaris.mobile;
 
 import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -41,5 +42,13 @@ public class UpdateCheckTest {
         assertTrue(UpdateCheck.compare("0.1.10", "0.1.9") > 0);
         assertTrue(UpdateCheck.compare("1.0", "0.9.9") > 0);
         assertEquals(0, UpdateCheck.compare("0.1", "0.1.0"));
+    }
+
+    @Test
+    public void leavesStoreInstallsToTheirStore() {
+        assertTrue(UpdateCheck.storeInstalled("com.android.vending"));
+        assertTrue(UpdateCheck.storeInstalled("org.fdroid.fdroid"));
+        assertFalse(UpdateCheck.storeInstalled(null));
+        assertFalse(UpdateCheck.storeInstalled("com.google.android.packageinstaller"));
     }
 }

@@ -23,13 +23,13 @@ jobs:
           java-version: "17"
       - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
         with:
-          packages: platforms;android-34 build-tools;34.0.0
+          packages: platforms;android-36 build-tools;35.0.0
       - uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
       - name: Unit tests, lint and release build
         working-directory: mobile/android
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon testReleaseUnitTest lintRelease assembleRelease
+          ./gradlew --no-daemon testReleaseUnitTest lintRelease assembleRelease bundleRelease
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/polaris-android.apk"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -69,6 +69,9 @@ jobs:
       MOBILE_KEYSTORE_BASE64: ${{ secrets.MOBILE_KEYSTORE_BASE64 }}
       MOBILE_KEYSTORE_PASSWORD: ${{ secrets.MOBILE_KEYSTORE_PASSWORD }}
       MOBILE_KEY_ALIAS: ${{ secrets.MOBILE_KEY_ALIAS }}
+      # Google Play: a service account with release access to the app in Play Console. Without it the release
+      # still goes to GitHub, and the bundle attached there is what gets uploaded by hand.
+      PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -93,18 +96,47 @@ jobs:
       - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
         if: steps.decide.outputs.publish == 'true'
         with:
-          packages: platforms;android-34 build-tools;34.0.0
+          packages: platforms;android-36 build-tools;35.0.0
       - name: Build and publish
         if: steps.decide.outputs.publish == 'true'
         run: |
           export MOBILE_KEYSTORE_PATH="$RUNNER_TEMP/mobile.keystore"
           printf '%s' "$MOBILE_KEYSTORE_BASE64" | base64 -d > "$MOBILE_KEYSTORE_PATH"
-          (cd mobile/android && chmod +x gradlew && ./gradlew --no-daemon assembleRelease)
+          (cd mobile/android && chmod +x gradlew && ./gradlew --no-daemon assembleRelease bundleRelease)
           rm -f "$MOBILE_KEYSTORE_PATH"
           mkdir out
           cp mobile/android/app/build/outputs/apk/release/app-release.apk out/polaris-android.apk
-          (cd out && sha256sum polaris-android.apk > SHA256SUMS)
+          # The bundle Google Play takes, signed with the same key as the APK (Play's upload key).
+          cp mobile/android/app/build/outputs/bundle/release/app-release.aab out/polaris-android.aab
+          (cd out && sha256sum polaris-android.apk polaris-android.aab > SHA256SUMS)
           gh release create "${{ steps.decide.outputs.tag }}" out/* \
             --title "Polaris for Android ${{ steps.decide.outputs.tag }}" \
-            --notes "Install polaris-android.apk on the phone. Later versions install over it, and the app offers them itself." \
+            --notes "Install polaris-android.apk on the phone. Later versions install over it, and the app offers them itself. polaris-android.aab is the bundle for Google Play." \
             --latest=false
+      # Play reads "what's new" as one whatsnew-<locale> file per language: the same text F-Droid reads from
+      # fastlane/metadata/android/<locale>/changelogs/<versionCode>.txt.
+      - name: Google Play release notes
+        if: steps.decide.outputs.publish == 'true' && env.PLAY_SERVICE_ACCOUNT_JSON != ''
+        run: |
+          code=$(sed -n "s/^ *versionCode \([0-9]*\)/\1/p" mobile/android/app/build.gradle)
+          mkdir -p "$RUNNER_TEMP/whatsnew"
+          for dir in mobile/android/fastlane/metadata/android/*/; do
+            locale=$(basename "$dir")
+            if [ -f "$dir/changelogs/$code.txt" ]; then
+              cp "$dir/changelogs/$code.txt" "$RUNNER_TEMP/whatsnew/whatsnew-$locale"
+            fi
+          done
+      # Track and status come from repository variables. A Play app that has never been published accepts only
+      # draft releases, so the default is a draft on the internal track; set PLAY_STATUS to "completed" and
+      # PLAY_TRACK to "production" once the listing is live.
+      - name: Upload to Google Play
+        if: steps.decide.outputs.publish == 'true' && env.PLAY_SERVICE_ACCOUNT_JSON != ''
+        uses: r0adkll/upload-google-play@e738b9dd8f2476ea806d921b64aacd24f34515a5 # v1.1.5
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: app.polaris.mobile
+          releaseFiles: out/polaris-android.aab
+          track: ${{ vars.PLAY_TRACK || 'internal' }}
+          status: ${{ vars.PLAY_STATUS || 'draft' }}
+          whatsNewDirectory: ${{ runner.temp }}/whatsnew
+          mappingFile: mobile/android/app/build/outputs/mapping/release/mapping.txt

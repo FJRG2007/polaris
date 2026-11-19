@@ -1,0 +1,30 @@
+# The recipe F-Droid builds Polaris for Android from. It is not read from here: a copy goes to
+# https://gitlab.com/fdroid/fdroiddata as metadata/app.polaris.mobile.yml in a merge request, and F-Droid
+# keeps it up to date from then on (AutoUpdateMode), building each new android-v* tag.
+#
+# The store listing (title, descriptions, changelogs) is read from mobile/android/fastlane in this repository.
+Categories:
+  - Internet
+  - Connectivity
+License: AGPL-3.0-only
+SourceCode: https://github.com/FJRG2007/polaris/tree/main/mobile/android
+IssueTracker: https://github.com/FJRG2007/polaris/issues
+Changelog: https://github.com/FJRG2007/polaris/releases
+
+AutoName: Polaris
+
+RepoType: git
+Repo: https://github.com/FJRG2007/polaris.git
+
+Builds:
+  - versionName: 0.1.4
+    versionCode: 5
+    commit: android-v0.1.4
+    subdir: mobile/android/app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags ^android-v.*$
+CurrentVersion: 0.1.4
+CurrentVersionCode: 5

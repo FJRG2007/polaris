@@ -6,6 +6,7 @@ import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -16,9 +17,12 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 /**
- * Whether a newer build of this app has been published, asked at most twice a day. The app is installed from its
- * GitHub release, not a store, so nothing else would ever tell the phone; a newer one is offered with a button that
- * downloads it, and the system installer puts it over this one because both carry the same key.
+ * Whether a newer build of this app has been published, asked at most twice a day. A copy installed from its GitHub
+ * release has nothing else to tell the phone; a newer one is offered with a button that downloads it, and the system
+ * installer puts it over this one because both carry the same key.
+ *
+ * A copy installed from a store is that store's to update, and both Google Play and F-Droid forbid an app updating
+ * itself any other way, so there the check never runs.
  */
 final class UpdateCheck {
     /** Every Android tag, and only those: the repository publishes many products, and a list of its releases
@@ -30,7 +34,36 @@ final class UpdateCheck {
     private static final long EVERY_MS = 12L * 60 * 60 * 1000;
     private static final int MAX_BYTES = 512 * 1024;
 
+    /** Stores that keep the app updated themselves: Google Play, F-Droid and its common clients, Aurora, Obtainium. */
+    private static final java.util.Set<String> STORES = new java.util.HashSet<>(java.util.Arrays.asList(
+            "com.android.vending",
+            "org.fdroid.fdroid",
+            "org.fdroid.basic",
+            "com.looker.droidify",
+            "com.machiav3lli.fdroid",
+            "com.aurora.store",
+            "dev.imranr.obtainium",
+            "dev.imranr.obtainium.fdroid"));
+
     private UpdateCheck() {
+    }
+
+    /** Whether the package that installed this app updates it itself. Null (a file opened by hand, adb) is not. */
+    static boolean storeInstalled(String installer) {
+        return installer != null && STORES.contains(installer);
+    }
+
+    @SuppressWarnings("deprecation")
+    private static String installer(Context context) {
+        try {
+            PackageManager packages = context.getPackageManager();
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                return packages.getInstallSourceInfo(context.getPackageName()).getInstallingPackageName();
+            }
+            return packages.getInstallerPackageName(context.getPackageName());
+        } catch (Exception unknown) {
+            return null;
+        }
     }
 
     /** The newest published build: its version and download address, or null when none is newer than `current`. */
@@ -74,6 +107,7 @@ final class UpdateCheck {
     }
 
     static void maybeRun(Activity activity) {
+        if (storeInstalled(installer(activity))) return;
         SharedPreferences prefs = activity.getSharedPreferences("update", Context.MODE_PRIVATE);
         long now = System.currentTimeMillis();
         if (now - prefs.getLong("checkedAt", 0) < EVERY_MS) return;

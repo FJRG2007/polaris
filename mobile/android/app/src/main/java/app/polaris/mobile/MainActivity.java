@@ -24,6 +24,8 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -56,6 +58,10 @@ public final class MainActivity extends Activity {
     private File photoTaken;
     private File videoTaken;
     private volatile String pickSource = "";
+    /** Back while the page has somewhere to go back to (Android 13+). Registered only then, so that on the first
+     *  page the system's own back - and its predictive animation home - is what happens. */
+    private Object pageBack;
+    private boolean pageBackRegistered;
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -135,6 +141,11 @@ public final class MainActivity extends Activity {
             if (ServerAddress.sameOrigin(origin, url)) return false;
             openOutside(request.getUrl());
             return true;
+        }
+
+        @Override
+        public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+            syncBack();
         }
 
         @Override
@@ -417,6 +428,28 @@ public final class MainActivity extends Activity {
         if (web != null) web.saveState(out);
     }
 
+    /**
+     * Android 13 and later deliver back through a callback instead of onBackPressed, and from Android 16 on an app
+     * that targets it is never sent onBackPressed at all. The page's own history goes first; with none left, the
+     * callback is withdrawn and the system takes the app home.
+     */
+    private void syncBack() {
+        if (android.os.Build.VERSION.SDK_INT < 33) return;
+        boolean wanted = web != null && web.canGoBack();
+        if (wanted == pageBackRegistered) return;
+        OnBackInvokedDispatcher dispatcher = getOnBackInvokedDispatcher();
+        if (pageBack == null) {
+            pageBack = (OnBackInvokedCallback) () -> {
+                if (web != null && web.canGoBack()) web.goBack();
+                syncBack();
+            };
+        }
+        if (wanted) dispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, (OnBackInvokedCallback) pageBack);
+        else dispatcher.unregisterOnBackInvokedCallback((OnBackInvokedCallback) pageBack);
+        pageBackRegistered = wanted;
+    }
+
+    /** Android 12 and earlier. */
     @Override
     public void onBackPressed() {
         if (web != null && web.canGoBack()) web.goBack();

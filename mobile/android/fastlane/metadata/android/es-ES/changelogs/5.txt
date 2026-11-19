@@ -1,0 +1,1 @@
+Lista para Android 16. Atrás recorre la página con el nuevo gesto del sistema. Las copias instaladas desde Google Play o F-Droid las actualiza esa tienda.

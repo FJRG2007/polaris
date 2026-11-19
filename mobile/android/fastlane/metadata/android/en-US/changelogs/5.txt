@@ -1,0 +1,1 @@
+Ready for Android 16. Back goes back through the page with the new system gesture. Copies installed from Google Play or F-Droid are updated by that store.

@@ -1,0 +1,11 @@
+Polaris is a self-hosted workspace you run on your own server. This app opens the Polaris you point it at and keeps you signed in.
+
+<ul>
+<li>Chat, voice and video calls, with the camera and microphone asked for only when a call needs them</li>
+<li>Notifications for messages and calls while the app is closed, straight from your server</li>
+<li>Files picked from and saved to the phone</li>
+<li>Photos and videos sent to be seen once, kept out of screenshots</li>
+<li>A home screen widget for your doors</li>
+</ul>
+
+The app needs a Polaris server. It talks only to the address you type. Installed outside a store, it also asks GitHub whether a newer version is out.
