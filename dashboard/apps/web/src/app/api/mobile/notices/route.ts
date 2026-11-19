@@ -46,7 +46,7 @@ export interface MobileNotice {
     readonly expiresAt?: number;
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(request: Request): Promise<Response> {
     const session = await backgroundUser();
     if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
     // Sign-in approvals reach every account; messages and calls only one that may chat.
@@ -62,10 +62,16 @@ export async function GET(): Promise<Response> {
     let unsubscribe: (() => void) | null = null;
     let unsubscribeApprovals: (() => void) | null = null;
     let closed = false;
+    // Which phone, by its app version and an account prefix, never more: enough to
+    // tell from the logs whether a phone that missed a message was listening.
+    const version = request.headers.get("user-agent")?.match(/PolarisMobile\/[\d.]+/)?.[0] ?? "unknown app";
+    const who = `${session.id.slice(0, 8)} ${version}`;
+    const openedAt = Date.now();
 
     function stop(): void {
         if (closed) return;
         closed = true;
+        console.info(`mobile notices: ${who} disconnected after ${Math.round((Date.now() - openedAt) / 1000)}s`);
         scope.release();
         if (heartbeat) clearInterval(heartbeat);
         for (const timer of waiting.values()) clearTimeout(timer);
@@ -188,6 +194,7 @@ export async function GET(): Promise<Response> {
 
             heartbeat = setInterval(() => write(": ping\n\n"), HEARTBEAT_MS);
             write(": connected\n\n");
+            console.info(`mobile notices: ${who} connected`);
         },
         cancel() {
             stop();

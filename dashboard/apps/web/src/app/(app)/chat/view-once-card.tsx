@@ -93,7 +93,7 @@ export function ViewOnceCard({
         </>
     );
     const shape =
-        "flex w-full max-w-xs items-center gap-2.5 rounded-md border border-border bg-card px-3 py-2 text-start text-xs";
+        "flex w-fit min-w-0 max-w-xs items-center gap-2.5 rounded-md border border-border bg-card px-3 py-2 text-start text-xs";
 
     if (!openable) {
         return <div className={cn(shape, (opened || gone) && "opacity-70")}>{body}</div>;

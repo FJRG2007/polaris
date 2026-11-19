@@ -59,7 +59,7 @@ vi.mock("@/lib/chat/toasts", () => ({
 const { GET } = await import("@/app/api/mobile/notices/route");
 
 async function open() {
-    const response = await GET();
+    const response = await GET(new Request("https://polaris.example/api/mobile/notices"));
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let text = "";
