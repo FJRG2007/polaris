@@ -236,8 +236,9 @@ export function VanishMenu({
     return (
         <>
             <DropdownMenuSeparator />
-            {/* The conversation's privacy, beside its timer: the same three
-                rows its profile panel draws, so neither place hides one. */}
+            {/* The conversation's privacy, beside its timer. In a direct
+                message this menu is the only place it is set: the profile
+                panel is about the person, not the conversation. */}
             {rules.mayChange && ruleMenu("receipts", Eye)}
             {rules.mayChange && ruleMenu("typing", PenLine)}
             {/* A group member who does not run it reads the timer in the

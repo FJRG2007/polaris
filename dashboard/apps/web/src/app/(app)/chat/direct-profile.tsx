@@ -207,8 +207,7 @@ export function DirectProfile({
     open,
     onOpenChange,
     onMention,
-    search,
-    privacy
+    search
 }: {
     /** The other person, or null in a conversation whose other side has deleted
      *  their account - there is nobody to draw and the panel stays shut. */
@@ -224,8 +223,6 @@ export function DirectProfile({
     /** The search box Discord keeps at the top of this column, drawn there
      *  only while the panel is a column - not in the phone's dialog. */
     search?: ReactNode;
-    /** The conversation's own privacy section, drawn below the profile. */
-    privacy?: ReactNode;
 }) {
     const t = useTranslations("chat");
     const { viewerId } = useChat();
@@ -336,7 +333,6 @@ export function DirectProfile({
                     {/* Named for a screen reader; the band is the visible top. */}
                     <DialogTitle className="sr-only">{profile?.name || person.name}</DialogTitle>
                     {details}
-                    {privacy}
                     {refusal}
                 </DialogContent>
                 {extras}
@@ -362,7 +358,6 @@ export function DirectProfile({
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {refusal}
                 {details}
-                {privacy}
             </div>
             <div className="shrink-0 p-3">{fullProfile}</div>
             {extras}

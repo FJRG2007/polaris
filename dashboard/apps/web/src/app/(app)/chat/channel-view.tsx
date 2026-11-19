@@ -3015,7 +3015,6 @@ export function ChannelView({
                         setInserting((current) => ({ token: (current?.token ?? 0) + 1, text }))
                     }
                     search={besideSearch}
-                    privacy={privacySection}
                 />
             )}
 
