@@ -172,9 +172,25 @@ function desktopFromUserAgent(userAgent: string): { name: string; version: strin
     return version ? { name: POLARIS_DESKTOP, version } : null;
 }
 
+/** What the Polaris phone app is called wherever a device list names it. */
+export const POLARIS_MOBILE = "Polaris Mobile";
+
+/**
+ * The Polaris phone app's own claim: the system WebView's user-agent with
+ * `PolarisMobile/<version>` appended (`mobile/android` AppAgent). Without it a
+ * sign-in from the app reads as "Android WebView", which is the engine and not
+ * anything its owner installed.
+ */
+const MOBILE_APP = /\bPolarisMobile\/(\d{1,4}(?:\.\d{1,4}){0,2})\b/;
+
+function mobileFromUserAgent(userAgent: string): { name: string; version: string | null } | null {
+    const version = userAgent.match(MOBILE_APP)?.[1];
+    return version ? { name: POLARIS_MOBILE, version } : null;
+}
+
 function browserFromUserAgent(userAgent: string): { name: string; version: string | null } {
-    const desktop = desktopFromUserAgent(userAgent);
-    if (desktop) return desktop;
+    const app = desktopFromUserAgent(userAgent) ?? mobileFromUserAgent(userAgent);
+    if (app) return app;
     for (const entry of BROWSERS) {
         if (!entry.test.test(userAgent)) continue;
         return { name: entry.name, version: userAgent.match(entry.version)?.[1] ?? null };
@@ -272,9 +288,11 @@ export function describeClient(
     }
 
     const claimed = browserFromUserAgent(userAgent);
-    // The desktop app's hints name only the Chromium it embeds, so its own
-    // token wins over them the way a rebadged browser's hints win elsewhere.
-    const hinted = claimed.name === POLARIS_DESKTOP ? null : brandFromHints(brands);
+    // The apps' hints name only the engine they embed (Chromium, Android
+    // WebView), so their own token wins over them the way a rebadged browser's
+    // hints win elsewhere.
+    const hinted =
+        claimed.name === POLARIS_DESKTOP || claimed.name === POLARIS_MOBILE ? null : brandFromHints(brands);
     // The hints name the browser; the user-agent is the fallback. A rebadged
     // Chromium sends both, and its own `Brave/` token does not exist - so where
     // the hints named it and gave no number, the user-agent's Chrome version is

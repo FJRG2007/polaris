@@ -64,6 +64,19 @@ describe("describeClient", () => {
         expect(describeClient(`${CHROME_WINDOWS} Polaris/1.0`).browser).toBe("Chrome");
     });
 
+    it("names the Polaris phone app rather than the WebView inside it", () => {
+        const phone =
+            "Mozilla/5.0 (Linux; Android 15; Pixel 8 Build/AP4A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/157.0.0.0 Mobile Safari/537.36 PolarisMobile/0.1.5 (Android)";
+        const hints = '"Android WebView";v="157", "Chromium";v="157", "Not:A-Brand";v="24"';
+        const reading = describeClient(phone, hints, '"Android"');
+        expect(reading.browser).toBe("Polaris Mobile");
+        expect(reading.browserVersion).toBe("0.1.5");
+        expect(reading.label).toBe("Polaris Mobile on Android");
+        expect(describeClient(phone.replace(" PolarisMobile/0.1.5 (Android)", ""), hints).browser).toBe(
+            "Android WebView"
+        );
+    });
+
     it("takes the major version only, which is the one anybody reads", () => {
         expect(describeClient(CHROME_WINDOWS).browserVersion).toBe("131");
         expect(describeClient(FIREFOX_LINUX).browserVersion).toBe("130");
