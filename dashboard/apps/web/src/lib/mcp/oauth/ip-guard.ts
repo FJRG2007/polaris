@@ -36,11 +36,11 @@ export async function liveSessionIps(userId: string): Promise<string[]> {
         where: { userId, expiresAt: { gt: new Date() } },
         orderBy: { updatedAt: "desc" },
         take: SESSION_LIMIT,
-        select: { ipAddress: true, state: { select: { ip: true, approval: true } } }
+        select: { ipAddress: true, state: { select: { ip: true, approval: true, stepUp: true } } }
     });
     const found = new Set<string>();
     for (const row of rows) {
-        if (row.state && row.state.approval !== "approved") continue;
+        if (row.state && (row.state.approval !== "approved" || row.state.stepUp !== null)) continue;
         if (row.state?.ip) found.add(row.state.ip);
         if (row.ipAddress) found.add(row.ipAddress);
     }

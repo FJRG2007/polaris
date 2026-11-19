@@ -26,6 +26,8 @@ import { sendCodeThroughChannel } from "@/lib/messaging/channel-runtime";
 import { codeRouteFor } from "@/lib/messaging/code-senders";
 import { checkTelegramLink, startTelegramLink, unlinkTelegram } from "@/lib/messaging/telegram-link";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
+import { isStricter, twoFactorPolicySchema } from "@/lib/two-factor-policy";
+import { loadTwoFactorPolicy, saveTwoFactorPolicy } from "@/lib/two-factor-policy-store";
 import {
     otpCodeField,
     phoneField,
@@ -38,6 +40,7 @@ import {
     removeUserPhone,
     setTwoFactorPreferences,
     setUserPhone,
+    verifyAccountPassword,
     verifyPhoneCode
 } from "@polaris/auth";
 
@@ -274,4 +277,57 @@ export async function saveTwoFactorPreferencesAction(input: unknown): Promise<Ac
         revalidatePath("/account/security");
     }
     return localized(result);
+}
+
+const savePolicySchema = z.object({
+    policy: twoFactorPolicySchema,
+    password: z.string().min(1, "Password is required")
+});
+
+/**
+ * Save which set-up methods count as a second factor and how strict a sign-in
+ * is. Behind the password and the new-device wait whichever way it moves: a
+ * stricter policy can lock somebody out of a device they are about to lose, and a
+ * looser one is exactly what somebody holding a stolen session would want.
+ *
+ * At least one set-up method must stay accepted. The sign-in side falls back to
+ * every set-up method if the refusals ever cover them all (a channel going away
+ * later), but a choice that already does is refused here, where it can be said.
+ */
+export async function saveTwoFactorPolicyAction(input: unknown): Promise<ActionResult> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    const parsed = savePolicySchema.safeParse(input);
+    if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
+
+    const t = await getTranslations("accountSecurity");
+    const throttle = await rateLimit(`2fa-policy:${user.id}`, CODE_CHECK_LIMIT, CODE_CHECK_WINDOW_MS);
+    if (!throttle.ok) return { error: t("errors.policyTooMany") };
+
+    const statuses = await describeTwoFactorMethods(user.id);
+    const setUp = statuses.filter((status) => status.enabled && status.available).map((status) => status.method);
+    const next = parsed.data.policy;
+    if (setUp.length > 0 && setUp.every((method) => next.refused.includes(method))) {
+        return { error: t("errors.keepOneMethod") };
+    }
+    if (!(await verifyAccountPassword(auth, user.id, parsed.data.password))) {
+        return { error: t("errors.policyWrongPassword") };
+    }
+
+    const previous = await loadTwoFactorPolicy(user.id);
+    await saveTwoFactorPolicy(user.id, next);
+    await recordAudit({
+        actorId: user.id,
+        action: "account.2fa.policy-updated",
+        metadata: {
+            refused: next.refused,
+            strictness: next.strictness,
+            previousRefused: previous.refused,
+            previousStrictness: previous.strictness,
+            stricter: isStricter(previous, next)
+        }
+    });
+    revalidatePath("/account/security");
+    return {};
 }

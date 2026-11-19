@@ -33,6 +33,8 @@ import {
     type TwoFactorMethod
 } from "@polaris/core";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { acceptedMethods } from "@/lib/two-factor-policy";
+import { loadTwoFactorPolicy } from "@/lib/two-factor-policy-store";
 
 /** How many codes one account may ask for, and over what span. Loose enough for
  *  a message that never arrived, tight enough that the mailbox is not a target. */
@@ -187,12 +189,20 @@ export interface ChallengeOptions {
  * preferred one is not among them.
  */
 export async function challengeOptions(userId: string): Promise<ChallengeOptions> {
-    const [settings, statuses] = await Promise.all([
+    const [settings, statuses, policy] = await Promise.all([
         getUserSecurity(userId),
-        describeTwoFactorMethods(userId)
+        describeTwoFactorMethods(userId),
+        loadTwoFactorPolicy(userId)
     ]);
-    const methods = statuses
-        .filter((status) => status.enabled && status.available)
+    // Only the methods the account accepts as its second factor - which falls
+    // back to every one set up when the refusals would leave none.
+    const usable = statuses.filter((status) => status.enabled && status.available);
+    const accepted = acceptedMethods(
+        usable.map((status) => status.method),
+        policy.refused
+    );
+    const methods = usable
+        .filter((status) => accepted.includes(status.method))
         .map((status) => ({ method: status.method, target: status.target }));
     const preferred = methods.some((entry) => entry.method === settings.twoFactorPreferred)
         ? settings.twoFactorPreferred
@@ -265,11 +275,17 @@ export async function sendTwoFactorCode(input: {
     const throttle = await rateLimit(`2fa-code:${userId}`, SEND_LIMIT, SEND_WINDOW_MS);
     if (!throttle.ok) return { error: (await readerWords("api"))("refusals.twoFactor.tooManyCodes") };
 
-    const [settings, statuses] = await Promise.all([
+    const [settings, statuses, policy] = await Promise.all([
         getUserSecurity(userId),
-        describeTwoFactorMethods(userId)
+        describeTwoFactorMethods(userId),
+        loadTwoFactorPolicy(userId)
     ]);
-    const usable = statuses.filter((status) => status.enabled && status.available && status.method !== "totp");
+    const setUp = statuses.filter((status) => status.enabled && status.available);
+    const accepted = acceptedMethods(
+        setUp.map((status) => status.method),
+        policy.refused
+    );
+    const usable = setUp.filter((status) => status.method !== "totp" && accepted.includes(status.method));
     const asked = usable.find((status) => status.method === input.requested);
     const preferred = usable.find((status) => status.method === settings.twoFactorPreferred);
     const chosen = (asked ?? preferred ?? usable[0])?.method;

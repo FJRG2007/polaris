@@ -31,7 +31,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { setLoginApprovalAction } from "./actions";
-import { saveTwoFactorPreferencesAction } from "./two-factor-actions";
+import { saveTwoFactorPolicyAction, saveTwoFactorPreferencesAction } from "./two-factor-actions";
+import { TWO_FACTOR_STRICTNESS, type TwoFactorPolicy, type TwoFactorStrictness } from "@/lib/two-factor-policy";
 import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
 import {
     TWO_FACTOR_DELIVERY_METHODS,
@@ -67,7 +68,8 @@ export function TwoFactorMethodsCard({
     preferred,
     twoFactorEnabled,
     trustedDevices,
-    approval
+    approval,
+    policy
 }: {
     /** Set while this browser is too new on the account to change any of it. */
     lock?: SettingLock;
@@ -77,6 +79,8 @@ export function TwoFactorMethodsCard({
     /** Browsers currently allowed to sign in without answering the challenge. */
     trustedDevices: number;
     approval: LoginApprovalStatus;
+    /** Which set-up methods count as a second factor, and how strict sign-in is. */
+    policy: TwoFactorPolicy;
 }) {
     const router = useRouter();
     const t = useTranslations("accountSecurity");
@@ -91,6 +95,10 @@ export function TwoFactorMethodsCard({
     const [approve, setApprove] = useState(approval.enabled);
     const [confirming, setConfirming] = useState(false);
     const locked = Boolean(lock);
+    const totpAcceptedNow = !policy.refused.includes("totp");
+    const [acceptTotp, setAcceptTotp] = useState(totpAcceptedNow);
+    const [strictness, setStrictness] = useState<TwoFactorStrictness>(policy.strictness);
+    const totpReady = statuses.find((status) => status.method === "totp")?.available === true;
 
     const savedMethods = TWO_FACTOR_DELIVERY_METHODS.filter(
         (method) => statuses.find((status) => status.method === method)?.enabled === true
@@ -99,12 +107,19 @@ export function TwoFactorMethodsCard({
         choice !== preferred ||
         methods.length !== savedMethods.length ||
         savedMethods.some((method) => !methods.includes(method));
-    const changed = preferencesChanged || approve !== approval.enabled;
+    const policyChanged = acceptTotp !== totpAcceptedNow || strictness !== policy.strictness;
+    const changed = preferencesChanged || policyChanged || approve !== approval.enabled;
+    const nextPolicy: TwoFactorPolicy = {
+        refused: [...policy.refused.filter((method) => method !== "totp"), ...(acceptTotp ? [] : ["totp" as const])],
+        strictness
+    };
 
     function toggle(method: TwoFactorDeliveryMethod, next: boolean) {
         const updated = next ? [...methods, method] : methods.filter((entry) => entry !== method);
         setMethods(updated);
         if (!next && choice === method) setChoice("totp");
+        // The last accepted method cannot be switched off from under the policy.
+        if (updated.length === 0) setAcceptTotp(true);
     }
 
     return (
@@ -134,7 +149,14 @@ export function TwoFactorMethodsCard({
                                         <p className="text-xs text-warning">{knownMessage(t, tv, status.blocker)}</p>
                                     ) : null}
                                 </div>
-                                {isAuthenticator ? (
+                                {isAuthenticator && twoFactorEnabled && totpReady ? (
+                                    <Switch
+                                        checked={acceptTotp}
+                                        disabled={locked || (acceptTotp && methods.length === 0)}
+                                        aria-label={t("methods.accept", { method: label })}
+                                        onChange={setAcceptTotp}
+                                    />
+                                ) : isAuthenticator ? (
                                     <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("methods.alwaysOn")}>{t("methods.alwaysOn")}</span>
                                 ) : (
                                     <Switch
@@ -177,6 +199,22 @@ export function TwoFactorMethodsCard({
                         />
                     </div>
                 </div>
+
+                {twoFactorEnabled ? (
+                    <label className="flex flex-col gap-1 text-sm">
+                        {t("methods.strictness.label")}
+                        <Select
+                            value={strictness}
+                            disabled={locked}
+                            onValueChange={(value) => setStrictness(value as TwoFactorStrictness)}
+                            options={TWO_FACTOR_STRICTNESS.map((value) => ({
+                                value,
+                                label: t(`methods.strictness.${value}` as const)
+                            }))}
+                        />
+                        <span className="text-xs text-muted-foreground">{t("methods.strictness.hint")}</span>
+                    </label>
+                ) : null}
 
                 {twoFactorEnabled ? (
                     <label className="flex flex-col gap-1 text-sm">
@@ -236,6 +274,7 @@ export function TwoFactorMethodsCard({
                 methods={methods}
                 preferred={choice}
                 savePreferences={preferencesChanged}
+                policy={policyChanged ? nextPolicy : null}
                 approval={approve === approval.enabled ? null : approve}
                 onOpenChange={(open) => !open && setConfirming(false)}
                 onDone={() => {
@@ -252,6 +291,7 @@ function ConfirmDialog({
     methods,
     preferred,
     savePreferences,
+    policy,
     approval,
     onOpenChange,
     onDone
@@ -261,6 +301,8 @@ function ConfirmDialog({
     preferred: TwoFactorMethod;
     /** Whether the method list or the default changed and needs writing. */
     savePreferences: boolean;
+    /** The new second-factor policy, or null when it did not change. */
+    policy: TwoFactorPolicy | null;
     /** The new state of the approval gate, or null when it did not change. */
     approval: boolean | null;
     onOpenChange: (open: boolean) => void;
@@ -282,10 +324,11 @@ function ConfirmDialog({
         const saved = savePreferences
             ? await saveTwoFactorPreferencesAction({ preferences: { methods, preferred }, password })
             : {};
+        const ruled = saved.error || policy === null ? {} : await saveTwoFactorPolicyAction({ policy, password });
         const gated =
-            saved.error || approval === null ? {} : await setLoginApprovalAction(approval, password);
+            saved.error || ruled.error || approval === null ? {} : await setLoginApprovalAction(approval, password);
         setBusy(false);
-        const failure = saved.error ?? gated.error;
+        const failure = saved.error ?? ruled.error ?? gated.error;
         if (failure) {
             setError(failure);
             return;

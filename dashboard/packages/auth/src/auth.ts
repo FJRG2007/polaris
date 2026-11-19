@@ -933,25 +933,36 @@ const CLEARED_ONLY_ENDPOINTS: ReadonlySet<string> = new Set([
 
 /**
  * Whether the dashboard would turn this session away right now: held for
- * approval, refused, or locked.
+ * approval, refused, locked, or still owing factors its account's second-factor
+ * policy asks for (`stepUp`, which also covers the moment that is being decided).
  *
  * A session the dashboard has never seen has no state row yet, and is judged the
  * way the guard will judge it on its first page: held when the account asks for
  * approval, has no second factor to ask instead, and has another signed-in
  * device to ask it of. Mirrors `createSessionState` in the app's session guard,
  * which this package cannot import.
+ *
+ * With `holdUnseenChallenged`, an unseen session of an account that has a second
+ * factor is held too: whether its sign-in owes more factors is decided by the
+ * guard from the account's policy, which only the app can read, and until it has
+ * been decided the session must not be able to disarm the very factors it may
+ * still owe. The dashboard's first page decides it, so a real sign-in never
+ * notices.
  */
 async function sessionHeldBack(
     userId: string,
     sessionId: string,
-    twoFactorEnabled: boolean
+    twoFactorEnabled: boolean,
+    holdUnseenChallenged = false
 ): Promise<boolean> {
     const state = await prisma.sessionState.findUnique({
         where: { sessionId },
-        select: { approval: true, lockedAt: true }
+        select: { approval: true, lockedAt: true, stepUp: true }
     });
-    if (state) return state.approval !== "approved" || state.lockedAt !== null;
-    if (twoFactorEnabled) return false;
+    if (state) {
+        return state.approval !== "approved" || state.lockedAt !== null || state.stepUp !== null;
+    }
+    if (twoFactorEnabled) return holdUnseenChallenged;
     const security = await prisma.userSecurity.findUnique({
         where: { userId },
         select: { requireLoginApproval: true }
@@ -961,6 +972,7 @@ async function sessionHeldBack(
         where: {
             userId,
             approval: "approved",
+            stepUp: null,
             sessionId: { not: sessionId },
             session: { expiresAt: { gt: new Date() } }
         },
@@ -1037,7 +1049,7 @@ export async function refuseProtectedEndpoint(
 
     const twoFactorEnabled =
         (session.user as { twoFactorEnabled?: unknown }).twoFactorEnabled === true;
-    if (await sessionHeldBack(session.user.id, session.session.id, twoFactorEnabled)) {
+    if (await sessionHeldBack(session.user.id, session.session.id, twoFactorEnabled, true)) {
         return refused(
             "This sign-in has not been let in yet. Open Polaris to finish signing in first.",
             "SESSION_NOT_CLEARED"

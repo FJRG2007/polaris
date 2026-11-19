@@ -52,7 +52,17 @@ const METHOD_ICON: Record<TwoFactorMethod, ComponentType<{ className?: string }>
  *  get asked for four more times before the first one lands. */
 const RESEND_COOLDOWN_SECONDS = 30;
 
-export function TwoFactorView({ options, phoneApproval }: { options: ChallengeOptions; phoneApproval: boolean }) {
+export function TwoFactorView({
+    options,
+    phoneApproval,
+    steps = 1
+}: {
+    options: ChallengeOptions;
+    phoneApproval: boolean;
+    /** How many steps this sign-in is expected to take, the account's policy
+     *  applied. Only shown when there is more than one. */
+    steps?: number;
+}) {
     const router = useRouter();
     const t = useTranslations("auth");
     const [method, setMethod] = useState<TwoFactorMethod>(options.preferred ?? "totp");
@@ -133,6 +143,9 @@ export function TwoFactorView({ options, phoneApproval }: { options: ChallengeOp
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
                     <CardTitle>{t("twoFactor.title")}</CardTitle>
+                    {steps > 1 ? (
+                        <p className="text-xs text-muted-foreground">{t("stepUp.progress", { current: 1, total: steps })}</p>
+                    ) : null}
                 </CardHeader>
                 <CardBody>
                     {phoneApproval && !backup ? (

@@ -97,7 +97,10 @@
         "deviceForgotten": "Ese dispositivo ya no se recuerda.",
         "unknownConnection": "Conexión desconocida.",
         "connectionEnded": "Esa conexión ya ha terminado.",
-        "deviceEnded": "Esa sesión ya ha terminado."
+        "deviceEnded": "Esa sesión ya ha terminado.",
+        "policyTooMany": "Demasiados intentos. Espera unos minutos.",
+        "keepOneMethod": "Deja al menos un método aceptado.",
+        "policyWrongPassword": "La contraseña actual no es correcta."
     },
     "phone": {
         "confirmationMessage": "{code} es tu código de confirmación de Polaris. Caduca en {minutes} minutos."
@@ -370,6 +373,14 @@
             "noOtherSession": "No hay otra sesión abierta: aprobarías desde esta.",
             "otherSessions": "{count, plural, one {# otra sesión abierta} other {# otras sesiones abiertas}}.",
             "label": "Pedir aprobación para los inicios de sesión nuevos"
+        },
+        "accept": "Aceptar {method}",
+        "strictness": {
+            "label": "Cuándo pedir más",
+            "standard": "Nunca, un método",
+            "unusual": "Accesos raros",
+            "all": "Siempre, todos",
+            "hint": "Raro es un país desde el que no sueles entrar. Los códigos de respaldo siempre valen."
         }
     },
     "password": {

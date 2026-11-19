@@ -97,7 +97,10 @@
         "deviceForgotten": "That device is no longer remembered.",
         "unknownConnection": "Unknown connection.",
         "connectionEnded": "That connection has already ended.",
-        "deviceEnded": "That sign-in has already ended."
+        "deviceEnded": "That sign-in has already ended.",
+        "policyTooMany": "Too many tries. Wait a few minutes.",
+        "keepOneMethod": "Keep at least one method accepted.",
+        "policyWrongPassword": "Current password is incorrect."
     },
     "phone": {
         "confirmationMessage": "{code} is your Polaris confirmation code. It expires in {minutes} minutes."
@@ -370,6 +373,14 @@
             "noOtherSession": "No other session open - you would approve from this one.",
             "otherSessions": "{count, plural, one {# other session} other {# other sessions}} open.",
             "label": "Require approval for new sign-ins"
+        },
+        "accept": "Accept {method}",
+        "strictness": {
+            "label": "When to ask for more",
+            "standard": "Never, one method",
+            "unusual": "Unusual sign-ins",
+            "all": "Always, all methods",
+            "hint": "Unusual means a country you do not usually sign in from. Backup codes always work."
         }
     },
     "password": {

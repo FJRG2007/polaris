@@ -1,0 +1,55 @@
+/**
+ * The rest of a sign-in (/oauth/step-up): the factors the account's policy asks
+ * for beyond the one already answered, because the sign-in looks unusual or the
+ * account always asks for every method.
+ *
+ * Resolves the session directly rather than through requireUser, which would
+ * send a session that still owes factors straight back here.
+ */
+
+import { prisma } from "@polaris/db";
+import { maskPhone } from "@polaris/core";
+import { redirect } from "next/navigation";
+import { StepUpView } from "./step-up-view";
+import { resolveSession } from "@/lib/session";
+import { getUserPhone, listSecurityQuestions } from "@polaris/auth";
+import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
+import { parseStepUp, stepUpProgress, stepUpRemaining } from "@/lib/two-factor-policy";
+
+export const dynamic = "force-dynamic";
+
+export default async function StepUpPage() {
+    const session = await resolveSession();
+    if (!session) redirect("/oauth/login");
+
+    const row = await prisma.sessionState.findUnique({
+        where: { sessionId: session.sessionId },
+        select: { stepUp: true }
+    });
+    const state = parseStepUp(row?.stepUp);
+    if (!row?.stepUp || !state) redirect("/");
+
+    const left = stepUpRemaining(state);
+    const [statuses, questions, phone] = await Promise.all([
+        left.methods.length > 0 ? describeTwoFactorMethods(session.id) : Promise.resolve([]),
+        left.questionLeft ? listSecurityQuestions(session.id) : Promise.resolve([]),
+        left.methods.includes("whatsapp") && !state.phoneConfirmed ? getUserPhone(session.id) : Promise.resolve(null)
+    ]);
+    // Only what can actually be answered right now: a state read back from a
+    // damaged row lists every method, and a channel can go down after sign-in.
+    const methods = left.methods.flatMap((method) => {
+        const status = statuses.find((entry) => entry.method === method && entry.enabled && entry.available);
+        return status ? [{ method, target: status.target ?? null }] : [];
+    });
+
+    return (
+        <StepUpView
+            reason={state.reason}
+            progress={stepUpProgress(state)}
+            methods={methods}
+            questions={questions.map((entry) => entry.question)}
+            phoneHint={phone?.verified ? maskPhone(phone.phone) : null}
+            phoneConfirmed={state.phoneConfirmed}
+        />
+    );
+}

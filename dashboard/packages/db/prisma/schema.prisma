@@ -1348,6 +1348,16 @@ model UserSecurity {
     twoFactorMethods     String    @default("[]")
     // Which method the challenge offers first. Null means the authenticator.
     twoFactorPreferred   String?
+    // Methods the account has set up but will not take as a second factor, as a
+    // JSON list. Stored as the exclusions so every method set up later is accepted
+    // without anybody having to come back and say so.
+    twoFactorRefused     String    @default("[]")
+    // How many factors a sign-in owes: "standard" (one), "unusual" (more when the
+    // sign-in comes from a country the account does not usually use), "all".
+    twoFactorStrictness  String    @default("unusual")
+    // The countries this account finished signing in from, most recent first and
+    // bounded, which is what makes a sign-in from anywhere else unusual.
+    signInCountries      String[]  @default([])
     // The factor is armed but its authenticator secret belongs to nobody.
     //
     // An account can meet the instance's second-factor requirement with an email
@@ -1912,6 +1922,9 @@ model SessionState {
     // than reading an absent second factor as "no second step".
     signInMethod String?
     secondFactor String?
+    // The factors this sign-in still owes before the session may be used, as JSON.
+    // Null for a session that owes nothing, which is every session before this.
+    stepUp       String?
     // The session that let this one in, when one did: the device that approved it
     // from Account > Sessions, or that scanned the code on its sign-in screen.
     // Null for a session nobody had to answer for, which is most of them.

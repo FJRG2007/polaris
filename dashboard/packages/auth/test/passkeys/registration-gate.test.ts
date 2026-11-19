@@ -58,7 +58,7 @@ beforeEach(() => {
     session.findFirst.mockResolvedValue({ userAgent: "Chrome", state: null });
     // A session the dashboard has already cleared, which is every case below
     // that is not about the approval gate.
-    sessionState.findUnique.mockResolvedValue({ approval: "approved", lockedAt: null });
+    sessionState.findUnique.mockResolvedValue({ approval: "approved", lockedAt: null, stepUp: null });
     sessionState.findFirst.mockResolvedValue(null);
 });
 
@@ -185,7 +185,7 @@ describe("a session the dashboard has not let in", () => {
     ];
 
     it("is refused while it waits for another device's approval", async () => {
-        sessionState.findUnique.mockResolvedValue({ approval: "pending", lockedAt: null });
+        sessionState.findUnique.mockResolvedValue({ approval: "pending", lockedAt: null, stepUp: null });
         for (const path of GATED) {
             const refusal = await refuseProtectedEndpoint(authFor(SIGNED_IN), post(path));
             expect(refusal?.status, path).toBe(403);
@@ -194,7 +194,7 @@ describe("a session the dashboard has not let in", () => {
     });
 
     it("is refused while its screen is locked", async () => {
-        sessionState.findUnique.mockResolvedValue({ approval: "approved", lockedAt: new Date() });
+        sessionState.findUnique.mockResolvedValue({ approval: "approved", lockedAt: new Date(), stepUp: null });
         const refusal = await refuseProtectedEndpoint(
             authFor(SIGNED_IN),
             post("/revoke-other-sessions")
@@ -238,8 +238,33 @@ describe("a session the dashboard has not let in", () => {
         ).toBeNull();
     });
 
+    it("is refused while its sign-in still owes factors its account asks for", async () => {
+        // The shortcut this closes: the password and one factor, then disarm the
+        // other factors before the extra step is answered, so it is never owed.
+        for (const stepUp of ["deciding", JSON.stringify({ need: 2, done: ["email"] })]) {
+            sessionState.findUnique.mockResolvedValue({ approval: "approved", lockedAt: null, stepUp });
+            for (const path of GATED) {
+                const refusal = await refuseProtectedEndpoint(authFor(SIGNED_IN), post(path));
+                expect(refusal?.status, path).toBe(403);
+                expect(await refusal?.json()).toMatchObject({ code: "SESSION_NOT_CLEARED" });
+            }
+        }
+    });
+
+    it("is refused before its first page when the account has a second factor", async () => {
+        // Whether that sign-in owes more is decided on its first page; until
+        // then nothing it could owe may be taken away.
+        sessionState.findUnique.mockResolvedValue(null);
+        userSecurity.findUnique.mockResolvedValue({ requireLoginApproval: false, newDeviceGraceDays: 0 });
+        const challenged = { ...SIGNED_IN, user: { id: "user-1", twoFactorEnabled: true } };
+        for (const path of ["/two-factor/disable", "/passkey/generate-register-options", "/change-email"]) {
+            const refusal = await refuseProtectedEndpoint(authFor(challenged), post(path));
+            expect(refusal?.status, path).toBe(403);
+        }
+    });
+
     it("never stands in front of the challenge that finishes a sign-in", async () => {
-        sessionState.findUnique.mockResolvedValue({ approval: "pending", lockedAt: null });
+        sessionState.findUnique.mockResolvedValue({ approval: "pending", lockedAt: null, stepUp: null });
         for (const path of [
             "/two-factor/verify-totp",
             "/two-factor/verify-otp",

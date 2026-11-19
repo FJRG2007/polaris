@@ -15,6 +15,8 @@ import { resolveSession } from "@/lib/session";
 import { TwoFactorView } from "./two-factor-view";
 import { pendingTwoFactorUserId } from "@/lib/two-factor-challenge";
 import { phoneCanApprove } from "@/lib/mobile/sign-in-approval";
+import { clientIp } from "@/lib/request-context";
+import { previewSignInSteps } from "@/lib/two-factor-policy-service";
 import { challengeOptions, type ChallengeOptions } from "@/lib/two-factor-delivery";
 
 export const dynamic = "force-dynamic";
@@ -35,13 +37,18 @@ export default async function TwoFactorPage() {
     // a code field that cannot succeed is a dead end with no way out of it.
     if (!userId && (await resolveSession().catch(() => null))) redirect("/");
 
-    const [options, phoneApproval] = userId
-        ? await Promise.all([challengeOptions(userId), phoneCanApprove(userId)])
-        : [AUTHENTICATOR_ONLY, false];
+    const [options, phoneApproval, steps] = userId
+        ? await Promise.all([
+              challengeOptions(userId),
+              phoneCanApprove(userId),
+              previewSignInSteps(userId, await clientIp())
+          ])
+        : [AUTHENTICATOR_ONLY, false, 1];
     return (
         <TwoFactorView
             options={options.methods.length > 0 ? options : AUTHENTICATOR_ONLY}
             phoneApproval={phoneApproval}
+            steps={steps}
         />
     );
 }

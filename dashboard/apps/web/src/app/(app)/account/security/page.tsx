@@ -12,6 +12,7 @@
  * never going to be accepted.
  */
 
+import { loadTwoFactorPolicy } from "@/lib/two-factor-policy-store";
 import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
@@ -103,7 +104,8 @@ export default async function SecurityPage() {
         mail,
         lifecycle,
         account,
-        t
+        t,
+        twoFactorPolicy
     ] = await Promise.all([
         getUserSecurity(user.id),
         listSecurityQuestions(user.id),
@@ -134,7 +136,8 @@ export default async function SecurityPage() {
         // The handle itself, so the username switch names it rather than talking
         // about a concept.
         prisma.user.findUnique({ where: { id: user.id }, select: { username: true } }),
-        getTranslations("accountSecurity")
+        getTranslations("accountSecurity"),
+        loadTwoFactorPolicy(user.id)
     ]);
     const lock = standing.settled ? undefined : { reason: waitMessage(standing, t) };
 
@@ -168,6 +171,7 @@ export default async function SecurityPage() {
                     twoFactorMethods={methods}
                     trustedDevices={trustedDevices}
                     twoFactorPreferred={settings.twoFactorPreferred}
+                    twoFactorPolicy={twoFactorPolicy}
                     connections={connections}
                     connectionChallenge={{
                         enabled: settings.challengeConnectionSignIn,

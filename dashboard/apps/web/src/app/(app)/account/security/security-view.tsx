@@ -14,6 +14,7 @@
  * Nothing here decides anything; the server actions re-verify every change.
  */
 
+import type { TwoFactorPolicy } from "@/lib/two-factor-policy";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -89,6 +90,7 @@ export function SecurityView({
     passkeys,
     twoFactorMethods,
     twoFactorPreferred,
+    twoFactorPolicy,
     trustedDevices,
     connections,
     connectionChallenge,
@@ -131,6 +133,7 @@ export function SecurityView({
     passkeys: PasskeyView[];
     twoFactorMethods: TwoFactorMethodStatus[];
     twoFactorPreferred: TwoFactorMethod;
+    twoFactorPolicy: TwoFactorPolicy;
     /** Browsers allowed to sign in without answering the challenge. */
     trustedDevices: number;
     /** The outside accounts this person has connected, each with whether it may
@@ -236,6 +239,7 @@ export function SecurityView({
                         twoFactorEnabled={twoFactorEnabled}
                         trustedDevices={trustedDevices}
                         approval={{ enabled: requireLoginApproval, hasPin, otherSessions }}
+                        policy={twoFactorPolicy}
                     />
 
                     <TelegramLinkCard

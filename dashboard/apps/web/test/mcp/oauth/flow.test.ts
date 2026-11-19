@@ -1300,7 +1300,14 @@ describe("where a connected app may call from", () => {
             userId: ADA.id,
             expiresAt: later,
             ipAddress: null,
-            state: { ip: "192.0.2.9", approval: "pending" }
+            state: { ip: "192.0.2.9", approval: "pending", stepUp: null }
+        });
+        // Nor one whose sign-in still owes the extra factors its account asks for.
+        sessions.push({
+            userId: ADA.id,
+            expiresAt: later,
+            ipAddress: null,
+            state: { ip: "192.0.2.9", approval: "approved", stepUp: '{"need":2}' }
         });
         expect((await mcpCall(access, whoami)).status).toBe(403);
 
@@ -1309,7 +1316,7 @@ describe("where a connected app may call from", () => {
             userId: ADA.id,
             expiresAt: later,
             ipAddress: "198.51.100.30",
-            state: { ip: "2001:db8:aa:bb::1", approval: "approved" }
+            state: { ip: "2001:db8:aa:bb::1", approval: "approved", stepUp: null }
         });
         state.ip = "2001:db8:aa:bb:ffff::2";
         expect((await mcpCall(access, whoami)).status).toBe(200);

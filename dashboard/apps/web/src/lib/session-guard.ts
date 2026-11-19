@@ -38,6 +38,7 @@ import { describeOrigin } from "@/lib/session-directory";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { evaluateAccountAccess } from "@/lib/network-rules";
 import { getInstanceSecurity } from "@/lib/instance-security";
+import { beginSignInStepUp, STEP_UP_PATH } from "@/lib/two-factor-policy-service";
 import { notifySessionOpened, notifySessionsClosed } from "@/lib/notifications/session-events";
 import {
     consumeSessionRotation,
@@ -360,9 +361,13 @@ export async function guardSession({
                 ip,
                 country: decision.country,
                 requireApproval:
-                    settings?.requireLoginApproval === true && record.twoFactorEnabled !== true
+                    settings?.requireLoginApproval === true && record.twoFactorEnabled !== true,
+                twoFactorEnabled: record.twoFactorEnabled === true
             });
             if (created.approval === "pending") return { ok: false, redirect: "/oauth/pending" };
+            // The sign-in owes more factors than the one it answered: held until
+            // it pays them, exactly like a session waiting for approval.
+            if (created.stepUp) return { ok: false, redirect: STEP_UP_PATH };
             // The session is real from here, so it faces the same demand every
             // later request faces. Returning early without asking would let one
             // request through per sign-in, which is one more than none.
@@ -380,6 +385,9 @@ export async function guardSession({
         return { ok: false, redirect: "/oauth/login?denied=1" };
     }
     if (state.approval === "pending") return { ok: false, redirect: "/oauth/pending" };
+    // 4b. A sign-in that has answered some of the factors its policy asks for and
+    //     not all of them. Nothing is served until the rest are answered.
+    if (state.stepUp) return { ok: false, redirect: STEP_UP_PATH };
 
     // 5. The idle lock. Already locked, or idle long enough to lock now.
     if (state.lockedAt) return { ok: false, redirect: "/oauth/lock" };
@@ -491,6 +499,33 @@ function breachOf(
     );
 }
 
+/** What a new session owes while the request that claimed it is still working
+ *  out what its sign-in proved. Read as owing a step, never as owing nothing. */
+const STEP_UP_DECIDING = "deciding";
+
+/**
+ * The request that lost the race to create a session's row. It takes the
+ * winner's answer - once the winner has one. Waiting is bounded: past it, a row
+ * still deciding is reported as owing a step, which only ever holds a session
+ * back.
+ */
+async function adoptRacedState(sessionId: string): Promise<{ approval: string; stepUp: boolean }> {
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+        const existing = await prisma.sessionState.findUnique({
+            where: { sessionId },
+            select: { approval: true, stepUp: true }
+        });
+        // No row means the insert failed for a reason other than the race (a
+        // session deleted mid-request, say); refuse rather than guess.
+        if (!existing) return { approval: "denied", stepUp: false };
+        if (existing.stepUp !== STEP_UP_DECIDING) {
+            return { approval: existing.approval, stepUp: existing.stepUp !== null };
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    return { approval: "approved", stepUp: true };
+}
+
 /**
  * Record a newly seen session. It starts pending only when the user asked for
  * approvals AND there is another live, approved session that could grant one -
@@ -522,13 +557,17 @@ async function createSessionState(input: {
     ip: string | undefined;
     country: string | null;
     requireApproval: boolean;
-}): Promise<{ approval: string }> {
+    twoFactorEnabled: boolean;
+}): Promise<{ approval: string; stepUp: boolean }> {
     let approval = "approved";
     if (input.requireApproval && !(await consumeSessionRotation(input.userId, input.ip ?? null))) {
         const approver = await prisma.sessionState.findFirst({
             where: {
                 userId: input.userId,
                 approval: "approved",
+                // A session still owing factors is not signed in yet, so it
+                // cannot be the device asked to let another one in.
+                stepUp: null,
                 sessionId: { not: input.sessionId },
                 session: { expiresAt: { gt: new Date() } }
             },
@@ -537,13 +576,18 @@ async function createSessionState(input: {
         if (approver) approval = "pending";
     }
 
-    const [userAgent, userAgentBrands, userAgentPlatform, host, signIn] = await Promise.all([
+    const [userAgent, userAgentBrands, userAgentPlatform, host] = await Promise.all([
         clientUserAgent(),
         clientUserAgentBrands(),
         clientUserAgentPlatform(),
-        clientHost(),
-        takeSignInRecord(input.userId)
+        clientHost()
     ]);
+    // The row is claimed before the sign-in's note is collected, and it starts
+    // out owing a step that is still being decided. Two requests racing for the
+    // same new session must not both collect the note: the one that loses the
+    // insert would see no second factor, decide nothing is owed, and let the
+    // session through before the other had worked out it owed more. Claiming
+    // first means only the winner collects, and the loser waits for its answer.
     try {
         await prisma.sessionState.create({
             data: {
@@ -552,29 +596,51 @@ async function createSessionState(input: {
                 approval,
                 ip: input.ip ?? null,
                 country: input.country,
+                stepUp: STEP_UP_DECIDING,
                 userAgent: userAgent ?? null,
                 userAgentBrands: userAgentBrands ?? null,
                 userAgentPlatform: userAgentPlatform ?? null,
-                host: host ?? null,
-                signInMethod: signIn.method,
-                secondFactor: signIn.secondFactor,
-                // Set only for a sign-in somebody else had to answer for - a
-                // scanned code. The other way in that needs an answer, the
-                // approval on Account > Sessions, comes after this row exists
-                // and writes itself onto it there.
-                authorizedBySessionId: signIn.authorizedBy?.sessionId ?? null,
-                authorizedByDevice: signIn.authorizedBy?.device ?? null
+                host: host ?? null
             }
         });
     } catch {
-        const existing = await prisma.sessionState.findUnique({
-            where: { sessionId: input.sessionId },
-            select: { approval: true }
-        });
-        // No row means the insert failed for a reason other than the race (a
-        // session deleted mid-request, say); refuse rather than guess.
-        return { approval: existing?.approval ?? "denied" };
+        return adoptRacedState(input.sessionId);
     }
+
+    const signIn = await takeSignInRecord(input.userId);
+    // What the sign-in still owes under the account's second-factor policy, and
+    // the country it came from when the policy had to look it up.
+    const policy = await beginSignInStepUp({
+        userId: input.userId,
+        sessionId: input.sessionId,
+        ip: input.ip,
+        country: input.country,
+        // No note at all for an account with a second factor - it ran out
+        // because the first page came late, or another sign-in took it - says
+        // nothing about which factor answered. It counts as one factor that is
+        // none of the methods, so the policy still asks for what it asks of
+        // every other sign-in; reading it as "no challenge" would let a sign-in
+        // skip the extra step just by waiting before its first page.
+        factor: signIn.secondFactor ?? (signIn.method === null && input.twoFactorEnabled ? "code" : null)
+    });
+    const decided = await prisma.sessionState.updateMany({
+        where: { sessionId: input.sessionId },
+        data: {
+            country: policy.country,
+            stepUp: policy.stepUp,
+            signInMethod: signIn.method,
+            secondFactor: signIn.secondFactor,
+            // Set only for a sign-in somebody else had to answer for - a
+            // scanned code. The other way in that needs an answer, the
+            // approval on Account > Sessions, comes after this row exists
+            // and writes itself onto it there.
+            authorizedBySessionId: signIn.authorizedBy?.sessionId ?? null,
+            authorizedByDevice: signIn.authorizedBy?.device ?? null
+        }
+    });
+    // The row went away under us (the session was ended mid-request). What is
+    // left must not read as a session that owes nothing.
+    if (decided.count === 0) return { approval, stepUp: true };
 
     // The account's register of the browsers it has ever been signed in from,
     // which is what dates a device for the new-device wait. Written here because
@@ -641,5 +707,5 @@ async function createSessionState(input: {
             )
         });
     }
-    return { approval };
+    return { approval, stepUp: policy.stepUp !== null };
 }
