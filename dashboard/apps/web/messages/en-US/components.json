@@ -980,7 +980,8 @@
             "telegramCode": "Telegram code",
             "code": "Sent code",
             "backupCode": "Backup code",
-            "trustedDevice": "Remembered device"
+            "trustedDevice": "Remembered device",
+            "phoneApproval": "Approved on phone"
         },
         "notRecorded": "Sign-in not recorded"
     },

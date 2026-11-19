@@ -27,7 +27,7 @@ export const CHALLENGE_TTL_MS = 60_000;
 export const MOST_DEVICE_KEYS = 10;
 
 /** What a challenge can be for. Part of what is signed, so each is its own. */
-export type DevicePurpose = "view-once" | "door-open";
+export type DevicePurpose = "view-once" | "door-open" | "sign-in-approval";
 
 /** Why a device proof failed. */
 export type DeviceProofRefusal = "device" | "challenge" | "signature";

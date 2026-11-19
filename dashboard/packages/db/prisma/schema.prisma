@@ -418,6 +418,7 @@ model User {
     activitySettings    UserActivitySettings?
     gameTime            UserGameTime[]
     mobileDeviceKeys    MobileDeviceKey[]
+    signInApprovals     SignInApproval[]
     chatAttachmentOpens ChatAttachmentOpen[]
     badgesSeen          UserBadgeSeen[]
     listeningAlong      SpotifyListenAlong?  @relation("ListenAlongListener")
@@ -11376,6 +11377,29 @@ model MobileDeviceKey {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId, lastUsedAt])
+}
+
+// A sign-in waiting on the account's phone: "Is this you?" with Approve and Deny.
+// Bound to one second-factor challenge by a hash of its identifier (the raw one
+// is what finishes the challenge, so it is never stored here), short-lived and
+// answered once. An approval is spent the moment the waiting browser collects it.
+model SignInApproval {
+    id            String    @id @default(uuid(7)) @db.Uuid
+    userId        String    @db.Uuid
+    challengeHash String
+    // pending | approved | denied | used
+    status        String    @default("pending")
+    // How the browser asking reads, and where from - what the phone shows.
+    device        String?
+    ip            String?
+    createdAt     DateTime  @default(now())
+    expiresAt     DateTime
+    decidedAt     DateTime?
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, status, expiresAt])
+    @@index([challengeHash])
 }
 
 // A file already on the storage, waiting for the message that will carry it.

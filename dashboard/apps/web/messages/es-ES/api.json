@@ -361,6 +361,20 @@
                 "challenge": "Ha tardado demasiado. Vuelve a probar.",
                 "signature": "Este móvil no ha podido demostrar que es tuyo. Vuelve a probar."
             }
+        },
+        "signIn": {
+            "approved": "Acceso aprobado",
+            "denied": "Acceso denegado",
+            "gone": "Este acceso ya se respondió o ha caducado.",
+            "tooMany": "Demasiadas respuestas. Espera un poco.",
+            "refused": {
+                "device": "Este móvil no puede aprobar accesos. Abre la app de Polaris una vez y reinténtalo.",
+                "challenge": "Ha tardado demasiado. Reinténtalo.",
+                "signature": "Este móvil no pudo demostrar que es tuyo. Reinténtalo."
+            },
+            "askTitle": "¿Eres tú quien entra?",
+            "askBody": "{device}, desde {ip}",
+            "askBodyUnknown": "Un nuevo acceso a tu cuenta"
         }
     }
 }

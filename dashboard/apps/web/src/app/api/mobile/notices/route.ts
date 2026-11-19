@@ -19,6 +19,7 @@ import { readerWords } from "@/lib/i18n/reader-words";
 import { subscribeChatChanges } from "@/lib/chat/live";
 import { holdStreamScope } from "@/lib/chat/stream-scope";
 import { backgroundUser, sessionCan } from "@/lib/session";
+import { pendingApprovals, subscribeSignInApprovals } from "@/lib/mobile/sign-in-approval";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,7 +33,7 @@ const COALESCE_MS = 400;
 const SCOPE_TTL_MS = 10_000;
 
 export interface MobileNotice {
-    readonly kind: "message" | "call" | "call-ended";
+    readonly kind: "message" | "call" | "call-ended" | "sign-in" | "sign-in-ended";
     readonly channelId: string;
     /** One per conversation: a newer message replaces the notification. */
     readonly tag: string;
@@ -40,23 +41,26 @@ export interface MobileNotice {
     readonly body: string;
     /** Where opening it lands, on this instance. */
     readonly path: string;
+    /** A sign-in asking this phone: the request to answer, and when it stops counting (epoch ms). */
+    readonly approvalId?: string;
+    readonly expiresAt?: number;
 }
 
 export async function GET(): Promise<Response> {
     const session = await backgroundUser();
     if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
-    if (!(await sessionCan(session, "chat.use"))) {
-        return Response.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // Sign-in approvals reach every account; messages and calls only one that may chat.
+    const chatAllowed = await sessionCan(session, "chat.use");
     const actor = { id: session.id };
     // Resolved while the request is still the request: the callbacks below run
     // long after it, where the reader's language is no longer known.
-    const [t, chat] = await Promise.all([readerWords("components"), readerWords("chat")]);
+    const [t, chat, api] = await Promise.all([readerWords("components"), readerWords("chat"), readerWords("api")]);
     const encoder = new TextEncoder();
     const scope = holdStreamScope(actor);
     const waiting = new Map<string, ReturnType<typeof setTimeout>>();
     let heartbeat: ReturnType<typeof setInterval> | null = null;
     let unsubscribe: (() => void) | null = null;
+    let unsubscribeApprovals: (() => void) | null = null;
     let closed = false;
 
     function stop(): void {
@@ -68,6 +72,8 @@ export async function GET(): Promise<Response> {
         waiting.clear();
         unsubscribe?.();
         unsubscribe = null;
+        unsubscribeApprovals?.();
+        unsubscribeApprovals = null;
     }
 
     const stream = new ReadableStream<Uint8Array>({
@@ -118,10 +124,26 @@ export async function GET(): Promise<Response> {
                 );
             }
 
-            await scope.refresh();
+            function ask(approval: { id: string; device: string | null; ip: string | null; expiresAt: Date }): void {
+                send({
+                    kind: "sign-in",
+                    channelId: "",
+                    tag: `sign-in:${approval.id}`,
+                    title: api("mobile.signIn.askTitle"),
+                    body:
+                        approval.device && approval.ip
+                            ? api("mobile.signIn.askBody", { device: approval.device, ip: approval.ip })
+                            : (approval.device ?? api("mobile.signIn.askBodyUnknown")),
+                    path: "/account/sessions",
+                    approvalId: approval.id,
+                    expiresAt: approval.expiresAt.getTime()
+                });
+            }
+
+            if (chatAllowed) await scope.refresh();
             if (closed) return;
 
-            unsubscribe = subscribeChatChanges((change) => {
+            if (chatAllowed) unsubscribe = subscribeChatChanges((change) => {
                 if (closed || !change.channelId || change.actorId === actor.id) return;
                 const channelId = change.channelId;
                 const handle = () => {
@@ -156,6 +178,13 @@ export async function GET(): Promise<Response> {
                     if (!closed) handle();
                 });
             });
+
+            unsubscribeApprovals = subscribeSignInApprovals((change) => {
+                if (closed || change.userId !== actor.id) return;
+                if (change.kind === "requested") ask(change);
+                else send({ kind: "sign-in-ended", channelId: "", tag: `sign-in:${change.id}`, title: "", body: "", path: "/" });
+            });
+            for (const approval of await pendingApprovals(actor.id).catch(() => [])) ask(approval);
 
             heartbeat = setInterval(() => write(": ping\n\n"), HEARTBEAT_MS);
             write(": connected\n\n");

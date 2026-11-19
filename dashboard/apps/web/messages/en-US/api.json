@@ -361,6 +361,20 @@
                 "challenge": "That took too long. Try again.",
                 "signature": "This phone could not prove it is yours. Try again."
             }
+        },
+        "signIn": {
+            "approved": "Sign-in approved",
+            "denied": "Sign-in denied",
+            "gone": "This sign-in was already answered or has expired.",
+            "tooMany": "Too many answers. Wait a moment.",
+            "refused": {
+                "device": "This phone is not set up to approve sign-ins. Open the Polaris app once and try again.",
+                "challenge": "That took too long. Try again.",
+                "signature": "This phone could not prove it is yours. Try again."
+            },
+            "askTitle": "Is this you signing in?",
+            "askBody": "{device}, from {ip}",
+            "askBodyUnknown": "A new sign-in to your account"
         }
     }
 }

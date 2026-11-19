@@ -980,7 +980,8 @@
             "telegramCode": "Cód. Telegram",
             "code": "Código enviado",
             "backupCode": "Código de respaldo",
-            "trustedDevice": "Dispositivo recordado"
+            "trustedDevice": "Dispositivo recordado",
+            "phoneApproval": "Aprobado en móvil"
         },
         "notRecorded": "Sin registrar"
     },

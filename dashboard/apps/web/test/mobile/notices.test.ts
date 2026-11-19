@@ -32,6 +32,10 @@ vi.mock("@/lib/chat/live", () => ({
         return () => (listener = null);
     }
 }));
+vi.mock("@/lib/mobile/sign-in-approval", () => ({
+    pendingApprovals: async () => [],
+    subscribeSignInApprovals: () => () => undefined
+}));
 vi.mock("@/lib/chat/toasts", () => ({
     messageToasts: async (_actor: unknown, channels: string[]) => {
         toastCalls.push(channels);

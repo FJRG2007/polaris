@@ -75,6 +75,10 @@ const envSchema = z.object({
      * instance would spend everybody else's.
      */
     POLARIS_TENOR_KEY: z.string().optional(),
+    // Extra signing certificates the Polaris phone app may carry (SHA-256, colon
+    // hex, comma separated) - a build signed by a store's own key, for example.
+    // The official release key is always included; see lib/mobile/asset-links.
+    POLARIS_ANDROID_CERT_SHA256: z.string().optional(),
 
     /**
      * The call server (LiveKit) this deployment carries calls on, as an address

@@ -40,7 +40,15 @@ import {
 const NOTE_TTL_MS = 15 * 60 * 1000;
 
 /** The factors that mean "a code Polaris sent", whichever channel carried it. */
-const SENT_CODES: ReadonlySet<SecondFactor> = new Set(["email-code", "whatsapp-code", "telegram-code", "code"]);
+// A phone approval is answered through the same endpoint: the waiting browser is
+// handed a one-time code the moment the phone approves, so it is kept as noted.
+const SENT_CODES: ReadonlySet<SecondFactor> = new Set([
+    "email-code",
+    "whatsapp-code",
+    "telegram-code",
+    "code",
+    "phone-approval"
+]);
 
 /** The one way in that somebody else has to answer for before the session
  *  exists, and so the only one an authorizer can belong to. */

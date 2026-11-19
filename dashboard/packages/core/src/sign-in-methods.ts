@@ -54,7 +54,8 @@ export const SECOND_FACTORS = [
     "telegram-code",
     "code",
     "backup-code",
-    "trusted-device"
+    "trusted-device",
+    "phone-approval"
 ] as const;
 
 export type SecondFactor = (typeof SECOND_FACTORS)[number];
@@ -80,7 +81,8 @@ export const SECOND_FACTOR_LABELS: Record<SecondFactor, string> = {
     "telegram-code": "Telegram code",
     code: "Sent code",
     "backup-code": "Backup code",
-    "trusted-device": "Remembered device"
+    "trusted-device": "Remembered device",
+    "phone-approval": "Approved on phone"
 };
 
 /**

@@ -55,7 +55,7 @@ function unsign(signed: string, secret: string): string | null {
 /** The verification row this browser's challenge cookie names, if it carries a
  *  genuine one. Null covers all the ways it can fail: no cookie, a signature that
  *  does not check out, or a value that never was an identifier. */
-async function challengeIdentifier(): Promise<string | null> {
+export async function challengeIdentifier(): Promise<string | null> {
     const store = await cookies();
     const raw = cookieNames()
         .map((name) => store.get(name)?.value)

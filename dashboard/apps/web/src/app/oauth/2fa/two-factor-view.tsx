@@ -19,7 +19,8 @@ import { KeyRound, Mail, Smartphone } from "lucide-react";
 import { WhatsAppLogo } from "./whatsapp-logo";
 import { TelegramLogo } from "./telegram-logo";
 import type { ChallengeOptions } from "@/lib/two-factor-delivery";
-import { useEffect, useState, type ComponentType, type FormEvent } from "react";
+import { PhoneApproval } from "./phone-approval";
+import { useCallback, useEffect, useState, type ComponentType, type FormEvent } from "react";
 import {
     Button,
     Card,
@@ -51,7 +52,7 @@ const METHOD_ICON: Record<TwoFactorMethod, ComponentType<{ className?: string }>
  *  get asked for four more times before the first one lands. */
 const RESEND_COOLDOWN_SECONDS = 30;
 
-export function TwoFactorView({ options }: { options: ChallengeOptions }) {
+export function TwoFactorView({ options, phoneApproval }: { options: ChallengeOptions; phoneApproval: boolean }) {
     const router = useRouter();
     const t = useTranslations("auth");
     const [method, setMethod] = useState<TwoFactorMethod>(options.preferred ?? "totp");
@@ -107,6 +108,17 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
         landAfterSignIn(router, target());
     }
 
+    /** The phone approved: spend the code it handed over, exactly as a typed one. */
+    const approvedOnPhone = useCallback(
+        async (approved: string) => {
+            const { error: verifyError } = await authClient.twoFactor.verifyOtp({ code: approved, trustDevice });
+            if (verifyError) return false;
+            landAfterSignIn(router, target());
+            return true;
+        },
+        [router, trustDevice]
+    );
+
     function choose(next: TwoFactorMethod) {
         setMethod(next);
         setBackup(false);
@@ -123,6 +135,9 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
                     <CardTitle>{t("twoFactor.title")}</CardTitle>
                 </CardHeader>
                 <CardBody>
+                    {phoneApproval && !backup ? (
+                        <PhoneApproval disabled={pending} onApproved={approvedOnPhone} />
+                    ) : null}
                     {options.methods.length > 1 && !backup ? (
                         <div className="mb-4 flex flex-col gap-1">
                             {options.methods.map((option) => {

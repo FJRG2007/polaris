@@ -28,7 +28,8 @@ const SECOND_FACTORS: Readonly<Record<SecondFactor, NamespaceKey<"components">>>
     "telegram-code": "signIn.secondFactors.telegramCode",
     code: "signIn.secondFactors.code",
     "backup-code": "signIn.secondFactors.backupCode",
-    "trusted-device": "signIn.secondFactors.trustedDevice"
+    "trusted-device": "signIn.secondFactors.trustedDevice",
+    "phone-approval": "signIn.secondFactors.phoneApproval"
 };
 
 /** Each half of how a session signed in, in order: the method, then the second factor. */
