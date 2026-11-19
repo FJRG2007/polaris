@@ -190,8 +190,14 @@ export function mentionPrompt(
         lines.replaceAll("</conversation>", "</ conversation>"),
         "</conversation>",
         "",
-        `${askerName || "Someone"} asks:`,
-        question.slice(0, LINE_CHARS * 4)
+        // Only the mention, nothing asked: the question is the conversation
+        // itself, the way somebody is called into a thread by name. Answered
+        // rather than refused, because Polar has read what came before.
+        ...(question.replace(/(^|[^\w@])@polar(?![\w-])/gi, "$1").trim()
+            ? [`${askerName || "Someone"} asks:`, question.slice(0, LINE_CHARS * 4)]
+            : [
+                  `${askerName || "Someone"} mentioned you without a question. Reply to the latest messages of the conversation: answer what was last asked there, or add what is useful.`
+              ])
     ].join("\n");
 }
 

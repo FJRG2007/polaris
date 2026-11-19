@@ -210,6 +210,13 @@ describe("Polar's answer in Chat", () => {
         expect(recorded).toHaveLength(0);
     });
 
+    it("answers a mention with nothing asked from the conversation before it", async () => {
+        await answerPolarMention({ ...mention, body: "@polar " });
+        expect(asked[0]?.prompt).toContain("mentioned you without a question");
+        expect(asked[0]?.prompt).toContain("Earlier line");
+        expect(posted).toHaveLength(1);
+    });
+
     it("answers nobody who has left the conversation", async () => {
         inChannel = false;
         expect(await answerPolarMention(mention)).toBeNull();

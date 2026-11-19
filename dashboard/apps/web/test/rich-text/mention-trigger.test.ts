@@ -55,6 +55,9 @@ describe("a room mention once it is written", () => {
     it("closes the picker the moment the space after it is there", () => {
         expect(queryFits("@", "everyone ")).toBe(false);
         expect(queryFits("@", "here ")).toBe(false);
+        expect(queryFits("@", "all ")).toBe(false);
+        expect(queryFits("@", "polar ")).toBe(false);
+        expect(queryFits("@", "polar")).toBe(true);
         expect(queryFits("@", "All ")).toBe(false);
     });
 

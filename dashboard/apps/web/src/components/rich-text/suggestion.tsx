@@ -17,13 +17,15 @@ import { keepOwnScroll } from "@/lib/keep-own-scroll";
 import * as refs from "./references";
 import { AtSign } from "lucide-react";
 import { PolarFace } from "@/components/polar/polar-bot";
-import { REFERENCE } from "./markdown";
+import { REFERENCE, splitChannelMentions, splitPolarMentions } from "./markdown";
 import { Extension } from "@tiptap/core";
 import { cn, Skeleton } from "@polaris/ui";
 import Suggestion from "@tiptap/suggestion";
 import { Avatar } from "@/components/avatar";
 import { ReactRenderer } from "@tiptap/react";
-import { PluginKey, type EditorState } from "@tiptap/pm/state";
+import { Decoration, DecorationSet } from "@tiptap/pm/view";
+import type { Node as ProseNode } from "@tiptap/pm/model";
+import { Plugin, PluginKey, type EditorState } from "@tiptap/pm/state";
 import { PersonName, PersonRow, PlainNames } from "@/components/person-name";
 import type { MentionCandidate } from "@/lib/rich-text/mention-service";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
@@ -281,11 +283,53 @@ const List = forwardRef<SuggestionHandle, ListProps>(function List(props, ref) {
  * them apart is what lets a description mention a task without notifying half a
  * team, and it means neither list has to be filtered by what the reader meant.
  */
+/** The look a room word or `@polar` has once a message is sent, so it has the
+ *  same one while it is being written. */
+const WORD_MENTION_CLASS = "rounded bg-primary/15 px-0.5 font-medium text-primary";
+
+/**
+ * `@everyone`, `@here` and `@polar` drawn as mentions in the editor.
+ *
+ * They are kept as the words that were typed - that is what the server reads -
+ * so without this, picking one from the list put back plain text and the chip
+ * the list had just shown was gone. A decoration changes the look and nothing
+ * else: the document, and so the message, stay the words. Never inside code,
+ * where the reader does not draw them either.
+ */
+export function wordMentionDecorations(doc: ProseNode, rooms: boolean, polar: boolean): DecorationSet {
+    const found: Decoration[] = [];
+    doc.descendants((node, position) => {
+        if (node.type.name === "codeBlock") return false;
+        if (!node.isText || node.marks.some((mark) => mark.type.name === "code")) return true;
+        let at = position;
+        for (const part of splitChannelMentions(node.text ?? "")) {
+            if (part.mention && rooms) found.push(Decoration.inline(at, at + part.text.length, { class: WORD_MENTION_CLASS }));
+            if (!part.mention && polar) {
+                let inner = at;
+                for (const run of splitPolarMentions(part.text)) {
+                    if (run.polar) found.push(Decoration.inline(inner, inner + run.text.length, { class: WORD_MENTION_CLASS }));
+                    inner += run.text.length;
+                }
+            }
+            at += part.text.length;
+        }
+        return true;
+    });
+    return DecorationSet.create(doc, found);
+}
+
 export function mentionExtension(search: MentionSearch, rooms = false, polar = false) {
     return Extension.create({
         name: "polarisMentions",
         addProseMirrorPlugins() {
             return [
+                new Plugin({
+                    key: new PluginKey("polarisWordMentions"),
+                    props: {
+                        decorations: (state) =>
+                            rooms || polar ? wordMentionDecorations(state.doc, rooms, polar) : null
+                    }
+                }),
                 Suggestion({
                     editor: this.editor,
                     pluginKey: POPUP_KEYS.people,
@@ -324,6 +368,16 @@ const MAX_QUERY = { person: 60, work: 120 } as const;
  * An empty query is the trigger on its own, which is the picker being opened
  * deliberately: that one always shows.
  */
+/** A room word, or `@polar`, written out and followed by a space: what picking
+ *  one leaves behind. Built from the same lists the picker offers, so a word
+ *  added there closes the picker too - `@polar` was missing from a copy of
+ *  this and kept the picker open over itself, so Enter broke the line or
+ *  picked it again instead of sending. */
+const FINISHED_ROOM_WORD = new RegExp(
+    `^(${[...ROOM_MENTIONS.map((room) => room.id), "all", POLAR_MENTION.id].join("|")})\\s`,
+    "i"
+);
+
 export function queryFits(char: string, query: string): boolean {
     if (query === "") return true;
     // A space straight after the trigger is the tell: nobody starts a name with
@@ -333,7 +387,7 @@ export function queryFits(char: string, query: string): boolean {
     // one puts it in as text, and the picker has to be gone the moment it is -
     // not after a search comes back - or the next Enter picks it again rather
     // than sending the message.
-    if (char === "@" && /^(everyone|here|all)\s/i.test(query)) return false;
+    if (char === "@" && FINISHED_ROOM_WORD.test(query)) return false;
     if (char === "@") return query.length <= MAX_QUERY.person && PERSON_QUERY.test(query);
     // A title can hold almost anything, so the only limit is length.
     return query.length <= MAX_QUERY.work;
