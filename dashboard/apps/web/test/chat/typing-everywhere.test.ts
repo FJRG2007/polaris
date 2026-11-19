@@ -22,4 +22,27 @@ describe("who is typing", () => {
         const list = [{ userId: "ana", name: "Ana", activity: "typing" as const, at: 1_000 }];
         expect(typing.typistsAt(list, 1_500)).toBe(list);
     });
+
+    it("drops a writer the moment their message lands, Polar included", () => {
+        const ana = { userId: "ana", name: "Ana", activity: "typing" as const, at: 1_000 };
+        const polar = { userId: "polar", name: "Polar", activity: "typing" as const, at: 1_000 };
+        expect(typing.withoutWriters([ana, polar], [{ authorId: null, fromAgent: "polar" }])).toEqual([ana]);
+        expect(typing.withoutWriters([ana, polar], [{ authorId: "ana" }])).toEqual([polar]);
+        const both = [ana, polar];
+        expect(typing.withoutWriters(both, [{ authorId: "bea" }])).toBe(both);
+    });
+
+    it("stops the list's dots when a message arrives, and only Polar's when it answers in place", () => {
+        const ana = { userId: "ana", name: "Ana", activity: "typing" as const, at: Date.now() };
+        const polar = { userId: "polar", name: "Polar", activity: "typing" as const, at: Date.now() };
+        typing.noteTyping("c1", ana);
+        typing.noteTyping("c1", polar);
+        typing.stopTyping("c1", new Set(["polar"]));
+        expect(typing.typistsAt([ana], Date.now())).toEqual([ana]);
+        typing.stopTyping("c1");
+        typing.noteTyping("c2", ana);
+        typing.stopTyping("c2");
+        // Nothing left to stop: a second call is a no-op.
+        expect(() => typing.stopTyping("c2")).not.toThrow();
+    });
 });

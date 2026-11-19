@@ -79,6 +79,7 @@ import type { RosterModeration } from "./call-moderation-menu";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
 import type { KeptPick } from "@/components/file-picker/as-files";
 import { ChannelMembers, useMembersPanel } from "./members-panel";
+import { withoutWriters } from "./typing-everywhere";
 import { ChatPrivacySection, type ChatRulesChange } from "./chat-privacy-section";
 import { unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import { callBandHeight, callBandLimit, callBandSize, type CallPlace } from "./call-band";
@@ -817,6 +818,7 @@ export function ChannelView({
         // scrolled to, and shown as a press at the bottom of the list.
         if (!following.current) setUnseen((current) => current + arrived.length);
 
+        setTypists((current) => withoutWriters(current, arrived));
         const window = [...held.current, ...arrived];
         if (window.length > MAX_WINDOW && following.current) {
             // Following along, so the top is what gives: the reader is at the
@@ -1146,6 +1148,10 @@ export function ChannelView({
                 if (!result.messages) return;
                 fresh.push(...result.messages);
             }
+            // Polar's answer to a "Try again" is its earlier message rewritten;
+            // a reaction or an edit to somebody's message says nothing about
+            // whether they are typing, so only an agent's change stops it.
+            setTypists((current) => withoutWriters(current, fresh.filter((message) => message.fromAgent)));
             const next = applyChanged(held.current, asked, fresh);
             if (next === held.current) return;
             if (next.length === 0) {

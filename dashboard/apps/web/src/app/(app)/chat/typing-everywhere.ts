@@ -67,6 +67,50 @@ export function noteTyping(channelId: string, typist: ListTypist): void {
     sweep ??= setInterval(expire, 1000);
 }
 
+/**
+ * Who wrote a message, as a typing frame names them: the person, or the agent
+ * (Polar) that has no account. Pure.
+ */
+export function writerOf(message: { readonly authorId: string | null; readonly fromAgent?: string }): string | null {
+    return message.authorId ?? message.fromAgent ?? null;
+}
+
+/**
+ * Typists with the writers of `messages` taken out: somebody whose message has
+ * landed has stopped typing it, whatever the last frame said, the way the dots
+ * go the moment the message appears in WhatsApp and Discord instead of a few
+ * seconds after. Returns `entries` itself when nobody left. Pure.
+ */
+export function withoutWriters<T extends { readonly userId: string }>(
+    entries: readonly T[],
+    messages: readonly { readonly authorId: string | null; readonly fromAgent?: string }[]
+): readonly T[] {
+    if (entries.length === 0) return entries;
+    const wrote = new Set(messages.flatMap((message) => writerOf(message) ?? []));
+    const kept = entries.filter((entry) => !wrote.has(entry.userId));
+    return kept.length === entries.length ? entries : kept;
+}
+
+/**
+ * A message landed in `channelId`: the list knows the conversation, not who
+ * wrote it, so everybody typing there stops - anyone still writing is back
+ * within one frame. `only` narrows it to those ids: an answer Polar writes over
+ * its own earlier message changes it in place, and stops only Polar.
+ */
+export function stopTyping(channelId: string, only?: ReadonlySet<string>): void {
+    const current = byChannel.get(channelId);
+    if (!current) return;
+    const kept = only ? current.filter((entry) => !only.has(entry.userId)) : [];
+    if (kept.length === current.length) return;
+    if (kept.length === 0) byChannel.delete(channelId);
+    else byChannel.set(channelId, kept);
+    changed(channelId);
+}
+
+/** Typists that write no message of their own account: an agent's answer is
+ *  written in place, and changing a message in place is how it lands. */
+const AGENT_TYPISTS: ReadonlySet<string> = new Set(["polar"]);
+
 /** Forget everything, for the tests. */
 export function resetTyping(): void {
     byChannel.clear();
@@ -97,6 +141,11 @@ export function useTypingIn(channelId: string, viewerId: string): readonly ListT
 /** Mounted once by the list: feeds the store from the shared stream. */
 export function TypingWatch(): null {
     useChatStream((frame) => {
+        if (frame.kind === "posted") {
+            for (const channelId of frame.arrived ?? frame.channels) stopTyping(channelId);
+            for (const channelId of Object.keys(frame.changed ?? {})) stopTyping(channelId, AGENT_TYPISTS);
+            return;
+        }
         if (frame.kind !== "typing") return;
         noteTyping(frame.channelId, {
             userId: frame.userId,
