@@ -1017,7 +1017,10 @@ export function CommandPalette({
                             </SearchGroup>
                         ))
                     )}
-                    {rows.length > 0 && searching ? <HitSkeleton /> : null}
+                    {/* Rows already found stay as they are while the rest
+                        arrive; the spinner in the field says a search is
+                        running, and skeletons under real rows only made the
+                        list jump. */}
                 </PlainNames>
             </SearchPalette>
         </>

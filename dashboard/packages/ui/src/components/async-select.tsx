@@ -187,7 +187,7 @@ function AsyncPicker<T>({
     }, [hasMore, lastDrawn, list.items.length, loadMore]);
 
     const empty =
-        !list.loading && !list.failed && list.items.length === 0 && shownFixed.length === 0;
+        !list.pending && !list.failed && list.items.length === 0 && shownFixed.length === 0;
     const status = list.loading
         ? t("asyncSelect.loading")
         : list.failed
@@ -288,7 +288,7 @@ function AsyncPicker<T>({
                 ) : (
                     <div
                         ref={setScroller}
-                        aria-busy={list.loadingMore}
+                        aria-busy={list.loadingMore || list.refreshing}
                         className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
                     >
                         <div className="relative w-full" style={{ height: virtual.getTotalSize() }}>

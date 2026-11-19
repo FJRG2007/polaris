@@ -58,12 +58,38 @@ describe("useAsyncOptions", () => {
         view.rerender({ open: true, query: "" });
         expect(calls).toHaveLength(1);
         expect(calls[0]).toMatchObject({ query: "", cursor: null });
+        // Waiting, but no skeletons yet: an answer that lands at once never
+        // flashes them.
+        expect(view.result.current.pending).toBe(true);
+        expect(view.result.current.loading).toBe(false);
+        await act(async () => vi.advanceTimersByTime(200));
         expect(view.result.current.loading).toBe(true);
 
         await calls[0]!.answer({ items: rows("a", "b"), next: "c1" });
         expect(view.result.current.items).toEqual(rows("a", "b"));
         expect(view.result.current.loading).toBe(false);
         expect(view.result.current.hasMore).toBe(true);
+    });
+
+    it("keeps the last rows on screen while a new search is on its way", async () => {
+        const { load, calls } = controlledLoad();
+        const view = mount(load);
+        view.rerender({ open: true, query: "" });
+        await calls[0]!.answer({ items: rows("a", "b"), next: null });
+
+        view.rerender({ open: true, query: "web" });
+        await act(async () => vi.advanceTimersByTime(250));
+        expect(calls).toHaveLength(2);
+        expect(view.result.current.items).toEqual(rows("a", "b"));
+        expect(view.result.current.refreshing).toBe(true);
+        expect(view.result.current.loading).toBe(false);
+        await act(async () => vi.advanceTimersByTime(500));
+        expect(view.result.current.loading).toBe(false);
+
+        await calls[1]!.answer({ items: rows("web"), next: null });
+        expect(view.result.current.items).toEqual(rows("web"));
+        expect(view.result.current.refreshing).toBe(false);
+        expect(view.result.current.pending).toBe(false);
     });
 
     it("sends the search to the server once typing pauses, not per keystroke", async () => {

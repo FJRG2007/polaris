@@ -12,7 +12,10 @@
  *
  * A first page read before is drawn at once from a short-lived cache and read
  * again behind it, and replaced only when the answer differs, so reopening a
- * picker does not flash a skeleton. A request for a question nobody is asking
+ * picker does not flash a skeleton. A new search keeps the rows already on
+ * screen until its answer lands (`refreshing`), as Discord's pickers do, and a
+ * list with nothing to show waits `SKELETON_DELAY_MS` before it draws skeletons,
+ * so an answer that arrives at once never flashes them. A request for a question nobody is asking
  * any more - an older search, a closed picker - is aborted, and its answer is
  * dropped if it arrives anyway.
  */
@@ -34,8 +37,14 @@ export type AsyncLoad<T> = (request: {
 
 export interface AsyncOptionsState<T> {
     readonly items: readonly T[];
-    /** No first page yet for this question: the list region shows skeletons. */
+    /** No first page yet for this question and nothing else to show: the list
+     *  region shows skeletons. */
     readonly loading: boolean;
+    /** A new search is on its way while the rows of the last one stay drawn. */
+    readonly refreshing: boolean;
+    /** An answer to the current question is still on its way, so an empty list
+     *  is not yet "nothing found". */
+    readonly pending: boolean;
     /** A page after the first is on its way. */
     readonly loadingMore: boolean;
     readonly hasMore: boolean;
@@ -51,6 +60,8 @@ export interface AsyncOptionsState<T> {
 export const ASYNC_OPTIONS_TTL_MS = 30_000;
 /** How long typing has to pause before it is sent. */
 export const ASYNC_OPTIONS_DEBOUNCE_MS = 250;
+/** How long an empty list waits for its answer before it draws skeletons. */
+export const SKELETON_DELAY_MS = 200;
 /** First pages kept, across every picker on the screen. */
 const CACHE_ENTRIES = 50;
 
@@ -110,6 +121,11 @@ export function useAsyncOptions<T>({
     const [items, setItems] = useState<readonly T[]>([]);
     const [next, setNext] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+    const [pending, setPending] = useState(false);
+    // Read by the effect that asks, which must not re-run when rows change.
+    const shown = useRef(0);
+    shown.current = items.length;
     const [loadingMore, setLoadingMore] = useState(false);
     const [failed, setFailed] = useState<"first" | "more" | null>(null);
     const [attempt, setAttempt] = useState(0);
@@ -138,6 +154,8 @@ export function useAsyncOptions<T>({
             controller.current?.abort();
             controller.current = null;
             question.current += 1;
+            setRefreshing(false);
+            setPending(false);
             // Every picker opens on an empty search.
             setSettledQuery("");
             return;
@@ -151,16 +169,32 @@ export function useAsyncOptions<T>({
         setLoadingMore(false);
 
         const cached = cache.get(key);
+        let skeletons: ReturnType<typeof setTimeout> | null = null;
         if (cached) {
             setItems(cached.page.items as readonly T[]);
             setNext(cached.page.next);
             setLoading(false);
+            setRefreshing(false);
+            setPending(false);
             if (Date.now() - cached.at < ttlMs && attempt === 0) return;
+        } else if (shown.current > 0) {
+            // The last answer stays until this one replaces it.
+            setLoading(false);
+            setRefreshing(true);
         } else {
-            setItems([]);
             setNext(null);
-            setLoading(true);
+            setRefreshing(false);
+            skeletons = setTimeout(() => {
+                if (asked === question.current) setLoading(true);
+            }, SKELETON_DELAY_MS);
         }
+        if (!cached) setPending(true);
+        const settle = () => {
+            if (skeletons) clearTimeout(skeletons);
+            setLoading(false);
+            setRefreshing(false);
+            setPending(false);
+        };
 
         loadRef
             .current({ query: settledQuery, cursor: null, signal: own.signal })
@@ -172,15 +206,23 @@ export function useAsyncOptions<T>({
                     setItems(page.items);
                     setNext(page.next);
                 }
-                setLoading(false);
+                settle();
             })
             .catch((error: unknown) => {
                 if (asked !== question.current || aborted(error)) return;
-                setLoading(false);
-                // A cached page already drawn stays; only an empty list says it failed.
-                if (!cached) setFailed("first");
+                settle();
+                // A cached page already drawn stays; only a list with no
+                // answer to this question says it failed.
+                if (!cached) {
+                    setItems([]);
+                    setNext(null);
+                    setFailed("first");
+                }
             });
-        return () => own.abort();
+        return () => {
+            if (skeletons) clearTimeout(skeletons);
+            own.abort();
+        };
     }, [open, cacheKey, settledQuery, ttlMs, attempt]);
 
     const loadMore = useCallback(() => {
@@ -217,6 +259,8 @@ export function useAsyncOptions<T>({
     return {
         items,
         loading,
+        refreshing,
+        pending,
         loadingMore,
         hasMore: next !== null,
         failed: failed !== null,
