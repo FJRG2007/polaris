@@ -15,7 +15,6 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
-import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.VideoView;
@@ -133,13 +132,13 @@ public final class ViewOnceActivity extends Activity {
                 fail(getString(R.string.view_once_failed));
                 return;
             }
-            ImageView image = new ImageView(this);
-            image.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            // Pinch, pan and double tap to look closer; leaving is the close button or back.
+            ZoomImageView image = new ZoomImageView(this);
             image.setImageBitmap(picture);
             frame.addView(image, 0, new FrameLayout.LayoutParams(-1, -1));
         }
         shown = true;
-        frame.setOnClickListener(view -> finish());
+        // No tap-anywhere-to-close: a pinch to zoom started with a tap and threw the photo away.
         topBar();
         String mark = file.headers.get(WATERMARK);
         if (mark != null) {
