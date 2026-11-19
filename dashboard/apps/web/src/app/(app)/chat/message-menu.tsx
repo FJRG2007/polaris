@@ -238,7 +238,14 @@ export function MessageMenu({
     const recording = pointedFile && isPlayable(pointedFile.contentType) ? pointedFile : null;
     const loose = pointedFile && !recording && !picture && !clip ? pointedFile : null;
     const hide = useHideMessage();
-    const reactable = canPost && !message.deleted && message.kind !== "system" && actions.onReact;
+    /**
+     * A line Polaris wrote itself - a call ended, somebody joined. It is reacted
+     * to and answered like any message, as Discord's are, but nobody wrote it:
+     * there is nothing to rewrite, nobody to report or answer privately, and
+     * taking it down is not offered rather than offered and refused.
+     */
+    const notice = message.kind === "system";
+    const reactable = canPost && !message.deleted && actions.onReact;
     const remindable = !message.deleted && message.kind !== "system";
     const speakable = !message.deleted && Boolean(message.body.trim()) && browserCanSpeak();
     const readingThis = useReadingMessage() === message.id;
@@ -483,7 +490,7 @@ export function MessageMenu({
                         <>
                             {/* The keys said out loud, because a shortcut nobody is
                                 told about is a shortcut nobody uses. */}
-                            {mine && actions.onEdit && (
+                            {mine && actions.onEdit && !notice && (
                                 <ContextMenuItem onSelect={() => actions.onEdit?.(message)}>
                                     <Pencil className="size-3.5" />
                                     {t("messageMenu.edit")}
@@ -515,13 +522,13 @@ export function MessageMenu({
                             {/* Absent rather than refused when whoever wrote it does
                                 not allow it. A menu that offers something and then
                                 says no is worse than one that offers less. */}
-                            {message.forwardable && actions.onForward && (
+                            {message.forwardable && actions.onForward && !notice && (
                                 <ContextMenuItem onSelect={() => actions.onForward?.(message)}>
                                     <Forward className="size-3.5" />
                                     {t("messageMenu.forward")}
                                 </ContextMenuItem>
                             )}
-                            {actions.onOpenThread && (
+                            {actions.onOpenThread && !notice && (
                                 <ContextMenuItem onSelect={() => actions.onOpenThread?.(message)}>
                                     <MessageSquare className="size-3.5" />
                                     {t("messageMenu.replyInAThread")}
@@ -655,7 +662,7 @@ export function MessageMenu({
 
                     {/* Anybody's message, gone from this reader's screen only.
                         Absent where there is no conversation to hide it from. */}
-                    {hide && (
+                    {hide && !notice && (
                         <>
                             <ContextMenuSeparator />
                             <ContextMenuItem variant="danger" onSelect={() => hide(message)}>
@@ -665,7 +672,7 @@ export function MessageMenu({
                         </>
                     )}
 
-                    {canPost && !message.deleted && (mine || canModerate) && (
+                    {canPost && !message.deleted && !notice && (mine || canModerate) && (
                         <>
                             {!hide && <ContextMenuSeparator />}
                             {/* Shift held skips the question - only the click
@@ -682,7 +689,7 @@ export function MessageMenu({
                         </>
                     )}
 
-                    {!mine && !message.deleted && (
+                    {!mine && !message.deleted && !notice && (
                         <>
                             <ContextMenuSeparator />
                             {/* Red. It is the one consequence in this menu, and

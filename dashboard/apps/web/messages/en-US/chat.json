@@ -628,7 +628,8 @@
             "yours": "{provider} flagged a link in your message. Others are warned before they open it.",
             "moderator": "{provider} flagged a link in this message. Others are warned before they open it, and you can delete it from its menu."
         },
-        "appHint": "Written by a Polaris app, not by a person"
+        "appHint": "Written by a Polaris app, not by a person",
+        "systemMessage": "system message"
     },
     "composer": {
         "replyingTo": "Replying to",

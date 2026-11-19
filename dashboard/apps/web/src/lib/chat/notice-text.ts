@@ -214,3 +214,22 @@ export function renderNotice(
 export function noticeString(parts: readonly NoticePart[]): string {
     return parts.map((part) => ("text" in part ? part.text : part.name)).join("");
 }
+
+/**
+ * A notice as the quote line over a reply to it carries it: the sentence this
+ * reader sees, cut to one line. Its own cut rather than the Markdown excerpt,
+ * because what `renderNotice` returns is already plain text - a name with an
+ * asterisk in it is a name, not emphasis.
+ */
+export function noticeExcerpt(
+    body: string,
+    names: ReadonlyMap<string, string>,
+    viewerId: string | null,
+    max: number
+): string {
+    const flat = renderNotice(body, names, viewerId).replace(/\s+/g, " ").trim();
+    if (flat.length <= max) return flat;
+    const cut = flat.slice(0, max);
+    const lastSpace = cut.lastIndexOf(" ");
+    return `${(lastSpace > max / 2 ? cut.slice(0, lastSpace) : cut).trimEnd()}...`;
+}

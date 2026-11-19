@@ -32,7 +32,15 @@ import {
 } from "./references";
 import { pollsFor, type ChatPollView } from "./polls";
 import { mentionsReader, readerTeams } from "./notify";
-import { noticeParts, noticePeople, noticeString, type NoticePart } from "./notice-text";
+import {
+    noticeExcerpt,
+    noticeParts,
+    noticePeople,
+    noticeString,
+    type NoticePart
+} from "./notice-text";
+import { activityIdIn } from "./activity-card";
+import { gameServerIdIn } from "./game-server-card";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { announceRoomMention, refuseRoomMention } from "./room-mentions";
 import { requireNotSpam, requireRoomMentionAllowed } from "./spam-guard";
@@ -264,6 +272,10 @@ export interface ChatQuoteView {
     /** True for a forward, false for a reply. The two read differently and are
      *  placed differently, and this is what decides which. */
     readonly forwarded: boolean;
+    /** The quoted message is a line Polaris wrote - a call ended, somebody
+     *  joined. It has no author to name, and the excerpt is the sentence as this
+     *  reader reads it. Absent on anything a person wrote. */
+    readonly notice?: true;
 }
 
 /** How much of the quoted message the line carries. */
@@ -2179,6 +2191,7 @@ export async function decorateMessages(
                       id: true,
                       channelId: true,
                       authorId: true,
+                      kind: true,
                       body: true,
                       deletedAt: true,
                       createdAt: true,
@@ -2194,9 +2207,14 @@ export async function decorateMessages(
     // The quoted messages have authors of their own, and they are usually
     // already in the page - but not always, which is why they join the lookup
     // rather than being read out of it.
-    const quoteAuthorIds = quoted
-        .map((row) => row.authorId)
-        .filter((id): id is string => id !== null && !authorIds.includes(id));
+    // A line Polaris wrote has nobody behind it but names people of its own,
+    // which the quote line reads out the way the line itself does.
+    const quoteAuthorIds = [
+        ...quoted.map((row) => row.authorId),
+        ...quoted.filter((row) => row.kind === "system").flatMap((row) => noticePeople(row.body))
+    ].filter(
+        (id): id is string => id !== null && !authorIds.includes(id) && !noticeIds.includes(id)
+    );
     const quoteAuthors = quoteAuthorIds.length
         ? await prisma.user.findMany({
               where: { id: { in: [...new Set(quoteAuthorIds)] } },
@@ -2390,7 +2408,7 @@ export async function decorateMessages(
                 ),
             attachments: onMessageFiles.get(row.id) ?? [],
             poll: polls.get(row.id) ?? null,
-            quote: quoteViewOf(row, quotes, names, quoteReachable, quoteHidden),
+            quote: quoteViewOf(row, quotes, names, quoteReachable, quoteHidden, actor.id),
             starred: kept.has(row.id),
             blocked: row.authorId !== null && shut.has(row.authorId),
             mentionsYou: mentioned.has(row.id),
@@ -2552,13 +2570,15 @@ function quoteViewOf(
             id: string;
             channelId: string;
             authorId: string | null;
+            kind: string;
             body: string;
             deletedAt: Date | null;
         }
     >,
     names: ReadonlyMap<string, string>,
     reachable: ReadonlySet<string>,
-    hidden: ReadonlySet<string>
+    hidden: ReadonlySet<string>,
+    viewerId: string
 ): ChatQuoteView | null {
     if (!row.replyToId) return null;
     const original =
@@ -2586,10 +2606,29 @@ function quoteViewOf(
         authorName: original.authorId ? (names.get(original.authorId) ?? null) : null,
         // The words, not the Markdown they were written in. A quote that read
         // "```py print(1) ```" showed the reader the fence rather than the code.
-        excerpt: original.deletedAt ? "" : plainExcerpt(original.body, QUOTE_LENGTH),
+        excerpt: original.deletedAt ? "" : quotedWords(original, names, viewerId),
         deleted: original.deletedAt !== null,
-        forwarded: row.forwarded
+        forwarded: row.forwarded,
+        ...(original.kind === "system" ? { notice: true as const } : {})
     };
+}
+
+/**
+ * What a quote line says the quoted message said.
+ *
+ * A line Polaris wrote is read the way the line itself is drawn - current
+ * names, "You" for the reader - rather than as the mentions it is stored as.
+ * One drawn as a card (a game, a server) carries a marker rather than words,
+ * so it quotes as nothing and the line says what kind of message it was.
+ */
+function quotedWords(
+    original: { kind: string; body: string },
+    names: ReadonlyMap<string, string>,
+    viewerId: string
+): string {
+    if (original.kind !== "system") return plainExcerpt(original.body, QUOTE_LENGTH);
+    if (activityIdIn(original.body) || gameServerIdIn(original.body)) return "";
+    return noticeExcerpt(original.body, names, viewerId, QUOTE_LENGTH);
 }
 
 function faceOf(face: string | null): { webhookAvatar?: string } {

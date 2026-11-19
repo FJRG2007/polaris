@@ -1167,9 +1167,12 @@ export function Composer({
                     <span className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t("composer.replyingTo")}>
                         {t("composer.replyingTo")}
                     </span>
-                    <span className="shrink-0 font-medium">
-                        {replyingTo.authorName ?? t("composer.somebodyWhoHasLeft")}
-                    </span>
+                    {/* A line Polaris wrote has nobody behind it to name. */}
+                    {replyingTo.kind !== "system" && (
+                        <span className="shrink-0 font-medium">
+                            {replyingTo.authorName ?? t("composer.somebodyWhoHasLeft")}
+                        </span>
+                    )}
                     {replyingFrom && (
                         <span className="shrink-0 text-muted-foreground">
                             in {replyingFrom.channel ? `#${replyingFrom.name}` : replyingFrom.name}

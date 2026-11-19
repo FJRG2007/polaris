@@ -690,8 +690,9 @@ function useMessageKeys({
             const message = shown.messages.find((entry) => entry.id === id);
             if (!message || message.deleted) return;
             // A line Polaris wrote itself - somebody joined, a call started - is
-            // not a message to answer, rewrite or take down.
-            if (message.kind === "system") return;
+            // answered and copied like any message, but nobody wrote it to
+            // rewrite or take down. The same items the menu leaves out.
+            if (message.kind === "system" && (wanted === "edit" || wanted === "delete")) return;
 
             if (wanted === "copy") {
                 // The same text the menu's "Copy text" hands over: what the
@@ -841,9 +842,7 @@ function Message({
     /** Swiping the line to the right answers it, on a phone - the same reply the
      *  menu and the hover bar offer, so only where those offer it. */
     const swipe = useSwipeReply(
-        onReply && canPost && !message.deleted && message.kind !== "system"
-            ? () => onReply(message)
-            : undefined
+        onReply && canPost && !message.deleted ? () => onReply(message) : undefined
     );
     const coverAll = useContext(CoverMedia);
     const translator = useTextTranslator();
@@ -853,22 +852,19 @@ function Message({
         translatesIncoming(message, viewerId, liveTranslation, translator.target)
     );
 
-    // Something Polaris said rather than somebody: joined, left, was added.
-    // Indented to where message text starts rather than to the avatar gutter,
-    // so a room reads as one column of sentences with the occasional quiet one
-    // among them - the gutter is for faces, and this line has none.
-    if (message.kind === "system") {
+    // Something Polaris said rather than somebody: joined, left, was added, a
+    // call ended. Drawn in the same row as a message - the hover, the bar, the
+    // menu, reactions and replies - the way Discord draws these, but as one
+    // quiet sentence with no face or name: the gutter is for faces, and this
+    // line has none.
+    const notice = message.kind === "system";
+    if (notice) {
         // A game played in this conversation's call: drawn as its card.
         const activity = activityIdIn(message.body);
         if (activity) return <ActivityCard sessionId={activity} message={message} />;
         // A game server somebody was let onto: its address and how to join.
         const server = gameServerIdIn(message.body);
         if (server) return <GameServerCard serverId={server} message={message} />;
-        return (
-            <p className="py-1 ps-14 pe-4 text-xs text-muted-foreground">
-                <NoticeText message={message} /> <MessageTime iso={message.createdAt} inline />
-            </p>
-        );
     }
 
     // Somebody this reader has blocked. Folded away rather than dropped: a
@@ -941,12 +937,12 @@ function Message({
                     ref={swipe.line}
                     className={cn(
                         "group relative flex gap-2 px-4 transition-colors hover:bg-card-hover/60 data-[state=open]:bg-card-hover",
-                        grouped ? "py-0.5" : "pb-0.5 pt-3",
+                        notice ? "py-1" : grouped ? "py-0.5" : "pb-0.5 pt-3",
                         swipe.enabled && "touch-pan-y touch-pinch-zoom"
                     )}
                 >
                     <span className="w-8 shrink-0">
-                        {grouped ? (
+                        {notice ? null : grouped ? (
                             <>
                                 <span
                                     className="hidden pt-1 text-[0.625rem] leading-4 text-foreground-subtle group-hover:block group-data-[state=open]:block"
@@ -1031,7 +1027,15 @@ function Message({
                     </span>
 
                     <div className="min-w-0 flex-1 pb-0.5">
-                        {!grouped && (
+                        {notice && !message.deleted && (
+                            <p className="text-xs text-muted-foreground">
+                                <NoticeText message={message} />{" "}
+                                <MessageTime iso={message.createdAt} inline />{" "}
+                                <Marks pinned={pinned} starred={message.starred} />
+                            </p>
+                        )}
+
+                        {!grouped && !notice && (
                             <p className="flex items-baseline gap-2">
                                 {press && message.authorId ? (
                                     <Writer
@@ -1133,7 +1137,7 @@ function Message({
                             <p className="text-sm italic text-foreground-subtle">
                                 {t("messageList.thisMessageWasDeleted")}
                             </p>
-                        ) : (
+                        ) : notice ? null : (
                             <div className="text-sm">
                                 <TranslatableText id={message.id} body={message.body} live={live}>
                                     <RichText
@@ -1201,15 +1205,25 @@ function Message({
                             />
                         )}
 
-                        {!message.deleted && (mine || canModerate) && (
-                            <FlaggedNotice message={message} mine={mine} />
-                        )}
+                        {/* A notice's mentions are its people, already drawn as
+                        names - not links, references or invites to card. */}
+                        {!notice && (
+                            <>
+                                {!message.deleted && (mine || canModerate) && (
+                                    <FlaggedNotice message={message} mine={mine} />
+                                )}
 
-                        <Spoiler kind="link" covered={coverAll}>
-                            <LinkArea message={message} />
-                        </Spoiler>
-                        <ReferenceCards message={message} inRoom={inVoice} onJumpTo={onJumpTo} />
-                        <InviteCards invites={message.invites ?? []} mine={mine} />
+                                <Spoiler kind="link" covered={coverAll}>
+                                    <LinkArea message={message} />
+                                </Spoiler>
+                                <ReferenceCards
+                                    message={message}
+                                    inRoom={inVoice}
+                                    onJumpTo={onJumpTo}
+                                />
+                                <InviteCards invites={message.invites ?? []} mine={mine} />
+                            </>
+                        )}
 
                         {message.attachments.length > 0 && (
                             <ul className="mt-1 flex flex-col gap-1">
@@ -1451,7 +1465,7 @@ function Message({
                                 </button>
                             )}
                             <TranslateButton message={message} />
-                            {onOpenThread && (
+                            {onOpenThread && !notice && (
                                 <button
                                     type="button"
                                     aria-label={t("messageList.replyInAThread")}
@@ -1462,7 +1476,7 @@ function Message({
                                     <MessageSquare className="size-3.5" />
                                 </button>
                             )}
-                            {(mine || canModerate) && (
+                            {(mine || canModerate) && !notice && (
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
                                         <button
@@ -1906,11 +1920,18 @@ function QuoteLine({
             {quote.forwarded && (
                 <span className="min-w-0 max-w-full shrink-0 truncate font-medium" title={t("messageList.forwardedFrom")}>{t("messageList.forwardedFrom")}</span>
             )}
-            <span className="shrink-0 font-medium text-foreground">
-                {quote.authorName ?? t("messageList.somebodyWhoHasLeft")}
-            </span>
+            {/* A line Polaris wrote has nobody to name: the sentence is the
+                whole of it. */}
+            {!quote.notice && (
+                <span className="shrink-0 font-medium text-foreground">
+                    {quote.authorName ?? t("messageList.somebodyWhoHasLeft")}
+                </span>
+            )}
             <span className="min-w-0 truncate" title={quote.excerpt}>
-                {quote.deleted ? t("messageList.messageDeleted") : quote.excerpt || "attachment"}
+                {quote.deleted
+                    ? t("messageList.messageDeleted")
+                    : quote.excerpt ||
+                      (quote.notice ? t("messageList.systemMessage") : "attachment")}
             </span>
         </>
     );
