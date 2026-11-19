@@ -10,7 +10,7 @@
 import { apiPermission } from "@/lib/api-session";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { readerWords } from "@/lib/i18n/reader-words";
-import { deviceKeySchema, registerDeviceKey } from "@/lib/chat/view-once";
+import { deviceKeySchema, registerDeviceKey } from "@/lib/mobile/device-proof";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";

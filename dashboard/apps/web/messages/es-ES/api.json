@@ -348,5 +348,19 @@
                 "mayNotRecord": "Solo el anfitrión graba esta llamada."
             }
         }
+    },
+    "mobile": {
+        "door": {
+            "opened": "Abierta",
+            "sent": "Enviado, aún sin confirmar",
+            "failed": "No se ha abierto. Vuelve a probar o ábrela desde Places.",
+            "throttled": "Demasiados intentos. Espera un momento.",
+            "noPlaces": "Places no está activado para ti en este Polaris.",
+            "refused": {
+                "device": "Este móvil no está preparado para abrir puertas. Abre la app de Polaris una vez y vuelve a probar.",
+                "challenge": "Ha tardado demasiado. Vuelve a probar.",
+                "signature": "Este móvil no ha podido demostrar que es tuyo. Vuelve a probar."
+            }
+        }
     }
 }

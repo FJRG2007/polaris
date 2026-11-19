@@ -22,7 +22,7 @@ const CALLS_PER_MINUTE = 120;
 const CHANGES_PER_MINUTE = 30;
 
 /** How a call reached the tool, as the audit trail and the log name it. */
-export type McpVia = "oauth" | "api-key" | "agent-session" | "streamdeck";
+export type McpVia = "oauth" | "api-key" | "agent-session" | "streamdeck" | "phone";
 
 export function viaOf(caller: McpCaller): McpVia {
     return caller.grantId ? "oauth" : caller.keyId ? "api-key" : "agent-session";

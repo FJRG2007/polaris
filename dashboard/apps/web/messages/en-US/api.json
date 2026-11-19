@@ -348,5 +348,19 @@
                 "mayNotRecord": "Only the host can record this call."
             }
         }
+    },
+    "mobile": {
+        "door": {
+            "opened": "Opened",
+            "sent": "Sent - not confirmed yet",
+            "failed": "It did not open. Try again, or open it from Places.",
+            "throttled": "Too many tries. Wait a moment.",
+            "noPlaces": "Places is not set up for you on this Polaris.",
+            "refused": {
+                "device": "This phone is not set up to open doors. Open the Polaris app once and try again.",
+                "challenge": "That took too long. Try again.",
+                "signature": "This phone could not prove it is yours. Try again."
+            }
+        }
     }
 }

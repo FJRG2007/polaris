@@ -402,6 +402,7 @@ public final class MainActivity extends Activity {
         NoticeService.pageVisible = true;
         // Signed in since the last time it ran, or stopped while signed out: it reconnects with the session now held.
         NoticeService.start(this);
+        DoorWidget.redrawAll(this);
         String next = ServerStore.origin(this);
         if (web != null && next != null && !next.equals(origin)) {
             origin = next;

@@ -27,4 +27,15 @@
     <string name="notices_channel_connection">Connection</string>
     <string name="notices_channel_messages">Messages</string>
     <string name="notices_channel_calls">Calls</string>
+    <string name="door_widget_label">Door</string>
+    <string name="door_widget_description">Open a door from your home screen</string>
+    <string name="door_tap">Tap to open</string>
+    <string name="door_opening">Opening...</string>
+    <string name="door_opened">Opened</string>
+    <string name="door_failed">It did not open. Try again.</string>
+    <string name="door_pick_title">Which door?</string>
+    <string name="door_none">There are no doors you can open on this Polaris.</string>
+    <string name="door_list_failed">Your doors could not be read. Check your connection and try again.</string>
+    <string name="door_signed_out">Open Polaris and sign in first.</string>
+    <string name="door_open_app">Open Polaris</string>
 </resources>

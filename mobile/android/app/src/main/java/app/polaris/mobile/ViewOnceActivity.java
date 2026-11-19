@@ -12,24 +12,17 @@ import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
-import android.webkit.CookieManager;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.VideoView;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
 import java.util.UUID;
-import org.json.JSONObject;
 
 /**
  * A photo or a video sent to be seen once, shown by the app itself rather than by the page: the bytes are fetched
@@ -41,6 +34,8 @@ public final class ViewOnceActivity extends Activity {
     static final String EXTRA_ORIGIN = "origin";
     static final String EXTRA_ATTACHMENT = "attachment";
     private static final int MAX_BYTES = 100 * 1024 * 1024;
+    private static final String SECONDS = "X-Polaris-View-Seconds";
+    private static final String WATERMARK = "X-Polaris-Watermark";
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private FrameLayout frame;
@@ -77,30 +72,19 @@ public final class ViewOnceActivity extends Activity {
     }
 
     private void fetch(String origin, String attachment) {
-        String base = origin + "/api/chat/attachments/" + attachment + "/once";
+        String address = origin + "/api/chat/attachments/" + attachment + "/once";
         try {
-            String key = DeviceKey.publicKey();
-            JSONObject register = new JSONObject().put("publicKey", key).put("platform", "android");
-            Answer registered = request(origin + "/api/mobile/device-key", "POST", register.toString());
-            if (registered.status >= 400) throw new Refused(registered.error());
-            Answer challenge = request(base, "GET", null);
-            if (challenge.status >= 400) throw new Refused(challenge.error());
-            String nonce = new JSONObject(new String(challenge.body, StandardCharsets.UTF_8)).getString("challenge");
-            JSONObject proof = new JSONObject()
-                    .put("challenge", nonce)
-                    .put("publicKey", key)
-                    .put("signature", DeviceKey.sign("view-once:" + attachment + ":" + nonce));
-            Answer file = request(base, "POST", proof.toString());
-            if (file.status >= 400) throw new Refused(file.error());
+            PolarisHttp.Answer file = PolarisHttp.signed(this, origin, address, "view-once", attachment,
+                    getString(R.string.view_once_failed), MAX_BYTES, SECONDS, WATERMARK);
             main.post(() -> show(file));
-        } catch (Refused refused) {
+        } catch (PolarisHttp.Refused refused) {
             main.post(() -> fail(refused.getMessage()));
         } catch (Exception failed) {
             main.post(() -> fail(getString(R.string.view_once_failed)));
         }
     }
 
-    private void show(Answer file) {
+    private void show(PolarisHttp.Answer file) {
         if (isFinishing()) return;
         loading.setVisibility(View.GONE);
         String type = file.type == null ? "" : file.type;
@@ -136,9 +120,19 @@ public final class ViewOnceActivity extends Activity {
         }
         shown = true;
         frame.setOnClickListener(view -> finish());
-        if (file.watermark != null && !file.watermark.isEmpty()) watermark(file.watermark);
-        if (file.seconds > 0) {
-            left = file.seconds;
+        String mark = file.headers.get(WATERMARK);
+        if (mark != null) {
+            try {
+                mark = URLDecoder.decode(mark, "UTF-8");
+            } catch (java.io.UnsupportedEncodingException | IllegalArgumentException unreadable) {
+                mark = null;
+            }
+        }
+        if (mark != null && !mark.isEmpty()) watermark(mark);
+        String seconds = file.headers.get(SECONDS);
+        int timer = seconds != null && seconds.matches("[0-9]{1,3}") ? Integer.parseInt(seconds) : 0;
+        if (timer > 0) {
+            left = timer;
             countdown = label(Gravity.TOP | Gravity.END, 18);
             tick();
         }
@@ -211,73 +205,5 @@ public final class ViewOnceActivity extends Activity {
         main.removeCallbacksAndMessages(null);
         if (played != null) played.delete();
         super.onDestroy();
-    }
-
-    private static final class Refused extends Exception {
-        Refused(String message) {
-            super(message);
-        }
-    }
-
-    private final class Answer {
-        int status;
-        String type;
-        String watermark;
-        int seconds;
-        byte[] body = new byte[0];
-
-        String error() {
-            try {
-                String said = new JSONObject(new String(body, StandardCharsets.UTF_8)).optString("error", "");
-                if (!said.isEmpty()) return said;
-            } catch (Exception ignored) {
-                // Not JSON: say it in the app's own words.
-            }
-            return getString(R.string.view_once_failed);
-        }
-    }
-
-    /** One request to this Polaris, signed in as the page is. */
-    private Answer request(String address, String method, String json) throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
-        try {
-            connection.setInstanceFollowRedirects(false);
-            connection.setConnectTimeout(15000);
-            connection.setReadTimeout(60000);
-            connection.setRequestMethod(method);
-            String cookie = CookieManager.getInstance().getCookie(address);
-            if (cookie != null) connection.setRequestProperty("Cookie", cookie);
-            connection.setRequestProperty("User-Agent", AppAgent.of(this));
-            if (json != null) {
-                connection.setDoOutput(true);
-                connection.setRequestProperty("Content-Type", "application/json");
-                try (OutputStream out = connection.getOutputStream()) {
-                    out.write(json.getBytes(StandardCharsets.UTF_8));
-                }
-            }
-            Answer answer = new Answer();
-            answer.status = connection.getResponseCode();
-            answer.type = connection.getContentType();
-            String seconds = connection.getHeaderField("X-Polaris-View-Seconds");
-            if (seconds != null && seconds.matches("\\d{1,3}")) answer.seconds = Integer.parseInt(seconds);
-            String mark = connection.getHeaderField("X-Polaris-Watermark");
-            if (mark != null) answer.watermark = URLDecoder.decode(mark, "UTF-8");
-            InputStream in = answer.status >= 400 ? connection.getErrorStream() : connection.getInputStream();
-            if (in != null) {
-                try (InputStream stream = in) {
-                    ByteArrayOutputStream out = new ByteArrayOutputStream();
-                    byte[] chunk = new byte[64 * 1024];
-                    int read;
-                    while ((read = stream.read(chunk)) != -1) {
-                        if (out.size() + read > MAX_BYTES) throw new IOException("too large");
-                        out.write(chunk, 0, read);
-                    }
-                    answer.body = out.toByteArray();
-                }
-            }
-            return answer;
-        } finally {
-            connection.disconnect();
-        }
     }
 }

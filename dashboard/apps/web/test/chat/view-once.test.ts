@@ -35,6 +35,7 @@ vi.mock("@polaris/db", () => {
 });
 
 const once = await import("@/lib/chat/view-once");
+const proof = await import("@/lib/mobile/device-proof");
 const choice = await import("@/lib/chat/view-once-choice");
 
 const FILE = "0190f5e2-7c1a-7b3e-9a4d-2f6b8c1d0e9a";
@@ -67,25 +68,27 @@ beforeEach(() => {
 describe("challenges", () => {
     it("holds for exactly one reader, one file and one minute", () => {
         const now = 1_800_000_000_000;
-        const challenge = once.viewOnceChallenge(FILE, "me", now);
-        expect(once.challengeValid(challenge, FILE, "me", now + 59_000)).toBe(true);
-        expect(once.challengeValid(challenge, FILE, "me", now + 61_000)).toBe(false);
-        expect(once.challengeValid(challenge, FILE, "someone-else", now)).toBe(false);
-        expect(once.challengeValid(challenge, "another-file", "me", now)).toBe(false);
-        expect(once.challengeValid(`${challenge}x`, FILE, "me", now)).toBe(false);
-        expect(once.challengeValid("garbage", FILE, "me", now)).toBe(false);
+        const challenge = proof.deviceChallenge("view-once", FILE, "me", now);
+        expect(proof.challengeValid(challenge, "view-once", FILE, "me", now + 59_000)).toBe(true);
+        expect(proof.challengeValid(challenge, "view-once", FILE, "me", now + 61_000)).toBe(false);
+        expect(proof.challengeValid(challenge, "view-once", FILE, "someone-else", now)).toBe(false);
+        expect(proof.challengeValid(challenge, "view-once", "another-file", "me", now)).toBe(false);
+        // Signed for one thing, it is no good for another: a view-once open is not a door.
+        expect(proof.challengeValid(challenge, "door-open", FILE, "me", now)).toBe(false);
+        expect(proof.challengeValid(`${challenge}x`, "view-once", FILE, "me", now)).toBe(false);
+        expect(proof.challengeValid("garbage", "view-once", FILE, "me", now)).toBe(false);
     });
 });
 
 describe("the phone's key", () => {
     it("accepts a P-256 key and its signature, and nothing else", () => {
         const device = phone();
-        expect(once.readDeviceKey(device.spki)).not.toBeNull();
-        expect(once.signatureValid(device.spki, "hello", device.sign("hello"))).toBe(true);
-        expect(once.signatureValid(device.spki, "hello", device.sign("other"))).toBe(false);
+        expect(proof.readDeviceKey(device.spki)).not.toBeNull();
+        expect(proof.signatureValid(device.spki, "hello", device.sign("hello"))).toBe(true);
+        expect(proof.signatureValid(device.spki, "hello", device.sign("other"))).toBe(false);
         const rsa = generateKeyPairSync("rsa", { modulusLength: 2048 }).publicKey;
-        expect(once.readDeviceKey(rsa.export({ format: "der", type: "spki" }).toString("base64"))).toBeNull();
-        expect(once.readDeviceKey("not a key")).toBeNull();
+        expect(proof.readDeviceKey(rsa.export({ format: "der", type: "spki" }).toString("base64"))).toBeNull();
+        expect(proof.readDeviceKey("not a key")).toBeNull();
     });
 });
 
@@ -95,7 +98,7 @@ describe("opening", () => {
         return once.claimViewOnce(userId, target, {
             challenge,
             publicKey: device.spki,
-            signature: device.sign(once.signedText(FILE, challenge))
+            signature: device.sign(proof.signedText("view-once", FILE, challenge))
         });
     }
 
@@ -123,7 +126,7 @@ describe("opening", () => {
             once.claimViewOnce("me", file(), {
                 challenge,
                 publicKey: device.spki,
-                signature: other.sign(once.signedText(FILE, challenge))
+                signature: other.sign(proof.signedText("view-once", FILE, challenge))
             })
         ).rejects.toMatchObject({ reason: "signature" });
         await expect(attempt(device, "me", file("me"))).rejects.toMatchObject({ reason: "own" });
@@ -148,8 +151,8 @@ describe("what a sender may choose", () => {
     });
 
     it("believes where a file came from only from the phone app", () => {
-        expect(once.fromPhoneApp("Mozilla/5.0 PolarisMobile/0.1.2 (Android)")).toBe(true);
-        expect(once.fromPhoneApp("Mozilla/5.0 Chrome/130")).toBe(false);
-        expect(once.fromPhoneApp(null)).toBe(false);
+        expect(proof.fromPhoneApp("Mozilla/5.0 PolarisMobile/0.1.2 (Android)")).toBe(true);
+        expect(proof.fromPhoneApp("Mozilla/5.0 Chrome/130")).toBe(false);
+        expect(proof.fromPhoneApp(null)).toBe(false);
     });
 });

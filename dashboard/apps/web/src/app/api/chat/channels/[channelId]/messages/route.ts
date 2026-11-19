@@ -43,7 +43,7 @@ import {
     type StoredAttachment
 } from "@/lib/chat/attachments";
 import { claimUploads, UploadRefused } from "@/lib/chat/uploads";
-import { fromPhoneApp } from "@/lib/chat/view-once";
+import { fromPhoneApp } from "@/lib/mobile/device-proof";
 import { readViewOnceChoices, viewOnceable } from "@/lib/chat/view-once-choice";
 
 /**

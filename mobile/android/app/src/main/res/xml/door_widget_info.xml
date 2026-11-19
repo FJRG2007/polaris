@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One door on the home screen. Never refreshed on a timer: it draws what it was last told and asks only when pressed. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:configure="app.polaris.mobile.DoorWidgetConfigure"
+    android:description="@string/door_widget_description"
+    android:initialLayout="@layout/widget_door"
+    android:minWidth="110dp"
+    android:minHeight="40dp"
+    android:previewLayout="@layout/widget_door"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

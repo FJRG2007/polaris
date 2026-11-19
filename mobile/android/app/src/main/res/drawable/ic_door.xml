@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A door with its handle, in the primary colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/primary"
+        android:pathData="M6,2h12a1,1 0,0 1,1 1v18h2v2H3v-2h2V3a1,1 0,0 1,1 -1zM7,4v17h10V4H7zM14,11h2v2h-2z" />
+</vector>

@@ -52,6 +52,33 @@
             android:noHistory="true"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" />
 
+        <!-- A door on the home screen, and the screen that picks which. -->
+        <receiver
+            android:name=".DoorWidget"
+            android:exported="true"
+            android:label="@string/door_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/door_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".DoorPress"
+            android:exported="false" />
+
+        <activity
+            android:name=".DoorWidgetConfigure"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Polaris">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <!-- One connection to the instance for messages and calls while the app is closed. -->
         <service
             android:name=".NoticeService"

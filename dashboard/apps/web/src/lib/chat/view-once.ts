@@ -15,15 +15,14 @@
  * Server-only.
  */
 
-import { z } from "zod";
-import { loadEnv } from "@polaris/config";
 import { Prisma, prisma } from "@polaris/db";
-import { createHmac, createPublicKey, timingSafeEqual, verify } from "node:crypto";
-
-/** How long a challenge stays good: a phone asks for one and signs it at once. */
-export const CHALLENGE_TTL_MS = 60_000;
-/** Keys kept per account; older phones beyond this are forgotten. */
-export const MOST_DEVICE_KEYS = 10;
+import {
+    deviceChallenge,
+    DeviceProofRefused,
+    deviceUsed,
+    proveDevice,
+    type DeviceProof
+} from "@/lib/mobile/device-proof";
 
 export type ViewOnceRefusal =
     | "notFound"
@@ -40,99 +39,9 @@ export class ViewOnceRefused extends Error {
     }
 }
 
-/** Whether the request came from the phone app, the only sender whose "camera" is believed. */
-export function fromPhoneApp(userAgent: string | null): boolean {
-    return /\bPolarisMobile\/\d/.test(userAgent ?? "");
-}
-
-function challengeMac(attachmentId: string, userId: string, expires: string, secret: string): string {
-    return createHmac("sha256", secret)
-        .update(`view-once:${attachmentId}:${userId}:${expires}`)
-        .digest("base64url");
-}
-
-/** A challenge for one reader and one file, good for a minute. */
-export function viewOnceChallenge(
-    attachmentId: string,
-    userId: string,
-    now = Date.now(),
-    secret = loadEnv().POLARIS_AUTH_SECRET
-): string {
-    const expires = String(now + CHALLENGE_TTL_MS);
-    return `${expires}.${challengeMac(attachmentId, userId, expires, secret)}`;
-}
-
-/** Whether a challenge was made for exactly this reader and file, and is still good. */
-export function challengeValid(
-    challenge: string,
-    attachmentId: string,
-    userId: string,
-    now = Date.now(),
-    secret = loadEnv().POLARIS_AUTH_SECRET
-): boolean {
-    const [expires, mac, extra] = challenge.split(".");
-    if (!expires || !mac || extra !== undefined || !/^\d{10,16}$/.test(expires)) return false;
-    if (Number(expires) < now) return false;
-    const expected = Buffer.from(challengeMac(attachmentId, userId, expires, secret));
-    const given = Buffer.from(mac);
-    return expected.length === given.length && timingSafeEqual(expected, given);
-}
-
-/** The text a phone signs for one file and one challenge. */
-export function signedText(attachmentId: string, challenge: string): string {
-    return `view-once:${attachmentId}:${challenge}`;
-}
-
-/** A P-256 public key in SPKI base64, or null when it is anything else. */
-export function readDeviceKey(publicKey: string) {
-    if (!/^[A-Za-z0-9+/=]{40,400}$/.test(publicKey)) return null;
-    try {
-        const key = createPublicKey({ key: Buffer.from(publicKey, "base64"), format: "der", type: "spki" });
-        if (key.asymmetricKeyType !== "ec" || key.asymmetricKeyDetails?.namedCurve !== "prime256v1") return null;
-        return key;
-    } catch {
-        return null;
-    }
-}
-
-/** Whether this signature (DER ECDSA, base64) over this text is that key's. */
-export function signatureValid(publicKey: string, text: string, signature: string): boolean {
-    const key = readDeviceKey(publicKey);
-    if (!key || !/^[A-Za-z0-9+/=]{16,200}$/.test(signature)) return false;
-    try {
-        return verify("sha256", Buffer.from(text, "utf8"), key, Buffer.from(signature, "base64"));
-    } catch {
-        return false;
-    }
-}
-
-export const deviceKeySchema = z.object({
-    publicKey: z.string().trim().min(40).max(400),
-    platform: z.enum(["android", "ios"])
-});
-
-/**
- * Keep a phone's key for this account.
- *
- * The same phone signed in as somebody else moves its key to them: a key is a
- * phone, and the phone now opens that account. Past `MOST_DEVICE_KEYS` the
- * longest-unused keys are forgotten.
- */
-export async function registerDeviceKey(userId: string, publicKey: string, platform: "android" | "ios"): Promise<boolean> {
-    if (!readDeviceKey(publicKey)) return false;
-    await prisma.mobileDeviceKey.upsert({
-        where: { publicKey },
-        create: { userId, publicKey, platform },
-        update: { userId, platform, lastUsedAt: new Date() }
-    });
-    const kept = await prisma.mobileDeviceKey.findMany({
-        where: { userId },
-        orderBy: { lastUsedAt: "desc" },
-        skip: MOST_DEVICE_KEYS,
-        select: { id: true }
-    });
-    if (kept.length > 0) await prisma.mobileDeviceKey.deleteMany({ where: { id: { in: kept.map((row) => row.id) } } });
-    return true;
+/** A challenge to open one view-once file, for one reader. */
+export function viewOnceChallenge(attachmentId: string, userId: string): string {
+    return deviceChallenge("view-once", attachmentId, userId);
 }
 
 /** A view-once file as the opening route needs it. Null for anything else. */
@@ -162,17 +71,15 @@ export type ViewOnceFile = NonNullable<Awaited<ReturnType<typeof viewOnceFile>>>
 export async function claimViewOnce(
     userId: string,
     file: ViewOnceFile,
-    proof: { readonly challenge: string; readonly publicKey: string; readonly signature: string }
+    proof: DeviceProof
 ): Promise<void> {
     if (file.message.authorId === userId) throw new ViewOnceRefused("own");
-    const device = await prisma.mobileDeviceKey.findUnique({
-        where: { publicKey: proof.publicKey },
-        select: { id: true, userId: true }
-    });
-    if (!device || device.userId !== userId) throw new ViewOnceRefused("device");
-    if (!challengeValid(proof.challenge, file.id, userId)) throw new ViewOnceRefused("challenge");
-    if (!signatureValid(proof.publicKey, signedText(file.id, proof.challenge), proof.signature)) {
-        throw new ViewOnceRefused("signature");
+    let keyId: string;
+    try {
+        keyId = await proveDevice(userId, "view-once", file.id, proof);
+    } catch (error) {
+        if (error instanceof DeviceProofRefused) throw new ViewOnceRefused(error.reason);
+        throw error;
     }
     try {
         await prisma.chatAttachmentOpen.create({ data: { attachmentId: file.id, userId } });
@@ -182,7 +89,7 @@ export async function claimViewOnce(
         }
         throw error;
     }
-    await prisma.mobileDeviceKey.update({ where: { id: device.id }, data: { lastUsedAt: new Date() } });
+    await deviceUsed(keyId);
 }
 
 /** Who is looking and when, for the phone to draw across the picture. */

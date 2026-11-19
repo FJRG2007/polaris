@@ -8,8 +8,8 @@
  * See `lib/chat/view-once`.
  */
 
-import { z } from "zod";
 import { prisma } from "@polaris/db";
+import { deviceProofSchema } from "@/lib/mobile/device-proof";
 import { apiPermission } from "@/lib/api-session";
 import { channelAccess } from "@/lib/chat/access";
 import { publishChatChange } from "@/lib/chat/live";
@@ -29,12 +29,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } as const;
-
-const proofSchema = z.object({
-    challenge: z.string().trim().min(10).max(200),
-    publicKey: z.string().trim().min(40).max(400),
-    signature: z.string().trim().min(16).max(200)
-});
 
 type Reader = { readonly id: string; readonly name?: string | null; readonly username?: string | null };
 
@@ -74,7 +68,7 @@ export async function POST(
     const user = await apiPermission("chat.use");
     if (user instanceof Response) return user;
     const { attachmentId } = await params;
-    const proof = proofSchema.safeParse(await request.json().catch(() => null));
+    const proof = deviceProofSchema.safeParse(await request.json().catch(() => null));
     if (!proof.success) return refusal("signature");
     const file = await reachable(user, attachmentId);
     if (!file) return refusal("notFound");
