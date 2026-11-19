@@ -25,6 +25,8 @@ const ALLOWED: Record<string, string> = {
         "public share link: the visitor is not signed in and has no Drive",
     "apps/web/src/app/(app)/apps/deploy/upload-source.tsx":
         "a whole folder, which the picker cannot choose; the .zip button uses the picker",
+    "apps/web/src/app/(app)/chat/media-editor.tsx":
+        "Add more inside the photo editor: more from the phone's gallery, as the picker's own gallery button opens",
     "apps/web/src/app/(app)/vault/qr-scan.tsx":
         "a 2FA QR carries the secret; the vault reads it only in the browser, and a Drive or address pick is fetched through the server",
     "apps/web/src/app/(app)/vault/recovery-codes.tsx":

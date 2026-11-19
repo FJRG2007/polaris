@@ -34,7 +34,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useFavoriteApps } from "@/components/favorite-apps-context";
 import { useNotificationFeed } from "@/components/notifications/notifications-provider";
 import { setAccountSheetOpen, useAccountSheetOpen } from "@/components/account-sheet-state";
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useBottomTabsOwned } from "@/components/phone-tabs-owner";
+import { useEffect, useState } from "react";
 
 /** How many apps get a tab of their own, between Home and the bell: five tabs
  *  in all, as many as a phone's width holds with a readable name under each. */
@@ -46,35 +47,6 @@ const NOTIFICATIONS_PATH = "/account/notifications";
 /** Apps that already have a tab of their own: Home is the Overview, and "You"
  *  is the account. */
 const OWN_TAB = new Set([nav.OVERVIEW_APP_ID, "account"]);
-
-const PhoneTabsContext = createContext<{ owned: boolean; own: () => () => void }>({
-    owned: false,
-    own: () => () => undefined
-});
-
-/** Holds whether a screen has taken the bottom of the phone for its own tabs. */
-export function PhoneTabsProvider({ children }: { children: ReactNode }) {
-    const [owners, setOwners] = useState(0);
-    const own = useCallback(() => {
-        setOwners((count) => count + 1);
-        return () => setOwners((count) => count - 1);
-    }, []);
-    const value = useMemo(() => ({ owned: owners > 0, own }), [owners, own]);
-    return <PhoneTabsContext.Provider value={value}>{children}</PhoneTabsContext.Provider>;
-}
-
-/** For a screen that draws its own BottomTabs: the shell's bar steps aside
- *  while the screen is mounted. */
-export function useOwnBottomTabs(): void {
-    const { own } = useContext(PhoneTabsContext);
-    useEffect(() => own(), [own]);
-}
-
-/** `useOwnBottomTabs` as an element, for a server layout. */
-export function OwnBottomTabs(): null {
-    useOwnBottomTabs();
-    return null;
-}
 
 /** The tabs the bar draws, in order. Pure, so the choice can be asserted. */
 export function phoneTabApps({
@@ -106,7 +78,7 @@ export function PhoneTabBar({
     guestAppIds?: string[];
     otherwiseAppIds?: string[];
 }) {
-    const { owned } = useContext(PhoneTabsContext);
+    const owned = useBottomTabsOwned();
     const t = useTranslations("nav");
     const label = useNavLabel();
     const router = useRouter();

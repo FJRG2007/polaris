@@ -22,7 +22,7 @@ import { ChatSidebar } from "./chat-sidebar";
 import { ChatLockProvider } from "./lock-dialogs";
 import { usePathname, useRouter } from "next/navigation";
 import { usePhone } from "@/components/use-phone";
-import { useOwnBottomTabs } from "@/components/phone-tabs";
+import { useOwnBottomTabs } from "@/components/phone-tabs-owner";
 import { MessageSquare, Server, Video } from "lucide-react";
 import { phoneChatTab, phoneTabBadges, type PhoneChatTab } from "./phone-chat";
 import { useChatPane } from "./use-chat-pane";

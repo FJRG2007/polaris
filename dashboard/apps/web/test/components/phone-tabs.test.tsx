@@ -34,7 +34,8 @@ vi.mock("@/components/device-accounts", () => ({ AccountSwitcherDialog: () => nu
 import { PHONE_TABS_HIDE } from "@polaris/ui";
 import { AccountSheet } from "@/components/account-sheet";
 import { setAccountSheetOpen, useAccountSheetOpen } from "@/components/account-sheet-state";
-import { OwnBottomTabs, PHONE_TAB_APPS, PhoneTabBar, PhoneTabsProvider, phoneTabApps } from "@/components/phone-tabs";
+import { PHONE_TAB_APPS, PhoneTabBar, phoneTabApps } from "@/components/phone-tabs";
+import { OwnBottomTabs, PhoneTabsProvider } from "@/components/phone-tabs-owner";
 
 const DASHBOARD = resolve(__dirname, "../../../..");
 const person = { id: "u1", name: "Ada Lovelace" };

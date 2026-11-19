@@ -102,7 +102,7 @@ export function ConversationInfo({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent phone="full" className="flex flex-col gap-0 overflow-y-auto p-0">
+            <DialogContent phone="full" className="flex flex-col gap-0 overflow-y-auto overscroll-contain p-0">
                 <div className="flex flex-col items-center gap-2 px-4 pt-6 pb-4 text-center">
                     {channel.spaceId !== null ? (
                         <span className="flex size-20 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
