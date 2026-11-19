@@ -417,6 +417,8 @@ model User {
     activities          UserActivity[]
     activitySettings    UserActivitySettings?
     gameTime            UserGameTime[]
+    mobileDeviceKeys    MobileDeviceKey[]
+    chatAttachmentOpens ChatAttachmentOpen[]
     badgesSeen          UserBadgeSeen[]
     listeningAlong      SpotifyListenAlong?  @relation("ListenAlongListener")
     ownOAuthApps        UserOAuthApp[]
@@ -11319,11 +11321,52 @@ model ChatAttachment {
     // spoiler and the sentence explaining it are usually sent together, and it
     // is the picture that has to be hidden.
     spoiler      Boolean  @default(false)
+    // Seen once, on a phone, and never kept. The bytes and the still are served
+    // only to the Polaris phone app, signed with that phone's own key, once per
+    // reader (`ChatAttachmentOpen`); a browser is told to open it on the phone.
+    viewOnce     Boolean  @default(false)
+    // How long it stays on screen once opened, in seconds. Null is "until it is
+    // closed" (and, for a video, until it ends).
+    viewSeconds  Int?
+    // Where the sender's phone app says it came from: "camera" or "gallery".
+    // Null when it was not sent from the app, which is everything else.
+    captured     String?
     createdAt    DateTime @default(now())
 
     message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+    opens   ChatAttachmentOpen[]
 
     @@index([messageId])
+}
+
+// A view-once file somebody opened. Its existence is the "once": the row is
+// written before a byte is sent, and the primary key refuses the second.
+model ChatAttachmentOpen {
+    attachmentId String   @db.Uuid
+    userId       String   @db.Uuid
+    openedAt     DateTime @default(now())
+
+    attachment ChatAttachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+    user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([attachmentId, userId])
+    @@index([userId])
+}
+
+// A key made inside a phone running the Polaris app, kept so a request it signs
+// can be told from a browser's. The private half never leaves the phone.
+model MobileDeviceKey {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    userId     String   @db.Uuid
+    // X.509 SubjectPublicKeyInfo, base64: an ECDSA P-256 key.
+    publicKey  String   @unique
+    platform   String
+    createdAt  DateTime @default(now())
+    lastUsedAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, lastUsedAt])
 }
 
 // A file already on the storage, waiting for the message that will carry it.

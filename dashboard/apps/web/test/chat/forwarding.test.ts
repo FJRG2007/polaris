@@ -74,6 +74,8 @@ const original = {
     parentId: null,
     replyToId: null,
     forwarded: false,
+    // None of its files is one to be seen once.
+    attachments: [] as { id: string }[],
     replyCount: 0,
     lastReplyAt: null,
     editedAt: null,

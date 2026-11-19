@@ -33,6 +33,7 @@ import {
     readAttachmentPoster
 } from "@/lib/chat/attachments";
 import { downloadTicketHeaders } from "@/lib/download-ticket";
+import { viewOnceFile } from "@/lib/chat/view-once";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -65,6 +66,12 @@ export async function GET(
     ) {
         console.warn(`chat: ${user.id} may not read attachment ${attachmentId}`);
         return new Response(null, { status: 404 });
+    }
+
+    // Sent to be seen once: never to a browser, the still included. The phone
+    // app opens it through `./once`, signed, and only once.
+    if (await viewOnceFile(attachmentId)) {
+        return Response.json({ error: (await readerWords("chat"))("viewOnce.phoneOnly") }, { status: 403 });
     }
 
     // The still, when that is what was asked for. Its own answer rather than its

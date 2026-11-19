@@ -32,6 +32,7 @@ import { WebhookFace } from "./webhook-face";
 import { PersonName } from "@/components/person-name";
 import { PolarBadge, PolarBotCard, PolarFace, POLAR_NAME } from "@/components/polar/polar-bot";
 import { Spoiler } from "./spoiler";
+import { ViewOnceCard } from "./view-once-card";
 import { MessageMenu } from "./message-menu";
 import { deleteKeyWithShift, type DeleteMessage } from "./delete-message";
 import { copyText } from "./links";
@@ -1200,6 +1201,13 @@ function Message({
                                     // this one file's download only when the
                                     // right-click was on it - see `messageTarget`.
                                     <li key={file.id} data-attachment={file.id}>
+                                        {file.viewOnce ? (
+                                            <ViewOnceCard
+                                                file={{ ...file, viewOnce: file.viewOnce }}
+                                                mine={mine}
+                                            />
+                                        ) : (
+                                        <>
                                         {/* Covered where the sender said so. The
                                         file is drawn underneath either way, so
                                         uncovering it is the cover coming off
@@ -1274,6 +1282,8 @@ function Message({
                                                 />
                                             )}
                                         </Spoiler>
+                                        </>
+                                        )}
                                     </li>
                                 ))}
                             </ul>

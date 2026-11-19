@@ -190,6 +190,12 @@ export interface StoredAttachment {
     /** Whether the bytes are somebody else's, shared out of a Drive rather than
      *  copied in here. See `borrowAttachment`. */
     readonly borrowed: boolean;
+    /** Sent to be seen once, on a phone - see `lib/chat/view-once`. */
+    readonly viewOnce?: boolean;
+    /** Seconds on screen once opened; null is until it is closed. */
+    readonly viewSeconds?: number | null;
+    /** "camera" or "gallery", as the sender's phone app said. */
+    readonly captured?: string | null;
 }
 
 /**
@@ -452,8 +458,9 @@ const READ_TIMEOUT_MS = 20_000;
  * thumbnails and none of the files.
  */
 export async function readAttachmentPoster(attachmentId: string): Promise<Uint8Array | null> {
+    // A view-once file has no still for anybody: see `lib/chat/view-once`.
     const row = await prisma.chatAttachment.findUnique({
-        where: { id: attachmentId },
+        where: { id: attachmentId, viewOnce: false },
         select: { posterPath: true, posterConnectionId: true }
     });
     if (!row?.posterPath) return null;
@@ -475,8 +482,11 @@ export async function describeAttachment(attachmentId: string): Promise<{
     readonly connectionId: string | null;
     readonly path: string;
 } | null> {
+    // Never a view-once file: those are served by their own route, to the
+    // phone app alone, once (`lib/chat/view-once`). Refused here, where every
+    // reader of a chat file passes, rather than at each of them.
     return prisma.chatAttachment.findUnique({
-        where: { id: attachmentId },
+        where: { id: attachmentId, viewOnce: false },
         select: { name: true, contentType: true, connectionId: true, path: true }
     });
 }
@@ -487,7 +497,7 @@ export async function readAttachment(attachmentId: string): Promise<{
     readonly bytes: Uint8Array;
 } | null> {
     const row = await prisma.chatAttachment.findUnique({
-        where: { id: attachmentId },
+        where: { id: attachmentId, viewOnce: false },
         select: { name: true, contentType: true, connectionId: true, path: true }
     });
     if (!row) return null;

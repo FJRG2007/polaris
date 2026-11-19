@@ -59,6 +59,12 @@ import {
 import { isBlankMarkdown } from "@/components/rich-text/markdown";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { dropDraft, keepDraft, readDraft, type SavedDraft } from "./drafts";
+import { lastPickSource } from "@/lib/mobile-bridge";
+import {
+    VIEW_SECONDS,
+    viewOnceable,
+    type ViewOnceChoice
+} from "@/lib/chat/view-once-choice";
 import {
     canRecord,
     MAX_VOICE_SECONDS,
@@ -77,6 +83,7 @@ import {
     Paperclip,
     SendHorizontal,
     Square,
+    Timer,
     Trash2,
     Video,
     X
@@ -87,6 +94,7 @@ import {
     cn,
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuItem,
     DropdownMenuTrigger,
     isDirty,
     shortcutPressed,
@@ -145,6 +153,7 @@ export function Composer({
     onTyping,
     onSend,
     canShareFromDrive = false,
+    canViewOnce = false,
     onSchedule,
     onPoll,
     onMedia,
@@ -280,7 +289,10 @@ export function Composer({
         report?: (progress: SendProgress) => void,
         /** Set when `body` is a translation of what was typed - see
          *  `translateOutgoing`. */
-        translation?: core.ChatSentTranslation
+        translation?: core.ChatSentTranslation,
+        /** Which of `files` go to be seen once, with their timer. Only ever set
+         *  for a caller that said it can send them (`canViewOnce`). */
+        viewOnce?: readonly ViewOnceChoice[]
     ) => void | Promise<SendOutcome>;
     /**
      * The language what is written goes out in, or null to send it as written:
@@ -323,6 +335,8 @@ export function Composer({
      * because silently dropping the file would be worse than copying it.
      */
     canShareFromDrive?: boolean;
+    /** Whether a photo or video here may be sent to be seen once, on a phone. */
+    canViewOnce?: boolean;
     /** A GIF or sticker chosen from the picker. Its own path rather than a
      *  staged file: it is already somewhere, and it is the whole message. */
     onMedia?: (address: string) => void | Promise<void>;
@@ -379,6 +393,11 @@ export function Composer({
      *  one over both lists: the two are held apart, and an index into a list
      *  that does not hold it is how a mark lands on the wrong file. */
     const [coveredKept, setCoveredKept] = useState<ReadonlySet<number>>(() => new Set());
+    /** Which staged files go to be seen once, by index, with their timer (null
+     *  is until closed). Beside the list for the same reason as `covered`. */
+    const [once, setOnce] = useState<ReadonlyMap<number, number | null>>(() => new Map());
+    /** Where the phone app said each picked file came from. */
+    const pickedFrom = useRef(new WeakMap<File, "camera" | "gallery">());
     const [refused, setRefused] = useState("");
     /** What the editor draws and offers for `:`, kept to one object per list so
      *  the editor is not told the list changed on every keystroke. */
@@ -736,7 +755,8 @@ export function Composer({
                 one.kept,
                 (progress) =>
                     settle((was) => (was.phase === "sending" ? { ...was, progress } : was)),
-                one.translation
+                one.translation,
+                one.viewOnce
             );
         } catch {
             outcome = { error: t("composer.outgoing.notSent") };
@@ -831,11 +851,19 @@ export function Composer({
         const hidden = [...covered, ...[...coveredKept].map((at) => sending.length + at)].sort(
             (one, other) => one - other
         );
+        const viewOnce = [...once]
+            .filter(([at]) => sending[at] !== undefined)
+            .map(([index, seconds]) => ({
+                index,
+                seconds,
+                captured: pickedFrom.current.get(sending[index]!) ?? null
+            }));
         setBody("");
         setFiles([]);
         setKept([]);
         setCovered(new Set());
         setCoveredKept(new Set());
+        setOnce(new Map());
         setRefused("");
         emptyTheBox();
         // It is somewhere that is not a browser now.
@@ -849,7 +877,8 @@ export function Composer({
                 files: sending,
                 kept: staying,
                 hidden,
-                translation
+                translation,
+                ...(viewOnce.length > 0 ? { viewOnce } : {})
             });
         } else await onSend(words, sending, undefined, hidden, staying, undefined, translation);
     };
@@ -865,6 +894,12 @@ export function Composer({
         if (!onSchedule || disabled || tooLong) return;
         const text = isBlankMarkdown(body) ? "" : body.trim();
         if (!text && files.length === 0) return;
+        // A scheduled message is copied when it goes, and a view-once file is
+        // not one to keep a copy of: said, rather than sent without it.
+        if (once.size > 0) {
+            setScheduleError(t("viewOnce.notScheduled"));
+            return;
+        }
         setScheduleBusy(true);
         setScheduleError("");
         const result = await onSchedule(sendAt, text, files);
@@ -1034,6 +1069,10 @@ export function Composer({
             );
         }
         setRefused(notes.join(" "));
+        // Asked once per pick and forgotten by the app as it answers, so a file
+        // pasted afterwards is not taken for one from the camera.
+        const source = lastPickSource();
+        if (source) for (const file of accepted) pickedFrom.current.set(file, source);
         if (accepted.length > 0) setFiles((current) => [...current, ...accepted]);
         return accepted.length;
     };
@@ -1201,6 +1240,19 @@ export function Composer({
                             key={`${file.name}:${file.lastModified}:${index}`}
                             file={file}
                             covered={covered.has(index)}
+                            viewOnce={
+                                canViewOnce && viewOnceable(typeOfFile(file.type, file.name))
+                                    ? { seconds: once.has(index) ? once.get(index)! : undefined }
+                                    : null
+                            }
+                            onViewOnce={(seconds) =>
+                                setOnce((current) => {
+                                    const next = new Map(current);
+                                    if (seconds === undefined) next.delete(index);
+                                    else next.set(index, seconds);
+                                    return next;
+                                })
+                            }
                             onCover={() =>
                                 setCovered((current) => {
                                     const next = new Set(current);
@@ -1218,6 +1270,14 @@ export function Composer({
                                     for (const at of current) {
                                         if (at < index) next.add(at);
                                         else if (at > index) next.add(at - 1);
+                                    }
+                                    return next;
+                                });
+                                setOnce((current) => {
+                                    const next = new Map<number, number | null>();
+                                    for (const [at, seconds] of current) {
+                                        if (at < index) next.set(at, seconds);
+                                        else if (at > index) next.set(at - 1, seconds);
                                     }
                                     return next;
                                 });
@@ -1763,12 +1823,18 @@ function MicButton({ disabled, onStart }: { disabled: boolean; onStart: () => vo
 function StagedFile({
     file,
     covered,
+    viewOnce,
+    onViewOnce,
     onCover,
     onRemove
 }: {
     file: File;
     /** Whether this one has been marked to arrive covered. */
     covered: boolean;
+    /** Null when it cannot be sent to be seen once; otherwise its timer, with
+     *  `undefined` for not chosen and null for until closed. */
+    viewOnce: { readonly seconds: number | null | undefined } | null;
+    onViewOnce: (seconds: number | null | undefined) => void;
     onCover: () => void;
     onRemove: () => void;
 }) {
@@ -1833,6 +1899,59 @@ function StagedFile({
         </tile.AttachmentAction>
     );
 
+    /**
+     * Send it to be seen once, on a phone, for this long.
+     *
+     * A menu rather than a toggle because the timer is the decision: a photo
+     * opens for ten seconds unless the sender says otherwise, a video until it
+     * is closed.
+     */
+    const chosen = viewOnce?.seconds;
+    const onceOn = chosen !== undefined;
+    const timerLabel = (seconds: number | null) =>
+        seconds === null ? t("viewOnce.untilClosed") : t("viewOnce.seconds", { seconds });
+    const viewOnceControl = viewOnce && (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <button
+                    type="button"
+                    aria-pressed={onceOn}
+                    aria-label={t("viewOnce.chooseNamed", { name: file.name })}
+                    title={onceOn ? `${t("viewOnce.label")} - ${timerLabel(chosen)}` : t("viewOnce.label")}
+                    className={cn(
+                        "flex items-center gap-0.5 rounded p-0.5 transition-colors",
+                        onceOn ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                    )}
+                >
+                    <Timer className="size-3" />
+                    {onceOn && (
+                        <span className="text-[0.625rem] leading-none">
+                            {chosen === null ? "\u221e" : chosen}
+                        </span>
+                    )}
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top" className="w-48">
+                {[...VIEW_SECONDS, null].map((seconds) => (
+                    <DropdownMenuItem
+                        key={String(seconds)}
+                        onSelect={() => onViewOnce(seconds)}
+                        className={chosen === seconds ? "text-primary" : undefined}
+                    >
+                        <Timer />
+                        {timerLabel(seconds)}
+                    </DropdownMenuItem>
+                ))}
+                {onceOn && (
+                    <DropdownMenuItem onSelect={() => onViewOnce(undefined)}>
+                        <X />
+                        {t("viewOnce.off")}
+                    </DropdownMenuItem>
+                )}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+
     if (!preview) {
         return (
             <li className="flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs">
@@ -1841,7 +1960,8 @@ function StagedFile({
                     {file.name}
                 </span>
                 <span className="text-muted-foreground">{readableSize(file.size)}</span>
-                {cover}
+                {viewOnceControl}
+                {!onceOn && cover}
                 {remove}
             </li>
         );
@@ -1880,7 +2000,8 @@ function StagedFile({
                 />
             )}
             <tile.AttachmentCorner>
-                {cover}
+                {viewOnceControl}
+                {!onceOn && cover}
                 {remove}
             </tile.AttachmentCorner>
             {/* Nothing to forward and nothing to report: it is not on a message

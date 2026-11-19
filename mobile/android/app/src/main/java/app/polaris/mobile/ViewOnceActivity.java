@@ -247,7 +247,7 @@ public final class ViewOnceActivity extends Activity {
             connection.setRequestMethod(method);
             String cookie = CookieManager.getInstance().getCookie(address);
             if (cookie != null) connection.setRequestProperty("Cookie", cookie);
-            connection.setRequestProperty("User-Agent", "PolarisMobile/" + BuildConfig.VERSION_NAME + " (Android)");
+            connection.setRequestProperty("User-Agent", AppAgent.of(this));
             if (json != null) {
                 connection.setDoOutput(true);
                 connection.setRequestProperty("Content-Type", "application/json");

@@ -225,6 +225,21 @@ export interface ChatAttachmentView {
      * conversation is entitled to know which of the two they are looking at.
      */
     readonly borrowed: boolean;
+    /**
+     * Sent to be seen once, on a phone (`lib/chat/view-once`). Absent for every
+     * ordinary file. A browser draws a closed card and never the file: the
+     * bytes and the still are refused to it.
+     */
+    readonly viewOnce?: {
+        /** Seconds on screen; null is until it is closed. */
+        readonly seconds: number | null;
+        /** Where the sender's phone said it came from; null when not said. */
+        readonly captured: "camera" | "gallery" | null;
+        /** Whether this reader has opened it. */
+        readonly opened: boolean;
+        /** How many people have, for the sender. */
+        readonly openedCount: number;
+    };
 }
 
 /** The message a reply or a forward stands on, as the quote line draws it. */
@@ -1800,9 +1815,18 @@ export async function forward(
 ): Promise<string> {
     const original = await prisma.chatMessage.findUnique({
         where: { id: input.messageId },
-        select: { id: true, channelId: true, authorId: true, deletedAt: true }
+        select: {
+            id: true,
+            channelId: true,
+            authorId: true,
+            deletedAt: true,
+            // A file meant to be seen once is not passed on, here any more than
+            // from the menu that no longer offers it.
+            attachments: { where: { viewOnce: true }, select: { id: true }, take: 1 }
+        }
     });
     if (!original || original.deletedAt) throw new ChatAccessError({ key: "errors.messageGone" });
+    if (original.attachments.length > 0) throw new ChatAccessError({ key: "errors.viewOnceNotForwarded" });
     await requireAgeCleared(actor, original.channelId);
     await history.requireReadable(actor, original.channelId, input.messageId);
     await requireUnlocked(actor, original.channelId, proof);
@@ -2109,7 +2133,13 @@ export async function decorateMessages(
                 borrowed: true,
                 messageId: true,
                 durationMs: true,
-                contentType: true
+                contentType: true,
+                viewOnce: true,
+                viewSeconds: true,
+                captured: true,
+                // Whether this reader has had their one look, and how many have.
+                opens: { where: { userId: actor.id }, select: { userId: true }, take: 1 },
+                _count: { select: { opens: true } }
             }
         }),
         prisma.chatStar.findMany({
@@ -2258,12 +2288,23 @@ export async function decorateMessages(
             name: file.name,
             size: Number(file.size),
             waveform: file.waveform,
-            hasPoster: file.posterPath !== null,
+            hasPoster: file.posterPath !== null && !file.viewOnce,
             spoiler: file.spoiler,
             durationMs: file.durationMs,
             contentType: file.contentType,
-            inline: isInlineImage(file.contentType),
-            borrowed: file.borrowed
+            inline: isInlineImage(file.contentType) && !file.viewOnce,
+            borrowed: file.borrowed,
+            ...(file.viewOnce
+                ? {
+                      viewOnce: {
+                          seconds: file.viewSeconds,
+                          captured:
+                              file.captured === "camera" || file.captured === "gallery" ? file.captured : null,
+                          opened: file.opens.length > 0,
+                          openedCount: file._count.opens
+                      }
+                  }
+                : {})
         });
         onMessageFiles.set(file.messageId, bucket);
     }
@@ -2333,8 +2374,12 @@ export async function decorateMessages(
                 .filter((card): card is ChatInviteCard => card !== undefined),
             // A message whose author has since deleted their account carries no
             // setting to honour, and a deleted one has nothing left to send.
+            // Nor one carrying a file meant to be seen once: a forward would be a
+            // second copy of exactly what was not to be kept.
             forwardable:
-                row.deletedAt === null && (row.authorId === null || mayForward.has(row.authorId)),
+                row.deletedAt === null &&
+                (row.authorId === null || mayForward.has(row.authorId)) &&
+                !(onMessageFiles.get(row.id) ?? []).some((file) => file.viewOnce),
             link: links.get(row.id) ?? null,
             preview: previewOf(row, links, previews),
             previewPending: pendingOf(row, links, previews),

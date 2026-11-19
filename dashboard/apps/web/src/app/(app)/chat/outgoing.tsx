@@ -15,6 +15,7 @@
  * than throwing them away with the file.
  */
 
+import type { ViewOnceChoice } from "@/lib/chat/view-once-choice";
 import { cn } from "@polaris/ui";
 import { useEffect, useState } from "react";
 import type { ChatSentTranslation } from "@polaris/core";
@@ -51,6 +52,8 @@ export interface Outgoing {
     readonly hidden: readonly number[];
     /** Set when `body` is a translation of what was typed. */
     readonly translation?: ChatSentTranslation;
+    /** Which of `files` go to be seen once - see `lib/chat/view-once`. */
+    readonly viewOnce?: readonly ViewOnceChoice[];
     readonly phase: "sending" | "failed";
     readonly error?: string;
     readonly progress?: SendProgress;

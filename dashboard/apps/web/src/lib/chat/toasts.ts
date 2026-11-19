@@ -107,6 +107,7 @@ interface ToastFile {
     readonly contentType: string;
     readonly posterPath: string | null;
     readonly spoiler: boolean;
+    readonly viewOnce?: boolean;
 }
 
 function isVideo(contentType: string): boolean {
@@ -198,7 +199,8 @@ export function conversationName(
 /** The picture to show for these files, when the first one has one to show. */
 export function previewOf(files: readonly ToastFile[]): MessageToastMedia | null {
     const [first] = files;
-    if (!first || first.spoiler) return null;
+    // Neither a covered file nor one to be seen once on a phone is shown here.
+    if (!first || first.spoiler || first.viewOnce) return null;
     const src = `/api/chat/attachments/${first.id}`;
     if (isInlineImage(first.contentType)) return { kind: "image", src };
     if (isVideo(first.contentType) && first.posterPath)
@@ -370,7 +372,14 @@ async function recentIn(userId: string, channelIds: readonly string[], since: Da
             // them - the first is the one a toast shows.
             attachments: {
                 orderBy: { createdAt: "asc" },
-                select: { id: true, name: true, contentType: true, posterPath: true, spoiler: true }
+                select: {
+                    id: true,
+                    name: true,
+                    contentType: true,
+                    posterPath: true,
+                    spoiler: true,
+                    viewOnce: true
+                }
             },
             channel: {
                 select: {

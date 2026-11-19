@@ -43,6 +43,8 @@ import {
     type StoredAttachment
 } from "@/lib/chat/attachments";
 import { claimUploads, UploadRefused } from "@/lib/chat/uploads";
+import { fromPhoneApp } from "@/lib/chat/view-once";
+import { readViewOnceChoices, viewOnceable } from "@/lib/chat/view-once-choice";
 
 /**
  * The Drive files a message is sharing, as the composer lists them.
@@ -184,6 +186,9 @@ async function posterBytes(entry: File | undefined): Promise<Uint8Array | null> 
     return new Uint8Array(await entry.arrayBuffer());
 }
 
+/** A view-once choice for a file that cannot be one. */
+class ViewOnceNotAllowed extends Error {}
+
 export async function POST(
     request: Request,
     { params }: { params: Promise<{ channelId: string }> }
@@ -267,6 +272,9 @@ export async function POST(
     // first in the message, which is the order the composer showed them in: it
     // uploads as they are picked and sends the ones it has.
     const uploads = readUploads(form.get("uploads"));
+    // Which of them are to be seen once, on a phone: by index over the same
+    // list, with the timer each was given. See `lib/chat/view-once`.
+    const once = new Map(readViewOnceChoices(form.get("viewOnce")).map((choice) => [choice.index, choice]));
     /** Everything this message carries, however it got here. The counts, the
      *  covered list, the stills and the sounds are all indexed over this. */
     const carrying = uploads.length + files.length + borrowed.length;
@@ -388,6 +396,24 @@ export async function POST(
             );
         }
 
+        // Sent to be seen once. Only a photo or a video, and only one whose bytes
+        // the conversation holds: a Drive file stays readable from the Drive.
+        // Where it came from is believed only from the phone app's own picker.
+        const phone = fromPhoneApp(request.headers.get("user-agent"));
+        for (const [position, choice] of once) {
+            const file = stored[position];
+            if (!file || file.borrowed || position >= uploads.length + files.length || !viewOnceable(file.contentType)) {
+                throw new ViewOnceNotAllowed();
+            }
+            stored[position] = {
+                ...file,
+                spoiler: false,
+                viewOnce: true,
+                viewSeconds: choice.seconds,
+                captured: phone ? (choice.captured ?? null) : null
+            };
+        }
+
         const id = await send(
             { id: user.id },
             {
@@ -417,6 +443,12 @@ export async function POST(
         // A file this message named that is not there to claim: swept, already
         // sent, or never this sender's. Whoever pressed send still has it in front
         // of them, so it is their sentence rather than an internal one.
+        if (caught instanceof ViewOnceNotAllowed) {
+            return Response.json(
+                { error: (await readerWords("chat"))("viewOnce.onlyMedia") },
+                { status: 400 }
+            );
+        }
         if (caught instanceof UploadRefused) {
             return Response.json({ error: caught.message }, { status: 409 });
         }

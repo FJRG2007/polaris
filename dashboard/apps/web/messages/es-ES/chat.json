@@ -77,6 +77,7 @@
         "youAreNotInMeeting": "No estás en esa reunión",
         "notInOrganization": "No está en esta organización",
         "forwardingRefused": "No permite que se reenvíen sus mensajes",
+        "viewOnceNotForwarded": "Una foto o un vídeo de ver una vez no se puede reenviar.",
         "pollSingleAnswer": "Solo admite una respuesta",
         "bodyRequired": "Escribe algo primero",
         "groupStartNotAllowed": "No tienes permiso para iniciar conversaciones de grupo",
@@ -2480,5 +2481,35 @@
         "sent": "Aviso enviado. Gracias.",
         "failed": "No se pudo enviar el aviso. Inténtalo de nuevo.",
         "pickFirst": "Elige antes qué ha fallado."
+    },
+    "viewOnce": {
+        "label": "Ver una vez",
+        "photo": "Foto, ver una vez",
+        "video": "Vídeo, ver una vez",
+        "chooseNamed": "Enviar {name} para ver una vez",
+        "off": "Enviar normal",
+        "seconds": "{seconds} s",
+        "untilClosed": "Hasta cerrarlo",
+        "tapToView": "Toca para ver",
+        "openOnPhone": "Ábrelo en la app de Polaris del móvil",
+        "opened": "Abierto",
+        "notOpened": "Aún sin abrir",
+        "openedBy": "Abierto por {count, plural, one {# persona} other {# personas}}",
+        "captured": {
+            "camera": "Hecha con la cámara",
+            "gallery": "De la galería"
+        },
+        "phoneOnly": "Solo se puede abrir en la app de Polaris del móvil.",
+        "onlyMedia": "Solo una foto o un vídeo adjuntos pueden enviarse para ver una vez.",
+        "notScheduled": "Un mensaje con un archivo de ver una vez no se puede programar. Envíalo ahora o quita ver una vez.",
+        "tooMany": "Demasiados intentos. Prueba en un minuto.",
+        "refused": {
+            "notFound": "Ya no está disponible.",
+            "own": "Lo enviaste tú, así que no te toca abrirlo.",
+            "opened": "Ya lo abriste.",
+            "device": "Este móvil no está preparado para abrirlo. Actualiza la app de Polaris y vuelve a probar.",
+            "challenge": "Ha tardado demasiado. Vuelve a probar.",
+            "signature": "Este móvil no ha podido demostrar que es tuyo. Vuelve a probar."
+        }
     }
 }

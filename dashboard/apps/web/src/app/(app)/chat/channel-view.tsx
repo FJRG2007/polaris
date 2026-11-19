@@ -21,6 +21,7 @@
  * did not read them.
  */
 
+import type { ViewOnceChoice } from "@/lib/chat/view-once-choice";
 import * as actions from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { spokenWait } from "@/lib/chat/durations";
@@ -1777,7 +1778,8 @@ export function ChannelView({
         spoilers: readonly number[] = [],
         fromDrive: readonly KeptPick[] = [],
         report?: (progress: SendProgress) => void,
-        translation?: core.ChatSentTranslation
+        translation?: core.ChatSentTranslation,
+        viewOnce: readonly ViewOnceChoice[] = []
     ): Promise<SendOutcome> => {
         if (files.length > 0 || fromDrive.length > 0) {
             following.current = true;
@@ -1821,6 +1823,7 @@ export function ChannelView({
             // are any, which is nearly never - an empty field on every message
             // in Polaris to say "none" is a field nobody needed.
             if (spoilers.length > 0) form.set("spoilers", spoilers.join(","));
+            if (viewOnce.length > 0) form.set("viewOnce", JSON.stringify(viewOnce));
             if (uploaded.length > 0) form.set("uploads", JSON.stringify(uploaded));
             // A still per video, in the same order as the files that were just
             // uploaded, with an empty one standing in for everything that is not
@@ -2556,6 +2559,7 @@ export function ChannelView({
                         onSend={send}
                         translateOutgoing={channel.translation?.outgoing ?? null}
                         canShareFromDrive
+                        canViewOnce
                         onSchedule={scheduleMessage}
                         onPoll={createPoll}
                         onMedia={async (address) => {

@@ -125,7 +125,7 @@ public final class NoticeService extends Service {
             // Twice the heartbeat: a connection that has gone quiet longer than that is dead.
             connection.setReadTimeout(60_000);
             connection.setRequestProperty("Accept", "text/event-stream");
-            connection.setRequestProperty("User-Agent", "PolarisMobile/" + BuildConfig.VERSION_NAME + " (Android)");
+            connection.setRequestProperty("User-Agent", AppAgent.of(this));
             String cookie = CookieManager.getInstance().getCookie(address);
             if (cookie != null) connection.setRequestProperty("Cookie", cookie);
             int status = connection.getResponseCode();

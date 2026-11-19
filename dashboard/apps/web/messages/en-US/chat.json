@@ -77,6 +77,7 @@
         "youAreNotInMeeting": "You are not in that meeting",
         "notInOrganization": "They are not in this organization",
         "forwardingRefused": "They do not allow their messages to be passed on",
+        "viewOnceNotForwarded": "A view-once photo or video cannot be forwarded.",
         "pollSingleAnswer": "This poll takes one answer",
         "bodyRequired": "Write something first",
         "groupStartNotAllowed": "You are not allowed to start group conversations",
@@ -2480,5 +2481,35 @@
         "sent": "Report sent. Thank you.",
         "failed": "The report could not be sent. Try again.",
         "pickFirst": "Pick what went wrong first."
+    },
+    "viewOnce": {
+        "label": "View once",
+        "photo": "View-once photo",
+        "video": "View-once video",
+        "chooseNamed": "Send {name} to be seen once",
+        "off": "Send normally",
+        "seconds": "{seconds} s",
+        "untilClosed": "Until closed",
+        "tapToView": "Tap to view",
+        "openOnPhone": "Open it in the Polaris app on your phone",
+        "opened": "Opened",
+        "notOpened": "Not opened yet",
+        "openedBy": "Opened by {count, plural, one {# person} other {# people}}",
+        "captured": {
+            "camera": "Taken with the camera",
+            "gallery": "From the gallery"
+        },
+        "phoneOnly": "This can only be opened in the Polaris app on a phone.",
+        "onlyMedia": "Only a photo or a video you attach can be sent to be seen once.",
+        "notScheduled": "A message with a view-once file cannot be scheduled. Send it now or turn view once off.",
+        "tooMany": "Too many attempts. Try again in a minute.",
+        "refused": {
+            "notFound": "This is no longer available.",
+            "own": "You sent this one, so it is not yours to open.",
+            "opened": "You already opened this.",
+            "device": "This phone is not set up to open it. Update the Polaris app and try again.",
+            "challenge": "That took too long. Try again.",
+            "signature": "This phone could not prove it is yours. Try again."
+        }
     }
 }

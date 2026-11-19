@@ -175,8 +175,9 @@ async function validate(actor: ChatActor, source: string): Promise<string> {
 
     if (cleaned.startsWith(ATTACHMENT)) {
         const attachmentId = cleaned.slice(ATTACHMENT.length);
+        // A view-once file is not one to keep: it reads as gone.
         const attachment = await prisma.chatAttachment.findUnique({
-            where: { id: attachmentId },
+            where: { id: attachmentId, viewOnce: false },
             select: { message: { select: { channelId: true } } }
         });
         if (!attachment) throw new ChatAccessError({ key: "errors.pictureGone" });

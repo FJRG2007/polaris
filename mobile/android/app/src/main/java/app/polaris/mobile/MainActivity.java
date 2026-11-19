@@ -55,7 +55,7 @@ public final class MainActivity extends Activity {
     private Pick pendingPick;
     private File photoTaken;
     private File videoTaken;
-    private String pickSource = "";
+    private volatile String pickSource = "";
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -116,7 +116,7 @@ public final class MainActivity extends Activity {
         settings.setAllowContentAccess(false);
         settings.setSupportMultipleWindows(false);
         // How the instance tells this app from a browser on its sessions screen.
-        settings.setUserAgentString(settings.getUserAgentString() + " PolarisMobile/" + BuildConfig.VERSION_NAME + " (Android)");
+        settings.setUserAgentString(AppAgent.of(this));
 
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
@@ -266,8 +266,11 @@ public final class MainActivity extends Activity {
         return intent;
     }
 
+    /** Read once: a file pasted or dropped after a pick is not that pick's. */
     String lastPickSource() {
-        return pickSource;
+        String source = pickSource;
+        pickSource = "";
+        return source;
     }
 
     void openViewOnce(String attachmentId) {
