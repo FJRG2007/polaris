@@ -36,11 +36,15 @@ vi.mock("@/app/(app)/chat/call-combine-panel", () => ({
     CombineStrip: () => null
 }));
 vi.mock("@/app/(app)/chat/actions", () => ({ searchPeopleAction: async () => ({ people: [] }) }));
-// One output to pick, which jsdom has no way to list.
+// Two outputs to pick from, which jsdom has no way to list: a picker is only
+// offered when there is a choice (`device-choice`).
 vi.mock("@/app/(app)/chat/speaker-device", async (original) => ({
     ...(await original<typeof import("@/app/(app)/chat/speaker-device")>()),
     useSpeakers: () => ({
-        devices: [{ id: "s1", label: "Fixture headphones" }],
+        devices: [
+            { id: "s1", label: "Fixture headphones" },
+            { id: "s2", label: "Fixture speakers" }
+        ],
         chosenId: "s1",
         choose: () => undefined
     })
@@ -79,7 +83,10 @@ function callWith(over: Record<string, unknown> = {}): CallState {
         changingShare: false,
         screenQuality: "auto",
         screenLevel: "high",
-        microphones: [{ id: "m1", label: "Fixture desk mic" }],
+        microphones: [
+            { id: "m1", label: "Fixture desk mic" },
+            { id: "m2", label: "Fixture headset mic" }
+        ],
         microphoneId: "m1",
         cameras: [],
         cleanMic: NOISE_LEVELS[0]!.value,
