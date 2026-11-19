@@ -39,6 +39,7 @@ a regression. Entries are sorted open/regressed first, then by severity.
 | VULN-0002 | UniFi UNAS Home Assistant add-on does not verify the NAS SSH host key | Medium | Fixed | plugins/unifi-unas/homeassistant/custom_components/unifi_unas/ssh_manager.py:121 | CWE-295 | 2026-09-28 |
 | VULN-0004 | Private GitHub repositories can be built through the instance GitHub App by any deploy member | Medium | Fixed | dashboard/apps/web/src/lib/github-access.ts | CWE-863 | 2026-09-28 |
 | VULN-0001 | SSRF via DNS rebinding (TOCTOU) in safe-fetch link unfurl | Medium | Fixed | dashboard/apps/web/src/lib/safe-fetch.ts:118 | CWE-918 | 2026-08-16 |
+| VULN-0043 | A Minecraft player's allowed address can be forged by quoting a login line in chat | Medium | Fixed | dashboard/apps/game-servers/src/lib/minecraft/parse.ts | CWE-345 | 2026-11-19 |
 | VULN-0038 | An open terminal keeps running commands after its account is banned or signed out | Medium | Fixed | dashboard/apps/web/ws-server.mjs | CWE-613 | 2026-11-12 |
 | VULN-0042 | A terminal that stops reading makes the sidecar queue shell output without limit | Medium | Fixed | dashboard/apps/web/ws-server.mjs | CWE-770 | 2026-11-12 |
 | VULN-0030 | Vault login saved for an IP address offered and filled on other IP addresses | Low | Fixed | dashboard/packages/core/src/vault-uris.ts:125 | CWE-697 | 2026-09-28 |
