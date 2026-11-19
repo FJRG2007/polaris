@@ -27,6 +27,7 @@ import { EmojiPicker, type PickerCustomEmoji } from "./emoji-picker";
 import { AiRewriting } from "@/components/polar/ai-rewriting";
 import { FillInBar } from "@/components/polar/fill-in-bar";
 import { ImproveButton } from "@/components/polar/improve-button";
+import { onScreenKeyboard } from "@/lib/enter-key";
 import { usePolarAllowed } from "@/components/polar/polar-allowed";
 import type { CustomEmojiEntry } from "@/components/rich-text/custom-emoji";
 import { asFiles, type KeptPick } from "@/components/file-picker/as-files";
@@ -439,8 +440,12 @@ export function Composer({
     // button belongs: `capture` on a laptop opens the same file dialog as every
     // other picker, so the button would be a second paperclip wearing a camera.
     const [handheld, setHandheld] = useState(false);
+    // A phone's keyboard has a microphone key of its own, so the box offers no
+    // second one for dictating (`onScreenKeyboard`); the voice message stays.
+    const [keyboardDictates, setKeyboardDictates] = useState(false);
     useEffect(() => {
         setHandheld(typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches);
+        setKeyboardDictates(onScreenKeyboard());
     }, []);
     // Bumped to rebuild the editor, which is how it is cleared: the editor owns
     // its document, and setting the value prop back to "" does not empty it.
@@ -1621,7 +1626,7 @@ export function Composer({
                                 {/* Dictation, beside Send rather than in place of
                                     anything: it types into the box, it sends
                                     nothing. */}
-                                {engine && (
+                                {engine && (!keyboardDictates || dictation.active) && (
                                     <MicSlot
                                         disabled={disabled}
                                         engine={engine}

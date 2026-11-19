@@ -18,6 +18,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useEffect, useRef, useState } from "react";
 import { micDevice } from "./mic-device";
 import { MicSettings } from "./mic-settings";
+import { worthChoosing } from "./device-choice";
 import { MediaPlayer } from "@/components/media-player";
 import { MAX_CLIP_SECONDS, useClipRecorder, type ClipSources } from "./clip-recorder";
 import {
@@ -215,7 +216,7 @@ export function ClipDialog({
                             {/* Which one, where there is more than one to choose
                                 between. A machine with a single camera is not
                                 asked a question it has no answer to. */}
-                            {sources.camera && devices.cameras.length > 1 && (
+                            {sources.camera && worthChoosing(devices.cameras) && (
                                 <label className="flex w-full flex-col gap-1 text-xs">
                                     {t("clip.camera")}
                                     <Select

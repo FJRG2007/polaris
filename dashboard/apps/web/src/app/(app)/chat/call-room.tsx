@@ -68,6 +68,7 @@ import {
 import { Cue, SoundboardButton } from "./soundboard-picker";
 import { LiveBadge } from "./call-roster";
 import { useSpeakers } from "./speaker-device";
+import { worthChoosing } from "./device-choice";
 import { HandStrip } from "./call-hands-panel";
 import {
     CallGameOffer,
@@ -1392,7 +1393,6 @@ export function CallRoom({
                                 chosenId={speakers.chosenId}
                                 devicesLabel={t("callRoom.outputDevice")}
                                 onChoose={speakers.choose}
-                                listOne
                             />
                         </span>
 
@@ -1709,7 +1709,6 @@ function Split({
     hint,
     alert,
     disabled = false,
-    listOne = false,
     menu
 }: {
     label: string;
@@ -1720,9 +1719,6 @@ function Split({
     /** The control itself can't be pressed - a moderator's deafen. Its menu
      *  still opens: the device is the reader's to choose either way. */
     disabled?: boolean;
-    /** Offer the menu for a single device too: the outputs, where seeing which
-     *  one the call comes out of is the point even when there is only one. */
-    listOne?: boolean;
     /** Something wrong with what this control sends, marked on it as a dot and
      *  said in its name - the microphone not being sent, picking nothing up,
      *  arriving too quiet. The sentence itself is in the call notices. */
@@ -1823,9 +1819,8 @@ function Split({
     // choice to make about how much of it to send.
     const hasMenu =
         menu !== undefined ||
-        devices.length > 1 ||
-        (listOne && devices.length > 0) ||
-        outputs !== undefined ||
+        worthChoosing(devices) ||
+        (outputs !== undefined && worthChoosing(outputs.devices)) ||
         onCleanMic !== undefined ||
         onQuality !== undefined ||
         onBackground !== undefined ||
@@ -1905,7 +1900,10 @@ function Split({
                         {/* Which device, as a row naming the one in use - the
                             list itself one step in, because it is chosen once
                             and read every time the menu opens. */}
-                        {devices.length > 0 && (
+                        {/* Only where there is a choice: one microphone, one
+                            speaker - a phone's, most of the time - is not a
+                            question (`worthChoosing`). */}
+                        {worthChoosing(devices) && (
                             <ChoiceSub
                                 label={outputs ? t("callRoom.inputDevice") : devicesLabel}
                                 current={nameOfDevice(devices, chosenId, t)}
@@ -2188,7 +2186,7 @@ function Split({
                         )}
                         {/* Where the call comes out. Only where the browser lets
                             a page choose - see `speaker-device`. */}
-                        {outputs && outputs.devices.length > 0 && (
+                        {outputs && worthChoosing(outputs.devices) && (
                             <ChoiceSub
                                 label={t("callRoom.outputDevice")}
                                 current={nameOfDevice(outputs.devices, outputs.chosenId, t)}

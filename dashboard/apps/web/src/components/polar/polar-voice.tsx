@@ -38,6 +38,8 @@ import {
 import { affectedBy, Confirmation } from "@/components/polar/elements/confirmation";
 import { measureVoice, speaking, type VoiceLevel } from "@/app/(app)/chat/voice-level";
 import type { TranscriptionOption } from "@/lib/polar/transcription";
+import { onScreenKeyboard } from "@/lib/enter-key";
+import { worthChoosing } from "@/app/(app)/chat/device-choice";
 import { setMicDevice, useMicrophones } from "@/app/(app)/chat/mic-device";
 import {
     Button,
@@ -106,6 +108,9 @@ export function DictationButton({
 }) {
     const t = useTranslations("polar");
     const [transcribing, setTranscribing] = useState(false);
+    // Read after mount: the server drew the button, and a phone hides it.
+    const [keyboardDictates, setKeyboardDictates] = useState(false);
+    useEffect(() => setKeyboardDictates(onScreenKeyboard()), []);
     const recorder = useVoiceRecording((file, sound) => {
         setTranscribing(true);
         void transcribeAudio(file, sound.durationMs, payer, undefined, transcriber).then(
@@ -124,6 +129,10 @@ export function DictationButton({
     useEffect(() => {
         if (recorder.error) notice.current("micDenied");
     }, [recorder.error]);
+
+    // The phone's keyboard dictates (`onScreenKeyboard`); a recording already
+    // under way is still shown, so it can be finished.
+    if (keyboardDictates && !recorder.recording && !transcribing) return null;
 
     if (recorder.recording) {
         return (
@@ -252,52 +261,59 @@ export function DictationMenu({
             </DropdownMenuTrigger>
             {/* Upward: the composer sits at the bottom of the panel. */}
             <DropdownMenuContent align="start" side="top" className="w-64">
-                <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                        <Mic />
-                        <span className="min-w-0 flex-1 truncate">
-                            {t("voice.menu.microphone")}
-                        </span>
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuSubContent className="w-64">
-                        <DropdownMenuItem onSelect={() => setMicDevice(null)}>
-                            <Check
-                                className={cn(
-                                    "size-3.5",
-                                    chosen === null ? "opacity-100" : "opacity-0"
-                                )}
-                            />
-                            <span className="min-w-0 truncate">
-                                {t("voice.menu.systemDefault")}
+                {/* The microphone is a question only with two of them, or
+                    before their names can be read (`worthChoosing`). */}
+                {(unnamed || worthChoosing(devices)) && (
+                    <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>
+                            <Mic />
+                            <span className="min-w-0 flex-1 truncate">
+                                {t("voice.menu.microphone")}
                             </span>
-                        </DropdownMenuItem>
-                        {devices.map((device) => (
-                            <DropdownMenuItem key={device.id} onSelect={() => choose(device.id)}>
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="w-64">
+                            <DropdownMenuItem onSelect={() => setMicDevice(null)}>
                                 <Check
                                     className={cn(
                                         "size-3.5",
-                                        device.id === chosen ? "opacity-100" : "opacity-0"
+                                        chosen === null ? "opacity-100" : "opacity-0"
                                     )}
                                 />
-                                <span className="min-w-0 truncate" title={device.label}>
-                                    {device.label}
+                                <span className="min-w-0 truncate">
+                                    {t("voice.menu.systemDefault")}
                                 </span>
                             </DropdownMenuItem>
-                        ))}
-                        {unnamed && (
-                            <DropdownMenuItem
-                                onSelect={(event) => {
-                                    event.preventDefault();
-                                    void allow();
-                                }}
-                            >
-                                <span className="min-w-0 whitespace-normal text-muted-foreground">
-                                    {denied ? t("voice.menu.denied") : t("voice.menu.allow")}
-                                </span>
-                            </DropdownMenuItem>
-                        )}
-                    </DropdownMenuSubContent>
-                </DropdownMenuSub>
+                            {devices.map((device) => (
+                                <DropdownMenuItem
+                                    key={device.id}
+                                    onSelect={() => choose(device.id)}
+                                >
+                                    <Check
+                                        className={cn(
+                                            "size-3.5",
+                                            device.id === chosen ? "opacity-100" : "opacity-0"
+                                        )}
+                                    />
+                                    <span className="min-w-0 truncate" title={device.label}>
+                                        {device.label}
+                                    </span>
+                                </DropdownMenuItem>
+                            ))}
+                            {unnamed && (
+                                <DropdownMenuItem
+                                    onSelect={(event) => {
+                                        event.preventDefault();
+                                        void allow();
+                                    }}
+                                >
+                                    <span className="min-w-0 whitespace-normal text-muted-foreground">
+                                        {denied ? t("voice.menu.denied") : t("voice.menu.allow")}
+                                    </span>
+                                </DropdownMenuItem>
+                            )}
+                        </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                )}
                 <DropdownMenuSub>
                     <DropdownMenuSubTrigger>
                         <AudioLines />

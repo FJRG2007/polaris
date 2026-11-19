@@ -16,6 +16,7 @@
  * by which time it is somebody else's problem.
  */
 
+import { worthChoosing } from "./device-choice";
 import { cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Check } from "lucide-react";
@@ -36,7 +37,7 @@ export function MicSettings({ className }: { className?: string }) {
 
     return (
         <div className={cn("flex flex-col gap-3 text-xs", className)}>
-            {devices.length > 1 && (
+            {worthChoosing(devices) && (
                 <div className="flex flex-col gap-1">
                     <p className="font-medium text-foreground-subtle">
                         {t("micSettings.microphone")}
