@@ -91,10 +91,10 @@ export function CallStage({
     return (
         <section
             aria-label={ringing ? t("callStage.incomingCall") : t("callPreview.callInProgress")}
-            className="relative flex max-h-[60vh] min-h-56 shrink-0 flex-col gap-4 border-b border-border bg-black px-4 pb-4 pt-3 text-white"
+            className="relative flex max-h-[60vh] min-h-56 shrink-0 flex-col gap-4 border-b border-border px-4 pb-4 pt-3 text-foreground"
         >
             <div className="flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/80">
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-muted-foreground">
                     {caller?.name
                         ? t("callStage.calling", { name: caller.name })
                         : callSummary(count)}
@@ -106,7 +106,7 @@ export function CallStage({
                         disabled={silenced}
                         aria-label={t("callStage.silence")}
                         title={t("callStage.silence")}
-                        className="rounded p-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white disabled:pointer-events-none disabled:opacity-40"
+                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
                     >
                         <BellOff className="size-4" />
                     </button>
@@ -116,7 +116,7 @@ export function CallStage({
                     onClick={onHide}
                     aria-label={t("callPreview.hideTheCall")}
                     title={t("callPreview.hideTheCallItKeeps")}
-                    className="rounded p-1.5 text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <ChevronUp className="size-4" />
                 </button>
@@ -137,11 +137,11 @@ export function CallStage({
                                     <span
                                         aria-hidden
                                         data-testid="ring-pulse"
-                                        className="absolute -inset-1.5 rounded-full ring-2 ring-white/80"
+                                        className="absolute -inset-1.5 rounded-full ring-2 ring-success"
                                     />
                                     <span
                                         aria-hidden
-                                        className="call-ring-pulse absolute -inset-1.5 rounded-full ring-2 ring-white/50"
+                                        className="call-ring-pulse absolute -inset-1.5 rounded-full ring-2 ring-success/60"
                                     />
                                 </>
                             )}
@@ -153,7 +153,7 @@ export function CallStage({
                         </span>
                     );
                     const label = (
-                        <span className="flex w-full items-center justify-center gap-1 text-xs text-white/80">
+                        <span className="flex w-full items-center justify-center gap-1 text-xs text-muted-foreground">
                             <span className="min-w-0 truncate">
                                 <PersonName id={face.id} name={face.name} />
                             </span>
