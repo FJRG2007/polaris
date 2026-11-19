@@ -449,7 +449,11 @@ public final class MainActivity extends Activity {
         pageBackRegistered = wanted;
     }
 
-    /** Android 12 and earlier. */
+    /**
+     * Android 12 and earlier. From 13 on the back gesture goes to the callback {@link #syncBack()} registers (the
+     * manifest opts in), so this is the older systems' path only; the app has no AndroidX to take the dispatcher from.
+     */
+    @SuppressLint("GestureBackNavigation")
     @Override
     public void onBackPressed() {
         if (web != null && web.canGoBack()) web.goBack();
