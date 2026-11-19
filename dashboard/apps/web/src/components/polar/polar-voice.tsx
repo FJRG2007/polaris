@@ -38,7 +38,7 @@ import {
 import { affectedBy, Confirmation } from "@/components/polar/elements/confirmation";
 import { measureVoice, speaking, type VoiceLevel } from "@/app/(app)/chat/voice-level";
 import type { TranscriptionOption } from "@/lib/polar/transcription";
-import { onScreenKeyboard } from "@/lib/enter-key";
+import { useKeyboardDictates } from "@/components/use-phone";
 import { worthChoosing } from "@/app/(app)/chat/device-choice";
 import { setMicDevice, useMicrophones } from "@/app/(app)/chat/mic-device";
 import {
@@ -108,9 +108,7 @@ export function DictationButton({
 }) {
     const t = useTranslations("polar");
     const [transcribing, setTranscribing] = useState(false);
-    // Read after mount: the server drew the button, and a phone hides it.
-    const [keyboardDictates, setKeyboardDictates] = useState(false);
-    useEffect(() => setKeyboardDictates(onScreenKeyboard()), []);
+    const keyboardDictates = useKeyboardDictates();
     const recorder = useVoiceRecording((file, sound) => {
         setTranscribing(true);
         void transcribeAudio(file, sound.durationMs, payer, undefined, transcriber).then(
@@ -130,7 +128,7 @@ export function DictationButton({
         if (recorder.error) notice.current("micDenied");
     }, [recorder.error]);
 
-    // The phone's keyboard dictates (`onScreenKeyboard`); a recording already
+    // The phone's keyboard dictates (`useKeyboardDictates`); a recording already
     // under way is still shown, so it can be finished.
     if (keyboardDictates && !recorder.recording && !transcribing) return null;
 

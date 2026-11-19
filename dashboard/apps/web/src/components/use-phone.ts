@@ -1,6 +1,7 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { onScreenKeyboard } from "@/lib/enter-key";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 /**
  * Below `sm`, where menus open as sheets rather than hanging off their button.
@@ -25,6 +26,19 @@ export function usePhone(): boolean {
         () => typeof window.matchMedia === "function" && window.matchMedia(PHONE_QUERY).matches,
         () => false
     );
+}
+
+/**
+ * Whether the keyboard on screen already dictates, so Polaris offers no
+ * dictation button of its own: a phone-sized screen (the Android app's WebView
+ * can report a fine pointer), or touch with no mouse beside it
+ * (`onScreenKeyboard`). Asked after mount, since the server drew the button.
+ */
+export function useKeyboardDictates(): boolean {
+    const phone = usePhone();
+    const [touchOnly, setTouchOnly] = useState(false);
+    useEffect(() => setTouchOnly(onScreenKeyboard()), []);
+    return phone || touchOnly;
 }
 
 /** A control's height and width on a touch screen: what a finger can hit. */

@@ -679,7 +679,10 @@
             "tooBigOthers": "{count, plural, one {Otro archivo también superaba el límite y se quedó fuera.} other {Otros # archivos también superaban el límite y se quedaron fuera.}}",
             "recordingTooBig": "Aquí una grabación puede ocupar hasta {limit} MB. Graba una más corta.",
             "raise": "Un administrador puede subir el límite en Apps de Polaris > Chat > Ajustes, en Archivo más grande."
-        }
+        },
+        "timeLeft": "Quedan {time}",
+        "voiceViewOnce": "Enviar para oír una vez",
+        "voiceViewOnceOn": "Se oirá una vez"
     },
     "sidebar": {
         "listLoadFailed": "No se pudieron cargar tus conversaciones. Reintentando.",
@@ -2543,5 +2546,34 @@
         "onlyFor": "Solo quien lo pidió puede usarlo.",
         "working": "Un momento...",
         "cancel": "Cancelar"
+    },
+    "mediaEditor": {
+        "title": "Editar antes de enviar",
+        "description": "Recorta, dibuja o añade texto y envía",
+        "crop": "Recortar y girar",
+        "draw": "Dibujar",
+        "text": "Poner texto",
+        "undo": "Deshacer",
+        "remove": "Quitar este",
+        "rotate": "Girar",
+        "resetCrop": "Sin recorte",
+        "textPlaceholder": "Escribe un texto",
+        "addText": "Añadir",
+        "item": "Elemento {number} de {count}",
+        "addMore": "Añadir más",
+        "caption": "Añade un pie",
+        "viewOnce": "Ver una vez",
+        "viewOnceOn": "Se verá una vez",
+        "send": "Enviar",
+        "cropFrame": "Recorte",
+        "notDrawn": "No se pudo crear la foto editada. Inténtalo de nuevo.",
+        "colors": {
+            "white": "Blanco",
+            "black": "Negro",
+            "red": "Rojo",
+            "amber": "Ámbar",
+            "green": "Verde",
+            "blue": "Azul"
+        }
     }
 }

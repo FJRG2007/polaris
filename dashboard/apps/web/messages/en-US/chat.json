@@ -679,7 +679,10 @@
             "tooBigOthers": "{count, plural, one {One more file was} other {# more files were}} also over the limit and left out.",
             "recordingTooBig": "A recording here can be up to {limit} MB. Record a shorter one.",
             "raise": "An administrator can raise the limit in Polaris apps > Chat > Settings, under Biggest single file."
-        }
+        },
+        "timeLeft": "{time} left",
+        "voiceViewOnce": "Send to be heard once",
+        "voiceViewOnceOn": "Will be heard once"
     },
     "sidebar": {
         "listLoadFailed": "Your conversations could not be loaded. Trying again.",
@@ -2543,5 +2546,34 @@
         "onlyFor": "Only the person who asked can use this.",
         "working": "Working...",
         "cancel": "Cancel"
+    },
+    "mediaEditor": {
+        "title": "Edit before sending",
+        "description": "Crop, draw or add text, then send",
+        "crop": "Crop and rotate",
+        "draw": "Draw",
+        "text": "Add text",
+        "undo": "Undo last",
+        "remove": "Remove this one",
+        "rotate": "Rotate",
+        "resetCrop": "Reset crop",
+        "textPlaceholder": "Type some text",
+        "addText": "Add",
+        "item": "Item {number} of {count}",
+        "addMore": "Add more",
+        "caption": "Add a caption",
+        "viewOnce": "View once",
+        "viewOnceOn": "Will be seen once",
+        "send": "Send",
+        "cropFrame": "Crop frame",
+        "notDrawn": "The edited photo could not be made. Try again.",
+        "colors": {
+            "white": "White",
+            "black": "Black",
+            "red": "Red",
+            "amber": "Amber",
+            "green": "Green",
+            "blue": "Blue"
+        }
     }
 }

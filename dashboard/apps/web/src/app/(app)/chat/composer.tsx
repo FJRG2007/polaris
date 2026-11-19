@@ -27,7 +27,6 @@ import { EmojiPicker, type PickerCustomEmoji } from "./emoji-picker";
 import { AiRewriting } from "@/components/polar/ai-rewriting";
 import { FillInBar } from "@/components/polar/fill-in-bar";
 import { ImproveButton } from "@/components/polar/improve-button";
-import { onScreenKeyboard } from "@/lib/enter-key";
 import { usePolarAllowed } from "@/components/polar/polar-allowed";
 import type { CustomEmojiEntry } from "@/components/rich-text/custom-emoji";
 import { asFiles, type KeptPick } from "@/components/file-picker/as-files";
@@ -35,7 +34,10 @@ import type { PickedFile } from "@/components/file-picker/picked-file";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { ClipDialog } from "./clip-dialog";
 import { MicSlot } from "./mic-slot";
-import { MicSettings } from "./mic-settings";
+import { VoiceMicButton } from "./voice-mic-button";
+import { MediaEditor, isEditorMedia } from "./media-editor";
+import { planMediaSend, type EditedMedia } from "./media-edit";
+import { useKeyboardDictates } from "@/components/use-phone";
 import { speechRecognizer, useDictation, usePrivateDictation } from "./use-dictation";
 import { VideoPreview } from "@/components/video-preview";
 import { ImageViewer } from "@/components/image-viewer";
@@ -75,11 +77,9 @@ import {
 } from "./voice-recorder";
 import {
     BarChart3,
-    ChevronDown,
     CornerUpLeft,
     Eye,
     EyeOff,
-    Mic,
     MicOff,
     Paperclip,
     SendHorizontal,
@@ -420,6 +420,8 @@ export function Composer({
     const scope = draftKey ?? (channelId ? `channel:${channelId}` : ownScope.current);
     const outgoing = useOutgoing(scope);
     const [picking, setPicking] = useState(false);
+    /** Photos and videos open in the editor, waiting for its Send. */
+    const [inEditor, setInEditor] = useState<readonly File[]>([]);
     /** Whether the "when" dialog is open, and what the server said about the
      *  last moment offered to it. */
     const [scheduling, setScheduling] = useState(false);
@@ -441,11 +443,10 @@ export function Composer({
     // other picker, so the button would be a second paperclip wearing a camera.
     const [handheld, setHandheld] = useState(false);
     // A phone's keyboard has a microphone key of its own, so the box offers no
-    // second one for dictating (`onScreenKeyboard`); the voice message stays.
-    const [keyboardDictates, setKeyboardDictates] = useState(false);
+    // second one for dictating (`useKeyboardDictates`); the voice message stays.
+    const keyboardDictates = useKeyboardDictates();
     useEffect(() => {
         setHandheld(typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches);
-        setKeyboardDictates(onScreenKeyboard());
     }, []);
     // Bumped to rebuild the editor, which is how it is cleared: the editor owns
     // its document, and setting the value prop back to "" does not empty it.
@@ -706,7 +707,8 @@ export function Composer({
     const blank = useMemo(() => isBlankMarkdown(body), [body]);
     const voiceFirst = mayAttach && recordable && !inCall && blank && files.length === 0;
 
-    const staged = files.length > 0 || kept.length > 0 || scheduleBusy || pollBusy;
+    const staged =
+        files.length > 0 || kept.length > 0 || inEditor.length > 0 || scheduleBusy || pollBusy;
     useEffect(() => (staged ? holdReload() : undefined), [staged]);
 
     /**
@@ -717,6 +719,8 @@ export function Composer({
      * a second press is the shape everybody gets wrong. Cancelling is the other
      * button, and it is next to it while the recording runs.
      */
+    /** The recording being made goes to be heard once. */
+    const [voiceOnce, setVoiceOnce] = useState(false);
     const voice = useVoiceRecording((file, sound) => {
         if (disabled) return;
         if (file.size > maxBytes) {
@@ -731,6 +735,8 @@ export function Composer({
             return;
         }
         setRefused("");
+        const heardOnce = canViewOnce && voiceOnce;
+        setVoiceOnce(false);
         void deliver({
             id: newOutgoingId(),
             scope,
@@ -738,9 +744,13 @@ export function Composer({
             files: [file],
             kept: [],
             sounds: [sound],
-            hidden: []
+            hidden: [],
+            ...(heardOnce ? { viewOnce: [{ index: 0, seconds: null, captured: null }] } : {})
         });
     });
+    useEffect(() => {
+        if (!voice.recording) setVoiceOnce(false);
+    }, [voice.recording]);
 
     /**
      * Send a message that carries files, and keep it on screen until it lands.
@@ -1010,7 +1020,7 @@ export function Composer({
             keepDrive: canShareFromDrive
         });
         if (failed.length > 0) setRefused(failed[0] ?? "");
-        if (got.length > 0) stage(got);
+        if (got.length > 0) pickMedia(got);
         if (staying.length > 0) keep(staying);
     };
 
@@ -1041,15 +1051,70 @@ export function Composer({
     };
 
     const stage = (picked: ArrayLike<File> | null): number => {
-        if (!picked || picked.length === 0) return 0;
+        const accepted = admit(picked, rules.maxAttachments - files.length - kept.length);
+        if (accepted.length > 0) setFiles((current) => [...current, ...accepted]);
+        return accepted.length;
+    };
+
+    /**
+     * Open picked photos and videos in the editor, and stage everything else.
+     * The editor's items are a message of their own, so they have the whole
+     * message's room.
+     */
+    const pickMedia = (picked: readonly File[]): void => {
+        const media = picked.filter(isEditorMedia);
+        const other = picked.filter((file) => !isEditorMedia(file));
+        if (other.length > 0) stage(other);
+        if (media.length === 0) return;
+        const accepted = admit(media, rules.maxAttachments - inEditor.length);
+        if (accepted.length > 0) setInEditor((current) => [...current, ...accepted]);
+    };
+
+    /** The editor's Send: one message, or one per captioned item. */
+    const sendEdited = (media: readonly EditedMedia[], viewOnce: boolean): void => {
+        if (disabled) return;
+        // Said in the editor, which stays open: an edited photo can come out
+        // heavier than the one picked, and the edits are not thrown away for it.
+        const tooBig = media.find((one) => one.file.size > maxBytes);
+        if (tooBig) {
+            setRefused(
+                t("composer.refused.tooBig", {
+                    name: tooBig.file.name,
+                    size: (tooBig.file.size / (1024 * 1024)).toFixed(1),
+                    limit: rules.maxAttachmentMib
+                })
+            );
+            return;
+        }
+        setInEditor([]);
+        setRefused("");
+        for (const message of planMediaSend(media, canViewOnce && viewOnce)) {
+            void deliver({
+                id: newOutgoingId(),
+                scope,
+                body: message.body,
+                files: message.files,
+                kept: [],
+                hidden: [],
+                ...(message.viewOnce.length > 0 ? { viewOnce: message.viewOnce } : {})
+            });
+        }
+    };
+
+    /**
+     * The files of a pick that fit: under the size limit and within `room`,
+     * with what did not fit said in the composer's notice.
+     */
+    const admit = (picked: ArrayLike<File> | null, space: number): File[] => {
+        if (!picked || picked.length === 0) return [];
         // Said rather than ignored: a file dropped onto a box that quietly does
         // nothing with it reads as a broken composer.
         if (!attachable) {
             setRefused(t("composer.refused.notAllowed"));
-            return 0;
+            return [];
         }
         const chosen = Array.from(picked);
-        const room = Math.max(0, rules.maxAttachments - files.length - kept.length);
+        const room = Math.max(0, space);
         const small = chosen.filter((file) => file.size <= maxBytes);
         const accepted = small.slice(0, room);
 
@@ -1082,8 +1147,7 @@ export function Composer({
         // pasted afterwards is not taken for one from the camera.
         const source = lastPickSource();
         if (source) for (const file of accepted) pickedFrom.current.set(file, source);
-        if (accepted.length > 0) setFiles((current) => [...current, ...accepted]);
-        return accepted.length;
+        return accepted;
     };
 
     const announce = () => {
@@ -1369,8 +1433,29 @@ export function Composer({
                             ))}
                         </span>
                         <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">
-                            {spokenLength(MAX_VOICE_SECONDS - voice.seconds)} left
+                            {t("composer.timeLeft", {
+                                time: spokenLength(MAX_VOICE_SECONDS - voice.seconds)
+                            })}
                         </span>
+                        {/* Heard once, like a photo seen once: the server takes
+                            a recording the same way it takes a staged one. */}
+                        {canViewOnce && (
+                            <button
+                                type="button"
+                                aria-pressed={voiceOnce}
+                                aria-label={t("composer.voiceViewOnce")}
+                                title={voiceOnce ? t("composer.voiceViewOnceOn") : t("composer.voiceViewOnce")}
+                                onClick={() => setVoiceOnce((now) => !now)}
+                                className={cn(
+                                    "flex size-6 shrink-0 items-center justify-center rounded-full border text-[0.6875rem] font-semibold tabular-nums transition-colors",
+                                    voiceOnce
+                                        ? "border-primary bg-primary text-primary-foreground"
+                                        : "border-border-strong text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                1
+                            </button>
+                        )}
                         <button
                             type="button"
                             onClick={voice.cancel}
@@ -1665,12 +1750,15 @@ export function Composer({
                                     are behind Send's chevron - see `SendButton` -
                                     so neither is offered with nothing to send. */}
                                 {voiceFirst ? (
-                                    <MicButton
+                                    <VoiceMicButton
                                         disabled={disabled}
+                                        recording={voice.recording}
                                         onStart={() => {
                                             dictation.stop();
                                             voice.start();
                                         }}
+                                        onStop={voice.stop}
+                                        onCancel={voice.cancel}
                                     />
                                 ) : (
                                 <SendButton
@@ -1720,6 +1808,19 @@ export function Composer({
                 />
             )}
 
+            {inEditor.length > 0 && (
+                <MediaEditor
+                    files={inEditor}
+                    canViewOnce={canViewOnce}
+                    refused={refused}
+                    captured={(file) => pickedFrom.current.get(file) ?? null}
+                    onAdd={pickMedia}
+                    onRemove={(file) => setInEditor((current) => current.filter((one) => one !== file))}
+                    onClose={() => setInEditor([])}
+                    onSend={sendEdited}
+                />
+            )}
+
             {picking && (
                 <FilePickerDialog
                     // Most of what is attached comes straight off the device.
@@ -1753,69 +1854,6 @@ export function Composer({
                 />
             )}
         </div>
-    );
-}
-
-/**
- * Record, and set up what records.
- *
- * The button starts the recording and the chevron beside it opens everything
- * about the microphone - which one, how much is done to what it hears, and how
- * loud it goes out. The same shape the call controls use, and for the same
- * reason: those are decided once, and they must not slow down the thing that is
- * decided every time.
- *
- * Always there, unlike before: it used to appear only where a second microphone
- * existed, which hid the noise and level settings from every laptop with one
- * built-in microphone - the machines that need them most.
- *
- * Every choice behind it is this browser's and is shared with calls and clips:
- * see `MicSettings`.
- */
-function MicButton({ disabled, onStart }: { disabled: boolean; onStart: () => void }) {
-    const t = useTranslations("chat");
-    const many = true;
-
-    return (
-        <span className="flex items-center">
-            <button
-                type="button"
-                disabled={disabled}
-                onClick={onStart}
-                aria-label={t("composer.recordAVoiceMessage")}
-                title={t("composer.recordAVoiceMessage")}
-                className={cn(
-                    "rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50",
-                    many && "rounded-e-none pe-1"
-                )}
-            >
-                <Mic className="size-4" />
-            </button>
-            {many && (
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <button
-                            type="button"
-                            disabled={disabled}
-                            aria-label={t("composer.microphoneSettings")}
-                            title={t("composer.microphoneSettings")}
-                            className="rounded rounded-s-none py-1.5 ps-0.5 pe-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                        >
-                            <ChevronDown className="size-3" />
-                        </button>
-                    </DropdownMenuTrigger>
-                    {/* Upward: the composer is at the bottom of the screen.
-                        The settings are drawn rather than listed as menu items,
-                        because one of them is a slider and a menu that closes on
-                        every press is no place for one - a plain button inside a
-                        menu surface is not an option, so nothing closes when one
-                        is pressed. */}
-                    <DropdownMenuContent align="start" side="top" className="w-72">
-                        <MicSettings className="p-1" />
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            )}
-        </span>
     );
 }
 
