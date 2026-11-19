@@ -62,7 +62,7 @@ export function SelectionBar({
     const open = count > 0;
 
     return (
-        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)_+_1rem)] z-40 flex justify-center px-4">
+        <div className="pointer-events-none fixed inset-x-0 bottom-[calc(1rem+var(--safe-bottom))] z-40 flex justify-center px-4">
             <div
                 role="toolbar"
                 aria-label={t("bulk.toolbar")}

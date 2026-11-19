@@ -31,7 +31,7 @@ export default async function PublicFormPage({ params }: { params: Promise<{ tok
     const t = await getTranslations("publicPages");
 
     return (
-        <main className="flex min-h-dvh items-center justify-center bg-background p-6">
+        <main className="flex min-h-dvh items-center justify-center bg-background safe-p-6">
             {form ? (
                 <Messages namespaces={["publicPages"]}>
                     <PublicForm

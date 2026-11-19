@@ -123,12 +123,35 @@
        it, or the buttons cover it. */
     --window-controls-height: env(titlebar-area-height, 0px);
 
+    /* The edges of the screen a notch, a punch-hole, a Dynamic Island, the
+       status bar or the home indicator take, in whichever orientation the phone
+       is held (the viewport is `viewport-fit=cover`, see the root layout). 0px
+       on a plain rectangle, in a desktop browser, and inside the Android app,
+       whose window already keeps its WebView clear of all of them. The model is
+       one: the chrome's backgrounds run to the edge and their contents stay
+       inside these - the top bar takes the top, the shell the sides and the
+       bottom, and anything fixed to an edge adds the one it touches. Start and
+       end follow the reading direction, like the rest of the layout. */
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+    --safe-start: var(--safe-left);
+    --safe-end: var(--safe-right);
+
     /* What the shell's notices above a page take, published by the page-notices
        strip while one is up (see PAGE_NOTICES), plus the connection strip above
        the whole shell. Screens that fill the window subtract it. */
     --page-notice-height: 0px;
     --connection-banner-height: 0px;
-    --notice-height: calc(var(--page-notice-height) + var(--connection-banner-height));
+    /* The top bar's share of the top inset: all of it, unless the connection
+       strip is up and has already taken it (its measured height includes it). */
+    --header-safe-top: max(0px, calc(var(--safe-top) - var(--connection-banner-height)));
+    /* Also the screen edges above and below the shell, so a screen that fills
+       the window is never taller than what is left of it. */
+    --notice-height: calc(
+        var(--page-notice-height) + var(--connection-banner-height) + var(--header-safe-top) + var(--safe-bottom)
+    );
 
     /* Elevation. A popover reads as lifted; a modal reads as detached. */
     --shadow-popover: 0 8px 24px -6px hsl(225 30% 2% / 0.55), 0 2px 6px -2px hsl(225 30% 2% / 0.45);
@@ -143,6 +166,11 @@
        it is what renders before the font arrives and if it never does. */
     --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+}
+
+[dir="rtl"] {
+    --safe-start: var(--safe-right);
+    --safe-end: var(--safe-left);
 }
 
 :root.light {

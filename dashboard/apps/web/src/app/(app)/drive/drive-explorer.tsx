@@ -1214,7 +1214,7 @@ export function DriveExplorer({
             </section>
 
             {ops.length > 0 || jobs.length > 0 ? (
-                <div className="fixed bottom-4 end-4 z-50 flex w-80 flex-col gap-3 rounded-lg border border-border-strong bg-elevated p-3 shadow-popover">
+                <div className="fixed bottom-[calc(1rem+var(--safe-bottom))] end-[calc(1rem+var(--safe-end))] z-50 flex w-80 flex-col gap-3 rounded-lg border border-border-strong bg-elevated p-3 shadow-popover">
                     <p className="text-xs font-medium text-muted-foreground">
                         {t("explorer.background")}
                     </p>
@@ -1275,7 +1275,7 @@ export function DriveExplorer({
             ) : null}
 
             {opError ? (
-                <div className="fixed bottom-4 end-4 z-50 flex w-80 items-start gap-2 rounded-lg border border-danger-edge bg-danger-soft p-3 text-sm text-danger-ink shadow-popover">
+                <div className="fixed bottom-[calc(1rem+var(--safe-bottom))] end-[calc(1rem+var(--safe-end))] z-50 flex w-80 items-start gap-2 rounded-lg border border-danger-edge bg-danger-soft p-3 text-sm text-danger-ink shadow-popover">
                     <Info className="mt-0.5 size-4 shrink-0" />
                     <span className="min-w-0 flex-1 break-words">{opError}</span>
                     <button

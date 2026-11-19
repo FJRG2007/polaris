@@ -9,7 +9,32 @@
  */
 
 import type { Config } from "tailwindcss";
+import plugin from "tailwindcss/plugin";
 import animate from "tailwindcss-animate";
+
+/**
+ * `safe-p-4`, `safe-px-6`, `safe-py-10`: the padding `p-4` and the rest would
+ * give, plus whatever edge a notch, a punch-hole, the status bar or the home
+ * indicator takes on that side (the `--safe-*` insets in tokens.css, 0px on a
+ * plain screen). For a screen drawn outside the app shell - sign-in, a shared
+ * link, an error page - which has no top bar to take the insets for it.
+ */
+const safePadding = plugin(({ matchUtilities, theme }) => {
+    const around = (value: string, side: "top" | "right" | "bottom" | "left") => `calc(${value} + var(--safe-${side}))`;
+    matchUtilities(
+        {
+            "safe-p": (value: string) => ({
+                paddingTop: around(value, "top"),
+                paddingRight: around(value, "right"),
+                paddingBottom: around(value, "bottom"),
+                paddingLeft: around(value, "left")
+            }),
+            "safe-px": (value: string) => ({ paddingRight: around(value, "right"), paddingLeft: around(value, "left") }),
+            "safe-py": (value: string) => ({ paddingTop: around(value, "top"), paddingBottom: around(value, "bottom") })
+        },
+        { values: theme("spacing") }
+    );
+});
 
 const withAlpha = (variable: string) => `hsl(var(--${variable}) / <alpha-value>)`;
 
@@ -105,11 +130,11 @@ const preset: Omit<Config, "content"> = {
                 header: "var(--header-height)"
             },
             height: {
-                "below-header": "calc(100dvh - var(--header-height))"
+                "below-header": "calc(100dvh - var(--header-height) - var(--header-safe-top))"
             }
         }
     },
-    plugins: [animate]
+    plugins: [animate, safePadding]
 };
 
 export default preset;

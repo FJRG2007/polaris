@@ -51,10 +51,10 @@ const CLOSE =
 export type PhoneLayout = "sheet" | "full" | "keep";
 
 const PHONE_SHEET =
-    "max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:max-h-[92dvh] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.25rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-8 max-sm:data-[state=closed]:slide-out-to-bottom-8";
+    "max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:max-h-[92dvh] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.25rem+var(--safe-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-8 max-sm:data-[state=closed]:slide-out-to-bottom-8";
 
 const PHONE_FULL =
-    "max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:top-0 max-sm:h-dvh max-sm:w-full max-sm:max-w-none max-sm:max-h-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0 max-sm:pb-[calc(1.25rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-8 max-sm:data-[state=closed]:slide-out-to-bottom-8";
+    "max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:top-0 max-sm:h-dvh max-sm:w-full max-sm:max-w-none max-sm:max-h-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0 max-sm:pt-[calc(1.25rem+var(--safe-top))] max-sm:pb-[calc(1.25rem+var(--safe-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-8 max-sm:data-[state=closed]:slide-out-to-bottom-8";
 
 const PHONE_CLASSES: Record<PhoneLayout, string> = {
     sheet: PHONE_SHEET,
@@ -150,7 +150,7 @@ export const SheetContent = forwardRef<
         <RadixDialog.Content
             ref={ref}
             className={cn(
-                "fixed bottom-0 end-0 top-[var(--window-controls-height)] z-50 flex h-[calc(100dvh-var(--window-controls-height))] w-full max-w-full flex-col overflow-hidden border-s border-border-strong bg-elevated shadow-modal outline-none transition-[width,max-width] duration sm:bottom-2 sm:end-2 sm:top-[calc(0.5rem+var(--window-controls-height))] sm:h-[calc(100dvh-1rem-var(--window-controls-height))] sm:max-w-[calc(100vw-1rem)] sm:rounded-xl sm:border",
+                "fixed bottom-0 end-0 top-[var(--window-controls-height)] z-50 flex h-[calc(100dvh-var(--window-controls-height))] w-full max-w-full flex-col overflow-hidden pb-[var(--safe-bottom)] pe-[var(--safe-end)] ps-[var(--safe-start)] pt-[var(--safe-top)] sm:p-0 border-s border-border-strong bg-elevated shadow-modal outline-none transition-[width,max-width] duration sm:bottom-[calc(0.5rem+var(--safe-bottom))] sm:end-[calc(0.5rem+var(--safe-end))] sm:top-[calc(0.5rem+var(--window-controls-height)+var(--safe-top))] sm:h-[calc(100dvh-1rem-var(--window-controls-height)-var(--safe-top)-var(--safe-bottom))] sm:max-w-[calc(100vw-1rem)] sm:rounded-xl sm:border",
                 "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-right-8 data-[state=closed]:slide-out-to-right-8 data-[state=closed]:duration-fast",
                 className
             )}

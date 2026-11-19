@@ -296,7 +296,7 @@ export function MicSlot({
                     <Dialog open={menuOpen} onOpenChange={onMenuOpenChange}>
                         <DialogContent
                             aria-describedby={undefined}
-                            className="bottom-0 left-0 top-auto w-full max-w-full translate-x-0 translate-y-0 rounded-b-none pb-[max(1rem,env(safe-area-inset-bottom))] data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8"
+                            className="bottom-0 left-0 top-auto w-full max-w-full translate-x-0 translate-y-0 rounded-b-none pb-[max(1rem,var(--safe-bottom))] data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8"
                         >
                             <DialogTitle className="pb-2">{t("dictation.settings")}</DialogTitle>
                             {body}

@@ -26,7 +26,7 @@ export default async function VerifyEmailPage({
     const t = await getTranslations("auth");
 
     return (
-        <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-4 p-6 text-center">
+        <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-4 safe-p-6 text-center">
             {verified ? (
                 <>
                     <CheckCircle2 className="size-10 text-success" />

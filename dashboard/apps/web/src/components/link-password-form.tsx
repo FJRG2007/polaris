@@ -64,7 +64,7 @@ export function LinkPasswordForm({
     }
 
     return (
-        <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 p-6">
+        <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 safe-p-6">
             <div className="flex items-center justify-center gap-2 text-muted-foreground">
                 <PolarisMark className="size-6" />
                 <span className="text-sm font-medium">

@@ -44,7 +44,10 @@ export function AppShell({
         // the full height of the screen - up beside the header, as if the bar
         // itself were part of what scrolls.
         <div className="relative flex h-[calc(100dvh-var(--connection-banner-height,0px))] flex-col overflow-hidden bg-background print:block print:h-auto print:overflow-visible">
-            <header className="app-titlebar z-40 flex h-header shrink-0 items-center justify-between gap-1 border-b border-border bg-surface px-2 sm:gap-4 sm:px-4">
+            {/* The bar's background runs under the notch and the status bar; its
+                controls start below them and inside the side insets of a phone
+                held sideways (see --safe-top in tokens.css). */}
+            <header className="app-titlebar z-40 flex h-[calc(var(--header-height)+var(--header-safe-top))] shrink-0 items-center justify-between gap-1 border-b border-border bg-surface pe-[calc(0.5rem+var(--safe-end))] ps-[calc(0.5rem+var(--safe-start))] pt-[var(--header-safe-top)] sm:gap-4 sm:pe-[calc(1rem+var(--safe-end))] sm:ps-[calc(1rem+var(--safe-start))]">
                 <div className="flex min-w-0 items-center gap-1 sm:gap-3">
                     {navButton}
                     {mark ?? <PolarisMark className="shrink-0" nameClassName="hidden sm:inline" />}
@@ -69,7 +72,9 @@ export function AppShell({
                     {account}
                 </div>
             </header>
-            <div className="flex min-h-0 flex-1 print:block">
+            {/* Clear of a cutout at either side in landscape and of the home
+                indicator below; the strips they leave are the page's own colour. */}
+            <div className="flex min-h-0 flex-1 pb-[var(--safe-bottom)] pe-[var(--safe-end)] ps-[var(--safe-start)] print:block print:p-0">
                 {sidebar ? (
                     // Scrolling on its own beside the content, so the rail stays
                     // reachable however far down the content the user is. An app

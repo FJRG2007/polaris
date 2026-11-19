@@ -101,7 +101,7 @@ export function GuestCall({
 
     if (seat?.admission === "admitted") {
         return (
-            <div className="flex h-dvh flex-col overflow-hidden">
+            <div className="flex h-dvh safe-p-0 flex-col overflow-hidden">
                 <GuestRoom
                     title={title}
                     meetingId={seat.meetingId}

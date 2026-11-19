@@ -40,7 +40,7 @@ function Shell({
     back: string;
 }) {
     return (
-        <div className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 p-6">
+        <div className="mx-auto flex min-h-dvh max-w-3xl flex-col gap-4 safe-p-6">
             <header className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 text-muted-foreground">
                     <PolarisMark className="size-6" />

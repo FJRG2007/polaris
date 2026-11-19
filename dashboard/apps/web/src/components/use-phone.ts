@@ -2,7 +2,15 @@
 
 import { useSyncExternalStore } from "react";
 
-/** Below `sm`, where menus open as sheets rather than hanging off their button. */
+/**
+ * Below `sm`, where menus open as sheets rather than hanging off their button.
+ *
+ * By width alone, deliberately, and the same width the CSS lays the screen out
+ * by: a phone turned sideways is a wide, short window and gets the wider layout
+ * (the "compact height" case of Material's window size classes), an unfolded
+ * foldable gets the tablet one and a folded one the phone one. It is a live
+ * media query, so turning or unfolding the phone switches it as it happens.
+ */
 export const PHONE_QUERY = "(max-width: 639px)";
 
 /** Whether the screen is a phone's. Not on the server, where the menu is drawn. */

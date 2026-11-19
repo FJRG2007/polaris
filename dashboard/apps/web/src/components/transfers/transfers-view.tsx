@@ -66,7 +66,7 @@ export function TransfersView() {
              * composer taking the whole screen does not bury the progress of the
              * file it is uploading.
              */
-            className="pointer-events-auto fixed bottom-[calc(1rem_+_var(--docked-panel-height,0px))] end-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-lg border border-border bg-elevated p-3 shadow-popover"
+            className="pointer-events-auto fixed bottom-[calc(1rem_+_var(--docked-panel-height,0px)_+_var(--safe-bottom))] end-[calc(1rem+var(--safe-end))] z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2 rounded-lg border border-border bg-elevated p-3 shadow-popover"
         >
             <div className="flex items-center gap-2">
                 <p className="flex-1 text-xs font-medium text-muted-foreground">

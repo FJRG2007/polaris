@@ -115,7 +115,7 @@ export function EnrollView({
     }
 
     return (
-        <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-6 p-6">
+        <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-6 safe-p-6">
             <header className="flex flex-col gap-3">
                 <PolarisMark />
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
@@ -480,7 +480,7 @@ function BackupCodes({
     const text = codes.join("\n");
 
     return (
-        <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-6 p-6">
+        <main className="mx-auto flex min-h-dvh w-full max-w-lg flex-col justify-center gap-6 safe-p-6">
             <header className="flex flex-col gap-3">
                 <ShieldCheck className="size-8 text-primary" />
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">

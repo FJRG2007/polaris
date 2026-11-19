@@ -208,7 +208,7 @@ export function Present({
                 if (event.button === 0) next();
             }}
             className={cn(
-                "fixed inset-0 z-50 flex touch-none select-none flex-col bg-black text-white outline-none",
+                "fixed inset-0 z-50 flex safe-p-0 touch-none select-none flex-col bg-black text-white outline-none",
                 !controls && "cursor-none"
             )}
         >

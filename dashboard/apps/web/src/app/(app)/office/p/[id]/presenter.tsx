@@ -253,7 +253,7 @@ export function PresenterView({
                 }
                 event.preventDefault();
             }}
-            className="fixed inset-0 z-50 flex flex-col bg-background text-foreground outline-none"
+            className="fixed inset-0 z-50 flex flex-col bg-background safe-p-0 text-foreground outline-none"
         >
             <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-3 py-2">
                 <div className="flex items-center gap-1">

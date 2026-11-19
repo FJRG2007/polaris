@@ -41,7 +41,7 @@ export async function PublicChrome({
             {/* Deliberately the signed-in header's own measurements. A public
                 page an inch shorter in the bar is the kind of difference nobody
                 can name and everybody notices. */}
-            <header className="app-titlebar sticky top-0 z-40 flex h-header shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-4">
+            <header className="app-titlebar sticky top-0 z-40 flex h-[calc(var(--header-height)+var(--safe-top))] shrink-0 items-center justify-between gap-2 border-b border-border bg-surface pe-[calc(0.75rem+var(--safe-end))] ps-[calc(0.75rem+var(--safe-start))] pt-[var(--safe-top)] sm:gap-4 sm:pe-[calc(1rem+var(--safe-end))] sm:ps-[calc(1rem+var(--safe-start))]">
                 <Link
                     href={PUBLIC_PATHS.home}
                     aria-label="Polaris" // i18n-ignore the product's name
@@ -80,7 +80,7 @@ export async function PublicChrome({
                 <OutsideApp>{children}</OutsideApp>
             </main>
 
-            <footer className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-x-5 gap-y-1 px-4 pb-8 text-xs text-muted-foreground sm:px-6">
+            <footer className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-x-5 gap-y-1 px-4 pb-[calc(2rem+var(--safe-bottom))] text-xs text-muted-foreground sm:px-6">
                 <Link href={PUBLIC_PATHS.home} className="transition-colors hover:text-foreground">
                     {t("publicChrome.about")}
                 </Link>

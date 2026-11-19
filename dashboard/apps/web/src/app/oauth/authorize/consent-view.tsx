@@ -100,7 +100,7 @@ export function ConsentView({
     }
 
     return (
-        <main className="grid min-h-dvh place-items-center p-4">
+        <main className="grid min-h-dvh place-items-center safe-p-4">
             <ConsentCard
                 requester={
                     app.brand ? (

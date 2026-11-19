@@ -159,7 +159,7 @@ export function ConnectionBanner() {
         <BannerStrip>
             <p
                 className={cn(
-                    "relative flex min-w-0 max-w-full flex-wrap items-center justify-center gap-x-2 overflow-hidden border-b px-4 py-1 text-sm",
+                    "relative flex min-w-0 max-w-full flex-wrap items-center justify-center gap-x-2 overflow-hidden border-b pb-1 pe-[calc(1rem+var(--safe-end))] ps-[calc(1rem+var(--safe-start))] pt-[calc(0.25rem+var(--safe-top))] text-sm",
                     good
                         ? "border-success-edge bg-success-soft text-success-ink"
                         : state === "offline"

@@ -129,7 +129,7 @@ export function SheetMenuContent({
                 aria-describedby={undefined}
                 showClose={false}
                 onEscapeKeyDown={onEscapeKeyDown}
-                className="bottom-0 left-0 top-auto flex max-h-[85dvh] w-full max-w-full translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-b-none p-0 pb-[env(safe-area-inset-bottom)] data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8"
+                className="bottom-0 left-0 top-auto flex max-h-[85dvh] w-full max-w-full translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-b-none p-0 pb-[var(--safe-bottom)] data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8"
             >
                 <div className="flex min-h-14 min-w-0 shrink-0 items-center gap-2 border-b border-border ps-4 pe-1.5">
                     <DialogTitle className="min-w-0 flex-1 truncate text-base">{title}</DialogTitle>

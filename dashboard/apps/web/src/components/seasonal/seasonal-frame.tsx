@@ -255,7 +255,7 @@ function PreviewBar({ season }: { season: core.Season }) {
     return (
         <div
             role="status"
-            className="fixed bottom-4 left-1/2 z-40 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-card py-1.5 pl-4 pr-1.5 text-sm shadow-lg"
+            className="fixed bottom-[calc(1rem+var(--safe-bottom))] left-1/2 z-40 flex w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-card py-1.5 pl-4 pr-1.5 text-sm shadow-lg"
         >
             <Eye aria-hidden="true" className="size-4 shrink-0 text-[hsl(var(--season-a))]" />
             <span className="min-w-0 truncate">

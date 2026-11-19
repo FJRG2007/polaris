@@ -573,13 +573,13 @@ export function Composer() {
     // over the other half.
     const shellClass =
         posture === "full"
-            ? "inset-0 md:inset-10 md:rounded-lg md:border-b max-md:rounded-none max-md:border-0 max-md:pb-[env(safe-area-inset-bottom)]"
+            ? "inset-0 md:inset-10 md:rounded-lg md:border-b max-md:rounded-none max-md:border-0 max-md:pb-[var(--safe-bottom)] max-md:pt-[var(--safe-top)]"
             : posture === "minimized"
-              ? "bottom-0 end-6 w-[22rem] max-md:inset-x-2 max-md:end-auto max-md:w-auto"
+              ? "bottom-0 end-[calc(1.5rem+var(--safe-end))] w-[22rem] pb-[var(--safe-bottom)] max-md:inset-x-2 max-md:end-auto max-md:w-auto"
               : // Taller and wider than it was. A composer whose body is three
                 // lines is one people write three lines in, and the message
                 // being written is the whole point of the screen it covers.
-                "inset-0 mx-auto flex w-full max-w-3xl max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:pb-[env(safe-area-inset-bottom)] md:inset-x-auto md:bottom-0 md:top-auto md:end-6 md:mx-0 md:h-[38rem] md:max-h-[85vh] md:w-[40rem]";
+                "inset-0 mx-auto flex w-full max-w-3xl max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:pb-[var(--safe-bottom)] max-md:pt-[var(--safe-top)] md:inset-x-auto md:bottom-0 md:top-auto md:end-6 md:mx-0 md:h-[38rem] md:max-h-[85vh] md:w-[40rem]";
 
     return (
         <>
@@ -1208,7 +1208,7 @@ function QueuedPill({
         <div
             ref={pill}
             className={cn(
-                "fixed inset-x-4 bottom-4 z-[42] flex items-center gap-1 rounded-full border border-border bg-elevated py-1 ps-4 pe-1 shadow-modal md:inset-x-auto md:end-6",
+                "fixed start-[calc(1rem+var(--safe-start))] end-[calc(1rem+var(--safe-end))] bottom-[calc(1rem+var(--safe-bottom))] z-[42] flex items-center gap-1 rounded-full border border-border bg-elevated py-1 ps-4 pe-1 shadow-modal md:inset-x-auto md:end-[calc(1.5rem+var(--safe-end))]",
                 "animate-in fade-in slide-in-from-bottom-2 zoom-in-95 duration-300 motion-reduce:animate-none"
             )}
         >

@@ -14,7 +14,7 @@ export default async function LinkElsewherePage() {
     const t = await getTranslations("auth");
 
     return (
-        <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-4 p-6 text-center">
+        <div className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center gap-4 safe-p-6 text-center">
             <ShieldAlert className="size-10 shrink-0 text-warning" />
             <div className="min-w-0">
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("linkElsewhere.title")}</h1>

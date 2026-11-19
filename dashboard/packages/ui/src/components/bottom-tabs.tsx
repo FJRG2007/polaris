@@ -8,7 +8,7 @@
  * column, which has the room. At the bottom because that is where a thumb
  * already is; each tab is the full height of a finger, an icon over a short
  * name, the open one marked by the pill behind its icon. It clears the home
- * indicator on phones that draw one (`safe-area-inset-bottom`).
+ * indicator on phones that draw one (`--safe-bottom`).
  *
  * An app passes its own tabs, so a third-party app gets the same bar as
  * Polaris's own.
@@ -41,7 +41,7 @@ export function BottomTabs({
         <nav
             aria-label={label}
             className={cn(
-                "flex shrink-0 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] md:hidden",
+                "flex shrink-0 border-t border-border bg-surface pb-[var(--safe-bottom)] md:hidden",
                 className
             )}
         >

@@ -463,7 +463,7 @@ export function ImageViewer({
             data-image-viewer=""
             ref={root}
             tabIndex={-1}
-            className="fixed inset-0 z-50 flex flex-col outline-none"
+            className="fixed inset-0 z-50 flex flex-col safe-p-0 outline-none"
         >
             {/* Its own layer, so it fades while the picture flies. */}
             <div

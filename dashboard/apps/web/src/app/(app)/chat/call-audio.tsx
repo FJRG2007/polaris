@@ -214,7 +214,7 @@ export function CallAudio({ call }: { call: CallState }) {
                 silently. A press is all it wants, so this asks for one - once
                 for the room, wherever in Polaris the reader happens to be. */}
             {blocked.size > 0 && !silent && (
-                <div className="pointer-events-none fixed inset-x-0 top-14 z-50 flex justify-center px-2">
+                <div className="pointer-events-none fixed inset-x-0 top-[calc(3.5rem+var(--safe-top))] z-50 flex justify-center px-2">
                     <button
                         type="button"
                         onClick={() => {

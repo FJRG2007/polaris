@@ -1,7 +1,7 @@
 // One stylesheet, which pulls in the design tokens itself: see globals.css for why
 // the token import cannot live here.
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { CSSProperties, ReactNode } from "react";
 import { FONT_CLASSES } from "./fonts";
 import { IdleWatch } from "@/components/idle-watch";
@@ -15,6 +15,20 @@ import { seasonPreviewFor } from "@/lib/seasonal-preview";
 import { I18nProvider, LocaleSync } from "@/components/i18n/i18n-provider";
 import { ConnectionBanner } from "@/components/connection-banner";
 import { resolveTextSize, resolveTheme } from "@/lib/display-prefs-service";
+
+/**
+ * The page is laid out to the very edges of the screen, under a notch, a
+ * punch-hole or a Dynamic Island and beside one when the phone is turned, so
+ * the browser reports those edges as `env(safe-area-inset-*)` instead of
+ * leaving black bars around the page. The chrome keeps its contents clear of
+ * them - see `--safe-top` and its siblings in the UI package's tokens.css,
+ * which is the one place that model is written down.
+ */
+export const viewport: Viewport = {
+    width: "device-width",
+    initialScale: 1,
+    viewportFit: "cover"
+};
 
 /** The document's title and description, the description in the reader's
  *  language, and the rule that keeps every page out of search engines. The

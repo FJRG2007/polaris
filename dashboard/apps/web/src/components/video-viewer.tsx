@@ -62,7 +62,7 @@ export function VideoViewer({
             // The ground closes it; the player does not. A press that landed on
             // the pause button must not also put the video away.
             onClick={onClose}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 safe-p-4 backdrop-blur-sm"
         >
             <button
                 type="button"
