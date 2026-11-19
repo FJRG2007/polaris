@@ -256,8 +256,13 @@ export interface AccountRef {
  * `saveCaptured` names none of them.
  */
 export interface OfferedCapture {
-    /** What saving it would do: add a login, replace a password, or nothing. */
-    readonly kind: "none" | "save" | "update";
+    /**
+     * What saving it would do: add a login, replace a password, or nothing - or
+     * that it cannot be told yet, because the vault is locked (`locked`) or this
+     * browser is not connected to a vault (`unlinked`). Those two are held until
+     * the vault opens, and then become one of the others.
+     */
+    readonly kind: "none" | "save" | "update" | "locked" | "unlinked";
     /** The name of the item about to change, for an update, or the site's host
      *  for a save. Null when there is nothing to offer. */
     readonly name: string | null;

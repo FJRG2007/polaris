@@ -347,6 +347,22 @@ const FIRST_STEP = storage.defineItem<{
     username: string;
     until: number;
 } | null>("session:vault.firstStep", { fallback: null });
+/**
+ * A login submitted while the vault could not take it - locked, or this browser
+ * not connected to one. Without it the sign-in passes in silence and the new
+ * password is never saved, which is how a changed password goes missing. Held in
+ * session memory for the tab and site it was typed on, for the same few minutes
+ * as a capture, and dropped on an explicit lock, a sign-out or "Not now"; once
+ * the vault opens it is weighed like any capture and offered as save or update.
+ */
+const LOCKED_CAPTURE = storage.defineItem<{
+    tabId: number;
+    url: string;
+    username: string;
+    password: string;
+    newAccount: boolean;
+    until: number;
+} | null>("session:vault.captureWaiting", { fallback: null });
 /** The wrapped keys, kept so unlocking does not need the network. */
 const WRAPPED = storage.defineItem<{ key: string; privateKey: string | null; kdf: unknown } | null>(
     "session:vault.wrapped",
@@ -1614,8 +1630,22 @@ async function capture(
     submitted: Extract<messages.Request, { kind: "captured" }>
 ): Promise<messages.Reply> {
     const quiet: messages.Reply = { ok: true, offer: { kind: "none", name: null, username: null } };
-    if (!(await vault())) return quiet;
     if (isBlockedHost(await BLOCKED.getValue(), page.url)) return quiet;
+    if (!(await vault())) {
+        // Not weighed yet - that needs the vault's items - but not dropped either:
+        // the page is told why it cannot be saved and how to fix it, and the login
+        // waits for the vault to open.
+        if (submitted.password === "") return quiet;
+        await LOCKED_CAPTURE.setValue({
+            tabId: page.tabId,
+            url: page.url,
+            username: submitted.username.trim(),
+            password: submitted.password,
+            newAccount: submitted.newAccount === true,
+            until: Date.now() + CAPTURE_FOR_MS
+        });
+        return { ok: true, offer: await waitingOffer(page.url, submitted.username.trim()) };
+    }
 
     // A username with no password is the first page of a two-page sign-in: kept
     // for the page that asks for the password, and nothing offered yet.
@@ -1666,6 +1696,43 @@ async function capture(
         offer
     });
     return { ok: true, offer: describeOffer(offer, hostOf(page.url)) };
+}
+
+/** Why a login cannot be offered yet: no connection at all, or a locked vault. */
+async function waitingOffer(url: string, username: string): Promise<messages.OfferedCapture> {
+    const linked = (await LINK_TOKEN.getValue()) !== null && (await LINK_VAULT.getValue());
+    return { kind: linked ? "locked" : "unlinked", name: hostOf(url), username: username || null };
+}
+
+/**
+ * The page asking what it has to show: a capture already weighed, or one that
+ * waited for the vault and is weighed now that it is open, or still waiting.
+ */
+async function pendingOffer(page: PageContext): Promise<messages.OfferedCapture> {
+    const held = await heldFor(page);
+    if (held) return describeOffer(held.offer, hostOf(held.url));
+    const waiting = await LOCKED_CAPTURE.getValue();
+    if (!waiting) return { kind: "none", name: null, username: null };
+    if (waiting.until <= Date.now()) {
+        await LOCKED_CAPTURE.setValue(null);
+        return { kind: "none", name: null, username: null };
+    }
+    if (waiting.tabId !== page.tabId || !sameSite(waiting.url, page.url)) {
+        return { kind: "none", name: null, username: null };
+    }
+    if (!(await vault())) return waitingOffer(waiting.url, waiting.username);
+    await LOCKED_CAPTURE.setValue(null);
+    // Weighed against the address it was typed on, as it would have been then.
+    const reply = await capture(
+        { ...page, url: waiting.url },
+        {
+            kind: "captured",
+            username: waiting.username,
+            password: waiting.password,
+            newAccount: waiting.newAccount
+        }
+    );
+    return reply.ok && "offer" in reply ? reply.offer : { kind: "none", name: null, username: null };
 }
 
 /**
@@ -1929,6 +1996,7 @@ async function clearActive(): Promise<void> {
     await abandonRequest();
     await Promise.all([
         CAPTURE.setValue(null),
+        LOCKED_CAPTURE.setValue(null),
         SECOND_STEP.setValue(null),
         FIRST_STEP.setValue(null),
         LOCK_AT.setValue(null),
@@ -3480,7 +3548,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     // would answer a different question than the one the button asks:
                     // being set aside is disuse, and so is being locked.
                     parkedVaults.clear();
-                    await CAPTURE.setValue(null);
+                    await Promise.all([CAPTURE.setValue(null), LOCKED_CAPTURE.setValue(null)]);
                     await LOCK_AT.setValue(null);
                 });
                 await badge();
@@ -3838,13 +3906,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
 
             case "pendingCapture": {
                 if (!page) return { ok: false, error: await say("errors.noPage") };
-                const held = await heldFor(page);
-                return {
-                    ok: true,
-                    offer: held
-                        ? describeOffer(held.offer, hostOf(held.url))
-                        : { kind: "none", name: null, username: null }
-                };
+                return { ok: true, offer: await inTurn(() => pendingOffer(page)) };
             }
 
             case "saveCaptured":
@@ -3853,7 +3915,7 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                     : { ok: false, error: await say("errors.noPage") };
 
             case "dismissCapture": {
-                await CAPTURE.setValue(null);
+                await Promise.all([CAPTURE.setValue(null), LOCKED_CAPTURE.setValue(null)]);
                 // "Never here" is the same instruction the popup's switch gives,
                 // so it is kept in the same place and honoured by everything that
                 // reads it - no suggestions, no badge, nothing to fill.

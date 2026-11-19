@@ -1794,6 +1794,93 @@ async function offerHeld(before?: () => Promise<void>): Promise<void> {
     if (reply.ok && "offer" in reply) bar(reply.offer, before);
 }
 
+/** How often a bar waiting on the vault asks whether it has opened, and for how
+ *  long: the worker holds the login for five minutes. */
+const WAITING_LOOK_MS = 1500;
+const WAITING_FOR_MS = 5 * 60 * 1000;
+
+/**
+ * "Unlock Polaris to save this login", when the vault could not take it.
+ *
+ * Without this a sign-in on a locked or disconnected vault passed in silence, and
+ * a changed password was never saved anywhere. The worker holds the login; this
+ * opens the popup to unlock or connect, and once the vault is open it is offered
+ * as an ordinary save or update in its place.
+ */
+function waitingBar(offer: OfferedCapture, before?: () => Promise<void>): void {
+    barHost?.remove();
+    const host = ourHost();
+    barHost = host;
+    host.style.cssText = "position:fixed;z-index:2147483647;right:16px;bottom:16px;width:320px;";
+    const shadow = host.attachShadow({ mode: "closed" });
+    const panel = document.createElement("div");
+    panel.setAttribute("role", "group");
+    // i18n-ignore the product's name
+    panel.setAttribute("aria-label", "Polaris");
+    panel.style.cssText = `
+        border: 1px solid hsl(225 10% 16%);
+        border-radius: 10px;
+        padding: 12px;
+        background: hsl(225 11% 9%);
+        color: hsl(220 14% 96%);
+        font: 13px/1.45 ui-sans-serif, system-ui, sans-serif;
+        box-shadow: 0 10px 30px rgb(0 0 0 / 0.45);
+    `;
+    let looking: ReturnType<typeof setInterval> | null = null;
+    const stop = (): void => {
+        if (looking !== null) clearInterval(looking);
+        looking = null;
+    };
+    const close = (): void => {
+        stop();
+        host.remove();
+        if (barHost === host) barHost = null;
+    };
+
+    const title = document.createElement("p");
+    title.style.cssText = "margin:0 0 2px;font-weight:600;";
+    title.textContent = t(offer.kind === "locked" ? "inline.unlockToSave" : "inline.connectToSave");
+    const who = document.createElement("p");
+    who.style.cssText = "margin:0 0 10px;color:hsl(222 10% 66%);word-break:break-all;";
+    who.textContent = [offer.username, offer.name].filter(Boolean).join(" - ");
+
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;";
+    row.append(
+        action(
+            t(offer.kind === "locked" ? "inline.unlock" : "inline.connect"),
+            () => {
+                void askBackground({ kind: "openUnlock" });
+                if (looking !== null) return;
+                const started = Date.now();
+                // The popup unlocks in its own window, so nothing tells this page
+                // it happened: it asks, briefly, until the answer changes.
+                looking = setInterval(() => {
+                    if (!host.isConnected || Date.now() - started > WAITING_FOR_MS) {
+                        stop();
+                        return;
+                    }
+                    void askBackground({ kind: "pendingCapture" }).then((reply) => {
+                        if (!reply.ok || !("offer" in reply) || !host.isConnected) return;
+                        const next = reply.offer;
+                        if (next.kind === "locked" || next.kind === "unlinked") return;
+                        close();
+                        bar(next, before);
+                    });
+                }, WAITING_LOOK_MS);
+            },
+            true
+        ),
+        action(t("inline.notNow"), () => {
+            void askBackground({ kind: "dismissCapture", never: false });
+            close();
+        })
+    );
+    panel.append(title, who, row);
+    shadow.append(panel);
+    document.body.append(host);
+}
+
 /** The bar in the corner is drawn once at a time, however many forms a page has. */
 let barHost: HTMLElement | null = null;
 
@@ -1810,6 +1897,10 @@ let barHost: HTMLElement | null = null;
  */
 function bar(offer: OfferedCapture, before?: () => Promise<void>): void {
     if (offer.kind === "none") return;
+    if (offer.kind === "locked" || offer.kind === "unlinked") {
+        waitingBar(offer, before);
+        return;
+    }
     barHost?.remove();
 
     const host = ourHost();
