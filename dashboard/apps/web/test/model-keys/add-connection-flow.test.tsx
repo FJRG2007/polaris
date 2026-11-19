@@ -170,7 +170,17 @@ describe("One connections table", () => {
             <MessagesWrapper>
                 <ModelKeysView
                     providers={[XAI]}
-                    keys={[key("a", "First"), key("b", "Second")] as never}
+                    keys={
+                        [
+                            key("a", "First"),
+                            key("b", "Second"),
+                            // An agent signed in on the machine is a row like any
+                            // other, marked by its config (`machine-login-config`).
+                            ...(connected.includes(CURSOR.env)
+                                ? [{ ...key("c", "Cursor"), provider: CURSOR.slug, config: { machineLogin: CURSOR.env } }]
+                                : [])
+                        ] as never
+                    }
                     actions={actions}
                     copy={{ title: "Connections", hint: "", empty: "None", adding: "" }}
                     assist={{ signins: [CURSOR], connected, actions: { status: async () => ({ statuses: {} }) } } as never}
@@ -188,7 +198,6 @@ describe("One connections table", () => {
         expect(text.findIndex((one) => one.includes("Cursor"))).toBeGreaterThan(text.findIndex((one) => one.includes("Second")));
         expect(text.at(-1)).toContain("Groq");
         expect(text.at(-1)).toContain("Available to you");
-        expect(screen.getByRole("button", { name: /Sign in/ })).toBeTruthy();
     });
 
     it("leaves out an agent nobody connected; Add connection offers it", () => {
