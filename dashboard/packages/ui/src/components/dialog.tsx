@@ -31,6 +31,57 @@ const CENTRED_MOTION =
 const CLOSE =
     "absolute end-3 top-3 rounded-md p-1.5 text-muted-foreground transition-colors duration-fast hover:bg-card-hover hover:text-foreground active:bg-muted";
 
+/**
+ * How a dialog sits on a phone, where a box floating in the middle of a small
+ * screen is the desktop's habit rather than the phone's.
+ *
+ * - `sheet`: rises from the bottom edge, full width, its top corners rounded -
+ *   where the thumb already is. A confirmation, a short form.
+ * - `full`: takes the whole screen, as Discord and WhatsApp open "new message"
+ *   or a picker on a phone. Anything with a list to search or a lot to fill in.
+ * - `keep`: what the caller drew, untouched: a drawer docked to an edge, or a
+ *   dialog that already says where it goes on a phone.
+ *
+ * Left out, a dialog the caller placed itself (`translate-x-0`) is `keep`, a
+ * dialog the caller made wide (`max-w-2xl` and up) is `full`, and every other
+ * is `sheet`: the width a caller asked for on a computer is the
+ * one thing every dialog already says about how much it holds. From `sm` up
+ * nothing changes.
+ */
+export type PhoneLayout = "sheet" | "full" | "keep";
+
+const PHONE_SHEET =
+    "max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:top-auto max-sm:w-full max-sm:max-w-none max-sm:max-h-[92dvh] max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:border-x-0 max-sm:border-b-0 max-sm:pb-[calc(1.25rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-8 max-sm:data-[state=closed]:slide-out-to-bottom-8";
+
+const PHONE_FULL =
+    "max-sm:bottom-0 max-sm:left-0 max-sm:right-0 max-sm:top-0 max-sm:h-dvh max-sm:w-full max-sm:max-w-none max-sm:max-h-none max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:border-0 max-sm:pb-[calc(1.25rem+env(safe-area-inset-bottom))] max-sm:data-[state=open]:slide-in-from-bottom-8 max-sm:data-[state=closed]:slide-out-to-bottom-8";
+
+const PHONE_CLASSES: Record<PhoneLayout, string> = {
+    sheet: PHONE_SHEET,
+    full: PHONE_FULL,
+    keep: ""
+};
+
+/** A caller that positions the dialog itself, on a phone or everywhere. */
+const PLACED = /(?:^|\s)(?:max-sm:)?translate-x-0(?:\s|$)/;
+const WIDE = /(?:^|\s)(?:sm:|md:|lg:)?max-w-(?:[2-7]xl|screen(?:-[a-z0-9]+)?)(?:\s|$)/;
+/** An arbitrary width, `max-w-[40rem]` or `max-w-[min(48rem,95vw)]`: its first length. */
+const ARBITRARY = /(?:^|\s)(?:sm:|md:|lg:)?max-w-\[(?:min\()?(\d+(?:\.\d+)?)(rem|px)/;
+/** 42rem, Tailwind's `2xl`: from here up a dialog holds more than a sheet should. */
+const WIDE_REM = 42;
+
+/** Which phone layout a dialog takes: the caller's, or read off its width. Pure. */
+export function phoneLayout(className: string | undefined, chosen?: PhoneLayout): PhoneLayout {
+    if (chosen) return chosen;
+    if (!className) return "sheet";
+    if (PLACED.test(className)) return "keep";
+    if (WIDE.test(className)) return "full";
+    const arbitrary = ARBITRARY.exec(className);
+    if (!arbitrary) return "sheet";
+    const rem = Number(arbitrary[1]) / (arbitrary[2] === "px" ? 16 : 1);
+    return rem >= WIDE_REM ? "full" : "sheet";
+}
+
 export const Dialog = RadixDialog.Root;
 export const DialogTrigger = RadixDialog.Trigger;
 export const DialogClose = RadixDialog.Close;
@@ -38,9 +89,13 @@ export const DialogClose = RadixDialog.Close;
 export const DialogContent = forwardRef<
     ElementRef<typeof RadixDialog.Content>,
     /** `showClose` drops the corner X for dialogs whose own content reaches into
-     *  that corner (the search palette); Escape still closes them. */
-    ComponentPropsWithoutRef<typeof RadixDialog.Content> & { showClose?: boolean }
->(({ className, children, showClose = true, ...props }, ref) => (
+     *  that corner (the search palette); Escape still closes them. `phone` is
+     *  how it sits on a phone (`PhoneLayout`). */
+    ComponentPropsWithoutRef<typeof RadixDialog.Content> & {
+        showClose?: boolean;
+        phone?: PhoneLayout;
+    }
+>(({ className, children, showClose = true, phone, ...props }, ref) => (
     <RadixDialog.Portal>
         <RadixDialog.Overlay className={OVERLAY} />
         <RadixDialog.Content
@@ -55,7 +110,9 @@ export const DialogContent = forwardRef<
                 // (a phone, the extension's side panel) it never touches the edges.
                 "fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-xl border border-border-strong bg-elevated p-5 shadow-modal",
                 CENTRED_MOTION,
-                className
+                className,
+                // Last, so it wins over the caller's desktop placement on a phone.
+                PHONE_CLASSES[phoneLayout(className, phone)]
             )}
             {...props}
         >

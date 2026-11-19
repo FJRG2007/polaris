@@ -8,10 +8,11 @@
  */
 
 import { cn } from "../lib/cn";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
+import { useUiStrings } from "../lib/ui-strings";
 import { highlightRanges } from "./search-match";
 import { Input, type InputProps } from "../components/input";
-import { Dialog, DialogContent, DialogTitle } from "../components/dialog";
+import { Dialog, DialogClose, DialogContent, DialogTitle } from "../components/dialog";
 import {
     forwardRef,
     type ButtonHTMLAttributes,
@@ -107,9 +108,15 @@ export function SearchPalette({
     footer,
     children
 }: SearchPaletteProps) {
+    const close = useUiStrings().close;
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent showClose={false} className="max-w-xl overflow-hidden p-0">
+            <DialogContent
+                showClose={false}
+                // A list to search: the whole screen on a phone, as "new message" is in Discord and WhatsApp.
+                phone="full"
+                className="max-w-xl overflow-hidden p-0 max-sm:flex max-sm:flex-col"
+            >
                 <DialogTitle className="sr-only">{title}</DialogTitle>
                 <div className="flex items-center gap-2 border-b border-border px-3">
                     <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -143,6 +150,13 @@ export function SearchPalette({
                         {overlay}
                     </div>
                     {trail}
+                    {/* A phone has no Escape key, and the corner X is off. */}
+                    <DialogClose
+                        className="-me-1 flex size-10 shrink-0 items-center justify-center rounded-md text-muted-foreground sm:hidden"
+                        aria-label={close}
+                    >
+                        <X className="size-5" />
+                    </DialogClose>
                 </div>
                 {toolbar}
                 <div
@@ -150,7 +164,7 @@ export function SearchPalette({
                     id={listId}
                     role="listbox"
                     aria-label={listLabel}
-                    className="max-h-[min(60vh,26rem)] overflow-y-auto overscroll-contain p-2"
+                    className="max-h-[min(60vh,26rem)] overflow-y-auto overscroll-contain p-2 max-sm:max-h-none max-sm:min-h-0 max-sm:flex-1"
                 >
                     {children}
                 </div>

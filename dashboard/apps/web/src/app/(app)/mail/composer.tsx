@@ -568,15 +568,18 @@ export function Composer() {
           })
         : "";
 
+    // On a phone, writing takes the whole screen, as it does in Gmail's app: a
+    // panel docked to the bottom there was half a screen with the keyboard
+    // over the other half.
     const shellClass =
         posture === "full"
-            ? "inset-4 md:inset-10 rounded-lg border-b"
+            ? "inset-0 md:inset-10 md:rounded-lg md:border-b max-md:rounded-none max-md:border-0 max-md:pb-[env(safe-area-inset-bottom)]"
             : posture === "minimized"
-              ? "bottom-0 end-6 w-[22rem]"
+              ? "bottom-0 end-6 w-[22rem] max-md:inset-x-2 max-md:end-auto max-md:w-auto"
               : // Taller and wider than it was. A composer whose body is three
                 // lines is one people write three lines in, and the message
                 // being written is the whole point of the screen it covers.
-                "inset-x-0 bottom-0 mx-auto flex w-full max-w-3xl md:inset-x-auto md:end-6 md:mx-0 md:h-[38rem] md:max-h-[85vh] md:w-[40rem]";
+                "inset-0 mx-auto flex w-full max-w-3xl max-md:max-w-none max-md:rounded-none max-md:border-0 max-md:pb-[env(safe-area-inset-bottom)] md:inset-x-auto md:bottom-0 md:top-auto md:end-6 md:mx-0 md:h-[38rem] md:max-h-[85vh] md:w-[40rem]";
 
     return (
         <>
