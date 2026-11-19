@@ -2575,5 +2575,25 @@
             "green": "Green",
             "blue": "Blue"
         }
+    },
+    "phoneTabs": {
+        "label": "Chat sections",
+        "chats": "Chats",
+        "servers": "Servers",
+        "calls": "Calls",
+        "noServers": "You are not in any server yet. Create one or join one with an invite."
+    },
+    "peek": {
+        "label": "Recent messages",
+        "locked": "This chat is locked. Open it to unlock.",
+        "failed": "Recent messages could not load.",
+        "empty": "No messages yet."
+    },
+    "info": {
+        "open": "Info for {name}",
+        "people": "{count, plural, one {# person} other {# people}}",
+        "video": "Video",
+        "search": "Search",
+        "shared": "Shared here"
     }
 }

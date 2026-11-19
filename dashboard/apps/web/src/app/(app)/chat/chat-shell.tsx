@@ -20,14 +20,17 @@ import { ServerRail } from "./server-rail";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChatSidebar } from "./chat-sidebar";
 import { ChatLockProvider } from "./lock-dialogs";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { usePhone } from "@/components/use-phone";
+import { MessageSquare, Server, Video } from "lucide-react";
+import { phoneChatTab, phoneTabBadges, type PhoneChatTab } from "./phone-chat";
 import { useChatPane } from "./use-chat-pane";
 import { paneWidthFor } from "./list-view";
 import { useChatStream } from "./use-chat-stream";
 import { resetPaneLayout } from "./pane-preferences";
-import { PAGE_BLEED, ResizeHandle } from "@polaris/ui";
+import { BottomTabs, PAGE_BLEED, ResizeHandle } from "@polaris/ui";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
-import { useRef, useCallback, type CSSProperties, type ReactNode } from "react";
+import { useRef, useMemo, useState, useCallback, type CSSProperties, type ReactNode } from "react";
 import { ChatProvider, useChat, type ChatAllowances } from "./chat-context";
 
 /**
@@ -104,7 +107,10 @@ export function ChatShell({
 function ChatColumns({ children }: { children: ReactNode }) {
     const t = useTranslations("chat");
     const pathname = usePathname();
-    const { channels, refresh, refreshChannels, viewerId } = useChat();
+    const { channels, refresh, refreshChannels, viewerId, spaces, activeSpaceId, setActiveSpaceId } =
+        useChat();
+    const router = useRouter();
+    const phone = usePhone();
     // Read from the frame handler without re-subscribing on every list change.
     const rows = useRef(channels);
     rows.current = channels;
@@ -116,6 +122,44 @@ function ChatColumns({ children }: { children: ReactNode }) {
     // Inside a conversation on a phone the list steps aside; on anything wider
     // both are shown, which is why this decides a class rather than a render.
     const inConversation = conversationOnScreen(pathname);
+    // A phone's three places, WhatsApp's tab bar: which one is open is read off
+    // the address and the space the rail stands in - see `phoneChatTab`. Only
+    // somebody in no space at all needs Servers remembered on its own.
+    const [serversPicked, setServersPicked] = useState(false);
+    const lastSpace = useRef<string | null>(null);
+    if (activeSpaceId) lastSpace.current = activeSpaceId;
+    const tab = phoneChatTab(pathname, activeSpaceId, serversPicked);
+    const calls = pathname === "/chat/meetings";
+    // Inside a conversation the conversation owns the screen; the meetings list
+    // is the Calls tab, not a conversation, so the bar stays under it.
+    const tabsShown = phone && (!inConversation || calls);
+    const badges = useMemo(() => phoneTabBadges(channels), [channels]);
+    const chooseTab = (next: PhoneChatTab): void => {
+        if (next === "calls") {
+            router.push("/chat/meetings");
+            return;
+        }
+        if (next === "chats") {
+            setServersPicked(false);
+            setActiveSpaceId(null);
+        } else {
+            const target =
+                spaces.find((space) => space.id === lastSpace.current)?.id ?? spaces[0]?.id ?? null;
+            if (target) setActiveSpaceId(target);
+            else setServersPicked(true);
+        }
+        if (calls) router.push("/chat");
+    };
+    // On a phone the rail of spaces is the Servers tab's, not furniture beside
+    // every list; from `sm` up it is what it always was.
+    const railClass = phone
+        ? tab === "servers" && !inConversation
+            ? "flex"
+            : "hidden"
+        : inConversation
+          ? "hidden md:flex"
+          : "flex";
+    const noServers = phone && tab === "servers" && activeSpaceId === null;
 
     useChatStream(
         useCallback(
@@ -157,54 +201,94 @@ function ChatColumns({ children }: { children: ReactNode }) {
         // four sides. No `w-full` - see PAGE_BLEED. The lock wraps both columns:
         // the open conversation reads how long its unlock lasts from it.
         <ChatLockProvider>
-            <div className={`${PAGE_BLEED} flex flex-row`}>
-                {/* The column of spaces stays on a phone while the list is showing,
-                and steps aside with it once a conversation is open - on a narrow
-                screen the conversation gets the whole width. */}
-                <div
-                    data-tour="chat.spaces"
-                    className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 shrink-0`}
-                >
-                    <ServerRail />
-                </div>
-                {/* The width rides a custom property rather than the class, because
-                on a phone this column takes whatever the rail of spaces leaves
-                and a remembered desktop width would be wrong in both directions.
-                `flex-1`, not `w-full`: a full width beside the rail is the rail's
-                width wider than the screen, and the right edge of every row - when
-                the last message arrived, the unread count - went off it. */}
-                <div
-                    ref={measure}
-                    data-tour="chat.conversations"
-                    style={{ "--chat-list": `${drawn}px` } as CSSProperties}
-                    className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col border-e border-border md:w-[var(--chat-list)] md:flex-none`}
-                >
-                    <ChatSidebar
-                        onListView={(view) => {
-                            const width = paneWidthFor(view, drawn, ceiling);
-                            if (width !== null) resize(width);
-                        }}
+            <div className={`${PAGE_BLEED} flex flex-col`}>
+                <div className="flex min-h-0 min-w-0 flex-1 flex-row">
+                    {/* The column of spaces: on a phone, the Servers tab's, beside
+                    that space's channels; on a narrow screen it steps aside with the
+                    list once a conversation is open, which gets the whole width. */}
+                    <div
+                        data-tour="chat.spaces"
+                        className={`${railClass} min-h-0 shrink-0`}
+                    >
+                        <ServerRail browse={phone} />
+                    </div>
+                    {/* The width rides a custom property rather than the class, because
+                    on a phone this column takes whatever the rail of spaces leaves
+                    and a remembered desktop width would be wrong in both directions.
+                    `flex-1`, not `w-full`: a full width beside the rail is the rail's
+                    width wider than the screen, and the right edge of every row - when
+                    the last message arrived, the unread count - went off it. */}
+                    <div
+                        ref={measure}
+                        data-tour="chat.conversations"
+                        style={{ "--chat-list": `${drawn}px` } as CSSProperties}
+                        className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col border-e border-border md:w-[var(--chat-list)] md:flex-none`}
+                    >
+                        {noServers ? (
+                            <p className="px-4 py-6 text-sm text-muted-foreground">
+                                {t("phoneTabs.noServers")}
+                            </p>
+                        ) : (
+                            <ChatSidebar
+                                onListView={(view) => {
+                                    const width = paneWidthFor(view, drawn, ceiling);
+                                    if (width !== null) resize(width);
+                                }}
+                            />
+                        )}
+                    </div>
+                    {/* Only where there are two columns to divide. On a phone one of them
+                    is always the whole screen, so there is no line to move. */}
+                    <ResizeHandle
+                        axis="x"
+                        size={drawn}
+                        min={LIST_PANE.min}
+                        max={ceiling}
+                        onChange={resize}
+                        onReset={reset}
+                        onResetAll={resetPaneLayout}
+                        label={t("shell.conversationListWidth")}
+                        className="hidden md:block"
                     />
+                    <div
+                        data-tour="chat.conversation"
+                        className={`${inConversation ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-1 flex-col`}
+                    >
+                        {children}
+                    </div>
                 </div>
-                {/* Only where there are two columns to divide. On a phone one of them
-                is always the whole screen, so there is no line to move. */}
-                <ResizeHandle
-                    axis="x"
-                    size={drawn}
-                    min={LIST_PANE.min}
-                    max={ceiling}
-                    onChange={resize}
-                    onReset={reset}
-                    onResetAll={resetPaneLayout}
-                    label={t("shell.conversationListWidth")}
-                    className="hidden md:block"
-                />
-                <div
-                    data-tour="chat.conversation"
-                    className={`${inConversation ? "flex" : "hidden md:flex"} min-h-0 min-w-0 flex-1 flex-col`}
-                >
-                    {children}
-                </div>
+                {/* Self-contained on purpose: when the app shell grows a phone tab
+                    bar of its own, this is the bar a route hands the bottom to. */}
+                {tabsShown ? (
+                    <BottomTabs
+                        label={t("phoneTabs.label")}
+                        tabs={[
+                            {
+                                id: "chats",
+                                label: t("phoneTabs.chats"),
+                                icon: <MessageSquare />,
+                                active: tab === "chats",
+                                badge: badges.chats,
+                                onSelect: () => chooseTab("chats")
+                            },
+                            {
+                                id: "servers",
+                                label: t("phoneTabs.servers"),
+                                icon: <Server />,
+                                active: tab === "servers",
+                                badge: badges.servers,
+                                onSelect: () => chooseTab("servers")
+                            },
+                            {
+                                id: "calls",
+                                label: t("phoneTabs.calls"),
+                                icon: <Video />,
+                                active: tab === "calls",
+                                onSelect: () => chooseTab("calls")
+                            }
+                        ]}
+                    />
+                ) : null}
             </div>
         </ChatLockProvider>
     );

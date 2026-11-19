@@ -110,6 +110,7 @@ import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
 import { AgeGate } from "./age-gate";
 import { LockedGate, useChatLock } from "./lock-dialogs";
 import { forgetUnlockProof, unlockProofFor } from "./lock-session";
+import type { SharedKind } from "./conversation-info";
 import { useUnlockKeepAlive } from "./lock-keepalive";
 import { placed } from "./ring-back";
 import { fetchLiveCall } from "./chat-polls";
@@ -262,7 +263,11 @@ export function ChannelView({
     const wide = useWideScreen();
     /** What the header's search box sent, and a count so the same words typed
      *  twice still open a fresh search. */
-    const [searchSeed, setSearchSeed] = useState({ term: "", token: 0 });
+    const [searchSeed, setSearchSeed] = useState<{
+        term: string;
+        token: number;
+        has?: SharedKind;
+    }>({ term: "", token: 0 });
     const members = useMembersPanel();
     const [highlight, setHighlight] = useState<string | null>(null);
     // The same, for a message a link led to that turned out to be a reply: it is
@@ -2702,6 +2707,12 @@ export function ChannelView({
         setSearching(true);
     }
 
+    /** What has been shared here, one kind at a time: the search, narrowed. */
+    function showShared(has: SharedKind): void {
+        setSearchSeed((current) => ({ term: "", has, token: current.token + 1 }));
+        setSearching(true);
+    }
+
     /** The profile or the roster is a column on the right, so the box goes on
      *  top of it. A voice room has neither, and a thread or a search takes
      *  that column's place. */
@@ -2753,6 +2764,7 @@ export function ChannelView({
                     call={live}
                     onStartCall={startCall}
                     onSearch={searchFor}
+                    onShared={showShared}
                     searchInPanel={panelSearch}
                     onPins={() => setPinsOpen(true)}
                     // In a conversation with a roster this opens it; in a
@@ -3042,6 +3054,7 @@ export function ChannelView({
                     channelId={channelId}
                     channelName={channel.name}
                     initialTerm={searchSeed.term}
+                    initialHas={searchSeed.has}
                     onClose={() => setSearching(false)}
                     onOpen={(hit) => {
                         // A hit in another conversation is a navigation; one in

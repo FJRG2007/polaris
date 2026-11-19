@@ -50,6 +50,9 @@ import { NotifyOptions } from "./notify-menu";
 import { GameLinkMark } from "./game-link-badge";
 import { blockPersonAction, unblockPersonAction } from "@/app/(app)/account/privacy/actions";
 import { MuteOptions, type MenuParts } from "./mute-menu";
+import { previewText } from "./phone-chat";
+import { ConversationPeek } from "./conversation-peek";
+import { TOUCH_TARGET, usePhone } from "@/components/use-phone";
 import { LeaveDialog } from "./leave-dialog";
 import { runAction } from "@/lib/run-action";
 import { NicknameDialog } from "./nickname-dialog";
@@ -641,7 +644,8 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                 <Link
                     href="/chat/meetings"
                     className={cn(
-                        "mb-3 flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
+                        // On a phone the meetings are the Calls tab.
+                        "mb-3 flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover max-sm:hidden",
                         meetings ? "bg-card-hover text-foreground" : "text-muted-foreground"
                     )}
                 >
@@ -1462,6 +1466,8 @@ function Row({
             data-active={active ? "" : undefined}
             className={cn(
                 "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-card-hover data-[state=open]:bg-card-hover",
+                // A finger's height on a touch screen, whatever the row draws.
+                TOUCH_TARGET,
                 // Every size here has its `md:` twin set back to the line above,
                 // so the desktop rail is untouched.
                 roomy &&
@@ -1592,7 +1598,9 @@ function Row({
 
     return channel ? (
         <RowMenu channel={channel} active={active} onManage={onManage} move={moveTo}>
-            <div data-chat-row={channel.id} className="min-w-0">
+            {/* No callout: on iOS a held link opens Safari's own preview, which
+                would stand where the peek does. */}
+            <div data-chat-row={channel.id} className="min-w-0 [-webkit-touch-callout:none]">
                 {body}
             </div>
         </RowMenu>
@@ -1664,17 +1672,6 @@ function typingLine(
         : typists.length === 2
           ? t(`typing.${doing}Two`, { first: typists[0]!.name, second: typists[1]!.name })
           : t(`typing.${doing}Many`);
-}
-
-function previewText(
-    last: NonNullable<ChatChannelView["last"]>,
-    t: ReturnType<typeof useTranslations>
-): string {
-    if (last.deleted) return t("listView.deleted");
-    if (last.kind === "call") return t("listView.call");
-    if (last.kind === "poll") return t("listView.poll");
-    if (last.kind === "system") return "";
-    return last.body.replace(/\s+/g, " ").trim() || t("listView.attachment");
 }
 
 /**
@@ -1834,6 +1831,11 @@ function RowMenu({
     const toast = useToast();
     const chatLock = useChatLock();
     const [unlocking, setUnlocking] = useState(false);
+    // A long press on a phone peeks inside above the same menu - see
+    // `ConversationPeek`. Mounted only while the menu is open, so a list of
+    // thirty rows asks for nothing until one is held.
+    const phone = usePhone();
+    const [peeking, setPeeking] = useState(false);
     /** Drawn at once, put back on a refusal - which is answered with its reason. */
     async function flag(
         patch: { locked?: boolean; hidden?: boolean },
@@ -1913,9 +1915,17 @@ function RowMenu({
 
     return (
         <>
-            <ContextMenu>
+            <ContextMenu onOpenChange={setPeeking}>
                 <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-                <ContextMenuContent className="w-52">
+                <ContextMenuContent
+                    className={phone ? "w-[min(24rem,calc(100vw_-_2rem))]" : "w-52"}
+                >
+                    {phone && peeking ? (
+                        <>
+                            <ConversationPeek channel={channel} />
+                            <ContextMenuSeparator />
+                        </>
+                    ) : null}
                     {/* Grouped, a line between each group and never one at an
                         edge or two together - see `joinMenuGroups`, which is
                         what makes a group with nothing in it for this reader

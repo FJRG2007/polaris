@@ -41,6 +41,7 @@ export function SearchPanel({
     channelId,
     channelName,
     initialTerm = "",
+    initialHas = "any",
     onClose,
     onOpen
 }: {
@@ -51,6 +52,9 @@ export function SearchPanel({
     /** What was typed into the header's box before the panel opened, searched
      *  for straight away so Enter there is the search, not a second step. */
     initialTerm?: string;
+    /** What the messages must carry, set before the panel opens - the info
+     *  page's photos, files and links - and searched for straight away. */
+    initialHas?: core.ChatSearchAttachment;
     onClose: () => void;
     /** Go to a hit. The panel stays open: somebody working through results
      *  wants the next one to still be there. */
@@ -61,7 +65,7 @@ export function SearchPanel({
     const [term, setTerm] = useState(initialTerm);
     const [here, setHere] = useState(true);
     const [author, setAuthor] = useState<PickedPerson | null>(null);
-    const [has, setHas] = useState<core.ChatSearchAttachment>("any");
+    const [has, setHas] = useState<core.ChatSearchAttachment>(initialHas);
     const [after, setAfter] = useState("");
     const [before, setBefore] = useState("");
     const [hits, setHits] = useState<readonly ChatSearchHit[] | null>(null);
@@ -127,7 +131,7 @@ export function SearchPanel({
     // Once, on opening with a term from the header. After the clear above, so
     // the first answer is not wiped by it.
     useEffect(() => {
-        if (initialTerm.trim()) void run();
+        if (initialTerm.trim() || initialHas !== "any") void run();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

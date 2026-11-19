@@ -91,7 +91,13 @@ function hex(color: string | undefined): string | null {
     return /^#[0-9a-f]{6}$/i.test(trimmed) ? trimmed.toLowerCase() : null;
 }
 
-export function ServerRail() {
+export function ServerRail({
+    browse = false
+}: {
+    /** The phone's Servers tab: picking a space shows its channels rather than
+     *  opening one, and direct messages are a tab of their own, not a pill. */
+    browse?: boolean;
+} = {}) {
     const t = useTranslations("chat");
     const router = useRouter();
     const { spaces, channels, activeSpaceId, setActiveSpaceId, refresh, may } = useChat();
@@ -150,6 +156,7 @@ export function ServerRail() {
      */
     const openSpace = (spaceId: string | null): void => {
         setActiveSpaceId(spaceId);
+        if (browse) return;
         const inSpace = channels.filter(
             (channel) =>
                 channel.spaceId === spaceId && !channel.archived && channel.kind !== "voice"
@@ -181,16 +188,20 @@ export function ServerRail() {
 
     return (
         <div className="flex h-full w-14 shrink-0 flex-col items-center gap-1.5 border-e border-border bg-surface py-2">
-            <Pill
-                label={t("serverRail.directMessages")}
-                active={activeSpaceId === null}
-                unread={waiting.get(null) ?? 0}
-                onClick={() => openSpace(null)}
-            >
-                <MessageSquare className="size-4" />
-            </Pill>
+            {browse ? null : (
+                <>
+                    <Pill
+                        label={t("serverRail.directMessages")}
+                        active={activeSpaceId === null}
+                        unread={waiting.get(null) ?? 0}
+                        onClick={() => openSpace(null)}
+                    >
+                        <MessageSquare className="size-4 shrink-0" />
+                    </Pill>
 
-            <span className="h-px w-6 shrink-0 bg-border" />
+                    <span className="h-px w-6 shrink-0 bg-border" />
+                </>
+            )}
 
             {/* The whole width of the rail, and a little room above and below:
                 a scrolling box clips on both axes, and sized to its pills it

@@ -36,6 +36,8 @@ import { NotifyOptions } from "./notify-menu";
 import { GameLinkChips } from "./game-link-badge";
 import { MuteOptions, type MenuParts } from "./mute-menu";
 import { GroupSettingsDialog } from "./group-settings-dialog";
+import { ConversationInfo, type SharedKind } from "./conversation-info";
+import { TOUCH_TARGET, usePhone } from "@/components/use-phone";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { VanishDuration } from "@/lib/chat/vanish-rules";
@@ -95,6 +97,7 @@ export function ChannelHeader({
     onMembers,
     membersOpen = false,
     searchInPanel = false,
+    onShared,
     vanish
 }: {
     channel: ChatChannelView;
@@ -119,6 +122,9 @@ export function ChannelHeader({
     onMembers?: () => void;
     /** Whether that panel is showing, so its button reads as a switch. */
     membersOpen?: boolean;
+    /** What has been shared here, narrowed to one kind - the info page's
+     *  photos, files and links, answered by the search. */
+    onShared?: (kind: SharedKind) => void;
     /** The panel on the right is open as a column and carries the search box
      *  at its top, the way Discord draws it, so the bar leaves it out. */
     searchInPanel?: boolean;
@@ -151,6 +157,10 @@ export function ChannelHeader({
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [leaving, setLeaving] = useState(false);
     const [error, setError] = useState("");
+    // On a phone the name at the top opens the conversation's info page, the
+    // way WhatsApp's does, instead of leaving it all to the three dots.
+    const phone = usePhone();
+    const [info, setInfo] = useState(false);
 
     const named = channel.spaceId !== null;
     // A group belongs to everybody in it: any of them can walk out, and add
@@ -219,42 +229,53 @@ export function ChannelHeader({
                 <Link
                     href="/chat"
                     aria-label={t("channelHeader.backToConversations")}
-                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+                    className={cn(
+                        "flex items-center justify-center rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden",
+                        TOUCH_TARGET
+                    )}
                 >
-                    <ArrowLeft className="size-4" />
+                    <ArrowLeft className="size-4 shrink-0" />
                 </Link>
 
                 {/* A named channel is its hash; a conversation is who is in
                     it - one face for a direct message, the group's picture or
                     the faces of its people for a group. */}
-                {named ? (
-                    <Icon className="size-4 shrink-0 text-muted-foreground" />
-                ) : channel.others.length === 1 && channel.others[0] ? (
-                    <Avatar openable person={channel.others[0]} size={20} />
-                ) : (
-                    <ChatAvatar
-                        kind="channel"
-                        id={channel.id}
-                        name={channel.name}
-                        members={channel.others}
-                        size={20}
-                    />
-                )}
-                {/* A direct message is called after the person in it, so the bar
-                    has to follow a rename the way every other place their name
-                    is drawn does. A named channel is called what it is called,
-                    and `PersonName` with no id draws exactly the same span. */}
-                <span className="min-w-0 truncate" title={channel.name}>
-                    <PersonName
-                        id={
-                            !named && channel.others.length === 1
-                                ? (channel.others[0]?.id ?? null)
-                                : null
-                        }
-                        name={channel.name}
-                        className="text-sm font-semibold"
-                    />
-                </span>
+                {/* On a phone the face and the name are one button: the
+                    conversation's info page. */}
+                <HeaderTitle
+                    phone={phone}
+                    label={t("info.open", { name: channel.name })}
+                    onOpen={() => setInfo(true)}
+                >
+                    {named ? (
+                        <Icon className="size-4 shrink-0 text-muted-foreground" />
+                    ) : channel.others.length === 1 && channel.others[0] ? (
+                        <Avatar openable={!phone} person={channel.others[0]} size={20} />
+                    ) : (
+                        <ChatAvatar
+                            kind="channel"
+                            id={channel.id}
+                            name={channel.name}
+                            members={channel.others}
+                            size={20}
+                        />
+                    )}
+                    {/* A direct message is called after the person in it, so the bar
+                        has to follow a rename the way every other place their name
+                        is drawn does. A named channel is called what it is called,
+                        and `PersonName` with no id draws exactly the same span. */}
+                    <span className="min-w-0 truncate" title={channel.name}>
+                        <PersonName
+                            id={
+                                !named && channel.others.length === 1
+                                    ? (channel.others[0]?.id ?? null)
+                                    : null
+                            }
+                            name={channel.name}
+                            className="text-sm font-semibold"
+                        />
+                    </span>
+                </HeaderTitle>
                 {vanish && <VanishBadge seconds={vanish.rules.vanishAfter} />}
                 {/* A call running in a one-to-one or a group, said beside who
                     it is with. Only to somebody who may take calls - the same
@@ -430,9 +451,12 @@ export function ChannelHeader({
                             <button
                                 type="button"
                                 aria-label={t("channelHeader.moreForThisConversation")}
-                                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                className={cn(
+                                    "flex items-center justify-center rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                                    TOUCH_TARGET
+                                )}
                             >
-                                <MoreHorizontal className="size-4" />
+                                <MoreHorizontal className="size-4 shrink-0" />
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -651,6 +675,47 @@ export function ChannelHeader({
                 </p>
             )}
 
+            {phone ? (
+                <ConversationInfo
+                    channel={channel}
+                    open={info}
+                    onOpenChange={setInfo}
+                    privacy={group ? undefined : vanish?.privacy}
+                    entries={{
+                        onStartCall: startable ? onStartCall : undefined,
+                        onSearch: onSearch ? () => onSearch("") : undefined,
+                        onPins,
+                        onMembers,
+                        onShared,
+                        onMute: (minutes) =>
+                            void act(() => actions.setMutedAction(channel.id, minutes)),
+                        addPeople: adder
+                            ? { reason: adder.reason, onSelect: () => setAdding(true) }
+                            : undefined,
+                        onNickname:
+                            !named && !group && channel.others.length === 1
+                                ? () => setNaming(true)
+                                : undefined,
+                        onEditGroup:
+                            group && channel.mayPicture ? () => setRenaming(true) : undefined,
+                        onGroupSettings:
+                            group && channel.ownerId === viewerId
+                                ? () => setSettings(true)
+                                : undefined,
+                        channelSettingsHref:
+                            named && channel.mayAdminister
+                                ? `/chat/c/${channel.id}/settings`
+                                : undefined,
+                        onLeave: group ? () => setLeaving(true) : undefined,
+                        onDeleteChannel:
+                            named && channel.mayAdminister
+                                ? () => setConfirmDelete(true)
+                                : undefined,
+                        onDeleteChat: vanish?.onDeleteChat
+                    }}
+                />
+            ) : null}
+
             <TranslationDialog
                 open={translating}
                 onOpenChange={setTranslating}
@@ -736,6 +801,32 @@ export function ChannelHeader({
     );
 }
 
+/** The face and the name at the top: a button to the info page on a phone,
+ *  where the avatar gives up opening the profile for it, and as drawn elsewhere. */
+function HeaderTitle({
+    phone,
+    label,
+    onOpen,
+    children
+}: {
+    phone: boolean;
+    label: string;
+    onOpen: () => void;
+    children: React.ReactNode;
+}) {
+    if (!phone) return <>{children}</>;
+    return (
+        <button
+            type="button"
+            onClick={onOpen}
+            aria-label={label}
+            className={cn("flex min-w-0 items-center gap-2 rounded text-start", TOUCH_TARGET)}
+        >
+            {children}
+        </button>
+    );
+}
+
 /**
  * One icon in the header's row.
  *
@@ -768,7 +859,8 @@ function HeaderButton({
             aria-pressed={pressed}
             title={reason ?? (hint ? `${label} - ${hint}` : label)}
             className={cn(
-                "hidden rounded p-1.5 transition-colors sm:block",
+                "hidden items-center justify-center rounded p-1.5 transition-colors sm:flex",
+                TOUCH_TARGET,
                 reason !== null
                     ? "cursor-not-allowed text-foreground-subtle"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -874,9 +966,12 @@ function HeaderSearch({
                 onClick={() => onSearch("")}
                 aria-label={label}
                 title={label}
-                className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+                className={cn(
+                    "flex items-center justify-center rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden",
+                    TOUCH_TARGET
+                )}
             >
-                <Search className="size-4" />
+                <Search className="size-4 shrink-0" />
             </button>
         </>
     );

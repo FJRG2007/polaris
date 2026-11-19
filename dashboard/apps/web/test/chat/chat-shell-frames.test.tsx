@@ -19,7 +19,10 @@ let full = 0;
 let channelsOnly = 0;
 let rows: unknown[] = [];
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/chat" }));
+vi.mock("next/navigation", () => ({
+    usePathname: () => "/chat",
+    useRouter: () => ({ push: () => undefined })
+}));
 vi.mock("@/app/(app)/chat/server-rail", () => ({ ServerRail: () => null }));
 vi.mock("@/app/(app)/chat/chat-sidebar", () => ({ ChatSidebar: () => null }));
 // The lock provider sits in the shell now; its server reads are not under test here.
@@ -50,7 +53,10 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
         },
         refreshChannels: () => {
             channelsOnly += 1;
-        }
+        },
+        spaces: [],
+        activeSpaceId: null,
+        setActiveSpaceId: () => undefined
     })
 }));
 

@@ -2575,5 +2575,25 @@
             "green": "Verde",
             "blue": "Azul"
         }
+    },
+    "phoneTabs": {
+        "label": "Secciones",
+        "chats": "Chats",
+        "servers": "Servidores",
+        "calls": "Llamadas",
+        "noServers": "Aún no estás en ningún servidor. Crea uno o únete con una invitación."
+    },
+    "peek": {
+        "label": "Mensajes recientes",
+        "locked": "Este chat está bloqueado. Ábrelo para desbloquear.",
+        "failed": "No se cargaron los mensajes.",
+        "empty": "Aún no hay mensajes."
+    },
+    "info": {
+        "open": "Info de {name}",
+        "people": "{count, plural, one {# persona} other {# personas}}",
+        "video": "Vídeo",
+        "search": "Buscar",
+        "shared": "Compartido"
     }
 }
