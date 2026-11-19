@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const keys = new Map<string, { id: string; userId: string }>();
 const opens = new Set<string>();
 
+vi.mock("@/lib/chat/attachments", () => ({ removeStoredFiles: async () => undefined }));
+vi.mock("@/lib/chat/report-files", () => ({ keepForReports: async () => undefined }));
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({ POLARIS_AUTH_SECRET: "test-secret-test-secret-test-secret" }) }));
 vi.mock("@polaris/db", () => {
     class PrismaClientKnownRequestError extends Error {
@@ -147,6 +149,7 @@ describe("what a sender may choose", () => {
         expect(choice.readViewOnceChoices(null)).toEqual([]);
         expect(choice.viewOnceable("image/png")).toBe(true);
         expect(choice.viewOnceable("video/mp4")).toBe(true);
+        expect(choice.viewOnceable("audio/webm")).toBe(true);
         expect(choice.viewOnceable("application/pdf")).toBe(false);
     });
 

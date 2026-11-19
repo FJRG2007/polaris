@@ -1942,7 +1942,8 @@ function StagedFile({
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" side="top" className="w-48">
-                {[...VIEW_SECONDS, null].map((seconds) => (
+                {/* A recording plays to its end: there is no timer to choose. */}
+                {(type.startsWith("audio/") ? [null] : [...VIEW_SECONDS, null]).map((seconds) => (
                     <DropdownMenuItem
                         key={String(seconds)}
                         onSelect={() => onViewOnce(seconds)}

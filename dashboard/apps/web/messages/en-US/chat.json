@@ -2501,10 +2501,11 @@
         "untilClosed": "Until closed",
         "openOnPhone": "Open it in the Polaris app on your phone",
         "opened": "Opened",
+        "gone": "No longer available",
         "opensOnPhone": "Opens only in the phone app",
         "openedBy": "Opened by {count, plural, one {# person} other {# people}}",
         "phoneOnly": "This can only be opened in the Polaris app on a phone.",
-        "onlyMedia": "Only a photo or a video you attach can be sent to be seen once.",
+        "onlyMedia": "Only a photo, a video or a recording you attach can be sent to be seen once.",
         "notScheduled": "A message with a view-once file cannot be scheduled. Send it now or turn view once off.",
         "tooMany": "Too many attempts. Try again in a minute.",
         "refused": {

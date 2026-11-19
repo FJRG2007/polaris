@@ -18,7 +18,9 @@ import { streamStored } from "@/lib/chat/streamed-file";
 import * as history from "@/lib/chat/history-visibility";
 import {
     claimViewOnce,
+    purgeIfSpent,
     viewOnceChallenge,
+    viewOnceSpent,
     viewOnceFile,
     ViewOnceRefused,
     watermarkText,
@@ -36,7 +38,8 @@ type Reader = { readonly id: string; readonly name?: string | null; readonly use
 async function reachable(user: Reader, attachmentId: string): Promise<ViewOnceFile | null> {
     if (!/^[0-9a-f-]{36}$/i.test(attachmentId)) return null;
     const file = await viewOnceFile(attachmentId);
-    if (!file) return null;
+    // Spent: the bytes are gone, and "not there" is the truth.
+    if (!file || viewOnceSpent(file.path)) return null;
     if (!(await channelAccess({ id: user.id }, file.message.channelId))) return null;
     if (!(await history.attachmentReadable({ id: user.id }, file.message.channelId, attachmentId))) return null;
     return file;
@@ -100,7 +103,18 @@ export async function POST(
         );
     }
     const viewer = await prisma.user.findUnique({ where: { id: user.id }, select: { name: true, username: true } });
-    return new Response(opened.body, {
+    // Once the last reader who can open it has the whole of it, nothing is left
+    // to keep the bytes for: they go when this stream ends.
+    const body = opened.body.pipeThrough(
+        new TransformStream<Uint8Array, Uint8Array>({
+            flush() {
+                void purgeIfSpent(file).catch((error: unknown) =>
+                    console.error("polaris: a spent view-once file was not purged:", error)
+                );
+            }
+        })
+    );
+    return new Response(body, {
         headers: {
             ...NO_STORE,
             "Content-Type": file.contentType,

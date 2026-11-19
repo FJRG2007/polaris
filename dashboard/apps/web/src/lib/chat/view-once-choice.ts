@@ -37,7 +37,7 @@ export function readViewOnceChoices(raw: unknown): ViewOnceChoice[] {
     }
 }
 
-/** Whether a file can be sent to be seen once: a photo or a video, and nothing else. */
+/** Whether a file can be sent to be seen once: a photo, a video or a recording, and nothing else. */
 export function viewOnceable(contentType: string): boolean {
-    return /^(image|video)\//i.test(contentType);
+    return /^(image|video|audio)\//i.test(contentType);
 }

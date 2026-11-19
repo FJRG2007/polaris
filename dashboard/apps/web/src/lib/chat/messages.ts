@@ -12,6 +12,7 @@
  */
 
 import { readComponents, type MessageComponent } from "./message-components";
+import { viewOnceSpent } from "@/lib/chat/view-once";
 import { inviteCards, type ChatInviteCard } from "./invite-cards";
 import { prisma, Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
@@ -242,6 +243,8 @@ export interface ChatAttachmentView {
         readonly opened: boolean;
         /** How many people have, for the sender. */
         readonly openedCount: number;
+        /** Whether its bytes are gone: everyone had their look, or it waited too long. */
+        readonly gone: boolean;
     };
 }
 
@@ -2159,6 +2162,7 @@ export async function decorateMessages(
                 viewOnce: true,
                 viewSeconds: true,
                 captured: true,
+                path: true,
                 // Whether this reader has had their one look, and how many have.
                 opens: { where: { userId: actor.id }, select: { userId: true }, take: 1 },
                 _count: { select: { opens: true } }
@@ -2323,7 +2327,8 @@ export async function decorateMessages(
                           captured:
                               file.captured === "camera" || file.captured === "gallery" ? file.captured : null,
                           opened: file.opens.length > 0,
-                          openedCount: file._count.opens
+                          openedCount: file._count.opens,
+                          gone: viewOnceSpent(file.path)
                       }
                   }
                 : {})

@@ -49,7 +49,7 @@ export function ViewOnceCard({
     const t = useTranslations("chat");
     // Read after hydration: the server has no phone to ask.
     const phone = useSyncExternalStore(never, canViewOnce, () => false);
-    const { opened, openedCount } = file.viewOnce;
+    const { opened, openedCount, gone } = file.viewOnce;
     // Only what it is, the way WhatsApp draws it: how it was taken and how long
     // it stays up are for the screen that shows it, not a hint before it opens.
     const what = file.contentType.startsWith("video/")
@@ -57,8 +57,8 @@ export function ViewOnceCard({
         : file.contentType.startsWith("audio/")
           ? t("viewOnce.audio")
           : t("viewOnce.photo");
-    const openable = phone && !mine && !opened;
-    const spent = opened || (mine && openedCount > 0);
+    const openable = phone && !mine && !opened && !gone;
+    const spent = opened || gone || (mine && openedCount > 0);
 
     const title = !mine && opened ? t("viewOnce.opened") : what;
     // Away from the phone app nothing here opens it, so the card says where.
@@ -68,9 +68,13 @@ export function ViewOnceCard({
             : phone
               ? null
               : t("viewOnce.opensOnPhone")
-        : opened || phone
+        : opened
           ? null
-          : t("viewOnce.openOnPhone");
+          : gone
+            ? t("viewOnce.gone")
+            : phone
+              ? null
+              : t("viewOnce.openOnPhone");
 
     const body = (
         <>
@@ -92,7 +96,7 @@ export function ViewOnceCard({
         "flex w-full max-w-xs items-center gap-2.5 rounded-md border border-border bg-card px-3 py-2 text-start text-xs";
 
     if (!openable) {
-        return <div className={cn(shape, opened && "opacity-70")}>{body}</div>;
+        return <div className={cn(shape, (opened || gone) && "opacity-70")}>{body}</div>;
     }
     return (
         <button

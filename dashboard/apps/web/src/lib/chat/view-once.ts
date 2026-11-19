@@ -16,6 +16,8 @@
  */
 
 import { Prisma, prisma } from "@polaris/db";
+import { removeStoredFiles } from "@/lib/chat/attachments";
+import { keepForReports } from "@/lib/chat/report-files";
 import {
     deviceChallenge,
     DeviceProofRefused,
@@ -36,6 +38,104 @@ export class ViewOnceRefused extends Error {
     constructor(readonly reason: ViewOnceRefusal) {
         super(`view once refused: ${reason}`);
         this.name = "ViewOnceRefused";
+    }
+}
+
+/**
+ * What a view-once file's `path` becomes once its bytes are gone: the message
+ * still says a photo was sent and who opened it, and nothing is left to serve.
+ * A path no upload is ever written at - they are all under a channel's folder.
+ */
+export const VIEW_ONCE_SPENT = "view-once-spent";
+
+/** How long an unopened view-once file waits, as WhatsApp's do. */
+export const VIEW_ONCE_KEEP_MS = 14 * 24 * 60 * 60 * 1000;
+
+/** How far back the sweep looks past the wait: a server down for longer than
+ *  this leaves the oldest to the next deletion of their message. Keeps the
+ *  sweep a bounded range of one index instead of every view-once file ever. */
+const SWEEP_WINDOW_MS = 60 * 24 * 60 * 60 * 1000;
+const SWEEP_BATCH = 200;
+
+/** Whether a view-once file's bytes are gone. */
+export function viewOnceSpent(path: string): boolean {
+    return path === VIEW_ONCE_SPENT;
+}
+
+/**
+ * Take the bytes and the still of view-once files off their storage and mark
+ * the rows spent. The mark goes first, so nothing streams a file half deleted;
+ * a removal that fails leaves a file nothing points at, which is the outcome to
+ * prefer over one somebody could still open. Anything a report holds is moved
+ * out from under it first, as deleting a message does.
+ */
+export async function purgeViewOnce(attachmentIds: readonly string[]): Promise<number> {
+    if (attachmentIds.length === 0) return 0;
+    const rows = await prisma.chatAttachment.findMany({
+        where: { id: { in: [...attachmentIds] }, viewOnce: true, path: { not: VIEW_ONCE_SPENT } },
+        select: { id: true, connectionId: true, path: true, posterPath: true, posterConnectionId: true }
+    });
+    if (rows.length === 0) return 0;
+    // Where the bytes are, read before the rows stop saying.
+    const files = [
+        ...rows.map((row) => ({ connectionId: row.connectionId, path: row.path })),
+        ...rows
+            .filter((row) => row.posterPath)
+            .map((row) => ({ connectionId: row.posterConnectionId, path: row.posterPath! }))
+    ];
+    await keepForReports(rows.map((row) => row.id));
+    await prisma.chatAttachment.updateMany({
+        where: { id: { in: rows.map((row) => row.id) }, path: { not: VIEW_ONCE_SPENT } },
+        data: { path: VIEW_ONCE_SPENT, posterPath: null, posterConnectionId: null }
+    });
+    await removeStoredFiles(files).catch((error: unknown) => console.error("polaris: a view-once file could not be removed:", error));
+    return rows.length;
+}
+
+/**
+ * Purge a view-once file once nobody is left to open it: in a direct message
+ * or a group, every member but the sender has had their look. A channel in a
+ * space has no fixed list of readers, so its files wait for the sweep.
+ */
+export async function purgeIfSpent(file: ViewOnceFile): Promise<boolean> {
+    const channel = await prisma.chatChannel.findUnique({
+        where: { id: file.message.channelId },
+        select: { kind: true }
+    });
+    if (channel?.kind !== "dm" && channel?.kind !== "group") return false;
+    const opened = await prisma.chatAttachmentOpen.findMany({
+        where: { attachmentId: file.id },
+        select: { userId: true }
+    });
+    const waiting = await prisma.chatChannelMember.count({
+        where: {
+            channelId: file.message.channelId,
+            userId: { notIn: [file.message.authorId, ...opened.map((open) => open.userId)].filter(Boolean) as string[] }
+        }
+    });
+    if (waiting > 0) return false;
+    return (await purgeViewOnce([file.id])) > 0;
+}
+
+/** The scheduled half: everything past its wait, opened or not, in batches. */
+export async function sweepViewOnce(now = new Date()): Promise<number> {
+    const cutoff = new Date(now.getTime() - VIEW_ONCE_KEEP_MS);
+    const floor = new Date(cutoff.getTime() - SWEEP_WINDOW_MS);
+    let purged = 0;
+    for (;;) {
+        const due = await prisma.chatAttachment.findMany({
+            where: {
+                viewOnce: true,
+                createdAt: { gte: floor, lt: cutoff },
+                path: { not: VIEW_ONCE_SPENT }
+            },
+            select: { id: true },
+            take: SWEEP_BATCH
+        });
+        if (due.length === 0) return purged;
+        const done = await purgeViewOnce(due.map((row) => row.id));
+        purged += done;
+        if (done === 0 || due.length < SWEEP_BATCH) return purged;
     }
 }
 

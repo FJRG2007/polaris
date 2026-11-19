@@ -780,6 +780,8 @@ export async function removeStoredFiles(
 
     const byTarget = new Map<string, string[]>();
     for (const file of files) {
+        // A view-once file already purged: its row keeps a marker, not a path.
+        if (file.path === "view-once-spent") continue;
         const target = file.connectionId ?? LOCAL_TARGET;
         byTarget.set(target, [...(byTarget.get(target) ?? []), file.path]);
     }

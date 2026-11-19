@@ -2501,10 +2501,11 @@
         "untilClosed": "Hasta cerrarlo",
         "openOnPhone": "Ábrelo en la app de Polaris del móvil",
         "opened": "Abierto",
+        "gone": "Ya no está disponible",
         "opensOnPhone": "Solo se abre en la app del móvil",
         "openedBy": "Abierto por {count, plural, one {# persona} other {# personas}}",
         "phoneOnly": "Solo se puede abrir en la app de Polaris del móvil.",
-        "onlyMedia": "Solo una foto o un vídeo adjuntos pueden enviarse para ver una vez.",
+        "onlyMedia": "Solo una foto, un vídeo o una grabación adjuntos pueden enviarse para ver una vez.",
         "notScheduled": "Un mensaje con un archivo de ver una vez no se puede programar. Envíalo ahora o quita ver una vez.",
         "tooMany": "Demasiados intentos. Prueba en un minuto.",
         "refused": {

@@ -41,6 +41,7 @@ import { sweepUploads } from "@/lib/chat/uploads";
 import { sweepUnsentPolarAttachments } from "@/lib/polar/attachments";
 import { sweepTemporaryPolarThreads } from "@/lib/polar/threads";
 import { sweepEmptyGroups } from "@/lib/chat/chat-service";
+import { sweepViewOnce } from "@/lib/chat/view-once";
 import { sweepEndedFriendRequestNotices } from "@/lib/friends-service";
 import { probeAllDomains } from "@/lib/domain-health-probe";
 import { tickServiceCrons } from "@/lib/deploy/service-cron";
@@ -574,6 +575,17 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         leaseMs: null,
         run: async () => {
             await sweepTemporaryPolarThreads();
+        }
+    },
+    {
+        key: "chat-view-once",
+        // A view-once file nobody can open any more: everyone had their look,
+        // or it waited fourteen days. Hourly - what it reclaims is disk, and a
+        // file is refused to everyone the moment it is past its wait anyway.
+        everyMs: HOUR,
+        leaseMs: null,
+        run: async () => {
+            await sweepViewOnce();
         }
     },
     {

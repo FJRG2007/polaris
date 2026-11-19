@@ -11344,6 +11344,8 @@ model ChatAttachment {
     opens   ChatAttachmentOpen[]
 
     @@index([messageId])
+    // The view-once sweep's range: files past their wait, oldest first.
+    @@index([viewOnce, createdAt])
 }
 
 // A view-once file somebody opened. Its existence is the "once": the row is
