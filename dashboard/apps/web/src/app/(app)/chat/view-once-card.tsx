@@ -41,10 +41,13 @@ function OnceMark({ spent }: { spent: boolean }) {
 
 export function ViewOnceCard({
     file,
-    mine
+    mine,
+    direct = false
 }: {
     file: ChatAttachmentView & { viewOnce: NonNullable<ChatAttachmentView["viewOnce"]> };
     mine: boolean;
+    /** A conversation with one other person, where "opened" can only mean them. */
+    direct?: boolean;
 }) {
     const t = useTranslations("chat");
     // Read after hydration: the server has no phone to ask.
@@ -60,11 +63,21 @@ export function ViewOnceCard({
     const openable = phone && !mine && !opened && !gone;
     const spent = opened || gone || (mine && openedCount > 0);
 
-    const title = !mine && opened ? t("viewOnce.opened") : what;
+    // Where it came from, the way Snapchat marks a picture that was not taken there
+    // and then: said on the card, never the picture itself.
+    const source =
+        file.viewOnce.captured === "camera"
+            ? t("viewOnce.fromCamera")
+            : file.viewOnce.captured === "gallery"
+              ? t("viewOnce.fromGallery")
+              : null;
+    const title = !mine && opened ? t("viewOnce.opened") : source ? `${what} - ${source}` : what;
     // Away from the phone app nothing here opens it, so the card says where.
     const status = mine
         ? openedCount > 0
-            ? t("viewOnce.openedBy", { count: openedCount })
+            ? direct
+                ? t("viewOnce.opened")
+                : t("viewOnce.openedBy", { count: openedCount })
             : phone
               ? null
               : t("viewOnce.opensOnPhone")

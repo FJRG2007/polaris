@@ -121,6 +121,8 @@ export async function POST(
             "Content-Disposition": "inline",
             "Content-Security-Policy": "default-src 'none'; sandbox",
             "X-Polaris-View-Seconds": file.viewSeconds === null ? "" : String(file.viewSeconds),
+            // Camera or gallery, as the sender's phone said: the viewer marks it.
+            "X-Polaris-Captured": file.captured === "camera" || file.captured === "gallery" ? file.captured : "",
             "X-Polaris-Watermark": encodeURIComponent(watermarkText(viewer?.name || viewer?.username || ""))
         }
     });

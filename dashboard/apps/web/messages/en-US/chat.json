@@ -2497,6 +2497,8 @@
         "pickFirst": "Pick what went wrong first."
     },
     "viewOnce": {
+        "fromCamera": "Camera",
+        "fromGallery": "Gallery",
         "label": "View once",
         "photo": "Photo",
         "video": "Video",

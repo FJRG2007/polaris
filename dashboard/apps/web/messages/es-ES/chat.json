@@ -2497,6 +2497,8 @@
         "pickFirst": "Elige antes qué ha fallado."
     },
     "viewOnce": {
+        "fromCamera": "Cámara",
+        "fromGallery": "Galería",
         "label": "Ver una vez",
         "photo": "Foto",
         "video": "Vídeo",

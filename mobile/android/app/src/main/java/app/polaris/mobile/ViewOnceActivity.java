@@ -37,6 +37,7 @@ public final class ViewOnceActivity extends Activity {
     private static final int MAX_BYTES = 100 * 1024 * 1024;
     private static final String SECONDS = "X-Polaris-View-Seconds";
     private static final String WATERMARK = "X-Polaris-Watermark";
+    private static final String CAPTURED = "X-Polaris-Captured";
 
     private final Handler main = new Handler(Looper.getMainLooper());
     private FrameLayout frame;
@@ -84,7 +85,7 @@ public final class ViewOnceActivity extends Activity {
         String address = origin + "/api/chat/attachments/" + attachment + "/once";
         try {
             PolarisHttp.Answer file = PolarisHttp.signed(this, origin, address, "view-once", attachment,
-                    getString(R.string.view_once_failed), MAX_BYTES, SECONDS, WATERMARK);
+                    getString(R.string.view_once_failed), MAX_BYTES, SECONDS, WATERMARK, CAPTURED);
             main.post(() -> show(file));
         } catch (PolarisHttp.Refused refused) {
             main.post(() -> fail(refused.getMessage()));
@@ -149,6 +150,20 @@ public final class ViewOnceActivity extends Activity {
             }
         }
         if (mark != null && !mark.isEmpty()) watermark(mark);
+        // Taken there and then, or picked from the gallery: said under the bar, the way Snapchat marks it.
+        String captured = file.headers.get(CAPTURED);
+        if ("camera".equals(captured) || "gallery".equals(captured)) {
+            TextView source = new TextView(this);
+            source.setText("camera".equals(captured) ? R.string.view_once_camera : R.string.view_once_gallery);
+            source.setTextColor(Color.WHITE);
+            source.setTextSize(13);
+            source.setShadowLayer(4, 0, 0, Color.BLACK);
+            int pad = (int) (12 * getResources().getDisplayMetrics().density);
+            FrameLayout.LayoutParams corner = new FrameLayout.LayoutParams(-2, pad * 4, Gravity.TOP | Gravity.START);
+            corner.setMargins(pad, pad * 2, 0, 0);
+            source.setGravity(Gravity.CENTER_VERTICAL);
+            frame.addView(source, corner);
+        }
         String seconds = file.headers.get(SECONDS);
         int timer = seconds != null && seconds.matches("[0-9]{1,3}") ? Integer.parseInt(seconds) : 0;
         if (timer > 0) {

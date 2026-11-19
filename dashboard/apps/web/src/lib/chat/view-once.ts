@@ -155,6 +155,7 @@ export async function viewOnceFile(attachmentId: string) {
             connectionId: true,
             path: true,
             viewSeconds: true,
+            captured: true,
             message: { select: { id: true, channelId: true, authorId: true } }
         }
     });

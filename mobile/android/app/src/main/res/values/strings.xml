@@ -24,6 +24,8 @@
     <string name="update_later">Later</string>
     <string name="view_once_audio">Playing audio</string>
     <string name="view_once_close">Close</string>
+    <string name="view_once_camera">Taken with the camera</string>
+    <string name="view_once_gallery">From the gallery</string>
     <string name="battery_title">Get messages right away</string>
     <string name="battery_body">Android puts Polaris to sleep to save battery, so messages and calls can arrive late. Let it run in the background to get them as they come.</string>
     <string name="battery_allow">Allow</string>
