@@ -11,11 +11,12 @@ const openExternal = vi.fn();
 const writeText = vi.fn();
 vi.mock("electron", () => ({ Menu: { buildFromTemplate }, shell: { openExternal }, clipboard: { writeText } }));
 
-const { contextMenuTemplate, installContextMenu, linkInSelection, openableLink } = await import("../../src/main/context-menu");
+const { contextMenuTemplate, installContextMenu, linkInSelection, openableLink, searchAddress, searchLabel } = await import("../../src/main/context-menu");
 
 const NO_EDIT = { canUndo: false, canRedo: false, canCut: false, canCopy: false, canPaste: false, canSelectAll: false, canDelete: false, canEditRichly: false };
-const base = { linkURL: "", selectionText: "", isEditable: false, editFlags: NO_EDIT, misspelledWord: "", dictionarySuggestions: [] as string[] };
-const actions = () => ({ openExternal: vi.fn(), copyText: vi.fn(), replaceMisspelling: vi.fn() });
+const base = { linkURL: "", selectionText: "", isEditable: false, editFlags: NO_EDIT, misspelledWord: "", dictionarySuggestions: [] as string[], mediaType: "none" as const, srcURL: "", hasImageContents: false, formControlType: "none" as "none" | "input-password" };
+const actions = () => ({ openExternal: vi.fn(), copyText: vi.fn(), replaceMisspelling: vi.fn(), addToDictionary: vi.fn(), copyImage: vi.fn(), saveImage: vi.fn() });
+const labels = (items: { label?: string; role?: string; type?: string; }[]) => items.map((item) => item.label ?? item.role ?? item.type);
 
 describe("contextMenuTemplate", () => {
     it("offers to open and copy a link", () => {
@@ -43,7 +44,7 @@ describe("contextMenuTemplate", () => {
     });
 
     it("offers copy on selected text, and the edit roles in a field", () => {
-        expect(contextMenuTemplate({ ...base, selectionText: "hello" }, actions())).toEqual([{ role: "copy" }]);
+        expect(labels(contextMenuTemplate({ ...base, selectionText: "hello" }, actions()))).toEqual(["copy", 'Search Google for "hello"']);
         const field = contextMenuTemplate({ ...base, isEditable: true, editFlags: { ...NO_EDIT, canPaste: true } }, actions());
         expect(field.filter((item) => item.role).map((item) => [item.role, item.enabled])).toEqual([
             ["undo", false],
@@ -58,13 +59,60 @@ describe("contextMenuTemplate", () => {
     it("puts spelling suggestions first in a field", () => {
         const spy = actions();
         const items = contextMenuTemplate({ ...base, isEditable: true, misspelledWord: "teh", dictionarySuggestions: ["the", "ten"] }, spy);
-        expect(items.slice(0, 3).map((item) => item.label ?? item.type)).toEqual(["the", "ten", "separator"]);
+        expect(labels(items.slice(0, 5))).toEqual(["the", "ten", "separator", "Add to dictionary", "separator"]);
         items[0]?.click?.({} as never, undefined, {} as never);
         expect(spy.replaceMisspelling).toHaveBeenCalledWith("the");
+        items[3]?.click?.({} as never, undefined, {} as never);
+        expect(spy.addToDictionary).toHaveBeenCalledWith("teh");
+    });
+
+    it("says there is no suggestion rather than offering none", () => {
+        const items = contextMenuTemplate({ ...base, isEditable: true, misspelledWord: "qzxv" }, actions());
+        expect(items[0]).toEqual({ label: "No spelling suggestions", enabled: false });
+        expect(items[2]?.label).toBe("Add to dictionary");
+    });
+
+    it("offers to copy and save an image", () => {
+        const spy = actions();
+        const items = contextMenuTemplate({ ...base, mediaType: "image", srcURL: "https://example.com/a.png", hasImageContents: true }, spy);
+        expect(labels(items)).toEqual(["Copy image", "Copy image address", "Save image as..."]);
+        items.forEach((item) => item.click?.({} as never, undefined, {} as never));
+        expect(spy.copyImage).toHaveBeenCalledTimes(1);
+        expect(spy.copyText).toHaveBeenCalledWith("https://example.com/a.png");
+        expect(spy.saveImage).toHaveBeenCalledWith("https://example.com/a.png");
+    });
+
+    it("has no address to copy for an inline image, and nothing to save from another scheme", () => {
+        expect(labels(contextMenuTemplate({ ...base, mediaType: "image", srcURL: "data:image/png;base64,AAAA", hasImageContents: true }, actions()))).toEqual(["Copy image", "Save image as..."]);
+        expect(contextMenuTemplate({ ...base, mediaType: "image", srcURL: "file:///etc/passwd", hasImageContents: false }, actions())).toEqual([]);
+    });
+
+    it("puts the link before the image when the image is a link", () => {
+        const items = contextMenuTemplate({ ...base, linkURL: "https://example.com/", mediaType: "image", srcURL: "https://example.com/a.png", hasImageContents: true }, actions());
+        expect(labels(items)).toEqual(["Open link in browser", "Copy link", "separator", "Copy image", "Copy image address", "Save image as..."]);
+    });
+
+    it("searches a selection, in a field too, but never a password", () => {
+        const spy = actions();
+        const items = contextMenuTemplate({ ...base, selectionText: "  polar\n star " }, spy);
+        items[1]?.click?.({} as never, undefined, {} as never);
+        expect(spy.openExternal).toHaveBeenCalledWith("https://www.google.com/search?q=polar%20star");
+        const field = contextMenuTemplate({ ...base, isEditable: true, selectionText: "word" }, actions());
+        expect(labels(field)[0]).toBe('Search Google for "word"');
+        const password = contextMenuTemplate({ ...base, isEditable: true, selectionText: "hunter2", formControlType: "input-password" }, actions());
+        expect(labels(password).some((label) => label?.startsWith("Search"))).toBe(false);
     });
 
     it("is empty where there is nothing to offer", () => {
         expect(contextMenuTemplate(base, actions())).toEqual([]);
+    });
+});
+
+describe("searchLabel", () => {
+    it("keeps a long selection on one short line", () => {
+        expect(searchLabel("a\n  b")).toBe('Search Google for "a b"');
+        expect(searchLabel("x".repeat(80))).toBe(`Search Google for "${"x".repeat(27)}..."`);
+        expect(searchAddress("a&b=c")).toBe("https://www.google.com/search?q=a%26b%3Dc");
     });
 });
 
