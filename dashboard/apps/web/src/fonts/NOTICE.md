@@ -13,7 +13,7 @@ self-hosted rather than fetched from a font service for two reasons: a build has
 to work with no network, and a request per visitor to a third party is a record
 of who uses this instance, held somewhere the operator does not control.
 
-`app/layout.tsx` loads them through `next/font/local`, which fingerprints and
+`app/fonts.ts` loads them through `next/font/local`, which fingerprints and
 preloads them and exposes each as a CSS variable that `globals.css` folds into
 `--font-sans` and `--font-mono`.
 

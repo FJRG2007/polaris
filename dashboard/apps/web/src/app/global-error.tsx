@@ -12,6 +12,7 @@ import "@polaris/ui/styles.css";
 import esES from "../../messages/es-ES/common.json";
 import enUS from "../../messages/en-US/common.json";
 import { useEffect, useState } from "react";
+import { FONT_CLASSES } from "./fonts";
 import { readLocaleCookie } from "@/lib/i18n/cookie";
 import { isStaleBuildError, reloadForNewBuild } from "@/lib/stale-build";
 import {
@@ -74,7 +75,7 @@ export default function GlobalError({
     }, [staleBuild]);
 
     return (
-        <html lang="en" dir="ltr" suppressHydrationWarning>
+        <html lang="en" dir="ltr" className={FONT_CLASSES} suppressHydrationWarning>
             <body>
                 <div className="flex min-h-dvh items-center justify-center p-6">
                     <div className="flex max-w-md flex-col gap-4 rounded-lg border border-border bg-surface p-6">
