@@ -44,7 +44,8 @@ import {
 } from "@/lib/chat/attachments";
 import { claimUploads, UploadRefused } from "@/lib/chat/uploads";
 import { fromPhoneApp } from "@/lib/mobile/device-proof";
-import { readViewOnceChoices, viewOnceable } from "@/lib/chat/view-once-choice";
+import { senderWatermark } from "@/lib/chat/view-once";
+import { readViewOnceChoices, VIEW_ONCE_TEXT_NAME, viewOnceAllowed, viewOnceText } from "@/lib/chat/view-once-choice";
 
 /**
  * The Drive files a message is sharing, as the composer lists them.
@@ -399,18 +400,33 @@ export async function POST(
         // Sent to be seen once. Only a photo or a video, and only one whose bytes
         // the conversation holds: a Drive file stays readable from the Drive.
         // Where it came from is believed only from the phone app's own picker.
+        // A typed message sent the same way is a small text file that came in
+        // this request, read here for its size and encoding before it is kept.
         const phone = fromPhoneApp(request.headers.get("user-agent"));
+        // The sender's watermark setting as it stands now, kept with each file:
+        // turning it off later must not change what was already sent.
+        const watermark = once.size > 0 ? await senderWatermark(user.id) : true;
         for (const [position, choice] of once) {
             const file = stored[position];
-            if (!file || file.borrowed || position >= uploads.length + files.length || !viewOnceable(file.contentType)) {
-                throw new ViewOnceNotAllowed();
-            }
+            const sent = position >= uploads.length ? files[position - uploads.length] : undefined;
+            const allowed =
+                file !== undefined &&
+                position < uploads.length + files.length &&
+                viewOnceAllowed({
+                    contentType: file.contentType,
+                    borrowed: file.borrowed,
+                    inForm: sent ? new Uint8Array(await sent.arrayBuffer()) : null
+                });
+            if (!file || !allowed) throw new ViewOnceNotAllowed();
+            const text = viewOnceText(file.contentType);
             stored[position] = {
                 ...file,
+                ...(text ? { name: VIEW_ONCE_TEXT_NAME } : {}),
                 spoiler: false,
                 viewOnce: true,
                 viewSeconds: choice.seconds,
-                captured: phone ? (choice.captured ?? null) : null
+                captured: phone && !text ? (choice.captured ?? null) : null,
+                watermark
             };
         }
 

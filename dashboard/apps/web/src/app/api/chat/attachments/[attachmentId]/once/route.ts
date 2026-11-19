@@ -23,7 +23,7 @@ import {
     viewOnceSpent,
     viewOnceFile,
     ViewOnceRefused,
-    watermarkText,
+    watermarkHeader,
     type ViewOnceFile
 } from "@/lib/chat/view-once";
 
@@ -102,7 +102,10 @@ export async function POST(
             { status: 410, headers: NO_STORE }
         );
     }
-    const viewer = await prisma.user.findUnique({ where: { id: user.id }, select: { name: true, username: true } });
+    // Only asked for when it is drawn: a sender who turned it off sent no name to draw.
+    const viewer = file.watermark
+        ? await prisma.user.findUnique({ where: { id: user.id }, select: { name: true, username: true } })
+        : null;
     // Once the last reader who can open it has the whole of it, nothing is left
     // to keep the bytes for: they go when this stream ends.
     const body = opened.body.pipeThrough(
@@ -123,7 +126,7 @@ export async function POST(
             "X-Polaris-View-Seconds": file.viewSeconds === null ? "" : String(file.viewSeconds),
             // Camera or gallery, as the sender's phone said: the viewer marks it.
             "X-Polaris-Captured": file.captured === "camera" || file.captured === "gallery" ? file.captured : "",
-            "X-Polaris-Watermark": encodeURIComponent(watermarkText(viewer?.name || viewer?.username || ""))
+            "X-Polaris-Watermark": watermarkHeader(file, viewer?.name || viewer?.username || "")
         }
     });
 }

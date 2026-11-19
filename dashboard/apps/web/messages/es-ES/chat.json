@@ -1530,6 +1530,7 @@
         "send": "Enviar",
         "moreWaysToSend": "Más formas de enviar",
         "scheduleMessage": "Programar mensaje",
+        "sendOnce": "Enviar para ver una vez",
         "saveAsDraft": "Guardar borrador"
     },
     "nickname": {
@@ -2503,6 +2504,8 @@
         "photo": "Foto",
         "video": "Vídeo",
         "audio": "Audio",
+        "message": "Mensaje",
+        "textTooLong": "Es demasiado largo para ver una vez. Acórtalo o envíalo normal.",
         "chooseNamed": "Enviar {name} para ver una vez",
         "off": "Enviar normal",
         "seconds": "{seconds} s",

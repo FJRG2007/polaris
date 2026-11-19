@@ -16,6 +16,7 @@ import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ProgressBar;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.VideoView;
 import java.io.File;
@@ -23,6 +24,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 /**
@@ -127,6 +129,21 @@ public final class ViewOnceActivity extends Activity {
                 playing.setTextSize(18);
                 frame.addView(playing, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
             }
+        } else if (type.toLowerCase(java.util.Locale.ROOT).startsWith("text/plain")) {
+            // A message sent to be seen once: the words, scrollable, behind the same bar and watermark.
+            float density = getResources().getDisplayMetrics().density;
+            int pad = (int) (24 * density);
+            TextView words = new TextView(this);
+            words.setText(new String(file.body, StandardCharsets.UTF_8));
+            words.setTextColor(Color.WHITE);
+            words.setTextSize(20);
+            words.setLineSpacing(0, 1.2f);
+            words.setTextIsSelectable(false);
+            words.setPadding(pad, pad * 4, pad, pad * 2);
+            ScrollView scroll = new ScrollView(this);
+            scroll.setFillViewport(true);
+            scroll.addView(words, new FrameLayout.LayoutParams(-1, -2));
+            frame.addView(scroll, 0, new FrameLayout.LayoutParams(-1, -1));
         } else {
             Bitmap picture = decode(file.body);
             if (picture == null) {

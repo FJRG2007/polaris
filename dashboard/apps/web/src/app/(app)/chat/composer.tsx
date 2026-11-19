@@ -63,11 +63,8 @@ import { isBlankMarkdown } from "@/components/rich-text/markdown";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { dropDraft, keepDraft, readDraft, type SavedDraft } from "./drafts";
 import { lastPickSource } from "@/lib/mobile-bridge";
-import {
-    VIEW_SECONDS,
-    viewOnceable,
-    type ViewOnceChoice
-} from "@/lib/chat/view-once-choice";
+import { viewOnceable, viewOnceTextFile, type ViewOnceChoice } from "@/lib/chat/view-once-choice";
+import { useViewOnceTimerLabel, ViewOnceMenu } from "./view-once-menu";
 import {
     canRecord,
     MAX_VOICE_SECONDS,
@@ -93,10 +90,6 @@ import {
     ProductMark,
     Button,
     cn,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
     isDirty,
     shortcutPressed,
     useShortcutHint
@@ -809,7 +802,7 @@ export function Composer({
      * what they wrote. `choice` is that choice; Enter on a translation that
      * is already shown is the same as pressing its button.
      */
-    const submit = async (value: string, choice?: "translated" | "original") => {
+    const submit = async (value: string, choice?: "translated" | "original", seenOnce = false) => {
         const text = isBlankMarkdown(value) ? "" : value.trim();
         // A message that is only a file is a message. Making somebody type
         // "here" before they can send a screenshot is a tax on the common case.
@@ -818,7 +811,9 @@ export function Composer({
         if (editing && !isDirty(editing.body, text)) return onCancelEdit?.();
         let translation: core.ChatSentTranslation | undefined;
         let words = text;
-        if (outgoingTo && translator && text && choice !== "original") {
+        // Seen once goes as written: a translation shown first would be a second
+        // press that sends it the ordinary way.
+        if (outgoingTo && translator && text && choice !== "original" && !seenOnce) {
             const shown =
                 preview !== null && preview.source === text && preview.to === outgoingTo
                     ? preview
@@ -859,6 +854,17 @@ export function Composer({
                 return;
             }
         }
+        // Sent to be seen once: the words travel as a small text file, so the
+        // message itself carries none and every preview, notice and quote of
+        // it has nothing to show. Only a message that is words alone.
+        const onceText =
+            seenOnce && canViewOnce && !editing && files.length === 0 && kept.length === 0
+                ? viewOnceTextFile(words)
+                : null;
+        if (seenOnce && !onceText) {
+            setRefused(t("viewOnce.textTooLong"));
+            return;
+        }
         setPreview(null);
         // Sending is the end of what was being said, and words still on their
         // way would land in the box it just emptied.
@@ -888,7 +894,18 @@ export function Composer({
         // It is somewhere that is not a browser now.
         if (draftKey && !editing) dropDraft(draftKey);
         if (editing && onSaveEdit) await onSaveEdit(editing.id, text);
-        else if (sending.length > 0 || staying.length > 0) {
+        else if (onceText) {
+            // Open until it is closed: a timer would take the words away mid-sentence.
+            await deliver({
+                id: newOutgoingId(),
+                scope,
+                body: "",
+                files: [onceText],
+                kept: [],
+                hidden: [],
+                viewOnce: [{ index: 0, seconds: null, captured: null }]
+            });
+        } else if (sending.length > 0 || staying.length > 0) {
             await deliver({
                 id: newOutgoingId(),
                 scope,
@@ -1447,7 +1464,7 @@ export function Composer({
                                 title={voiceOnce ? t("composer.voiceViewOnceOn") : t("composer.voiceViewOnce")}
                                 onClick={() => setVoiceOnce((now) => !now)}
                                 className={cn(
-                                    "flex size-6 shrink-0 items-center justify-center rounded-full border text-[0.6875rem] font-semibold tabular-nums transition-colors",
+                                    "flex size-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular-nums transition-colors sm:size-6 sm:text-[0.6875rem]",
                                     voiceOnce
                                         ? "border-primary bg-primary text-primary-foreground"
                                         : "border-border-strong text-muted-foreground hover:text-foreground"
@@ -1764,6 +1781,11 @@ export function Composer({
                                 <SendButton
                                     disabled={disabled || tooLong || (blank && files.length === 0)}
                                     onSend={() => void submit(body)}
+                                    onSendOnce={
+                                        canViewOnce && !editing && files.length === 0 && kept.length === 0
+                                            ? () => void submit(body, undefined, true)
+                                            : undefined
+                                    }
                                     onSchedule={
                                         onSchedule
                                             ? () => {
@@ -1804,7 +1826,15 @@ export function Composer({
                     // Staged like any other file, so a clip can go with a line of
                     // text, with other files, or at nine tomorrow morning -
                     // none of which is a special case.
-                    onReady={(clip) => stage([clip])}
+                    // Its view-once timer, when one was chosen there, is the
+                    // staged file's like any other's.
+                    canViewOnce={canViewOnce}
+                    onReady={(clip, seconds) => {
+                        const at = files.length;
+                        if (stage([clip]) > 0 && seconds !== undefined) {
+                            setOnce((current) => new Map(current).set(at, seconds));
+                        }
+                    }}
                 />
             )}
 
@@ -1950,58 +1980,30 @@ function StagedFile({
         </tile.AttachmentAction>
     );
 
-    /**
-     * Send it to be seen once, on a phone, for this long.
-     *
-     * A menu rather than a toggle because the timer is the decision: a photo
-     * opens for ten seconds unless the sender says otherwise, a video until it
-     * is closed.
-     */
+    // The timer each file goes with - see `ViewOnceMenu`.
     const chosen = viewOnce?.seconds;
     const onceOn = chosen !== undefined;
-    const timerLabel = (seconds: number | null) =>
-        seconds === null ? t("viewOnce.untilClosed") : t("viewOnce.seconds", { seconds });
+    const timerLabel = useViewOnceTimerLabel();
     const viewOnceControl = viewOnce && (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <button
-                    type="button"
-                    aria-pressed={onceOn}
-                    aria-label={t("viewOnce.chooseNamed", { name: file.name })}
-                    title={onceOn ? `${t("viewOnce.label")} - ${timerLabel(chosen)}` : t("viewOnce.label")}
-                    className={cn(
-                        "flex items-center gap-0.5 rounded p-0.5 transition-colors",
-                        onceOn ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                    )}
-                >
-                    <Timer className="size-3" />
-                    {onceOn && (
-                        <span className="text-[0.625rem] leading-none">
-                            {chosen === null ? "\u221e" : chosen}
-                        </span>
-                    )}
-                </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="top" className="w-48">
-                {/* A recording plays to its end: there is no timer to choose. */}
-                {(type.startsWith("audio/") ? [null] : [...VIEW_SECONDS, null]).map((seconds) => (
-                    <DropdownMenuItem
-                        key={String(seconds)}
-                        onSelect={() => onViewOnce(seconds)}
-                        className={chosen === seconds ? "text-primary" : undefined}
-                    >
-                        <Timer />
-                        {timerLabel(seconds)}
-                    </DropdownMenuItem>
-                ))}
-                {onceOn && (
-                    <DropdownMenuItem onSelect={() => onViewOnce(undefined)}>
-                        <X />
-                        {t("viewOnce.off")}
-                    </DropdownMenuItem>
+        <ViewOnceMenu seconds={chosen} audio={type.startsWith("audio/")} onChange={onViewOnce}>
+            <button
+                type="button"
+                aria-pressed={onceOn}
+                aria-label={t("viewOnce.chooseNamed", { name: file.name })}
+                title={onceOn ? `${t("viewOnce.label")} - ${timerLabel(chosen)}` : t("viewOnce.label")}
+                className={cn(
+                    "flex items-center gap-0.5 rounded p-0.5 transition-colors",
+                    onceOn ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 )}
-            </DropdownMenuContent>
-        </DropdownMenu>
+            >
+                <Timer className="size-3" />
+                {onceOn && (
+                    <span className="text-[0.625rem] leading-none">
+                        {chosen === null ? "∞" : chosen}
+                    </span>
+                )}
+            </button>
+        </ViewOnceMenu>
     );
 
     if (!preview) {

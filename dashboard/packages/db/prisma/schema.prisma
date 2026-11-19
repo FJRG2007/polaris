@@ -11358,6 +11358,10 @@ model ChatAttachment {
     // Where the sender's phone app says it came from: "camera" or "gallery".
     // Null when it was not sent from the app, which is everything else.
     captured     String?
+    // Whether the phone draws the reader's name and the time across it, as the
+    // sender's setting stood when it was sent (`UserPrivacy.viewOnceWatermark`).
+    // Copied per file so a later change never alters what was already sent.
+    watermark    Boolean  @default(true)
     createdAt    DateTime @default(now())
 
     message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
@@ -11706,6 +11710,10 @@ model UserPrivacy {
     // The disappearing-message timer a new direct message starts with, in
     // seconds. 0 is off.
     chatVanishAfter Int   @default(0)
+    // Whether what this account sends to be seen once carries the reader's name
+    // and the time across it. On by default: with a photo of the screen taken
+    // from another device, it is what says who it was shown to.
+    viewOnceWatermark Boolean @default(true)
     // Who may read the two follower lists on a profile. Nullable, and that is
     // the point: null is "nobody has chosen", and what that resolves to is the
     // operator's setting rather than a number frozen into this column. An

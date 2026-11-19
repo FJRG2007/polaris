@@ -14,7 +14,7 @@
  * is a control that lies.
  */
 
-import { CalendarClock, ChevronDown, FilePen, SendHorizontal } from "lucide-react";
+import { CalendarClock, ChevronDown, FilePen, SendHorizontal, Timer } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     cn,
@@ -27,6 +27,7 @@ import {
 export function SendButton({
     disabled,
     onSend,
+    onSendOnce,
     onSchedule,
     onSaveDraft,
     draftRefusal
@@ -35,6 +36,9 @@ export function SendButton({
      *  "later" are not questions about nothing. */
     disabled: boolean;
     onSend: () => void;
+    /** Send the words to be seen once, on a phone. Absent where that cannot be:
+     *  with files staged, while editing, or where view once is not offered. */
+    onSendOnce?: () => void;
     /** Absent where there is no sending later. */
     onSchedule?: () => void;
     /** Absent where there is no keeping a draft. */
@@ -44,7 +48,7 @@ export function SendButton({
     draftRefusal?: string;
 }) {
     const t = useTranslations("chat");
-    const menu = onSchedule !== undefined || onSaveDraft !== undefined;
+    const menu = onSchedule !== undefined || onSaveDraft !== undefined || onSendOnce !== undefined;
 
     return (
         <span className="flex items-center">
@@ -77,6 +81,12 @@ export function SendButton({
                     {/* Upward and to the right edge: the box is at the bottom of
                         the screen and the button at the end of it. */}
                     <DropdownMenuContent align="end" side="top" className="w-56">
+                        {onSendOnce && (
+                            <DropdownMenuItem onSelect={onSendOnce}>
+                                <Timer />
+                                {t("sendButton.sendOnce")}
+                            </DropdownMenuItem>
+                        )}
                         {onSchedule && (
                             <DropdownMenuItem onSelect={onSchedule}>
                                 <CalendarClock />

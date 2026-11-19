@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * A photo or video sent to be seen once, as a message draws it.
+ * A photo, video, recording or text sent to be seen once, as a message draws it.
  *
  * Never the file: a browser is refused the bytes and the still, so this is a
  * closed card. In the phone app the card opens it, once, in the app's own
@@ -12,6 +12,7 @@
 import { cn } from "@polaris/ui";
 import { useSyncExternalStore } from "react";
 import type { ChatAttachmentView } from "@/lib/chat/messages";
+import { viewOnceText } from "@/lib/chat/view-once-choice";
 import { canViewOnce, openViewOnce } from "@/lib/mobile-bridge";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -55,11 +56,13 @@ export function ViewOnceCard({
     const { opened, openedCount, gone } = file.viewOnce;
     // Only what it is, the way WhatsApp draws it: how it was taken and how long
     // it stays up are for the screen that shows it, not a hint before it opens.
-    const what = file.contentType.startsWith("video/")
-        ? t("viewOnce.video")
-        : file.contentType.startsWith("audio/")
-          ? t("viewOnce.audio")
-          : t("viewOnce.photo");
+    const what = viewOnceText(file.contentType)
+        ? t("viewOnce.message")
+        : file.contentType.startsWith("video/")
+          ? t("viewOnce.video")
+          : file.contentType.startsWith("audio/")
+            ? t("viewOnce.audio")
+            : t("viewOnce.photo");
     const openable = phone && !mine && !opened && !gone;
     const spent = opened || gone || (mine && openedCount > 0);
 

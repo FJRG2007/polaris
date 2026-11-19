@@ -294,5 +294,13 @@
     "chatTimer": {
         "label": "Temporizador para mensajes directos nuevos",
         "hint": "Los mensajes de los chats directos que inicies desaparecen tras este tiempo."
+    },
+    "viewOnceWatermark": {
+        "label": "Marca de agua en lo que envío para ver una vez",
+        "hint": "Fotos, vídeos y mensajes muestran el nombre de quien lo ve y la hora.",
+        "confirmTitle": "¿Quitar la marca de agua?",
+        "confirmBody": "Sin ella, una foto de la pantalla hecha desde otro dispositivo ya no muestra a quién se le enseñó, así que es más fácil compartirla. Se aplica a lo que envíes a partir de ahora.",
+        "keep": "Mantenerla",
+        "turnOff": "Quitarla"
     }
 }

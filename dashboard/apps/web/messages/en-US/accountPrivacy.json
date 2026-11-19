@@ -294,5 +294,13 @@
     "chatTimer": {
         "label": "Default timer for new direct messages",
         "hint": "Messages in direct chats you start disappear after this time."
+    },
+    "viewOnceWatermark": {
+        "label": "Watermark what I send to view once",
+        "hint": "Photos, videos and messages show the viewer's name and the time.",
+        "confirmTitle": "Turn off the watermark?",
+        "confirmBody": "Without it, a photo of the screen taken from another device no longer shows who it was shown to, so it is easier to share. Applies to what you send from now on.",
+        "keep": "Keep it on",
+        "turnOff": "Turn off"
     }
 }

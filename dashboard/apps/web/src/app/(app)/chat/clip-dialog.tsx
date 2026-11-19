@@ -21,6 +21,7 @@ import { MicSettings } from "./mic-settings";
 import { worthChoosing } from "./device-choice";
 import { MediaPlayer } from "@/components/media-player";
 import { MAX_CLIP_SECONDS, useClipRecorder, type ClipSources } from "./clip-recorder";
+import { useViewOnceTimerLabel, ViewOnceMenu } from "./view-once-menu";
 import {
     Camera,
     CameraOff,
@@ -30,7 +31,8 @@ import {
     Pause,
     Play,
     RotateCcw,
-    Square
+    Square,
+    Timer
 } from "lucide-react";
 import {
     Button,
@@ -85,6 +87,7 @@ export function ClipDialog({
     open,
     onOpenChange,
     onReady,
+    canViewOnce = false,
     maxBytes,
     maxMib
 }: {
@@ -92,13 +95,18 @@ export function ClipDialog({
     onOpenChange: (open: boolean) => void;
     /** The finished clip, handed to the composer to be staged like any other
      *  file. The dialog closes itself once it has been taken. */
-    onReady: (file: File) => void;
+    onReady: (file: File, viewOnce: number | null | undefined) => void;
+    /** Whether this conversation takes a file to be seen once. */
+    canViewOnce?: boolean;
     maxBytes: number;
     maxMib: number;
 }) {
     const t = useTranslations("chat");
     const clip = useClipRecorder({ maxBytes });
     const [sources, setSources] = useState<ClipSources>({ camera: false, microphone: true });
+    /** The view-once timer it is attached with; undefined is sent normally. */
+    const [once, setOnce] = useState<number | null | undefined>(undefined);
+    const timerLabel = useViewOnceTimerLabel();
     /**
      * What this machine has to record with.
      *
@@ -329,13 +337,28 @@ export function ClipDialog({
                             <>
                                 <Button
                                     onClick={() => {
-                                        onReady(clip.file as File);
+                                        onReady(clip.file as File, canViewOnce ? once : undefined);
                                         clip.discard();
                                         onOpenChange(false);
                                     }}
                                 >
                                     {t("clip.attachIt")}
                                 </Button>
+                                {canViewOnce && (
+                                    <ViewOnceMenu seconds={once} onChange={setOnce}>
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            aria-pressed={once !== undefined}
+                                            className={cn(once !== undefined && "text-primary")}
+                                        >
+                                            <Timer className="size-4" />
+                                            {once === undefined
+                                                ? t("viewOnce.label")
+                                                : `${t("viewOnce.label")} - ${timerLabel(once)}`}
+                                        </Button>
+                                    </ViewOnceMenu>
+                                )}
                                 <Button size="sm" variant="secondary" onClick={clip.discard}>
                                     <RotateCcw className="size-4" />
                                     {t("clip.recordAgain")}

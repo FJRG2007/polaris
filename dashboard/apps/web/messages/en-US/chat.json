@@ -1530,6 +1530,7 @@
         "send": "Send",
         "moreWaysToSend": "More ways to send",
         "scheduleMessage": "Schedule message",
+        "sendOnce": "Send to be seen once",
         "saveAsDraft": "Save as draft"
     },
     "nickname": {
@@ -2503,6 +2504,8 @@
         "photo": "Photo",
         "video": "Video",
         "audio": "Audio",
+        "message": "Message",
+        "textTooLong": "Too long to send to be seen once. Shorten it or send it normally.",
         "chooseNamed": "Send {name} to be seen once",
         "off": "Send normally",
         "seconds": "{seconds} s",

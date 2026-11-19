@@ -196,6 +196,8 @@ export interface StoredAttachment {
     readonly viewSeconds?: number | null;
     /** "camera" or "gallery", as the sender's phone app said. */
     readonly captured?: string | null;
+    /** Whether the phone draws the reader's name across it, as the sender had it set. */
+    readonly watermark?: boolean;
 }
 
 /**

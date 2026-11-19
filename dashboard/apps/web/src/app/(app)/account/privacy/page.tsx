@@ -12,6 +12,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { PrivacyView } from "./privacy-view";
 import { prisma } from "@polaris/db";
 import { ChatTimerCard } from "./chat-timer-card";
+import { ViewOnceWatermarkCard } from "./view-once-watermark-card";
 import { BlockedCard } from "./blocked-card";
 import { listsFor, namePeople, privacyFor } from "@/lib/privacy-service";
 
@@ -26,7 +27,7 @@ export default async function PrivacyPage() {
         listBlocked(session.id),
         prisma.userPrivacy.findUnique({
             where: { userId: session.id },
-            select: { chatVanishAfter: true }
+            select: { chatVanishAfter: true, viewOnceWatermark: true }
         })
     ]);
     // Every name any rule needs, in one read: a row draws the people it names,
@@ -41,6 +42,7 @@ export default async function PrivacyPage() {
             </div>
             <PrivacyView settings={settings} lists={lists} people={people} />
             <ChatTimerCard seconds={chatPrivacy?.chatVanishAfter ?? 0} />
+            <ViewOnceWatermarkCard on={chatPrivacy?.viewOnceWatermark ?? true} />
             {/* What is shared beside your name has its own page: sources,
                 detected games and your own, which outgrew a card here. */}
             <Card>

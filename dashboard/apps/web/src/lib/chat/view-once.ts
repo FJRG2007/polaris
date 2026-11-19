@@ -156,6 +156,7 @@ export async function viewOnceFile(attachmentId: string) {
             path: true,
             viewSeconds: true,
             captured: true,
+            watermark: true,
             message: { select: { id: true, channelId: true, authorId: true } }
         }
     });
@@ -197,4 +198,19 @@ export async function claimViewOnce(
 export function watermarkText(name: string, at = new Date()): string {
     const stamp = at.toISOString().slice(0, 16).replace("T", " ");
     return `${name} - ${stamp} UTC`.slice(0, 120);
+}
+
+/**
+ * The watermark header the phone draws from: the reader and the time, or empty
+ * when the sender had the watermark off for this file. The phone draws nothing
+ * for an empty one.
+ */
+export function watermarkHeader(file: { readonly watermark: boolean }, name: string, at = new Date()): string {
+    return file.watermark ? encodeURIComponent(watermarkText(name, at)) : "";
+}
+
+/** Whether what this account sends to be seen once is watermarked: on unless they turned it off. */
+export async function senderWatermark(userId: string): Promise<boolean> {
+    const row = await prisma.userPrivacy.findUnique({ where: { userId }, select: { viewOnceWatermark: true } });
+    return row?.viewOnceWatermark ?? true;
 }

@@ -325,3 +325,25 @@ export async function saveChatTimerAction(seconds: unknown): Promise<{ error?: s
     revalidatePath(PRIVACY_PATH);
     return {};
 }
+
+// ---------------------------------------------------------------------------
+// The watermark on what this account sends to be seen once
+// ---------------------------------------------------------------------------
+
+/** On or off. Applies to what is sent from now on: every file keeps the
+ *  watermark it was sent with (`ChatAttachment.watermark`). */
+export async function saveViewOnceWatermarkAction(on: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = z.boolean().safeParse(on);
+    if (!parsed.success) {
+        return { error: (await getTranslations("accountPrivacy"))("errors.notSaved") };
+    }
+    await prisma.userPrivacy.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, viewOnceWatermark: parsed.data },
+        update: { viewOnceWatermark: parsed.data },
+        select: { userId: true }
+    });
+    revalidatePath(PRIVACY_PATH);
+    return {};
+}

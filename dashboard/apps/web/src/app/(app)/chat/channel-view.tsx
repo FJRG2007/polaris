@@ -22,7 +22,7 @@
  */
 
 import { useAppCommands } from "./use-app-commands";
-import type { ViewOnceChoice } from "@/lib/chat/view-once-choice";
+import { viewOnceText, type ViewOnceChoice } from "@/lib/chat/view-once-choice";
 import * as actions from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { spokenWait } from "@/lib/chat/durations";
@@ -1804,7 +1804,11 @@ export function ChannelView({
             // written rather than carrying it, which is what lets a file be
             // measured in gigabytes instead of in what one request may hold.
             const uploaded: string[] = [];
-            for (const [at, file] of files.entries()) {
+            // A message sent to be seen once is a few kilobytes of text and rides
+            // the message itself, where the server reads it before keeping it.
+            const inForm =
+                files.length === 1 && viewOnce.length === 1 && viewOnceText(files[0]!.type) ? files[0]! : null;
+            for (const [at, file] of (inForm ? [] : files).entries()) {
                 const query = new URLSearchParams({ name: file.name });
                 // Covered is chosen before the upload, because that is when the
                 // sender marked it.
@@ -1839,6 +1843,7 @@ export function ChannelView({
             if (spoilers.length > 0) form.set("spoilers", spoilers.join(","));
             if (viewOnce.length > 0) form.set("viewOnce", JSON.stringify(viewOnce));
             if (uploaded.length > 0) form.set("uploads", JSON.stringify(uploaded));
+            if (inForm) form.append("files", inForm);
             // A still per video, in the same order as the files that were just
             // uploaded, with an empty one standing in for everything that is not
             // a video - so the two lists line up on the other side without
