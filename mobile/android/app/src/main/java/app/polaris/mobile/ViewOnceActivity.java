@@ -2,6 +2,7 @@ package app.polaris.mobile;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -13,6 +14,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -41,9 +43,15 @@ public final class ViewOnceActivity extends Activity {
     private FrameLayout frame;
     private ProgressBar loading;
     private TextView countdown;
+    private ProgressBar progress;
+    private VideoView video;
     private File played;
-    private int left;
+    /** The timer's end, on the uptime clock; zero while there is no timer. */
+    private long endsAt;
+    private long timerMs;
     private boolean shown;
+    /** How often the bar along the top moves: smooth enough to read as a sweep. */
+    private static final int FRAME_MS = 50;
 
     static Intent intent(Activity from, String origin, String attachmentId) {
         return new Intent(from, ViewOnceActivity.class)
@@ -102,7 +110,7 @@ public final class ViewOnceActivity extends Activity {
                 fail(getString(R.string.view_once_failed));
                 return;
             }
-            VideoView video = new VideoView(this);
+            video = new VideoView(this);
             frame.addView(video, 0, new FrameLayout.LayoutParams(-1, -1, Gravity.CENTER));
             video.setVideoPath(played.getAbsolutePath());
             video.setOnCompletionListener(player -> finish());
@@ -132,6 +140,7 @@ public final class ViewOnceActivity extends Activity {
         }
         shown = true;
         frame.setOnClickListener(view -> finish());
+        topBar();
         String mark = file.headers.get(WATERMARK);
         if (mark != null) {
             try {
@@ -144,10 +153,50 @@ public final class ViewOnceActivity extends Activity {
         String seconds = file.headers.get(SECONDS);
         int timer = seconds != null && seconds.matches("[0-9]{1,3}") ? Integer.parseInt(seconds) : 0;
         if (timer > 0) {
-            left = timer;
-            countdown = label(Gravity.TOP | Gravity.END, 18);
-            tick();
+            timerMs = timer * 1000L;
+            endsAt = android.os.SystemClock.uptimeMillis() + timerMs;
         }
+        if (timer > 0 || video != null) tick();
+        else progress.setVisibility(View.GONE);
+    }
+
+    /**
+     * Along the top, the way Instagram and Telegram show a story: a bar that runs
+     * out with the time left (or with the video), the seconds beside it, and a close
+     * button - leaving is always one tap away, not only when the time is up.
+     */
+    private void topBar() {
+        float density = getResources().getDisplayMetrics().density;
+        int pad = (int) (12 * density);
+        int close = (int) (48 * density);
+
+        progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(1000);
+        progress.setProgress(1000);
+        progress.setProgressTintList(ColorStateList.valueOf(Color.WHITE));
+        progress.setProgressBackgroundTintList(ColorStateList.valueOf(Color.argb(90, 255, 255, 255)));
+        FrameLayout.LayoutParams line = new FrameLayout.LayoutParams(-1, (int) (3 * density), Gravity.TOP);
+        line.setMargins(pad, pad, pad, 0);
+        frame.addView(progress, line);
+
+        ImageButton shut = new ImageButton(this);
+        shut.setImageResource(android.R.drawable.ic_menu_close_clear_cancel);
+        shut.setColorFilter(Color.WHITE);
+        shut.setBackgroundColor(Color.TRANSPARENT);
+        shut.setContentDescription(getString(R.string.view_once_close));
+        shut.setOnClickListener(view -> finish());
+        FrameLayout.LayoutParams corner = new FrameLayout.LayoutParams(close, close, Gravity.TOP | Gravity.END);
+        corner.setMargins(0, pad * 2, pad / 2, 0);
+        frame.addView(shut, corner);
+
+        countdown = new TextView(this);
+        countdown.setTextColor(Color.WHITE);
+        countdown.setTextSize(16);
+        countdown.setShadowLayer(4, 0, 0, Color.BLACK);
+        countdown.setGravity(Gravity.CENTER_VERTICAL);
+        FrameLayout.LayoutParams beside = new FrameLayout.LayoutParams(-2, close, Gravity.TOP | Gravity.END);
+        beside.setMargins(0, pad * 2, close + pad / 2, 0);
+        frame.addView(countdown, beside);
     }
 
     /** Who is looking and when, across the picture: a photo of the screen taken with another phone still says. */
@@ -173,13 +222,22 @@ public final class ViewOnceActivity extends Activity {
 
     private void tick() {
         if (isFinishing()) return;
-        if (left <= 0) {
-            finish();
-            return;
+        float share;
+        if (timerMs > 0) {
+            long remaining = endsAt - android.os.SystemClock.uptimeMillis();
+            if (remaining <= 0) {
+                finish();
+                return;
+            }
+            share = remaining / (float) timerMs;
+            countdown.setText(String.valueOf((remaining + 999) / 1000));
+        } else {
+            // A video or voice note with no timer: the bar follows what is left of it.
+            int length = video.getDuration();
+            share = length > 0 ? 1f - video.getCurrentPosition() / (float) length : 1f;
         }
-        countdown.setText(String.valueOf(left));
-        left--;
-        main.postDelayed(this::tick, 1000);
+        progress.setProgress(Math.round(Math.max(0f, Math.min(1f, share)) * 1000));
+        main.postDelayed(this::tick, FRAME_MS);
     }
 
     /** Decoded no larger than the screen: a 48-megapixel photo held whole would not fit in memory. */
