@@ -316,6 +316,23 @@ describe("enforcing a linked player", () => {
         expect(report.kicked).toEqual(["AdaMC"]);
     });
 
+    it("kicks a player whose chat quotes an allowed login address", async () => {
+        config = { bindAddresses: true };
+        await service.grantPlayerAccess(OWNER, SERVER, OWNER, {
+            username: "Bob",
+            address: "5.5.5.5"
+        });
+        online = ["Bob"];
+        joinLog = [
+            joined("Bob", "8.8.8.8"),
+            `[00:42:00 INFO]: <Bob> ${joined("Bob", "5.5.5.5")}`
+        ].join("\n");
+        const report = await service.enforcePlayerAddresses(OWNER, SERVER);
+        expect(report.kicked).toEqual(["Bob"]);
+        expect(report.unknown).toEqual([]);
+        expect(commands.at(-1)?.slice(0, 2)).toEqual(["kick", "Bob"]);
+    });
+
     it("reads the gateway as no address only while the relay serves", async () => {
         config = { bindAddresses: true };
         await service.grantPlayerAccess(OWNER, SERVER, OWNER, {
