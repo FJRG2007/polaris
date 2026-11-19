@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Holding the icon: the way to another Polaris, even while this one does not answer. -->
+<!-- Holding the icon: the list of Polaris servers, even while the one open does not answer. -->
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
         android:enabled="true"
@@ -9,7 +9,7 @@
         android:shortcutLongLabel="@string/change_server">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetClass="app.polaris.mobile.ServerActivity"
+            android:targetClass="app.polaris.mobile.HostsActivity"
             android:targetPackage="app.polaris.mobile" />
     </shortcut>
 </shortcuts>

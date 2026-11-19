@@ -37,4 +37,22 @@
     <string name="door_list_failed">No se han podido leer tus puertas. Revisa la conexión y vuelve a probar.</string>
     <string name="door_signed_out">Abre Polaris e inicia sesión primero.</string>
     <string name="door_open_app">Abrir Polaris</string>
+    <string name="hosts_title">Tus servidores Polaris</string>
+    <string name="hosts_hint">Cada uno mantiene su propia sesión. Toca uno para abrirlo.</string>
+    <string name="hosts_add">Añadir un Polaris</string>
+    <string name="hosts_current">Abierto ahora - %1$s</string>
+    <string name="hosts_open">Abrir %1$s</string>
+    <string name="hosts_rename">Renombrar</string>
+    <string name="hosts_rename_title">Nombre de este Polaris</string>
+    <string name="hosts_remove">Quitar</string>
+    <string name="hosts_remove_title">¿Quitar %1$s?</string>
+    <string name="hosts_remove_message">Este móvil cierra la sesión y lo olvida. Puedes volver a añadirlo después.</string>
+    <string name="hosts_save">Guardar</string>
+    <string name="hosts_cancel">Cancelar</string>
+    <string name="notices_channel_sign_in">Solicitudes de inicio de sesión</string>
+    <string name="sign_in_approve">Aprobar</string>
+    <string name="sign_in_deny">Rechazar</string>
+    <string name="sign_in_approved">Inicio de sesión aprobado</string>
+    <string name="sign_in_denied">Inicio de sesión rechazado</string>
+    <string name="sign_in_failed">No se pudo enviar tu respuesta. Responde desde el dispositivo que inicia sesión.</string>
 </resources>

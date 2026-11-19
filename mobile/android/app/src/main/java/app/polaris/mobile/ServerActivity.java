@@ -1,7 +1,6 @@
 package app.polaris.mobile;
 
 import android.app.Activity;
-import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -16,8 +15,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /**
- * Where the phone is told which Polaris to open: one field for the address, checked against the server before it is
- * kept, with the reason on screen when it is not one.
+ * Where the phone is told about a Polaris to open: one field for the address, checked against the server before it
+ * is added to the list, with the reason on screen when it is not one. The one added opens straight away.
  */
 public final class ServerActivity extends Activity {
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
@@ -37,8 +36,6 @@ public final class ServerActivity extends Activity {
         connect = findViewById(R.id.connect);
         busy = findViewById(R.id.busy);
         problem = findViewById(R.id.problem);
-        String current = ServerStore.origin(this);
-        if (current != null) address.setText(current);
         connect.setOnClickListener(view -> submit());
         address.setOnEditorActionListener((view, action, event) -> {
             boolean enter = event != null && event.getKeyCode() == KeyEvent.KEYCODE_ENTER;
@@ -65,8 +62,8 @@ public final class ServerActivity extends Activity {
                 if (mine != attempt || isFinishing()) return;
                 setBusy(false);
                 if (verdict == ServerProbe.Verdict.POLARIS) {
-                    ServerStore.save(this, origin);
-                    startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP));
+                    ServerStore.add(this, origin);
+                    MainActivity.reopen(this);
                     finish();
                 } else {
                     show(getString(reason(verdict)));

@@ -1,0 +1,1 @@
+Aprueba un inicio de sesión desde el móvil: "¿Eres tú?" llega como notificación con Aprobar y Rechazar. Las llaves de acceso funcionan dentro de la app. Guarda varios servidores Polaris, cada uno con su sesión, y cambia entre ellos.

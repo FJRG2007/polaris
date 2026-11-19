@@ -10,10 +10,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
+import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
-import android.webkit.CookieManager;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -35,8 +35,11 @@ public final class NoticeService extends Service {
     private static final String CONNECTION = "connection";
     private static final String MESSAGES = "messages";
     private static final String CALLS = "calls";
+    static final String SIGN_IN = "sign_in";
     private static final int RUNNING_ID = 1;
-    private static final int NOTICE_ID = 2;
+    static final int NOTICE_ID = 2;
+    /** What came of an answer to a sign-in, under the request's own tag. */
+    static final int RESULT_ID = 3;
     private static final long MAX_BACKOFF_MS = 60_000;
 
     /** Whether the app is on screen, where the page already says it. */
@@ -44,6 +47,14 @@ public final class NoticeService extends Service {
 
     private volatile boolean running;
     private Thread worker;
+    /** The connection open now, closed when the service stops: another Polaris chosen must not keep this one. */
+    private volatile HttpURLConnection current;
+
+    /** Stops listening to the Polaris it was connected to; the next start connects to the one open now. */
+    static void restart(Context context) {
+        context.stopService(new Intent(context, NoticeService.class));
+        start(context);
+    }
 
     /** Starts it, when there is a Polaris to listen to and Android lets notifications through. */
     static void start(Context context) {
@@ -89,6 +100,7 @@ public final class NoticeService extends Service {
         manager.createNotificationChannel(connection);
         manager.createNotificationChannel(new NotificationChannel(MESSAGES, getString(R.string.notices_channel_messages), NotificationManager.IMPORTANCE_HIGH));
         manager.createNotificationChannel(new NotificationChannel(CALLS, getString(R.string.notices_channel_calls), NotificationManager.IMPORTANCE_HIGH));
+        manager.createNotificationChannel(new NotificationChannel(SIGN_IN, getString(R.string.notices_channel_sign_in), NotificationManager.IMPORTANCE_HIGH));
     }
 
     private void listen() {
@@ -119,6 +131,7 @@ public final class NoticeService extends Service {
     private int read(String origin) throws IOException {
         String address = origin + "/api/mobile/notices";
         HttpURLConnection connection = (HttpURLConnection) new URL(address).openConnection();
+        current = connection;
         try {
             connection.setInstanceFollowRedirects(false);
             connection.setConnectTimeout(15_000);
@@ -126,7 +139,7 @@ public final class NoticeService extends Service {
             connection.setReadTimeout(60_000);
             connection.setRequestProperty("Accept", "text/event-stream");
             connection.setRequestProperty("User-Agent", AppAgent.of(this));
-            String cookie = CookieManager.getInstance().getCookie(address);
+            String cookie = HostProfiles.cookieFor(this, address);
             if (cookie != null) connection.setRequestProperty("Cookie", cookie);
             int status = connection.getResponseCode();
             if (status != 200) return status;
@@ -153,8 +166,13 @@ public final class NoticeService extends Service {
             String kind = notice.optString("kind");
             String tag = notice.optString("tag");
             NotificationManager manager = getSystemService(NotificationManager.class);
-            if ("call-ended".equals(kind)) {
+            if ("call-ended".equals(kind) || "sign-in-ended".equals(kind)) {
                 manager.cancel(tag, NOTICE_ID);
+                return;
+            }
+            // Somebody signing in elsewhere, asking this phone: shown even with the app open, the page is elsewhere.
+            if ("sign-in".equals(kind)) {
+                askSignIn(manager, origin, notice);
                 return;
             }
             // On screen, the page already showed it.
@@ -175,6 +193,42 @@ public final class NoticeService extends Service {
         }
     }
 
+    /** "Is this you?", with the answer on the notification itself. */
+    private void askSignIn(NotificationManager manager, String origin, JSONObject notice) {
+        String id = notice.optString("approvalId");
+        String tag = notice.optString("tag");
+        if (!id.matches("[0-9a-f-]{36}") || tag.isEmpty()) return;
+        long left = notice.optLong("expiresAt", 0) - System.currentTimeMillis();
+        if (left <= 0) return;
+        Notification.Builder built = new Notification.Builder(this, SIGN_IN)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(notice.optString("title"))
+                .setContentIntent(open(Uri.parse(origin + "/account/sessions"), tag.hashCode()))
+                .setCategory(Notification.CATEGORY_STATUS)
+                .setTimeoutAfter(left)
+                .addAction(answer(origin, id, tag, "approve", R.string.sign_in_approve))
+                .addAction(answer(origin, id, tag, "deny", R.string.sign_in_deny));
+        String body = notice.optString("body");
+        if (!body.isEmpty()) built.setContentText(body).setStyle(new Notification.BigTextStyle().bigText(body));
+        manager.notify(tag, NOTICE_ID, built.build());
+    }
+
+    private Notification.Action answer(String origin, String id, String tag, String decision, int label) {
+        Intent intent = new Intent(this, SignInAnswer.class)
+                .setAction(SignInAnswer.ACTION)
+                .putExtra(SignInAnswer.EXTRA_ID, id)
+                .putExtra(SignInAnswer.EXTRA_DECISION, decision)
+                .putExtra(SignInAnswer.EXTRA_ORIGIN, origin)
+                .putExtra(SignInAnswer.EXTRA_TAG, tag);
+        PendingIntent pending = PendingIntent.getBroadcast(this, (id + decision).hashCode(), intent,
+                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+        Notification.Action.Builder action = new Notification.Action.Builder(
+                Icon.createWithResource(this, R.drawable.ic_notification), getString(label), pending);
+        // Unlocked first: nobody answers from a locked phone left on a desk.
+        if (Build.VERSION.SDK_INT >= 31) action.setAuthenticationRequired(true);
+        return action.build();
+    }
+
     private PendingIntent open(Uri page, int request) {
         Intent intent = new Intent(this, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         if (page != null) intent.setAction(Intent.ACTION_VIEW).setData(page);
@@ -185,6 +239,8 @@ public final class NoticeService extends Service {
     public void onDestroy() {
         running = false;
         if (worker != null) worker.interrupt();
+        HttpURLConnection connection = current;
+        if (connection != null) new Thread(connection::disconnect, "notices-close").start();
         super.onDestroy();
     }
 

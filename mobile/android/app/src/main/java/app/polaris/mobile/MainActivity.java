@@ -6,6 +6,7 @@ import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.ActivityNotFoundException;
 import android.content.ClipData;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -30,6 +31,8 @@ import android.widget.Button;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.webkit.WebSettingsCompat;
+import androidx.webkit.WebViewFeature;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,11 +49,13 @@ public final class MainActivity extends Activity {
     private static final int MEDIA_PERMISSIONS = 2;
     private static final int CAMERA_FOR_PICK = 3;
     private static final int NOTIFICATIONS = 4;
+    private static final String SAVED_HOST = "polaris.host";
 
     private WebView web;
     private View failure;
     private TextView failureText;
     private ProgressBar loading;
+    private ServerStore.Host host;
     private String origin;
     private ValueCallback<Uri[]> picking;
     private PermissionRequest asking;
@@ -66,12 +71,15 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle saved) {
         super.onCreate(saved);
-        origin = ServerStore.origin(this);
-        if (origin == null) {
+        // Before any WebView exists: a removed Polaris's profile can only be deleted while nothing has it open.
+        HostProfiles.sweep(this);
+        host = ServerStore.active(this);
+        if (host == null) {
             startActivity(new Intent(this, ServerActivity.class));
             finish();
             return;
         }
+        origin = host.origin;
         setContentView(R.layout.activity_main);
         SystemInsets.pad(findViewById(R.id.root));
         web = findViewById(R.id.web);
@@ -87,7 +95,9 @@ public final class MainActivity extends Activity {
         change.setOnClickListener(view -> changeServer());
 
         configure(web);
-        if (saved != null) web.restoreState(saved);
+        // A page saved for another Polaris is not restored into this one's window.
+        if (saved != null && host.id.equals(saved.getString(SAVED_HOST))) web.restoreState(saved);
+        else saved = null;
         if (saved == null || web.getUrl() == null) web.loadUrl(start(getIntent()));
         UpdateCheck.maybeRun(this);
         listenForNotices();
@@ -112,6 +122,8 @@ public final class MainActivity extends Activity {
 
     @SuppressLint("SetJavaScriptEnabled")
     private void configure(WebView view) {
+        // First, before anything else touches the WebView: which Polaris's cookies and storage the page sees.
+        HostProfiles.apply(view, host);
         WebSettings settings = view.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
@@ -124,8 +136,13 @@ public final class MainActivity extends Activity {
         settings.setSupportMultipleWindows(false);
         // How the instance tells this app from a browser on its sessions screen.
         settings.setUserAgentString(AppAgent.of(this));
+        // Passkeys on the page, answered by the phone's own credential manager (the instance publishes the app in
+        // its Digital Asset Links, which is what lets this app use its passkeys).
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_AUTHENTICATION)) {
+            WebSettingsCompat.setWebAuthenticationSupport(settings, WebSettingsCompat.WEB_AUTHENTICATION_SUPPORT_FOR_APP);
+        }
 
-        CookieManager cookies = CookieManager.getInstance();
+        CookieManager cookies = HostProfiles.cookies(host);
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(view, true);
 
@@ -157,7 +174,7 @@ public final class MainActivity extends Activity {
         @Override
         public void onPageFinished(WebView view, String url) {
             loading.setVisibility(View.GONE);
-            CookieManager.getInstance().flush();
+            HostProfiles.cookies(host).flush();
         }
 
         @Override
@@ -367,7 +384,7 @@ public final class MainActivity extends Activity {
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name);
         if (ServerAddress.sameOrigin(origin, url)) {
-            String cookie = CookieManager.getInstance().getCookie(url);
+            String cookie = HostProfiles.cookies(host).getCookie(url);
             if (cookie != null) request.addRequestHeader("Cookie", cookie);
         }
         DownloadManager manager = getSystemService(DownloadManager.class);
@@ -385,21 +402,32 @@ public final class MainActivity extends Activity {
     }
 
     void changeServer() {
-        startActivity(new Intent(this, ServerActivity.class));
+        startActivity(new Intent(this, HostsActivity.class));
+    }
+
+    /**
+     * Opens the Polaris chosen now in a new window. A WebView's profile is fixed once it has loaded a page, so another
+     * Polaris is never loaded into this one: the old window goes, and its notices connection with it.
+     */
+    static void reopen(Context context) {
+        NoticeService.restart(context);
+        context.startActivity(new Intent(context, MainActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
+    }
+
+    /** Whether another Polaris was chosen since this window opened; if so it has been reopened on that one. */
+    private boolean hostChanged() {
+        ServerStore.Host next = ServerStore.active(this);
+        if (next == null || next.id.equals(host.id)) return false;
+        reopen(this);
+        return true;
     }
 
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        String next = ServerStore.origin(this);
-        if (next != null && !next.equals(origin)) {
-            // Pointed at another Polaris: start over there.
-            origin = next;
-            web.clearHistory();
-            web.loadUrl(origin + "/");
-        } else if (intent.getData() != null) {
-            web.loadUrl(start(intent));
-        }
+        if (web == null || hostChanged()) return;
+        if (intent.getData() != null) web.loadUrl(start(intent));
     }
 
     @Override
@@ -415,18 +443,16 @@ public final class MainActivity extends Activity {
         // Signed in since the last time it ran, or stopped while signed out: it reconnects with the session now held.
         NoticeService.start(this);
         DoorWidget.redrawAll(this);
-        String next = ServerStore.origin(this);
-        if (web != null && next != null && !next.equals(origin)) {
-            origin = next;
-            web.clearHistory();
-            web.loadUrl(origin + "/");
-        }
+        if (web != null) hostChanged();
     }
 
     @Override
     protected void onSaveInstanceState(Bundle out) {
         super.onSaveInstanceState(out);
-        if (web != null) web.saveState(out);
+        if (web != null) {
+            web.saveState(out);
+            out.putString(SAVED_HOST, host.id);
+        }
     }
 
     /**

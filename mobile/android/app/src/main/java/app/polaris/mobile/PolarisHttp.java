@@ -1,7 +1,6 @@
 package app.polaris.mobile;
 
 import android.content.Context;
-import android.webkit.CookieManager;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -65,7 +64,7 @@ final class PolarisHttp {
             connection.setConnectTimeout(15000);
             connection.setReadTimeout(60000);
             connection.setRequestMethod(method);
-            String cookie = CookieManager.getInstance().getCookie(address);
+            String cookie = HostProfiles.cookieFor(context, address);
             if (cookie != null) connection.setRequestProperty("Cookie", cookie);
             connection.setRequestProperty("User-Agent", AppAgent.of(context));
             if (json != null) {

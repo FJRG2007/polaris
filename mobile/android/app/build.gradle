@@ -10,8 +10,8 @@ android {
         applicationId 'app.polaris.mobile'
         minSdk 26
         targetSdk 36
-        versionCode 5
-        versionName '0.1.4'
+        versionCode 6
+        versionName '0.1.5'
     }
 
     signingConfigs {
@@ -50,6 +50,9 @@ android {
 }
 
 dependencies {
+    // WebView features newer than the phone's Android: passkeys inside the page, and one cookie jar per Polaris.
+    implementation 'androidx.webkit:webkit:1.18.0'
+
     // Test only (never in the APK): plain JVM tests for the address and the server check, src/test.
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20240303'

@@ -3,8 +3,8 @@ package app.polaris.mobile;
 import android.webkit.JavascriptInterface;
 
 /**
- * What the page can ask of the app, as `window.polarisMobile`: which app and version it is running in, the way back to
- * the address screen, where the last picked file came from, and opening a photo sent to be seen once. Nothing here
+ * What the page can ask of the app, as `window.polarisMobile`: which app and version it is running in, the way to the
+ * list of Polaris servers, where the last picked file came from, and opening a photo sent to be seen once. Nothing here
  * hands the page anything it could not already see: a view-once file is fetched and shown by the app, never given to
  * the page.
  */

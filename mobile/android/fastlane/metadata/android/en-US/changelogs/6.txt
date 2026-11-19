@@ -1,0 +1,1 @@
+Approve a sign-in from the phone: "Is this you?" arrives as a notification with Approve and Deny. Passkeys work inside the app. Keep several Polaris servers, each signed in on its own, and switch between them.

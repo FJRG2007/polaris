@@ -39,4 +39,22 @@
     <string name="door_list_failed">Your doors could not be read. Check your connection and try again.</string>
     <string name="door_signed_out">Open Polaris and sign in first.</string>
     <string name="door_open_app">Open Polaris</string>
+    <string name="hosts_title">Your Polaris servers</string>
+    <string name="hosts_hint">Each one stays signed in on its own. Tap one to open it.</string>
+    <string name="hosts_add">Add a Polaris</string>
+    <string name="hosts_current">Open now - %1$s</string>
+    <string name="hosts_open">Open %1$s</string>
+    <string name="hosts_rename">Rename</string>
+    <string name="hosts_rename_title">Name this Polaris</string>
+    <string name="hosts_remove">Remove</string>
+    <string name="hosts_remove_title">Remove %1$s?</string>
+    <string name="hosts_remove_message">This phone signs out of it and forgets it. You can add it again later.</string>
+    <string name="hosts_save">Save</string>
+    <string name="hosts_cancel">Cancel</string>
+    <string name="notices_channel_sign_in">Sign-in requests</string>
+    <string name="sign_in_approve">Approve</string>
+    <string name="sign_in_deny">Deny</string>
+    <string name="sign_in_approved">Sign-in approved</string>
+    <string name="sign_in_denied">Sign-in denied</string>
+    <string name="sign_in_failed">Your answer could not be sent. Answer from the device signing in instead.</string>
 </resources>
