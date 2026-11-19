@@ -17,12 +17,16 @@
  */
 
 import { useContext } from "react";
-import { Download } from "lucide-react";
+import { Download, ExternalLink } from "lucide-react";
+import type { ReactNode } from "react";
 import { Badge, Button } from "../../index";
 import { useTranslations } from "../../i18n";
 import { pickFile, type AppDownload, type AppFile } from "./app-releases";
 import { BrowserChoice } from "./browser-choice";
 import { browserGuide } from "./browser-guide";
+import { DownloadRow, DownloadRows } from "../download-card";
+import type { AndroidStores } from "./store-listings";
+import { AndroidMark, FDroidMark, GooglePlayMark } from "./client-marks";
 import { DownloadWithGuide } from "./download-guide";
 import type { InstallPlatform } from "./install-platform";
 import { PlatformSelect, useInstallPlatform } from "./platform-select";
@@ -315,5 +319,106 @@ export function ExtensionFilesOffer({
             unreachable={unreachable}
             nothing={t("downloads.noExtensionVersion")}
         />
+    );
+}
+
+/** A store's listing, opened beside the page. */
+function StoreLink({
+    href,
+    primary = false,
+    children
+}: {
+    href: string;
+    /** The way this page recommends, drawn as the one to press. */
+    primary?: boolean;
+    children: ReactNode;
+}) {
+    return (
+        <Button asChild size="sm" variant={primary ? "primary" : "outline"}>
+            <a href={href} target="_blank" rel="noreferrer">
+                {children} <ExternalLink className="size-3.5" />
+            </a>
+        </Button>
+    );
+}
+
+/**
+ * Every way to install Polaris on an Android phone, the best first: Google
+ * Play, which updates it with everything else on the phone; F-Droid, built from
+ * the source; and the APK itself, which the app keeps up to date on its own.
+ * A store appears the day it carries the app (`store-listings`); the APK is
+ * always offered while a release has one.
+ */
+export function AndroidFilesOffer({
+    download,
+    stores,
+    unreachable
+}: {
+    download: AppDownload | null;
+    stores: AndroidStores;
+    /** The repository, when GitHub could not be asked. */
+    unreachable?: string;
+}) {
+    const t = useTranslations("components");
+    const apk = download ? pickFile(download.files, [".apk"]) : null;
+    const first = stores.play ? "play" : stores.fdroid ? "fdroid" : "apk";
+    const recommended = (
+        <Badge variant="neutral" className="shrink-0">
+            {t("downloads.android.recommended")}
+        </Badge>
+    );
+    return (
+        <DownloadRows label={t("downloads.android.title")}>
+            {stores.play ? (
+                <DownloadRow
+                    mark={<GooglePlayMark className="size-4" />}
+                    name="Google Play"
+                    detail={t("downloads.android.playDetail")}
+                    action={
+                        <>
+                            {first === "play" ? recommended : null}
+                            <StoreLink href={stores.play} primary={first === "play"}>{t("downloads.android.open")}</StoreLink>
+                        </>
+                    }
+                />
+            ) : null}
+            {stores.fdroid ? (
+                <DownloadRow
+                    mark={<FDroidMark className="size-4" />}
+                    name="F-Droid"
+                    detail={t("downloads.android.fdroidDetail")}
+                    action={
+                        <>
+                            {first === "fdroid" ? recommended : null}
+                            <StoreLink href={stores.fdroid} primary={first === "fdroid"}>{t("downloads.android.open")}</StoreLink>
+                        </>
+                    }
+                />
+            ) : null}
+            <DownloadRow
+                mark={<AndroidMark className="size-4" />}
+                name={t("downloads.android.apk")}
+                detail={
+                    apk && download
+                        ? t("downloads.android.apkDetail", { version: download.version })
+                        : !download && unreachable
+                          ? t("downloads.android.unreachable")
+                          : t("downloads.android.notReleased")
+                }
+                action={
+                    apk ? (
+                        <Button asChild size="sm" variant={first === "apk" ? "primary" : "outline"}>
+                            <a href={apk.url} download={apk.name}>
+                                <Download className="size-4" /> {t("downloads.download")}
+                            </a>
+                        </Button>
+                    ) : !download && unreachable ? (
+                        <StoreLink href={`https://github.com/${unreachable}/releases`}>
+                            {t("downloads.android.releases")}
+                        </StoreLink>
+                    ) : null
+                }
+            />
+        </DownloadRows>
     );
 }

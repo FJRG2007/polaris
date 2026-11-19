@@ -12,7 +12,9 @@ import { buildOpenApi } from "@/lib/api-docs/openapi";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AppMark, ownAppLogo } from "@/components/app-mark";
 import { STREAMDECK_MARKETPLACE_URL } from "@/lib/deck/marketplace";
+import { androidStores } from "@polaris/ui/account-downloads/store-listings";
 import {
+    ANDROID_TAG_PREFIX,
     appDownload,
     COMPANION_TAG_PREFIX,
     DESKTOP_TAG_PREFIX,
@@ -496,11 +498,16 @@ const tvGallery = tvGallerySources({
     })
 }).filter((source) => existsSync(join(tvDir, source.from)));
 // The same lookup the dashboard's Downloads makes, so the files offered match.
-const [desktop, extension, streamdeck, companion] = await Promise.all(
-    [DESKTOP_TAG_PREFIX, EXTENSION_TAG_PREFIX, STREAMDECK_TAG_PREFIX, COMPANION_TAG_PREFIX].map(
-        (prefix) => appDownload(repo, prefix).catch(() => null)
-    )
+const [desktop, extension, streamdeck, companion, android] = await Promise.all(
+    [
+        DESKTOP_TAG_PREFIX,
+        EXTENSION_TAG_PREFIX,
+        STREAMDECK_TAG_PREFIX,
+        COMPANION_TAG_PREFIX,
+        ANDROID_TAG_PREFIX
+    ].map((prefix) => appDownload(repo, prefix).catch(() => null))
 );
+const stores = await androidStores();
 
 // The feature guides, one page each, in both languages.
 const featuresDir = join(root, "docs", "features");
@@ -714,7 +721,8 @@ const data: site.SiteData = {
     docs: { en: docsEn, es: docsEs },
     docSections: { en: sectionsEn, es: sectionsEs },
     downloadsPage: {
-        files: { desktop, extension, streamdeck, companion },
+        files: { desktop, extension, streamdeck, companion, android },
+        androidStores: stores,
         storeUrl: STREAMDECK_MARKETPLACE_URL,
         tvGallery: tvGallery.map((source) => source.item),
         messages: { en: downloadMessages("en-US"), es: downloadMessages("es-ES") }

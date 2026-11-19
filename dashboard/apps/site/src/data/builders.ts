@@ -11,6 +11,7 @@ import { apiPath } from "./api-pages";
 import type { DocPage, DocSection } from "@/data/docs";
 import type { SearchRecord } from "@/lib/search-index";
 import type { AppDownload } from "@polaris/ui/account-downloads/app-releases";
+import type { AndroidStores } from "@polaris/ui/account-downloads/store-listings";
 import type { TvGalleryItem } from "@polaris/ui/tv-gallery";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { PLATFORM_NAMES, TV_MODELS, TV_PRIVACY } from "@polaris/core/tv-compat";
@@ -580,8 +581,13 @@ export const TV_PRIVACY_SLUG = "polaris-tv-privacy";
 /** What the shared Downloads page is fed with on the site. */
 export interface DownloadsData {
     readonly files: Readonly<
-        Record<"desktop" | "extension" | "streamdeck" | "companion", AppDownload | null>
+        Record<
+            "desktop" | "extension" | "streamdeck" | "companion" | "android",
+            AppDownload | null
+        >
     >;
+    /** Where the Android app is listed, as the stores answered at build time. */
+    readonly androidStores: AndroidStores;
     readonly storeUrl: string | null;
     /** The TV's themes and add-ons, their screenshots under `tv-gallery/`. */
     readonly tvGallery: readonly TvGalleryItem[];

@@ -18,9 +18,9 @@ import { Globe, Monitor, Smartphone, Tv } from "lucide-react";
 import { DownloadCard, DownloadRow, DownloadRows } from "../download-card";
 import { DesktopPreview, PhonePreview, TvPreview } from "./download-previews";
 
-/** The phone systems the mobile card names; product names, the same in every language. */
-// i18n-ignore systems' names
-const MOBILE_SYSTEMS = ["iOS", "Android"] as const;
+/** The phone system with no app yet; a product name, the same in every language. */
+// i18n-ignore system's name
+const IOS = "iOS";
 
 export function DownloadsPage({
     repo,
@@ -29,6 +29,7 @@ export function DownloadsPage({
     extensionFiles,
     deck,
     desktopFiles,
+    mobileFiles,
     tv,
     signedFirefox
 }: {
@@ -44,6 +45,8 @@ export function DownloadsPage({
     /** The Stream Deck card. */
     deck: ReactNode;
     desktopFiles: ReactNode;
+    /** Every way to install it on an Android phone (`AndroidFilesOffer`). */
+    mobileFiles?: ReactNode;
     /**
      * The TV card, where this page can offer its install. Without one, the card
      * still says what Polaris TV is and what installing it takes.
@@ -110,6 +113,33 @@ export function DownloadsPage({
                     </div>
                 </DownloadCard>
 
+                {/* Second, right after the computer: the phone is where most
+                    people carry Polaris. Android first, the best way to install
+                    it at the top; iOS says plainly it is not out yet. */}
+                <DownloadCard
+                    id="mobile"
+                    tint="rose"
+                    icon={<Smartphone className="size-4 shrink-0" />}
+                    title={t("downloads.mobile.title")}
+                    description={t("downloads.mobile.description")}
+                    preview={<PhonePreview />}
+                >
+                    {mobileFiles ?? (
+                        <p className="text-sm text-muted-foreground">
+                            {t("downloads.mobile.elsewhere")}
+                        </p>
+                    )}
+                    <DownloadRows>
+                        <DownloadRow
+                            mark={<SystemMark os={IOS} />}
+                            name={IOS}
+                            action={
+                                <Badge variant="neutral">{t("downloads.mobile.planned")}</Badge>
+                            }
+                        />
+                    </DownloadRows>
+                </DownloadCard>
+
                 {/* Beside the desktop app, since installing on a set goes through
                     it. Where the page cannot drive that install, the card still
                     says what it is and what it takes, with nothing to press. */}
@@ -144,32 +174,6 @@ export function DownloadsPage({
                 <CliSection repo={repo} serverUrl={serverUrl} />
 
                 <AssistantsCard />
-
-                {/* Present, unlinked and honest. A real plan with nothing built,
-                    and saying so is the only thing that can be said about it - a
-                    disabled button implies a file that is nearly ready, which
-                    would be a different and untrue statement. */}
-                <DownloadCard
-                    id="mobile"
-                    tint="rose"
-                    icon={<Smartphone className="size-4 shrink-0" />}
-                    title={t("downloads.later.mobile")}
-                    description={t("downloads.later.mobileHint")}
-                    preview={<PhonePreview />}
-                >
-                    <DownloadRows label={t("downloads.later.title")}>
-                        {MOBILE_SYSTEMS.map((os) => (
-                            <DownloadRow
-                                key={os}
-                                mark={<SystemMark os={os} />}
-                                name={os}
-                                action={
-                                    <Badge variant="neutral">{t("downloads.mobile.planned")}</Badge>
-                                }
-                            />
-                        ))}
-                    </DownloadRows>
-                </DownloadCard>
             </div>
         </div>
     );

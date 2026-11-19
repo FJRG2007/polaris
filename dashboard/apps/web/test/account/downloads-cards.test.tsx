@@ -149,7 +149,7 @@ describe("the page", () => {
         expect(source).toContain('className="lg:col-span-2"');
     });
 
-    it("installs from the browser as a row of the desktop card, with the TV card next", async () => {
+    it("installs from the browser as a row of the desktop card, with the phone and then the TV next", async () => {
         const layout = await readFile(
             `${SRC}../../../packages/ui/src/downloads/account/downloads-page.tsx`,
             "utf8"
@@ -157,18 +157,20 @@ describe("the page", () => {
         const desktop = layout.indexOf('id="desktop"');
         const app = layout.indexOf('id="app"');
         const tv = layout.indexOf("{tv ?? (");
+        const phone = layout.indexOf('id="mobile"');
         // Inside the desktop card, before it closes.
         expect(app).toBeGreaterThan(desktop);
         expect(app).toBeLessThan(layout.indexOf("</DownloadCard>", desktop));
         expect(layout.slice(app, tv)).toContain("<DownloadRow");
-        // The place it freed goes to the TV, ahead of every other card.
-        expect(tv).toBeGreaterThan(app);
+        // The phone comes straight after the computer, then the TV, ahead of every other card.
+        expect(phone).toBeGreaterThan(app);
+        expect(tv).toBeGreaterThan(phone);
         expect(tv).toBeLessThan(layout.indexOf("<ExtensionCard"));
         // A page with no TV slot, the public site, still draws the card.
         expect(layout.slice(tv)).toContain('id="tv"');
     });
 
-    it("offers no download for a phone, only the plain fact that it is planned", async () => {
+    it("offers Android through its own slot, and iOS only as planned", async () => {
         const source =
             await // The page and the shared layout it renders, which the public site draws too.
             Promise.all([
@@ -178,8 +180,10 @@ describe("the page", () => {
                     "utf8"
                 )
             ]).then((parts) => parts.join(" "));
-        const mobile = source.slice(source.indexOf('id="mobile"'));
+        const mobile = source.slice(source.indexOf('id="mobile"'), source.indexOf("{tv ?? ("));
+        expect(mobile).toContain("{mobileFiles ?? (");
         expect(mobile).toContain('t("downloads.mobile.planned")');
         expect(mobile).not.toContain("href=");
+        expect(source).toContain("mobileFiles={");
     });
 });

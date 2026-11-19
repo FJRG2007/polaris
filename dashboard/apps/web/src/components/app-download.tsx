@@ -14,7 +14,9 @@
  * the half above it does nothing but await.
  */
 
+import { androidStores } from "@polaris/ui/account-downloads/store-listings";
 import {
+    ANDROID_TAG_PREFIX,
     DESKTOP_TAG_PREFIX,
     EXTENSION_TAG_PREFIX,
     appLookup,
@@ -22,13 +24,20 @@ import {
     extensionDownload
 } from "@/lib/app-releases";
 import {
+    AndroidFilesOffer,
     DesktopDownloadOffer,
     DesktopFilesOffer,
     ExtensionDownloadOffer,
     ExtensionFilesOffer
 } from "@/components/app-download-offers";
 
-export { DesktopDownloadOffer, DesktopFilesOffer, ExtensionDownloadOffer, ExtensionFilesOffer };
+export {
+    AndroidFilesOffer,
+    DesktopDownloadOffer,
+    DesktopFilesOffer,
+    ExtensionDownloadOffer,
+    ExtensionFilesOffer
+};
 
 /** The same, once GitHub has answered. Render inside a Suspense boundary. */
 export async function DesktopDownload({ repo }: { repo: string }) {
@@ -50,4 +59,20 @@ export async function DesktopFiles({ repo }: { repo: string }) {
 export async function ExtensionFiles({ repo }: { repo: string }) {
     const { download, reached } = await appLookup(repo, EXTENSION_TAG_PREFIX);
     return <ExtensionFilesOffer download={download} unreachable={reached ? undefined : repo} />;
+}
+
+/** Every way to install it on Android, once GitHub and the stores have answered.
+ *  Render inside a Suspense boundary. */
+export async function AndroidFiles({ repo }: { repo: string }) {
+    const [{ download, reached }, stores] = await Promise.all([
+        appLookup(repo, ANDROID_TAG_PREFIX),
+        androidStores()
+    ]);
+    return (
+        <AndroidFilesOffer
+            download={download}
+            stores={stores}
+            unreachable={reached ? undefined : repo}
+        />
+    );
 }

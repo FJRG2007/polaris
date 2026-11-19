@@ -211,6 +211,10 @@
             "types": "./src/downloads/account/app-releases.ts",
             "import": "./src/downloads/account/app-releases.ts"
         },
+        "./account-downloads/store-listings": {
+            "types": "./src/downloads/account/store-listings.ts",
+            "import": "./src/downloads/account/store-listings.ts"
+        },
         "./account-downloads/app-link": {
             "types": "./src/downloads/account/app-link.tsx",
             "import": "./src/downloads/account/app-link.tsx"

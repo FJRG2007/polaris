@@ -31,7 +31,7 @@ import { DownloadsPage as DownloadsView } from "@polaris/ui/account-downloads/do
 import { requireUser } from "@/lib/session";
 import { publicAppUrl } from "@/lib/domain-service";
 import { InstallAppOffer, NativeAppOffer } from "@/components/installed-app";
-import { DesktopFiles, ExtensionFiles } from "@/components/app-download";
+import { AndroidFiles, DesktopFiles, ExtensionFiles } from "@/components/app-download";
 import { FIREFOX_PACKAGE_ROUTE } from "@/lib/extension-package";
 import { signedFirefoxFile } from "@polaris/ui/account-downloads/extension-install";
 import {
@@ -139,6 +139,11 @@ export default async function DownloadsPage() {
                         </Suspense>
                     }
                 />
+            }
+            mobileFiles={
+                <Suspense fallback={<FilesSkeleton />}>
+                    <AndroidFiles repo={repo} />
+                </Suspense>
             }
             desktopFiles={
                 <NativeAppOffer>

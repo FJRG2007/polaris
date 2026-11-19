@@ -1392,6 +1392,18 @@
         "onlyMatches": "Only show matching lines"
     },
     "downloads": {
+        "android": {
+            "title": "Android",
+            "recommended": "Recommended",
+            "open": "Open",
+            "playDetail": "Updates with the rest of your apps.",
+            "fdroidDetail": "Built from the source code by F-Droid.",
+            "apk": "APK file",
+            "apkDetail": "Version {version}. The app offers each new version itself.",
+            "notReleased": "Not released yet.",
+            "unreachable": "GitHub did not answer just now.",
+            "releases": "Releases"
+        },
         "desktopVersion": "Download the desktop app {version}",
         "desktop": "Download the desktop app",
         "notReleased": "Not released yet. Installing Polaris above is how to have it in a window of its own today, and it updates with Polaris itself.",

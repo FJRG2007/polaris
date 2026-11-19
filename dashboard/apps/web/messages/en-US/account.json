@@ -1515,11 +1515,6 @@
                 "safari": "Safari only takes extensions that come inside a Mac app signed by Apple, and Polaris has none yet. Chrome, Edge, Brave, Opera and Firefox work today."
             }
         },
-        "later": {
-            "title": "Not here yet",
-            "mobile": "Android and iOS",
-            "mobileHint": "No app yet. Installing Polaris as an app above puts it on your home screen from the browser, which is most of the way there."
-        },
         "command": {
             "title": "One line, and it keeps itself up to date",
             "system": "Which system you are installing on",
@@ -1630,6 +1625,9 @@
             "all": "See all {count} assistants"
         },
         "mobile": {
+            "title": "Polaris for phones",
+            "description": "Chat, calls and everything else on your phone, with notifications while the app is closed.",
+            "elsewhere": "The Android app is listed with its files on the Downloads page of your Polaris.",
             "planned": "Planned"
         },
         "preview": {

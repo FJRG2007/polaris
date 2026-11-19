@@ -1392,6 +1392,18 @@
         "onlyMatches": "Solo las líneas que coinciden"
     },
     "downloads": {
+        "android": {
+            "title": "Android",
+            "recommended": "Recomendada",
+            "open": "Abrir",
+            "playDetail": "Se actualiza con el resto de tus apps.",
+            "fdroidDetail": "F-Droid la compila desde el código fuente.",
+            "apk": "Archivo APK",
+            "apkDetail": "Versión {version}. La propia app ofrece cada versión nueva.",
+            "notReleased": "Aún no publicada.",
+            "unreachable": "GitHub no ha respondido ahora mismo.",
+            "releases": "Versiones"
+        },
         "desktopVersion": "Descargar la app de escritorio {version}",
         "desktop": "Descargar la app de escritorio",
         "notReleased": "Aún no se ha publicado. Instalar Polaris arriba es la forma de tenerlo hoy en su propia ventana, y se actualiza con el propio Polaris.",

@@ -53,6 +53,7 @@ export const EXTENSION_TAG_PREFIX = "extension-v";
 export const STREAMDECK_TAG_PREFIX = "streamdeck-v";
 export const COMPANION_TAG_PREFIX = "companion-v";
 export const TV_TAG_PREFIX = "tv-v";
+export const ANDROID_TAG_PREFIX = "android-v";
 
 /** One release, in the fields this module reads. Everything is `unknown` because
  *  it arrives from the network and is checked here rather than trusted. */
@@ -183,7 +184,8 @@ const KNOWN_PREFIXES = [
     EXTENSION_TAG_PREFIX,
     STREAMDECK_TAG_PREFIX,
     COMPANION_TAG_PREFIX,
-    TV_TAG_PREFIX
+    TV_TAG_PREFIX,
+    ANDROID_TAG_PREFIX
 ] as const;
 
 /** How soon a lookup that failed is tried again. Short, because the failure is
@@ -371,6 +373,11 @@ export async function companionDownload(repo: string): Promise<AppDownload | nul
 /** Polaris TV, as the APK the desktop app sideloads onto a set. */
 export async function tvDownload(repo: string): Promise<AppDownload | null> {
     return appDownload(repo, TV_TAG_PREFIX);
+}
+
+/** Polaris for Android phones, as the signed APK of an `android-v*` release. */
+export async function androidDownload(repo: string): Promise<AppDownload | null> {
+    return appDownload(repo, ANDROID_TAG_PREFIX);
 }
 
 /**

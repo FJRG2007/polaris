@@ -22,6 +22,7 @@ import { AppHrefProvider } from "@polaris/ui/account-downloads/app-link";
 import { DeckCard, DeckFile } from "@polaris/ui/account-downloads/deck-card";
 import { DownloadsPage } from "@polaris/ui/account-downloads/downloads-page";
 import {
+    AndroidFilesOffer,
     DesktopFilesOffer,
     ExtensionFilesOffer
 } from "@polaris/ui/account-downloads/app-download-offers";
@@ -76,6 +77,9 @@ export function SiteDownloads({
                         />
                     }
                     desktopFiles={<DesktopFilesOffer download={files.desktop} />}
+                    mobileFiles={
+                        <AndroidFilesOffer download={files.android} stores={data.androidStores} />
+                    }
                 />
             </AppHrefProvider>
             <section
