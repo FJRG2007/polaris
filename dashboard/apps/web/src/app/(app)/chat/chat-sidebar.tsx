@@ -22,6 +22,7 @@
  */
 
 import Link from "next/link";
+import { TypingWatch, useTypingIn, type ListTypist } from "./typing-everywhere";
 import * as actions from "./actions";
 import { useChat } from "./chat-context";
 import { Elsewhere } from "./elsewhere";
@@ -527,6 +528,7 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
 
     return (
         <div className="flex h-full min-h-0 flex-col">
+            <TypingWatch />
             <div className="flex h-header shrink-0 items-center justify-between gap-2 border-b border-border px-3">
                 <span className="min-w-0 truncate text-sm font-semibold" title={space?.name}>
                     {space?.name ?? t("sidebar.directMessages")}
@@ -1436,11 +1438,16 @@ function Row({
      * that grows to three lines pushes the conversation below it off the screen.
      */
     // Or, when they said nothing, what they are playing or listening to.
-    const said = presenceLine(
+    const presence = presenceLine(
         usePresence(personId),
         useTranslations("components"),
         useDisplayFormat()
     );
+    const { viewerId: me } = useChat();
+    // Somebody writing here says so in place of the presence line, as Discord's
+    // list does; the detailed row puts it in place of the last message.
+    const typing = typingLine(useTypingIn(channel?.id ?? "", me), channel?.others.length === 1, t);
+    const said = typing ?? presence;
     const row = (
         <PersonRow
             as={Link}
@@ -1488,6 +1495,7 @@ function Row({
                             <span
                                 className={cn(
                                     "min-w-0 truncate text-[0.6875rem] text-foreground-subtle",
+                                    typing && "text-primary",
                                     roomy && "text-[0.75rem] md:text-[0.6875rem]"
                                 )}
                                 title={said}
@@ -1637,6 +1645,27 @@ function ListViewMenu({
 }
 
 /** What the last message says, in the words a list row has room for. */
+/**
+ * What the list says while somebody is writing: "typing..." in a conversation
+ * with one other person, who is named by the row already; who it is in a group.
+ * Null when nobody is.
+ */
+function typingLine(
+    typists: readonly ListTypist[],
+    oneToOne: boolean,
+    t: ReturnType<typeof useTranslations>
+): string | null {
+    if (typists.length === 0) return null;
+    const recording = typists.some((entry) => entry.activity === "recording");
+    if (oneToOne) return t(recording ? "listView.recording" : "listView.typing");
+    const doing = recording ? "recording" : "typing";
+    return typists.length === 1
+        ? t(`typing.${doing}One`, { name: typists[0]!.name })
+        : typists.length === 2
+          ? t(`typing.${doing}Two`, { first: typists[0]!.name, second: typists[1]!.name })
+          : t(`typing.${doing}Many`);
+}
+
 function previewText(
     last: NonNullable<ChatChannelView["last"]>,
     t: ReturnType<typeof useTranslations>
@@ -1679,7 +1708,8 @@ function DetailedLine({
                 : (channel.others.find((person) => person.id === last.authorId)?.name ?? "")
             : "";
     const text = last ? previewText(last, t) : "";
-    const line = sender && text ? t("listView.from", { sender, text }) : text;
+    const typing = typingLine(useTypingIn(channel.id, viewerId), oneToOne, t);
+    const line = typing ?? (sender && text ? t("listView.from", { sender, text }) : text);
     return (
         <span className="flex min-w-0 flex-1 flex-col gap-0.5 leading-tight">
             <span className="flex min-w-0 items-baseline gap-2">
@@ -1716,7 +1746,10 @@ function DetailedLine({
                         <Check className="size-3.5 shrink-0" aria-label={t("listView.sent")} />
                     )
                 ) : null}
-                <span className="min-w-0 flex-1 truncate" title={line || undefined}>
+                <span
+                    className={cn("min-w-0 flex-1 truncate", typing && "text-primary")}
+                    title={line || undefined}
+                >
                     {line}
                 </span>
                 {channel.locked && (

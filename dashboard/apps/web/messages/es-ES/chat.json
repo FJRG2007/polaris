@@ -2260,6 +2260,8 @@
         "yesterday": "Ayer",
         "you": "Tú",
         "from": "{sender}: {text}",
+        "typing": "escribiendo...",
+        "recording": "grabando audio...",
         "deleted": "Mensaje eliminado",
         "call": "Llamada",
         "poll": "Encuesta",
