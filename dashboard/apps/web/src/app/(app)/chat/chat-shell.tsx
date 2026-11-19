@@ -22,6 +22,7 @@ import { ChatSidebar } from "./chat-sidebar";
 import { ChatLockProvider } from "./lock-dialogs";
 import { usePathname, useRouter } from "next/navigation";
 import { usePhone } from "@/components/use-phone";
+import { useOwnBottomTabs } from "@/components/phone-tabs";
 import { MessageSquare, Server, Video } from "lucide-react";
 import { phoneChatTab, phoneTabBadges, type PhoneChatTab } from "./phone-chat";
 import { useChatPane } from "./use-chat-pane";
@@ -132,6 +133,9 @@ function ChatColumns({ children }: { children: ReactNode }) {
     const calls = pathname === "/chat/meetings";
     // Inside a conversation the conversation owns the screen; the meetings list
     // is the Calls tab, not a conversation, so the bar stays under it.
+    // Chat draws its own tabs, and none at all inside a conversation, so the
+    // shell's bar steps aside for the whole app.
+    useOwnBottomTabs();
     const tabsShown = phone && (!inConversation || calls);
     const badges = useMemo(() => phoneTabBadges(channels), [channels]);
     const chooseTab = (next: PhoneChatTab): void => {
@@ -257,8 +261,7 @@ function ChatColumns({ children }: { children: ReactNode }) {
                         {children}
                     </div>
                 </div>
-                {/* Self-contained on purpose: when the app shell grows a phone tab
-                    bar of its own, this is the bar a route hands the bottom to. */}
+                {/* The app shell's bar steps aside for this one (useOwnBottomTabs). */}
                 {tabsShown ? (
                     <BottomTabs
                         label={t("phoneTabs.label")}
