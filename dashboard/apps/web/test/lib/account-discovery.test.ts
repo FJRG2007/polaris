@@ -15,6 +15,7 @@ interface Account {
     username: string;
     bannedAt: Date | null;
     disabledAt: Date | null;
+    phone: { phone: string; verifiedAt: Date | null } | null;
 }
 
 function account(id: string, name: string): Account {
@@ -24,7 +25,8 @@ function account(id: string, name: string): Account {
         email: `${id}@example.test`,
         username: `fixture_${id}`,
         bannedAt: null,
-        disabledAt: null
+        disabledAt: null,
+        phone: null
     };
 }
 
@@ -45,6 +47,8 @@ let hiddenFrom = new Set<string>();
 let blocked = new Set<string>();
 /** Accounts that show the viewer their address. */
 let showsEmail = new Set<string>();
+/** Accounts whose "find me by email" or "by phone" leaves the viewer out. */
+let hiddenByContact = new Map<string, Set<string>>();
 
 type Text = { contains: string } | string;
 
@@ -74,6 +78,10 @@ function matches(person: Account, where: Record<string, unknown>): boolean {
             if (rule === null && person[field] !== null) return false;
         } else if (field === "emails") {
             return false;
+        } else if (field === "phone") {
+            const wanted = (rule as { is: { phone: string; verifiedAt: { not: null } } }).is;
+            if (person.phone?.phone !== wanted.phone || person.phone.verifiedAt === null)
+                return false;
         } else {
             throw new Error(`unhandled field ${field}`);
         }
@@ -92,8 +100,16 @@ vi.mock("@/lib/friends-service", () => ({ friendIds: async () => friends }));
 vi.mock("@/lib/privacy-service", () => ({
     discoverableBy: async (_viewer: unknown, ids: readonly string[]) =>
         new Set(ids.filter((id) => !hiddenFrom.has(id))),
-    allowedBy: async (viewer: { isAdmin: boolean }, _field: string, ids: readonly string[]) =>
-        new Set(ids.filter((id) => viewer.isAdmin || showsEmail.has(id)))
+    allowedBy: async (viewer: { isAdmin: boolean }, field: string, ids: readonly string[]) =>
+        new Set(
+            ids.filter(
+                (id) =>
+                    viewer.isAdmin ||
+                    (field === "email"
+                        ? showsEmail.has(id)
+                        : !(hiddenByContact.get(field)?.has(id) ?? false))
+            )
+        )
 }));
 vi.mock("@/lib/blocks", () => ({
     blockedBy: async () => new Set<string>(),
@@ -124,7 +140,7 @@ vi.mock("@polaris/db", () => ({
 }));
 
 const mentions = await import("@/lib/rich-text/mention-service");
-const { setDiscoveryPolicy } = await import("@/lib/people-search");
+const { setDiscoveryPolicy, findPeople } = await import("@/lib/people-search");
 const { DEFAULT_DISCOVERY_POLICY } = await import("@/lib/discovery-policy");
 
 const viewer = { id: "viewer", isAdmin: false };
@@ -143,6 +159,12 @@ beforeEach(() => {
     hiddenFrom = new Set();
     blocked = new Set();
     showsEmail = new Set();
+    hiddenByContact = new Map();
+    for (const person of accounts) person.phone = null;
+    accounts.find((person) => person.id === "stranger")!.phone = {
+        phone: "+34600111222",
+        verifiedAt: new Date(0)
+    };
 });
 
 describe("an account field for somebody who is not an administrator", () => {
@@ -216,7 +238,8 @@ describe("the instance's discovery policy", () => {
             usernameExact: true,
             usernamePartial: true,
             namePartial: true,
-            emailExact: true
+            emailExact: true,
+            phoneExact: true
         });
         expect(await search("S")).not.toContain("stranger");
     });
@@ -251,8 +274,76 @@ describe("picking by id", () => {
             usernameExact: false,
             usernamePartial: false,
             namePartial: false,
-            emailExact: false
+            emailExact: false,
+            phoneExact: false
         });
         expect(await byId(["stranger", "friend"])).toEqual(["friend"]);
+    });
+});
+
+describe("finding somebody by email or phone", () => {
+    async function people(term: string): Promise<string[]> {
+        return (await findPeople(viewer, term, { reachableOnly: false })).people.map(
+            (person) => person.id
+        );
+    }
+
+    it("finds by the whole address only when that account's email setting allows it", async () => {
+        await setDiscoveryPolicy({ ...DEFAULT_DISCOVERY_POLICY, emailExact: true });
+        expect(await search("stranger@example.test")).toEqual(["stranger"]);
+        expect(await people("stranger@example.test")).toEqual(["stranger"]);
+
+        hiddenByContact = new Map([["findByEmail", new Set(["stranger"])]]);
+        expect(await search("stranger@example.test")).toEqual([]);
+        expect(await people("stranger@example.test")).toEqual([]);
+    });
+
+    it("holds an address match to the email setting, not to the username one", async () => {
+        await setDiscoveryPolicy({ ...DEFAULT_DISCOVERY_POLICY, emailExact: true });
+        hiddenFrom = new Set(["stranger"]);
+        expect(await search("stranger@example.test")).toEqual(["stranger"]);
+        expect(await search("fixture_stranger")).toEqual([]);
+    });
+
+    it("leaves a username search alone whatever the email and phone settings say", async () => {
+        await setDiscoveryPolicy({ ...DEFAULT_DISCOVERY_POLICY, emailExact: true, phoneExact: true });
+        hiddenByContact = new Map([
+            ["findByEmail", new Set(["stranger"])],
+            ["findByPhone", new Set(["stranger"])]
+        ]);
+        expect(await search("fixture_stranger")).toEqual(["stranger"]);
+        expect(await people("@fixture_stranger")).toEqual(["stranger"]);
+    });
+
+    it("still refuses an address match across a block", async () => {
+        await setDiscoveryPolicy({ ...DEFAULT_DISCOVERY_POLICY, emailExact: true });
+        blocked = new Set(["stranger"]);
+        expect(await search("stranger@example.test")).toEqual([]);
+    });
+
+    it("finds by phone only when the instance allows it", async () => {
+        expect(await search("+34600111222")).toEqual([]);
+        await setDiscoveryPolicy({ ...DEFAULT_DISCOVERY_POLICY, phoneExact: true });
+        expect(await search("+34600111222")).toEqual(["stranger"]);
+        // Written the way people copy a number, it is still the same number.
+        expect(await people("+34 600 11 12 22")).toEqual(["stranger"]);
+    });
+
+    it("finds by phone only when that account's phone setting allows it", async () => {
+        await setDiscoveryPolicy({ ...DEFAULT_DISCOVERY_POLICY, phoneExact: true });
+        hiddenByContact = new Map([["findByPhone", new Set(["stranger"])]]);
+        expect(await search("+34600111222")).toEqual([]);
+        expect(await people("+34600111222")).toEqual([]);
+        // Hidden from a phone search is not hidden from a username one.
+        expect(await search("fixture_stranger")).toEqual(["stranger"]);
+    });
+
+    it("never matches part of a number, one without its prefix, or an unconfirmed one", async () => {
+        await setDiscoveryPolicy({ ...DEFAULT_DISCOVERY_POLICY, phoneExact: true });
+        expect(await search("+3460011")).toEqual([]);
+        expect(await search("600111222")).toEqual([]);
+        expect(await search("111222")).toEqual([]);
+        accounts.find((person) => person.id === "stranger")!.phone!.verifiedAt = null;
+        expect(await search("+34600111222")).toEqual([]);
     });
 });

@@ -113,6 +113,8 @@ const AUDIENCE_COLUMNS = {
     fileTransfers: true,
     calls: true,
     discoverable: true,
+    findByEmail: true,
+    findByPhone: true,
     readReceipts: true,
     lastActive: true,
     typing: true

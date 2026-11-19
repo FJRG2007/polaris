@@ -4306,6 +4306,10 @@
                 "emailExact": {
                     "label": "Correo completo",
                     "hint": "Encuentra la cuenta. El correo solo se muestra si su dueño lo permite."
+                },
+                "phoneExact": {
+                    "label": "Teléfono completo",
+                    "hint": "Encuentra la cuenta por su número confirmado. Solo se muestra si su dueño lo permite."
                 }
             }
         },

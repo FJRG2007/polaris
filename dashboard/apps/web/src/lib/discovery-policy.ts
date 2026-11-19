@@ -26,7 +26,10 @@ export const discoveryPolicySchema = z
         /** Part of a display name. */
         namePartial: z.boolean(),
         /** The whole email address. Never printed back because of it. */
-        emailExact: z.boolean()
+        emailExact: z.boolean(),
+        /** The whole confirmed phone number, in international form. Never
+         *  printed back because of it. */
+        phoneExact: z.boolean()
     })
     .strict();
 
@@ -36,14 +39,16 @@ export const DISCOVERY_RULES = [
     "usernameExact",
     "usernamePartial",
     "namePartial",
-    "emailExact"
+    "emailExact",
+    "phoneExact"
 ] as const;
 
 export const DEFAULT_DISCOVERY_POLICY: DiscoveryPolicy = {
     usernameExact: true,
     usernamePartial: false,
     namePartial: false,
-    emailExact: false
+    emailExact: false,
+    phoneExact: false
 };
 
 /**

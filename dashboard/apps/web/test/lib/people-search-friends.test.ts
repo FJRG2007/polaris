@@ -81,7 +81,9 @@ vi.mock("@/lib/setting-store", () => ({
     setSetting: async () => {}
 }));
 vi.mock("@/lib/privacy-service", () => ({
-    discoverableBy: async (_viewer: { id: string }, userIds: readonly string[]) => new Set(userIds)
+    discoverableBy: async (_viewer: { id: string }, userIds: readonly string[]) => new Set(userIds),
+    allowedBy: async (_viewer: { id: string }, _field: string, userIds: readonly string[]) =>
+        new Set(userIds)
 }));
 vi.mock("@/lib/blocks", () => ({ blockedBetween: async () => new Set<string>() }));
 vi.mock("@/lib/friends-service", () => ({ friendIds: async () => friends }));

@@ -11667,6 +11667,13 @@ model UserPrivacy {
     // account, and the one setting here that decides whether two people who
     // share an instance can find each other at all.
     discoverable String?
+    // Who finds the account by its whole email address, and by its whole confirmed
+    // phone number. Separate from `discoverable` (the username and name) because
+    // somebody can be glad to be found by the handle they hand out and not by the
+    // address a stranger bought on a list. Only asked when the instance's
+    // discovery policy lets that identifier find anybody at all.
+    findByEmail  String?
+    findByPhone  String?
     // Who may read the profile itself - what they wrote, their links, their
     // banner. Everybody else gets the name and the photo. Open by default, which
     // is what every account had before this existed.

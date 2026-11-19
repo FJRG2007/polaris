@@ -127,7 +127,9 @@ export function audienceNeedsList(audience: PrivacyAudience): boolean {
 /** What each setting is, said once, so the screen and this file cannot drift. */
 export const PRIVACY_FIELD_LABELS = {
     profile: "Who can see your profile",
-    discoverable: "Whether people can find you",
+    discoverable: "Finding you by username",
+    findByEmail: "Finding you by email",
+    findByPhone: "Finding you by phone number",
     lastSeen: "Whether you are shown online",
     lastActive: "When you were last online",
     activity: "What you are playing or listening to",
@@ -151,7 +153,11 @@ export const PRIVACY_FIELD_NOTES = {
     profile:
         "Your bio, links, pronouns and banner. Anybody else sees only your name and photo. Small servers are those with fewer than 200 members.",
     discoverable:
-        "Who finds your account when they look for somebody. Anybody who cannot has to know your exact username to ask to be added, and is never told whether it exists.",
+        "Who finds your account by your username or name. Anybody who cannot has to know your exact username to ask to be added, and is never told whether it exists.",
+    findByEmail:
+        "Who finds your account by typing your whole email address, when this instance allows it. Finding you never shows them the address.",
+    findByPhone:
+        "Who finds your account by typing your whole phone number, when this instance allows it. Finding you never shows them the number.",
     lastSeen: "The dot beside your name and the status under it. Anybody who cannot see it sees you as offline.",
     lastActive:
         "The time shown under your name while you are away, such as last seen today at 14:32. Turning this down also stops you seeing anybody else's.",
@@ -185,6 +191,8 @@ export const PRIVACY_FIELD_NOTES = {
 /** The order the settings are read in, so the screen does not have its own. */
 export const PRIVACY_FIELDS = [
     "discoverable",
+    "findByEmail",
+    "findByPhone",
     "profile",
     "avatar",
     "photoFullSize",
@@ -219,7 +227,7 @@ export const PRIVACY_SECTIONS = [
     {
         id: "finding",
         label: "Being found",
-        fields: ["discoverable"]
+        fields: ["discoverable", "findByEmail", "findByPhone"]
     },
     {
         id: "details",
@@ -308,7 +316,9 @@ const known = rule("friends");
 
 export const privacySettingsSchema = z.object({
     /**
-     * Whether an account turns up when somebody searches for people.
+     * Whether an account turns up when somebody searches for people by
+     * username or name. The whole address and the whole number are their own
+     * settings, `findByEmail` and `findByPhone`.
      *
      * The one setting here that is not about a detail of somebody's presence but
      * about the account itself, and the reason it exists: an instance is not
@@ -321,6 +331,16 @@ export const privacySettingsSchema = z.object({
      * hands out deliberately, one at a time.
      */
     discoverable: open,
+    /**
+     * Who finds the account by typing its whole email address - the main one or
+     * one it added and confirmed. Never prints the address back: whether that is
+     * shown is `email`. Only ever asked when the instance's discovery policy lets
+     * an address find somebody at all, which it does not by default, so this is
+     * open the way `discoverable` is and the operator's switch is the gate.
+     */
+    findByEmail: open,
+    /** The same for the whole, confirmed phone number. */
+    findByPhone: open,
     /**
      * Who may read somebody's profile: what they wrote about themselves, their
      * links, pronouns, banner, who they follow and what they share with you.

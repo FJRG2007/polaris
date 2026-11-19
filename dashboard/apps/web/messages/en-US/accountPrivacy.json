@@ -85,8 +85,16 @@
             "note": "Your bio, links, pronouns and banner. Anybody else sees only your name and photo. Small servers are those with fewer than 200 members."
         },
         "discoverable": {
-            "label": "Whether people can find you",
-            "note": "Who finds your account when they look for somebody. Anybody who cannot has to know your exact username to ask to be added, and is never told whether it exists."
+            "label": "Finding you by username",
+            "note": "Who finds your account by your username or name. Anybody who cannot has to know your exact username to ask to be added, and is never told whether it exists."
+        },
+        "findByEmail": {
+            "label": "Finding you by email",
+            "note": "Who finds your account by typing your whole email address, when this instance allows it. Finding you never shows them the address."
+        },
+        "findByPhone": {
+            "label": "Finding you by phone number",
+            "note": "Who finds your account by typing your whole phone number, when this instance allows it. Finding you never shows them the number."
         },
         "lastSeen": {
             "label": "Whether you are shown online",

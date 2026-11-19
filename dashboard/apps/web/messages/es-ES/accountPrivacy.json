@@ -85,8 +85,16 @@
             "note": "Tu biografía, enlaces, pronombres y banner. El resto solo ve tu nombre y tu foto. Un servidor pequeño tiene menos de 200 miembros."
         },
         "discoverable": {
-            "label": "Si la gente puede encontrarte",
-            "note": "Quién encuentra tu cuenta cuando busca a alguien. Quien no pueda tendrá que saber tu nombre de usuario exacto para pedirte que le añadas, y nunca se le dice si existe."
+            "label": "Encontrarte por usuario",
+            "note": "Quién encuentra tu cuenta por tu nombre de usuario o tu nombre. Quien no pueda tendrá que saber tu usuario exacto para pedirte que le añadas, y nunca se le dice si existe."
+        },
+        "findByEmail": {
+            "label": "Encontrarte por correo",
+            "note": "Quién encuentra tu cuenta escribiendo tu correo completo, si esta instancia lo permite. Encontrarte nunca le muestra la dirección."
+        },
+        "findByPhone": {
+            "label": "Encontrarte por teléfono",
+            "note": "Quién encuentra tu cuenta escribiendo tu número de teléfono completo, si esta instancia lo permite. Encontrarte nunca le muestra el número."
         },
         "lastSeen": {
             "label": "Si se te muestra en línea",

@@ -45,7 +45,7 @@ const DEFAULTS = Object.fromEntries(
     core.PRIVACY_FIELDS.map((field) => [field, core.DEFAULT_PRIVACY[field].audience])
 ) as Record<(typeof core.PRIVACY_FIELDS)[number], (typeof core.PRIVACY_AUDIENCES)[number]>;
 
-const POLICY = { usernameExact: true, usernamePartial: false, namePartial: false, emailExact: false };
+const POLICY = { usernameExact: true, usernamePartial: false, namePartial: false, emailExact: false, phoneExact: false };
 
 function screen(locale?: "es-ES") {
     return renderToStaticMarkup(

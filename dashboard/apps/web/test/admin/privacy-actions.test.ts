@@ -29,7 +29,8 @@ const policy = {
     usernameExact: true,
     usernamePartial: false,
     namePartial: true,
-    emailExact: false
+    emailExact: false,
+    phoneExact: false
 };
 
 beforeEach(() => {

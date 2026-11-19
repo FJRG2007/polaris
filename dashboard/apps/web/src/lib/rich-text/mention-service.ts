@@ -252,6 +252,7 @@ export async function searchAccounts(
             colleagues: contains
                 ? { OR: [{ name: contains }, { email: contains }, { username: contains }] }
                 : {},
+            term,
             // An empty box offers friends: they are the people this account
             // already chose, and the reason somebody opens a field like this.
             others: (friends, policy) => {
@@ -302,6 +303,9 @@ export async function accountsByIdInReach(
  *  policy - among everybody else, or nobody else when null. */
 interface AccountMatch {
     readonly colleagues: Prisma.UserWhereInput;
+    /** What was typed, when anything was: who it found by an address or a
+     *  number is held to that setting rather than to "who can find me". */
+    readonly term?: string;
     readonly others: (friends: string[], policy: DiscoveryPolicy) => Prisma.UserWhereInput | null;
 }
 
@@ -328,10 +332,8 @@ async function accountsInReach(
             search.discoveryPolicy()
         ]);
         const colleagues = new Set(scope);
-        const others = match.others(
-            [...friends].filter((id) => !colleagues.has(id)),
-            policy
-        );
+        const strangerFriends = [...friends].filter((id) => !colleagues.has(id));
+        const others = match.others(strangerFriends, policy);
         const found = await prisma.user.findMany({
             where: {
                 OR: [
@@ -349,7 +351,8 @@ async function accountsInReach(
         // if they let this account find them and neither has blocked the other.
         const findable = await search.findableBy(
             actor.id,
-            found.filter((user) => !colleagues.has(user.id)).map((user) => user.id)
+            found.filter((user) => !colleagues.has(user.id)).map((user) => user.id),
+            match.term ? { term: match.term, friends: strangerFriends, policy } : undefined
         );
         users = found
             .filter((user) => colleagues.has(user.id) || findable.has(user.id))

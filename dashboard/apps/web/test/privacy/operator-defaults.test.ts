@@ -103,6 +103,26 @@ describe("operator defaults", () => {
     it("refuse an audience that names a list", async () => {
         await expect(service.setDefaultAudience("avatar", "only")).rejects.toThrow();
     });
+
+    it("decide who finds an account by email and by phone, each on its own key", async () => {
+        // Open in code: the instance's discovery policy is what gates either.
+        expect(core.DEFAULT_PRIVACY.findByEmail.audience).toBe("everyone");
+        expect(core.DEFAULT_PRIVACY.findByPhone.audience).toBe("everyone");
+        expect(await service.allowedBy(viewer, "findByEmail", ["a"])).toEqual(new Set(["a"]));
+
+        state.settings.set("privacy.defaults.findByEmail", "nobody");
+        state.rows.set("b", { findByEmail: null, findByPhone: null });
+        state.rows.set("c", { findByEmail: "everyone", findByPhone: null });
+        expect(await service.allowedBy(viewer, "findByEmail", ["a", "b", "c"])).toEqual(
+            new Set(["c"])
+        );
+        // The phone default was not touched, so it stays open.
+        expect(await service.allowedBy(viewer, "findByPhone", ["a", "b", "c"])).toEqual(
+            new Set(["a", "b", "c"])
+        );
+        expect((await service.privacyFor("b")).findByEmail.audience).toBe("nobody");
+        expect(service.privacyDefaultKey("findByPhone")).toBe("privacy.defaults.findByPhone");
+    });
 });
 
 describe("setPrivacy", () => {
