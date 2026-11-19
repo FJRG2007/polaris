@@ -101,7 +101,8 @@ import {
     ProposalBar,
     useDirectRules,
     useDropExpired,
-    useHide
+    useHide,
+    VanishMenu
 } from "./vanish-controls";
 import { Button, EmptyState, ResizeHandle, cn, useToast } from "@polaris/ui";
 import { ConversationSkeleton, MessagesSkeleton } from "./messages-skeleton";
@@ -2948,6 +2949,20 @@ export function ChannelView({
                             // the call moves into a new group instead.
                             mayInvite={channel.kind === "dm" || channel.mayInvite}
                             mayRecord={channel.kind === "dm" || channel.kind === "group"}
+                            // The conversation's own rules - its timer, read
+                            // receipts and typing - in the call's menu too: on
+                            // a phone the call covers the header that holds them.
+                            moreItems={
+                                direct && vanish.rules ? (
+                                    <VanishMenu
+                                        rules={vanish.rules}
+                                        onTimer={setTimer}
+                                        onAllowDelete={allowDeleteForAll}
+                                        onRules={changeRules}
+                                        onDeleteChat={() => setDeletingChat(true)}
+                                    />
+                                ) : undefined
+                            }
                             onStage={setStaged}
                             expanded={expanded}
                             onExpand={
