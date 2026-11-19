@@ -25,7 +25,7 @@ import java.net.URLDecoder;
 import java.util.UUID;
 
 /**
- * A photo or a video sent to be seen once, shown by the app itself rather than by the page: the bytes are fetched
+ * A photo, a video or an audio sent to be seen once, shown by the app itself rather than by the page: the bytes are fetched
  * here with a request this phone signed, drawn in a window Android keeps out of screenshots, recordings and the recent
  * apps list, and forgotten when the window closes. Leaving it - the timer running out, the back button, another app -
  * ends it; there is no second look.
@@ -88,9 +88,11 @@ public final class ViewOnceActivity extends Activity {
         if (isFinishing()) return;
         loading.setVisibility(View.GONE);
         String type = file.type == null ? "" : file.type;
-        if (type.startsWith("video/")) {
+        boolean audio = type.startsWith("audio/");
+        if (type.startsWith("video/") || audio) {
             try {
-                played = new File(getCacheDir(), "once-" + UUID.randomUUID() + ".mp4");
+                // No extension to trust: the player reads the container from the bytes.
+                played = new File(getCacheDir(), "once-" + UUID.randomUUID() + ".media");
                 try (OutputStream out = new FileOutputStream(played)) {
                     out.write(file.body);
                 }
@@ -107,6 +109,14 @@ public final class ViewOnceActivity extends Activity {
                 return true;
             });
             video.start();
+            if (audio) {
+                // Nothing to look at while it plays: say what it is, over the same black.
+                TextView playing = new TextView(this);
+                playing.setText(R.string.view_once_audio);
+                playing.setTextColor(Color.WHITE);
+                playing.setTextSize(18);
+                frame.addView(playing, new FrameLayout.LayoutParams(-2, -2, Gravity.CENTER));
+            }
         } else {
             Bitmap picture = decode(file.body);
             if (picture == null) {

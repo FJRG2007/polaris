@@ -20,6 +20,7 @@
     <string name="update_message">Descárgalo y abre el archivo para instalarlo encima de esta versión.</string>
     <string name="update_download">Descargar</string>
     <string name="update_later">Luego</string>
+    <string name="view_once_audio">Reproduciendo audio</string>
     <string name="view_once_failed">Ahora no se puede abrir. Vuelve a intentarlo en un momento.</string>
     <string name="notices_connected">Conectado para mensajes</string>
     <string name="notices_channel_connection">Conexión</string>
