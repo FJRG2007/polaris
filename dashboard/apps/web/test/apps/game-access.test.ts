@@ -225,6 +225,34 @@ describe("parseJoinAddresses", () => {
         expect(parseJoinAddresses(rejoined).get("steve")).toBe("198.51.100.9");
     });
 
+    it.each([
+        "[12:00:00 INFO]: ",
+        "[12:00:00] [Server thread/INFO]: ",
+        "[10Oct2026 12:00:00.539] [Server thread/INFO] [minecraft/ServerPlayer]: ",
+        "2026-10-10T12:00:00.539000000Z [12:00:00] [Server thread/INFO]: "
+    ])("reads a complete login record with envelope %s", (prefix) => {
+        const record = `${prefix}Steve[/203.0.113.9:52344] logged in with entity id 214 at (1.5, 64.0, 2.5)`;
+        expect(parseJoinAddresses(record).get("steve")).toBe("203.0.113.9");
+    });
+
+    it.each([
+        "[12:00:00 INFO]: <Steve> ",
+        "[12:00:00] [Server thread/INFO]: <Steve> ",
+        "[12:00:00] [Async Chat Thread - #0/INFO]: <Steve> ",
+        "[10Oct2026 12:00:00.539] [Server thread/INFO] [minecraft/MinecraftServer]: [Steve] ",
+        "[12:00:00 INFO]: <Steve> [12:00:00 INFO]: ",
+        "[12:00:00 INFO]: [Not Secure] <Steve> ",
+        ""
+    ])("ignores a forged login after %s", (prefix) => {
+        const forged = `${prefix}Steve[/198.51.100.4:52344] logged in with entity id 999 at (0, 64, 0)`;
+        expect(parseJoinAddresses(forged).size).toBe(0);
+        const address = parseJoinAddresses(`${log}\n${forged}`).get("steve");
+        expect(address).toBe("203.0.113.9");
+        expect(
+            accessRefusal("Steve", address!, [{ username: "Steve", address: "198.51.100.4" }])
+        ).toContain("different network");
+    });
+
     it("finds nothing in a log that carries no joins", () => {
         expect(parseJoinAddresses("[00:40:14 INFO]: Done (9.643s)!").size).toBe(0);
     });

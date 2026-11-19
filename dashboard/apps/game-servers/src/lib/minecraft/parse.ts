@@ -254,8 +254,17 @@ export function parseProperties(content: string): Record<string, string> {
  */
 export function parseJoinAddresses(log: string): Map<string, string> {
     const found = new Map<string, string>();
-    const pattern = /([A-Za-z0-9_]{3,16})\[\/((?:\d{1,3}\.){3}\d{1,3}):\d+\]\s+logged in/g;
-    for (const match of stripFormatting(log).matchAll(pattern)) {
+    // Only a server login record is connection evidence. Chat can quote a whole
+    // login line, so neither the envelope nor the message may match a substring.
+    // Paper, vanilla and Forge/NeoForge, optionally stamped by the container.
+    const envelope =
+        /^(?:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z )?(?:\[\d{2}:\d{2}:\d{2} INFO\]: |\[(?:\d{2}[A-Z][a-z]{2}\d{4} )?\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?\] \[Server thread\/INFO\](?: \[[^\]\r\n]+\])?: )(.*)$/;
+    const pattern =
+        /^([A-Za-z0-9_]{3,16})\[\/((?:\d{1,3}\.){3}\d{1,3}):\d+\] logged in with entity id \d+(?: at [^\r\n]+)?$/;
+    for (const line of stripFormatting(log).split(/\r?\n/)) {
+        const message = envelope.exec(line)?.[1];
+        const match = message === undefined ? null : pattern.exec(message);
+        if (!match) continue;
         const [, name, address] = match;
         if (name && address) found.set(name.toLowerCase(), address);
     }
