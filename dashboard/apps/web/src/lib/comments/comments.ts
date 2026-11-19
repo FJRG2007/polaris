@@ -35,6 +35,8 @@ export interface CommentView {
      *  route that decides between an upload, a linked account's picture and a
      *  Gravatar. */
     readonly author: { readonly id: string; readonly name: string } | null;
+    /** Written by an assistant ("polar"), for a comment with no author; null otherwise. */
+    readonly agent: string | null;
     /**
      * What was sent with it.
      *
@@ -68,10 +70,13 @@ export interface CommentInput {
 export async function post(
     actorId: string | null,
     input: CommentInput,
-    client: Prisma.TransactionClient = prisma
+    client: Prisma.TransactionClient = prisma,
+    /** An assistant writing it, with no account behind it. */
+    agent: string | null = null
 ): Promise<string> {
     const comment = await client.comment.create({
         data: {
+            agent: actorId ? null : agent,
             subjectType: input.subjectType,
             subjectId: input.subjectId,
             parentId: input.parentId ?? null,
@@ -101,6 +106,7 @@ export async function thread(
             assignedToId: true,
             resolvedAt: true,
             createdAt: true,
+            agent: true,
             // Not the picture an OAuth provider handed better-auth: a face is
             // resolved from the account id, through the one route that puts an
             // uploaded photo first. Read here, it outranked the photo somebody
@@ -140,6 +146,7 @@ export async function thread(
         resolvedAt: row.resolvedAt?.toISOString() ?? null,
         createdAt: row.createdAt.toISOString(),
         author: row.user,
+        agent: row.agent,
         files: byComment.get(row.id) ?? []
     }));
 }

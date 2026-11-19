@@ -17,6 +17,7 @@ import { PriorityMark } from "@/components/priority-mark";
 import { Avatar, preloadAvatars } from "@/components/avatar";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PersonName, PersonRow } from "@/components/person-name";
+import { PolarBadge, PolarFace, POLAR_NAME } from "@/components/polar/polar-bot";
 import { optionLabel } from "./option-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayPreferences } from "@/components/display-format";
@@ -57,13 +58,17 @@ export function AssigneePicker({
     selected,
     onChange,
     disabled,
-    trigger
+    trigger,
+    polar
 }: {
     people: readonly PersonRef[];
     selected: readonly string[];
     onChange: (ids: string[]) => void;
     disabled?: boolean;
     trigger?: React.ReactNode;
+    /** Polar as the first choice: handing the task to an agent, the way a bot
+     *  is assigned on any tracker. Absent where there is no task to hand yet. */
+    polar?: { readonly usable: boolean; readonly reason: string | null; readonly onPick: () => void };
 }) {
     const t = useTranslations("tasks");
     const [query, setQuery] = useState("");
@@ -109,6 +114,28 @@ export function AssigneePicker({
                         onChange={setQuery}
                         placeholder={t("pickers.findSomeone")}
                     />
+                )}
+                {polar && (
+                    <>
+                        <DropdownMenuItem
+                            disabled={!polar.usable}
+                            title={polar.reason ?? undefined}
+                            onSelect={polar.onPick}
+                            className="gap-2"
+                        >
+                            <PolarFace size={20} />
+                            <span className="flex min-w-0 flex-1 flex-col">
+                                <span className="truncate">{POLAR_NAME}</span>
+                                {polar.reason && (
+                                    <span className="truncate text-xs text-muted-foreground">
+                                        {polar.reason}
+                                    </span>
+                                )}
+                            </span>
+                            <PolarBadge />
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                    </>
                 )}
                 <div className="max-h-64 overflow-y-auto overscroll-contain">
                     {matches.length === 0 && (

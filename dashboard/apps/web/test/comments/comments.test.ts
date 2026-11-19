@@ -59,7 +59,8 @@ describe("posting", () => {
                 parentId: null,
                 userId: "u1",
                 body: "Disk was full",
-                assignedToId: null
+                assignedToId: null,
+                agent: null
             },
             select: { id: true }
         });

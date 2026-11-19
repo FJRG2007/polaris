@@ -85,7 +85,7 @@ export function HandToAgent({ taskId, reference, name, description }: Props) {
     );
 }
 
-function HandOffDialog({
+export function HandOffDialog({
     taskId,
     reference,
     name,

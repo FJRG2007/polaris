@@ -7960,6 +7960,9 @@ model Comment {
     subjectId    String    @db.Uuid
     parentId     String?   @db.Uuid
     userId       String?   @db.Uuid
+    // Written by an assistant rather than a person or a rule: "polar" for Polar
+    // answering a mention. Null for everything else.
+    agent        String?
     body         String
     // No FKs: both are display references that must survive the account leaving.
     assignedToId String?   @db.Uuid

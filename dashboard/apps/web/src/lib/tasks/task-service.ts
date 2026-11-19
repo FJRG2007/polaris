@@ -362,6 +362,7 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
                 assignedToId: true,
                 resolvedAt: true,
                 createdAt: true,
+                agent: true,
                 user: { select: { id: true, name: true } }
             }
         }),
@@ -461,6 +462,7 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
             body: comment.body,
             parentId: comment.parentId,
             author: comment.user,
+            agent: comment.agent,
             assignedToId: comment.assignedToId,
             resolvedAt: comment.resolvedAt?.toISOString() ?? null,
             createdAt: comment.createdAt.toISOString(),

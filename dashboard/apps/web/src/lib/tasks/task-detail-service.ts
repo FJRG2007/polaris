@@ -19,6 +19,7 @@ import { spaceShelf } from "./shelf";
 import { translate } from "@/lib/i18n/translate";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import { TaskRefusal } from "./refusal";
+import { answerTaskPolarLater } from "./polar-comment";
 
 // ---------------------------------------------------------------------------
 // Comments
@@ -85,6 +86,17 @@ export async function addComment(actorId: string, input: core.CommentInput): Pro
         except: [...recipients]
     });
     await runAutomations({ trigger: "task.commentAdded", taskId: input.taskId, actorId });
+    // Named in it, Polar answers in the same thread, later: the comment is posted now.
+    if (task) {
+        answerTaskPolarLater({
+            taskId: input.taskId,
+            spaceId: task.spaceId,
+            commentId,
+            authorId: actorId,
+            parentId: input.parentId,
+            body: input.body
+        });
+    }
     return commentId;
 }
 

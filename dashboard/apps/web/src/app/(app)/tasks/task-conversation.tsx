@@ -34,6 +34,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { RichText } from "@/components/rich-text/rich-text";
 import { cn, Input, Button, SegmentedControl, Checkbox } from "@polaris/ui";
 import { Composer } from "@/app/(app)/chat/composer";
+import { PolarBadge, PolarBotCard, PolarFace, POLAR_NAME } from "@/components/polar/polar-bot";
 import { CheckCircle2, Paperclip, Play, Square, Trash2 } from "lucide-react";
 import type { ActivityView, CommentView, TimeEntryView } from "@/lib/tasks/task-service";
 import { describeActivity, mergeConversation, type ConversationFilter } from "./conversation";
@@ -154,6 +155,16 @@ export function ActivityStream({
         <div key={comment.id} className={cn("flex gap-2", nested && "ms-8")}>
             {comment.author ? (
                 <Avatar person={comment.author} size={28} />
+            ) : comment.agent === "polar" ? (
+                <PolarBotCard>
+                    <button
+                        type="button"
+                        aria-label={POLAR_NAME}
+                        className="shrink-0 self-start rounded-full focus-visible:outline-2 focus-visible:outline-ring"
+                    >
+                        <PolarFace size={28} />
+                    </button>
+                </PolarBotCard>
             ) : (
                 <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-muted text-[0.625rem] text-muted-foreground ring-1 ring-border">
                     {AUTOMATION_INITIALS}
@@ -162,8 +173,11 @@ export function ActivityStream({
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">
-                        {comment.author?.name ?? t("conversation.automation")}
+                        {comment.author?.name ??
+                            (comment.agent === "polar" ? POLAR_NAME : t("conversation.automation"))}
                     </span>
+                    {/* Not a person: Polar, answering a mention, tagged as a bot is. */}
+                    {!comment.author && comment.agent === "polar" && <PolarBadge />}
                     <span className="text-xs text-muted-foreground">
                         <RelativeTime iso={comment.createdAt} />
                     </span>
@@ -264,6 +278,7 @@ export function ActivityStream({
                     <div className="mt-2 flex flex-col gap-1">
                         <Composer
                             channelId={null}
+                            polarMentions
                             divided={false}
                             rules={COMMENT_RULES}
                             fixedLimits
@@ -344,6 +359,7 @@ export function ActivityStream({
                     were describing. */}
                 <Composer
                     channelId={null}
+                    polarMentions
                     rules={COMMENT_RULES}
                     fixedLimits
                     disabled={busy}

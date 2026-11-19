@@ -18,7 +18,6 @@
  * and never as a person. Server-only.
  */
 
-import { generateText } from "ai";
 import { prisma } from "@polaris/db";
 import { chatWordsFor } from "./text";
 import { channelAccess } from "./access";
@@ -27,6 +26,7 @@ import { unhideOnMessage } from "./chat-lock";
 import { expiryForChannel } from "./vanish";
 import * as history from "./history-visibility";
 import { polarMentioned } from "@/components/rich-text/markdown";
+import { answerMention, questionOf } from "@/lib/polar/mention-answer";
 
 export const POLAR_AGENT = "polar";
 export const POLAR_LABEL = "Polar";
@@ -35,10 +35,6 @@ export const POLAR_LABEL = "Polar";
 const HISTORY = 20;
 /** Characters of one earlier message it reads. */
 const LINE_CHARS = 2_000;
-/** The longest answer, in tokens; a chat reply is not a report. */
-const ANSWER_TOKENS = 2_048;
-/** How often the dots are refreshed while Polar writes. */
-const TYPING_EVERY_MS = 2_500;
 
 export interface PolarMention {
     readonly channelId: string;
@@ -56,43 +52,12 @@ export function answerPolarLater(mention: PolarMention): void {
     );
 }
 
-type Words = Awaited<ReturnType<typeof chatWordsFor>>;
 
 export async function answerPolarMention(mention: PolarMention): Promise<string | null> {
     // Still in the conversation: a message from somebody who has since left it
     // is answered nowhere.
     if (!(await channelAccess({ id: mention.authorId }, mention.channelId))) return null;
     const words = await chatWordsFor(mention.authorId);
-    const reply = (body: string) => postPolarMessage(mention, body);
-
-    const [{ polarAccessFor }, { rateLimit }] = await Promise.all([
-        import("@/lib/polar/access"),
-        import("@/lib/rate-limit-service")
-    ]);
-    const access = await polarAccessFor(mention.authorId);
-    if (!access.use) return reply(words("polar.notAvailable"));
-    // The panel's own ceiling: a mention is a Polar turn like any other.
-    const allowed = await rateLimit(`polar-chat:${mention.authorId}`, 30, 60_000);
-    if (!allowed.ok) return reply(words("polar.tooFast"));
-
-    const [{ resolvePolarModel }, { automaticChoice }, { PLAIN_TURN }, usage] = await Promise.all([
-        import("@/lib/polar/models"),
-        import("@/lib/polar/shared"),
-        import("@/lib/polar/automatic"),
-        import("@/lib/polar/usage")
-    ]);
-    const resolved = await resolvePolarModel(
-        mention.authorId,
-        automaticChoice(),
-        PLAIN_TURN,
-        access
-    );
-    if (typeof resolved === "string") return reply(noProviderText(words, access.spend));
-    if (resolved.credential.source === "instance") {
-        const hit = await usage.polarLimitReached(mention.authorId);
-        if (hit) return reply(words("polar.limitReached"));
-    }
-
     const author = await prisma.user.findUnique({
         where: { id: mention.authorId },
         select: { name: true, username: true }
@@ -100,73 +65,23 @@ export async function answerPolarMention(mention: PolarMention): Promise<string 
     const askerName = author?.name || author?.username || "";
     const history = await conversationBefore(mention);
 
-    const typing = () =>
-        publishChatChange({
-            channelId: mention.channelId,
-            kind: "typing",
-            actorId: POLAR_AGENT,
-            actorName: POLAR_LABEL,
-            activity: "typing"
-        });
-    typing();
-    const dots = setInterval(typing, TYPING_EVERY_MS);
-    let text: string;
-    let spent: Parameters<typeof usage.answerUsage>[0];
-    try {
-        const answer = await generateText({
-            // The router retries and walks keys and fallbacks itself.
-            maxRetries: 0,
-            model: resolved.model,
-            maxOutputTokens: ANSWER_TOKENS,
-            system: mentionSystemPrompt(askerName),
-            prompt: mentionPrompt(history, askerName, mention.body)
-        });
-        text = answer.text;
-        spent = answer.totalUsage;
-    } catch (error) {
-        const { classifyProviderFailure, failureLogLine } =
-            await import("@/lib/polar/provider-failure");
-        const failure = classifyProviderFailure(error);
-        console.warn(failureLogLine("a chat mention", resolved.option.providerName, failure));
-        return reply(words("polar.failed"));
-    } finally {
-        clearInterval(dots);
-    }
-
-    const { withoutPseudoToolCalls } = await import("@/lib/polar/pseudo-tools");
-    const rules = await import("./rules").then((module) =>
-        module.rulesForChannel(mention.channelId)
-    );
-    const cleaned = [...withoutPseudoToolCalls(text).trim()]
-        .slice(0, rules.maxMessageLength)
-        .join("");
-    const id = await reply(cleaned || words("polar.failed"));
-
-    const { answeredBy } = await import("@/lib/polar/models");
-    const answered = answeredBy(resolved);
-    try {
-        await usage.recordPolarUsage({
-            userId: mention.authorId,
-            threadId: null,
-            messageId: null,
-            provider: answered.option.provider,
-            model: answered.option.model,
-            payer: answered.credential.source === "instance" ? "instance" : "own",
-            usage: usage.answerUsage(spent, answered.option),
-            ...usage.routeRecord(resolved)
-        });
-    } catch (error) {
-        console.error("chat: could not record a Polar mention's usage:", error);
-    }
-    return id;
-}
-
-/** What Polar says when no model can answer for this person, with the way to fix it. */
-function noProviderText(words: Words, spendsShared: boolean): string {
-    return [
-        words(spendsShared ? "polar.noProvider" : "polar.noProviderOwnOnly"),
-        `[${words("polar.addKey")}](/polar/settings/providers)`
-    ].join(" ");
+    const text = await answerMention({
+        userId: mention.authorId,
+        words,
+        system: mentionSystemPrompt(askerName),
+        prompt: mentionPrompt(history, askerName, mention.body),
+        where: "a chat mention",
+        typing: () =>
+            publishChatChange({
+                channelId: mention.channelId,
+                kind: "typing",
+                actorId: POLAR_AGENT,
+                actorName: POLAR_LABEL,
+                activity: "typing"
+            })
+    });
+    const rules = await import("./rules").then((module) => module.rulesForChannel(mention.channelId));
+    return postPolarMessage(mention, [...text].slice(0, rules.maxMessageLength).join(""));
 }
 
 export function mentionSystemPrompt(askerName: string): string {
@@ -193,7 +108,7 @@ export function mentionPrompt(
         // Only the mention, nothing asked: the question is the conversation
         // itself, the way somebody is called into a thread by name. Answered
         // rather than refused, because Polar has read what came before.
-        ...(question.replace(/(^|[^\w@])@polar(?![\w-])/gi, "$1").trim()
+        ...(questionOf(question)
             ? [`${askerName || "Someone"} asks:`, question.slice(0, LINE_CHARS * 4)]
             : [
                   `${askerName || "Someone"} mentioned you without a question. Reply to the latest messages of the conversation: answer what was last asked there, or add what is useful.`

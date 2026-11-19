@@ -18,6 +18,7 @@ import type { TaskRow } from "@/lib/tasks/facts";
 import { AvatarStack } from "@/components/avatar";
 import { TimerControl } from "./task-conversation";
 import { CustomFieldEditor } from "./custom-fields";
+import { HandOffDialog, useHandoffGate } from "./hand-to-agent";
 import type { SpaceContext } from "@/lib/tasks/facts";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -102,6 +103,10 @@ export function PropertyRows({
     const disabled = !context.canEdit;
     const t = useTranslations("tasksDetail");
     const tt = useTranslations("tasks");
+    // Polar in the assignee list hands the task to an agent, through the same
+    // dialog as the toolbar's button, with the same reason when it cannot.
+    const handoff = useHandoffGate();
+    const [handingOff, setHandingOff] = useState(false);
 
     return (
         <div className="flex flex-col">
@@ -122,7 +127,17 @@ export function PropertyRows({
                     selected={task.assignees.map((person) => person.id)}
                     disabled={disabled}
                     onChange={(assigneeIds) => patch({ assigneeIds })}
+                    polar={timer ? { ...handoff, onPick: () => setHandingOff(true) } : undefined}
                 />
+                {handingOff && (
+                    <HandOffDialog
+                        taskId={task.id}
+                        reference={task.reference}
+                        name={task.name}
+                        description={task.description}
+                        onClose={() => setHandingOff(false)}
+                    />
+                )}
                 {task.assignees.length === 0 && (
                     <span className="text-xs text-muted-foreground">{t("props.nobody")}</span>
                 )}

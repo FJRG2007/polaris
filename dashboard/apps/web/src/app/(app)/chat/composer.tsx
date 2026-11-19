@@ -154,6 +154,7 @@ export function Composer({
     onSend,
     canShareFromDrive = false,
     canViewOnce = false,
+    polarMentions = false,
     onSchedule,
     onPoll,
     onMedia,
@@ -337,6 +338,9 @@ export function Composer({
     canShareFromDrive?: boolean;
     /** Whether a photo or video here may be sent to be seen once, on a phone. */
     canViewOnce?: boolean;
+    /** Offer `@polar` where there is no conversation to mention people of - a
+     *  task's thread, where Polar answers as a comment. */
+    polarMentions?: boolean;
     /** A GIF or sticker chosen from the picker. Its own path rather than a
      *  staged file: it is already somewhere, and it is the whole message. */
     onMedia?: (address: string) => void | Promise<void>;
@@ -1445,6 +1449,7 @@ export function Composer({
                         // this account shares a Tasks space with, which is what
                         // it used to offer and is a different question entirely.
                         mentionsIn={channelId}
+                        polarMentions={polarMentions}
                         roomMentions={roomMentions}
                         slashCommands={commands}
                         mentionSource={mentionSource}

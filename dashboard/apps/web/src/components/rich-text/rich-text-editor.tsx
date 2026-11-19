@@ -134,6 +134,9 @@ export interface RichTextEditorProps {
      * shared space anywhere else in Polaris.
      */
     mentionsIn?: string | null;
+    /** Offer `@polar` without a conversation: a task's thread, where Polar
+     *  answers as a comment. Where there is a conversation it is offered anyway. */
+    polarMentions?: boolean;
     /**
      * Whether @ offers `@everyone` and `@here` in that conversation.
      *
@@ -253,6 +256,7 @@ export function RichTextEditor({
     leadingBlankLine = false,
     onPasteFiles,
     mentionsIn = null,
+    polarMentions = false,
     roomMentions = true,
     slashCommands,
     mentionSource = null,
@@ -329,10 +333,14 @@ export function RichTextEditor({
             }),
             // Polar only for whoever may ask it: offering a name that answers
             // "not available to you" is a suggestion that leads nowhere.
-            mentionExtension(search, mentionsIn !== null && roomMentions, mentionsIn !== null && polarAllowed),
+            mentionExtension(
+                search,
+                mentionsIn !== null && roomMentions,
+                (mentionsIn !== null || polarMentions) && polarAllowed
+            ),
             ...(writesEmoji ? [CustomEmojiNode, emojiExtension(() => customEmoji.current)] : [])
         ],
-        [hint, search, mentionsIn, roomMentions, writesEmoji, polarAllowed]
+        [hint, search, mentionsIn, polarMentions, roomMentions, writesEmoji, polarAllowed]
     );
 
     /** A document with the space's emoji drawn as pictures, where this box
