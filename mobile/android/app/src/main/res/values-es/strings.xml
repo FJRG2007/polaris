@@ -176,4 +176,8 @@
     <string name="hosts_import_file">Abrir un archivo</string>
     <string name="hosts_export_subject">Servidores de Polaris</string>
     <string name="hosts_export_title">Enviar tus servidores</string>
+    <string name="live_location_channel">Ubicación en tiempo real</string>
+    <string name="live_location_title">Compartiendo ubicación</string>
+    <string name="live_location_text">Tus chats ven dónde estás hasta que acabe.</string>
+    <string name="live_location_stop">Detener</string>
 </resources>

@@ -52,6 +52,7 @@ targets:
           - IBMPlexSans-SemiBold.ttf
         NSCameraUsageDescription: Polaris uses the camera in calls you join.
         NSMicrophoneUsageDescription: Polaris uses the microphone in calls you join.
+        NSLocationWhenInUseUsageDescription: Polaris shares your location in a chat only when you send it.
         NSPhotoLibraryAddUsageDescription: Polaris saves the pictures you download to your library.
         NSPhotoLibraryUsageDescription: Polaris shows your recent photos and videos so you can send them in chat.
         # Limited access is managed from chat's + sheet, when the person asks, not by a system alert at launch.

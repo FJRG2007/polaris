@@ -252,7 +252,14 @@
         "componentNotYours": "Only the person who asked can use this.",
         "componentTooFast": "Too many tries. Wait a moment.",
         "componentInvalid": "Check the fields and try again.",
-        "taskNotCreated": "The task could not be created. Check the list and try again."
+        "taskNotCreated": "The task could not be created. Check the list and try again.",
+        "locationNotSent": "That location could not be sent",
+        "liveLocationLimit": "You are sharing live location in too many chats",
+        "locationGone": "That location is gone",
+        "locationNotYours": "Only whoever shared it can stop it",
+        "locationNotLive": "That is not a live location",
+        "placesBusy": "Too many searches. Try again in a minute.",
+        "placesUnavailable": "Place search is unavailable right now"
     },
     "media": {
         "refused": {
@@ -651,7 +658,8 @@
         "readFailed": "Couldn't open that photo. Try again.",
         "tooLarge": "Too large",
         "video": "Video, {length}",
-        "photo": "Photo"
+        "photo": "Photo",
+        "location": "Location"
     },
     "composer": {
         "replyingTo": "Replying to",
@@ -2295,7 +2303,8 @@
         "read": "Read",
         "delivered": "Delivered",
         "sent": "Sent",
-        "muted": "Muted"
+        "muted": "Muted",
+        "location": "Location"
     },
     "lock": {
         "lock": "Lock chat",
@@ -2637,5 +2646,49 @@
         "video": "Video",
         "search": "Search",
         "shared": "Shared here"
+    },
+    "location": {
+        "title": "Share location",
+        "back": "Back",
+        "locating": "Finding where you are...",
+        "denied": "Location is blocked for Polaris. Allow it in your browser or phone settings, then try again.",
+        "unavailable": "Your device could not find where you are.",
+        "unsupported": "This device cannot share its location.",
+        "insecure": "Location only works when Polaris is opened over https.",
+        "tryAgain": "Try again",
+        "sendCurrent": "Send current location",
+        "accurateTo": "Accurate to {meters} m",
+        "shareLive": "Share live location",
+        "shareLiveHint": "Updates on the map as you move",
+        "request": "Request location",
+        "requestHint": "Ask the chat to share theirs",
+        "searchNearby": "Search nearby places",
+        "search": "Search",
+        "noPlaces": "No places found nearby",
+        "forHowLong": "For how long",
+        "minutes": "{count} min",
+        "hours": "{count, plural, one {# hour} other {# hours}}",
+        "addComment": "Add a comment (optional)",
+        "liveNote": "Members of this chat see where you are until it ends or you stop it.",
+        "startSharing": "Start sharing",
+        "meters": "{meters} m",
+        "kilometers": "{km} km",
+        "youRequested": "You asked for a location",
+        "requestedYou": "{name} asked for your location",
+        "place": "Place",
+        "location": "Location",
+        "liveLocation": "Live location",
+        "liveEnded": "Live location ended",
+        "liveUntil": "Live until {time}",
+        "updated": "Updated",
+        "lastUpdated": "Last updated",
+        "stopSharing": "Stop sharing",
+        "openMap": "Open map",
+        "openInMaps": "Open in maps",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out",
+        "attribution": "© OpenStreetMap",
+        "sharingIn": "{count, plural, one {Sharing live location in # chat} other {Sharing live location in # chats}}",
+        "stopAll": "Stop all"
     }
 }

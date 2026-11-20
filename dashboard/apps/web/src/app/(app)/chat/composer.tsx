@@ -73,21 +73,7 @@ import {
     useVoiceRecording,
     type RecordedSound
 } from "./voice-recorder";
-import {
-    BarChart3,
-    CornerUpLeft,
-    Eye,
-    EyeOff,
-    MicOff,
-    Paperclip,
-    Plus,
-    SendHorizontal,
-    Square,
-    Timer,
-    Trash2,
-    Video,
-    X
-} from "lucide-react";
+import { BarChart3, CornerUpLeft, Eye, EyeOff, MapPin, MicOff, Paperclip, Plus, SendHorizontal, Square, Timer, Trash2, Video, X } from "lucide-react";
 import {
     ProductMark,
     Button,
@@ -153,6 +139,7 @@ export function Composer({
     polarMentions = false,
     onSchedule,
     onPoll,
+    onLocation,
     onMedia,
     onSaved,
     onSaveEdit,
@@ -321,6 +308,8 @@ export function Composer({
      * the only place the person can read it.
      */
     onPoll?: (draft: PollDraft) => Promise<{ error?: string }>;
+    /** Opens the location sheet. Absent where a location has nowhere to go. */
+    onLocation?: () => void;
     /**
      * Whether this caller can send a file that stays where it is.
      *
@@ -1616,7 +1605,7 @@ export function Composer({
                 ) : null}
 
                 <div className="flex items-center gap-0.5 px-2 pb-1.5">
-                    {!editing && phone && (mayAttach || onPoll) && (
+                    {!editing && phone && (mayAttach || onPoll || onLocation) && (
                         <button
                             type="button"
                             disabled={disabled}
@@ -1681,6 +1670,18 @@ export function Composer({
                                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                 >
                                     <BarChart3 className="size-4" />
+                                </button>
+                            )}
+                            {onLocation && !phone && (
+                                <button
+                                    type="button"
+                                    disabled={disabled}
+                                    onClick={onLocation}
+                                    aria-label={t("location.title")}
+                                    title={t("location.title")}
+                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                >
+                                    <MapPin className="size-4" />
                                 </button>
                             )}
                             {canImprove ? (
@@ -1868,7 +1869,7 @@ export function Composer({
                 />
             )}
 
-            {phone && (mayAttach || onPoll) && (
+            {phone && (mayAttach || onPoll || onLocation) && (
                 <AttachSheet
                     open={attaching}
                     onOpenChange={setAttaching}
@@ -1883,6 +1884,7 @@ export function Composer({
                               }
                             : undefined
                     }
+                    onLocation={onLocation}
                 />
             )}
 

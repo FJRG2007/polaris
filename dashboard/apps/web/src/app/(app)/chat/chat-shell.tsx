@@ -16,6 +16,7 @@
  * a 4rem message column helps nobody.
  */
 
+import { LiveLocationBar } from "./live-location-bar";
 import { ServerRail } from "./server-rail";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChatSidebar } from "./chat-sidebar";
@@ -228,6 +229,7 @@ function ChatColumns({ children }: { children: ReactNode }) {
                         style={{ "--chat-list": `${drawn}px` } as CSSProperties}
                         className={`${inConversation ? "hidden md:flex" : "flex"} min-h-0 min-w-0 flex-1 flex-col border-e border-border md:w-[var(--chat-list)] md:flex-none`}
                     >
+                        <LiveLocationBar />
                         {noServers ? (
                             <p className="px-4 py-6 text-sm text-muted-foreground">
                                 {t("phoneTabs.noServers")}

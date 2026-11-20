@@ -1431,3 +1431,98 @@ export function inviteCodesIn(body: string, origin: string | null): string[] {
     }
     return found;
 }
+
+// ---------------------------------------------------------------------------
+// Location
+// ---------------------------------------------------------------------------
+
+/** How long a live share may run, in minutes: the three lengths WhatsApp offers. */
+export const LIVE_LOCATION_MINUTES = [15, 60, 480] as const;
+/** The longest note a live share carries, the same room a caption has. */
+export const MAX_LOCATION_COMMENT = 500;
+/** The longest place name or address kept from a search answer. */
+export const MAX_PLACE_TEXT = 300;
+/** An accuracy radius past this is no fix at all, and is not kept. */
+export const MAX_LOCATION_ACCURACY_M = 100_000;
+
+export const chatLocationModes = ["pin", "place", "live", "request"] as const;
+export type ChatLocationMode = (typeof chatLocationModes)[number];
+
+/** A position as a device reported it. */
+export const geoPointSchema = z.object({
+    latitude: z.number().finite().min(-90).max(90),
+    longitude: z.number().finite().min(-180).max(180),
+    /** Metres. Dropped rather than refused when the device made no sense of it. */
+    accuracy: z
+        .number()
+        .finite()
+        .min(0)
+        .max(MAX_LOCATION_ACCURACY_M)
+        .nullable()
+        .optional()
+        .catch(null)
+});
+
+export type GeoPoint = z.infer<typeof geoPointSchema>;
+
+const placeText = z.string().trim().max(MAX_PLACE_TEXT);
+
+/**
+ * A location going out as a message.
+ *
+ * Each mode carries exactly what it means: a pin and a live share a point, a
+ * place a point and its name, a request nothing at all - it asks for one.
+ */
+export const chatLocationSendSchema = z.discriminatedUnion("mode", [
+    z.object({
+        mode: z.literal("pin"),
+        channelId: z.string().uuid(),
+        point: geoPointSchema,
+        parentId: z.string().uuid().nullable().optional(),
+        replyToId: z.string().uuid().nullable().optional()
+    }),
+    z.object({
+        mode: z.literal("place"),
+        channelId: z.string().uuid(),
+        point: geoPointSchema,
+        name: placeText.min(1),
+        address: placeText.nullable().optional(),
+        parentId: z.string().uuid().nullable().optional(),
+        replyToId: z.string().uuid().nullable().optional()
+    }),
+    z.object({
+        mode: z.literal("live"),
+        channelId: z.string().uuid(),
+        point: geoPointSchema,
+        minutes: z
+            .number()
+            .int()
+            .refine((value) => (LIVE_LOCATION_MINUTES as readonly number[]).includes(value)),
+        comment: z.string().trim().max(MAX_LOCATION_COMMENT).default(""),
+        parentId: z.string().uuid().nullable().optional(),
+        replyToId: z.string().uuid().nullable().optional()
+    }),
+    z.object({
+        mode: z.literal("request"),
+        channelId: z.string().uuid(),
+        parentId: z.string().uuid().nullable().optional(),
+        replyToId: z.string().uuid().nullable().optional()
+    })
+]);
+
+export type ChatLocationSendInput = z.infer<typeof chatLocationSendSchema>;
+
+/** Looking for a place near a point. */
+export const nearbyPlacesSchema = z.object({
+    query: z.string().trim().min(2).max(120),
+    latitude: z.number().finite().min(-90).max(90),
+    longitude: z.number().finite().min(-180).max(180)
+});
+
+/** Whether a live share is still moving at this moment. */
+export function liveLocationRunning(
+    location: { readonly liveUntil: Date | null; readonly endedAt: Date | null },
+    now = new Date()
+): boolean {
+    return location.liveUntil !== null && location.endedAt === null && location.liveUntil > now;
+}

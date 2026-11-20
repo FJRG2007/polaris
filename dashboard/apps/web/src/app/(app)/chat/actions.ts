@@ -25,6 +25,7 @@ import * as saved from "@/lib/chat/saved-media";
 import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
 import * as polls from "@/lib/chat/polls";
+import * as locations from "@/lib/chat/locations";
 import * as pins from "@/lib/chat/pins";
 import * as reminders from "@/lib/chat/reminders";
 import * as webhooks from "@/lib/chat/webhooks";
@@ -37,7 +38,8 @@ import { dismissEphemeral } from "@/lib/chat/ephemeral";
 import { publishChatChange } from "@/lib/chat/live";
 import { MOST_CHOICES, MOST_COMPONENTS } from "@/lib/chat/message-components";
 import { appCommandsFor, type AppCommandView } from "@/lib/chat/app-commands";
-import { getTranslations } from "@/lib/i18n/request";
+import { getLocale, getTranslations } from "@/lib/i18n/request";
+import { rateLimit } from "@/lib/rate-limit-service";
 import { storeAttachment } from "@/lib/chat/attachments";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
@@ -1807,4 +1809,80 @@ export async function dismissEphemeralAction(messageId: unknown): Promise<{ erro
         });
     }
     return {};
+}
+
+// ---------------------------------------------------------------------------
+// Location
+// ---------------------------------------------------------------------------
+
+/**
+ * Send where you are, a place nearby, a live share, or a request for somebody
+ * else's. Like a poll, this is `messages.send` with the place handed to it, so
+ * every rule a message obeys holds here too.
+ */
+export async function sendLocationAction(input: unknown): Promise<{ id?: string; error?: string }> {
+    const me = await actor();
+    const t = await getTranslations("chat");
+    const parsed = core.chatLocationSendSchema.safeParse(input);
+    if (!parsed.success) return { error: t("errors.locationNotSent") };
+    const data = parsed.data;
+    if (data.mode === "live" && !(await locations.mayStartLive(me))) {
+        return { error: t("errors.liveLocationLimit") };
+    }
+    const point = data.mode === "request" ? null : data.point;
+    const result = await guard(() =>
+        messages.send(
+            me,
+            { channelId: data.channelId, body: data.mode === "live" ? data.comment : "", parentId: data.parentId ?? null },
+            [],
+            data.replyToId ? { messageId: data.replyToId, forwarded: false } : null,
+            null,
+            {
+                mode: data.mode,
+                latitude: point?.latitude ?? null,
+                longitude: point?.longitude ?? null,
+                accuracy: point?.accuracy ?? null,
+                placeName: data.mode === "place" ? data.name : null,
+                address: data.mode === "place" ? (data.address ?? null) : null,
+                liveUntil: data.mode === "live" ? new Date(Date.now() + data.minutes * 60_000) : null
+            }
+        )
+    );
+    return result.error ? { error: result.error } : { id: result.value };
+}
+
+/** One location read again, for a card the live frame says has moved. */
+export async function locationAction(
+    messageId: string
+): Promise<{ location?: locations.ChatLocationView | null; error?: string }> {
+    const me = await actor();
+    if (!z.string().uuid().safeParse(messageId).success) return { location: null };
+    const result = await guard(() => locations.readLocation(me, messageId));
+    return result.error ? { error: result.error } : { location: result.value ?? null };
+}
+
+/** Stop one live share early, or every one of them when no message is named. */
+export async function stopLiveLocationAction(messageId: string | null): Promise<{ error?: string }> {
+    const me = await actor();
+    if (messageId !== null && !z.string().uuid().safeParse(messageId).success) return {};
+    return guard(() => locations.stopLive(me, messageId));
+}
+
+/** What the reader is sharing live right now. */
+export async function liveSharesAction(): Promise<{ shares: locations.LiveShareView[] }> {
+    const me = await actor();
+    return { shares: await locations.liveShares(me) };
+}
+
+/** Places near a point matching what was typed. */
+export async function nearbyPlacesAction(
+    input: unknown
+): Promise<{ places?: locations.NearbyPlace[]; error?: string }> {
+    const me = await actor();
+    const t = await getTranslations("chat");
+    const parsed = core.nearbyPlacesSchema.safeParse(input);
+    if (!parsed.success) return { places: [] };
+    if (!(await rateLimit(`chat-places:${me.id}`, 20, 60_000)).ok) return { error: t("errors.placesBusy") };
+    const found = await locations.nearbyPlaces(parsed.data, (await getLocale()).slice(0, 2));
+    return found ? { places: found } : { error: t("errors.placesUnavailable") };
 }

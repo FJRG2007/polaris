@@ -38,6 +38,7 @@ import { deleteKeyWithShift, type DeleteMessage } from "./delete-message";
 import { copyText } from "./links";
 import { plainText } from "@/components/rich-text/excerpt";
 import { PollCard } from "./poll-card";
+import { LocationCard } from "./location-card";
 import { POLARIS_APPS } from "@/lib/apps";
 import { EphemeralNote, MessageComponents } from "./message-components-view";
 import { hasCard, referenced } from "./message-references";
@@ -1196,6 +1197,16 @@ function Message({
                                 // the asker has their answer, and the moderator has
                                 // a poll that should not be running.
                                 canEnd={mine || canModerate}
+                                onError={onError}
+                            />
+                        )}
+
+                        {message.location && !message.deleted && (
+                            <LocationCard
+                                message={message}
+                                location={message.location}
+                                mine={mine}
+                                canPost={canPost}
                                 onError={onError}
                             />
                         )}

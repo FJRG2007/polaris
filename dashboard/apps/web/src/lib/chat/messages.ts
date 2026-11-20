@@ -31,6 +31,7 @@ import {
     type ChatReferenceView
 } from "./references";
 import { pollsFor, type ChatPollView } from "./polls";
+import { locationsFor, type ChatLocationView } from "./locations";
 import { mentionsReader, readerTeams } from "./notify";
 import {
     noticeExcerpt,
@@ -129,6 +130,8 @@ export interface ChatMessageView {
      * search, in a quote, in a forward or in the rail's preview.
      */
     readonly poll: ChatPollView | null;
+    /** The place under this message, when it is a location. Null otherwise. */
+    readonly location?: ChatLocationView | null;
     /** The message this one answers or forwards, already resolved to what the
      *  quote line needs. Null when it stands alone, and present-but-gone when
      *  the original was deleted - which is a different thing to say. */
@@ -516,6 +519,20 @@ export async function send(
         readonly multiple: boolean;
         readonly hideResults: boolean;
         readonly closesAt: Date | null;
+    } | null = null,
+    /**
+     * The place, when what is being sent is a location. Written in the same
+     * transaction as the message, like a poll's answers. The body is the note
+     * that goes with it, and may be empty.
+     */
+    location: {
+        readonly mode: core.ChatLocationMode;
+        readonly latitude: number | null;
+        readonly longitude: number | null;
+        readonly accuracy: number | null;
+        readonly placeName: string | null;
+        readonly address: string | null;
+        readonly liveUntil: Date | null;
     } | null = null
 ): Promise<string> {
     const access = await requirePostable(actor, input.channelId);
@@ -535,7 +552,7 @@ export async function send(
     // A forward is the exception, and it was a bug: the message being passed on
     // is the content, the note on top is optional and says so on the dialog -
     // and this refused every forward somebody sent without typing one.
-    if (attachments.length === 0 && !quote?.forwarded && isBlankMarkdown(input.body)) {
+    if (attachments.length === 0 && !quote?.forwarded && !location && isBlankMarkdown(input.body)) {
         throw new ChatRuleError({ key: "errors.bodyRequired" });
     }
 
@@ -601,7 +618,7 @@ export async function send(
                 channelId: input.channelId,
                 authorId: actor.id,
                 ...(expiresAt ? { expiresAt } : {}),
-                kind: poll ? "poll" : "text",
+                kind: poll ? "poll" : location ? "location" : "text",
                 body: input.body,
                 parentId: input.parentId ?? null,
                 replyToId: quoted,
@@ -632,7 +649,8 @@ export async function send(
                               }
                           }
                       }
-                    : {})
+                    : {}),
+                ...(location ? { location: { create: { ...location } } } : {})
             },
             select: { id: true, createdAt: true }
         });
@@ -2153,13 +2171,17 @@ export async function decorateMessages(
         .filter((row) => row.kind === "poll" && row.deletedAt === null)
         .map((row) => row.id);
 
+    const locationIds = rows
+        .filter((row) => row.kind === "location" && row.deletedAt === null)
+        .map((row) => row.id);
+
     // Only the messages with an address in them can have a flagged link, which
     // on most pages is none - and then this asks nothing.
     const linkedIds = rows
         .filter((row) => row.deletedAt === null && row.body.includes("://"))
         .map((row) => row.id);
 
-    const [authors, reactions, files, stars, quoted, previews, polls, flags] = await Promise.all([
+    const [authors, reactions, files, stars, quoted, previews, polls, flags, places] = await Promise.all([
         authorIds.length || noticeIds.length
             ? prisma.user.findMany({
                   where: { id: { in: [...new Set([...authorIds, ...noticeIds])] } },
@@ -2214,7 +2236,8 @@ export async function decorateMessages(
             : Promise.resolve([]),
         knownPreviews([...links.values()]),
         pollsFor(actor.id, pollIds),
-        flaggedLinksFor(linkedIds)
+        flaggedLinksFor(linkedIds),
+        locationsFor(locationIds)
     ]);
 
     // The quoted messages have authors of their own, and they are usually
@@ -2422,6 +2445,7 @@ export async function decorateMessages(
                 ),
             attachments: onMessageFiles.get(row.id) ?? [],
             poll: polls.get(row.id) ?? null,
+            location: places.get(row.id) ?? null,
             quote: quoteViewOf(row, quotes, names, quoteReachable, quoteHidden, actor.id),
             starred: kept.has(row.id),
             blocked: row.authorId !== null && shut.has(row.authorId),

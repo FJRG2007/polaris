@@ -152,7 +152,8 @@ describe("allowPermission", () => {
             "clipboard-sanitized-write",
             "media",
             "fullscreen",
-            "display-capture"
+            "display-capture",
+            "geolocation"
         ]) {
             expect(allowPermission(permission, "https://polaris.example.com/chat", SERVER)).toBe(true);
             expect(allowPermission(permission, "https://evil.test/", SERVER)).toBe(false);
@@ -160,7 +161,7 @@ describe("allowPermission", () => {
     });
 
     it("denies everything else, and everything before a server is set", () => {
-        for (const permission of ["geolocation", "midi", "hid", "serial", "usb", "openExternal"]) {
+        for (const permission of ["midi", "hid", "serial", "usb", "openExternal"]) {
             expect(allowPermission(permission, "https://polaris.example.com/", SERVER)).toBe(false);
         }
         expect(allowPermission("notifications", "https://polaris.example.com/", null)).toBe(false);

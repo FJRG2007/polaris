@@ -19,7 +19,7 @@ import { phoneMedia } from "@/lib/mobile-media";
 import { useMemo, useRef, type ReactNode } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { BarChart3, Camera, Images, Paperclip } from "lucide-react";
+import { BarChart3, Camera, Images, MapPin, Paperclip } from "lucide-react";
 
 /** What a photo or a video pick asks the phone for. */
 const MEDIA = "image/*,video/*";
@@ -30,7 +30,8 @@ export function AttachSheet({
     onMedia,
     onFiles,
     onPoll,
-    maxBytes = 0
+    maxBytes = 0,
+    onLocation
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -41,6 +42,8 @@ export function AttachSheet({
     onPoll?: () => void;
     /** The largest file this conversation takes; a larger recent photo cannot be chosen. */
     maxBytes?: number;
+    /** Absent where a location has nowhere to go. */
+    onLocation?: () => void;
 }) {
     const t = useTranslations("chat");
     const camera = useRef<HTMLInputElement>(null);
@@ -136,6 +139,16 @@ export function AttachSheet({
                                 onClick={() => {
                                     onOpenChange(false);
                                     onPoll();
+                                }}
+                            />
+                        ) : null}
+                        {onLocation ? (
+                            <Tile
+                                icon={<MapPin className="size-6" />}
+                                label={t("attachSheet.location")}
+                                onClick={() => {
+                                    onOpenChange(false);
+                                    onLocation();
                                 }}
                             />
                         ) : null}

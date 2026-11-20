@@ -178,4 +178,8 @@
     <string name="hosts_import_file">Open a file</string>
     <string name="hosts_export_subject">Polaris servers</string>
     <string name="hosts_export_title">Send your servers</string>
+    <string name="live_location_channel">Live location</string>
+    <string name="live_location_title">Sharing live location</string>
+    <string name="live_location_text">Your chats see where you are until it ends.</string>
+    <string name="live_location_stop">Stop</string>
 </resources>

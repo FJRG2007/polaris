@@ -56,6 +56,7 @@ public final class MainActivity extends Activity {
     private static final int CAMERA_FOR_PICK = 3;
     private static final int NOTIFICATIONS = 4;
     private static final int VPN_CONSENT = 5;
+    private static final int LOCATION = 7;
     private static final String SAVED_HOST = "polaris.host";
 
     private WebView web;
@@ -235,7 +236,34 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /** The page's geolocation prompt waiting on Android's location permission. */
+    private android.webkit.GeolocationPermissions.Callback locating;
+    private String locatingOrigin;
+
+    /** Asks Android for location, for a live share the page started before it was granted. */
+    void askLocation() {
+        requestPermissions(new String[] {Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION}, LOCATION);
+    }
+
     private final class Chrome extends WebChromeClient {
+        @Override
+        public void onGeolocationPermissionsShowPrompt(String asker, android.webkit.GeolocationPermissions.Callback callback) {
+            // Only the instance itself, and only when Chat asks: Android's own prompt comes the first time.
+            if (!ServerAddress.sameOrigin(origin, asker)) {
+                callback.invoke(asker, false, false);
+                return;
+            }
+            if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+                    || checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                callback.invoke(asker, true, false);
+                return;
+            }
+            if (locating != null) locating.invoke(locatingOrigin, false, false);
+            locating = callback;
+            locatingOrigin = asker;
+            askLocation();
+        }
+
         @Override
         public void onPermissionRequest(PermissionRequest request) {
             // Only the instance itself may ask for the camera or the microphone.
@@ -409,6 +437,14 @@ public final class MainActivity extends Activity {
         }
         if (code == DeviceMedia.REQUEST) {
             if (media != null) media.onPermissionsResult();
+            return;
+        }
+        if (code == LOCATION) {
+            boolean granted = false;
+            for (int result : results) granted |= result == PackageManager.PERMISSION_GRANTED;
+            if (locating != null) locating.invoke(locatingOrigin, granted, false);
+            locating = null;
+            locatingOrigin = null;
             return;
         }
         if (code == CAMERA_FOR_PICK) {

@@ -25,6 +25,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/app/(app)/chat/server-rail", () => ({ ServerRail: () => null }));
 vi.mock("@/app/(app)/chat/chat-sidebar", () => ({ ChatSidebar: () => null }));
+vi.mock("@/app/(app)/chat/live-location-bar", () => ({ LiveLocationBar: () => null }));
 // The lock provider sits in the shell now; its server reads are not under test here.
 vi.mock("@/app/(app)/chat/lock-dialogs", () => ({
     ChatLockProvider: ({ children }: { children: unknown }) => children

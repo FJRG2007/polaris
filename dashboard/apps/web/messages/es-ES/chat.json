@@ -252,7 +252,14 @@
         "componentNotYours": "Solo quien lo pidió puede usarlo.",
         "componentTooFast": "Demasiados intentos. Espera un poco.",
         "componentInvalid": "Revisa los campos y vuelve a probar.",
-        "taskNotCreated": "No se pudo crear la tarea. Revisa la lista y prueba otra vez."
+        "taskNotCreated": "No se pudo crear la tarea. Revisa la lista y prueba otra vez.",
+        "locationNotSent": "No se pudo enviar la ubicación",
+        "liveLocationLimit": "Compartes ubicación en tiempo real en demasiados chats",
+        "locationGone": "Esa ubicación ya no está",
+        "locationNotYours": "Solo quien la compartió puede detenerla",
+        "locationNotLive": "No es una ubicación en tiempo real",
+        "placesBusy": "Demasiadas búsquedas. Prueba en un minuto.",
+        "placesUnavailable": "La búsqueda de lugares no está disponible"
     },
     "media": {
         "refused": {
@@ -651,7 +658,8 @@
         "readFailed": "No se abrió esa foto. Reinténtalo.",
         "tooLarge": "Muy grande",
         "video": "Vídeo, {length}",
-        "photo": "Foto"
+        "photo": "Foto",
+        "location": "Ubicación"
     },
     "composer": {
         "replyingTo": "Respondiendo a",
@@ -2295,7 +2303,8 @@
         "read": "Leído",
         "delivered": "Entregado",
         "sent": "Enviado",
-        "muted": "Silenciado"
+        "muted": "Silenciado",
+        "location": "Ubicación"
     },
     "lock": {
         "lock": "Bloquear",
@@ -2637,5 +2646,49 @@
         "video": "Vídeo",
         "search": "Buscar",
         "shared": "Compartido"
+    },
+    "location": {
+        "title": "Enviar ubicación",
+        "back": "Atrás",
+        "locating": "Buscando dónde estás...",
+        "denied": "La ubicación está bloqueada para Polaris. Permítela en el navegador o en el móvil y reinténtalo.",
+        "unavailable": "Tu dispositivo no encontró dónde estás.",
+        "unsupported": "Este dispositivo no comparte ubicación.",
+        "insecure": "La ubicación solo funciona si Polaris se abre por https.",
+        "tryAgain": "Reintentar",
+        "sendCurrent": "Enviar ubicación actual",
+        "accurateTo": "Precisión de {meters} m",
+        "shareLive": "Ubicación en tiempo real",
+        "shareLiveHint": "Se mueve en el mapa contigo",
+        "request": "Pedir ubicación",
+        "requestHint": "Pide al chat que comparta la suya",
+        "searchNearby": "Buscar lugares cercanos",
+        "search": "Buscar",
+        "noPlaces": "No hay lugares cerca",
+        "forHowLong": "Durante cuánto",
+        "minutes": "{count} min",
+        "hours": "{count, plural, one {# hora} other {# horas}}",
+        "addComment": "Comentario (opcional)",
+        "liveNote": "Los miembros del chat ven dónde estás hasta que acabe o lo detengas.",
+        "startSharing": "Compartir",
+        "meters": "{meters} m",
+        "kilometers": "{km} km",
+        "youRequested": "Pediste una ubicación",
+        "requestedYou": "{name} pidió tu ubicación",
+        "place": "Lugar",
+        "location": "Ubicación",
+        "liveLocation": "En tiempo real",
+        "liveEnded": "Ubicación finalizada",
+        "liveUntil": "Hasta las {time}",
+        "updated": "Movida",
+        "lastUpdated": "Última vez",
+        "stopSharing": "Detener",
+        "openMap": "Abrir mapa",
+        "openInMaps": "Abrir en mapas",
+        "zoomIn": "Acercar",
+        "zoomOut": "Alejar",
+        "attribution": "© OpenStreetMap",
+        "sharingIn": "{count, plural, one {Compartes ubicación en # chat} other {Compartes ubicación en # chats}}",
+        "stopAll": "Parar todo"
     }
 }

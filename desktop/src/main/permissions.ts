@@ -11,6 +11,7 @@
  * - `fullscreen` - a video or a call's stage, full screen.
  * - `display-capture` - sharing a screen or a window in a call, or recording a
  *   clip of one; what is shared is picked by the person (`screen-share`).
+ * - `geolocation` - sharing a location in Chat, asked only when somebody does.
  */
 
 const GRANTED = new Set([
@@ -19,7 +20,9 @@ const GRANTED = new Set([
     "clipboard-sanitized-write",
     "media",
     "fullscreen",
-    "display-capture"
+    "display-capture",
+    // Chat's location sharing; Chromium still shows nothing until the page asks.
+    "geolocation"
 ]);
 
 /**

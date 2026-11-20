@@ -93,6 +93,7 @@ import {
 import { ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { keepReading, readingPosition, type ReadingPosition } from "./reading-position";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { LocationDialog } from "./location-dialog";
 import * as vanishActions from "./vanish-actions";
 import type { VanishDuration } from "@/lib/chat/vanish-rules";
 import {
@@ -1755,6 +1756,7 @@ export function ChannelView({
      * leave somebody looking at an error with the thing they were answering
      * already forgotten.
      */
+    const [locating, setLocating] = useState(false);
     const createPoll = async (draft: PollDraft): Promise<{ error?: string }> => {
         following.current = true;
         const result = await actions.createPollAction({
@@ -2580,6 +2582,7 @@ export function ChannelView({
                         canViewOnce
                         onSchedule={scheduleMessage}
                         onPoll={createPoll}
+                        onLocation={() => setLocating(true)}
                         onMedia={async (address) => {
                             following.current = true;
                             // The picture answers whatever the bar was pointing at, and
@@ -2619,6 +2622,21 @@ export function ChannelView({
                             if (!result?.error) patchMessage(messageId, { body, edited: true });
                         }}
                     />
+                    {locating ? (
+                        <LocationDialog
+                            open
+                            onOpenChange={setLocating}
+                            channelId={channelId}
+                            replyToId={replyingTo?.id ?? null}
+                            onSent={() => {
+                                following.current = true;
+                                setReplyingTo(null);
+                                setCarried(null);
+                                void load();
+                                refresh();
+                            }}
+                        />
+                    ) : null}
                 </>
             )}
         </HideMessage.Provider>

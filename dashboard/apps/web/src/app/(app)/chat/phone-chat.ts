@@ -44,11 +44,12 @@ export function phoneTabBadges(channels: readonly ChatChannelView[]): {
 /** What a list row or a peek says a message was. Empty for a system line. */
 export function previewText(
     last: { readonly deleted: boolean; readonly kind: string; readonly body: string },
-    t: (key: "listView.deleted" | "listView.call" | "listView.poll" | "listView.attachment") => string
+    t: (key: "listView.deleted" | "listView.call" | "listView.poll" | "listView.location" | "listView.attachment") => string
 ): string {
     if (last.deleted) return t("listView.deleted");
     if (last.kind === "call") return t("listView.call");
     if (last.kind === "poll") return t("listView.poll");
+    if (last.kind === "location") return last.body.replace(/\s+/g, " ").trim() || t("listView.location");
     if (last.kind === "system") return "";
     return last.body.replace(/\s+/g, " ").trim() || t("listView.attachment");
 }

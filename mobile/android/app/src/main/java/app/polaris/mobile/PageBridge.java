@@ -38,6 +38,17 @@ final class PageBridge {
         activity.runOnUiThread(() -> activity.startActivity(new android.content.Intent(activity, VaultActivity.class)));
     }
 
+    /** Live location in Chat, sent by a foreground service until the given moment (epoch ms). */
+    @JavascriptInterface
+    public void startLiveLocation(double untilMs) {
+        if (!LiveLocationService.start(activity, (long) untilMs)) activity.runOnUiThread(activity::askLocation);
+    }
+
+    @JavascriptInterface
+    public void stopLiveLocation() {
+        LiveLocationService.stop(activity);
+    }
+
     @JavascriptInterface
     public void changeServer() {
         activity.runOnUiThread(activity::changeServer);

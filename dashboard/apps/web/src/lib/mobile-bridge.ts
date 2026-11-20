@@ -33,6 +33,27 @@ interface PolarisMobileBridge {
     swipeBack?(available: boolean): void;
     /** The app's own settings: its servers, notifications, language, version. */
     changeServer?(): void;
+    /** Live location run by the app's own foreground service until the given
+     *  moment (epoch ms), so it keeps moving with the page closed. */
+    startLiveLocation?(untilMs: number): void;
+    stopLiveLocation?(): void;
+}
+
+/**
+ * Hand live location to the phone app, which keeps sending it with the screen
+ * off. Null stops it. Answers false in a browser and in an app too old to, where
+ * the page sends it itself while it is open.
+ */
+export function phoneLiveLocation(untilMs: number | null): boolean {
+    const app = bridge();
+    if (!app?.startLiveLocation || !app.stopLiveLocation) return false;
+    try {
+        if (untilMs === null) app.stopLiveLocation();
+        else app.startLiveLocation(untilMs);
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 /** The VPN the same shape the desktop app gives it, so the VPN page has one way to connect. */

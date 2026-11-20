@@ -10915,6 +10915,7 @@ model ChatMessage {
     reactions   ChatReaction[]
     attachments ChatAttachment[]
     poll        ChatPoll?
+    location    ChatLocation?
     stars       ChatStar[]
     reminders   ChatReminder[]
     linkFlags   ChatMessageLinkFlag[]
@@ -11260,6 +11261,38 @@ model ChatPoll {
     options ChatPollOption[]
 
     @@index([closesAt])
+}
+
+// A place on a message: where somebody is, a place they picked, a live share
+// that keeps moving until it runs out, or a request asking somebody for theirs.
+//
+// Kept beside the message rather than in its body, so a coordinate is read only
+// through the same conversation check every message goes through, and a deleted
+// message takes it along. Whether a live share is still running is worked out on
+// read from `liveUntil` and `endedAt`, the way a poll closes: nothing has to run
+// for one to stop on time, and an update after either is refused.
+model ChatLocation {
+    messageId String    @id @db.Uuid
+    // pin (where I am), place (a place picked nearby), live, request.
+    mode      String
+    latitude  Float?
+    longitude Float?
+    // Radius in metres the device vouched for, when it said.
+    accuracy  Float?
+    // A picked place's name and address.
+    placeName String?
+    address   String?
+    // When a live share stops on its own; null for every other mode.
+    liveUntil DateTime?
+    // When the sender stopped it early.
+    endedAt   DateTime?
+    // When the coordinates last moved, which the card shows as "updated".
+    movedAt   DateTime  @default(now())
+    createdAt DateTime  @default(now())
+
+    message ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@index([liveUntil])
 }
 
 // One answer on a poll.
