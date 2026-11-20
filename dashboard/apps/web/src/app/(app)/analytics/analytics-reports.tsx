@@ -1002,7 +1002,7 @@ function RetentionPanel(props: PanelProps) {
                         <table className="w-max min-w-full border-separate border-spacing-0.5 text-xs">
                             <thead>
                                 <tr>
-                                    <th className="px-2 py-1 text-start font-medium text-muted-foreground">{t("retention.cohort")}</th>
+                                    <th className="sticky start-0 z-[1] bg-card px-2 py-1 text-start font-medium text-muted-foreground">{t("retention.cohort")}</th>
                                     <th className="px-2 py-1 text-end font-medium text-muted-foreground">{t("retention.people")}</th>
                                     {Array.from({ length: grid.width }, (_, day) => (
                                         <th key={day} className="px-2 py-1 text-end font-medium text-muted-foreground">
@@ -1016,7 +1016,7 @@ function RetentionPanel(props: PanelProps) {
                                     const size = row.get(0) ?? 0;
                                     return (
                                         <tr key={cohort}>
-                                            <td className="whitespace-nowrap px-2 py-1">{format.date(cohort)}</td>
+                                            <td className="sticky start-0 z-[1] bg-card whitespace-nowrap px-2 py-1">{format.date(cohort)}</td>
                                             <td className="px-2 py-1 text-end tabular-nums">{grouped(size)}</td>
                                             {Array.from({ length: grid.width }, (_, day) => {
                                                 const value = row.get(day);

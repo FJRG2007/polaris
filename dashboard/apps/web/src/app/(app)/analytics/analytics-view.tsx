@@ -243,18 +243,13 @@ export function AnalyticsView({
                 </div>
                 {data?.shared ? <Badge variant="neutral">{t("view.sharedWithYou")}</Badge> : null}
                 <div className="flex shrink-0 items-center gap-1">
-                <SitePicker
-                    scope={scope}
-                    siteId={siteId}
-                    services={services}
-                    canOperate={seesPolaris}
-                />
                 {/* The list of every site, and adding one, belong beside the
-                    picker that moves between sites - not to the site on screen. */}
-                <Button asChild size="sm" variant="ghost" className="shrink-0">
-                    <Link href="/analytics/sites">
+                    picker that moves between sites - not to the site on screen.
+                    Icons alone on a phone, so the title row never spills. */}
+                <Button asChild size="sm" variant="ghost" className="shrink-0" title={t("sites.all")}>
+                    <Link href="/analytics/sites" aria-label={t("sites.all")}>
                         <List aria-hidden="true" />
-                        {t("sites.all")}
+                        <span className="hidden sm:inline">{t("sites.all")}</span>
                     </Link>
                 </Button>
                 {canAdd ? (
@@ -265,13 +260,27 @@ export function AnalyticsView({
                     </Button>
                 ) : null}
                 {data?.canShare && (siteId || !scopeNeedsTarget(scope)) ? (
-                    <Button variant="outline" size="sm" className="shrink-0" onClick={() => setSharing(true)}>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        title={t("view.share")}
+                        aria-label={t("view.share")}
+                        onClick={() => setSharing(true)}
+                    >
                         <Share2 aria-hidden="true" />
-                        {t("view.share")}
+                        <span className="hidden sm:inline">{t("view.share")}</span>
                     </Button>
                 ) : null}
                 </div>
                 </div>
+                {/* In the app bar from md up; its own full-width row below that. */}
+                <SitePicker
+                    scope={scope}
+                    siteId={siteId}
+                    services={services}
+                    canOperate={seesPolaris}
+                />
                 {sharing && data ? (
                     <ShareDialog
                         open
@@ -296,12 +305,21 @@ export function AnalyticsView({
             </div>
 
             {failure ? (
-                <p className="rounded-md border border-danger-edge bg-danger-soft px-4 py-3 text-sm text-danger-ink">
-                    {failure}
-                </p>
+                <div
+                    role="alert"
+                    className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-danger-edge bg-danger-soft px-4 py-3 text-sm text-danger-ink"
+                >
+                    <span className="min-w-0 flex-1 basis-48">{failure}</span>
+                    <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={load}>
+                        <RefreshCw aria-hidden="true" />
+                        {t("sessions.retry")}
+                    </Button>
+                </div>
             ) : null}
 
-            {nothingToMeasure ? (
+            {/* A read that failed with nothing to show: the sentence above and its
+                button, not skeletons that promise numbers which are not coming. */}
+            {failure && !data ? null : nothingToMeasure ? (
                 <p className="rounded-md border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
                     {scope === "external" ? t("view.noWebsites") : t("view.noServices")}
                 </p>
@@ -425,7 +443,7 @@ function SitePicker({
             onValueChange={(value) => go(scope, value)}
         />
     ) : (
-        <span className="whitespace-nowrap text-sm text-muted-foreground">
+        <span className="min-w-0 truncate text-sm text-muted-foreground" title={t("view.noServicesShort")}>
             {t("view.noServicesShort")}
         </span>
     );
@@ -440,7 +458,7 @@ function SitePicker({
                     {siteSelect}
                 </span>
             </HeaderPortal>
-            <div className="flex items-center gap-2 md:hidden">
+            <div className="flex w-full min-w-0 items-center gap-2 md:hidden">
                 {scopeSelect}
                 {siteSelect}
             </div>
@@ -910,7 +928,44 @@ function Recent({ data }: { data: AnalyticsOverview | null }) {
                         {t("recent.none")}
                     </p>
                 ) : (
-                    <div className="-mx-2 overflow-x-auto">
+                    <>
+                    {/* A phone reads each visit as a card: seven columns side by
+                        side only fit from sm up. */}
+                    <ul className="-mx-1 flex flex-col divide-y divide-border/40 sm:hidden">
+                        {data.recent.map((visit) => (
+                            <li key={visit.id} className="flex min-w-0 flex-col gap-1 px-1 py-2.5 text-sm">
+                                <span className="flex min-w-0 items-baseline gap-2">
+                                    <span
+                                        className="min-w-0 flex-1 truncate font-mono text-xs"
+                                        title={visit.lastPath ?? undefined}
+                                    >
+                                        {visit.lastPath ?? "-"}
+                                    </span>
+                                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                                        {format.time(visit.lastSeenAt, { seconds: true })}
+                                    </span>
+                                </span>
+                                <span className="flex min-w-0 items-baseline gap-2 text-xs text-muted-foreground">
+                                    <span className="min-w-0 flex-1 truncate">
+                                        {visit.country ? `${countryFlag(visit.country)} ` : ""}
+                                        {visit.referrerSource ?? t("recent.direct")}
+                                        {" - "}
+                                        {t("recent.clientOn", { browser: visit.browser, os: visit.os })}
+                                    </span>
+                                    <span className="shrink-0 tabular-nums">
+                                        {t("recent.pagesShort", { count: visit.views })}
+                                        {visit.durationSec > 0 ? ` - ${duration(visit.durationSec)}` : ""}
+                                    </span>
+                                </span>
+                                {visit.ip ? (
+                                    <span className="truncate font-mono text-[11px] text-foreground-subtle" title={visit.ip}>
+                                        {visit.ip}
+                                    </span>
+                                ) : null}
+                            </li>
+                        ))}
+                    </ul>
+                    <div className="-mx-2 hidden overflow-x-auto sm:block">
                         <table className="w-full min-w-[40rem] text-sm">
                             <thead className="text-start text-xs text-muted-foreground">
                                 <tr className="border-b border-border/60">
@@ -975,6 +1030,7 @@ function Recent({ data }: { data: AnalyticsOverview | null }) {
                             </tbody>
                         </table>
                     </div>
+                    </>
                 )}
             </CardBody>
         </Card>

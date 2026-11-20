@@ -233,9 +233,9 @@ export function TimeSeriesChart({
 
     return (
         <div className={cn("rounded-lg border border-border/60 p-3", className)}>
-            <div className="flex items-baseline justify-between gap-2">
-                {label ? <span className="text-sm font-medium">{label}</span> : <span />}
-                <span className="flex items-baseline gap-2">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                {label ? <span className="min-w-0 truncate text-sm font-medium" title={label}>{label}</span> : <span />}
+                <span className="ms-auto flex flex-wrap items-baseline justify-end gap-x-2">
                     {stats.map((stat) => (
                         <span key={stat.label} className="text-xs text-muted-foreground/70">
                             {stat.label === "avg" ? words.seriesAverage : words.seriesPeak}{" "}
@@ -257,11 +257,14 @@ export function TimeSeriesChart({
             ) : (
                 <div
                     ref={plotRef}
-                    className="relative mt-2 touch-none"
+                    className="relative mt-2 touch-pan-y"
                     style={{ height }}
                     onPointerMove={trackPointer}
                     onPointerDown={trackPointer}
-                    onPointerLeave={() => setHoverIndex(null)}
+                    onPointerLeave={(event) => {
+                        // A lifted finger leaves too; its readout stays until the next tap.
+                        if (event.pointerType !== "touch") setHoverIndex(null);
+                    }}
                     onPointerCancel={() => setHoverIndex(null)}
                 >
                     <svg
@@ -501,11 +504,13 @@ export function MultiSeriesChart({
             ) : (
                 <div
                     ref={plotRef}
-                    className="relative mt-2 touch-none"
+                    className="relative mt-2 touch-pan-y"
                     style={{ height }}
                     onPointerMove={trackPointer}
                     onPointerDown={trackPointer}
-                    onPointerLeave={() => setHoverAt(null)}
+                    onPointerLeave={(event) => {
+                        if (event.pointerType !== "touch") setHoverAt(null);
+                    }}
                     onPointerCancel={() => setHoverAt(null)}
                 >
                     <svg

@@ -170,13 +170,13 @@ export function SitesView({ canAdd }: { canAdd: boolean }) {
             <Card className="min-w-0">
                 <CardBody className="p-0">
                     <div className="min-w-0 overflow-x-auto">
-                        <table className="w-full min-w-[40rem] table-fixed text-sm">
+                        <table className="w-full table-fixed text-sm sm:min-w-[40rem]">
                             <thead>
                                 <tr className="border-b border-border text-start text-xs text-muted-foreground">
-                                    <th className="w-[34%] px-4 py-2 font-medium">{t("sites.colName")}</th>
-                                    <th className="w-[26%] px-3 py-2 font-medium">{t("sites.colAddress")}</th>
-                                    <th className="w-[12%] px-3 py-2 text-end font-medium">{t("sites.colVisitors")}</th>
-                                    <th className="w-[12%] px-3 py-2 font-medium">{t("sites.colTag")}</th>
+                                    <th className="px-4 py-2 font-medium sm:w-[34%]">{t("sites.colName")}</th>
+                                    <th className="hidden w-[26%] px-3 py-2 font-medium sm:table-cell">{t("sites.colAddress")}</th>
+                                    <th className="hidden w-[12%] px-3 py-2 text-end font-medium sm:table-cell">{t("sites.colVisitors")}</th>
+                                    <th className="hidden w-[12%] px-3 py-2 font-medium sm:table-cell">{t("sites.colTag")}</th>
                                     <th className="hidden w-[12%] px-3 py-2 font-medium lg:table-cell">{t("sites.colCreated")}</th>
                                     <th className="w-12 px-2 py-2">
                                         <span className="sr-only">{t("sites.colActions")}</span>
@@ -210,14 +210,26 @@ export function SitesView({ canAdd }: { canAdd: boolean }) {
                                                               {t(`scopes.${site.scope}`)}
                                                           </Badge>
                                                       </Link>
+                                                      {/* The columns a phone drops, folded under the name. */}
+                                                      <span className="mt-1 flex min-w-0 items-center gap-2 ps-6 text-xs text-muted-foreground sm:hidden">
+                                                          <span className="min-w-0 flex-1 truncate" title={address || undefined}>
+                                                              {address || t("sites.noAddress")}
+                                                          </span>
+                                                          <span className="shrink-0 tabular-nums" title={t("sites.colVisitors")}>
+                                                              {site.visitors}
+                                                          </span>
+                                                          <Badge variant={site.trackerEnabled ? "success" : "neutral"} className="shrink-0">
+                                                              {site.trackerEnabled ? t("sites.tagOn") : t("sites.tagOff")}
+                                                          </Badge>
+                                                      </span>
                                                   </td>
-                                                  <td className="px-3 py-2">
+                                                  <td className="hidden px-3 py-2 sm:table-cell">
                                                       <span className="block min-w-0 truncate text-muted-foreground" title={address || undefined}>
                                                           {address || t("sites.noAddress")}
                                                       </span>
                                                   </td>
-                                                  <td className="px-3 py-2 text-end tabular-nums">{site.visitors}</td>
-                                                  <td className="px-3 py-2">
+                                                  <td className="hidden px-3 py-2 text-end tabular-nums sm:table-cell">{site.visitors}</td>
+                                                  <td className="hidden px-3 py-2 sm:table-cell">
                                                       <Badge variant={site.trackerEnabled ? "success" : "neutral"}>
                                                           {site.trackerEnabled ? t("sites.tagOn") : t("sites.tagOff")}
                                                       </Badge>

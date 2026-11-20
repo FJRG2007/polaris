@@ -76,7 +76,8 @@
         "client": "Cliente",
         "time": "Tiempo",
         "direct": "Directo",
-        "clientOn": "{browser} en {os}"
+        "clientOn": "{browser} en {os}",
+        "pagesShort": "{count, plural, one {# página} other {# páginas}}"
     },
     "tracker": {
         "title": "Rastreador",

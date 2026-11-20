@@ -213,7 +213,7 @@ export function LabCard({ scope, siteId, canEdit }: { scope: AnalyticsScope; sit
                                 <table className="w-full min-w-[32rem] text-sm">
                                     <thead>
                                         <tr className="text-start text-xs text-muted-foreground">
-                                            <th className="py-1 pe-3 font-medium">{t("lab.when")}</th>
+                                            <th className="sticky start-0 z-[1] bg-card py-1 pe-3 font-medium">{t("lab.when")}</th>
                                             <th className="py-1 pe-3 font-medium">{t("lab.device")}</th>
                                             {SCORES.map((key) => (
                                                 <th key={key} className="py-1 pe-3 text-end font-medium">
@@ -225,7 +225,7 @@ export function LabCard({ scope, siteId, canEdit }: { scope: AnalyticsScope; sit
                                     <tbody>
                                         {history.map((run) => (
                                             <tr key={run.id} className="border-t border-border">
-                                                <td className="py-1.5 pe-3 whitespace-nowrap" title={t(`lab.trigger.${run.triggeredBy}`)}>
+                                                <td className="sticky start-0 z-[1] bg-card py-1.5 pe-3 whitespace-nowrap" title={t(`lab.trigger.${run.triggeredBy}`)}>
                                                     {format.dateTime(run.finishedAt ?? run.createdAt)}
                                                 </td>
                                                 <td className="py-1.5 pe-3">{t(`lab.strategy.${run.strategy}`)}</td>

@@ -543,18 +543,20 @@ export function RealtimeSection(props: PanelProps) {
     return (
         <div className="flex flex-col gap-3">
             <Failure message={error} />
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {/* Three small numbers side by side even on a phone: stacked, they
+                pushed the chart a screen down. The labels wrap rather than cut. */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
                 {tiles.map((tile) => (
                     <Card key={tile.label} className="min-w-0">
-                        <CardBody className="flex flex-col gap-1">
-                            <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                                {tile.live ? <span className="size-1.5 shrink-0 animate-pulse rounded-full bg-success" /> : null}
-                                <span className="truncate" title={tile.label}>{tile.label}</span>
+                        <CardBody className="flex flex-col gap-1 p-3 sm:p-4">
+                            <span className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground">
+                                {tile.live ? <span className="mt-1.5 size-1.5 shrink-0 animate-pulse rounded-full bg-success" /> : null}
+                                <span className="min-w-0 break-words">{tile.label}</span>
                             </span>
                             {tile.value === null ? (
                                 <Skeleton className="h-7 w-16" />
                             ) : (
-                                <span className="text-2xl font-semibold tabular-nums">{grouped(tile.value)}</span>
+                                <span className="truncate text-xl font-semibold tabular-nums sm:text-2xl">{grouped(tile.value)}</span>
                             )}
                         </CardBody>
                     </Card>

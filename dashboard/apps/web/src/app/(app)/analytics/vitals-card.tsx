@@ -76,7 +76,7 @@ export function VitalsCard(props: PanelProps) {
                             <table className="w-full min-w-[36rem] text-sm">
                                 <thead>
                                     <tr className="text-start text-xs text-muted-foreground">
-                                        <th className="py-1 pe-3 font-medium">{t("vitals.page")}</th>
+                                        <th className="sticky start-0 z-[1] bg-card min-w-[8rem] py-1 pe-3 font-medium">{t("vitals.page")}</th>
                                         {(["lcp", "inp", "cls"] as const).map((metric) => (
                                             <th key={metric} className="py-1 pe-3 text-end font-medium">
                                                 {label(metric)}
@@ -88,7 +88,7 @@ export function VitalsCard(props: PanelProps) {
                                 <tbody>
                                     {report.pages.map((row) => (
                                         <tr key={row.path} className="border-t border-border">
-                                            <td className="max-w-0 py-1.5 pe-3">
+                                            <td className="sticky start-0 z-[1] bg-card min-w-[8rem] max-w-0 py-1.5 pe-3">
                                                 <span className="block truncate" title={row.path}>
                                                     {row.path}
                                                 </span>

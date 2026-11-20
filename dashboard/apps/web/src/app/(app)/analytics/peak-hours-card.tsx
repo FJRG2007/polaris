@@ -79,7 +79,7 @@ export function PeakHoursCard(props: PanelProps) {
                             <table className="w-full min-w-[34rem] border-separate border-spacing-0.5 text-[10px]">
                                 <thead>
                                     <tr>
-                                        <th className="w-10" />
+                                        <th className="sticky start-0 z-[1] bg-card w-10" />
                                         {HOURS.map((hour) => (
                                             <th key={hour} className="font-normal tabular-nums text-muted-foreground">
                                                 {hour % 3 === 0 ? String(hour).padStart(2, "0") : ""}
@@ -90,7 +90,7 @@ export function PeakHoursCard(props: PanelProps) {
                                 <tbody>
                                     {DAYS.map((day) => (
                                         <tr key={day}>
-                                            <th className="truncate pe-1 text-start font-normal text-muted-foreground">
+                                            <th className="sticky start-0 z-[1] bg-card truncate pe-1 text-start font-normal text-muted-foreground">
                                                 {dayNames[day - 1]}
                                             </th>
                                             {HOURS.map((hour) => {

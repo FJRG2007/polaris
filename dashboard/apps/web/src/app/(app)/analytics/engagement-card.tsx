@@ -46,7 +46,7 @@ export function EngagementCard(props: PanelProps) {
                         <table className="w-full min-w-[32rem] text-sm">
                             <thead className="text-start text-xs text-muted-foreground">
                                 <tr>
-                                    <th className="py-1 pe-3 font-medium">{t("engagement.page")}</th>
+                                    <th className="sticky start-0 z-[1] bg-card min-w-[8rem] py-1 pe-3 font-medium">{t("engagement.page")}</th>
                                     <th className="py-1 pe-3 text-end font-medium">{t("engagement.scroll")}</th>
                                     <th className="py-1 pe-3 text-end font-medium">{t("engagement.deep")}</th>
                                     <th className="py-1 pe-3 text-end font-medium">{t("engagement.time")}</th>
@@ -56,7 +56,7 @@ export function EngagementCard(props: PanelProps) {
                             <tbody>
                                 {report.pages.map((row) => (
                                     <tr key={row.path} className="border-t border-border/60">
-                                        <td className="max-w-0 py-1.5 pe-3">
+                                        <td className="sticky start-0 z-[1] bg-card min-w-[8rem] max-w-0 py-1.5 pe-3">
                                             <span className="block truncate font-mono text-xs" title={row.path}>
                                                 {row.path}
                                             </span>
