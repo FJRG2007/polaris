@@ -50,6 +50,27 @@ final class PageBridge {
         return activity.lastPickSource();
     }
 
+    /** Whether this app reads the phone's gallery for the page: the + sheet shows the recent photos only then. */
+    @JavascriptInterface
+    public boolean canMedia() {
+        return true;
+    }
+
+    /** The gallery (`DeviceMedia`): `op` is access, request, manage, settings, list, thumb or read, `args` its JSON. The
+     *  answer comes back to `window.__polarisMobileMedia(id, json)`. */
+    @JavascriptInterface
+    public void mediaCall(String id, String op, String args) {
+        if (!validId(id) || op == null || op.length() > 16 || args == null || args.length() > 1024) return;
+        org.json.JSONObject parsed;
+        try {
+            parsed = new org.json.JSONObject(args);
+        } catch (org.json.JSONException unreadable) {
+            parsed = new org.json.JSONObject();
+        }
+        org.json.JSONObject input = parsed;
+        activity.runOnUiThread(() -> activity.mediaCall(id, op, input));
+    }
+
     /** Whether this app can open a view-once photo or video: the page offers the button only when it can. */
     @JavascriptInterface
     public boolean canViewOnce() {

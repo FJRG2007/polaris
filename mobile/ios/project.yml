@@ -53,6 +53,9 @@ targets:
         NSCameraUsageDescription: Polaris uses the camera in calls you join.
         NSMicrophoneUsageDescription: Polaris uses the microphone in calls you join.
         NSPhotoLibraryAddUsageDescription: Polaris saves the pictures you download to your library.
+        NSPhotoLibraryUsageDescription: Polaris shows your recent photos and videos so you can send them in chat.
+        # Limited access is managed from chat's + sheet, when the person asks, not by a system alert at launch.
+        PHPhotoLibraryPreventAutomaticLimitedAccessAlert: true
         # A Polaris at home is often reached by plain http on the local network.
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true

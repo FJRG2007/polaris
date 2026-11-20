@@ -13,6 +13,9 @@ interface PolarisMobileBridge {
     version?(): string;
     /** "camera" or "gallery" for the file the last picker returned, else "". */
     lastPickSource?(): string;
+    /** The phone's gallery for chat's "+" sheet; used through `lib/mobile-media.ts`. */
+    canMedia?(): boolean;
+    mediaCall?(id: string, op: string, args: string): void;
     canViewOnce?(): boolean;
     openViewOnce?(attachmentId: string): void;
     /** Hand a web or mail address to the phone's browser or mail app. */

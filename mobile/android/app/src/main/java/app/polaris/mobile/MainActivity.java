@@ -77,6 +77,7 @@ public final class MainActivity extends Activity {
     private File photoTaken;
     private File videoTaken;
     private volatile String pickSource = "";
+    private DeviceMedia media;
     /** Back while the page has somewhere to go back to (Android 13+). Registered only then, so that on the first
      *  page the system's own back - and its predictive animation home - is what happens. */
     private Object pageBack;
@@ -282,9 +283,12 @@ public final class MainActivity extends Activity {
         final boolean multiple;
         final boolean images;
         final boolean videos;
+        /** `capture` on the input: the page's own Camera button, which opens the camera and nothing else. */
+        final boolean capture;
 
         Pick(WebChromeClient.FileChooserParams params) {
             intent = params.createIntent();
+            capture = params.isCaptureEnabled();
             multiple = params.getMode() == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE;
             boolean any = true;
             boolean image = false;
@@ -324,6 +328,16 @@ public final class MainActivity extends Activity {
                 cameras.add(capture(MediaStore.ACTION_VIDEO_CAPTURE, videoTaken));
             }
         }
+        if (pick.capture && !cameras.isEmpty()) {
+            // A photo, the way a phone's camera button opens: the video one is a swipe away inside the camera app.
+            if (photoTaken != null) videoTaken = null;
+            try {
+                startActivityForResult(cameras.get(0), PICK_FILES);
+                return true;
+            } catch (ActivityNotFoundException none) {
+                // No camera app: the chooser below still has the gallery.
+            }
+        }
         Intent chooser = Intent.createChooser(gallery, null);
         if (!cameras.isEmpty()) chooser.putExtra(Intent.EXTRA_INITIAL_INTENTS, cameras.toArray(new Intent[0]));
         try {
@@ -342,6 +356,24 @@ public final class MainActivity extends Activity {
         intent.setClipData(ClipData.newRawUri("", uri));
         intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
         return intent;
+    }
+
+    /** A call from the page for the gallery; only the page of the Polaris this window belongs to is answered. */
+    void mediaCall(String id, String op, JSONObject args) {
+        if (web == null || !ServerAddress.sameOrigin(origin, web.getUrl())) return;
+        if (media == null) media = new DeviceMedia(this);
+        media.call(id, op, args);
+    }
+
+    void mediaAnswer(String id, String json) {
+        if (web == null) return;
+        web.evaluateJavascript("window.__polarisMobileMedia && window.__polarisMobileMedia(" + JSONObject.quote(id) + ","
+                + JSONObject.quote(json) + ")", null);
+    }
+
+    /** What the page read from the gallery goes to the photo editor as a gallery pick, like the system chooser's. */
+    void pickedFromGallery() {
+        pickSource = "gallery";
     }
 
     /** Read once: a file pasted or dropped after a pick is not that pick's. */
@@ -373,6 +405,10 @@ public final class MainActivity extends Activity {
         if (code == NOTIFICATIONS) {
             NoticeService.start(this);
             askToStayAwake();
+            return;
+        }
+        if (code == DeviceMedia.REQUEST) {
+            if (media != null) media.onPermissionsResult();
             return;
         }
         if (code == CAMERA_FOR_PICK) {
@@ -671,6 +707,7 @@ public final class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         VpnTunnel.get(this).unlisten(vpnListener);
+        if (media != null) media.shutdown();
         if (web != null) {
             web.destroy();
             web = null;

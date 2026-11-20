@@ -17,6 +17,8 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     /// seconds at first, then less often, so it comes back as soon as Polaris does without anybody pressing a button.
     private var retry: Timer?
     private var retries = 0
+    /// The phone's gallery for chat's "+" sheet, made the first time the page asks.
+    private lazy var media = DeviceMedia(presenter: self) { [weak self] id, result in self?.mediaAnswer(id, result) }
 
     init(host: Host, path: String? = nil, changeServer: @escaping () -> Void) {
         self.host = host
@@ -60,6 +62,10 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             },
             vpnDown: function (id) {
                 window.webkit.messageHandlers.polarisMobile.postMessage({ kind: "vpnDown", id: String(id) });
+            },
+            canMedia: function () { return true; },
+            mediaCall: function (id, op, args) {
+                window.webkit.messageHandlers.polarisMobile.postMessage({ kind: "media", id: String(id), op: String(op), args: String(args) });
             },
             swipeBack: function (available) {
                 window.webkit.messageHandlers.polarisMobile.postMessage(available ? "swipeBack:on" : "swipeBack:off");
@@ -278,6 +284,12 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         guard let body = message.body as? [String: Any], let kind = body["kind"] as? String,
               let id = body["id"] as? String, id.count <= 40,
               id.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) || $0 == "-" }) else { return }
+        if kind == "media" {
+            guard let op = body["op"] as? String, op.count <= 16, let raw = (body["args"] as? String)?.data(using: .utf8),
+                  raw.count <= 1024 else { return }
+            let args = (try? JSONSerialization.jsonObject(with: raw)) as? [String: Any] ?? [:]
+            return media.call(id: id, op: op, args: args)
+        }
         if kind == "vpnDown" { return vpnAnswer(id, "") }
         guard kind == "vpnUp", let input = (body["input"] as? String)?.data(using: .utf8), input.count <= 16 * 1024,
               let connection = try? JSONDecoder().decode(VpnHandoff.Connection.self, from: input),
@@ -301,6 +313,14 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     /// How one VPN request of the page's ended: "" when it worked, else a code the page puts in words.
     private func vpnAnswer(_ id: String, _ error: String) {
         let call = "window.__polarisMobileVpn && window.__polarisMobileVpn(\(Self.jsString(id)), \(Self.jsString(error)))"
+        web.evaluateJavaScript(call, completionHandler: nil)
+    }
+
+    /// One answer to the page's gallery: a JSON object, which can carry a chunk of a photo.
+    private func mediaAnswer(_ id: String, _ result: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: result),
+              let json = String(data: data, encoding: .utf8) else { return }
+        let call = "window.__polarisMobileMedia && window.__polarisMobileMedia(\(Self.jsString(id)), \(Self.jsString(json)))"
         web.evaluateJavaScript(call, completionHandler: nil)
     }
 

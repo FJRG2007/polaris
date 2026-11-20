@@ -636,7 +636,22 @@
         "camera": "Camera",
         "photos": "Photos",
         "files": "Files",
-        "poll": "Poll"
+        "poll": "Poll",
+        "recent": "Recent photos and videos",
+        "allowText": "See your recent photos and videos here.",
+        "allow": "Allow access",
+        "deniedText": "Polaris can't see your photos. Turn it on in Settings.",
+        "openSettings": "Open Settings",
+        "limitedText": "Polaris sees only the photos you chose.",
+        "manage": "Manage",
+        "empty": "No photos or videos yet.",
+        "loadFailed": "Couldn't load your photos.",
+        "retry": "Try again",
+        "add": "Add {count}",
+        "readFailed": "Couldn't open that photo. Try again.",
+        "tooLarge": "Too large",
+        "video": "Video, {length}",
+        "photo": "Photo"
     },
     "composer": {
         "replyingTo": "Replying to",

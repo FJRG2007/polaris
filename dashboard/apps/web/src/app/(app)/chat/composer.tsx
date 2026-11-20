@@ -1874,6 +1874,7 @@ export function Composer({
                     onOpenChange={setAttaching}
                     onMedia={mayAttach ? pickMedia : undefined}
                     onFiles={mayAttach ? () => setPicking(true) : undefined}
+                    maxBytes={maxBytes}
                     onPoll={
                         onPoll
                             ? () => {

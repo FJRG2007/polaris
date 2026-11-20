@@ -7,11 +7,16 @@
  *
  * Camera and Photos go straight to the phone's own camera and gallery - no
  * Polaris dialog in between - and land in the media editor like any other pick.
+ * Inside the Polaris phone app the recent photos and videos are right there in a
+ * grid to tap (`recent-media.tsx`), as Discord and Signal show them; Photos then
+ * stays as the way to everything else in the gallery.
  * Files is the picker Mail uses, so Drive is there too. Poll is offered only
  * where a poll has somewhere to go.
  */
 
-import { useRef, type ReactNode } from "react";
+import { RecentMedia } from "./recent-media";
+import { phoneMedia } from "@/lib/mobile-media";
+import { useMemo, useRef, type ReactNode } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { BarChart3, Camera, Images, Paperclip } from "lucide-react";
@@ -24,7 +29,8 @@ export function AttachSheet({
     onOpenChange,
     onMedia,
     onFiles,
-    onPoll
+    onPoll,
+    maxBytes = 0
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -33,10 +39,14 @@ export function AttachSheet({
     onFiles?: () => void;
     /** Absent where a poll makes no sense. */
     onPoll?: () => void;
+    /** The largest file this conversation takes; a larger recent photo cannot be chosen. */
+    maxBytes?: number;
 }) {
     const t = useTranslations("chat");
     const camera = useRef<HTMLInputElement>(null);
     const gallery = useRef<HTMLInputElement>(null);
+    // The phone app's gallery, read once: null in a browser and in an older app.
+    const device = useMemo(() => phoneMedia(), []);
 
     const take = (input: HTMLInputElement | null) => {
         const files = input?.files ? Array.from(input.files) : [];
@@ -73,17 +83,34 @@ export function AttachSheet({
                 <DialogContent phone="sheet" showClose={false} className="flex flex-col gap-4 bg-background">
                     <span aria-hidden className="mx-auto -mt-2 h-1 w-10 shrink-0 rounded-full bg-border-strong" />
                     <DialogTitle className="sr-only">{t("attachSheet.title")}</DialogTitle>
+                    {device && onMedia && onFiles ? (
+                        <RecentMedia
+                            media={device}
+                            maxBytes={maxBytes}
+                            onCamera={() => {
+                                onOpenChange(false);
+                                camera.current?.click();
+                            }}
+                            onPick={(files) => {
+                                onOpenChange(false);
+                                if (files.length > 0) onMedia(files);
+                            }}
+                        />
+                    ) : null}
+                    {/* Four to a row, so another way to add something has room beside these. */}
                     <div className="grid grid-cols-4 gap-2">
                         {onMedia && onFiles ? (
                             <>
-                                <Tile
-                                    icon={<Camera className="size-6" />}
-                                    label={t("attachSheet.camera")}
-                                    onClick={() => {
-                                        onOpenChange(false);
-                                        camera.current?.click();
-                                    }}
-                                />
+                                {device ? null : (
+                                    <Tile
+                                        icon={<Camera className="size-6" />}
+                                        label={t("attachSheet.camera")}
+                                        onClick={() => {
+                                            onOpenChange(false);
+                                            camera.current?.click();
+                                        }}
+                                    />
+                                )}
                                 <Tile
                                     icon={<Images className="size-6" />}
                                     label={t("attachSheet.photos")}

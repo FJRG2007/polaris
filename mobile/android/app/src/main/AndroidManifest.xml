@@ -16,6 +16,12 @@
     <uses-permission android:name="android.permission.DETECT_SCREEN_CAPTURE" />
     <!-- Vault autofill: the phone's own fingerprint/face/PIN prompt opens the vault key. -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Chat's + sheet shows the recent photos and videos (DeviceMedia), asked for the first time it opens. Android 14
+         adds "Select photos", which grants READ_MEDIA_VISUAL_USER_SELECTED alone. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
 
     <!-- Vault autofill names a new login after the app it was typed in, which needs that app to be visible here. -->
     <queries>
