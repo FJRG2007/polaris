@@ -6,7 +6,7 @@ import android.webkit.JavascriptInterface;
  * What the page can ask of the app, as `window.polarisMobile`: which app and version it is running in, the way to the
  * list of Polaris servers, where the last picked file came from, and opening a photo sent to be seen once. Nothing here
  * hands the page anything it could not already see: a view-once file is fetched and shown by the app, never given to
- * the page.
+ * the page, and the VPN's private key stays in the app.
  */
 final class PageBridge {
     private final MainActivity activity;
@@ -47,5 +47,45 @@ final class PageBridge {
     public void openViewOnce(String attachmentId) {
         if (attachmentId == null || !attachmentId.matches("[0-9a-f-]{36}")) return;
         activity.runOnUiThread(() -> activity.openViewOnce(attachmentId));
+    }
+
+    /** Whether this app runs the VPN itself: the VPN page offers Connect only when it does. */
+    @JavascriptInterface
+    public boolean canVpn() {
+        return true;
+    }
+
+    @JavascriptInterface
+    public String vpnDeviceName() {
+        return VpnTunnel.deviceName(activity);
+    }
+
+    /** The public half of this phone's VPN key; the private one never leaves the app. "" if none can be made. */
+    @JavascriptInterface
+    public String vpnKey() {
+        return activity.vpnKey();
+    }
+
+    /** Connect with what Polaris answered; the outcome comes back to `window.__polarisMobileVpn(id, error)`. */
+    @JavascriptInterface
+    public void vpnUp(String id, String json) {
+        if (!validId(id) || json == null || json.length() > 16 * 1024) return;
+        activity.runOnUiThread(() -> activity.vpnUp(id, json));
+    }
+
+    @JavascriptInterface
+    public void vpnDown(String id) {
+        if (!validId(id)) return;
+        activity.runOnUiThread(() -> activity.vpnDown(id));
+    }
+
+    /** `{"nodeId": ...}`: the place the tunnel is up to, null while it is off. */
+    @JavascriptInterface
+    public String vpnStatus() {
+        return VpnTunnel.get(activity).statusJson();
+    }
+
+    private static boolean validId(String id) {
+        return id != null && id.matches("[A-Za-z0-9-]{1,40}");
     }
 }

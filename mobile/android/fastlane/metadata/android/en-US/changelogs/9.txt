@@ -1,0 +1,1 @@
+Connect to your Polaris VPN from the phone: pick a location on the VPN page and press Connect. A Quick Settings tile turns it on and off with one tap.

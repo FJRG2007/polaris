@@ -12,6 +12,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.net.Uri;
+import android.net.VpnService;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
@@ -40,6 +41,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 /**
  * Polaris itself, in a window of its own: the instance the phone was pointed at, signed in like any browser and kept
@@ -52,6 +55,7 @@ public final class MainActivity extends Activity {
     private static final int MEDIA_PERMISSIONS = 2;
     private static final int CAMERA_FOR_PICK = 3;
     private static final int NOTIFICATIONS = 4;
+    private static final int VPN_CONSENT = 5;
     private static final String SAVED_HOST = "polaris.host";
 
     private WebView web;
@@ -60,6 +64,13 @@ public final class MainActivity extends Activity {
     private ProgressBar loading;
     private ServerStore.Host host;
     private String origin;
+    /** A connect the page asked for, waiting on Android's VPN consent screen. */
+    private String vpnWaitingId;
+    private JSONObject vpnWaitingInput;
+    /** The page hears when the tunnel goes up or down, from here or from the Quick Settings tile. */
+    private final VpnTunnel.Listener vpnListener = () -> {
+        if (web != null) web.evaluateJavascript("window.dispatchEvent(new Event(\"polaris-mobile-vpn\"))", null);
+    };
     private ValueCallback<Uri[]> picking;
     private PermissionRequest asking;
     private Pick pendingPick;
@@ -98,6 +109,7 @@ public final class MainActivity extends Activity {
         change.setOnClickListener(view -> changeServer());
 
         configure(web);
+        VpnTunnel.get(this).listen(vpnListener);
         // A page saved for another Polaris is not restored into this one's window.
         if (saved != null && host.id.equals(saved.getString(SAVED_HOST))) web.restoreState(saved);
         else saved = null;
@@ -372,6 +384,16 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onActivityResult(int code, int result, Intent data) {
+        if (code == VPN_CONSENT) {
+            String id = vpnWaitingId;
+            JSONObject input = vpnWaitingInput;
+            vpnWaitingId = null;
+            vpnWaitingInput = null;
+            if (id == null) return;
+            if (result != RESULT_OK || input == null) vpnAnswer(id, VpnTunnel.DENIED);
+            else VpnTunnel.get(this).up(origin, input, error -> vpnAnswer(id, error));
+            return;
+        }
         if (code != PICK_FILES || picking == null) {
             super.onActivityResult(code, result, data);
             return;
@@ -521,6 +543,49 @@ public final class MainActivity extends Activity {
      * manifest opts in), so this is the older systems' path only; the app has no AndroidX to take the dispatcher from.
      */
     @SuppressLint("GestureBackNavigation")
+    /** The page's Connect: Android's consent screen first, the one time it is needed, then the tunnel. */
+    void vpnUp(String id, String json) {
+        JSONObject input;
+        try {
+            input = new JSONObject(json);
+        } catch (JSONException bad) {
+            vpnAnswer(id, VpnTunnel.FAILED);
+            return;
+        }
+        Intent consent = VpnService.prepare(this);
+        if (consent == null) {
+            VpnTunnel.get(this).up(origin, input, error -> vpnAnswer(id, error));
+            return;
+        }
+        if (vpnWaitingId != null) vpnAnswer(vpnWaitingId, VpnTunnel.DENIED);
+        vpnWaitingId = id;
+        vpnWaitingInput = input;
+        try {
+            startActivityForResult(consent, VPN_CONSENT);
+        } catch (ActivityNotFoundException none) {
+            vpnWaitingId = null;
+            vpnWaitingInput = null;
+            vpnAnswer(id, VpnTunnel.DENIED);
+        }
+    }
+
+    void vpnDown(String id) {
+        VpnTunnel.get(this).down(error -> vpnAnswer(id, error));
+    }
+
+    String vpnKey() {
+        String key = VpnTunnel.get(this).publicKey(origin);
+        return key == null ? "" : key;
+    }
+
+    /** How one request of the page's ended: "" when it worked, else a code it puts in words. */
+    private void vpnAnswer(String id, String error) {
+        if (web == null) return;
+        String call = "window.__polarisMobileVpn && window.__polarisMobileVpn(" + JSONObject.quote(id) + ","
+                + JSONObject.quote(error == null ? "" : error) + ")";
+        web.evaluateJavascript(call, null);
+    }
+
     @Override
     public void onBackPressed() {
         if (web != null && web.canGoBack()) web.goBack();
@@ -529,6 +594,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        VpnTunnel.get(this).unlisten(vpnListener);
         if (web != null) {
             web.destroy();
             web = null;

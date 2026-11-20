@@ -121,6 +121,22 @@
             android:exported="false"
             android:foregroundServiceType="remoteMessaging" />
 
+        <!-- The VPN in Quick Settings. The tunnel itself runs in the WireGuard library's own VpnService, which its
+             manifest adds. -->
+        <service
+            android:name=".VpnTile"
+            android:exported="true"
+            android:icon="@drawable/ic_vpn"
+            android:label="@string/vpn_tile"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>
+
         <receiver
             android:name=".BootReceiver"
             android:exported="true">
