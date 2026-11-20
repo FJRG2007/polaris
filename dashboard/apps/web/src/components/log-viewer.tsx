@@ -565,7 +565,7 @@ const LogRow = memo(function LogRow({
                 type="button"
                 onClick={copy}
                 aria-label={t("logViewer.copyEntry")}
-                className="absolute end-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-zinc-400 transition-colors hover:bg-white/10 hover:text-zinc-100 group-hover:block"
+                className="absolute end-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-zinc-400 transition-colors hover:bg-white/10 hover:text-zinc-100 group-hover:block [@media(hover:none)]:block"
             >
                 {copied ? (
                     <Check className="size-3.5 text-success" />

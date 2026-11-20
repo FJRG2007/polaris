@@ -8,6 +8,10 @@ import preset from "@polaris/ui/preset";
  */
 const config: Config = {
     presets: [preset],
+    // `hover:` only where the pointer really hovers. A touch screen keeps the
+    // last tapped element "hovered" until the next tap, so every round icon
+    // button on a phone stayed lit after it was pressed.
+    future: { hoverOnlyWhenSupported: true },
     content: [
         "./src/**/*.{ts,tsx}",
         "../../packages/ui/src/**/*.{ts,tsx}",
