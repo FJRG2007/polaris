@@ -32,6 +32,7 @@ public final class HostsActivity extends Activity {
         list = findViewById(R.id.hosts);
         Button add = findViewById(R.id.add_host);
         add.setOnClickListener(view -> startActivity(new Intent(this, ServerActivity.class)));
+        findViewById(R.id.vault_autofill).setOnClickListener(view -> startActivity(new Intent(this, VaultActivity.class)));
     }
 
     @Override

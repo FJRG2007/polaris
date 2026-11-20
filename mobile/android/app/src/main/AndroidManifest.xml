@@ -14,6 +14,16 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.DETECT_SCREEN_CAPTURE" />
+    <!-- Vault autofill: the phone's own fingerprint/face/PIN prompt opens the vault key. -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
+    <!-- Vault autofill names a new login after the app it was typed in, which needs that app to be visible here. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
@@ -136,5 +146,41 @@
             android:authorities="app.polaris.mobile.capture"
             android:exported="false"
             android:grantUriPermissions="true" />
+
+        <!-- Polaris Vault autofill: the service, its screen (also opened from the phone's autofill settings), and the
+             two screens that answer the system once the owner has proved who they are. -->
+        <service
+            android:name=".PolarisAutofillService"
+            android:exported="true"
+            android:label="@string/vault_title"
+            android:permission="android.permission.BIND_AUTOFILL_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.autofill.AutofillService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.autofill"
+                android:resource="@xml/autofill_service" />
+        </service>
+
+        <activity
+            android:name=".VaultActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:exported="true"
+            android:label="@string/vault_title" />
+
+        <activity
+            android:name=".VaultFillActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Theme.Polaris.Link"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".VaultSaveActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:theme="@style/Theme.Polaris.Link" />
     </application>
 </manifest>

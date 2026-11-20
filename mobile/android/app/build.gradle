@@ -52,6 +52,8 @@ android {
 dependencies {
     // WebView features newer than the phone's Android: passkeys inside the page, and one cookie jar per Polaris.
     implementation 'androidx.webkit:webkit:1.18.0'
+    // Vault autofill: the keyboard chips (inline suggestions) are drawn in the slice format this library defines.
+    implementation 'androidx.autofill:autofill:1.1.0'
 
     // Test only (never in the APK): plain JVM tests for the address and the server check, src/test.
     testImplementation 'junit:junit:4.13.2'

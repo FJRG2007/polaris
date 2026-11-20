@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Every login, searchable, for an app or site nothing is saved for yet. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fitsSystemWindows="true"
+    android:orientation="vertical"
+    android:paddingStart="24dp"
+    android:paddingTop="24dp"
+    android:paddingEnd="24dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:fontFamily="@font/plex_sans_semibold"
+        android:text="@string/vault_pick_title"
+        android:textColor="@color/foreground"
+        android:textSize="22sp" />
+
+    <EditText
+        android:id="@+id/pick_search"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="@string/vault_pick_search"
+        android:importantForAutofill="no"
+        android:inputType="text"
+        android:maxLength="200"
+        android:singleLine="true" />
+
+    <CheckBox
+        android:id="@+id/pick_remember"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:checked="true"
+        android:minHeight="48dp"
+        android:textColor="@color/muted"
+        android:textSize="14sp" />
+
+    <ListView
+        android:id="@+id/pick_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@color/border"
+        android:dividerHeight="1dp" />
+
+    <TextView
+        android:id="@+id/pick_empty"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="@string/vault_pick_empty"
+        android:textColor="@color/muted"
+        android:textSize="14sp"
+        android:visibility="gone" />
+</LinearLayout>

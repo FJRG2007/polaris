@@ -25,6 +25,17 @@ final class PageBridge {
         return BuildConfig.VERSION_NAME;
     }
 
+    /** Polaris Vault autofill on this phone: the page offers its button only where this answers true. */
+    @JavascriptInterface
+    public boolean canVaultAutofill() {
+        return true;
+    }
+
+    @JavascriptInterface
+    public void openVaultAutofill() {
+        activity.runOnUiThread(() -> activity.startActivity(new android.content.Intent(activity, VaultActivity.class)));
+    }
+
     @JavascriptInterface
     public void changeServer() {
         activity.runOnUiThread(activity::changeServer);
