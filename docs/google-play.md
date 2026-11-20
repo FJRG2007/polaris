@@ -106,6 +106,9 @@ the user chose, so declare it:
 
 ## Privacy policy
 
+Published at https://fjrg2007.github.io/polaris/en/docs/privacy/ (source: `docs/privacy.md`,
+Spanish `docs/privacy.es.md`); that is the URL the Play Console asks for.
+
 Play needs a public URL. The policy has to name who publishes the app and how to
 contact them. Those details are filled in where the policy is hosted and in the
 Play Console, never in this repository:

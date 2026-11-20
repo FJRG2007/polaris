@@ -18,6 +18,7 @@ on:
       - "docs/integrations-setup*.md"
       - "docs/connecting-ai-assistants*.md"
       - "docs/roadmap*.md"
+      - "docs/privacy*.md"
       - "dashboard/apps/site/**"
       - "dashboard/packages/ui/**"
       - "dashboard/apps/web/src/lib/apps/**"

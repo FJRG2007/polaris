@@ -522,9 +522,12 @@ const featureFiles = readdirSync(featuresDir)
 // reads `<name>.es.md` beside each one where it exists, and the English text
 // where it does not.
 const developersDir = join(root, "docs", "developers");
+/** The phone apps' privacy policy: the address their store listings link to. */
+const PRIVACY = "docs/privacy.md";
 const extraGuides = [
     "docs/integrations-setup.md",
     "docs/connecting-ai-assistants.md",
+    PRIVACY,
     ...docs
         .orderByIndex(
             (existsSync(developersDir) ? readdirSync(developersDir) : []).filter(
@@ -681,7 +684,10 @@ function sections(spanish: boolean, pages: readonly docs.DocPage[]): docs.DocSec
     return docs.arrangeSections(
         [
             ...(own.length ? own : docs.readmeSections(readmeEn)),
-            { label: words.integrations, slugs: [INTEGRATIONS, ...extraPaths.values()] },
+            {
+                label: words.integrations,
+                slugs: [INTEGRATIONS, ...[...extraPaths].filter(([file]) => file !== PRIVACY).map(([, slug]) => slug)]
+            },
             { label: words.roadmap, slugs: [docs.ROADMAP.slug] }
         ],
         pages.map((page) => page.slug),
