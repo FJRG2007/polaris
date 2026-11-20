@@ -680,7 +680,23 @@ main() {
         fi
     else
         log "pulling the published dashboard image"
-        if ! docker pull "$web_image"; then
+        # Up to three tries. A prune elsewhere on the host (a deploy's tidy, the
+        # disk sweep) can take a layer while it is being stored, which fails the
+        # pull with `commit failed: rename .../ingest/... no such file or
+        # directory` though the image is fine; the layers already stored stay,
+        # so a retry fetches only what was lost.
+        pulled=0
+        for attempt in 1 2 3; do
+            if docker pull "$web_image"; then
+                pulled=1
+                break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+                log "the pull failed (try ${attempt} of 3); trying again"
+                sleep 5
+            fi
+        done
+        if [ "$pulled" -ne 1 ]; then
             err "could not fetch ${web_image}; nothing has been changed"
             exit 1
         fi
