@@ -29,8 +29,9 @@ Play listing by itself once Play answers for `app.polaris.mobile`.
 ## Store listing
 
 Title, short and full description in English and Spanish are in
-`mobile/android/fastlane/metadata/android/{en-US,es-ES}/`. Still needed: a
-512x512 icon, a 1024x500 feature graphic and at least two phone screenshots.
+`mobile/android/fastlane/metadata/android/{en-US,es-ES}/`, the 512x512 icon and the
+1024x500 feature graphic in `en-US/images/`. Still needed:
+at least two phone screenshots.
 
 ## App access
 
