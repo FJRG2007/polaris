@@ -596,8 +596,8 @@ export function MinecraftPlayers({
     /**
      * Tie somebody to a Polaris account - following its sign-ins, or only as who
      * they are, in which case the address and note typed with it are saved too.
-     * Whether the account was told comes back for the dialog to say so; a link
-     * that told nobody closes it here.
+     * A link that went through closes the dialog here, and whether the account
+     * was told is said on the page: the form stays open only for what refused it.
      */
     async function linkPlayer(input: {
         username: string;
@@ -605,7 +605,7 @@ export function MinecraftPlayers({
         followSignIns: boolean;
         address?: string;
         note?: string;
-    }): Promise<{ told: boolean }> {
+    }): Promise<void> {
         setFormError(null);
         // The address first, so the notice the account gets says where it may
         // join from.
@@ -618,7 +618,7 @@ export function MinecraftPlayers({
             });
             if (saved.error) {
                 setFormError(saved.error);
-                return { told: false };
+                return;
             }
         }
         const result = await actions.linkPlayerAccountAction({
@@ -630,10 +630,16 @@ export function MinecraftPlayers({
         onChanged();
         if (result.error) {
             setFormError(result.error);
-            return { told: false };
+            return;
         }
-        if (!result.told) setActing(null);
-        return { told: result.told === true };
+        linked(input.username, result.told === true);
+    }
+
+    /** A player tied to an account: the dialog is done, and the page says who
+     *  heard about it. */
+    function linked(player: string, told: boolean): void {
+        setActing(null);
+        setNote(told ? t("players.notifiedPlayer", { player }) : null);
     }
 
     /** Register somebody, or save a change to somebody already registered. Both are
@@ -1085,6 +1091,7 @@ export function MinecraftPlayers({
                             ...input
                         });
                         if (!result.error) onChanged();
+                        if (result.linked) linked(input.username, result.told === true);
                         return result;
                     }}
                     onUnlink={(username) => {

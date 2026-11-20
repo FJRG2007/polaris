@@ -729,18 +729,20 @@ export function PlayerAccessDialog({
     }>;
     /** Tie the player to a Polaris account. `followSignIns` false keeps the
      *  addresses typed for them; `address` and `note` are then saved with it.
-     *  `told` is whether the account was sent a notice of it. */
+     *  The caller closes the dialog once the link is made and says on its own
+     *  page who was told; a refusal comes back through `error`. */
     onLink?: (input: {
         username: string;
         userId: string;
         followSignIns: boolean;
         address?: string;
         note?: string;
-    }) => Promise<{ told: boolean }>;
+    }) => Promise<void>;
     /** Untie a linked player. */
     onUnlink?: (username: string) => void;
     /** Invite somebody with no Polaris account, so the one they make is tied to
-     *  this player. */
+     *  this player. An email that turned out to have an account is linked on the
+     *  spot (`linked`), and the caller closes the dialog as it does for a link. */
     onInvite?: (input: { username: string; email: string; followSignIns: boolean }) => Promise<{
         linked?: true;
         told?: boolean;
@@ -779,8 +781,6 @@ export function PlayerAccessDialog({
     const [invited, setInvited] = useState<{ email: string; url: string } | null>(null);
     const [inviteError, setInviteError] = useState<string | null>(null);
     const [saving, startSaving] = useTransition();
-    /** Who was just linked and sent a notice of it, to say so before closing. */
-    const [notified, setNotified] = useState<string | null>(null);
 
     /** Fill the name in from a Polaris account, spelled the way Mojang spells it. */
     function lookUp(query: string): void {
@@ -885,11 +885,8 @@ export function PlayerAccessDialog({
                 setInviteError(result.error);
                 return;
             }
-            if (result.linked) {
-                if (result.told) setNotified(inviteEmail);
-                else onClose();
-                return;
-            }
+            // Linked on the spot: the caller has closed the dialog already.
+            if (result.linked) return;
             // Polaris sends no email: without the link there is nothing to share.
             if (!result.invite?.url) {
                 setInviteError(t("players.inviteNoLink"));
@@ -899,8 +896,9 @@ export function PlayerAccessDialog({
         });
     }
 
-    // Nothing left to do but close: an invite to hand over, or a notice sent.
-    const finished = invited !== null || notified !== null;
+    // Nothing left to do but hand over the invite and close. The link itself is
+    // all that is drawn then: the form it came from is not asked again.
+    const finished = invited !== null;
 
     return (
         <PlayerFormDialog
@@ -945,7 +943,7 @@ export function PlayerAccessDialog({
                 }
                 if (linking && account && onLink) {
                     startSaving(async () => {
-                        const { told } = await onLink({
+                        await onLink({
                             username: name,
                             userId: account.userId,
                             followSignIns: followsNow,
@@ -956,7 +954,6 @@ export function PlayerAccessDialog({
                                       note: note.trim()
                                   })
                         });
-                        if (told) setNotified(account.name);
                     });
                     return;
                 }
@@ -967,289 +964,288 @@ export function PlayerAccessDialog({
                 });
             }}
         >
-            {!linkedTo && onLookUp && (
-                <PlayerFormField
-                    label={
-                        editing
-                            ? t("players.theirPolarisAccount")
-                            : t("players.somebodyWithAPolarisAccount")
-                    }
-                    error={lookUpError}
-                    hint={
-                        editing
-                            ? t("players.anyAccountWhateverItIs")
-                            : t("players.ifTheyHaveLinkedMinecraft")
-                    }
-                >
-                    <div className="flex items-center gap-1">
-                        <AccountInput
-                            autoFocus={!editing}
-                            value={person}
-                            onValueChange={(value) => {
-                                setPerson(value);
-                                setInvited(null);
-                            }}
-                            // Choosing somebody off the list is the errand, so it
-                            // is not also worth a button press. A name that was
-                            // typed rather than picked still is.
-                            onPick={(picked) => lookUp(picked.username || picked.email)}
-                            onEnter={() => lookUp(person)}
-                            placeholder={t("players.pauOrPauExampleCom")}
-                            aria-label={t("players.polarisUsernameOrEmailAddress")}
-                        />
-                        <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => lookUp(person)}
-                            disabled={looking || person.trim().length === 0}
-                            aria-label={t("players.findTheirPolarisAccount")}
-                            title={t("players.findTheirPolarisAccount")}
-                        >
-                            {looking ? (
-                                <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                                <UserSearch className="size-4" />
-                            )}
-                        </Button>
-                    </div>
-                    {canInvite && !invited && (
-                        <div className="flex flex-wrap items-center gap-2 pt-1">
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="secondary"
-                                disabled={inviting}
-                                onClick={invite}
-                            >
-                                {inviting && <Loader2 className="size-3.5 animate-spin" />}
-                                {t("players.inviteEmail", { email: inviteEmail })}
-                            </Button>
-                            <span className="text-xs text-muted-foreground">
-                                {t("players.tiedTo", { name })}
-                            </span>
-                        </div>
-                    )}
-                    {addressesHidden && (
-                        <p className="pt-1 text-xs text-muted-foreground">
-                            {t("players.thisPolarisDoesNotShow")}
-                        </p>
-                    )}
-                    {inviteError && <p className="pt-1 text-xs text-danger">{inviteError}</p>}
-                    {invited && (
-                        <div className="flex flex-col gap-1 pt-1 text-xs text-muted-foreground">
-                            <span>{t("players.inviteLink", { email: invited.email, name })}</span>
-                            <span className="flex items-center gap-1">
-                                <code className="min-w-0 truncate rounded bg-muted px-1.5 py-0.5">
-                                    {invited.url}
-                                </code>
-                                <CopyButton value={invited.url} label={t("players.theInviteLink")} />
-                            </span>
-                        </div>
-                    )}
-                </PlayerFormField>
-            )}
-
-            {linking && account && edition === "java" && (
-                <div className="flex flex-col gap-1.5">
-                    <span className="text-xs text-muted-foreground">
-                        {t("players.whereCanJoin", { name: account.name })}
+            {invited && (
+                <div role="status" className="flex flex-col gap-1 text-xs text-muted-foreground">
+                    <span>{t("players.inviteLink", { email: invited.email, name })}</span>
+                    <span className="flex items-center gap-1">
+                        <code className="min-w-0 truncate rounded bg-muted px-1.5 py-0.5">
+                            {invited.url}
+                        </code>
+                        <CopyButton value={invited.url} label={t("players.theInviteLink")} />
                     </span>
-                    <div
-                        className="flex flex-wrap gap-1"
-                        role="radiogroup"
-                        aria-label={t("players.whereTheyCanJoinFrom")}
-                    >
-                        <Button
-                            type="button"
-                            size="sm"
-                            role="radio"
-                            aria-checked={follow}
-                            variant={follow ? "secondary" : "ghost"}
-                            onClick={() => setFollow(true)}
-                        >
-                            {t("players.whereverTheyAreSignedIn")}
-                        </Button>
-                        <Button
-                            type="button"
-                            size="sm"
-                            role="radio"
-                            aria-checked={!follow}
-                            variant={follow ? "ghost" : "secondary"}
-                            onClick={() => setFollow(false)}
-                        >
-                            {editing && hasAddresses
-                                ? t("players.keepTheseAddresses")
-                                : t("players.aFixedAddress")}
-                        </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        {follow
-                            ? `${t("players.followsHint", { name: account.name })}${editing && hasAddresses ? t("players.typedGo") : ""}`
-                            : t("players.linkedHint", { name: account.name })}
-                    </p>
                 </div>
             )}
 
-            {notified && (
-                <p role="status" className="text-xs text-muted-foreground">
-                    {t("players.notified", { name: notified })}
-                </p>
-            )}
-
-            <PlayerFormField
-                label={edition === "bedrock" ? t("players.gamertag") : t("players.username")}
-                error={nameInvalid ? t("players.thatIsNotAUsername") : null}
-                hint={
-                    !editing && account && noMinecraft
-                        ? t("players.noMinecraft", { name: account.name })
-                        : !editing && account && typedName !== null && username.trim() === typedName
-                          ? t("players.typedBy", { name: account.name })
-                          : undefined
-                }
-            >
-                <Input
-                    value={editing ? player.username : username}
-                    onChange={(event) => setUsername(event.target.value)}
-                    placeholder={
-                        edition === "bedrock" ? t("players.gamertag") : t("players.username")
-                    }
-                    disabled={editing}
-                    aria-label={t("players.player")}
-                />
-            </PlayerFormField>
-
-            {linkedTo && (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
-                    <span className="text-xs text-muted-foreground">
-                        {!following
-                            ? t("players.linkedTo", { name: linkedTo.name })
-                            : player?.addresses.length
-                              ? t("players.followsSignIns", { name: linkedTo.name })
-                              : t("players.notSignedIn", {
-                                    account: schemaText(linkedTo.name) ?? "",
-                                    player: player?.username ?? ""
-                                })}
-                    </span>
-                    {onUnlink && player && (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="text-danger hover:text-danger"
-                            disabled={pending}
-                            onClick={() => onUnlink(player.username)}
+            {!invited && (
+                <>
+                    {!linkedTo && onLookUp && (
+                        <PlayerFormField
+                            label={
+                                editing
+                                    ? t("players.theirPolarisAccount")
+                                    : t("players.somebodyWithAPolarisAccount")
+                            }
+                            error={lookUpError}
+                            hint={
+                                editing
+                                    ? t("players.anyAccountWhateverItIs")
+                                    : t("players.ifTheyHaveLinkedMinecraft")
+                            }
                         >
-                            {t("players.unlink")}
-                        </Button>
-                    )}
-                </div>
-            )}
-
-            {editing && player.addresses.length > 0 && !(linking && followsNow) && (
-                <div className="flex flex-col gap-1.5">
-                    <span className="text-xs text-muted-foreground">
-                        {following ? t("players.signedInFrom") : t("players.addressesTheyPlayFrom")}
-                    </span>
-                    <div className="flex flex-wrap gap-1">
-                        {player.addresses.map((held) => (
-                            <span
-                                key={held}
-                                className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs"
-                            >
-                                {held}
-                                {onRemoveAddress && !following && (
-                                    <button
-                                        type="button"
-                                        disabled={pending}
-                                        aria-label={t("players.removeAddressFrom", {
-                                            address: held,
-                                            name: player.username
-                                        })}
-                                        title={t("players.removeNamed", { name: held })}
-                                        className="text-muted-foreground hover:text-danger disabled:opacity-50"
-                                        onClick={() => onRemoveAddress(held)}
-                                    >
-                                        <X className="size-3" />
-                                    </button>
-                                )}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {!following && !(linking && followsNow) && (
-                <PlayerFormField
-                    label={
-                        editing ? t("players.anotherAddress") : t("players.addressTheyConnectFrom")
-                    }
-                    error={addressInvalid ? t("players.thatIsNotAnAddress") : null}
-                    hint={
-                        detectFailed
-                            ? t("players.polarisCouldNotReadThe")
-                            : editing
-                              ? t("players.leaveItEmptyToChange")
-                              : undefined
-                    }
-                >
-                    <div className="flex items-center gap-1">
-                        <Input
-                            autoFocus={editing && Boolean(linkedTo)}
-                            value={address}
-                            onChange={(event) => setAddress(event.target.value)}
-                            placeholder={t("players.20301139203")}
-                            aria-label={t("players.addressTheyConnectFrom")}
-                        />
-                        <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            onClick={detect}
-                            disabled={pending || detecting}
-                            aria-label={t("players.useTheAddressYouAre")}
-                            title={t("players.useTheAddressYouAre")}
-                        >
-                            {detecting ? (
-                                <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                                <Locate className="size-4" />
-                            )}
-                        </Button>
-                    </div>
-                    {/* Where that account signs in to Polaris from. The operator doing
-                    this is on their own line, so the detect button beside the
-                    field is the wrong address for everybody but themselves. */}
-                    {offer.length > 0 && (
-                        <div className="flex flex-wrap items-center gap-1 pt-1">
-                            <span className="text-xs text-muted-foreground">
-                                {t("players.theySignInFrom")}
-                            </span>
-                            {offer.map((known) => (
-                                <button
-                                    key={known}
+                            <div className="flex items-center gap-1">
+                                <AccountInput
+                                    autoFocus={!editing}
+                                    value={person}
+                                    onValueChange={(value) => {
+                                        setPerson(value);
+                                        setInvited(null);
+                                    }}
+                                    // Choosing somebody off the list is the errand, so it
+                                    // is not also worth a button press. A name that was
+                                    // typed rather than picked still is.
+                                    onPick={(picked) => lookUp(picked.username || picked.email)}
+                                    onEnter={() => lookUp(person)}
+                                    placeholder={t("players.pauOrPauExampleCom")}
+                                    aria-label={t("players.polarisUsernameOrEmailAddress")}
+                                />
+                                <Button
                                     type="button"
-                                    className="rounded-md border border-border px-2 py-0.5 font-mono text-xs hover:bg-muted"
-                                    onClick={() => setAddress(known)}
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => lookUp(person)}
+                                    disabled={looking || person.trim().length === 0}
+                                    aria-label={t("players.findTheirPolarisAccount")}
+                                    title={t("players.findTheirPolarisAccount")}
                                 >
-                                    {known}
-                                </button>
-                            ))}
+                                    {looking ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                        <UserSearch className="size-4" />
+                                    )}
+                                </Button>
+                            </div>
+                            {canInvite && (
+                                <div className="flex flex-wrap items-center gap-2 pt-1">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="secondary"
+                                        disabled={inviting}
+                                        onClick={invite}
+                                    >
+                                        {inviting && <Loader2 className="size-3.5 animate-spin" />}
+                                        {t("players.inviteEmail", { email: inviteEmail })}
+                                    </Button>
+                                    <span className="text-xs text-muted-foreground">
+                                        {t("players.tiedTo", { name })}
+                                    </span>
+                                </div>
+                            )}
+                            {addressesHidden && (
+                                <p className="pt-1 text-xs text-muted-foreground">
+                                    {t("players.thisPolarisDoesNotShow")}
+                                </p>
+                            )}
+                            {inviteError && <p className="pt-1 text-xs text-danger">{inviteError}</p>}
+                        </PlayerFormField>
+                    )}
+
+                    {linking && account && edition === "java" && (
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-xs text-muted-foreground">
+                                {t("players.whereCanJoin", { name: account.name })}
+                            </span>
+                            <div
+                                className="flex flex-wrap gap-1"
+                                role="radiogroup"
+                                aria-label={t("players.whereTheyCanJoinFrom")}
+                            >
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    role="radio"
+                                    aria-checked={follow}
+                                    variant={follow ? "secondary" : "ghost"}
+                                    onClick={() => setFollow(true)}
+                                >
+                                    {t("players.whereverTheyAreSignedIn")}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    role="radio"
+                                    aria-checked={!follow}
+                                    variant={follow ? "ghost" : "secondary"}
+                                    onClick={() => setFollow(false)}
+                                >
+                                    {editing && hasAddresses
+                                        ? t("players.keepTheseAddresses")
+                                        : t("players.aFixedAddress")}
+                                </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                {follow
+                                    ? `${t("players.followsHint", { name: account.name })}${editing && hasAddresses ? t("players.typedGo") : ""}`
+                                    : t("players.linkedHint", { name: account.name })}
+                            </p>
                         </div>
                     )}
-                </PlayerFormField>
-            )}
 
-            {!following && !(linking && followsNow) && (
-                <PlayerFormField label={t("players.note")} hint={t("players.whoThisIsForWhoever")}>
-                    <Input
-                        value={note}
-                        onChange={(event) => setNote(event.target.value)}
-                        placeholder={t("players.whoThisIs")}
-                        maxLength={120}
-                        aria-label={t("players.note")}
-                    />
-                </PlayerFormField>
+                    <PlayerFormField
+                        label={edition === "bedrock" ? t("players.gamertag") : t("players.username")}
+                        error={nameInvalid ? t("players.thatIsNotAUsername") : null}
+                        hint={
+                            !editing && account && noMinecraft
+                                ? t("players.noMinecraft", { name: account.name })
+                                : !editing && account && typedName !== null && username.trim() === typedName
+                                  ? t("players.typedBy", { name: account.name })
+                                  : undefined
+                        }
+                    >
+                        <Input
+                            value={editing ? player.username : username}
+                            onChange={(event) => setUsername(event.target.value)}
+                            placeholder={
+                                edition === "bedrock" ? t("players.gamertag") : t("players.username")
+                            }
+                            disabled={editing}
+                            aria-label={t("players.player")}
+                        />
+                    </PlayerFormField>
+
+                    {linkedTo && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2">
+                            <span className="text-xs text-muted-foreground">
+                                {!following
+                                    ? t("players.linkedTo", { name: linkedTo.name })
+                                    : player?.addresses.length
+                                      ? t("players.followsSignIns", { name: linkedTo.name })
+                                      : t("players.notSignedIn", {
+                                            account: schemaText(linkedTo.name) ?? "",
+                                            player: player?.username ?? ""
+                                        })}
+                            </span>
+                            {onUnlink && player && (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-danger hover:text-danger"
+                                    disabled={pending}
+                                    onClick={() => onUnlink(player.username)}
+                                >
+                                    {t("players.unlink")}
+                                </Button>
+                            )}
+                        </div>
+                    )}
+
+                    {editing && player.addresses.length > 0 && !(linking && followsNow) && (
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-xs text-muted-foreground">
+                                {following ? t("players.signedInFrom") : t("players.addressesTheyPlayFrom")}
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                                {player.addresses.map((held) => (
+                                    <span
+                                        key={held}
+                                        className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs"
+                                    >
+                                        {held}
+                                        {onRemoveAddress && !following && (
+                                            <button
+                                                type="button"
+                                                disabled={pending}
+                                                aria-label={t("players.removeAddressFrom", {
+                                                    address: held,
+                                                    name: player.username
+                                                })}
+                                                title={t("players.removeNamed", { name: held })}
+                                                className="text-muted-foreground hover:text-danger disabled:opacity-50"
+                                                onClick={() => onRemoveAddress(held)}
+                                            >
+                                                <X className="size-3" />
+                                            </button>
+                                        )}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {!following && !(linking && followsNow) && (
+                        <PlayerFormField
+                            label={
+                                editing ? t("players.anotherAddress") : t("players.addressTheyConnectFrom")
+                            }
+                            error={addressInvalid ? t("players.thatIsNotAnAddress") : null}
+                            hint={
+                                detectFailed
+                                    ? t("players.polarisCouldNotReadThe")
+                                    : editing
+                                      ? t("players.leaveItEmptyToChange")
+                                      : undefined
+                            }
+                        >
+                            <div className="flex items-center gap-1">
+                                <Input
+                                    autoFocus={editing && Boolean(linkedTo)}
+                                    value={address}
+                                    onChange={(event) => setAddress(event.target.value)}
+                                    placeholder={t("players.20301139203")}
+                                    aria-label={t("players.addressTheyConnectFrom")}
+                                />
+                                <Button
+                                    type="button"
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={detect}
+                                    disabled={pending || detecting}
+                                    aria-label={t("players.useTheAddressYouAre")}
+                                    title={t("players.useTheAddressYouAre")}
+                                >
+                                    {detecting ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                        <Locate className="size-4" />
+                                    )}
+                                </Button>
+                            </div>
+                            {/* Where that account signs in to Polaris from. The operator doing
+                            this is on their own line, so the detect button beside the
+                            field is the wrong address for everybody but themselves. */}
+                            {offer.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-1 pt-1">
+                                    <span className="text-xs text-muted-foreground">
+                                        {t("players.theySignInFrom")}
+                                    </span>
+                                    {offer.map((known) => (
+                                        <button
+                                            key={known}
+                                            type="button"
+                                            className="rounded-md border border-border px-2 py-0.5 font-mono text-xs hover:bg-muted"
+                                            onClick={() => setAddress(known)}
+                                        >
+                                            {known}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </PlayerFormField>
+                    )}
+
+                    {!following && !(linking && followsNow) && (
+                        <PlayerFormField label={t("players.note")} hint={t("players.whoThisIsForWhoever")}>
+                            <Input
+                                value={note}
+                                onChange={(event) => setNote(event.target.value)}
+                                placeholder={t("players.whoThisIs")}
+                                maxLength={120}
+                                aria-label={t("players.note")}
+                            />
+                        </PlayerFormField>
+                    )}
+                </>
             )}
         </PlayerFormDialog>
     );
