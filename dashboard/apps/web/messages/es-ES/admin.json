@@ -115,26 +115,6 @@
             "poolGone": "Ese grupo de runners ya no existe."
         },
         "polarAccess": {
-            "use": {
-                "label": "Quién puede usar Polar",
-                "hint": "Por defecto. Un rol, o las Capacidades de una persona en Gestión > Usuarios, manda sobre esto. Los administradores siempre pueden."
-            },
-            "spend": {
-                "label": "Quién gasta las claves del despliegue",
-                "hint": "Por defecto; el resto solo usa las claves que añade en Cuenta > Claves de proveedores de IA. Un rol o sus Capacidades mandan sobre esto."
-            },
-            "who": {
-                "admins": "Administradores",
-                "chosen": "Personas elegidas",
-                "everyone": "Todos con sesión"
-            },
-            "people": "Personas",
-            "groups": "Grupos",
-            "noGroups": "Aún no hay grupos. Créalos en Grupos para elegir uno aquí.",
-            "findGroup": "Buscar un grupo",
-            "moreGroups": "Solo se listan los 200 primeros grupos. Busca para encontrar el resto.",
-            "noGroupFound": "Ningún grupo coincide con ese nombre.",
-            "guests": "Incluir cuentas de invitado",
             "web": {
                 "label": "Polar en la web",
                 "hint": "Polar busca en la web y lee páginas públicas. Las búsquedas usan la clave del chat."
@@ -3136,10 +3116,6 @@
             "alerts": {
                 "topics": "Recibir alertas de otros sistemas"
             }
-        },
-        "polarDefault": {
-            "title": "Polar cuando nada más decide",
-            "intro": "Quién puede usar Polar y gastar las claves del despliegue cuando ningún rol, política de grupo o Capacidad lo dice. Una denegación siempre gana; los administradores siempre pueden."
         }
     },
     "safety": {

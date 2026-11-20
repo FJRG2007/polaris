@@ -85,7 +85,7 @@ describe("Zen as the last stand-in", () => {
 
 describe("the opt-in switch", () => {
     const { decidePolarAccess, polarPolicySchema, DEFAULT_POLAR_POLICY } = access;
-    const FACTS = { userId: "00000000-0000-4000-8000-000000000001", isAdmin: false, guest: false, groupIds: [] };
+    const FACTS = { isAdmin: false, grants: { use: "allow", spend: "implicit-deny" } } as const;
 
     it("is off on a policy saved before it existed", () => {
         const stored = polarPolicySchema.parse({ ...POLICY, freeModels: true });
@@ -98,7 +98,7 @@ describe("the opt-in switch", () => {
         const on = polarPolicySchema.parse({ ...POLICY, zenStandInEveryone: true });
         expect(decidePolarAccess(on, FACTS).zenStandInEveryone).toBe(true);
         expect(decidePolarAccess({ ...on, freeModels: false }, FACTS).zenStandInEveryone).toBe(false);
-        const closed = { ...on, use: { ...on.use, who: "admins" as const } };
-        expect(decidePolarAccess(closed, FACTS).zenStandInEveryone).toBe(false);
+        const closed = { ...FACTS, grants: { ...FACTS.grants, use: "implicit-deny" } } as const;
+        expect(decidePolarAccess(on, closed).zenStandInEveryone).toBe(false);
     });
 });

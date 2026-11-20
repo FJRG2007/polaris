@@ -502,8 +502,6 @@
         "web/src/app/(app)/admin/agents/catalog-card.tsx",
         "web/src/app/(app)/admin/agents/page.tsx",
         "web/src/app/(app)/admin/agents/platform-defaults-view.tsx",
-        "web/src/app/(app)/admin/roles/polar-audience-card.tsx",
-        "web/src/app/(app)/admin/roles/polar-actions.ts",
         "web/src/app/(app)/admin/apps/[appId]/settings/_polar/polar-options-card.tsx",
         "web/src/app/(app)/admin/apps/[appId]/settings/_polar/shared-machine-card.tsx",
         "web/src/app/(app)/admin/apps/[appId]/settings/_polar/routing-card.tsx",

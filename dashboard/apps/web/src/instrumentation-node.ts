@@ -171,6 +171,13 @@ export async function registerNode(): Promise<void> {
         console.error("polaris: could not take back the automatic app installs:", error)
     );
 
+    // Polar is decided by roles and Capabilities alone; what its old audiences
+    // said is carried into them once, before anybody is asked (`access-carry`).
+    const { ensurePolarAccessCarried } = await import("./lib/polar/access-carry");
+    await ensurePolarAccessCarried().catch((error) =>
+        console.error("polaris: could not carry Polar's access into roles:", error)
+    );
+
     // A password kept under any id but its account's is refused at sign-in with
     // the right password; whatever wrote it (an old install, a transfer from
     // one), it does not survive a start.

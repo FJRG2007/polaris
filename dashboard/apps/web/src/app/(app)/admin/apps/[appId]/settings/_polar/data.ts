@@ -5,7 +5,7 @@
  */
 
 import { prisma } from "@polaris/db";
-import { polarOptionsSchema, readPolarPolicy } from "@/lib/polar/access";
+import { readPolarPolicy } from "@/lib/polar/access";
 import { instanceRouting } from "@/lib/polar/router/store";
 import { instanceRouteKeys } from "@/lib/polar/routing-screen";
 import { ALIVE_STATES, totalCeiling } from "@/lib/agents/session-capacity";
@@ -97,6 +97,5 @@ export async function polarChatAdmin() {
         instanceRouting(),
         instanceRouteKeys()
     ]);
-    // The audiences are permissions, edited under Management > Roles.
-    return { options: polarOptionsSchema.parse(policy), routing, routingKeys };
+    return { options: policy, routing, routingKeys };
 }

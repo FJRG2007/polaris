@@ -1,136 +1,111 @@
 import { join, resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
+import { DEFAULT_ROLES, PERMISSION_META, hasPermission } from "@polaris/core";
 import {
     DEFAULT_POLAR_POLICY,
-    audienceAdmits,
     decidePolarAccess,
     polarGrantsOf,
     polarPolicySchema,
-    unsavedPolarPolicy,
-    type AccessFacts,
-    type PolarAudience
+    type AccessFacts
 } from "@/lib/polar/access";
 
 vi.mock("@/lib/api-session", () => ({ apiUser: async () => null }));
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/lib/agents/model-keys", () => ({}));
 vi.mock("@polaris/auth", () => ({ resolveGlobalStatements: async () => [] }));
+vi.mock("@/lib/polar/access-carry", () => ({ ensurePolarAccessCarried: async () => {} }));
 
-const GROUP = "00000000-0000-4000-8000-0000000000a1";
-const OTHER = "00000000-0000-4000-8000-0000000000a2";
-const PICKED = "00000000-0000-4000-8000-000000000001";
+const allow = (action: string) => ({ effect: "allow" as const, actions: [action], resources: ["*"] });
+const deny = (action: string) => ({ effect: "deny" as const, actions: [action], resources: ["*"] });
 
-const member: AccessFacts = {
-    userId: "00000000-0000-4000-8000-000000000002",
+const withRole = (...grants: string[]): AccessFacts => ({
     isAdmin: false,
-    guest: false,
-    groupIds: []
-};
-const admin: AccessFacts = {
-    ...member,
-    userId: "00000000-0000-4000-8000-000000000003",
-    isAdmin: true
-};
-const guest: AccessFacts = {
-    ...member,
-    userId: "00000000-0000-4000-8000-000000000004",
-    guest: true
-};
-
-const audience = (patch: Partial<PolarAudience>): PolarAudience => ({
-    who: "everyone",
-    userIds: [],
-    groupIds: [],
-    guests: false,
-    ...patch
+    grants: polarGrantsOf(grants.map(allow))
 });
+const member = withRole("polar.use");
+const nobody: AccessFacts = { isAdmin: false };
+const admin: AccessFacts = { isAdmin: true };
 
-describe("Polar access policy", () => {
-    it("defaults to Polar for everybody signed in but the deployment's keys for administrators only", () => {
-        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, member)).toMatchObject({
-            use: true,
-            spend: false
-        });
-        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, admin)).toMatchObject({
-            use: true,
-            spend: true
-        });
+describe("Polar access", () => {
+    it("is decided by the permission system alone, and an administrator always has it", () => {
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, member)).toMatchObject({ use: true, spend: false });
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, nobody)).toMatchObject({ use: false, spend: false });
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, admin)).toMatchObject({ use: true, spend: true });
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, withRole("polar.use", "polar.spend")).spend).toBe(true);
     });
 
-    it("carries the deployment's key sharing over to a policy that was never saved", () => {
-        expect(unsavedPolarPolicy(false)).toEqual(DEFAULT_POLAR_POLICY);
-        expect(decidePolarAccess(unsavedPolarPolicy(true), member)).toMatchObject({
-            use: true,
-            spend: true
-        });
-        expect(decidePolarAccess(unsavedPolarPolicy(true), guest)).toMatchObject({
+    it("never spends for somebody without Polar itself", () => {
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, withRole("polar.spend"))).toMatchObject({
             use: false,
             spend: false
         });
+        const grants = polarGrantsOf([deny("polar.use"), allow("polar.use"), allow("polar.spend")]);
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, { isAdmin: false, grants }).spend).toBe(false);
     });
 
-    it("keeps guests out unless the audience lets them in or names them", () => {
-        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, guest)).toMatchObject({
-            use: false,
-            spend: false
-        });
-        expect(audienceAdmits(audience({ guests: true }), guest)).toBe(true);
-        expect(audienceAdmits(audience({ who: "chosen", userIds: [guest.userId] }), guest)).toBe(
-            true
+    it("lets a deny anywhere win over an allow", () => {
+        const grants = polarGrantsOf([allow("polar.use"), deny("polar.use")]);
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, { isAdmin: false, grants }).use).toBe(false);
+        expect(polarGrantsOf([allow("polar.use"), deny("*")]).use).toBe("deny");
+    });
+
+    it("does not let a wildcard allow use Polar or spend the deployment's keys", () => {
+        const everything = polarGrantsOf([allow("*")]);
+        expect(everything).toEqual({ use: "implicit-deny", spend: "implicit-deny" });
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, { isAdmin: false, grants: everything }).spend).toBe(
+            false
         );
-        expect(
-            audienceAdmits(audience({ who: "chosen", groupIds: [GROUP] }), {
-                ...guest,
-                groupIds: [GROUP]
-            })
-        ).toBe(false);
+        expect(polarGrantsOf([allow("polar.*")])).toEqual({ use: "allow", spend: "allow" });
+        // Something else allowed says nothing about Polar.
+        expect(polarGrantsOf([allow("chat.use")]).use).toBe("implicit-deny");
     });
 
-    it("admits chosen people and members of chosen groups only", () => {
-        const chosen = audience({ who: "chosen", userIds: [PICKED], groupIds: [GROUP] });
-        expect(audienceAdmits(chosen, { ...member, userId: PICKED })).toBe(true);
-        expect(audienceAdmits(chosen, { ...member, groupIds: [GROUP] })).toBe(true);
-        expect(audienceAdmits(chosen, { ...member, groupIds: [OTHER] })).toBe(false);
-        expect(audienceAdmits(chosen, member)).toBe(false);
+    it("is held by every built-in role but guest, and the keys by none of them", () => {
+        for (const [name, grants] of Object.entries(DEFAULT_ROLES)) {
+            if (grants.includes("*")) continue;
+            expect(hasPermission(grants, "polar.use"), name).toBe(name !== "guest");
+            expect(hasPermission(grants, "polar.spend"), name).toBe(false);
+        }
+        // Listed with no app, so Roles and Capabilities always show both.
+        expect(PERMISSION_META["polar.use"].app).toBeUndefined();
+        expect(PERMISSION_META["polar.spend"].app).toBeUndefined();
     });
 
-    it("never lets anybody spend the keys of a Polar they may not use", () => {
-        const policy = {
-            use: audience({ who: "admins" }),
-            spend: audience({ who: "everyone" }),
-            web: true,
-            connectors: DEFAULT_POLAR_POLICY.connectors
-        };
-        expect(decidePolarAccess(policy, member)).toMatchObject({ use: false, spend: false });
-        expect(decidePolarAccess(policy, admin)).toMatchObject({ use: true, spend: true });
+    it("keeps no audience of its own in the stored options", () => {
+        const parsed = polarPolicySchema.parse({
+            use: { who: "admins" },
+            spend: { who: "everyone" },
+            web: false
+        });
+        expect(Object.keys(parsed).sort()).toEqual([
+            "connectors",
+            "freeModels",
+            "web",
+            "zenStandInEveryone"
+        ]);
+        expect(parsed.web).toBe(false);
     });
 
     it("lets Polar on the web by default, and not once an administrator turns it off", () => {
         expect(decidePolarAccess(DEFAULT_POLAR_POLICY, member).web).toBe(true);
-        // A policy saved before the setting existed reads as on.
-        const saved = polarPolicySchema.parse({
-            use: { who: "everyone" },
-            spend: { who: "admins" }
-        });
+        const saved = polarPolicySchema.parse({});
         expect(saved.web).toBe(true);
         expect(decidePolarAccess({ ...saved, web: false }, member).web).toBe(false);
         expect(decidePolarAccess({ ...saved, web: false }, admin).web).toBe(false);
         // Nobody barred from Polar reaches its web tools.
-        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, guest).web).toBe(false);
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, nobody).web).toBe(false);
     });
 
-    it("rejects a policy that is not one of the audiences", () => {
-        expect(
-            polarPolicySchema.safeParse({ use: { who: "anyone" }, spend: { who: "admins" } })
-                .success
-        ).toBe(false);
-        expect(
-            polarPolicySchema.safeParse({
-                use: { who: "chosen", userIds: ["x"] },
-                spend: { who: "admins" }
-            }).success
-        ).toBe(false);
+    it("opens connectors to everybody who uses Polar until an administrator narrows them", () => {
+        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, member).connectors).toBe(true);
+        const saved = polarPolicySchema.parse({});
+        expect(saved.connectors).toEqual({ who: "everyone", hosts: [], privateNetwork: false });
+        const admins = { ...saved, connectors: { ...saved.connectors, who: "admins" as const } };
+        expect(decidePolarAccess(admins, member).connectors).toBe(false);
+        expect(decidePolarAccess(admins, admin).connectors).toBe(true);
+        const off = { ...saved, connectors: { ...saved.connectors, who: "off" as const } };
+        expect(decidePolarAccess(off, admin).connectors).toBe(false);
     });
 
     it("is asked by every Polar route instead of the plain session check", () => {
@@ -155,79 +130,17 @@ describe("Polar access policy", () => {
         }
     });
 
-    it("opens connectors to everybody who uses Polar until an administrator narrows them", () => {
-        expect(decidePolarAccess(DEFAULT_POLAR_POLICY, member).connectors).toBe(true);
-        const saved = polarPolicySchema.parse({
-            use: { who: "everyone" },
-            spend: { who: "admins" }
-        });
-        expect(saved.connectors).toEqual({ who: "everyone", hosts: [], privateNetwork: false });
-        const admins = { ...saved, connectors: { ...saved.connectors, who: "admins" as const } };
-        expect(decidePolarAccess(admins, member).connectors).toBe(false);
-        expect(decidePolarAccess(admins, admin).connectors).toBe(true);
-        const off = { ...saved, connectors: { ...saved.connectors, who: "off" as const } };
-        expect(decidePolarAccess(off, admin).connectors).toBe(false);
-    });
-
-    describe("as permissions, like every other app", () => {
-        const allow = (action: string) => ({
-            effect: "allow" as const,
-            actions: [action],
-            resources: ["*"]
-        });
-        const deny = (action: string) => ({
-            effect: "deny" as const,
-            actions: [action],
-            resources: ["*"]
-        });
-        const restricted = {
-            ...DEFAULT_POLAR_POLICY,
-            use: audience({ who: "admins" }),
-            spend: audience({ who: "admins" })
-        };
-
-        it("lets an account's own On, a role or a group policy in past the deployment's audience", () => {
-            const grants = polarGrantsOf([allow("polar.use"), allow("polar.spend")]);
-            expect(decidePolarAccess(restricted, { ...member, grants })).toMatchObject({
-                use: true,
-                spend: true
-            });
-        });
-
-        it("keeps an account switched Off out even when the audience is everybody", () => {
-            const grants = polarGrantsOf([allow("polar.use"), deny("polar.use")]);
-            expect(decidePolarAccess(DEFAULT_POLAR_POLICY, { ...member, grants }).use).toBe(false);
-        });
-
-        it("falls back to the audience when nothing names Polar, so existing installs keep it", () => {
-            const grants = polarGrantsOf([allow("chat.use")]);
-            expect(decidePolarAccess(DEFAULT_POLAR_POLICY, { ...member, grants })).toMatchObject({
-                use: true,
-                spend: false
-            });
-            expect(decidePolarAccess(restricted, { ...member, grants }).use).toBe(false);
-        });
-
-        it("does not let a wildcard allow spend the deployment's keys, but a wildcard deny still shuts", () => {
-            const everything = polarGrantsOf([allow("*")]);
-            expect(everything).toEqual({ use: "implicit-deny", spend: "implicit-deny" });
-            expect(decidePolarAccess(restricted, { ...member, grants: everything })).toMatchObject({
-                use: false,
-                spend: false
-            });
-            expect(polarGrantsOf([allow("polar.*")])).toEqual({ use: "allow", spend: "allow" });
-            expect(polarGrantsOf([allow("polar.use"), deny("*")]).use).toBe("deny");
-        });
-
-        it("never spends for somebody denied Polar itself, and an administrator is always in", () => {
-            const grants = polarGrantsOf([deny("polar.use"), allow("polar.spend")]);
-            expect(decidePolarAccess(DEFAULT_POLAR_POLICY, { ...member, grants }).spend).toBe(
-                false
+    it("has no audience card or editor left on any screen", () => {
+        const roles = resolve(__dirname, "../../src/app/(app)/admin/roles");
+        expect(readdirSync(roles)).not.toContain("polar-audience-card.tsx");
+        expect(readdirSync(roles)).not.toContain("polar-actions.ts");
+        for (const locale of ["en-US", "es-ES"]) {
+            const admin = JSON.parse(
+                readFileSync(resolve(__dirname, `../../messages/${locale}/admin.json`), "utf8")
             );
-            expect(decidePolarAccess(restricted, { ...admin, grants })).toMatchObject({
-                use: true,
-                spend: true
-            });
-        });
+            expect(admin.roles.polarDefault, locale).toBeUndefined();
+            expect(admin.agents.polarAccess.use, locale).toBeUndefined();
+            expect(admin.agents.polarAccess.spend, locale).toBeUndefined();
+        }
     });
 });

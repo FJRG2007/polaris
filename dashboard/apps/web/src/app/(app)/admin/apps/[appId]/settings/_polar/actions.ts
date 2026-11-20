@@ -15,7 +15,7 @@ import { INSTANCE_KEY, SHARED_WORKSPACE_KEY } from "@/lib/agents/session-capacit
 import { instanceRouteKeys } from "@/lib/polar/routing-screen";
 import { checkRouting, pinnedKeyIds } from "@/lib/polar/routing-keys";
 import { instanceRouting, setInstanceRouting } from "@/lib/polar/router/store";
-import { polarOptionsSchema, savePolarPolicyPart } from "@/lib/polar/access";
+import { polarPolicySchema, savePolarPolicy } from "@/lib/polar/access";
 import { poolSchema, writePool } from "@/lib/agents/session-placement";
 import { warmSchema, writeWarm } from "@/lib/agents/session-spares";
 import { checkReach } from "@/lib/agents/pool-reach";
@@ -82,16 +82,16 @@ export async function checkPoolReachAction(hostId: unknown): Promise<{ reach?: R
 
 /**
  * What Polar's chats may reach: the web, the free models, the free stand-in
- * and people's own MCP servers. Saved over the stored policy, so the audiences
- * edited under Management > Roles are left as they are.
+ * and people's own MCP servers. Who may use Polar is a permission, edited
+ * under Management > Roles and Users > Capabilities.
  */
 export async function setPolarOptionsAction(input: unknown): Promise<{ error?: string }> {
     const admin = await requireAdmin();
-    const parsed = polarOptionsSchema.safeParse(input);
+    const parsed = polarPolicySchema.safeParse(input);
     if (!parsed.success)
         return { error: (await getTranslations("admin"))("agents.errors.pickSetting") };
 
-    const saved = await savePolarPolicyPart(parsed.data);
+    const saved = await savePolarPolicy(parsed.data);
     await recordAudit({
         actorId: admin.id,
         action: "polar.access.update",

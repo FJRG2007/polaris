@@ -115,26 +115,6 @@
             "poolGone": "That runner pool no longer exists."
         },
         "polarAccess": {
-            "use": {
-                "label": "Who may use Polar",
-                "hint": "The default. A role, or a person's Capabilities under Management > Users, decides over it. Administrators always can."
-            },
-            "spend": {
-                "label": "Who may spend this deployment's keys",
-                "hint": "The default; everybody else uses only keys they add under Polar > AI providers. A role or their Capabilities decide over it."
-            },
-            "who": {
-                "admins": "Administrators",
-                "chosen": "Chosen people",
-                "everyone": "Everyone signed in"
-            },
-            "people": "People",
-            "groups": "Groups",
-            "noGroups": "No groups yet. Create them under Groups to pick one here.",
-            "findGroup": "Find a group",
-            "moreGroups": "Only the first 200 groups are listed. Search to find the rest.",
-            "noGroupFound": "No group matches that name.",
-            "guests": "Include guest accounts",
             "web": {
                 "label": "Polar on the web",
                 "hint": "Lets Polar search the web and read public pages. Searches run on the key the chat uses."
@@ -3136,10 +3116,6 @@
             "alerts": {
                 "topics": "Receive alerts from other systems"
             }
-        },
-        "polarDefault": {
-            "title": "Polar when nothing else decides",
-            "intro": "Who may use Polar and spend this deployment's keys when no role, group policy or Capabilities override says. A deny anywhere wins; administrators always can."
         }
     },
     "safety": {

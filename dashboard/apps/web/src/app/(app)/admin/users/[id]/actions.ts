@@ -157,8 +157,8 @@ export async function userCapabilitiesAction(
         .filter((entry) => entry.source.kind !== "account")
         .flatMap((entry) => entry.statements);
     const set = new Map(overrides.map((row) => [row.permission, row.effect]));
-    // Polar falls back to the deployment's own Polar access, not to nothing, so
-    // its "role allows" is that whole answer.
+    // Polar reads only statements that name it (`polarGrantsOf`), and an
+    // administrator always has it, so its "role allows" is that answer.
     const polar = await polarAccessWith(parsed.data, inheritedStatements);
     const vpn =
         vpnStanding({

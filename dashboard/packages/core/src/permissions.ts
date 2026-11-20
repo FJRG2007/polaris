@@ -159,6 +159,9 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "tasks.manage",
         "inbox.read",
         "inbox.manage",
+        // Polar on the person's own keys. Spending the deployment's keys is
+        // billed to its administrator, so no seeded role holds "polar.spend".
+        "polar.use",
         // Creating and looking after a child's account. Every adult member by
         // default (D3); a minor never holds it, whatever their role says
         // (`MINOR_FLOOR` in minors.ts).
@@ -206,7 +209,9 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         // live in the house, and a role nobody chose to give it to should not
         // arrive holding it. An operator who wants it ticks one box.
         "tasks.read",
-        "inbox.read"
+        "inbox.read",
+        // Every account but a guest had Polar before it was a permission.
+        "polar.use"
     ],
     guest: []
 };
@@ -337,10 +342,9 @@ export const PERMISSION_META: Readonly<Record<Permission, PermissionMeta>> = {
     },
     "agents.read": { area: "Apps", label: "See coding-agent repositories and runs" },
     "agents.manage": { area: "Apps", label: "Enable repositories and start agent runs" },
-    // Polar, the assistant. Neither is in a seeded role: who has Polar when
-    // nothing here says so is the deployment's Polar access (Management >
-    // Agents), which predates these and stays the default. A role, a group's
-    // policy or one account's override that names either one decides instead.
+    // Polar, the assistant. Decided by roles, group policies and overrides
+    // alone, like every other app; the built-in roles hold `polar.use`, and an
+    // install that predates that had its old audiences carried into them.
     "polar.use": { area: "Polar", label: "Talk to Polar" },
     // Every turn on the deployment's keys is billed to its administrator, which
     // is why this is apart from using Polar at all.

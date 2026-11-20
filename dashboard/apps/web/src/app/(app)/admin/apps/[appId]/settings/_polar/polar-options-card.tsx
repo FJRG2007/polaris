@@ -13,16 +13,16 @@ import { useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { setPolarOptionsAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import type { PolarConnectorPolicy, PolarOptions } from "@/lib/polar/access";
+import type { PolarConnectorPolicy, PolarPolicy } from "@/lib/polar/access";
 import { CONNECTOR_AUDIENCES, normalizeHostEntry } from "@/lib/polar/connectors/shared";
 import { Card, CardBody, Input, SegmentedControl, Switch, useOptimisticValue } from "@polaris/ui";
 
-export function PolarOptionsCard({ options }: { options: PolarOptions }) {
+export function PolarOptionsCard({ options }: { options: PolarPolicy }) {
     const t = useTranslations("admin");
     const [error, setError] = useState<string | null>(null);
     const [current, save] = useOptimisticValue(
         options,
-        async (next: PolarOptions) => {
+        async (next: PolarPolicy) => {
             setError(null);
             return (await runAction(() => setPolarOptionsAction(next), setError)) ?? { error: true };
         },

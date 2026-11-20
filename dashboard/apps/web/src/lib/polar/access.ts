@@ -3,57 +3,43 @@
  *
  * Two questions, answered separately, because they are different decisions: an
  * operator may want everybody to have Polar on keys they bring themselves while
- * keeping the deployment's own billing to the administrators. Each is an
- * audience - only administrators, chosen people and groups, or everybody signed
- * in - and a guest (an account whose only role is `guest`, which exists to be
- * identified at a share link and reaches no app) is in none of them unless the
- * audience says so or names them.
- *
- * Both are also permissions (`polar.use`, `polar.spend`), managed like every
- * other app's: a role, a group's policy or one account's override under
- * Management > Users that names either one decides it, a deny over an allow.
- * The audiences here answer only when none of those says anything, which is
- * what keeps every install that predates the permissions where it was.
+ * keeping the deployment's own billing to the administrators. Both are
+ * permissions (`polar.use`, `polar.spend`), decided like every other app's: by
+ * roles, group policies and one account's override under Management > Users, a
+ * deny over an allow. An administrator always may. Nothing else decides - the
+ * audiences an earlier release kept for Polar were carried into roles and
+ * overrides once (`access-carry.ts`) and are no longer read.
  *
  * Every Polar route asks `polarCaller`, and every place Polar picks a credential
  * asks `polarKeySources` / `polarCredentialFor`, so the screen and the server
- * read one answer. The policy lives in the settings table: a deployment that
- * has never saved one reads the defaults below, which is how an existing
- * install gets this without anything being written.
+ * read one answer. The rest of Polar's options (the web, connectors, the free
+ * models) live in the settings table: a deployment that has never saved them
+ * reads the defaults below.
  */
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
-import { resolveGlobalStatements } from "@polaris/auth";
-import { evaluateStatements, type AuthzDecision, type PolicyStatement } from "@polaris/core";
 import { NextResponse } from "next/server";
 import { apiUser } from "@/lib/api-session";
 import type { SessionUser } from "@/lib/session";
-import { getSetting, setSetting } from "@/lib/setting-store";
-import { CONNECTOR_AUDIENCES, DEFAULT_CONNECTOR_POLICY } from "@/lib/polar/connectors/shared";
-import { ZEN_FREE_SLUG, isSubscriptionToken } from "@/lib/polar/shared";
 import { zenCredential } from "@/lib/polar/zen-free";
+import { resolveGlobalStatements } from "@polaris/auth";
+import { getSetting, setSetting } from "@/lib/setting-store";
+import { ensurePolarAccessCarried } from "@/lib/polar/access-carry";
+import { ZEN_FREE_SLUG, isSubscriptionToken } from "@/lib/polar/shared";
+import { evaluateStatements, type AuthzDecision, type PolicyStatement } from "@polaris/core";
+import { CONNECTOR_AUDIENCES, DEFAULT_CONNECTOR_POLICY } from "@/lib/polar/connectors/shared";
 import {
     chatCredentialFor,
     chatCredentialsFor,
-    instanceKeysAreShared,
     keySourcesFor,
     type ChatCredential,
     type KeySource
 } from "@/lib/agents/model-keys";
 
-const POLICY_KEY = "polar.access";
-
-export const AUDIENCES = ["admins", "chosen", "everyone"] as const;
-export type AudienceKind = (typeof AUDIENCES)[number];
-
-const audienceSchema = z.object({
-    who: z.enum(AUDIENCES),
-    userIds: z.array(z.string().uuid()).max(500).default([]),
-    groupIds: z.array(z.string().uuid()).max(200).default([]),
-    guests: z.boolean().default(false)
-});
-export type PolarAudience = z.infer<typeof audienceSchema>;
+/** The stored row. It may still hold the audiences an earlier release saved
+ *  under `use` and `spend`; they are kept as they are and never read here. */
+export const POLAR_POLICY_KEY = "polar.access";
 
 /**
  * Who may connect their own MCP servers to Polar, and where to. Open to
@@ -71,9 +57,8 @@ const connectorPolicySchema = z.object({
 });
 export type PolarConnectorPolicy = z.infer<typeof connectorPolicySchema>;
 
+/** Polar's options, edited in Polar's own settings. */
 export const polarPolicySchema = z.object({
-    use: audienceSchema,
-    spend: audienceSchema,
     /** Whether Polar may search and read the web. On unless an administrator
      *  turned it off, so a policy saved before this existed keeps it on. */
     web: z.boolean().default(true),
@@ -90,87 +75,58 @@ export const polarPolicySchema = z.object({
 });
 export type PolarPolicy = z.infer<typeof polarPolicySchema>;
 
-/** The two audiences: the default for `polar.use` and `polar.spend`, edited
- *  beside the roles under Management > Roles. */
-export const polarAudiencesSchema = polarPolicySchema.pick({ use: true, spend: true });
-export type PolarAudiences = z.infer<typeof polarAudiencesSchema>;
-
-/** Everything else in the policy, edited in Polar's own settings. */
-export const polarOptionsSchema = polarPolicySchema.omit({ use: true, spend: true });
-export type PolarOptions = z.infer<typeof polarOptionsSchema>;
-
-/**
- * What a deployment that never saved a policy gets when its keys are not
- * shared, and what a stored policy that no longer reads falls back to.
- *
- * Using Polar stays open to everybody signed in, which is what every install
- * already did - minus guests, who reach no other app either. Spending the
- * deployment's keys is the administrators' alone: before this, every account
- * ran on the operator's billing without anybody having decided it, and the safe
- * reading of "nobody decided" is "nobody but the operator".
- */
+/** What a deployment that never saved the options reads, and what a stored row
+ *  that no longer reads falls back to. */
 export const DEFAULT_POLAR_POLICY: PolarPolicy = {
-    use: { who: "everyone", userIds: [], groupIds: [], guests: false },
-    spend: { who: "admins", userIds: [], groupIds: [], guests: false },
     web: true,
     connectors: DEFAULT_CONNECTOR_POLICY,
     freeModels: true,
     zenStandInEveryone: false
 };
 
-/**
- * The policy of a deployment that never saved one, given whether its
- * administrator shares the deployment's keys. Sharing them is a decision
- * somebody already made about who spends them, so it carries over: everybody
- * signed in, as before, rather than taking the keys away on an update.
- */
-export function unsavedPolarPolicy(keysShared: boolean): PolarPolicy {
-    if (!keysShared) return DEFAULT_POLAR_POLICY;
-    return { ...DEFAULT_POLAR_POLICY, spend: { ...DEFAULT_POLAR_POLICY.spend, who: "everyone" } };
-}
-
-export async function readPolarPolicy(): Promise<PolarPolicy> {
-    const raw = await getSetting(POLICY_KEY);
-    if (!raw) return unsavedPolarPolicy(await instanceKeysAreShared());
+/** The stored row as an object, whatever else it holds; null when absent or
+ *  unreadable. */
+async function storedRow(): Promise<Record<string, unknown> | null> {
+    const raw = await getSetting(POLAR_POLICY_KEY);
+    if (!raw) return null;
     try {
-        const parsed = polarPolicySchema.safeParse(JSON.parse(raw));
-        // A row that no longer reads is not a reason to open anything up.
-        return parsed.success ? parsed.data : DEFAULT_POLAR_POLICY;
+        const parsed: unknown = JSON.parse(raw);
+        return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>)
+            : null;
     } catch {
-        return DEFAULT_POLAR_POLICY;
+        return null;
     }
 }
 
-export async function savePolarPolicy(policy: PolarPolicy): Promise<void> {
-    await setSetting(POLICY_KEY, JSON.stringify(polarPolicySchema.parse(policy)));
+export async function readPolarPolicy(): Promise<PolarPolicy> {
+    const row = await storedRow();
+    if (!row) return DEFAULT_POLAR_POLICY;
+    const parsed = polarPolicySchema.safeParse(row);
+    // A row that no longer reads is not a reason to open anything up.
+    return parsed.success ? parsed.data : DEFAULT_POLAR_POLICY;
 }
 
 /**
- * Store one part of the policy over the rest as it reads now. The audiences and
- * the options are edited on two screens, so neither may write back the other's
- * part from a stale copy. A deployment that never saved one stores what it was
- * already reading, which is what saving the whole policy did before.
+ * Store the options over the row as it is. Whatever else the row holds - the
+ * audiences an earlier release saved - is written back untouched, so the
+ * change that stopped reading them stays reversible.
  */
-export async function savePolarPolicyPart(
-    part: PolarAudiences | PolarOptions
-): Promise<PolarPolicy> {
-    const next = polarPolicySchema.parse({ ...(await readPolarPolicy()), ...part });
-    await savePolarPolicy(next);
+export async function savePolarPolicy(policy: PolarPolicy): Promise<PolarPolicy> {
+    const next = polarPolicySchema.parse(policy);
+    await setSetting(POLAR_POLICY_KEY, JSON.stringify({ ...(await storedRow()), ...next }));
     return next;
 }
 
-/** What the policy needs to know about one account. */
+/** What the decision needs to know about one account. */
 export interface AccessFacts {
-    userId: string;
     isAdmin: boolean;
-    guest: boolean;
-    groupIds: readonly string[];
     /** What this account's roles, group policies and own overrides say about
      *  `polar.use` and `polar.spend`; absent is the same as nothing said. */
     grants?: PolarGrants;
 }
 
-/** The permission system's word on each, before the audiences are asked. */
+/** The permission system's word on each. */
 export interface PolarGrants {
     use: AuthzDecision;
     spend: AuthzDecision;
@@ -180,9 +136,11 @@ export interface PolarGrants {
  * Read the two decisions out of one account's global statements. Pure.
  *
  * Any matching deny counts, `*` included. An allow counts only from a statement
- * that names Polar (`polar.use`, `polar.spend`, `polar.*`): a role holding every
- * permission, or a policy allowing `*`, never meant Polar before these existed,
- * and must not start spending the deployment's keys after an update.
+ * that names Polar (`polar.use`, `polar.spend`, `polar.*`). The built-in roles
+ * hold `polar.use` by name, so this costs nobody anything; what it keeps out is
+ * a role or a policy allowing `*`, which never meant Polar - and above all never
+ * meant spending the deployment's keys, billed to its administrator. The
+ * administrators' own role holds `*`, and they are allowed regardless.
  */
 export function polarGrantsOf(statements: readonly PolicyStatement[]): PolarGrants {
     const naming = statements
@@ -196,33 +154,6 @@ export function polarGrantsOf(statements: readonly PolicyStatement[]): PolarGran
         return decision === "allow" ? evaluateStatements(naming, action, "*") : decision;
     };
     return { use: decide("polar.use"), spend: decide("polar.spend") };
-}
-
-/**
- * Whether an account is in, with the permission system asked first: an explicit
- * deny keeps it out and an explicit allow lets it in, whatever the audience
- * says. An administrator is in regardless, as everywhere else in Polaris.
- */
-function admitted(
-    decision: AuthzDecision | undefined,
-    audience: PolarAudience,
-    facts: AccessFacts
-): boolean {
-    if (facts.isAdmin) return true;
-    if (decision === "deny") return false;
-    if (decision === "allow") return true;
-    return audienceAdmits(audience, facts);
-}
-
-/** Whether one audience takes one account. Pure, so it can be asserted. */
-export function audienceAdmits(audience: PolarAudience, facts: AccessFacts): boolean {
-    if (facts.isAdmin) return true;
-    if (audience.who === "admins") return false;
-    // Naming somebody is the explicit decision a guest needs.
-    if (audience.userIds.includes(facts.userId)) return true;
-    if (facts.guest && !audience.guests) return false;
-    if (audience.who === "everyone") return true;
-    return facts.groupIds.some((id) => audience.groupIds.includes(id));
 }
 
 export interface PolarAccess {
@@ -239,11 +170,13 @@ export interface PolarAccess {
 
 /** One account's answer to both questions. Pure. */
 export function decidePolarAccess(policy: PolarPolicy, facts: AccessFacts): PolarAccess {
-    const use = admitted(facts.grants?.use, policy.use, facts);
+    const use = facts.isAdmin || facts.grants?.use === "allow";
+    // Spending needs Polar itself: a grant of the keys alone opens nothing.
+    const spend = use && (facts.isAdmin || facts.grants?.spend === "allow");
     const connectors = policy.connectors ?? DEFAULT_CONNECTOR_POLICY;
     return {
         use,
-        spend: use && admitted(facts.grants?.spend, policy.spend, facts),
+        spend,
         web: use && policy.web,
         connectors:
             use && (connectors.who === "everyone" || (connectors.who === "admins" && facts.isAdmin)),
@@ -251,79 +184,76 @@ export function decidePolarAccess(policy: PolarPolicy, facts: AccessFacts): Pola
     };
 }
 
-const FACTS_SELECT = {
-    id: true,
-    isAdmin: true,
-    roles: { select: { role: { select: { name: true } } } },
-    groups: { select: { groupId: true } }
-} as const;
+const NOBODY: PolarAccess = {
+    use: false,
+    spend: false,
+    web: false,
+    connectors: false,
+    zenStandInEveryone: false
+};
 
-function factsOf(row: {
-    id: string;
-    isAdmin: boolean;
-    roles: { role: { name: string } }[];
-    groups: { groupId: string }[];
-}): AccessFacts {
-    const roles = row.roles.map((entry) => entry.role.name);
-    return {
-        userId: row.id,
-        isAdmin: row.isAdmin,
-        // No role but guest - or none at all - reaches no app, so it is a guest here.
-        guest: !row.isAdmin && roles.every((name) => name === "guest"),
-        groupIds: row.groups.map((entry) => entry.groupId)
-    };
+/**
+ * The carry of the old audiences into roles, before anything is decided: an
+ * update must never answer from roles that do not hold Polar yet. Once per
+ * process, and a failure is logged and tried again on the next call.
+ */
+async function carried(): Promise<void> {
+    try {
+        await ensurePolarAccessCarried();
+    } catch (error) {
+        console.error("polar: could not carry the old access into roles", error);
+    }
 }
 
-async function factsFor(userId: string): Promise<AccessFacts> {
-    const [row, statements] = await Promise.all([
-        prisma.user.findUnique({ where: { id: userId }, select: FACTS_SELECT }),
-        resolveGlobalStatements(userId)
-    ]);
-    if (!row) return { userId, isAdmin: false, guest: true, groupIds: [] };
-    return { ...factsOf(row), grants: polarGrantsOf(statements) };
+async function isAdministrator(userId: string): Promise<boolean> {
+    const row = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
+    return row?.isAdmin === true;
 }
 
 /** This account's Polar access. A store that cannot be read answers no. */
 export async function polarAccessFor(userId: string): Promise<PolarAccess> {
     try {
-        const [policy, facts] = await Promise.all([readPolarPolicy(), factsFor(userId)]);
-        return decidePolarAccess(policy, facts);
+        await carried();
+        const [policy, isAdmin, statements] = await Promise.all([
+            readPolarPolicy(),
+            isAdministrator(userId),
+            resolveGlobalStatements(userId)
+        ]);
+        return decidePolarAccess(policy, { isAdmin, grants: polarGrantsOf(statements) });
     } catch (error) {
         console.error("polar: could not read the access policy", error);
-        return { use: false, spend: false, web: false, connectors: false, zenStandInEveryone: false };
+        return NOBODY;
     }
 }
 
 /**
  * What an account would have with `statements` in place of its own: the
  * capabilities screen asks it with the account's overrides taken out, which is
- * what "follow their role" leaves them with - the deployment's Polar access
- * included, and not only what a role grants.
+ * what "follow their role" leaves them with.
  */
 export async function polarAccessWith(
     userId: string,
     statements: readonly PolicyStatement[]
 ): Promise<PolarAccess> {
-    const [policy, row] = await Promise.all([
-        readPolarPolicy(),
-        prisma.user.findUnique({ where: { id: userId }, select: FACTS_SELECT })
-    ]);
-    const facts = row
-        ? factsOf(row)
-        : { userId, isAdmin: false, guest: true, groupIds: [] as string[] };
-    return decidePolarAccess(policy, { ...facts, grants: polarGrantsOf(statements) });
+    await carried();
+    const [policy, isAdmin] = await Promise.all([readPolarPolicy(), isAdministrator(userId)]);
+    return decidePolarAccess(policy, { isAdmin, grants: polarGrantsOf(statements) });
 }
 
 /**
- * The accounts among `userIds` that may use Polar, read with one policy and one
- * query. A store that cannot be read answers nobody.
+ * The accounts among `userIds` that may use Polar, read with one query. A store
+ * that cannot be read answers nobody.
  */
 export async function polarUsersAmong(userIds: readonly string[]): Promise<Set<string>> {
     if (userIds.length === 0) return new Set();
     try {
+        await carried();
         const [policy, rows] = await Promise.all([
             readPolarPolicy(),
-            prisma.user.findMany({ where: { id: { in: [...userIds] } }, select: FACTS_SELECT })
+            prisma.user.findMany({
+                where: { id: { in: [...userIds] } },
+                select: { id: true, isAdmin: true }
+            })
         ]);
         // One resolution per account found, all at once: the list is a page of
         // people-search results, never the directory.
@@ -334,7 +264,8 @@ export async function polarUsersAmong(userIds: readonly string[]): Promise<Set<s
             rows
                 .filter(
                     (row, index) =>
-                        decidePolarAccess(policy, { ...factsOf(row), grants: grants[index] }).use
+                        decidePolarAccess(policy, { isAdmin: row.isAdmin, grants: grants[index] })
+                            .use
                 )
                 .map((row) => row.id)
         );
