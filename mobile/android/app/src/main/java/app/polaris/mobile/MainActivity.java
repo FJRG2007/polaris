@@ -426,7 +426,7 @@ public final class MainActivity extends Activity {
         Toast.makeText(this, getString(R.string.download_started, name), Toast.LENGTH_SHORT).show();
     }
 
-    private void openOutside(Uri uri) {
+    void openOutside(Uri uri) {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, uri).addCategory(Intent.CATEGORY_BROWSABLE));
         } catch (ActivityNotFoundException none) {

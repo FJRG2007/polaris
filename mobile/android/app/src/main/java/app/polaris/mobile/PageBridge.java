@@ -1,10 +1,12 @@
 package app.polaris.mobile;
 
+import android.net.Uri;
 import android.webkit.JavascriptInterface;
 
 /**
  * What the page can ask of the app, as `window.polarisMobile`: which app and version it is running in, the way to the
- * list of Polaris servers, where the last picked file came from, and opening a photo sent to be seen once. Nothing here
+ * list of Polaris servers, where the last picked file came from, opening a photo sent to be seen once, and handing a
+ * link to the phone's browser or mail app. Nothing here
  * hands the page anything it could not already see: a view-once file is fetched and shown by the app, never given to
  * the page.
  */
@@ -58,5 +60,31 @@ final class PageBridge {
     public void openViewOnce(String attachmentId) {
         if (attachmentId == null || !attachmentId.matches("[0-9a-f-]{36}")) return;
         activity.runOnUiThread(() -> activity.openViewOnce(attachmentId));
+    }
+
+    /** A link the page opens outside itself. Only the web and mail leave: any other scheme would launch whatever app
+     *  claims it. A WebView has no tabs, and a link in a sandboxed frame (a mail body) cannot open a window of its
+     *  own, so the page hands every outside link here. */
+    @JavascriptInterface
+    public void openExternal(String url) {
+        Uri uri = externalUri(url);
+        if (uri != null) activity.runOnUiThread(() -> activity.openOutside(uri));
+    }
+
+    /** The address as a web or mail link, or null for anything else. */
+    static Uri externalUri(String url) {
+        if (url == null || url.length() > 20_000) return null;
+        Uri uri = Uri.parse(url);
+        String scheme = uri.getScheme();
+        if (scheme == null) return null;
+        switch (scheme.toLowerCase(java.util.Locale.ROOT)) {
+            case "http":
+            case "https":
+                return uri.getHost() == null || uri.getHost().isEmpty() ? null : uri;
+            case "mailto":
+                return uri;
+            default:
+                return null;
+        }
     }
 }

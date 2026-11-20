@@ -47,7 +47,8 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         window.polarisMobile = Object.freeze({
             platform: function () { return "ios"; },
             version: function () { return "\(version)"; },
-            changeServer: function () { window.webkit.messageHandlers.polarisMobile.postMessage("changeServer"); }
+            changeServer: function () { window.webkit.messageHandlers.polarisMobile.postMessage("changeServer"); },
+            openExternal: function (url) { window.webkit.messageHandlers.polarisMobile.postMessage({ openExternal: String(url) }); }
         });
         """
         config.userContentController.addUserScript(
@@ -240,6 +241,22 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.frameInfo.isMainFrame, ServerAddress.sameOrigin(origin, message.frameInfo.request.url) else { return }
         if message.body as? String == "changeServer" { changeServer() }
+        // A link the page opens outside itself: a WebView has no tabs, and a link in a sandboxed frame (a mail
+        // body) cannot open a window of its own. Only the web and mail leave.
+        if let body = message.body as? [String: Any], let raw = body["openExternal"] as? String,
+           let url = Self.externalURL(raw) {
+            UIApplication.shared.open(url)
+        }
+    }
+
+    /// The address as a web or mail link, or nil for any other scheme, which would launch whatever app claims it.
+    static func externalURL(_ raw: String) -> URL? {
+        guard raw.count <= 20_000, let url = URL(string: raw), let scheme = url.scheme?.lowercased() else { return nil }
+        switch scheme {
+        case "http", "https": return (url.host ?? "").isEmpty ? nil : url
+        case "mailto": return url
+        default: return nil
+        }
     }
 }
 
