@@ -22,6 +22,7 @@ Object.defineProperty(window, "localStorage", {
 const save = vi.fn(async (_input: { volume: number }) => ({}) as { error?: string });
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
+vi.mock("@/app/(app)/app-launcher-actions", () => ({ setAppMuteMentionsAction: vi.fn(async () => ({})) }));
 vi.mock("@/app/(app)/account/notifications/actions", () => ({
     saveNotificationRuleAction: vi.fn(),
     saveSoundVolumeAction: (input: { volume: number }) => save(input),

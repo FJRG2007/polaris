@@ -16,6 +16,7 @@ vi.mock("next/navigation", () => ({
     usePathname: () => "/account/notifications"
 }));
 
+vi.mock("@/app/(app)/app-launcher-actions", () => ({ setAppMuteMentionsAction: vi.fn(async () => ({})) }));
 vi.mock("@/app/(app)/account/notifications/actions", () => ({
     saveNotificationRuleAction: vi.fn(),
     saveSoundVolumeAction: vi.fn(),

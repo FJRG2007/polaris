@@ -17,6 +17,7 @@ vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn(), push: vi.fn() })
 }));
 
+vi.mock("@/app/(app)/app-launcher-actions", () => ({ setAppMuteMentionsAction: vi.fn(async () => ({})) }));
 vi.mock("@/app/(app)/account/notifications/actions", () => ({
     saveNotificationRuleAction: vi.fn(),
     saveSoundVolumeAction: vi.fn(),
