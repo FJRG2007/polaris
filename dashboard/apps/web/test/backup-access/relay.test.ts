@@ -510,7 +510,8 @@ describe("backup relay config", () => {
                 const spec = relaySpec(end, configs[end], set, ["polaris-proxy"]);
                 const call = spec.services.filter((service) => service.name.includes("0000ca11ed00"));
                 expect(call).toHaveLength(2);
-                // Its file and its containers, apart from what it waits on to start.
+                // Its file and its containers, apart from what it waits on to start,
+                // which compose leaves out of the hash that decides a recreate.
                 return JSON.stringify([configs[end].call, call.map(({ dependsOn: _, ...rest }) => rest)]);
             });
             expect(new Set(calls).size).toBe(1);

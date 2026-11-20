@@ -22,6 +22,14 @@
  * the same; whereas navigating away and coming back is a decision to leave, and
  * rejoining then would be a microphone opening itself.
  *
+ * A page that comes straight back to the address it left counts as reloaded
+ * too, whatever the browser calls the load. After an update the framework
+ * replaces the page on its own - a request the old build made fails against
+ * the new one, and it recovers by loading the same address afresh - and that
+ * load is a plain navigation, not a reload. Both people on a call through an
+ * update were dropped that way on 2026-11-20 and had to join again by hand.
+ * Nobody leaves a call by loading the page they are on within seconds.
+ *
  * Kept in this tab's own storage, which is the exact lifetime wanted: a reload
  * keeps it, closing the tab throws it away, and another tab never sees it. It
  * also outlives nothing else - the note is read once and removed, so a later
@@ -41,6 +49,9 @@ const KEY = "polaris.call.resume";
  */
 const WINDOW_MS = 90_000;
 
+/** How soon a page back at the same address counts as the same page reloaded. */
+const SAME_PAGE_MS = 20_000;
+
 /** Who wrote the note: the update banner, asked to reload, or the page as it was
  *  being left, which only counts when it was being reloaded. */
 type Reason = "offered" | "leaving";
@@ -53,6 +64,8 @@ interface Note {
      *  is not the same person, and their call is not this one's to rejoin. */
     readonly viewerId: string;
     readonly at: number;
+    /** The address being left, on a `leaving` note. */
+    readonly href?: string;
 }
 
 /** Write down the call this tab is on, because it is about to be replaced. */
@@ -65,7 +78,7 @@ export function rememberCall(
     if (typeof window === "undefined") return;
     try {
         if (reason === "leaving" && offeredNote()) return;
-        const note: Note = { session, video, viewerId, reason, at: Date.now() };
+        const note: Note = { session, video, viewerId, reason, at: Date.now(), href: here() };
         window.sessionStorage.setItem(KEY, JSON.stringify(note));
     } catch {
         // Storage refused - a browser with it off, or a full quota. The reload
@@ -139,11 +152,28 @@ export function takeCallNote(
             return null;
         if (note.viewerId !== viewerId) return null;
         if (typeof note.at !== "number" || Date.now() - note.at > WINDOW_MS) return null;
-        if (note.reason === "leaving" && !reloaded()) return { kind: "lost", session };
+        if (note.reason === "leaving" && !reloaded() && !cameBack(note)) return { kind: "lost", session };
         return { kind: "resume", session, video: note.video === true };
     } catch {
         return null;
     }
+}
+
+/** This page's address, without its fragment. */
+function here(): string {
+    const at = window.location;
+    return at ? `${at.pathname}${at.search}` : "";
+}
+
+/** Whether the page that wrote a `leaving` note was loaded again, at once. */
+function cameBack(note: Partial<Note>): boolean {
+    return (
+        typeof note.href === "string" &&
+        note.href !== "" &&
+        note.href === here() &&
+        typeof note.at === "number" &&
+        Date.now() - note.at <= SAME_PAGE_MS
+    );
 }
 
 /** Whether this page was loaded by reloading itself. */

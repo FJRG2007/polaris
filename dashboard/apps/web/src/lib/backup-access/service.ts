@@ -881,7 +881,11 @@ async function warmRelay(config: BackupConfig, repush: boolean): Promise<BackupT
     // Fresh keys start with no ports, so they always bring both ends up again; a
     // relay brought up before UDP was carried stored none, so one with UDP game
     // ports comes up again with them.
-    const lan = await getHostLanIp();
+    // A LAN address that cannot be read this pass is the one last used, not a move:
+    // the responder's file can be missing for a moment while it restarts, and
+    // reading nothing would re-render the house's inner links and recreate them,
+    // cutting the calls riding them.
+    const lan = (await getHostLanIp()) ?? stored.lan;
     const changed =
         stored.routes === null ||
         stored.spec !== RELAY_SPEC ||

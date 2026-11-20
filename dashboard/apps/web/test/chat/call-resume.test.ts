@@ -124,6 +124,31 @@ describe("the note a page leaves on its way out", () => {
         expect(takeCallNote(VIEWER)).toBeNull();
     });
 
+    it("brings the call back when the page loads the same address again at once", () => {
+        // What the framework does on its own after an update: it loads the page
+        // afresh, which the browser reports as a navigation, not a reload.
+        const at = { pathname: "/chat/general", search: "?call=1" };
+        (globalThis as { window?: unknown }).window = { sessionStorage: storage, location: at };
+        rememberCall(SESSION, true, VIEWER, "leaving");
+        loadedBy("navigate");
+        expect(takeRememberedCall(VIEWER)).toEqual({ session: SESSION, video: true });
+    });
+
+    it("says the call was lost when the same address comes back late, or another one does", () => {
+        const at = { pathname: "/chat/general", search: "" };
+        (globalThis as { window?: unknown }).window = { sessionStorage: storage, location: at };
+        const now = Date.now();
+        const clock = vi.spyOn(Date, "now").mockReturnValue(now);
+        rememberCall(SESSION, false, VIEWER, "leaving");
+        clock.mockReturnValue(now + 30_000);
+        loadedBy("navigate");
+        expect(takeCallNote(VIEWER)).toEqual({ kind: "lost", session: SESSION });
+        clock.mockReturnValue(now);
+        rememberCall(SESSION, false, VIEWER, "leaving");
+        at.pathname = "/home";
+        expect(takeCallNote(VIEWER)).toEqual({ kind: "lost", session: SESSION });
+    });
+
     it("does not after navigating away and back", () => {
         for (const type of ["navigate", "back_forward"]) {
             rememberCall(SESSION, false, VIEWER, "leaving");
