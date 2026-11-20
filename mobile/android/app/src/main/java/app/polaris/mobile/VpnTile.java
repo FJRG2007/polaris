@@ -1,5 +1,6 @@
 package app.polaris.mobile;
 
+import android.annotation.SuppressLint;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.net.Uri;
@@ -79,6 +80,8 @@ public final class VpnTile extends TileService {
     }
 
     /** The VPN page of this phone's Polaris, with the shade out of the way. */
+    // The Intent form only below Android 14, where the PendingIntent one does not exist.
+    @SuppressLint("StartActivityAndCollapseDeprecated")
     @SuppressWarnings("deprecation")
     private void openPage() {
         String origin = ServerStore.origin(this);
