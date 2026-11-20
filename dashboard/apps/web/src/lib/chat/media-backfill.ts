@@ -66,21 +66,33 @@ export async function measureImage(bytes: Uint8Array): Promise<MeasuredImage | n
     }
 }
 
-/** Where the walk is, across passes, so each pass picks up after the last. */
+/**
+ * Where the walk is, across passes. Ids are UUIDv7, so they grow with time: the
+ * walk never goes back to the start once it reaches the end, and each later
+ * pass reads only the pictures sent since, through the primary key. Without it
+ * every hourly pass would scan the whole table to find nothing.
+ */
 let cursor: string | null = null;
+/** The first picture a pass could not read from its storage, read again next pass. */
+let retry: string | null = null;
 
 /** Forget where the walk is. For tests. */
 export function resetBackfillCursor(): void {
     cursor = null;
+    retry = null;
 }
 
 /**
  * One pass: up to `BACKFILL_BATCHES_PER_PASS` batches of pictures with no size,
- * oldest id first. Starts again from the beginning once it reaches the end.
+ * oldest id first, from where the last one stopped (or from the first picture it
+ * could not read).
  */
 export async function backfillMediaShapes(): Promise<{ measured: number; unreadable: number }> {
     let measured = 0;
     let unreadable = 0;
+    // Inclusive for the picture to read again, exclusive past the last one read.
+    let from: { gte: string } | { gt: string } | null = retry ? { gte: retry } : cursor ? { gt: cursor } : null;
+    retry = null;
     for (let batch = 0; batch < BACKFILL_BATCHES_PER_PASS; batch += 1) {
         const rows = await prisma.chatAttachment.findMany({
             where: {
@@ -88,17 +100,16 @@ export async function backfillMediaShapes(): Promise<{ measured: number; unreada
                 contentType: { startsWith: "image/" },
                 viewOnce: false,
                 borrowed: false,
-                ...(cursor ? { id: { gt: cursor } } : {})
+                ...(from ? { id: from } : {})
             },
             orderBy: { id: "asc" },
             take: BACKFILL_BATCH,
             select: { id: true, connectionId: true, path: true, size: true }
         });
-        if (rows.length === 0) {
-            cursor = null;
-            break;
-        }
-        cursor = rows[rows.length - 1]!.id;
+        if (rows.length === 0) break;
+        const last = rows[rows.length - 1]!.id;
+        if (!cursor || last > cursor) cursor = last;
+        from = { gt: last };
         for (const row of rows) {
             const shape =
                 Number(row.size) > LARGEST_READ_BYTES
@@ -111,16 +122,16 @@ export async function backfillMediaShapes(): Promise<{ measured: number; unreada
                           if (!bytes) return undefined;
                           return measureImage(bytes);
                       })();
-            if (shape === undefined) continue;
+            if (shape === undefined) {
+                retry ??= row.id;
+                continue;
+            }
             const data = shape ?? { width: 0, height: null, thumbhash: null };
             await prisma.chatAttachment.updateMany({ where: { id: row.id, width: null }, data });
             if (shape) measured += 1;
             else unreadable += 1;
         }
-        if (rows.length < BACKFILL_BATCH) {
-            cursor = null;
-            break;
-        }
+        if (rows.length < BACKFILL_BATCH) break;
     }
     return { measured, unreadable };
 }

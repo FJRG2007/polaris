@@ -46,7 +46,7 @@ vi.mock("@polaris/db", () => ({
                     contentType: { startsWith: string };
                     viewOnce: boolean;
                     borrowed: boolean;
-                    id?: { gt: string };
+                    id?: { gt?: string; gte?: string };
                 };
                 take: number;
             }) => {
@@ -58,7 +58,8 @@ vi.mock("@polaris/db", () => ({
                             row.contentType.startsWith(where.contentType.startsWith) &&
                             row.viewOnce === where.viewOnce &&
                             row.borrowed === where.borrowed &&
-                            (!where.id || row.id > where.id.gt)
+                            (!where.id ||
+                                (where.id.gt !== undefined ? row.id > where.id.gt : row.id >= (where.id.gte ?? "")))
                     )
                     .sort((a, b) => a.id.localeCompare(b.id))
                     .slice(0, take)
@@ -190,5 +191,29 @@ describe("the pass", () => {
         expect(queries[0]?.id).toBeUndefined();
         expect(queries[1]?.id).toEqual({ gt: `r${String(BACKFILL_BATCH - 1).padStart(3, "0")}` });
         expect(rows.every((one) => one.width === 20)).toBe(true);
+    });
+});
+
+describe("across passes", () => {
+    it("never walks back over what it finished: a later pass reads only what came after", async () => {
+        rows = [row("a"), row("b")];
+        stored.set("chat/c1/a", await picture(10, 10));
+        stored.set("chat/c1/b", await picture(10, 10));
+        await backfillMediaShapes();
+        queries = [];
+        rows.push(row("c"));
+        stored.set("chat/c1/c", await picture(10, 10));
+        expect(await backfillMediaShapes()).toEqual({ measured: 1, unreadable: 0 });
+        expect(queries[0]).toMatchObject({ id: { gt: "b" } });
+    });
+
+    it("reads again, next pass, a picture its storage could not hand over", async () => {
+        rows = [row("a"), row("b")];
+        stored.set("chat/c1/b", await picture(10, 10));
+        expect(await backfillMediaShapes()).toEqual({ measured: 1, unreadable: 0 });
+        stored.set("chat/c1/a", await picture(10, 10));
+        queries = [];
+        expect(await backfillMediaShapes()).toEqual({ measured: 1, unreadable: 0 });
+        expect(queries[0]).toMatchObject({ id: { gte: "a" } });
     });
 });
