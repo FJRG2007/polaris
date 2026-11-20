@@ -18,6 +18,14 @@
         <item name="android:alertDialogTheme">@style/Theme.Polaris.Dialog</item>
     </style>
 
+    <!-- A link landing: nothing of its own on screen but the question it may ask. -->
+    <style name="Theme.Polaris.Link" parent="Theme.Polaris">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
+
     <!-- The update offer, drawn on the dashboard's card instead of the platform's grey sheet. -->
     <style name="Theme.Polaris.Dialog" parent="android:Theme.Material.Dialog.Alert">
         <item name="android:windowBackground">@drawable/dialog_background</item>

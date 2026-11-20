@@ -104,6 +104,45 @@ final class ServerStore {
         return added;
     }
 
+    /**
+     * Takes in a list carried from another device (see {@link HostList}): this phone's own hosts first and untouched,
+     * then each new one in the order it came. A host already here without a name takes the one it arrived with; a name
+     * somebody gave here is never overwritten. Nothing is selected unless the phone had no Polaris yet, when the first
+     * one taken in is what opens. Returns how many were added, named, and left out for want of room.
+     */
+    static synchronized int[] importHosts(Context context, List<HostList.Entry> incoming) {
+        List<Host> hosts = read(context);
+        boolean empty = hosts.isEmpty();
+        int added = 0;
+        int named = 0;
+        int skipped = 0;
+        for (HostList.Entry entry : incoming) {
+            int listed = -1;
+            for (int i = 0; i < hosts.size(); i++) {
+                if (hosts.get(i).origin.equals(entry.origin)) listed = i;
+            }
+            if (listed >= 0) {
+                Host host = hosts.get(listed);
+                if ((host.name == null || host.name.isEmpty()) && entry.name != null) {
+                    hosts.set(listed, new Host(host.id, host.origin, entry.name, host.profile));
+                    named++;
+                }
+                continue;
+            }
+            if (hosts.size() >= HostList.MAX) {
+                skipped++;
+                continue;
+            }
+            String id = UUID.randomUUID().toString();
+            String profile = hosts.isEmpty() || !HostProfiles.separate() ? null : "host-" + id;
+            hosts.add(new Host(hosts.isEmpty() ? DEFAULT_ID : id, entry.origin, entry.name, profile));
+            added++;
+        }
+        if (added > 0 || named > 0) write(context, hosts);
+        if (empty && !hosts.isEmpty()) select(context, hosts.get(0).id);
+        return new int[] {added, named, skipped};
+    }
+
     static synchronized void select(Context context, String id) {
         prefs(context).edit().putString(ACTIVE, id).apply();
     }

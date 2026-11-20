@@ -443,9 +443,16 @@ public final class MainActivity extends Activity {
      * Polaris is never loaded into this one: the old window goes, and its notices connection with it.
      */
     static void reopen(Context context) {
+        reopen(context, null);
+    }
+
+    /** The same, on a page of that Polaris rather than its start. */
+    static void reopen(Context context, String url) {
         NoticeService.restart(context);
-        context.startActivity(new Intent(context, MainActivity.class)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
+        Intent intent = new Intent(context, MainActivity.class)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        if (url != null) intent.setData(Uri.parse(url));
+        context.startActivity(intent);
     }
 
     /** Whether another Polaris was chosen since this window opened; if so it has been reopened on that one. */

@@ -62,4 +62,20 @@
     <string name="sign_in_approved">Inicio de sesión aprobado</string>
     <string name="sign_in_denied">Inicio de sesión rechazado</string>
     <string name="sign_in_failed">No se pudo enviar tu respuesta. Responde desde el dispositivo que inicia sesión.</string>
+
+    <string name="link_invalid">Ese enlace no es una página de Polaris.</string>
+    <string name="link_hosts_invalid">Ese código no es una lista de servidores Polaris.</string>
+    <string name="link_hosts_none_new">Todos los servidores de esa lista ya están en el móvil.</string>
+    <plurals name="link_hosts_added">
+        <item quantity="one">%1$d servidor añadido.</item>
+        <item quantity="other">%1$d servidores añadidos.</item>
+    </plurals>
+    <plurals name="link_hosts_skipped">
+        <item quantity="one">%1$d no cabía.</item>
+        <item quantity="other">%1$d no cabían.</item>
+    </plurals>
+    <string name="link_add_title">¿Añadir %1$s?</string>
+    <string name="link_add_message">Este Polaris aún no está en el móvil. Añádelo para abrir el enlace aquí.</string>
+    <string name="link_add_confirm">Añadir y abrir</string>
+    <string name="server_scan_hint">¿Tienes Polaris en un ordenador? Escanea con la cámara su QR de servidores para añadirlos todos.</string>
 </resources>

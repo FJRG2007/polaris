@@ -50,6 +50,22 @@
             android:label="@string/server_title"
             android:windowSoftInputMode="adjustResize" />
 
+        <!-- polaris:// links: the desktop app's servers QR, and a Polaris page opened from a link. -->
+        <activity
+            android:name=".LinkActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@style/Theme.Polaris.Link">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="polaris" android:host="hosts" />
+                <data android:scheme="polaris" android:host="open" />
+            </intent-filter>
+        </activity>
+
         <!-- Every Polaris on this phone: open, rename, remove or add one. -->
         <activity
             android:name=".HostsActivity"

@@ -46,7 +46,7 @@
             android:hint="@string/server_placeholder"
             android:imeOptions="actionGo"
             android:inputType="textUri"
-            android:maxLength="300"
+            android:maxLength="8192"
             android:singleLine="true" />
 
         <TextView
@@ -74,5 +74,13 @@
             android:layout_marginTop="16dp"
             android:indeterminateTint="@color/primary"
             android:visibility="gone" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/server_scan_hint"
+            android:textColor="@color/muted"
+            android:textSize="14sp" />
     </LinearLayout>
 </ScrollView>

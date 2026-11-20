@@ -42,5 +42,13 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="@string/hosts_add" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="@string/server_scan_hint"
+            android:textColor="@color/muted"
+            android:textSize="14sp" />
     </LinearLayout>
 </ScrollView>

@@ -1,0 +1,1 @@
+Añade de una vez todos los servidores de Polaris en tu ordenador: escanea con la cámara su QR de servidores o pega su código. Los enlaces de Polaris se abren en la app, y un servidor que el móvil aún no tiene se añade cuando dices que sí.

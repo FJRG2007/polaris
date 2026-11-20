@@ -48,6 +48,18 @@ public final class ServerActivity extends Activity {
     }
 
     private void submit() {
+        // The code the desktop app copies, pasted here instead of an address: every server on it, at once.
+        java.util.List<HostList.Entry> list = HostList.read(address.getText().toString());
+        if (list != null) {
+            if (list.isEmpty()) {
+                show(getString(R.string.link_hosts_invalid));
+                return;
+            }
+            ServerStore.importHosts(this, list);
+            MainActivity.reopen(this);
+            finish();
+            return;
+        }
         String origin = ServerAddress.origin(address.getText().toString());
         if (origin == null) {
             show(getString(R.string.server_invalid));

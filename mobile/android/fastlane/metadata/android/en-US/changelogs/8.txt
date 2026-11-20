@@ -1,0 +1,1 @@
+Add every server from Polaris on your computer at once: scan its servers QR with the camera, or paste its code. Polaris links open in the app, and a server the phone does not have yet is added after you say yes.
