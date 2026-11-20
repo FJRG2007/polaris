@@ -216,6 +216,27 @@
 
                 // Nothing remembered: the page stands as it is.
                 offer().catch(function () {});
+
+                // Back by itself once Polaris answers again - an update is a minute
+                // or two of this page - in every client alike: a browser, the phone
+                // app and the desktop app all show this page. A reload, so a call
+                // the page was on is walked back into (call-resume.ts). Every few
+                // seconds at first, then less often, and only while it is shown.
+                var tries = 0;
+                function retry() {
+                    tries += 1;
+                    var wait = tries < 20 ? 3000 : 15000;
+                    setTimeout(function () {
+                        if (document.visibilityState === "hidden") return retry();
+                        fetch(location.href, { cache: "no-store", credentials: "same-origin" })
+                            .then(function (response) {
+                                if (isGatewayFailure(response.status)) return retry();
+                                location.reload();
+                            })
+                            .catch(retry);
+                    }, wait);
+                }
+                retry();
             })();
         </script>
     </body>
