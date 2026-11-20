@@ -245,11 +245,17 @@ export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
         const file = componentFileFor(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? "");
         const mods = env.get(MODS_KEY) ?? "";
         const keyed = keyedMods(mods, PUBLIC_MOD_FILES, modToken());
-        let wanted = keyed;
-        if (baseUrl !== null && file !== null && !carriesFile(keyed, file)) {
+        // The engine plugin off a release whose Java cannot load it.
+        const unfit = anticheat.unfitAnticheatRemoved(
+            keyed,
+            env.get(SOFTWARE_KEY) ?? "",
+            env.get("VERSION") ?? ""
+        );
+        let wanted = unfit ?? keyed;
+        if (baseUrl !== null && file !== null && !carriesFile(wanted, file)) {
             if (!bundled.has(file))
                 bundled.set(file, await anticheatBundled(file).catch(() => false));
-            if (bundled.get(file)) wanted = withMod(keyed, modUrl(baseUrl, file, modToken()));
+            if (bundled.get(file)) wanted = withMod(wanted, modUrl(baseUrl, file, modToken()));
         }
         const rewrites = Object.entries(mapUrlRewrites(env, addresses)).map(([key, value]) => ({
             key,
@@ -263,6 +269,7 @@ export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
         );
         if (projects !== null)
             rewrites.push({ key: PROJECTS_KEY, value: projects, isSecret: false });
+        if (unfit !== null) rewrites.push({ key: anticheat.ANTICHEAT_KEY, value: "", isSecret: false });
         if (wanted === mods && rewrites.length === 0) continue;
         try {
             await setEnvVars("application", install.applicationId!, install.ownerId, [

@@ -11,7 +11,8 @@
  *
  * It simulates each player's movement packet by packet, so it runs only where it
  * can read those packets: Paper and everything built on it, Folia and Spigot -
- * Minecraft 1.8 to the latest, on the Java the managed images carry. The servers
+ * on a release whose managed image carries Java 17 or later (1.17 on), since the
+ * plugin is built for Java 17 and an older Java refuses to load it. The servers
  * that load plugins on top of a mod loader are left out: their mods change how
  * players move, and a simulation that does not know about them would accuse
  * everybody.
@@ -41,6 +42,7 @@ import {
     loginOn,
     modFileFor
 } from "./polaris-login";
+import { javaTagFor } from "./runtime";
 
 /** The switch: `on` when Polaris installed the plugin, `off` when somebody turned
  *  it off. The plugin reads it too, and reports to Polaris only while it is on. */
@@ -110,10 +112,34 @@ export type AnticheatBuild =
     | { readonly kind: "mod"; readonly file: string };
 
 export function anticheatBuildFor(software: string, version: string): AnticheatBuild | null {
-    if (anticheatRunsOn(software)) return { kind: "plugin", file: ANTICHEAT_FILE };
+    if (anticheatRunsOn(software)) {
+        return pluginLoadsOn(version) ? { kind: "plugin", file: ANTICHEAT_FILE } : null;
+    }
     if (loaderForType(software) !== "neoforge") return null;
     const file = modFileFor(software, version);
     return file ? { kind: "mod", file } : null;
+}
+
+/**
+ * Whether the plugin loads on the Java this release's managed image carries. It
+ * is compiled for Java 17, so the Java 8 and Java 11 images (1.16 and older)
+ * refuse it - and downloading it there only adds a request a boot can stall on.
+ */
+function pluginLoadsOn(version: string): boolean {
+    const java = javaTagFor(version);
+    return java !== "java8" && java !== "java11";
+}
+
+/**
+ * The `MODS` list of a plugin server whose release cannot load the plugin, with
+ * the plugin taken off - or null when there is nothing to take off. For servers
+ * that got it before this was checked; written as undecided, so the default puts
+ * it back if the server later moves to a release that loads it.
+ */
+export function unfitAnticheatRemoved(mods: string, software: string, version: string): string | null {
+    if (!anticheatRunsOn(software) || pluginLoadsOn(version)) return null;
+    if (!entries(mods).some(isEntry)) return null;
+    return withoutAnticheat(mods);
 }
 
 /** The image splits `MODS` on commas and newlines. */

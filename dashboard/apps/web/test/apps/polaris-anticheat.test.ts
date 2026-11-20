@@ -302,3 +302,21 @@ describe("on a NeoForge server, through the Polaris mod", () => {
         ).toBe(false);
     });
 });
+
+describe("the plugin on an old Java", () => {
+    const plugin = "https://polaris.example.com/api/minecraft/mods/polaris-anticheat-bukkit.jar";
+
+    it("is not offered where the managed image carries Java 8 or 11", () => {
+        expect(anticheat.anticheatBuildFor("PAPER", "1.16.5")).toBeNull();
+        expect(anticheat.anticheatBuildFor("PAPER", "1.8.8")).toBeNull();
+        expect(anticheat.anticheatBuildFor("PAPER", "1.17.1")?.kind).toBe("plugin");
+        expect(anticheat.anticheatBuildFor("PAPER", "LATEST")?.kind).toBe("plugin");
+    });
+
+    it("comes off a server that got it before, and only there", () => {
+        expect(anticheat.unfitAnticheatRemoved(`a.jar,${plugin}`, "PAPER", "1.16.5")).toBe("a.jar");
+        expect(anticheat.unfitAnticheatRemoved(`a.jar,${plugin}`, "PAPER", "1.21.4")).toBeNull();
+        expect(anticheat.unfitAnticheatRemoved("a.jar", "PAPER", "1.16.5")).toBeNull();
+        expect(anticheat.unfitAnticheatRemoved(plugin, "FABRIC", "1.16.5")).toBeNull();
+    });
+});
