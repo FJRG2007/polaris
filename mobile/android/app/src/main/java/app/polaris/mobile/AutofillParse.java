@@ -99,9 +99,12 @@ final class AutofillParse {
     private void classify(AssistStructure.ViewNode node) {
         AutofillId id = node.getAutofillId();
         if (id == null || node.getAutofillType() != View.AUTOFILL_TYPE_TEXT) return;
-        if (node.getImportantForAutofill() == View.IMPORTANT_FOR_AUTOFILL_NO
-                || node.getImportantForAutofill() == View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS) {
-            return;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            int important = node.getImportantForAutofill();
+            if (important == View.IMPORTANT_FOR_AUTOFILL_NO
+                    || important == View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS) {
+                return;
+            }
         }
         String value = textOf(node.getAutofillValue());
         String hints = joined(node.getAutofillHints());
