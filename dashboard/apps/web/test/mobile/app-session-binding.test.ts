@@ -45,4 +45,76 @@ describe("the app's own connections and the page's session", () => {
             ).toBeNull();
         }
     });
+
+    it("still knows the app when a request comes without its marker", () => {
+        // A service worker's fetch carries the WebView's own user-agent, without
+        // PolarisMobile/: seen on 2026-11-20, it revoked the owner's own session.
+        const bare = PAGE_AGENT.replace(/ PolarisMobile\/[^ ]+ \(Android\)/, "");
+        const page = describeClient(PAGE_AGENT, PAGE_BRANDS, PAGE_PLATFORM);
+        expect(page.browser).toBe("Polaris Mobile");
+        for (const [brands, platform] of [
+            [PAGE_BRANDS, PAGE_PLATFORM],
+            [null, null]
+        ] as const) {
+            const worker = describeClient(bare, brands, platform);
+            expect(worker.browser).toBe(brands ? "Android WebView" : "Chrome");
+            expect(
+                bindingBreach(
+                    { bindClient: true, pinScope: "off", pinThisSession: null },
+                    {
+                        os: page.os,
+                        browser: page.browser,
+                        claimedOs: page.os,
+                        claimedBrowser: page.browser,
+                        brandHinted: true,
+                        platformHinted: true,
+                        ip: "198.51.100.7",
+                        handheld: true
+                    },
+                    {
+                        os: worker.os,
+                        browser: worker.browser,
+                        claimedOs: worker.os,
+                        claimedBrowser: worker.browser,
+                        brandHinted: brands !== null,
+                        platformHinted: platform !== null,
+                        ip: "203.0.113.9"
+                    }
+                )
+            ).toBeNull();
+        }
+    });
+
+    it("still refuses the app's cookie in a desktop browser", () => {
+        const page = describeClient(PAGE_AGENT, PAGE_BRANDS, PAGE_PLATFORM);
+        const chrome = describeClient(
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36",
+            '"Chromium";v="157", "Google Chrome";v="157", "Not?A_Brand";v="99"',
+            '"Windows"'
+        );
+        expect(
+            bindingBreach(
+                { bindClient: true, pinScope: "off", pinThisSession: null },
+                {
+                    os: page.os,
+                    browser: page.browser,
+                    claimedOs: page.os,
+                    claimedBrowser: page.browser,
+                    brandHinted: true,
+                    platformHinted: true,
+                    ip: "198.51.100.7",
+                    handheld: true
+                },
+                {
+                    os: chrome.os,
+                    browser: chrome.browser,
+                    claimedOs: chrome.os,
+                    claimedBrowser: chrome.browser,
+                    brandHinted: true,
+                    platformHinted: true,
+                    ip: "203.0.113.9"
+                }
+            )
+        ).toBe("client");
+    });
 });

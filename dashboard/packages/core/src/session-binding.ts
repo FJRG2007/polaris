@@ -180,9 +180,29 @@ export function addressPinned(rules: BindingRules, session: SessionOrigin): bool
  */
 function movedBrowser(session: SessionOrigin, request: RequestOrigin): boolean {
     if (session.brandHinted === true && request.brandHinted === true) {
-        return differs(session.browser, request.browser);
+        return differs(engineOf(session.browser, "Android WebView"), engineOf(request.browser, "Android WebView"));
     }
-    return differs(session.claimedBrowser ?? session.browser, request.claimedBrowser ?? request.browser);
+    return differs(
+        engineOf(session.claimedBrowser ?? session.browser, "Chrome"),
+        engineOf(request.claimedBrowser ?? request.browser, "Chrome")
+    );
+}
+
+/**
+ * The phone app as the engine it runs in.
+ *
+ * The app is the system WebView with `PolarisMobile/` added to the page's
+ * user-agent, and Android does not carry that override everywhere the app's
+ * WebView makes requests - a service worker's fetches, among others, go out with
+ * the WebView's own user-agent. Read as two browsers, the app signed its owner
+ * out of their own phone and told them somebody had stolen the session. The
+ * marker is the app's word about itself, which any WebView could add or leave
+ * out; the engine is what can be compared. Its name depends on the reading:
+ * the brands call it Android WebView, and its user-agent without the marker
+ * reads as Chrome.
+ */
+function engineOf(browser: string, engine: string): string {
+    return browser.trim().toLowerCase() === "polaris mobile" ? engine : browser;
 }
 
 /**
