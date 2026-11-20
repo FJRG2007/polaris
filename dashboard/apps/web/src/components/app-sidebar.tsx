@@ -22,13 +22,18 @@
  * Every label the catalogue declares is drawn in the reader's language
  * (`useNavLabel`); a name somebody chose - an organization, an installed app -
  * is drawn as it is.
+ *
+ * On a phone (`sheet`) the same entries are drawn as the account screen draws
+ * its own - rows a finger's height in rounded groups - since there the rail is a
+ * whole screen rather than a column beside the page.
  */
 
 import Link from "next/link";
 import { AppLogo, cn } from "@polaris/ui";
 import * as nav from "@/lib/apps";
 import { railApps } from "@/lib/app-launcher";
-import { ChevronLeft, LayoutGrid, Star } from "lucide-react";
+import { ChevronLeft, ChevronRight, LayoutGrid, Star } from "lucide-react";
+import { SHEET_ROW, SheetGroup, SheetRowLabel } from "@/components/sheet-rows";
 import { useLauncherMarks, type LauncherMarks } from "@/components/launcher-waiting";
 import { useAppFavorites } from "@/components/use-app-favorites";
 import { useLastPlaces } from "@/lib/last-place";
@@ -50,7 +55,9 @@ export function AppSidebar({
     appIds = [],
     held = [],
     installed: installedApps = [],
-    isAdmin = false
+    isAdmin = false,
+    sheet = false,
+    sheetTitle = ""
 }: {
     appIds?: string[];
     /**
@@ -65,6 +72,10 @@ export function AppSidebar({
      *  Resolved on the server for the same reason; absent means none. */
     installed?: string[];
     isAdmin?: boolean;
+    /** Drawn as a phone screen of grouped rows (see the module's note). */
+    sheet?: boolean;
+    /** That screen's title, which a group heading saying the same leaves out. */
+    sheetTitle?: string;
 }) {
     const pathname = usePathname();
     const label = useNavLabel();
@@ -147,6 +158,61 @@ export function AppSidebar({
     // Drawn unless the way back leads somewhere this account cannot go.
     const showParent =
         subapp !== null && (!subapp.parentAppId || appIds.includes(subapp.parentAppId));
+
+    if (sheet) {
+        const inApp = subapp !== null || app.id !== nav.OVERVIEW_APP_ID;
+        return (
+            <nav className="flex min-w-0 flex-col gap-5">
+                {subapp && showParent ? (
+                    <SheetGroup>
+                        <Link href={subapp.parent.href} className={SHEET_ROW}>
+                            <ChevronLeft className="size-5 shrink-0 text-muted-foreground rtl:rotate-180" />
+                            <SheetRowLabel>{label(subapp.parent.label)}</SheetRowLabel>
+                        </Link>
+                    </SheetGroup>
+                ) : null}
+                {groups.map((group) => (
+                    <SheetGroup key={group.label} title={group.label === sheetTitle ? undefined : group.label}>
+                        {group.items.map((item) => (
+                            <RailLink
+                                key={item.href}
+                                item={item}
+                                pathname={pathname}
+                                sections={sections}
+                                inApp={inApp}
+                                mark={marks.markAction}
+                                sheet
+                            />
+                        ))}
+                    </SheetGroup>
+                ))}
+                {pinned.length > 0 ? (
+                    <SheetGroup title={t("switcher.favorites")}>
+                        {pinned.map((item) => (
+                            <RailLink
+                                key={item.id}
+                                item={{ label: item.label, href: item.href, icon: Star }}
+                                named
+                                pathname={pathname}
+                                sections={[]}
+                                inApp
+                                sheet
+                            />
+                        ))}
+                    </SheetGroup>
+                ) : null}
+                {moreApps ? (
+                    <SheetGroup>
+                        <button type="button" data-closes-nav="" onClick={openLauncher} className={SHEET_ROW}>
+                            <LayoutGrid className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                            <SheetRowLabel>{t("switcher.moreApps")}</SheetRowLabel>
+                            <ChevronRight className="size-4 shrink-0 text-muted-foreground rtl:rotate-180" />
+                        </button>
+                    </SheetGroup>
+                ) : null}
+            </nav>
+        );
+    }
 
     return (
         <nav className="flex flex-col gap-1">
@@ -257,7 +323,8 @@ function RailLink({
     pathname,
     sections,
     inApp,
-    mark
+    mark,
+    sheet = false
 }: {
     item: nav.AppSection;
     /** A name somebody chose, drawn as it is rather than translated. */
@@ -268,6 +335,8 @@ function RailLink({
     inApp: boolean;
     /** The app's own "mark read", for a row in the list of apps. */
     mark?: LauncherMarks["markAction"];
+    /** A row of the phone screen rather than of the column. */
+    sheet?: boolean;
 }) {
     const active = nav.isSectionActive(pathname, item.href, sections);
     const Icon = item.icon;
@@ -298,25 +367,30 @@ function RailLink({
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
-                "flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground",
-                active && "bg-primary/15 font-medium text-foreground hover:bg-primary/15"
+                sheet
+                    ? SHEET_ROW
+                    : "flex min-w-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-[0.8125rem] leading-5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground",
+                active &&
+                    (sheet
+                        ? "bg-primary/15 font-medium hover:bg-primary/15"
+                        : "bg-primary/15 font-medium text-foreground hover:bg-primary/15")
             )}
         >
             {/* The list of apps shows each app's own logo, so an app is found by
                 its colour before its name is read; an app's screens stay plain. */}
             <AppLogo
                 appId={inApp ? "" : appId}
-                size={16}
+                size={sheet ? 20 : 16}
                 fallback={
                     <Icon
                         className={cn(
-                            "size-4 shrink-0",
+                            sheet ? "size-5 shrink-0" : "size-4 shrink-0",
                             active ? "text-primary" : "text-foreground-subtle"
                         )}
                     />
                 }
             />
-            <span className="truncate" title={label}>
+            <span className={cn("truncate", sheet && "min-w-0 flex-1")} title={label}>
                 {label}
             </span>
             {unread > 0 ? (
@@ -333,6 +407,9 @@ function RailLink({
                 >
                     {badgeLabel(unread)}
                 </span>
+            ) : null}
+            {sheet ? (
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground rtl:rotate-180" />
             ) : null}
         </Link>
     );

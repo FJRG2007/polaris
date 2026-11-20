@@ -1,13 +1,19 @@
 "use client";
 
 /** The header button that opens the per-app rail on narrow viewports. An app
- *  with no sections (Watch) has no rail to open, so it renders no button. */
+ *  with no sections (Watch) has no rail to open, so it renders no button. On a
+ *  phone the rail opens as a whole screen of grouped rows, like the account
+ *  screen; between a phone and the width the rail fits beside the page, it
+ *  stays a drawer. */
 
 import { MobileNav } from "@polaris/ui";
 import { usePathname } from "next/navigation";
+import { usePhone } from "@/components/use-phone";
 import { AppSidebar } from "@/components/app-sidebar";
+import { useNavLabel } from "@/components/i18n/use-nav-label";
 import {
     APP_SECTIONS,
+    APP_SUBAPPS,
     OVERVIEW_APP_ID,
     resolveActiveApp,
     resolveSubapp,
@@ -28,6 +34,8 @@ export function AppNavDrawer({
     isAdmin?: boolean;
 }) {
     const pathname = usePathname();
+    const phone = usePhone();
+    const label = useNavLabel();
     const subapp = resolveSubapp(pathname);
     const app = resolveActiveApp(pathname);
     const sections = subapp ? subapp.sections : (APP_SECTIONS[app.id] ?? []);
@@ -40,9 +48,22 @@ export function AppNavDrawer({
                   (section) => !section.hidden && sectionOffered(section, { isAdmin, held, installed })
               );
     if (!hasRail) return null;
+    // The screen's title is the app it lists; the Overview lists the apps.
+    const title = subapp
+        ? APP_SUBAPPS.includes(subapp)
+            ? label(subapp.label)
+            : subapp.label
+        : label(app.id === OVERVIEW_APP_ID ? "Apps" : app.label);
     return (
-        <MobileNav>
-            <AppSidebar appIds={appIds} held={held} installed={installed} isAdmin={isAdmin} />
+        <MobileNav phoneTitle={phone ? title : undefined}>
+            <AppSidebar
+                appIds={appIds}
+                held={held}
+                installed={installed}
+                isAdmin={isAdmin}
+                sheet={phone}
+                sheetTitle={title}
+            />
         </MobileNav>
     );
 }

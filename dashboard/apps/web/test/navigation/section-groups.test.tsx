@@ -70,6 +70,20 @@ describe("the account rail", () => {
         expect(markup.indexOf("Developers</p>")).toBeLessThan(markup.indexOf("/account/api-keys"));
     });
 
+    it("on a phone, draws the same screens as grouped rows under the screen's title", () => {
+        const markup = renderToStaticMarkup(<AppSidebar sheet sheetTitle="My account" />);
+        // The groups keep their headings, but the one the title already says is left out.
+        expect(markup.match(/Security<\/h2>/g)).toHaveLength(1);
+        expect(markup).not.toContain("My account</h2>");
+        expect(markup).not.toContain("</p>");
+        // Every screen is still there, each a finger-height row.
+        for (const href of [...SECURITY_SCREENS, ...DEVELOPER_SCREENS]) {
+            expect(markup).toContain(`href="${href}"`);
+        }
+        expect(markup).toContain("min-h-12");
+        expect(markup.indexOf("Security</h2>")).toBeLessThan(markup.indexOf("/account/sessions"));
+    });
+
     it("draws a rail with no groups flat, under one heading", () => {
         const flat = (APP_SECTIONS.drive ?? []).every((section) => section.group === undefined);
         expect(flat).toBe(true);
