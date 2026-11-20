@@ -62,6 +62,20 @@ export function typeOfFile(declared: string | null | undefined, name: string): s
 }
 
 /**
+ * What the browser is allowed to show inline.
+ *
+ * Everything else is a download. An `<img>` pointed at a file somebody uploaded
+ * is the browser being asked to interpret bytes from an untrusted source, so the
+ * list is the formats that are images and nothing that can carry script - which
+ * is why SVG is not on it.
+ */
+const INLINE_IMAGE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]);
+
+export function isInlineImage(contentType: string): boolean {
+    return INLINE_IMAGE.has((contentType.split(";")[0] ?? "").trim().toLowerCase());
+}
+
+/**
  * The videos Polaris draws its own player for.
  *
  * QuickTime and 3GPP are what phones record: an iPhone's camera writes `.mov`

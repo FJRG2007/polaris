@@ -41,7 +41,9 @@ describe("the composer", () => {
         expect(THREAD).toContain("await sendWithFiles({");
         expect(THREAD).toContain("fields: { parentId: root.id }");
         expect(THREAD).not.toContain('form.append("files", file)');
-        expect(THREAD).toContain("<OutgoingBubbles outgoing={outgoing} />");
+        // Drawn as rows of the thread itself, in place - see `outgoingMessage`.
+        expect(THREAD).toContain("unlandedOutgoing(outgoing, messages).map((one) =>");
+        expect(THREAD).toContain("outgoing={outgoing}");
         expect(THREAD).toContain("useOutgoing(threadDraftKey(root.id))");
         expect(THREAD).toMatch(/<Composer[\s\S]*?outgoingInConversation/);
     });

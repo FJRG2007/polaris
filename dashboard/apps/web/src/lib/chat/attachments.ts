@@ -19,7 +19,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { isWatchableVideo, mimeForName, typeOfFile } from "@/lib/mime";
+import { isInlineImage, isWatchableVideo, mimeForName, typeOfFile } from "@/lib/mime";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { keepChannelForReports, keepForReports } from "./report-files";
 import {
@@ -73,19 +73,9 @@ const EVIDENCE_ROOT = "polaris/chat-reports";
  */
 export const MAX_ATTACHMENT_BYTES = 100 * 1024 * 1024;
 
-/**
- * What the browser is allowed to show inline.
- *
- * Everything else is a download. An `<img>` pointed at a file somebody uploaded
- * is the browser being asked to interpret bytes from an untrusted source, so the
- * list is the formats that are images and nothing that can carry script - which
- * is why SVG is not on it.
- */
-const INLINE_IMAGE = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"]);
-
-export function isInlineImage(contentType: string): boolean {
-    return INLINE_IMAGE.has(baseType(contentType));
-}
+/** What the browser is allowed to show inline - kept in `lib/mime`, where the
+ *  sender's own screen can ask it too. */
+export { isInlineImage };
 
 /**
  * What may be served as the sound or the picture-with-sound that it is.

@@ -22,7 +22,7 @@ import { Composer } from "./composer";
 import { useChat } from "./chat-context";
 import { threadDraftKey } from "./drafts";
 import { MessageList } from "./message-list";
-import { OutgoingBubbles } from "./outgoing-bubbles";
+import { outgoingMessage, unlandedOutgoing, withSending } from "./outgoing-message";
 import { useOutgoing } from "./outgoing";
 import { notUploadedSaid, sendWithFiles } from "./send-with-files";
 import { useMessageDelete } from "./delete-message";
@@ -35,7 +35,7 @@ import { PersonCardProvider } from "./person-card";
 import { ResizeHandle } from "@polaris/ui";
 import { resetPaneLayout } from "./pane-preferences";
 import type { ChatMessageView } from "@/lib/chat/messages";
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { MessagesSkeleton } from "./messages-skeleton";
 
 /**
@@ -84,7 +84,7 @@ export function ThreadPanel({
     translation?: core.ChatTranslationPrefs;
 }) {
     const t = useTranslations("chat");
-    const { may } = useChat();
+    const { may, viewerName } = useChat();
     const composerEmoji = useComposerEmoji(emoji);
     // Held to what the row can spare: a remembered width from a wider window, or
     // a second panel opened beside this one, is how the conversation gets
@@ -93,6 +93,20 @@ export function ThreadPanel({
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
     const [error, setError] = useState("");
     const outgoing = useOutgoing(threadDraftKey(root.id));
+    // Replies with files on their way are rows of the thread, under the replies
+    // already stored - see `outgoingMessage`.
+    const shown = useMemo(() => {
+        if (!messages) return null;
+        const going = unlandedOutgoing(outgoing, messages).map((one) =>
+            outgoingMessage(one, {
+                channelId: root.channelId,
+                authorId: viewerId,
+                authorName: viewerName,
+                parentId: root.id
+            })
+        );
+        return withSending(messages, going);
+    }, [messages, outgoing, root.channelId, root.id, viewerId, viewerName]);
     /** Somebody to drop into the reply being written. The thread has its own box,
      *  so a name mentioned in here belongs in this one rather than in the
      *  channel's - see the composer's `insert`. */
@@ -194,12 +208,13 @@ export function ThreadPanel({
                 </div>
 
                 <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-2">
-                    {messages === null ? (
+                    {shown === null ? (
                         <MessagesSkeleton turns={2} />
                     ) : (
                         <MessageList
                             emoji={emoji}
-                            messages={messages}
+                            messages={shown}
+                            outgoing={outgoing}
                             liveTranslation={translation}
                             viewerId={viewerId}
                             canPost={canPost}
@@ -231,9 +246,6 @@ export function ThreadPanel({
                             onDelete={deleteMessage}
                         />
                     )}
-                    {/* Replies with files on their way from this thread's box,
-                        under the replies - the scope the box keeps them under. */}
-                    <OutgoingBubbles outgoing={outgoing} />
                 </div>
 
                 {deleteDialog}

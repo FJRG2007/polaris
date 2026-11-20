@@ -60,6 +60,19 @@ function videoSize(file: File): Promise<{ width: number; height: number } | null
     });
 }
 
+const pictures = new WeakMap<File, Promise<MediaShape>>();
+
+async function measurePicture(file: File): Promise<MediaShape> {
+    // `from-image` turns a phone photo the way its EXIF says, which is the way
+    // every browser draws it.
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    try {
+        return { width: bitmap.width, height: bitmap.height, thumbhash: hashOf(bitmap) };
+    } finally {
+        bitmap.close();
+    }
+}
+
 /**
  * The shape of one file, or null for anything that is not a picture or a video
  * or that this browser cannot read. `still` is the frame already taken from a
@@ -69,14 +82,13 @@ export async function measureMedia(file: File, still?: Blob | null): Promise<Med
     if (typeof document === "undefined") return null;
     try {
         if (isPicture(file)) {
-            // `from-image` turns a phone photo the way its EXIF says, which is
-            // the way every browser draws it.
-            const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-            try {
-                return { width: bitmap.width, height: bitmap.height, thumbhash: hashOf(bitmap) };
-            } finally {
-                bitmap.close();
-            }
+            // Measured once per file: the message drawn on the sender's screen
+            // asks before it appears, and the send asks again for what it posts.
+            const known = pictures.get(file);
+            if (known) return await known;
+            const measured = measurePicture(file);
+            pictures.set(file, measured);
+            return await measured;
         }
         if (isVideo(file)) {
             const size = await videoSize(file);

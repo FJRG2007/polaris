@@ -703,8 +703,7 @@
             "removeNamed": "Quitar {name} y no enviarlo",
             "cancelNamed": "Dejar de enviar {name}",
             "sendingNamed": "Enviando {name}",
-            "failedNamed": "{name} no se envió: reintenta",
-            "more": "{count} más"
+            "failedNamed": "{name} no se envió: reintenta"
         },
         "refused": {
             "notAllowed": "No puedes enviar archivos aquí.",

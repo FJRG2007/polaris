@@ -89,6 +89,9 @@ import {
     setPrivateDictation
 } from "./dictation-logic";
 import { SendButton } from "./send-button";
+import { measureMedia } from "./media-measure";
+import { rememberLanded } from "./local-media";
+import { outgoingFileId, outgoingRowId } from "./outgoing-message";
 import { SavedDraftsBar, useSavedDrafts } from "./saved-drafts";
 import {
     OutgoingList,
@@ -290,7 +293,7 @@ export function Composer({
     ) => void | Promise<SendOutcome>;
     /**
      * Whether the messages on their way are drawn in the conversation, as
-     * bubbles with a ring on each picture (`OutgoingBubbles`), rather than as
+     * bubbles with a ring on each picture (`OutgoingFileState`, on the message row itself), rather than as
      * lines under this box. The conversation says so; a task's box does not.
      */
     outgoingInConversation?: boolean;
@@ -772,7 +775,27 @@ export function Composer({
         const items: OutgoingItem[] = one.files.map((_, at) =>
             staged[at] ? { phase: "sent", fraction: 1 } : { phase: "waiting", fraction: 0 }
         );
-        if (!putOutgoing({ ...one, phase: "sending", error: undefined, items, staged })) return;
+        // Drawn in the conversation, it is drawn at the size it lands at - see
+        // `outgoingMessage` - so each picture and video is measured first. A
+        // moment at most: one that takes longer is drawn as it is and given
+        // its size when the measure comes.
+        const measuring =
+            outgoingInConversation && !one.shapes
+                ? Promise.all(one.files.map((file) => measureMedia(file).catch(() => null)))
+                : null;
+        const shapes =
+            one.shapes ??
+            (measuring
+                ? await Promise.race([
+                      measuring,
+                      new Promise<undefined>((resolve) => setTimeout(resolve, MEASURE_PATIENCE_MS))
+                  ])
+                : undefined);
+        const at = one.at ?? new Date().toISOString();
+        if (!putOutgoing({ ...one, phase: "sending", error: undefined, items, staged, at, shapes })) return;
+        if (!shapes && measuring) {
+            void measuring.then((found) => settle((was) => ({ ...was, shapes: found })));
+        }
         setOutgoingHandlers(one.id, {
             retry: () => {
                 const now = outgoingById(one.id);
@@ -795,7 +818,21 @@ export function Composer({
                 settle((was) => ({
                     ...was,
                     staged: (was.staged ?? []).map((entry, at) => (at === index ? id : entry))
-                }))
+                })),
+            onPosted: (messageId) => {
+                const now = outgoingById(one.id);
+                if (!now) return;
+                const row = outgoingRowId(one.id);
+                rememberLanded(messageId, {
+                    key: row,
+                    files: now.files.flatMap((file, index) =>
+                        now.items?.[index]?.phase === "cancelled"
+                            ? []
+                            : [{ file, key: outgoingFileId(row, index) }]
+                    )
+                });
+                settle((was) => ({ ...was, posted: messageId }));
+            }
         };
         let outcome: SendOutcome;
         try {
@@ -2256,6 +2293,9 @@ function readableSize(bytes: number): string {
 let outgoingCount = 0;
 
 /** A key for one message on its way, unique within this tab. */
+/** How long a message with pictures waits to be measured before it is drawn. */
+const MEASURE_PATIENCE_MS = 400;
+
 function newOutgoingId(): string {
     outgoingCount += 1;
     return `outgoing-${Date.now().toString(36)}-${outgoingCount}`;

@@ -703,8 +703,7 @@
             "removeNamed": "Remove {name} and do not send it",
             "cancelNamed": "Stop sending {name}",
             "sendingNamed": "Sending {name}",
-            "failedNamed": "{name} was not sent - try again",
-            "more": "{count} more"
+            "failedNamed": "{name} was not sent - try again"
         },
         "refused": {
             "notAllowed": "You are not allowed to send files here.",

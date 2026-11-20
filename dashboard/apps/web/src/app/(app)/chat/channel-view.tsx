@@ -73,7 +73,7 @@ import type { SendOutcome, SendProgress, SendTrack } from "./outgoing";
 import { measureMedia } from "./media-measure";
 import { discardUpload, notUploadedSaid, sendWithFiles } from "./send-with-files";
 import { useOutgoing } from "./outgoing";
-import { OutgoingBubbles } from "./outgoing-bubbles";
+import { outgoingMessage, unlandedOutgoing, withSending } from "./outgoing-message";
 import { writeMediaShape } from "@/lib/chat/media-shape";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CallPreview, CallPreviewLine } from "./call-preview";
@@ -1400,7 +1400,15 @@ export function ChannelView({
             .catch(() => undefined);
     }, [activityAsked, callTitle, callsOff, channel, channelId, checkCall, enter, router, session]);
 
-    const shown = useMemo(() => [...(messages ?? []), ...pending], [messages, pending]);
+    // Messages with files on their way are rows of the conversation too, in the
+    // order they were sent - see `outgoingMessage`.
+    const shown = useMemo(() => {
+        const stored = messages ?? [];
+        const going = unlandedOutgoing(outgoing, stored).map((one) =>
+            outgoingMessage(one, { channelId, authorId: viewerId, authorName: viewerName })
+        );
+        return withSending(stored, [...pending, ...going]);
+    }, [messages, pending, outgoing, channelId, viewerId, viewerName]);
 
     /** Put the newest message on screen. */
     const stick = useCallback(() => {
@@ -2296,6 +2304,7 @@ export function ChannelView({
                     <MessageList
                         emoji={emojiScope}
                         messages={shown}
+                        outgoing={outgoing}
                         liveTranslation={channel?.translation}
                         coverMedia={channel?.contentMode === "spoiler"}
                         viewerId={viewerId}
@@ -2332,8 +2341,6 @@ export function ChannelView({
                         }
                     />
                 )}
-
-                <OutgoingBubbles outgoing={outgoing} />
 
                 {/* The way back, for somebody who has read a long way up.
                             Scrolling down would work and would take a page at a

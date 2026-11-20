@@ -117,7 +117,7 @@ export async function sendWithFiles(message: FilesMessage): Promise<"sent" | Exc
         track?.onFile(at, { phase: "sending", fraction: 0 });
         const sent = await sendFile(`/api/chat/channels/${channelId}/uploads?${query.toString()}`, file, {
             // The ring on the picture in the conversation is where
-            // this one's progress is - see `OutgoingBubbles`.
+            // this one's progress is - see `OutgoingFileState`.
             listed: !track,
             signal,
             onProgress: (moved, total) => {
@@ -239,5 +239,10 @@ export async function sendWithFiles(message: FilesMessage): Promise<"sent" | Exc
                     : message.notSent
         };
     }
+    // Which message it became, so the row drawn while it went is the row it
+    // lands in - see `landedAs`.
+    const stored: unknown = await response.json().catch(() => null);
+    const id = typeof stored === "object" && stored !== null ? (stored as { id?: unknown }).id : null;
+    if (typeof id === "string" && id) track?.onPosted?.(id);
     return "sent";
 }

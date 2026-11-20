@@ -55,7 +55,8 @@ import {
     useEffect,
     useMemo,
     useRef,
-    useState
+    useState,
+    type ReactNode
 } from "react";
 import { recentEmoji, rememberEmoji } from "./recents";
 import * as core from "@polaris/core";
@@ -89,6 +90,10 @@ import { attachmentImageUrl, messageGallery } from "./message-gallery";
 import { usePersonPress } from "@/components/person-press";
 import { NoticeText } from "./notice-line";
 import { useSwipeReply } from "./swipe-reply";
+import { stopOutgoing, type Outgoing } from "./outgoing";
+import { isGoing, OutgoingFailure, OutgoingFileState } from "./outgoing-bubbles";
+import { isOutgoingRow, outgoingFileIndex, outgoingRowId } from "./outgoing-message";
+import { heldLocalUrl, landedAs, localUrl, releaseLocal, type Landed } from "./local-media";
 
 /**
  * A file on a message that is not a picture, a recording or a clip.
@@ -108,16 +113,38 @@ import { useSwipeReply } from "./swipe-reply";
 function SentFile({
     file,
     at,
-    onOpen
+    onOpen,
+    pending = false
 }: {
     file: ChatMessageView["attachments"][number];
     at: string;
     onOpen: (file: ViewedFile) => void;
+    /** Still on its way: the same chip, with nothing to open or save yet. */
+    pending?: boolean;
 }) {
     const t = useTranslations("chat");
     const readable = previewableAs(file.name, file.contentType);
     const chip =
         "inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-start text-xs transition-colors hover:bg-card-hover";
+
+    if (pending) {
+        return (
+            <span className={cn(chip, "hover:bg-card")}>
+                {file.borrowed ? (
+                    <HardDrive className="size-3.5 shrink-0 text-muted-foreground" />
+                ) : readable ? (
+                    <FileText className="size-3.5 shrink-0 text-muted-foreground" />
+                ) : (
+                    <Paperclip className="size-3.5 shrink-0 text-muted-foreground" />
+                )}
+                <span className="max-w-[16rem] truncate" title={file.name}>
+                    {file.name}
+                </span>
+                <span className="shrink-0 text-muted-foreground">{readableSize(file.size)}</span>
+                {file.borrowed && <DriveMark />}
+            </span>
+        );
+    }
 
     if (!readable) {
         return (
@@ -330,6 +357,9 @@ export interface MessageListProps {
      *  others write is shown in the reader's language as it comes into view.
      *  Absent is off. */
     liveTranslation?: ChatTranslationPrefs;
+    /** The messages with files on their way from this box, whose rows are in
+     *  `messages` already - see `outgoingMessage`. */
+    outgoing?: readonly Outgoing[];
 }
 
 export function MessageList({
@@ -353,9 +383,16 @@ export function MessageList({
     onMention,
     emoji = null,
     coverMedia = false,
-    liveTranslation
+    liveTranslation,
+    outgoing
 }: MessageListProps) {
-    useMessageKeys({ messages, viewerId, canPost, canModerate, onReply, onEdit, onDelete });
+    // A message still on its way is nothing a key can reply to, edit or delete.
+    const keyed = useMemo(() => messages.filter((message) => !isOutgoingRow(message.id)), [messages]);
+    useMessageKeys({ messages: keyed, viewerId, canPost, canModerate, onReply, onEdit, onDelete });
+    const sendingById = useMemo(
+        () => new Map((outgoing ?? []).map((one) => [outgoingRowId(one.id), one])),
+        [outgoing]
+    );
     const { refresh } = useChat();
 
     // The picture being looked at, held here rather than in each message: one
@@ -467,10 +504,16 @@ export function MessageList({
                     const previous = index > 0 ? messages[index - 1] : undefined;
                     const newDay = !previous || !sameDay(previous.createdAt, message.createdAt);
                     const grouped = sharesBlock(previous, message);
+                    // A message with files on its way, drawn as a row of its own
+                    // until it lands - and then the landed one, under the same
+                    // key, so React keeps every element it drew rather than
+                    // drawing the message a second time.
+                    const sending = sendingById.get(message.id);
+                    const landed = sending ? undefined : landedAs(message.id);
 
                     return (
                         <li
-                            key={message.id}
+                            key={landed?.key ?? message.id}
                             // Addressable, so a search result can be scrolled to.
                             id={`message-${message.id}`}
                             className={cn(
@@ -505,21 +548,26 @@ export function MessageList({
                                 onOpenFile={setReading}
                                 onReport={(target) => setReporting(target.id)}
                                 onExplain={setExplaining}
-                                canPost={canPost}
-                                canModerate={canModerate}
-                                onOpenThread={onOpenThread}
+                                sending={sending}
+                                landed={landed}
+                                // Nothing is built on a message the server has
+                                // not stored yet: no reply, reaction, pin or
+                                // edit. Deleting it takes it back.
+                                canPost={canPost && !sending}
+                                canModerate={canModerate && !sending}
+                                onOpenThread={sending ? undefined : onOpenThread}
                                 onReact={react}
                                 onStar={onStar}
                                 pinned={pinnedIds?.has(message.id) ?? false}
-                                onPin={onPin}
-                                onMarkUnread={onMarkUnread}
+                                onPin={sending ? undefined : onPin}
+                                onMarkUnread={sending ? undefined : onMarkUnread}
                                 inVoice={inVoice}
                                 onJumpTo={onJumpTo}
-                                onReply={onReply}
-                                onReplyPrivately={onReplyPrivately}
-                                onForward={onForward}
-                                onEdit={onEdit}
-                                onDelete={onDelete}
+                                onReply={sending ? undefined : onReply}
+                                onReplyPrivately={sending ? undefined : onReplyPrivately}
+                                onForward={sending ? undefined : onForward}
+                                onEdit={sending ? undefined : onEdit}
+                                onDelete={sending ? () => stopOutgoing(sending.id) : onDelete}
                             />
                         </li>
                     );
@@ -761,9 +809,15 @@ function Message({
     onError,
     quick,
     emoji,
-    liveTranslation
+    liveTranslation,
+    sending,
+    landed
 }: {
     message: ChatMessageView;
+    /** Set while this is a message with files on its way - see `outgoingMessage`. */
+    sending?: Outgoing;
+    /** What this message was drawn as while it went, when it was sent from here. */
+    landed?: Landed;
     grouped: boolean;
     /** Whether the next message starts a new block, which is where the ticks go. */
     lastOfBlock: boolean;
@@ -1255,17 +1309,53 @@ function Message({
 
                         {message.attachments.length > 0 && (
                             <ul className="mt-1 flex flex-col gap-1">
-                                {message.attachments.map((file) => (
+                                {message.attachments.map((file, at) => {
+                                    // The sender's own copy, while it goes and
+                                    // until the server's has arrived - see
+                                    // `local-media`.
+                                    const index = sending ? outgoingFileIndex(file.id) : null;
+                                    const local =
+                                        index !== null ? sending?.files[index] : landed?.files[at]?.file;
+                                    const going =
+                                        sending !== undefined &&
+                                        (sending.phase === "failed" || (index !== null && isGoing(sending, index)));
+                                    const state =
+                                        sending && index !== null ? (
+                                            <OutgoingFileState one={sending} index={index} name={file.name} />
+                                        ) : null;
+                                    const smallState =
+                                        sending && index !== null ? (
+                                            <OutgoingFileState one={sending} index={index} name={file.name} small />
+                                        ) : null;
+                                    const pendingUrl = sending && local ? localUrl(local) : undefined;
+                                    return (
                                     // Named for the message menu, which offers
                                     // this one file's download only when the
                                     // right-click was on it - see `messageTarget`.
-                                    <li key={file.id} data-attachment={file.id}>
+                                    <li
+                                        key={landed?.files[at]?.key ?? file.id}
+                                        data-attachment={sending ? undefined : file.id}
+                                    >
                                         {file.viewOnce ? (
-                                            <ViewOnceCard
-                                                file={{ ...file, viewOnce: file.viewOnce }}
-                                                mine={mine}
-                                                direct={inDirect}
-                                            />
+                                            sending ? (
+                                                // Nothing to open until it is stored.
+                                                <span className="flex items-center gap-2">
+                                                    <span className="pointer-events-none">
+                                                        <ViewOnceCard
+                                                            file={{ ...file, viewOnce: file.viewOnce }}
+                                                            mine={mine}
+                                                            direct={inDirect}
+                                                        />
+                                                    </span>
+                                                    {smallState}
+                                                </span>
+                                            ) : (
+                                                <ViewOnceCard
+                                                    file={{ ...file, viewOnce: file.viewOnce }}
+                                                    mine={mine}
+                                                    direct={inDirect}
+                                                />
+                                            )
                                         ) : (
                                         <>
                                         {/* Covered where the sender said so. The
@@ -1285,13 +1375,25 @@ function Message({
                                             }
                                             covered={file.spoiler || coverAll}
                                         >
-                                            {file.inline ? (
+                                            {file.inline && sending ? (
+                                                <KeepableImage
+                                                    href={pendingUrl ?? ""}
+                                                    shape={file}
+                                                    alt={file.name}
+                                                    source=""
+                                                    name={file.name}
+                                                    going={going}
+                                                    state={state}
+                                                />
+                                            ) : file.inline ? (
                                                 <KeepableImage
                                                     href={attachmentImageUrl(file.id)}
                                                     shape={file}
                                                     alt={file.name}
                                                     source={`attachment:${file.id}`}
                                                     name={file.name}
+                                                    local={local ? heldLocalUrl(local) : undefined}
+                                                    onLocalDone={local ? () => releaseLocal(local) : undefined}
                                                     onOpen={() =>
                                                         onOpenImage({
                                                             url: attachmentImageUrl(file.id),
@@ -1304,6 +1406,47 @@ function Message({
                                                         })
                                                     }
                                                 />
+                                            ) : sending && pendingUrl && isPlayable(file.contentType) ? (
+                                                <span className="flex items-center gap-2">
+                                                    <VoiceNote
+                                                        href={pendingUrl}
+                                                        name={file.name}
+                                                        recorded={isVoiceMessage(file.name, file.contentType)}
+                                                        waveform={file.waveform}
+                                                        durationMs={file.durationMs}
+                                                    />
+                                                    {smallState}
+                                                </span>
+                                            ) : sending && pendingUrl && isWatchableVideo(file.contentType) ? (
+                                                <span className="relative block w-fit max-w-full">
+                                                    <span
+                                                        className={cn(
+                                                            "block transition-[filter] duration-300 motion-reduce:transition-none",
+                                                            going && "brightness-75 blur-[2px]"
+                                                        )}
+                                                    >
+                                                        <VideoPreview
+                                                            name={file.name}
+                                                            size={file.size}
+                                                            src={pendingUrl}
+                                                            aspect={
+                                                                file.width && file.height
+                                                                    ? file.width / file.height
+                                                                    : undefined
+                                                            }
+                                                        />
+                                                    </span>
+                                                    {state && (
+                                                        <span className="absolute inset-0 grid place-items-center">
+                                                            {state}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            ) : sending ? (
+                                                <span className="flex items-center gap-2">
+                                                    <SentFile file={file} at={message.createdAt} onOpen={onOpenFile} pending />
+                                                    {smallState}
+                                                </span>
                                             ) : isPlayable(file.contentType) ? (
                                                 <VoiceNote
                                                     href={`/api/chat/attachments/${file.id}`}
@@ -1358,9 +1501,11 @@ function Message({
                                         </>
                                         )}
                                     </li>
-                                ))}
+                                    );
+                                })}
                             </ul>
                         )}
+                        {sending && <OutgoingFailure one={sending} />}
 
                         {message.reactions.length > 0 && (
                             <ul className="mt-1 flex flex-wrap gap-1">
@@ -1616,10 +1761,24 @@ function KeepableImage({
     source,
     name,
     onOpen,
-    shape
+    shape,
+    local,
+    onLocalDone,
+    going = false,
+    state
 }: {
     href: string;
     alt: string;
+    /** The sender's own copy, drawn until `href` has been fetched and decoded,
+     *  so a picture that has just landed goes sharp where it is - see
+     *  `local-media`. */
+    local?: string;
+    /** `local` is no longer drawn and can be let go. */
+    onLocalDone?: () => void;
+    /** Still on its way: blurred and dimmed, with `state` over it, and nothing
+     *  to open or keep yet. */
+    going?: boolean;
+    state?: ReactNode;
     /**
      * Its pixel size and blur, measured by the sender - see
      * `lib/chat/media-shape`. With it the picture is drawn at its final size,
@@ -1644,6 +1803,33 @@ function KeepableImage({
     const [arrived, setArrived] = useState(false);
     const fitted = fittedSize(shape?.width, shape?.height, PICTURE_BOX);
     const blur = placeholderUrl(shape?.thumbhash);
+    // Which address has been decoded, so the swap from the local copy to the
+    // server's never shows an empty frame.
+    const [decoded, setDecoded] = useState<string | null>(null);
+    const swapping = Boolean(local) && local !== href;
+    useEffect(() => {
+        if (!swapping) return;
+        let live = true;
+        const probe = new Image();
+        probe.src = href;
+        void probe
+            .decode()
+            .catch(() => undefined)
+            .then(() => {
+                if (live) setDecoded(href);
+            });
+        return () => {
+            live = false;
+        };
+    }, [href, swapping]);
+    const shown = swapping && decoded !== href ? local! : href;
+    const releasing = useRef(onLocalDone);
+    releasing.current = onLocalDone;
+    useEffect(() => {
+        // Let go after the frame that stopped drawing it.
+        if (swapping && decoded === href) releasing.current?.();
+    }, [decoded, href, swapping]);
+    const pending = Boolean(state) || going;
 
     const toggle = async () => {
         setBusy(true);
@@ -1662,10 +1848,12 @@ function KeepableImage({
         <span className="group/pic relative inline-block max-w-full">
             <button
                 type="button"
-                onClick={onOpen}
+                onClick={pending ? undefined : onOpen}
                 aria-label={t("messageList.openNamed", { name })}
+                aria-disabled={pending || undefined}
                 className={cn(
-                    "relative block max-w-full cursor-zoom-in overflow-hidden rounded-md",
+                    "relative block max-w-full overflow-hidden rounded-md",
+                    pending ? "cursor-default" : "cursor-zoom-in",
                     // Its place is held before a byte of it has come: at its own
                     // size when the sender measured it, a neutral box otherwise.
                     !arrived && "bg-muted",
@@ -1685,7 +1873,7 @@ function KeepableImage({
             >
                 {/* eslint-disable-next-line @next/next/no-img-element -- one image per attachment, no loader wanted */}
                 <img
-                    src={href}
+                    src={shown}
                     alt={alt}
                     decoding="async"
                     // A picture the browser already had is complete before
@@ -1708,13 +1896,18 @@ function KeepableImage({
                         ]);
                     }}
                     className={cn(
-                        "rounded-md border border-border transition-opacity duration-300 motion-reduce:transition-none",
+                        "rounded-md border border-border transition-[opacity,filter] duration-300 motion-reduce:transition-none",
                         fitted ? "size-full object-cover" : "max-h-72 max-w-full object-contain",
+                        // While it goes: the sender's own copy, dimmed and
+                        // blurred, going sharp in place once it is stored.
+                        going && "brightness-75 blur-[2px]",
                         arrived ? "opacity-100" : "opacity-0",
                         !arrived && !fitted && "absolute"
                     )}
                 />
             </button>
+            {state && <span className="absolute inset-0 grid place-items-center">{state}</span>}
+            {!pending && (
             <button
                 type="button"
                 disabled={busy}
@@ -1733,6 +1926,7 @@ function KeepableImage({
             >
                 <Star className={cn("size-3.5", kept === true && "fill-current")} />
             </button>
+            )}
         </span>
     );
 }

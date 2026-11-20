@@ -20,6 +20,8 @@ import { cn } from "@polaris/ui";
 import { useEffect, useState } from "react";
 import type { ChatSentTranslation } from "@polaris/core";
 import { holdReload } from "@/lib/reload-safety";
+import type { MediaShape } from "@/lib/chat/media-shape";
+import { releaseFiles } from "./local-media";
 import type { RecordedSound } from "./voice-recorder";
 import { Paperclip, RotateCcw, X } from "lucide-react";
 import type { KeptPick } from "@/components/file-picker/as-files";
@@ -61,6 +63,8 @@ export interface SendTrack {
     signal(index: number): AbortSignal;
     onFile(index: number, item: OutgoingItem): void;
     onStaged(index: number, id: string | null): void;
+    /** The message itself was stored, as `messageId`. */
+    onPosted?(messageId: string): void;
 }
 
 export interface Outgoing {
@@ -85,6 +89,13 @@ export interface Outgoing {
     readonly items?: readonly OutgoingItem[];
     /** Upload ids that survive a failed try, by file index. */
     readonly staged?: readonly (string | null)[];
+    /** When it was first sent, which is where it sits in the conversation. */
+    readonly at?: string;
+    /** The size and blur of each picture or video, by file index, measured
+     *  before it is drawn so it is drawn at the size it lands at. */
+    readonly shapes?: readonly (MediaShape | null)[];
+    /** The message it became, once the server has stored it. */
+    readonly posted?: string;
 }
 
 /** What the box that sent one does when it is retried or given up on, kept
@@ -118,6 +129,21 @@ export function outgoingSignals(id: string, files: number): (index: number) => A
 /** Stop one file of a message on its way; the rest keep going. */
 export function cancelOutgoingFile(id: string, index: number): void {
     stoppers.get(id)?.[index]?.abort();
+}
+
+/**
+ * Take back a message on its way, the way deleting it would: every file still
+ * going is stopped, which gives the words back to the box once the send sees
+ * nothing is left; one that already failed is given up on straight away.
+ */
+export function stopOutgoing(id: string): void {
+    const one = pending.find((entry) => entry.id === id);
+    if (!one) return;
+    if (one.phase === "failed") {
+        removeOutgoing(id);
+        return;
+    }
+    for (const stopper of stoppers.get(id) ?? []) stopper.abort();
 }
 
 /**
@@ -160,6 +186,7 @@ export function patchOutgoing(id: string, change: (was: Outgoing) => Outgoing | 
         if (!next) {
             handlers.delete(id);
             stoppers.delete(id);
+            releaseFiles(entry.files);
         }
         return next ? [next] : [];
     });
