@@ -718,7 +718,7 @@ function useMessageKeys({
             // at all to answer - wherever answering is offered.
             // A poll is not rewritten - see `rewrite` in `Message`. The key
             // follows the pencil rather than reaching past it.
-            if (wanted === "edit" && (message.kind === "poll" || !mine || !shown.onEdit)) return;
+            if (wanted === "edit" && (message.kind === "poll" || gameInviteIn(message.body) || !mine || !shown.onEdit)) return;
             if (wanted === "delete" && !mine && !shown.canModerate) return;
             if (wanted === "reply" && !shown.onReply) return;
             event.preventDefault();
@@ -839,7 +839,8 @@ function Message({
      * the service refuses it and the pencil is not offered. Taking it down and
      * asking again is the way to change a poll.
      */
-    const rewrite = message.kind === "poll" ? undefined : onEdit;
+    // A poll and a game invite are cards, not text to rewrite.
+    const rewrite = message.kind === "poll" || gameInviteIn(message.body) ? undefined : onEdit;
     /** Who wrote it, when that is somebody other than the reader. Read out here
      *  so the name and the face can both ask about them without narrowing it
      *  again in two places. */
