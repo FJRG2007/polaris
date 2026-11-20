@@ -33,7 +33,8 @@ import { gameMessage } from "../game-message";
 import { projectSlug } from "./modrinth";
 import { FLAT_LEVEL_TYPE } from "./world";
 import { VOID_GENERATOR_SETTINGS } from "./oneblock";
-import type { MapCategory } from "./maps";
+import { pinnedRelease } from "./maps";
+import type { MapCategory, WorldMap } from "./maps";
 
 /** The size of world a blueprint expects, which changes what memory it needs. */
 export type BlueprintWeight = "light" | "normal" | "heavy";
@@ -46,6 +47,25 @@ export interface GameBlueprint {
     readonly editions: readonly ("java" | "bedrock")[];
     /** Server software it needs. Blank keeps whatever the operator chose. */
     readonly software?: string;
+    /** The one value that software asks for - the modpack - when the blueprint
+     *  settles it itself, so the operator is never asked to name one. */
+    readonly softwareSource?: string;
+    /**
+     * The one release it runs on, for a game whose content decides it rather than
+     * a plugin list: a modpack is built for one release and its loader, and a
+     * server asked for any other is a pack that does not resolve.
+     */
+    readonly release?: string;
+    /**
+     * Kept so the servers already built from it still read and reset, and no
+     * longer offered for a new one - because something better now does its job.
+     */
+    readonly retired?: boolean;
+    /**
+     * What every player has to install before they can join, with where to get
+     * it. A modded game is one the vanilla client cannot even connect to.
+     */
+    readonly clientPack?: { readonly name: string; readonly url: string };
     /** Modrinth projects installed on the first boot, on top of the defaults. */
     readonly projects: readonly string[];
     /**
@@ -76,6 +96,73 @@ export interface GameBlueprint {
     /** The kind of prebuilt map this game can be built on, when there is one. */
     readonly mapCategory?: MapCategory;
     readonly weight: BlueprintWeight;
+}
+
+/**
+ * Lucky Block Challenge (Kesselot), the modpack its blueprints install: NeoForge
+ * on 1.21.1 with Modern Lucky Block and Architectury, and four prebuilt worlds.
+ *
+ * Pinned to one version page, which the image resolves to that exact pack (and
+ * through it the loader and the release). The image applies the pack's overrides
+ * to /data - its worlds land in /data/saves, where a client would keep them - and
+ * runs its world step right after, so `WORLD` naming one of those folders copies
+ * it into the level the first time that level does not exist (itzg
+ * docker-minecraft-server, scripts/start-deployModrinth and start-setupWorld).
+ */
+export const LUCKY_CHALLENGE = {
+    pack: "https://modrinth.com/modpack/lucky-block-challenge/version/2.1.2",
+    page: "https://modrinth.com/modpack/lucky-block-challenge",
+    release: "1.21.1",
+    /** Where the pack's overrides put its worlds inside the container. */
+    saves: "/data/saves"
+} as const;
+
+/**
+ * Where a CurseForge file is downloaded from without an API key.
+ *
+ * CurseForge's documented API (api.curseforge.com) refuses every request without
+ * a key from its studio console, and a project's download page answers machines
+ * with a browser challenge. This is the address the website's own Download
+ * button calls: it answers with a redirect to the file on CurseForge's CDN,
+ * which the image follows. Undocumented, so it is one function a test pins and
+ * one place to change.
+ */
+export function curseforgeFileUrl(project: number, file: number): string {
+    return `https://www.curseforge.com/api/v1/mods/${project}/files/${file}/download`;
+}
+
+/** One of the pack's worlds as a blueprint of its own. `world` is the folder
+ *  name after "Lucky Block Challenge ", as the pack ships it. */
+function luckyChallenge(
+    id:
+        | "lucky-challenge-race"
+        | "lucky-challenge-pillars"
+        | "lucky-challenge-oneblock"
+        | "lucky-challenge-games",
+    world: string
+): GameBlueprint {
+    return {
+        id,
+        name: gameMessage("games", `lib.blueprints.${id}.name`),
+        summary: gameMessage("games", `lib.blueprints.${id}.summary`),
+        editions: ["java"],
+        software: "MODRINTH",
+        softwareSource: LUCKY_CHALLENGE.pack,
+        release: LUCKY_CHALLENGE.release,
+        // The pack carries every mod; nothing is added on top of it.
+        projects: [],
+        env: {
+            LEVEL: id,
+            WORLD: `${LUCKY_CHALLENGE.saves}/Lucky Block Challenge ${world}`,
+            PVP: "true",
+            SPAWN_PROTECTION: "0",
+            ALLOW_FLIGHT: "true"
+        },
+        setup: gameMessage("games", "lib.blueprints.lucky-challenge.setup"),
+        docs: LUCKY_CHALLENGE.page,
+        clientPack: { name: "Lucky Block Challenge 2.1.2", url: LUCKY_CHALLENGE.page },
+        weight: "heavy"
+    };
 }
 
 export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
@@ -204,6 +291,10 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         setup: gameMessage("games", "lib.blueprints.luckyblock.setup"),
         docs: "https://modrinth.com/datapack/ly-lucky-blocks",
         mapCategory: "luckyblock",
+        // An imitation of the Lucky Block mod - a hay bale wearing a display
+        // entity - which the Lucky Block Challenge blueprints below replace with
+        // the real mod. Kept for the servers already built on it.
+        retired: true,
         weight: "normal"
     },
     {
@@ -228,7 +319,59 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         },
         setup: gameMessage("games", "lib.blueprints.luckyrace.setup"),
         docs: "https://modrinth.com/datapack/ly-lucky-blocks",
+        // Replaced by the race map of Lucky Block Challenge on the real mod.
+        retired: true,
         weight: "light"
+    },
+    luckyChallenge("lucky-challenge-race", "Race"),
+    luckyChallenge("lucky-challenge-pillars", "Lucky Pillars"),
+    luckyChallenge("lucky-challenge-oneblock", "OneBlock"),
+    luckyChallenge("lucky-challenge-games", "Games"),
+    {
+        id: "lucky-oneblock",
+        name: gameMessage("games", "lib.blueprints.lucky-oneblock.name"),
+        summary: gameMessage("games", "lib.blueprints.lucky-oneblock.summary"),
+        editions: ["java"],
+        // Lucky OneBlock 26.2 (v1.1) by el_this_boy: a Fabric world whose own
+        // datapack puts My Lucky Block's block back every time it is broken
+        // (`myluckyblock:my_lucky_block`, read off its detect function). The mod
+        // has to be on the server for that block to exist at all; Fabric API
+        // comes with it as its dependency.
+        software: "FABRIC",
+        release: "26.2",
+        projects: ["myluckyblock"],
+        env: {
+            LEVEL: "lucky-oneblock",
+            WORLD: curseforgeFileUrl(872580, 8550497),
+            // The one block is at spawn; protection would make it unbreakable.
+            SPAWN_PROTECTION: "0"
+        },
+        setup: gameMessage("games", "lib.blueprints.lucky-oneblock.setup"),
+        docs: "https://www.curseforge.com/minecraft/worlds/lucky-oneblock",
+        clientPack: { name: "MyLuckyBlock (Fabric 26.2)", url: "https://modrinth.com/mod/myluckyblock" },
+        weight: "normal"
+    },
+    {
+        id: "lucky-race-manoj",
+        name: gameMessage("games", "lib.blueprints.lucky-race-manoj.name"),
+        summary: gameMessage("games", "lib.blueprints.lucky-race-manoj.summary"),
+        editions: ["java"],
+        // ManojTheReaper's race: lanes, then PvP. Its lucky blocks are the Lucky
+        // Blocks datapack (v1.3.3, for 1.21-1.21.1) inside the world's own
+        // datapacks folder, and its level.dat is 1.21.1 - so no mod on either side,
+        // and the release that datapack was written for.
+        software: "PAPER",
+        release: "1.21.1",
+        projects: [],
+        env: {
+            LEVEL: "lucky-race-manoj",
+            WORLD: curseforgeFileUrl(1574864, 8245381),
+            PVP: "true",
+            SPAWN_PROTECTION: "0"
+        },
+        setup: gameMessage("games", "lib.blueprints.lucky-race-manoj.setup"),
+        docs: "https://www.curseforge.com/minecraft/worlds/lucky-block-race-by-manojthereaper",
+        weight: "normal"
     },
     {
         id: "shrinking-world",
@@ -247,9 +390,21 @@ export function findBlueprint(id: string): GameBlueprint | undefined {
     return GAME_BLUEPRINTS.find((blueprint) => blueprint.id === id);
 }
 
-/** Blueprints that can be created for an edition. */
+/** Blueprints that can be created for an edition. A retired one is not offered,
+ *  and still found by `findBlueprint` for the servers built from it. */
 export function blueprintsFor(edition: "java" | "bedrock"): readonly GameBlueprint[] {
-    return GAME_BLUEPRINTS.filter((blueprint) => blueprint.editions.includes(edition));
+    return GAME_BLUEPRINTS.filter(
+        (blueprint) => !blueprint.retired && blueprint.editions.includes(edition)
+    );
+}
+
+/** The release a server of this blueprint, on this map, has to run on - the map's
+ *  pin first, because it is what people stand in - or null when nothing pins it. */
+export function releaseFor(
+    blueprint: GameBlueprint | undefined,
+    map: WorldMap | undefined
+): string | null {
+    return pinnedRelease(map) ?? blueprint?.release ?? null;
 }
 
 /**

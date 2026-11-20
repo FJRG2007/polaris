@@ -64,7 +64,6 @@ import {
     isMapResourcePack,
     mapFor,
     mapPackEnv,
-    pinnedRelease,
     worldUrl,
     type MapAddresses,
     type WorldMap
@@ -104,6 +103,7 @@ import {
     findBlueprint,
     formatMemory,
     GAME_BLUEPRINTS,
+    releaseFor,
     requiredProjects,
     type GameBlueprint
 } from "./minecraft/blueprints";
@@ -225,7 +225,7 @@ export async function minecraftShapeEnv(
     const versions = await blueprintVersions(blueprint, shape.crossplay, shape.software, map).catch(
         () => []
     );
-    const pinned = pinnedRelease(map);
+    const pinned = releaseFor(blueprint, map);
     const asked = (shape.version ?? "").trim();
     // A map pinned to a release is not a preference that a picker can override:
     // its datapack declares the release it was written for and its command blocks
@@ -233,7 +233,7 @@ export async function minecraftShapeEnv(
     // that boots, loads the world, and silently does none of what the map does.
     if (pinned && !wantsLatest(asked) && asked !== pinned) {
         throw new Error(
-            gameMessage("games", "lib.mapPinned", { name: map?.name ?? "", version: pinned })
+            gameMessage("games", "lib.mapPinned", { name: map?.name ?? blueprint.name, version: pinned })
         );
     }
     const wanted = pinned ?? (wantsLatest(asked) ? null : asked);
@@ -241,7 +241,7 @@ export async function minecraftShapeEnv(
         throw new Error(
             pinned
                 ? gameMessage("games", "lib.mapNeedsVersion", {
-                      name: map?.name ?? "",
+                      name: map?.name ?? blueprint.name,
                       version: pinned
                   })
                 : gameMessage("games", "lib.blueprintNoBuild", {
@@ -383,7 +383,7 @@ function javaSoftwareEnv(
     for (const [key, value] of Object.entries(findSoftware(software)?.env ?? {}))
         env.set(key, value);
     for (const [key, value] of Object.entries(
-        softwareSourceEnv(software, shape.softwareSource ?? "")
+        softwareSourceEnv(software, blueprint.softwareSource ?? shape.softwareSource ?? "")
     ))
         env.set(key, value);
     // Polaris's login mod, on a server being reset that already runs it: kept

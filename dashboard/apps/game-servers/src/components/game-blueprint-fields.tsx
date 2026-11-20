@@ -37,8 +37,8 @@ import {
     type MinecraftSoftware
 } from "@polaris/core";
 import { SoftwareLogo } from "./software-logo";
-import { blueprintsFor } from "../lib/minecraft/blueprints";
-import { mapsFor, pinnedRelease } from "../lib/minecraft/maps";
+import { blueprintsFor, releaseFor } from "../lib/minecraft/blueprints";
+import { mapsFor } from "../lib/minecraft/maps";
 import { blueprintVersionsAction, type BlueprintVersions } from "../screens/actions";
 
 /**
@@ -160,7 +160,7 @@ export function BlueprintFields({
     // Read off this blueprint's own list rather than by id alone, so a map left
     // over from the blueprint before it is not treated as the current choice.
     const map = maps.find((entry) => entry.id === value.mapId);
-    const pinned = pinnedRelease(map);
+    const pinned = releaseFor(blueprint, map);
     const seedError = shapeError(value);
 
     function set(patch: Partial<BlueprintShape>): void {
@@ -276,7 +276,10 @@ export function BlueprintFields({
                 </div>
                 <p className="text-xs text-muted-foreground">
                     {pinned ? (
-                        t("blueprint.mapPins", { name: map?.name ?? "", version: pinned })
+                        t("blueprint.mapPins", {
+                            name: map?.name ?? schemaText(blueprint?.name) ?? "",
+                            version: pinned
+                        })
                     ) : offered === null ? (
                         <span className="inline-block align-middle">
                             <Skeleton className="h-3 w-56" />

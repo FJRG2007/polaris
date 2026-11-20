@@ -1056,6 +1056,35 @@
                 "name": "Mundo menguante",
                 "summary": "Un borde que no para de moverse, para que nadie se asiente.",
                 "setup": "El borde se mueve según el horario de la configuración del plugin, y /dwb on y /dwb off lo paran y lo arrancan."
+            },
+            "lucky-challenge-race": {
+                "name": "Lucky Block Race",
+                "summary": "El mapa de carrera de Lucky Block Challenge, con el mod real."
+            },
+            "lucky-challenge-pillars": {
+                "name": "Lucky Pillars",
+                "summary": "El mapa Lucky Pillars de Lucky Block Challenge, con el mod real."
+            },
+            "lucky-challenge-oneblock": {
+                "name": "Lucky Block OneBlock",
+                "summary": "El mapa OneBlock de Lucky Block Challenge, con el mod real."
+            },
+            "lucky-challenge-games": {
+                "name": "Lucky Block Games",
+                "summary": "El mapa Games de Lucky Block Challenge, con el mod real."
+            },
+            "lucky-oneblock": {
+                "name": "Lucky OneBlock",
+                "summary": "Un lucky block sobre el vacío, que vuelve cada vez que se rompe.",
+                "setup": "Cada jugador necesita MyLuckyBlock para Fabric en Minecraft 26.2, con Fabric API, para entrar: instálalo desde el enlace de abajo. El servidor usa Fabric 26.2 con el mismo mod y arranca en el mapa."
+            },
+            "lucky-race-manoj": {
+                "name": "Lucky Block Race (carriles y PvP)",
+                "summary": "Un carril por jugador, lucky blocks que romper y pelea al final.",
+                "setup": "No hace falta instalar nada: los lucky blocks son un paquete de datos del mapa. Entra con Minecraft 1.21.1. El servidor arranca en el mapa, listo para correr."
+            },
+            "lucky-challenge": {
+                "setup": "Cada jugador necesita el modpack Lucky Block Challenge 2.1.2 para entrar: instálalo desde el enlace de abajo con la app de Modrinth, CurseForge o Prism, y conéctate con él. El servidor instala el mismo pack, con NeoForge para Minecraft 1.21.1, y arranca en este mapa."
             }
         },
         "maps": {

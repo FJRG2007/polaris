@@ -37,7 +37,7 @@ import * as duplicatePlan from "../lib/duplicate-plan";
 import * as duplicateService from "../lib/duplicate-service";
 import { refuseWhileCopying } from "../lib/duplicate-busy";
 import { createGameServerSchema, type CreateGameServerInput } from "../lib/games-schema";
-import { GAME_BLUEPRINTS, formatMemory } from "../lib/minecraft/blueprints";
+import { GAME_BLUEPRINTS, formatMemory, releaseFor } from "../lib/minecraft/blueprints";
 import {
     deleteServerTemplate,
     listServerTemplates,
@@ -247,6 +247,10 @@ export async function blueprintVersionsAction(
     const blueprint = GAME_BLUEPRINTS.find((entry) => entry.id === blueprintId);
     if (!blueprint) return { versions: [], latest: null, pinned: false };
     const map = findMap(mapId);
+    // A blueprint that runs on one release is answered with it, the way a map
+    // pinned to one is: there is nothing else it could be built on.
+    const release = releaseFor(blueprint, map);
+    if (release) return { versions: [release], latest: release, pinned: true };
     const versions = await blueprintVersions(blueprint, crossplay, undefined, map).catch(() => []);
     // A blueprint that constrains nothing still needs a list to pick from, so it
     // gets Minecraft's own releases.

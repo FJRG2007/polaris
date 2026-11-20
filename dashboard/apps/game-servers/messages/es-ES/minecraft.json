@@ -1129,7 +1129,8 @@
         "mapBuiltBy": "Creado por {author}, para Minecraft {version}.",
         "manageNamed": "Gestionar a {name}",
         "pinAndStart": "Fijar la versión instalada e iniciar",
-        "loaderPinned": "Fijado {loader} {version}. El servidor está arrancando."
+        "loaderPinned": "Fijado {loader} {version}. El servidor está arrancando.",
+        "clientPack": "Descargar {name}"
     },
     "joinPassword": {
         "restartOntoPolarisLogin": "¿Reiniciar con Polaris login?",

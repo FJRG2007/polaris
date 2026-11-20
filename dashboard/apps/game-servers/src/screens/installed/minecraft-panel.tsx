@@ -41,7 +41,7 @@ import type { GameContext } from "./game-context";
 import { MinecraftRules } from "./minecraft-rules";
 import { MinecraftReset } from "./minecraft-reset";
 import { MinecraftWorld } from "./minecraft-world";
-import { findMap, pinnedRelease } from "../../lib/minecraft/maps";
+import { findMap } from "../../lib/minecraft/maps";
 import { MapReleaseNotice } from "./map-release-notice";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
@@ -74,7 +74,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PlayerAccessView } from "../../lib/minecraft/player-access";
 import type { RememberedLevel } from "../../lib/minecraft/level-memory";
 import { PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY } from "../../lib/minecraft/join-guard";
-import { findBlueprint, hasCrossplay } from "../../lib/minecraft/blueprints";
+import { findBlueprint, hasCrossplay, releaseFor } from "../../lib/minecraft/blueprints";
 import {
     pinLoaderAndStartAction,
     resetServerConfigAction,
@@ -1341,7 +1341,7 @@ function OverviewTab({
     );
     const blueprint = findBlueprint(blueprintId ?? "");
     const map = findMap(mapId ?? "");
-    const pinned = pinnedRelease(map);
+    const pinned = releaseFor(blueprint, map);
     // A map is the game on the servers that have one, so the blueprint's note
     // about the plugin it replaced would be describing something that is not here.
     const note = map
@@ -1355,8 +1355,12 @@ function OverviewTab({
           ? {
                 title: t("panel.setupLeft", { name: schemaText(blueprint.name) ?? "" }),
                 text: schemaText(blueprint.setup) ?? "",
-                docs: blueprint.docs,
-                docsLabel: t("panel.pluginDocs")
+                // A modded game is one a vanilla client cannot join, so what the
+                // players install is the link this note leads with.
+                docs: blueprint.clientPack?.url ?? blueprint.docs,
+                docsLabel: blueprint.clientPack
+                    ? t("panel.clientPack", { name: blueprint.clientPack.name })
+                    : t("panel.pluginDocs")
             }
           : null;
 
@@ -1371,7 +1375,7 @@ function OverviewTab({
             {pinned && (
                 <MapReleaseNotice
                     installedAppId={installedAppId}
-                    mapName={map?.name ?? ""}
+                    mapName={map?.name ?? schemaText(blueprint?.name) ?? ""}
                     pinned={pinned}
                     current={settings.find((setting) => setting.key === VERSION_KEY)?.value ?? ""}
                     running={running}

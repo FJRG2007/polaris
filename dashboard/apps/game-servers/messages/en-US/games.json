@@ -1056,6 +1056,35 @@
                 "name": "Shrinking world",
                 "summary": "A border that keeps moving, so nobody settles down.",
                 "setup": "The border moves on the schedule in the plugin's config, and /dwb on and /dwb off stop and start it."
+            },
+            "lucky-challenge-race": {
+                "name": "Lucky Block Race",
+                "summary": "Lucky Block Challenge's race map, on the real Lucky Block mod."
+            },
+            "lucky-challenge-pillars": {
+                "name": "Lucky Pillars",
+                "summary": "Lucky Block Challenge's Lucky Pillars map, on the real mod."
+            },
+            "lucky-challenge-oneblock": {
+                "name": "Lucky Block OneBlock",
+                "summary": "Lucky Block Challenge's OneBlock map, on the real mod."
+            },
+            "lucky-challenge-games": {
+                "name": "Lucky Block Games",
+                "summary": "Lucky Block Challenge's Games map, on the real mod."
+            },
+            "lucky-oneblock": {
+                "name": "Lucky OneBlock",
+                "summary": "One lucky block over the void, broken forever.",
+                "setup": "Every player needs MyLuckyBlock for Fabric on Minecraft 26.2, with Fabric API, to join: install it from the link below. The server runs Fabric 26.2 with the same mod and starts on the map."
+            },
+            "lucky-race-manoj": {
+                "name": "Lucky Block Race (lanes and PvP)",
+                "summary": "A lane each, lucky blocks to break, then a fight at the end.",
+                "setup": "Nothing to install: the lucky blocks are a data pack inside the map. Join with Minecraft 1.21.1. The server starts on the map, ready to race."
+            },
+            "lucky-challenge": {
+                "setup": "Every player needs the Lucky Block Challenge 2.1.2 modpack to join: install it from the link below in the Modrinth app, CurseForge or Prism, and connect with it. The server installs the same pack, on NeoForge for Minecraft 1.21.1, and starts on this map."
             }
         },
         "maps": {
