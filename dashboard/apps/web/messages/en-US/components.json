@@ -943,6 +943,10 @@
                 "label": "Relay ports",
                 "summary": "Carries game, call and other side ports through the relay."
             },
+            "relayCalls": {
+                "label": "Relay calls",
+                "summary": "Carries calls through the relay, apart from games so adding one never cuts a call."
+            },
             "relayLink": {
                 "label": "Relay link",
                 "summary": "Keeps Polaris reachable through your relay server."

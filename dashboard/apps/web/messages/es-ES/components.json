@@ -943,6 +943,10 @@
                 "label": "Puertos relé",
                 "summary": "Lleva por el relé los puertos de juegos, llamadas y demás."
             },
+            "relayCalls": {
+                "label": "Llamadas relé",
+                "summary": "Lleva las llamadas por el relé, aparte de los juegos, para que añadir uno no corte ninguna."
+            },
             "relayLink": {
                 "label": "Enlace relé",
                 "summary": "Mantiene Polaris accesible a través de tu servidor relé."

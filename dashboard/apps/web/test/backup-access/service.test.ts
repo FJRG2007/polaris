@@ -1023,9 +1023,10 @@ describe("runBackupAccess", () => {
         ];
         brought.clear();
         await pass();
-        // Both links at each end: the web link and the side link the games ride.
+        // Three links at each end: the web link, the side link the games ride and the
+        // call link.
         for (const where of ["home", "relay"]) {
-            expect(images(where).filter((image) => image === WIREGUARD_IMAGE)).toHaveLength(2);
+            expect(images(where).filter((image) => image === WIREGUARD_IMAGE)).toHaveLength(3);
             // Nothing else runs there but the helpers that own each end's namespace.
             expect(
                 images(where).filter((image) => image !== WIREGUARD_IMAGE && image !== HELPER_IMAGE)

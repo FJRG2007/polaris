@@ -25,11 +25,19 @@
  * connection per player. The side link runs in containers of its own so that a
  * server added or removed recreates only them, never the link the web rides (see
  * `relaySpec`).
+ *
+ * The call media rides a third link, nested the same way, because the side link
+ * is recreated every time a game server is added or removed and every call
+ * through the relay cut for as long as it took to shake hands again - observed on
+ * 2026-11-20, a call's media path moving at the exact second each of two servers
+ * was created. The call ports are fixed, so the call link renders the same file
+ * whatever is installed and is never recreated by a game.
  */
 
 import { createHmac, createPrivateKey, createPublicKey } from "node:crypto";
 import type { ComposeSpec } from "@polaris/deploy";
 import * as wg from "@/lib/deploy/wireguard/tunnel-config";
+import { CALL_PORTS } from "@/lib/chat/call-ports";
 
 /** The UDP port the relay listens on: one past the range WireGuard tunnels hand
  *  out, so the two never ask a server for the same port. */
@@ -38,7 +46,7 @@ export const RELAY_LISTEN_PORT = wg.LAST_LISTEN_PORT + 1;
  *  never meets a tunnel's. */
 export const RELAY_SLOT = 16383;
 /** Raised when both ends must be brought up again with what this build renders. */
-export const RELAY_SPEC = 6;
+export const RELAY_SPEC = 7;
 /** The web ports every relay carries. */
 export const WEB_PORTS = [80, 443] as const;
 /**
@@ -52,6 +60,12 @@ export const SIDE_WIRE_PORT = RELAY_LISTEN_PORT;
 export const RELAY_SIDE_SLOT = 16382;
 /** The compose names of the side link's ends, beside the web link's. */
 export const RELAY_SIDE_ID = "00000051de00";
+/** The call link's WireGuard port, carried by the web link's second constant
+ *  forward: the next port up, which no carried port is given either. */
+export const CALL_WIRE_PORT = RELAY_LISTEN_PORT + 1;
+/** The call link's addresses, and the compose names of its ends. */
+export const RELAY_CALL_SLOT = 16381;
+export const RELAY_CALL_ID = "0000ca11ed00";
 /** The web link's MTU, the daemon's default, which fits a 1500-byte path over
  *  IPv6 (1500 - 40 - 8 - 32). */
 export const RELAY_MTU = 1420;
@@ -100,8 +114,8 @@ export function relayPorts(gamePorts: readonly RelayPort[]): RelayPortSet {
     const udp = new Set<number>();
     for (const entry of gamePorts) {
         if (!isPort(entry.port)) continue;
-        // The link's own UDP port, which the side link uses inside it too.
-        if (entry.port === RELAY_LISTEN_PORT) continue;
+        // The links' own UDP ports, which the inner links use inside it too.
+        if (entry.port === RELAY_LISTEN_PORT || entry.port === CALL_WIRE_PORT) continue;
         (entry.protocol === "udp" ? udp : tcp).add(entry.port);
     }
     return {
@@ -118,7 +132,7 @@ function isPort(value: number): boolean {
  *  the relay can carry. */
 function carriable(list: readonly number[]): readonly number[] {
     for (const port of list)
-        if (!isPort(port) || port === RELAY_LISTEN_PORT)
+        if (!isPort(port) || port === RELAY_LISTEN_PORT || port === CALL_WIRE_PORT)
             throw new Error(`The relay cannot carry port ${port}`);
     return list;
 }
@@ -129,31 +143,70 @@ export interface RelayKeys {
     readonly home: wg.KeyPair;
 }
 
-/** The ports that ride the side link rather than the web link: every carried
- *  port but the web ones. Games, calls and tunnels come and go; the web ports
- *  never do. */
+/** Whether a port is one of the call server's, which never change. */
+function isCallPort(port: number, protocol: "tcp" | "udp"): boolean {
+    return CALL_PORTS.some((call) => call.port === port && call.protocol === protocol);
+}
+
+/** The ports that ride the side link: every carried port but the web ones and
+ *  the call's. Games and tunnels come and go; those never do. */
 function sidePorts(carried: RelayPortSet): RelayPortSet {
     return {
-        tcp: carriable(carried.tcp).filter((port) => !WEB_PORTS.some((web) => web === port)),
-        udp: [...carriable(carried.udp)]
+        tcp: carriable(carried.tcp).filter(
+            (port) => !WEB_PORTS.some((web) => web === port) && !isCallPort(port, "tcp")
+        ),
+        udp: carriable(carried.udp).filter((port) => !isCallPort(port, "udp"))
     };
 }
 
-/** Whether there is anything for the side link to carry. */
-function carriesSide(carried: RelayPortSet): boolean {
-    const side = sidePorts(carried);
-    return side.tcp.length + side.udp.length > 0;
+/** The ports that ride the call link: the call server's, when carried. */
+function callPorts(carried: RelayPortSet): RelayPortSet {
+    return {
+        tcp: carriable(carried.tcp).filter((port) => isCallPort(port, "tcp")),
+        udp: carriable(carried.udp).filter((port) => isCallPort(port, "udp"))
+    };
 }
+
+/** Whether a set of ports has anything in it. */
+function carriesAny(ports: RelayPortSet): boolean {
+    return ports.tcp.length + ports.udp.length > 0;
+}
+
+/** One of the links nested inside the web link: the side link or the call link. */
+interface InnerLink {
+    /** Its compose names' id. */
+    readonly id: string;
+    readonly slot: number;
+    /** Its WireGuard port, carried by one of the web link's constant forwards. */
+    readonly wirePort: number;
+    /** What its keys are derived with. */
+    readonly salt: string;
+    readonly ports: (carried: RelayPortSet) => RelayPortSet;
+}
+
+const SIDE_LINK: InnerLink = {
+    id: RELAY_SIDE_ID,
+    slot: RELAY_SIDE_SLOT,
+    wirePort: SIDE_WIRE_PORT,
+    salt: "polaris-backup-relay-side",
+    ports: sidePorts
+};
+
+const CALL_LINK: InnerLink = {
+    id: RELAY_CALL_ID,
+    slot: RELAY_CALL_SLOT,
+    wirePort: CALL_WIRE_PORT,
+    salt: "polaris-backup-relay-call",
+    ports: callPorts
+};
 
 /** PKCS #8 for an X25519 private key, up to the 32 key bytes (RFC 8410). */
 const X25519_PKCS8_PREFIX = Buffer.from("302e020100300506032b656e04220420", "hex");
 
-/** A key pair derived from one of the web link's private keys: the side link's
+/** A key pair derived from one of the web link's private keys: an inner link's
  *  keys are never stored, and both ends always agree on them. */
-function sideKeyPair(privateKey: string): wg.KeyPair {
-    const seed = createHmac("sha256", key(privateKey))
-        .update("polaris-backup-relay-side")
-        .digest();
+function innerKeyPair(privateKey: string, salt: string): wg.KeyPair {
+    const seed = createHmac("sha256", key(privateKey)).update(salt).digest();
     // Clamped, as every X25519 private key is written.
     seed[0] = (seed[0] ?? 0) & 248;
     seed[31] = ((seed[31] ?? 0) & 127) | 64;
@@ -167,9 +220,22 @@ function sideKeyPair(privateKey: string): wg.KeyPair {
     };
 }
 
+/** An inner link's two key pairs. */
+function innerKeys(link: InnerLink, keys: RelayKeys): RelayKeys {
+    return {
+        relay: innerKeyPair(keys.relay.privateKey, link.salt),
+        home: innerKeyPair(keys.home.privateKey, link.salt)
+    };
+}
+
 /** The side link's two key pairs. */
 export function sideKeys(keys: RelayKeys): RelayKeys {
-    return { relay: sideKeyPair(keys.relay.privateKey), home: sideKeyPair(keys.home.privateKey) };
+    return innerKeys(SIDE_LINK, keys);
+}
+
+/** The call link's two key pairs. */
+export function callKeys(keys: RelayKeys): RelayKeys {
+    return innerKeys(CALL_LINK, keys);
 }
 
 /** The relay end: listens for the house, forwards the web ports into the link, and
@@ -201,6 +267,11 @@ export function renderRelayConfig(keys: RelayKeys): string {
         "[UDPServerTunnel]",
         `ListenPort = ${SIDE_WIRE_PORT}`,
         `Target = ${relaySide()}:${SIDE_WIRE_PORT}`,
+        "",
+        // The call link the same way, on a port of its own.
+        "[UDPServerTunnel]",
+        `ListenPort = ${CALL_WIRE_PORT}`,
+        `Target = ${relayCall()}:${CALL_WIRE_PORT}`,
         ""
     ].join("\n");
 }
@@ -234,6 +305,10 @@ export function renderHomeConfig(keys: RelayKeys, relayAddress: string): string 
         "[UDPProxyTunnel]",
         `BindAddress = 0.0.0.0:${SIDE_WIRE_PORT}`,
         `Target = ${publicAddress}:${SIDE_WIRE_PORT}`,
+        "",
+        "[UDPProxyTunnel]",
+        `BindAddress = 0.0.0.0:${CALL_WIRE_PORT}`,
+        `Target = ${publicAddress}:${CALL_WIRE_PORT}`,
         ""
     ].join("\n");
 }
@@ -241,9 +316,18 @@ export function renderHomeConfig(keys: RelayKeys, relayAddress: string): string 
 /** The side relay: listens for the house's side end inside the web link, and
  *  forwards each side port into the side link, TCP as TCP and UDP as UDP. */
 export function renderSideRelayConfig(keys: RelayKeys, carried: RelayPortSet): string {
-    const side = sidePorts(carried);
-    const pairs = sideKeys(keys);
-    const { publicAddress, peerAddress } = wg.slotAddresses(RELAY_SIDE_SLOT);
+    return renderInnerRelayConfig(SIDE_LINK, keys, carried);
+}
+
+/** The call relay: the same, for the call server's ports. */
+export function renderCallRelayConfig(keys: RelayKeys, carried: RelayPortSet): string {
+    return renderInnerRelayConfig(CALL_LINK, keys, carried);
+}
+
+function renderInnerRelayConfig(link: InnerLink, keys: RelayKeys, carried: RelayPortSet): string {
+    const side = link.ports(carried);
+    const pairs = innerKeys(link, keys);
+    const { publicAddress, peerAddress } = wg.slotAddresses(link.slot);
     const forward = (section: string) => (port: number) => [
         section,
         `BindAddress = 0.0.0.0:${port}`,
@@ -254,7 +338,7 @@ export function renderSideRelayConfig(keys: RelayKeys, carried: RelayPortSet): s
         "[Interface]",
         `PrivateKey = ${pairs.relay.privateKey}`,
         `Address = ${publicAddress}/32`,
-        `ListenPort = ${SIDE_WIRE_PORT}`,
+        `ListenPort = ${link.wirePort}`,
         `MTU = ${SIDE_MTU}`,
         "",
         "[Peer]",
@@ -276,9 +360,27 @@ export function renderSideHomeConfig(
     carried: RelayPortSet,
     local: string = HOST_ALIAS
 ): string {
-    const side = sidePorts(carried);
-    const pairs = sideKeys(keys);
-    const { publicAddress, peerAddress } = wg.slotAddresses(RELAY_SIDE_SLOT);
+    return renderInnerHomeConfig(SIDE_LINK, keys, carried, local);
+}
+
+/** The house's call end: the same, for the call server's ports. */
+export function renderCallHomeConfig(
+    keys: RelayKeys,
+    carried: RelayPortSet,
+    local: string = HOST_ALIAS
+): string {
+    return renderInnerHomeConfig(CALL_LINK, keys, carried, local);
+}
+
+function renderInnerHomeConfig(
+    link: InnerLink,
+    keys: RelayKeys,
+    carried: RelayPortSet,
+    local: string
+): string {
+    const side = link.ports(carried);
+    const pairs = innerKeys(link, keys);
+    const { publicAddress, peerAddress } = wg.slotAddresses(link.slot);
     const udpHost = local.includes(":") ? `[${local}]` : local;
     if (!wg.isHostPort(`${udpHost}:1`)) throw new Error("The LAN address is not an address");
     const forward = (section: string, host: string) => (port: number) => [
@@ -295,7 +397,7 @@ export function renderSideHomeConfig(
         "",
         "[Peer]",
         `PublicKey = ${pairs.relay.publicKey}`,
-        `Endpoint = ${wg.endNames(RELAY_ID, "nat").helper}:${SIDE_WIRE_PORT}`,
+        `Endpoint = ${wg.endNames(RELAY_ID, "nat").helper}:${link.wirePort}`,
         `AllowedIPs = ${publicAddress}/32`,
         `PersistentKeepalive = ${wg.KEEPALIVE_SECONDS}`,
         "",
@@ -403,6 +505,8 @@ export interface RelayEndConfig {
     readonly wireguard: string;
     /** The side link's end; null when there is no side port to carry. */
     readonly side: string | null;
+    /** The call link's end; null when the call ports are not carried. */
+    readonly call: string | null;
 }
 
 /** Both ends' files for one set of ports. */
@@ -412,15 +516,19 @@ export function relayConfigs(
     carried: RelayPortSet,
     lanAddress: string | null = null
 ): { relay: RelayEndConfig; home: RelayEndConfig } {
-    const side = carriesSide(carried);
+    const side = carriesAny(sidePorts(carried));
+    const call = carriesAny(callPorts(carried));
+    const local = lanAddress ?? HOST_ALIAS;
     return {
         relay: {
             wireguard: renderRelayConfig(keys),
-            side: side ? renderSideRelayConfig(keys, carried) : null
+            side: side ? renderSideRelayConfig(keys, carried) : null,
+            call: call ? renderCallRelayConfig(keys, carried) : null
         },
         home: {
             wireguard: renderHomeConfig(keys, relayAddress),
-            side: side ? renderSideHomeConfig(keys, carried, lanAddress ?? HOST_ALIAS) : null
+            side: side ? renderSideHomeConfig(keys, carried, local) : null,
+            call: call ? renderCallHomeConfig(keys, carried, local) : null
         }
     };
 }
@@ -472,18 +580,18 @@ export function relaySpec(
         ...rest
     ];
     const volumes = [...(spec.volumes ?? [])];
-    if (config.side) {
+    const inner = (link: InnerLink, file: string, after: readonly string[]): string => {
         const side = wg.endSpec({
-            tunnelId: RELAY_SIDE_ID,
+            tunnelId: link.id,
             end: home ? "nat" : "public",
-            config: config.side,
+            config: file,
             networks: ["default"],
             hostAlias: home ? HOST_ALIAS : undefined,
             status: home
         });
         const [sideHelper, ...sideRest] = side.services;
         if (!sideHelper) throw new Error("A WireGuard end has no helper container");
-        const ports = sidePorts(carried);
+        const ports = link.ports(carried);
         const published = (protocol: "tcp" | "udp") => (port: number) => ({
             host: port,
             container: port,
@@ -496,13 +604,20 @@ export function relaySpec(
                     ? []
                     : [...ports.tcp.map(published("tcp")), ...ports.udp.map(published("udp"))],
                 extraHosts: home ? [HOST_GATEWAY] : sideHelper.extraHosts,
-                // After the web helper: on the relay, one from before the split still
-                // publishes these ports until it is recreated or removed.
-                dependsOn: [helper.name]
+                // After the ones named: on the relay, one from an earlier design
+                // still publishes these ports until it is recreated or removed.
+                dependsOn: [...after]
             },
             ...sideRest
         );
         volumes.push(...(side.volumes ?? []));
+        return sideHelper.name;
+    };
+    const sideHelper = config.side ? inner(SIDE_LINK, config.side, [helper.name]) : null;
+    // After the side link, which published the call ports before they had a link
+    // of their own.
+    if (config.call) {
+        inner(CALL_LINK, config.call, sideHelper ? [helper.name, sideHelper] : [helper.name]);
     }
     return {
         ...spec,
@@ -520,6 +635,11 @@ export function relayHelper(): string {
 /** The relay end's side helper, which publishes the side ports. */
 export function relaySide(): string {
     return wg.endNames(RELAY_SIDE_ID, "public").helper;
+}
+
+/** The relay end's call helper, which publishes the call ports. */
+export function relayCall(): string {
+    return wg.endNames(RELAY_CALL_ID, "public").helper;
 }
 
 /** The compose project of one end, for taking it down. */

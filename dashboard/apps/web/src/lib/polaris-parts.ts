@@ -12,7 +12,7 @@
  * on the next self-update; the compose labels do not move.
  */
 
-import { RELAY_SIDE_ID, relayProject } from "@/lib/backup-access/relay";
+import { RELAY_CALL_ID, RELAY_SIDE_ID, relayProject } from "@/lib/backup-access/relay";
 import { findApp } from "@/lib/apps/catalog";
 import { baseProject } from "@/lib/deploy/host-volumes";
 import {
@@ -114,6 +114,11 @@ const RELAY_PORTS = {
     label: "Relay ports",
     summary: "Carries game, call and other side ports through the relay."
 };
+const RELAY_CALLS = {
+    // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
+    label: "Relay calls",
+    summary: "Carries calls through the relay, apart from games so adding one never cuts a call."
+};
 const RELAY_LINK = {
     // i18n-ignore said in the reader's words by the footprint panel (footprint.parts)
     label: "Relay link",
@@ -197,8 +202,13 @@ export function describePart(
     const project = container.composeProject;
     if (project === BACKUP_TUNNEL_PROJECT) return BACKUP_TUNNEL;
     if (project === relayProject("relay") || project === relayProject("home"))
-        // The side link's ends carry the side ports; the web link's are the link.
-        return container.name.includes(RELAY_SIDE_ID) ? RELAY_PORTS : RELAY_LINK;
+        // The side link's ends carry the side ports, the call link's the calls; the
+        // web link's are the link.
+        return container.name.includes(RELAY_SIDE_ID)
+            ? RELAY_PORTS
+            : container.name.includes(RELAY_CALL_ID)
+              ? RELAY_CALLS
+              : RELAY_LINK;
     const known = container.composeService ? PARTS[container.composeService] : undefined;
     return known ?? { label: container.composeService ?? container.name, summary: "" };
 }

@@ -15,6 +15,8 @@ import {
     RELAY_LISTEN_PORT,
     RELAY_MTU,
     RELAY_SIDE_SLOT,
+    RELAY_CALL_SLOT,
+    CALL_WIRE_PORT,
     RELAY_SLOT,
     RELAY_SPEC,
     SIDE_MTU,
@@ -24,6 +26,9 @@ import {
     relayPorts,
     relayProject,
     relaySide,
+    relayCall,
+    renderCallHomeConfig,
+    renderCallRelayConfig,
     relaySpec,
     renderRelayRoutes,
     renderHomeConfig,
@@ -411,8 +416,52 @@ describe("backup relay config", () => {
         }
     });
 
-    it("raises the spec so the Update button brings both ends up as two links", () => {
-        expect(RELAY_SPEC).toBe(6);
+    it("raises the spec so the Update button brings both ends up with the call link", () => {
+        expect(RELAY_SPEC).toBe(7);
+    });
+
+    it("carries the call ports on a link of their own, nested like the side link", () => {
+        const carried = { tcp: [80, 443, 7881, 25565], udp: [7882, 19132] };
+        const call = slotAddresses(RELAY_CALL_SLOT);
+        // The web link's second constant forward.
+        expect(renderRelayConfig(keys)).toContain(
+            `[UDPServerTunnel]\nListenPort = ${CALL_WIRE_PORT}\nTarget = ${relayCall()}:${CALL_WIRE_PORT}`
+        );
+        expect(renderHomeConfig(keys, "198.51.100.20")).toContain(
+            `[UDPProxyTunnel]\nBindAddress = 0.0.0.0:${CALL_WIRE_PORT}\nTarget = ${publicAddress}:${CALL_WIRE_PORT}`
+        );
+        expect(CALL_WIRE_PORT).not.toBe(SIDE_WIRE_PORT);
+        const relayText = renderCallRelayConfig(keys, carried);
+        expect(relayText).toContain(`ListenPort = ${CALL_WIRE_PORT}`);
+        expect(relayText).toContain(`Address = ${call.publicAddress}/32`);
+        expect(forwards(relayText)).toEqual(["[TCPClientTunnel] 7881", "[UDPProxyTunnel] 7882"]);
+        const homeText = renderCallHomeConfig(keys, carried, "192.0.2.10");
+        expect(homeText).toContain(`Endpoint = ${endNames("000000backup", "nat").helper}:${CALL_WIRE_PORT}`);
+        expect(homeText).toContain("Target = 192.0.2.10:7882");
+        // The side link no longer carries them.
+        const sideText = renderSideRelayConfig(keys, carried);
+        expect(forwards(sideText)).toEqual([
+            "[TCPClientTunnel] 25565",
+            "[UDPProxyTunnel] 19132"
+        ]);
+        // Published by the call helper on the relay end, after the side helper that
+        // published them before.
+        const configs = relayConfigs(keys, "198.51.100.20", carried, "192.0.2.10");
+        const relay = relaySpec("relay", configs.relay, carried, ["polaris-proxy"]);
+        expect(relay.services).toHaveLength(6);
+        const callHelper = relay.services.find((service) => service.name === relayCall());
+        expect(callHelper?.ports.map((p) => `${p.host}/${p.protocol ?? "tcp"}`)).toEqual([
+            "7881/tcp",
+            "7882/udp"
+        ]);
+        expect(callHelper?.dependsOn).toEqual([relayHelper(), relaySide()]);
+        const sideHelper = relay.services.find((service) => service.name === relaySide());
+        expect(sideHelper?.ports.map((p) => `${p.host}/${p.protocol ?? "tcp"}`)).toEqual([
+            "25565/tcp",
+            "19132/udp"
+        ]);
+        // A game port can never be the call link's wire port.
+        expect(relayPorts([{ port: CALL_WIRE_PORT, protocol: "udp" }]).udp).toEqual([]);
     });
 
     it("adding or removing a game server leaves the link's containers exactly as they were", () => {
@@ -422,7 +471,7 @@ describe("backup relay config", () => {
             webOnly,
             withUdp,
             { tcp: [80, 443, 25565, 25566], udp: [19132, 25565, 50000] },
-            { tcp: [80, 443], udp: [7882] }
+            { tcp: [80, 443, 25567], udp: [7882] }
         ];
         for (const end of ["relay", "home"] as const) {
             const links = sets.map((set) => {
@@ -447,6 +496,24 @@ describe("backup relay config", () => {
                 (set) => relayConfigs(keys, "198.51.100.20", set, "192.0.2.10")[end].side
             );
             expect(new Set(sides).size).toBe(sets.length);
+        }
+    });
+
+    it("adding or removing a game server leaves the call link exactly as it was", () => {
+        // The call link is what a call through the relay rides: recreated, every call
+        // through it cuts until it shakes hands again.
+        const games = [[], [25565], [25565, 25566], [25569]];
+        for (const end of ["relay", "home"] as const) {
+            const calls = games.map((ports) => {
+                const set = { tcp: [80, 443, 7881, ...ports], udp: [7882, ...ports] };
+                const configs = relayConfigs(keys, "198.51.100.20", set, "192.0.2.10");
+                const spec = relaySpec(end, configs[end], set, ["polaris-proxy"]);
+                const call = spec.services.filter((service) => service.name.includes("0000ca11ed00"));
+                expect(call).toHaveLength(2);
+                // Its file and its containers, apart from what it waits on to start.
+                return JSON.stringify([configs[end].call, call.map(({ dependsOn: _, ...rest }) => rest)]);
+            });
+            expect(new Set(calls).size).toBe(1);
         }
     });
 });

@@ -22,6 +22,7 @@ const PART_CATALOG_KEYS: Readonly<Record<string, string>> = {
     "Remote access": "tailscale",
     "VPN gateway": "vpnGateway",
     "Relay ports": "relayPorts",
+    "Relay calls": "relayCalls",
     "Relay link": "relayLink",
     "Backup access": "backupTunnel"
 };
