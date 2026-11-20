@@ -168,7 +168,7 @@ vi.mock("@polaris-app/game-servers/src/lib/container-files", () => ({
     writeContainerFile: async () => undefined
 }));
 
-const told = vi.hoisted(() => vi.fn(async () => true));
+const told = vi.hoisted(() => vi.fn(async (): Promise<"chat" | "notification" | null> => "chat"));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/player-notice", () => ({
     tellLinkedPlayer: told
 }));
@@ -199,7 +199,7 @@ describe("the account a player is tied to", () => {
             username: "AdaMC",
             userId: ADA
         });
-        expect(result).toEqual({ told: true });
+        expect(result).toEqual({ told: "chat" });
         expect(told).toHaveBeenCalledTimes(1);
         expect(told).toHaveBeenCalledWith(
             expect.objectContaining({ userId: ADA, installedAppId: SERVER, player: "AdaMC" })
@@ -213,7 +213,7 @@ describe("the account a player is tied to", () => {
             userId: ADA,
             followSignIns: false
         });
-        expect(again).toEqual({ told: false });
+        expect(again).toEqual({ told: null });
         expect(told).toHaveBeenCalledTimes(1);
     });
 });

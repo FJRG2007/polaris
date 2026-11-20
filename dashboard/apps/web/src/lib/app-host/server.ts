@@ -129,6 +129,7 @@ const load = {
     crmHost: once(() => import("@/lib/crm-host")),
     cloudServersHost: once(() => import("@/lib/cloud-servers-host")),
     chatGameLinks: once(() => import("@/lib/chat/game-links")),
+    chatGameInvites: once(() => import("@/lib/chat/game-server-card-post")),
     chatLive: once(() => import("@/lib/chat/live")),
     chatMeetingEvents: once(() => import("@/lib/chat/meeting-events")),
     chatMeetings: once(() => import("@/lib/chat/meetings")),
@@ -528,6 +529,10 @@ export const serverHost = {
     },
     notificationService: {
         createNotification: later(load.notificationService, "createNotification")
+    },
+    // The invite a player gets in Chat from whoever added them to a server.
+    chatGameInvites: {
+        sendGamePlayerInvite: later(load.chatGameInvites, "sendGamePlayerInvite")
     },
     notificationsDispatch: {
         notify: later(load.notificationsDispatch, "notify")

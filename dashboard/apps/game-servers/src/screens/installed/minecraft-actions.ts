@@ -1022,7 +1022,7 @@ const linkSchema = z.object({
  */
 export async function linkPlayerAccountAction(
     input: z.input<typeof linkSchema>
-): Promise<{ told?: boolean; error?: string }> {
+): Promise<{ told?: "chat" | "notification" | null; error?: string }> {
     const parsed = linkSchema.safeParse(input);
     if (!parsed.success)
         return {
@@ -1085,7 +1085,7 @@ export async function invitePlayerAccountAction(
     input: z.input<typeof inviteSchema>
 ): Promise<{
     linked?: true;
-    told?: boolean;
+    told?: "chat" | "notification" | null;
     invite?: { url?: string; sendError?: string };
     error?: string;
 }> {

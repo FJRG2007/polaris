@@ -88,6 +88,7 @@
         "inviteNoLink": "The invite was made without a link to share. Try again.",
         "notified": "{name} was told in Polaris, with the address to join.",
         "notifiedPlayer": "{player} was linked, and its account was told in Polaris.",
+        "invitedPlayerInChat": "{player} was linked, and its account got the invite in Chat.",
         "whereCanJoin": "Where {name} can join from",
         "followsHint": "They are let in only from an address where {name} is signed in to Polaris, and removed when they sign out.",
         "typedGo": " The addresses typed for them go.",

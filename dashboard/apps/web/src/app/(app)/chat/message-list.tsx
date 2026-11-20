@@ -71,8 +71,8 @@ import { RelativeTime } from "@/components/relative-time";
 import { MessageTime } from "@/components/message-time";
 import { ActivityCard } from "./activity-card";
 import { activityIdIn } from "@/lib/chat/activity-card";
-import { GameServerCard } from "./game-server-card";
-import { gameServerIdIn } from "@/lib/chat/game-server-card";
+import { GameInviteCard, GameServerCard } from "./game-server-card";
+import { gameInviteIn, gameServerIdIn } from "@/lib/chat/game-server-card";
 import { MessageInfoDialog } from "./message-info-dialog";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import type { ChatMessageView, ChatQuoteView } from "@/lib/chat/messages";
@@ -871,6 +871,9 @@ function Message({
         const server = gameServerIdIn(message.body);
         if (server) return <GameServerCard serverId={server} message={message} />;
     }
+    // An invite to a game server, sent by whoever added this player: drawn as
+    // the server's card in that person's own row, in place of its words.
+    const invite = notice || message.deleted ? null : gameInviteIn(message.body);
 
     // Somebody this reader has blocked. Folded away rather than dropped: a
     // conversation with gaps in it reads as messages that failed to load, and
@@ -1144,7 +1147,9 @@ function Message({
                             <p className="text-sm italic text-foreground-subtle">
                                 {t("messageList.thisMessageWasDeleted")}
                             </p>
-                        ) : notice ? null : (
+                        ) : notice ? null : invite ? (
+                            <GameInviteCard invite={invite} message={message} />
+                        ) : (
                             <div className="text-sm">
                                 <TranslatableText id={message.id} body={message.body} live={live}>
                                     <RichText

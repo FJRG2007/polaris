@@ -2439,6 +2439,17 @@
         "howToJoin": "How to join",
         "open": "Open in Polaris",
         "notification": "{name} added you to {server}",
+        "invite": {
+            "joinAs": "Join as {player}",
+            "running": "Running",
+            "fromSignIns": "From wherever you are signed in to Polaris",
+            "fromAnywhere": "From any address",
+            "fromAddresses": "From {addresses}",
+            "fromAsk": "Ask {name} which address to join from",
+            "openServer": "Open server page",
+            "play": "Play",
+            "label": "Server invite"
+        },
         "guide": {
             "minecraftJava": "1. Open Minecraft Java Edition {version}.\n2. Multiplayer > Add Server.\n3. Paste {address} as the address and press Done.\n4. Pick the server and Join Server.",
             "minecraftBedrock": "1. Open Minecraft (Bedrock).\n2. Play > Servers > Add Server.\n3. Address {host}, port {port}.\n4. Save, then pick the server to join.",

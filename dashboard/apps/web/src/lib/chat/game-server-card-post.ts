@@ -6,9 +6,10 @@
  * messaged, still has their access; they simply get no message about it.
  */
 
+import * as messages from "./messages";
 import { openDirect } from "./chat-service";
 import { postNoticeBody } from "./notices";
-import { gameServerMark } from "./game-server-card";
+import { gameInviteMark, gameServerMark } from "./game-server-card";
 import { translatorFor } from "@/lib/i18n/translate";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import { createNotification } from "@/lib/notification-service";
@@ -41,5 +42,37 @@ export async function announceGameServerAccess(input: {
         });
     } catch (caught) {
         console.error("games: could not tell somebody about a server they were let onto", caught);
+    }
+}
+
+/**
+ * The invite a person gets when somebody adds them as a player: a direct message
+ * from whoever did it, drawn as the server's card. Sent as that person because
+ * it is their own click - the same as sending somebody a chat invite - and
+ * through the same checks a message they typed would pass, so somebody who does
+ * not take messages from them is not reached this way.
+ *
+ * @param input.fallback - What a screen that shows messages as text reads, in
+ *   the invited person's language.
+ * @returns "chat" once the message is in the conversation, or null when it could
+ *   not be sent, for the caller to tell them some other way.
+ */
+export async function sendGamePlayerInvite(input: {
+    readonly inviterId: string;
+    readonly targetId: string;
+    readonly installedAppId: string;
+    readonly player: string;
+    readonly fallback: string;
+}): Promise<"chat" | null> {
+    if (input.targetId === input.inviterId) return null;
+    try {
+        const actor = { id: input.inviterId };
+        const body = gameInviteMark(input.installedAppId, input.player, input.fallback);
+        const channelId = await openDirect(actor, [input.targetId]);
+        await messages.send(actor, { channelId, body, replyToId: null }, [], null);
+        return "chat";
+    } catch (caught) {
+        console.error("games: a player invite could not be sent in Chat", caught);
+        return null;
     }
 }

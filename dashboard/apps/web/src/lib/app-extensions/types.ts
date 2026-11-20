@@ -11,6 +11,7 @@
  * about. Everything here is a type, so this module is shared by core and apps.
  */
 
+import type { GamePlayerJoinFrom } from "@/lib/chat/game-server-card";
 import type { ServerNode as AutomationServerNode } from "@/lib/automations/types";
 import type { McpTool } from "@/lib/mcp/protocol";
 import type { AppDeckAction } from "@/lib/deck/types";
@@ -305,6 +306,14 @@ export interface AppExtension {
         ownerId: string,
         installedAppId: string
     ) => Promise<GameServerCardFacts | null>;
+
+    /** Where one player on a server may connect from, for the invite card the
+     *  player gets in Chat. The caller has already checked who may read it. */
+    readonly gamePlayerJoinFrom?: (
+        ownerId: string,
+        installedAppId: string,
+        player: string
+    ) => Promise<GamePlayerJoinFrom | null>;
 
     /**
      * The tools it offers connected assistants over MCP. Listed, callable and

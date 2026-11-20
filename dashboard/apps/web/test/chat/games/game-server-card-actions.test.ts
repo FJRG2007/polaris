@@ -16,7 +16,21 @@ vi.mock("@/lib/apps/install-access", () => ({
         return access;
     }
 }));
+let link: { id: string } | null = null;
+let linkAsked: unknown[] = [];
+vi.mock("@polaris/db", () => ({
+    prisma: {
+        gamePlayerLink: {
+            findFirst: async (query: unknown) => {
+                linkAsked.push(query);
+                return link;
+            }
+        },
+        installedApp: { findFirst: async () => ({ ownerId: "owner" }) }
+    }
+}));
 vi.mock("@/lib/app-extensions/registry", () => ({
+    gamePlayerJoinFrom: async () => ({ kind: "signIns" }),
     gameServerCardFacts: async (_ownerId: string, id: string) => ({
         id,
         name: "Survival",
@@ -28,11 +42,13 @@ vi.mock("@/lib/app-extensions/registry", () => ({
     })
 }));
 
-const { readGameServerCard } = await import("../../../src/app/(app)/chat/game-server-card-actions");
+const { readGameServerCard, readGameInviteCard } = await import("../../../src/app/(app)/chat/game-server-card-actions");
 
 beforeEach(() => {
     access = null;
     asked = [];
+    link = null;
+    linkAsked = [];
 });
 
 describe("reading the game server card", () => {
@@ -52,6 +68,45 @@ describe("reading the game server card", () => {
 
     it("reads nothing for a mark that is not an id", async () => {
         expect(await readGameServerCard("nope")).toBeNull();
+        expect(asked).toEqual([]);
+    });
+});
+
+describe("reading a game invite card", () => {
+    it("shows the server's page to a reader who may read it", async () => {
+        access = { ownerId: "owner" };
+        expect(await readGameInviteCard(SERVER, "demo")).toMatchObject({
+            state: "ready",
+            player: "demo",
+            canOpen: true,
+            joinFrom: { kind: "signIns" },
+            address: "192.0.2.4:30120"
+        });
+    });
+
+    it("lets the linked player in without the server's page", async () => {
+        link = { id: "link" };
+        expect(await readGameInviteCard(SERVER, "demo")).toMatchObject({
+            state: "ready",
+            canOpen: false,
+            address: "192.0.2.4:30120"
+        });
+        expect(linkAsked[0]).toMatchObject({
+            where: {
+                installedAppId: SERVER,
+                userId: "reader",
+                player: { equals: "demo", mode: "insensitive" }
+            }
+        });
+    });
+
+    it("tells anybody else only that it is not theirs", async () => {
+        expect(await readGameInviteCard(SERVER, "demo")).toEqual({ state: "denied" });
+    });
+
+    it("reads nothing for a mark that is not a server and a player", async () => {
+        expect(await readGameInviteCard("nope", "demo")).toBeNull();
+        expect(await readGameInviteCard(SERVER, "")).toBeNull();
         expect(asked).toEqual([]);
     });
 });

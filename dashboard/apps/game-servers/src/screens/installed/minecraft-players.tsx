@@ -632,14 +632,20 @@ export function MinecraftPlayers({
             setFormError(result.error);
             return;
         }
-        linked(input.username, result.told === true);
+        linked(input.username, result.told ?? null);
     }
 
     /** A player tied to an account: the dialog is done, and the page says who
      *  heard about it. */
-    function linked(player: string, told: boolean): void {
+    function linked(player: string, told: "chat" | "notification" | null): void {
         setActing(null);
-        setNote(told ? t("players.notifiedPlayer", { player }) : null);
+        setNote(
+            told === "chat"
+                ? t("players.invitedPlayerInChat", { player })
+                : told === "notification"
+                  ? t("players.notifiedPlayer", { player })
+                  : null
+        );
     }
 
     /** Register somebody, or save a change to somebody already registered. Both are
@@ -1091,7 +1097,7 @@ export function MinecraftPlayers({
                             ...input
                         });
                         if (!result.error) onChanged();
-                        if (result.linked) linked(input.username, result.told === true);
+                        if (result.linked) linked(input.username, result.told ?? null);
                         return result;
                     }}
                     onUnlink={(username) => {

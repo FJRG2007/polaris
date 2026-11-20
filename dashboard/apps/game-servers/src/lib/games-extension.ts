@@ -204,6 +204,9 @@ export const gameServersExtension: AppExtension = {
         };
     },
 
+    gamePlayerJoinFrom: async (ownerId, installedAppId, player) =>
+        (await import("./minecraft/player-notice")).joinFromFor(ownerId, installedAppId, player),
+
     forwardedPorts: async () => (await games()).listGamePorts(),
 
     readForwardedPorts: async (probe) => (await games()).readGamePorts(probe),

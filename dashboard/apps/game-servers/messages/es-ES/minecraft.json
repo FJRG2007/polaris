@@ -88,6 +88,7 @@
         "inviteNoLink": "La invitación se creó sin enlace para compartir. Inténtalo de nuevo.",
         "notified": "Se avisó a {name} en Polaris, con la dirección para entrar.",
         "notifiedPlayer": "{player} quedó enlazado y se avisó a su cuenta en Polaris.",
+        "invitedPlayerInChat": "{player} quedó enlazado y su cuenta recibió la invitación en Chat.",
         "whereCanJoin": "Desde dónde puede entrar {name}",
         "followsHint": "Solo entra desde una dirección donde {name} tenga sesión en Polaris, y se le quita al cerrarla.",
         "typedGo": " Las direcciones escritas para él se quitan.",

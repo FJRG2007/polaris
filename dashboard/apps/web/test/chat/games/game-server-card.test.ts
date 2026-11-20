@@ -5,6 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import * as card from "../../../src/lib/chat/game-server-card";
+import { plainExcerpt } from "../../../src/components/rich-text/excerpt";
 
 const SERVER = "aaaaaaaa-1111-4111-8111-111111111111";
 
@@ -72,5 +73,40 @@ describe("the Join button", () => {
             joinLink: null,
             href: `/game-servers/${SERVER}`
         });
+    });
+});
+
+describe("the invite's mark", () => {
+    it("round-trips a server and a player, a gamertag with spaces included", () => {
+        for (const player of ["demo", "Steve_01", "Big Boss 77", "76561198000000000"]) {
+            expect(card.gameInviteIn(card.gameInviteMark(SERVER, player, "Join lbr"))).toEqual({
+                installedAppId: SERVER,
+                player
+            });
+        }
+    });
+
+    it("reads as its words wherever a message is shown as text", () => {
+        const body = card.gameInviteMark(SERVER, "demo", "Javier added you to [lbr]. Join at lbr.example.test as demo.");
+        expect(plainExcerpt(body, 400)).toBe("Javier added you to [lbr]. Join at lbr.example.test as demo.");
+        expect(plainExcerpt(body, 400)).not.toContain("polaris-game-invite");
+        expect(card.gameInviteIn(body)).toEqual({ installedAppId: SERVER, player: "demo" });
+    });
+
+    it("refuses to make a mark from a bad id or player", () => {
+        expect(() => card.gameInviteMark("../admin", "demo")).toThrow();
+        expect(() => card.gameInviteMark(SERVER, "a)b")).toThrow();
+        expect(() => card.gameInviteMark(SERVER, "")).toThrow();
+    });
+
+    it("is null for any other body, or a target that is not a server and a player", () => {
+        expect(card.gameInviteIn("hello")).toBeNull();
+        expect(card.gameInviteIn(card.gameServerMark(SERVER))).toBeNull();
+        expect(card.gameInviteIn(`[x](polaris-game-invite:${SERVER})`)).toBeNull();
+        expect(card.gameInviteIn(`[x](polaris-game-invite:not-a-uuid-at-all-not-a-uuid-at-all/demo)`)).toBeNull();
+        expect(card.gameInviteIn(`[x](polaris-game-invite:${SERVER}/a%2Fb)`)).toBeNull();
+        expect(card.gameInviteIn(`[x](polaris-game-invite:${SERVER}/%E0%A4%A)`)).toBeNull();
+        expect(card.gameInviteIn(`text [x](polaris-game-invite:${SERVER}/demo)`)).toBeNull();
+        expect(card.gameInviteIn(`[x](https://example.test/${SERVER}/demo)`)).toBeNull();
     });
 });

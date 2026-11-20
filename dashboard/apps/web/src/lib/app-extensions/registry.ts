@@ -9,6 +9,7 @@
  * Server-only.
  */
 
+import type { GamePlayerJoinFrom } from "@/lib/chat/game-server-card";
 import type { ServerNode as AutomationServerNode } from "@/lib/automations/types";
 import { bundleClientUrl, withBundleSlot } from "@/lib/app-bundles/code";
 import { installedExtensions } from "./installed";
@@ -374,6 +375,19 @@ export async function gameServerCardFacts(
     for (const extension of extensions()) {
         const facts = await extension.gameServerCard?.(ownerId, installedAppId);
         if (facts) return facts;
+    }
+    return null;
+}
+
+/** Where one player may connect to a game server from, for their invite card. */
+export async function gamePlayerJoinFrom(
+    ownerId: string,
+    installedAppId: string,
+    player: string
+): Promise<GamePlayerJoinFrom | null> {
+    for (const extension of extensions()) {
+        const where = await extension.gamePlayerJoinFrom?.(ownerId, installedAppId, player);
+        if (where) return where;
     }
     return null;
 }

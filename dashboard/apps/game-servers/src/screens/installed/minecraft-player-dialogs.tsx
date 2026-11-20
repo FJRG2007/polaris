@@ -745,7 +745,7 @@ export function PlayerAccessDialog({
      *  spot (`linked`), and the caller closes the dialog as it does for a link. */
     onInvite?: (input: { username: string; email: string; followSignIns: boolean }) => Promise<{
         linked?: true;
-        told?: boolean;
+        told?: "chat" | "notification" | null;
         invite?: { url?: string; sendError?: string };
         error?: string;
     }>;
