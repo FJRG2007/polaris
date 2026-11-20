@@ -39,7 +39,17 @@ export function chromeActions(): Record<string, ActionFixture> {
             status: { text: "", until: null }
         }),
         // Chat asks whether any conversation is locked; nobody here locked one.
-        lockStateAction: () => ({ hasCode: false, hideLocked: false, unlockMinutes: 5, codeLength: null })
+        lockStateAction: () => ({ hasCode: false, hideLocked: false, unlockMinutes: 5, codeLength: null }),
+        // The composer's slash commands from installed apps: none installed here.
+        appCommandsAction: () => [],
+        // A conversation opened is marked read; nothing to remember.
+        markChannelsReadAction: () => ({}),
+        // The task panel's "hand to an agent": this account starts none.
+        agentHandoffChoicesAction: () => ({ allowed: false, repos: [], agents: [], sources: [] }),
+        // A call's games: none offered here.
+        callGames: () => ({ ok: true, seat: "", games: [] }),
+        // A direct conversation's vanishing-message rules: none set.
+        directRulesAction: () => ({ rules: null })
     };
 }
 
@@ -91,6 +101,10 @@ export function chromeApi(ctx: SceneContext): Record<string, ApiFixture> {
             cursor: new Date(ctx.now).toISOString(),
             named: [],
             more: 0
-        })
+        }),
+        // Polar's model picker: no order of its own, nothing picked lately.
+        "GET /api/polar/picker": () => ({ order: [], recent: [] }),
+        // A Polar chat's subagents: none running.
+        "GET /api/polar/threads/:id/subagents": () => ({ subagents: [] })
     };
 }

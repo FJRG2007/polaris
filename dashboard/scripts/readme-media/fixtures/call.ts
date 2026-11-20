@@ -345,6 +345,10 @@ export function callState(ctx: SceneContext, shape: CallShape = standupShape(ctx
         hosting: true,
         reactions: [],
         react: nothing,
+        // Nobody is playing a game in this call.
+        setActivity: nothing,
+        sendActivity: nothing,
+        listenActivity: () => nothing,
         audio: { ok: true, blame: "fault", farEnd: false, headline: "", fix: "", lines: [] },
         outgoing: null
     };

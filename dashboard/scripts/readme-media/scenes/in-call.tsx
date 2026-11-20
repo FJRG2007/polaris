@@ -57,7 +57,10 @@ export async function watchSharedScreen(ctx: SceneContext): Promise<void> {
     for (let tries = 0; ; tries++) {
         const card = document.querySelector<HTMLElement>(`button[title="${title}"]`);
         if (card) return card.click();
-        if (tries > 50) throw new Error(`no card titled "${title}"`);
+        // A share is now shown as it arrives, unless this reader put it away
+        // before: already on the stage, there is no card to press.
+        if (tries > 10 && document.body.innerText.includes(screen)) return;
+        if (tries > 50) throw new Error(`no card titled "${title}", and no screen named "${screen}"`);
         await new Promise((resolve) => setTimeout(resolve, 100));
     }
 }

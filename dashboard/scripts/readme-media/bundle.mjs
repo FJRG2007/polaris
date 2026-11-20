@@ -188,6 +188,8 @@ export function bundle(entry, outfile) {
             ".mp4": "file",
             ".webm": "file"
         },
+        // Server modules the screens sit beside call Buffer at module scope.
+        inject: [join(here, "runtime", "buffer.ts")],
         plugins: [stubs],
         metafile: true
     });

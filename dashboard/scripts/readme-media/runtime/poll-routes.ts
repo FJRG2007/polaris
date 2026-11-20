@@ -43,6 +43,7 @@ const POLL_ROUTES: Record<string, { action: string; args: readonly string[] }> =
     },
     "/api/office/google-link": { action: "officeGoogleLinkAction", args: ["documentId"] },
     "/api/tasks/detail": { action: "getTaskDetailAction", args: ["taskId"] },
+    "/api/tasks/agent-handoff": { action: "agentHandoffChoicesAction", args: [] },
     "/api/vault/item-uses": { action: "itemUsesAction", args: ["itemId"] }
 };
 

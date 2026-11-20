@@ -36,6 +36,8 @@ function Inbox({ ctx, open }: { ctx: SceneContext; open: boolean }) {
                 viewerId={VIEWER.id}
                 shelf="personal"
                 lent={false}
+                mailboxIds={mailAccounts(ctx).map((account) => account.id)}
+                canImprove={false}
             >
                 <MailView
                     page={{
