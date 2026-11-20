@@ -18,7 +18,7 @@ import { available, byId, say } from "./dom";
 import { serverAddressSchema } from "@/shared/server-address";
 import { describeUpdateCheck, type UpdateCheck } from "@/shared/update-check";
 import { describeServer, normalizeServerName, SERVER_NAME_MAX, type ServerRow } from "@/shared/servers";
-import { encodeHostList, HOST_LIST_PREFIX } from "../../../dashboard/packages/core/src/host-list";
+import { encodeHostList, HOST_LIST_PREFIX, hostListLink } from "../../../dashboard/packages/core/src/host-list";
 import { encodeQr, qrSvgPath } from "../../../dashboard/packages/core/src/qr";
 import type { HostImport } from "@/shared/bridge";
 import jsQR from "jsqr";
@@ -451,7 +451,8 @@ async function afterImport(outcome: HostImport): Promise<void> {
 function openSend(): void {
     say(transferNote, null);
     say(sendNote, null);
-    const modules = encodeQr(encodeHostList(rows));
+    // The link, not the bare code: a phone camera opens the Polaris app on it.
+    const modules = encodeQr(hostListLink(rows));
     const svg = byId<HTMLElement>("qr-code") as unknown as SVGSVGElement;
     byId("qr-too-long").hidden = modules !== null;
     svg.style.display = modules ? "" : "none";

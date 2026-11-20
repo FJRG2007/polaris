@@ -16,7 +16,7 @@ import { useRef, useState } from "react";
 import type { Words } from "@/lib/words";
 import type { ServerRef } from "@/lib/servers";
 import { askBackground, type HostImport } from "@/lib/messages";
-import { encodeHostList, encodeQr, hostListFile, qrSvgPath, readHostList } from "@polaris/core";
+import { encodeHostList, encodeQr, hostListFile, hostListLink, qrSvgPath, readHostList } from "@polaris/core";
 
 /** The most text an import reads, pasted or from a file. A full list is far under it. */
 export const IMPORT_MAX = 64 * 1024;
@@ -121,7 +121,7 @@ export function HostTransfer({
         void browser.tabs.create({ url: browser.runtime.getURL("/scan.html") });
     };
 
-    const modules = view === "qr" && !empty ? encodeQr(encodeHostList(hosts)) : null;
+    const modules = view === "qr" && !empty ? encodeQr(hostListLink(hosts)) : null;
 
     return (
         <section className="fold" aria-labelledby="host-transfer-title">
