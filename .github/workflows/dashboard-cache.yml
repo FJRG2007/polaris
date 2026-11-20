@@ -9,8 +9,18 @@ name: Dashboard cache
 # had not changed. This saves, on main, the two things a pull request's run can then
 # restore: the built packages and the Next build cache.
 #
-# It gates nothing and nothing waits on it. A newer push cancels an older run: only
+# It gates nothing and nothing waits on it. A newer run cancels an older one: only
 # the latest copy is worth keeping.
+#
+# Not on every push to main. It used to be, and from 2026-11-13 to 11-20 it ran 207
+# times - about 56 runner hours, 123 of the runs cancelled by the next push - to warm
+# the cache for the two pull requests opened that week. A pull request restores the
+# newest copy main has by prefix (`next-<os>-`), and webpack revalidates every entry
+# it reads, so a copy a day old only costs the compile what changed since; the daily
+# run also keeps the entry from expiring after seven days unread. A push that changes
+# the lockfile or the patches still warms at once, since those change every module
+# id. The built packages are saved on main by every workflow that builds them
+# (.github/actions/workspace-packages), the publish's own Dashboard CI call included.
 #
 # And it must never fail. A host that builds its own checkout asks GitHub for every
 # check on main's head and holds back an update when any of them failed
@@ -23,10 +33,11 @@ on:
   push:
     branches: [main]
     paths:
-      - "dashboard/**"
-      - "!dashboard/docs/**"
-      - "!dashboard/*.md"
+      - "dashboard/package-lock.json"
+      - "dashboard/patches/**"
       - ".github/workflows/dashboard-cache.yml"
+  schedule:
+    - cron: "41 4 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -102,26 +113,11 @@ jobs:
       - run: npm run db:generate
         continue-on-error: true
 
-      # The key must match Dashboard CI's character for character, or a pull
-      # request will never find this copy. Restored and saved as two steps rather
-      # than one, so a build that failed - which this job lets through - is never
-      # saved as the packages every pull request then trusts and skips building.
+      # Saved only from a build that succeeded (see the action), so one this job
+      # lets fail is never what a pull request then trusts and skips building.
       - id: packages
         continue-on-error: true
-        uses: actions/cache/restore@v6
-        with:
-          path: dashboard/packages/*/dist
-          key: packages-v1-${{ runner.os }}-node22-${{ hashFiles('dashboard/packages/**', 'dashboard/package-lock.json', 'dashboard/patches/**', 'dashboard/tsconfig.base.json', 'dashboard/scripts/build-packages.mjs', 'dashboard/scripts/scope-editor-styles.mjs', '!dashboard/packages/*/dist/**', '!dashboard/packages/**/node_modules/**', '!dashboard/packages/db/generated/**') }}
-      - id: build-packages
-        if: steps.packages.outputs.cache-hit != 'true'
-        continue-on-error: true
-        run: npm run build:packages
-      - if: steps.build-packages.outcome == 'success'
-        continue-on-error: true
-        uses: actions/cache/save@v6
-        with:
-          path: dashboard/packages/*/dist
-          key: packages-v1-${{ runner.os }}-node22-${{ hashFiles('dashboard/packages/**', 'dashboard/package-lock.json', 'dashboard/patches/**', 'dashboard/tsconfig.base.json', 'dashboard/scripts/build-packages.mjs', 'dashboard/scripts/scope-editor-styles.mjs', '!dashboard/packages/*/dist/**', '!dashboard/packages/**/node_modules/**', '!dashboard/packages/db/generated/**') }}
+        uses: ./.github/actions/workspace-packages
 
       - uses: actions/cache/restore@v6
         continue-on-error: true
@@ -135,7 +131,7 @@ jobs:
       # Built the way Dashboard CI builds it, so the cache it leaves is the one a
       # pull request's build asks for.
       - id: build
-        if: steps.packages.outputs.cache-hit == 'true' || steps.build-packages.outcome == 'success'
+        if: steps.packages.outcome == 'success'
         continue-on-error: true
         run: npm run build -w @polaris/web
         env:
