@@ -14,6 +14,7 @@ import { Power, Trash2 } from "lucide-react";
 import * as actions from "./connect-actions";
 import { openProfileAction } from "./profile-actions";
 import { desktopBridge } from "@/lib/desktop-bridge";
+import { onPhoneVpnChange, phoneVpn } from "@/lib/mobile-bridge";
 import { countryName } from "@/components/map/country-name";
 import { WorldMap, type MapPlace } from "@/components/map/world-map";
 import type { DesktopVpnStatus } from "@/lib/desktop-bridge";
@@ -26,11 +27,12 @@ const GIB = 1024 ** 3;
 const CONNECTED_MS = 3 * 60_000;
 
 type Node = actions.ConnectAnswer["nodes"][number];
-type TunnelCode = "denied" | "failed" | "noAnswer" | "unreachable";
+type TunnelCode = "denied" | "failed" | "handedOff" | "noAnswer" | "unreachable";
 
 const TUNNEL_CODES: ReadonlySet<string> = new Set<TunnelCode>([
     "denied",
     "failed",
+    "handedOff",
     "noAnswer",
     "unreachable"
 ]);
@@ -52,13 +54,18 @@ export function ConnectSection({ isAdmin }: { isAdmin: boolean }) {
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     const data = read.data;
-    const desktop = desktopBridge()?.vpn ?? null;
+    // The computer's app or the phone's: both run the tunnel themselves, the same way.
+    const desktop = useMemo(() => desktopBridge()?.vpn ?? phoneVpn(), []);
     const blocked = data && data.standing !== "active" ? data.standing : null;
     const nodes = data?.nodes ?? [];
     const profiles = data?.profiles ?? [];
 
     useEffect(() => {
-        void desktop?.status().then(setTunnel);
+        if (!desktop) return;
+        const refresh = (): void => void desktop.status().then(setTunnel);
+        refresh();
+        // The phone's Quick Settings tile turns the tunnel on and off without this page.
+        return onPhoneVpnChange(refresh);
     }, [desktop]);
 
     const where = (node: Node): string =>

@@ -29,6 +29,17 @@ Until the app is on TestFlight, a Mac with Xcode installs it on your own iPhone 
 A free Apple ID signs the app for 7 days; press Run again to renew it. A paid Apple Developer account removes that
 limit and allows TestFlight.
 
+## VPN
+
+On Android the app runs the Polaris VPN itself: pick a location on the VPN page and press **Connect**, and accept
+Android's VPN prompt the first time. The **Polaris VPN** tile in Quick Settings turns the last location on and off
+with one tap. The tunnel is the WireGuard project's own Android library (`com.wireguard.android:tunnel`, the
+`GoBackend` the official WireGuard app runs); the key is made on the phone and only its public half reaches Polaris.
+
+On iPhone, running the tunnel inside the app needs a Network Extension, which Apple grants only to apps signed by a
+paid developer account. Until then **Connect** hands the finished configuration to the WireGuard app through the
+share sheet.
+
 ## Build
 
 `mobile/android` is a plain Java Android project and `mobile/ios` a Swift one generated from `project.yml`; both

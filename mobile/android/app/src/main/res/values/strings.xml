@@ -133,4 +133,18 @@
     <string name="vault_saved">Saved to Polaris Vault.</string>
     <string name="vault_save_conflict">That login changed somewhere else first. Sync and save it again.</string>
     <string name="vault_save_failed">Couldn\'t save to Polaris Vault. Your server didn\'t accept it.</string>
+    <string name="vpn_tile">Polaris VPN</string>
+    <string name="vpn_on">Connected</string>
+    <string name="vpn_off">Off</string>
+    <string name="vpn_working">Connecting</string>
+    <string name="vpn_error_denied">Allow Polaris to set up the VPN when the phone asks.</string>
+    <string name="vpn_error_no_answer">That place didn\'t answer. Try another location.</string>
+    <string name="vpn_error_unreachable">That place can\'t be reached right now. Check this phone is online, or try another location.</string>
+    <string name="vpn_error_sign_in">Sign in to Polaris to connect.</string>
+    <string name="vpn_error_no_place">Pick a location in Polaris first.</string>
+    <string name="vpn_error_no_access">Your account can\'t use the VPN any more.</string>
+    <string name="vpn_error_device_limit">You have used all your VPN devices. Remove one in Polaris.</string>
+    <string name="vpn_error_node_full">That location is full. Try another.</string>
+    <string name="vpn_error_node_gone">That location isn\'t available any more. Pick another in Polaris.</string>
+    <string name="vpn_error_failed">The VPN couldn\'t start. Try again.</string>
 </resources>

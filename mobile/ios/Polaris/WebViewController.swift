@@ -43,12 +43,24 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         // How the instance tells this app from Safari on its sessions screen.
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
         config.applicationNameForUserAgent = "PolarisMobile/\(version) (iOS)"
+        // The VPN's public key, ready before the page asks: the bridge answers it without a round trip.
+        let vpnKey = VpnHandoff.publicKey(for: origin) ?? ""
         let bridge = """
         window.polarisMobile = Object.freeze({
             platform: function () { return "ios"; },
             version: function () { return "\(version)"; },
             changeServer: function () { window.webkit.messageHandlers.polarisMobile.postMessage("changeServer"); },
-            openExternal: function (url) { window.webkit.messageHandlers.polarisMobile.postMessage({ openExternal: String(url) }); }
+            openExternal: function (url) { window.webkit.messageHandlers.polarisMobile.postMessage({ openExternal: String(url) }); },
+            canVpn: function () { return \(vpnKey.isEmpty ? "false" : "true"); },
+            vpnDeviceName: function () { return \(Self.jsString(UIDevice.current.name)); },
+            vpnKey: function () { return \(Self.jsString(vpnKey)); },
+            vpnStatus: function () { return '{"nodeId":null}'; },
+            vpnUp: function (id, input) {
+                window.webkit.messageHandlers.polarisMobile.postMessage({ kind: "vpnUp", id: String(id), input: String(input) });
+            },
+            vpnDown: function (id) {
+                window.webkit.messageHandlers.polarisMobile.postMessage({ kind: "vpnDown", id: String(id) });
+            }
         });
         """
         config.userContentController.addUserScript(
@@ -246,7 +258,19 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         if let body = message.body as? [String: Any], let raw = body["openExternal"] as? String,
            let url = Self.externalURL(raw) {
             UIApplication.shared.open(url)
+            return
         }
+        guard let body = message.body as? [String: Any], let kind = body["kind"] as? String,
+              let id = body["id"] as? String, id.count <= 40,
+              id.unicodeScalars.allSatisfy({ CharacterSet.alphanumerics.contains($0) || $0 == "-" }) else { return }
+        if kind == "vpnDown" { return vpnAnswer(id, "") }
+        guard kind == "vpnUp", let input = (body["input"] as? String)?.data(using: .utf8), input.count <= 16 * 1024,
+              let connection = try? JSONDecoder().decode(VpnHandoff.Connection.self, from: input),
+              let configuration = VpnHandoff.configuration(connection, origin: origin) else {
+            return vpnAnswer(id, "failed")
+        }
+        // No tunnel of its own yet (see VpnHandoff): the WireGuard app takes it from the share sheet.
+        VpnHandoff.share(configuration, from: self) { [weak self] in self?.vpnAnswer(id, "handedOff") }
     }
 
     /// The address as a web or mail link, or nil for any other scheme, which would launch whatever app claims it.
@@ -257,6 +281,18 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         case "mailto": return url
         default: return nil
         }
+    }
+
+    /// How one VPN request of the page's ended: "" when it worked, else a code the page puts in words.
+    private func vpnAnswer(_ id: String, _ error: String) {
+        let call = "window.__polarisMobileVpn && window.__polarisMobileVpn(\(Self.jsString(id)), \(Self.jsString(error)))"
+        web.evaluateJavaScript(call, completionHandler: nil)
+    }
+
+    /// A string as a JavaScript literal.
+    private static func jsString(_ value: String) -> String {
+        guard let data = try? JSONEncoder().encode([value]), let array = String(data: data, encoding: .utf8) else { return "\"\"" }
+        return String(array.dropFirst().dropLast())
     }
 }
 

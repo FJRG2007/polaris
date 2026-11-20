@@ -131,4 +131,18 @@
     <string name="vault_saved">Guardado en Polaris Vault.</string>
     <string name="vault_save_conflict">Ese inicio de sesión cambió antes en otro sitio. Sincroniza y guárdalo de nuevo.</string>
     <string name="vault_save_failed">No se pudo guardar en Polaris Vault. Tu servidor no lo aceptó.</string>
+    <string name="vpn_tile">VPN de Polaris</string>
+    <string name="vpn_on">Conectada</string>
+    <string name="vpn_off">Apagada</string>
+    <string name="vpn_working">Conectando</string>
+    <string name="vpn_error_denied">Permite que Polaris configure la VPN cuando el móvil lo pida.</string>
+    <string name="vpn_error_no_answer">Esa ubicación no responde. Prueba otra.</string>
+    <string name="vpn_error_unreachable">No se puede llegar a esa ubicación ahora. Comprueba que el móvil tiene conexión o prueba otra.</string>
+    <string name="vpn_error_sign_in">Inicia sesión en Polaris para conectar.</string>
+    <string name="vpn_error_no_place">Elige antes una ubicación en Polaris.</string>
+    <string name="vpn_error_no_access">Tu cuenta ya no puede usar la VPN.</string>
+    <string name="vpn_error_device_limit">Has usado todos tus dispositivos de VPN. Quita uno en Polaris.</string>
+    <string name="vpn_error_node_full">Esa ubicación está llena. Prueba otra.</string>
+    <string name="vpn_error_node_gone">Esa ubicación ya no está disponible. Elige otra en Polaris.</string>
+    <string name="vpn_error_failed">No se pudo iniciar la VPN. Inténtalo de nuevo.</string>
 </resources>

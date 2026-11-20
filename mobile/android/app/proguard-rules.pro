@@ -4,3 +4,5 @@
 -keepclassmembers class app.polaris.mobile.PageBridge {
     @android.webkit.JavascriptInterface <methods>;
 }
+# The WireGuard tunnel library: its Go half calls back into these classes by name over JNI.
+-keep class com.wireguard.android.backend.** { *; }

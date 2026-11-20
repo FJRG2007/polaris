@@ -6,6 +6,8 @@
  * Client-only.
  */
 
+import type { DesktopOutcome, DesktopVpnStatus, PolarisDesktop } from "@/lib/desktop-bridge";
+
 interface PolarisMobileBridge {
     platform?(): string;
     version?(): string;
@@ -15,7 +17,18 @@ interface PolarisMobileBridge {
     openViewOnce?(attachmentId: string): void;
     /** Hand a web or mail address to the phone's browser or mail app. */
     openExternal?(url: string): void;
+    /** The VPN, run by the app itself. Absent from an app older than the feature. */
+    canVpn?(): boolean;
+    vpnDeviceName?(): string;
+    vpnKey?(): string;
+    /** Answers later, through `window.__polarisMobileVpn(id, error)`. */
+    vpnUp?(id: string, input: string): void;
+    vpnDown?(id: string): void;
+    vpnStatus?(): string;
 }
+
+/** The VPN the same shape the desktop app gives it, so the VPN page has one way to connect. */
+export type PhoneVpn = NonNullable<PolarisDesktop["vpn"]>;
 
 function bridge(): PolarisMobileBridge | null {
     if (typeof window === "undefined") return null;
@@ -68,4 +81,77 @@ export function lastPickSource(): "camera" | "gallery" | null {
     } catch {
         return null;
     }
+}
+
+/** How long a connect may take before the page stops waiting: the app waits up to 12 s for the server. */
+const VPN_WAIT_MS = 60_000;
+const VPN_EVENT = "polaris-mobile-vpn";
+
+type VpnWindow = Window & { __polarisMobileVpn?: (id: string, error: string) => void };
+
+const waiting = new Map<string, (outcome: DesktopOutcome) => void>();
+let requests = 0;
+
+function vpnRequest(send: (id: string) => void): Promise<DesktopOutcome> {
+    const target = window as VpnWindow;
+    target.__polarisMobileVpn ??= (id, error) => {
+        const resolve = waiting.get(id);
+        waiting.delete(id);
+        resolve?.(error ? { ok: false, error } : { ok: true });
+    };
+    requests += 1;
+    const id = `vpn-${requests}-${Date.now().toString(36)}`;
+    return new Promise((resolve) => {
+        const timer = window.setTimeout(() => {
+            waiting.delete(id);
+            resolve({ ok: false, error: "failed" });
+        }, VPN_WAIT_MS);
+        waiting.set(id, (outcome) => {
+            window.clearTimeout(timer);
+            resolve(outcome);
+        });
+        try {
+            send(id);
+        } catch {
+            waiting.delete(id);
+            window.clearTimeout(timer);
+            resolve({ ok: false, error: "failed" });
+        }
+    });
+}
+
+function vpnStatus(found: PolarisMobileBridge): DesktopVpnStatus {
+    try {
+        const parsed = JSON.parse(found.vpnStatus?.() ?? "{}") as { nodeId?: unknown };
+        return { nodeId: typeof parsed.nodeId === "string" ? parsed.nodeId : null };
+    } catch {
+        return { nodeId: null };
+    }
+}
+
+/** This phone's VPN, or null in a browser and in an app too old to run one. */
+export function phoneVpn(): PhoneVpn | null {
+    const found = bridge();
+    try {
+        if (!found?.canVpn?.() || !found.vpnUp || !found.vpnDown || !found.vpnKey) return null;
+    } catch {
+        return null;
+    }
+    const app = found as Required<PolarisMobileBridge>;
+    return {
+        deviceName: async () => app.vpnDeviceName(),
+        key: async () => app.vpnKey() || null,
+        up: (input) => vpnRequest((id) => app.vpnUp(id, JSON.stringify(input))),
+        down: () => vpnRequest((id) => app.vpnDown(id)),
+        status: async () => vpnStatus(app),
+        // Private networks are joined from a computer.
+        joinNetwork: async () => ({ ok: false, error: "unsupported" })
+    };
+}
+
+/** Calls `listener` whenever the phone's tunnel goes up or down, the Quick Settings tile included. */
+export function onPhoneVpnChange(listener: () => void): () => void {
+    if (typeof window === "undefined") return () => undefined;
+    window.addEventListener(VPN_EVENT, listener);
+    return () => window.removeEventListener(VPN_EVENT, listener);
 }
