@@ -94,11 +94,7 @@ fn relay_links_nest_without_fragmenting() {
         .map(|u| u.listen_port)
         .collect();
     assert_eq!(wires, [SIDE_WIRE_PORT, CALL_WIRE_PORT]);
-    let home_wires: Vec<u16> = web_home
-        .udp_proxies
-        .iter()
-        .map(|u| u.bind.port())
-        .collect();
+    let home_wires: Vec<u16> = web_home.udp_proxies.iter().map(|u| u.bind.port()).collect();
     assert_eq!(home_wires, [SIDE_WIRE_PORT, CALL_WIRE_PORT]);
     // ... to the relay end's tunnel address, inside the web link.
     assert_eq!(
