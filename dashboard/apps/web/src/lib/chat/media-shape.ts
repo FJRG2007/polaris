@@ -112,6 +112,23 @@ export function readMediaShapes(raw: unknown): (MediaShape | null)[] {
     });
 }
 
+/**
+ * Put the shapes a message named on its files, by position over the first
+ * `named` of them. Never believed for anything that is not a picture or a
+ * video, whatever the browser said.
+ */
+export function withMediaShapes<T extends { readonly contentType: string }>(
+    files: readonly T[],
+    shapes: readonly (MediaShape | null)[],
+    named: number
+): T[] {
+    return files.map((file, position) => {
+        const shape = shapes[position];
+        if (!shape || position >= named || !/^(image|video)\//.test(file.contentType)) return file;
+        return { ...file, width: shape.width, height: shape.height, thumbhash: shape.thumbhash };
+    });
+}
+
 /** The shape in the form the message field carries it. */
 export function writeMediaShape(shape: MediaShape | null): z.input<typeof mediaShapeSchema> | null {
     if (!shape) return null;

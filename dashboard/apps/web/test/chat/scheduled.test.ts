@@ -42,6 +42,9 @@ interface Row {
         waveform: string | null;
         spoiler?: boolean;
         borrowed?: boolean;
+        width?: number | null;
+        height?: number | null;
+        thumbhash?: string | null;
     }[];
 }
 
@@ -49,7 +52,12 @@ let rows: Row[] = [];
 /** What the sending pass asked the database for, to hold it to the schema. */
 let lastSelect: Record<string, unknown> | undefined;
 /** What `send` did, and what it was told to refuse. */
-let sent: { channelId: string; body: string; attachments: number }[] = [];
+let sent: {
+    channelId: string;
+    body: string;
+    attachments: number;
+    files: readonly Record<string, unknown>[];
+}[] = [];
 let refuse: string | null = null;
 /** Who may post where, as the access layer answers it. */
 let postable = true;
@@ -81,7 +89,8 @@ vi.mock("@/lib/chat/messages", () => ({
         sent.push({
             channelId: input.channelId,
             body: input.body,
-            attachments: attachments.length
+            attachments: attachments.length,
+            files: attachments as readonly Record<string, unknown>[]
         });
         return "m1";
     }
@@ -263,7 +272,7 @@ describe("the hour coming round", () => {
 
         const result = await sweepDueScheduledMessages();
         expect(result).toEqual({ sent: 1, failed: 0 });
-        expect(sent).toEqual([{ channelId: "c1", body: "later", attachments: 0 }]);
+        expect(sent).toEqual([{ channelId: "c1", body: "later", attachments: 0, files: [] }]);
         // The row is gone rather than marked, which is what makes a second pass
         // over the same message impossible.
         expect(rows.map((row) => row.body)).toEqual(["much later"]);
@@ -315,6 +324,26 @@ describe("files a Drive share or a spoiler carried", () => {
             [{ ...file("chat/c1/one.webm"), spoiler: true, borrowed: true }]
         );
         expect(rows[0]?.files[0]).toMatchObject({ spoiler: true, borrowed: true });
+    });
+
+    it("keeps each picture's size and blur from the hour it was written to the hour it goes", async () => {
+        const shape = { width: 4032, height: 3024, thumbhash: "1QcSHQRnh493V4dIh4eXh1h4kJUI" };
+        await scheduleMessage(
+            ME,
+            { channelId: "c1", body: "", forwarded: false, sendAt: IN_AN_HOUR() },
+            [{ ...file("chat/c1/one.jpg"), contentType: "image/jpeg", ...shape }, file("chat/c1/two.webm")]
+        );
+        expect(rows[0]?.files[0]).toMatchObject(shape);
+        // A file nobody measured is kept as one: null, never a made-up size.
+        expect(rows[0]?.files[1]).toMatchObject({ width: null, height: null, thumbhash: null });
+
+        rows[0]!.sendAt = new Date(Date.now() - 1000);
+        await sweepDueScheduledMessages();
+        expect(sent[0]?.files[0]).toMatchObject(shape);
+        expect(sent[0]?.files[1]).toMatchObject({ width: null, height: null, thumbhash: null });
+        expect(lastSelect?.files).toMatchObject({
+            select: { width: true, height: true, thumbhash: true }
+        });
     });
 
     it("never deletes a borrowed Drive file when the message is taken back", async () => {

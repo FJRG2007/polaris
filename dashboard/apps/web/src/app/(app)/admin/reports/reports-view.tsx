@@ -28,6 +28,7 @@ import type { ChatReportView } from "@/lib/chat/reports";
 import { useDisplayFormat } from "@/components/display-format";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
 import type { ChatReportFileView } from "@/lib/chat/report-files";
+import { placeholderUrl } from "@/lib/chat/media-shape";
 import { Badge, Button, Card, CardBody, Select } from "@polaris/ui";
 import { Check, Download, MessageSquare, Paperclip, Trash2 } from "lucide-react";
 
@@ -214,7 +215,19 @@ function ReportFiles({
                         <img
                             src={href(file)}
                             alt={file.name}
-                            className="max-h-72 w-auto max-w-full rounded-md border border-border object-contain"
+                            // Its own size and blur where they were measured, so
+                            // the card does not jump when the picture lands.
+                            width={file.width ?? undefined}
+                            height={file.height ?? undefined}
+                            style={
+                                file.thumbhash
+                                    ? {
+                                          backgroundImage: `url(${placeholderUrl(file.thumbhash)})`,
+                                          backgroundSize: "cover"
+                                      }
+                                    : undefined
+                            }
+                            className="h-auto max-h-72 w-auto max-w-full rounded-md border border-border object-contain"
                         />
                     ) : file.contentType.startsWith("video/") ? (
                         <video

@@ -11197,6 +11197,11 @@ model ChatReportFile {
     // same player the conversation does rather than a link.
     durationMs   Int?
     waveform     String?
+    // The pixel size and ThumbHash the attachment carried, so the report draws a
+    // picture at its own size, blurred, before it loads - see `lib/chat/media-shape`.
+    width        Int?
+    height       Int?
+    thumbhash    String?
     // Whether the bytes now belong to the report. False means they are still the
     // message's, and deleting the message is what changes it.
     held         Boolean @default(false)
@@ -11616,6 +11621,11 @@ model ChatScheduledFile {
     // Somebody's own Drive file, shared rather than copied: sent the same way,
     // and never deleted when the message is cancelled - it was never ours.
     borrowed     Boolean  @default(false)
+    // The pixel size and ThumbHash the sending browser measured, carried across
+    // so a scheduled picture arrives at its final size like one sent now.
+    width        Int?
+    height       Int?
+    thumbhash    String?
     createdAt    DateTime @default(now())
 
     scheduled ChatScheduledMessage @relation(fields: [scheduledId], references: [id], onDelete: Cascade)

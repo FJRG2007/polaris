@@ -132,6 +132,8 @@ describe("the work Polaris runs on a schedule", () => {
             // Two passes would delete the same expired rows and race each other
             // on the ones the other already took.
             "chat-disappearing",
+            // Two passes would read the same pictures off the storage twice.
+            "chat-media-shapes",
             // Two passes would each fire the same reminder; each row is also
             // claimed before it fires.
             "chat-reminders",

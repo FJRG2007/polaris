@@ -115,7 +115,12 @@ export async function scheduleMessage(
                     // a covered file arrived uncovered and a Drive file arrived
                     // as a copy the cancel path would delete.
                     spoiler: file.spoiler,
-                    borrowed: file.borrowed
+                    borrowed: file.borrowed,
+                    // Kept so it arrives at its final size, the way one sent
+                    // now does - see `lib/chat/media-shape`.
+                    width: file.width ?? null,
+                    height: file.height ?? null,
+                    thumbhash: file.thumbhash ?? null
                 }))
             }
         },
@@ -236,7 +241,10 @@ const rowForSending = {
             posterPath: true,
             posterConnectionId: true,
             spoiler: true,
-            borrowed: true
+            borrowed: true,
+            width: true,
+            height: true,
+            thumbhash: true
         }
     }
 } as const;
@@ -261,6 +269,9 @@ interface SendableRow {
         posterConnectionId: string | null;
         spoiler: boolean;
         borrowed: boolean;
+        width: number | null;
+        height: number | null;
+        thumbhash: string | null;
     }[];
 }
 
@@ -285,7 +296,10 @@ async function deliver(row: SendableRow): Promise<void> {
         durationMs: file.durationMs,
         waveform: file.waveform,
         posterPath: file.posterPath,
-        posterConnectionId: file.posterConnectionId
+        posterConnectionId: file.posterConnectionId,
+        width: file.width,
+        height: file.height,
+        thumbhash: file.thumbhash
     }));
 
     await send(

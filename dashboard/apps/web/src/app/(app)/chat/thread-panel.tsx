@@ -22,6 +22,9 @@ import { Composer } from "./composer";
 import { useChat } from "./chat-context";
 import { threadDraftKey } from "./drafts";
 import { MessageList } from "./message-list";
+import { OutgoingBubbles } from "./outgoing-bubbles";
+import { useOutgoing } from "./outgoing";
+import { notUploadedSaid, sendWithFiles } from "./send-with-files";
 import { useMessageDelete } from "./delete-message";
 import { useDropExpired } from "./vanish-controls";
 import { runAction } from "@/lib/run-action";
@@ -89,6 +92,7 @@ export function ThreadPanel({
     const { drawn, ceiling, measure, resize, reset } = useChatPane("thread", THREAD_PANE);
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
     const [error, setError] = useState("");
+    const outgoing = useOutgoing(threadDraftKey(root.id));
     /** Somebody to drop into the reply being written. The thread has its own box,
      *  so a name mentioned in here belongs in this one rather than in the
      *  channel's - see the composer's `insert`. */
@@ -227,6 +231,9 @@ export function ThreadPanel({
                             onDelete={deleteMessage}
                         />
                     )}
+                    {/* Replies with files on their way from this thread's box,
+                        under the replies - the scope the box keeps them under. */}
+                    <OutgoingBubbles outgoing={outgoing} />
                 </div>
 
                 {deleteDialog}
@@ -239,6 +246,7 @@ export function ThreadPanel({
                 <Composer
                     channelId={root.channelId}
                     emoji={composerEmoji}
+                    outgoingInConversation
                     onTyping={(kind) => void actions.typingAction(root.channelId, kind)}
                     // Its own, under the message it answers: a half-written reply
                     // to a thread belongs to that thread and not to the channel it
@@ -273,33 +281,33 @@ export function ThreadPanel({
                         await load();
                         onChanged();
                     }}
-                    onSend={async (body, files, _sounds, _spoilers, _kept, _report, sent) => {
-                        if (files.length > 0) {
-                            // A reply with files takes the same route a message does,
-                            // with the thread named on it.
-                            const form = new FormData();
-                            form.set("body", body);
-                            form.set("parentId", root.id);
-                            if (sent) form.set("translation", JSON.stringify(sent));
-                            for (const file of files) form.append("files", file);
-                            const response = await fetch(
-                                `/api/chat/channels/${root.channelId}/messages`,
-                                { method: "POST", body: form }
-                            ).catch(() => null);
-                            if (!response?.ok) {
-                                // Kept in the composer with this on it and a
-                                // retry, rather than a line up here and the
-                                // files gone.
-                                const answer: unknown = await response?.json().catch(() => null);
-                                return {
-                                    error:
-                                        typeof answer === "object" &&
-                                        answer !== null &&
-                                        "error" in answer
-                                            ? String((answer as { error: unknown }).error)
-                                            : t("errors.notSent")
-                                };
-                            }
+                    onSend={async (body, files, sounds, spoilers, kept, report, sent, viewOnce, track) => {
+                        if (files.length > 0 || (kept?.length ?? 0) > 0) {
+                            // A reply with files takes the same route a message
+                            // does, each file on its own with a ring on it, and
+                            // the thread named on it. A refusal is kept in the
+                            // composer with a retry, rather than the files gone.
+                            const answered = await sendWithFiles({
+                                channelId: root.channelId,
+                                body,
+                                files,
+                                sounds,
+                                spoilers,
+                                fromDrive: kept,
+                                viewOnce,
+                                translation: sent,
+                                report,
+                                track,
+                                fields: { parentId: root.id },
+                                notUploaded: (failed, name) =>
+                                    notUploadedSaid(failed, {
+                                        noAnswer: t("channelView.fileNoAnswer", { name }),
+                                        dropped: t("channelView.fileDropped", { name }),
+                                        notSent: t("channelView.fileNotSent", { name })
+                                    }),
+                                notSent: t("errors.notSent")
+                            });
+                            if (answered !== "sent") return answered;
                         } else {
                             await runAction(
                                 () =>

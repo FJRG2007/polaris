@@ -28,6 +28,7 @@ import * as core from "@polaris/core";
 
 import { rulesForChannel } from "@/lib/chat/rules";
 import { scheduleMessage } from "@/lib/chat/scheduled";
+import { readMediaShapes, withMediaShapes } from "@/lib/chat/media-shape";
 import { ChatAccessError, requirePostable } from "@/lib/chat/access";
 import {
     AttachmentStorageError,
@@ -255,6 +256,11 @@ export async function POST(
             );
         }
 
+        // The size and blur each picture or video was measured at, kept so the
+        // message arrives at its final size when the hour comes - see
+        // `readMediaShapes`, which drops a shape that does not check out.
+        const shaped = withMediaShapes(stored, readMediaShapes(form.get("media")), carrying);
+
         const id = await scheduleMessage(
             { id: user.id },
             {
@@ -265,7 +271,7 @@ export async function POST(
                 forwarded: false,
                 sendAt: fields.data.sendAt
             },
-            stored
+            shaped
         );
         return Response.json({ id });
     } catch (caught) {

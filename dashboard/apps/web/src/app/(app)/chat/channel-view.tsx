@@ -22,7 +22,7 @@
  */
 
 import { useAppCommands } from "./use-app-commands";
-import { viewOnceText, type ViewOnceChoice } from "@/lib/chat/view-once-choice";
+import type { ViewOnceChoice } from "@/lib/chat/view-once-choice";
 import * as actions from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { spokenWait } from "@/lib/chat/durations";
@@ -69,8 +69,9 @@ import { MAX_REREAD } from "@/lib/chat/reread-limit";
 import { applyChanged, changedTargets, inBatches } from "./message-changes";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { sendFile, type Sent } from "@/components/transfers/move-file";
-import { withoutFiles, type SendOutcome, type SendProgress, type SendTrack } from "./outgoing";
+import type { SendOutcome, SendProgress, SendTrack } from "./outgoing";
 import { measureMedia } from "./media-measure";
+import { discardUpload, notUploadedSaid, sendWithFiles } from "./send-with-files";
 import { useOutgoing } from "./outgoing";
 import { OutgoingBubbles } from "./outgoing-bubbles";
 import { writeMediaShape } from "@/lib/chat/media-shape";
@@ -208,34 +209,6 @@ function readingOlder(element: HTMLElement): boolean {
 /** How long a freshly opened conversation keeps putting itself at the bottom
  *  while everything late finishes arriving. */
 const SETTLE_MS = 1200;
-
-/**
- * What the server said about a file it would not take.
- *
- * The upload route answers with a sentence for the sender - "that is bigger than
- * 200 MB", "files cannot be sent here" - and it is the only thing worth showing:
- * the alternative is "that could not be sent" over a refusal that said exactly
- * what to do about it.
- */
-function refusal(body: string): string | null {
-    if (!body) return null;
-    try {
-        const parsed: unknown = JSON.parse(body);
-        const said = (parsed as { error?: unknown }).error;
-        return typeof said === "string" && said ? said : null;
-    } catch {
-        return null;
-    }
-}
-
-/** Take a staged file back off the storage, for a send that failed after some of
- *  its files had already gone up. Best effort: the sweep is behind it. */
-async function discardUpload(channelId: string, id: string): Promise<void> {
-    if (!id) return;
-    await fetch(`/api/chat/channels/${channelId}/uploads?id=${encodeURIComponent(id)}`, {
-        method: "DELETE"
-    }).catch(() => undefined);
-}
 
 export function ChannelView({
     channelId,
@@ -1708,6 +1681,13 @@ export function ChannelView({
             // on the storage before the hour comes, and streaming them is what lets
             // somebody schedule a recording rather than a screenshot.
             const uploaded: string[] = [];
+            // The still and the shape of each picture or video, worked out while
+            // the bytes go, so the message arrives at its final size when the
+            // hour comes, exactly as one sent now does.
+            const stills = files.map((file) => posterFor(file).catch(() => null));
+            const shapes = files.map((file, at) =>
+                stills[at]!.then((still) => measureMedia(file, still)).catch(() => null)
+            );
             for (const file of files) {
                 const query = new URLSearchParams({ name: file.name });
                 const sent = await sendFile(
@@ -1727,8 +1707,10 @@ export function ChannelView({
             form.set("sendAt", sendAt);
             if (answering) form.set("replyToId", answering);
             form.set("uploads", JSON.stringify(uploaded));
-            for (const file of files) {
-                const still = await posterFor(file).catch(() => null);
+            const measured = await Promise.all(shapes);
+            if (measured.some(Boolean)) form.set("media", JSON.stringify(measured.map(writeMediaShape)));
+            for (const pending of stills) {
+                const still = await pending;
                 form.append("posters", still ?? new Blob([], { type: "image/jpeg" }));
             }
             const response = await fetch(`/api/chat/channels/${channelId}/scheduled`, {
@@ -1793,13 +1775,12 @@ export function ChannelView({
      * limit, the rule - and otherwise what this tab saw happen: the connection
      * dropped, or every byte went and no answer ever came back.
      */
-    const notUploaded = (sent: Sent, name: string): string => {
-        const said = refusal(sent.body);
-        if (said) return said;
-        if (sent.problem === "noAnswer") return t("channelView.fileNoAnswer", { name });
-        if (sent.problem === "dropped") return t("channelView.fileDropped", { name });
-        return t("channelView.fileNotSent", { name });
-    };
+    const notUploaded = (sent: Sent, name: string): string =>
+        notUploadedSaid(sent, {
+            noAnswer: t("channelView.fileNoAnswer", { name }),
+            dropped: t("channelView.fileDropped", { name }),
+            notSent: t("channelView.fileNotSent", { name })
+        });
 
     const send = async (
         body: string,
@@ -1815,171 +1796,24 @@ export function ChannelView({
         if (files.length > 0 || fromDrive.length > 0) {
             following.current = true;
 
-            // The files go first, one request each, streamed straight to the
-            // storage with a bar on screen for each - see
-            // `components/transfers`. The message that follows names what was
-            // written rather than carrying it, which is what lets a file be
-            // measured in gigabytes instead of in what one request may hold.
-            // What an earlier try already put on the server, by file index.
-            const staged: (string | null)[] = files.map((_, at) => track?.staged[at] ?? null);
-            // A message sent to be seen once is a few kilobytes of text and rides
-            // the message itself, where the server reads it before keeping it.
-            const inForm =
-                files.length === 1 && viewOnce.length === 1 && viewOnceText(files[0]!.type) ? files[0]! : null;
-            // The still and the shape of each picture or video are worked out
-            // while the bytes go, not before: nothing waits on them.
-            const stills = files.map((file) => posterFor(file).catch(() => null));
-            const shapes = files.map((file, at) =>
-                stills[at]!.then((still) => measureMedia(file, still)).catch(() => null)
-            );
-            let failure: { sent: Sent; name: string } | null = null;
-            // The files the sender tapped the ring of while they were going.
-            const stopped = new Set<number>();
-            const upload = async (at: number): Promise<void> => {
-                const file = files[at]!;
-                if (staged[at]) return;
-                const query = new URLSearchParams({ name: file.name });
-                // Covered is chosen before the upload, because that is when the
-                // sender marked it.
-                if (spoilers.includes(at)) query.set("spoiler", "1");
-                const signal = track?.signal(at);
-                track?.onFile(at, { phase: "sending", fraction: 0 });
-                const sent = await sendFile(
-                    `/api/chat/channels/${channelId}/uploads?${query.toString()}`,
-                    file,
-                    {
-                        // The ring on the picture in the conversation is where
-                        // this one's progress is - see `OutgoingBubbles`.
-                        listed: !track,
-                        signal,
-                        onProgress: (moved, total) => {
-                            report?.({ file: at, files: files.length, moved, total });
-                            track?.onFile(at, {
-                                phase: total > 0 && moved >= total ? "processing" : "sending",
-                                fraction: total > 0 ? Math.min(1, moved / total) : 0
-                            });
-                        }
-                    }
-                );
-                if (!sent.ok && signal?.aborted) {
-                    stopped.add(at);
-                    track?.onFile(at, { phase: "cancelled", fraction: 0 });
-                    return;
-                }
-                if (!sent.ok) {
-                    failure ??= { sent, name: file.name };
-                    track?.onFile(at, { phase: "failed", fraction: 0 });
-                    return;
-                }
-                const answer: unknown = JSON.parse(sent.body || "{}");
-                const id = String((answer as { id?: unknown }).id ?? "");
-                staged[at] = id;
-                track?.onStaged(at, id);
-                track?.onFile(at, { phase: "sent", fraction: 1 });
-            };
-            const going = inForm ? [] : files.map((_, at) => at);
-            if (track) {
-                // Each file on its own, three at a time, the way an album goes:
-                // one slow picture does not hold up the rest, and one that fails
-                // is retried alone.
-                let next = 0;
-                await Promise.all(
-                    Array.from({ length: Math.min(3, going.length) }, async () => {
-                        while (next < going.length) await upload(going[next++]!);
-                    })
-                );
-            } else {
-                for (const at of going) {
-                    await upload(at);
-                    if (failure) break;
-                }
-            }
-            const failed = failure as { sent: Sent; name: string } | null;
-            if (failed) {
-                // With a ring on each file, the ones that went up wait on the
-                // server and a retry sends only what is missing. Without, nothing
-                // is left behind: the files that did go up are taken off the
-                // storage rather than waiting for the sweep. Either way the
-                // message is not sent without them.
-                if (!track) {
-                    await Promise.all(
-                        staged.flatMap((id) => (id ? [discardUpload(channelId, id)] : []))
-                    );
-                }
-                return { error: notUploaded(failed.sent, failed.name), keepStaged: Boolean(track) };
-            }
-            // Every file was stopped and there is nothing else to carry them.
-            if (stopped.size > 0 && stopped.size === files.length && fromDrive.length === 0) {
-                return { cancelled: true };
-            }
-            const left = withoutFiles(
-                { files, hidden: spoilers, sounds, viewOnce, staged },
-                stopped
-            );
-            const uploaded = inForm ? [] : (left.staged ?? []).filter((id): id is string => Boolean(id));
-            const keptShapes = await Promise.all(shapes.filter((_, at) => !stopped.has(at)));
-            const keptStills = stills.filter((_, at) => !stopped.has(at));
-
-            const form = new FormData();
-            form.set("body", body);
-            if (replyingTo) form.set("replyToId", replyingTo.id);
-            if (translation) form.set("translation", JSON.stringify(translation));
-            // Which of them arrive covered, by position. Sent only when there
-            // are any, which is nearly never - an empty field on every message
-            // in Polaris to say "none" is a field nobody needed.
-            if (left.hidden.length > 0) form.set("spoilers", left.hidden.join(","));
-            if ((left.viewOnce ?? []).length > 0) form.set("viewOnce", JSON.stringify(left.viewOnce));
-            if (uploaded.length > 0) form.set("uploads", JSON.stringify(uploaded));
-            if (inForm) form.append("files", inForm);
-            // The size and blur of each picture and video, in file order, for
-            // every reader to draw it at its final size before it arrives.
-            if (keptShapes.some(Boolean)) {
-                form.set("media", JSON.stringify(keptShapes.map(writeMediaShape)));
-            }
-            // A still per video, in the same order as the files that were just
-            // uploaded, with an empty one standing in for everything that is not
-            // a video - so the two lists line up on the other side without
-            // either of them carrying an index. It rides the message because it
-            // is kilobytes. Taken here rather than on the server: the bytes are
-            // already in this browser, and the alternative is a transcoder on
-            // the machine Polaris runs on.
-            for (const pending of keptStills) {
-                const still = await pending;
-                form.append("posters", still ?? new Blob([], { type: "image/jpeg" }));
-            }
-            // How long each recording is and what it looks like, measured while
-            // it was made. Sent as one field in file order rather than one per
-            // file, so a message with no recording in it sends nothing.
-            if ((left.sounds ?? []).length > 0) form.set("sounds", JSON.stringify(left.sounds));
-            // The files that are staying where they are: where to find each one
-            // and nothing else. What happens to them - copied into the
-            // conversation or pointed at - is the instance's setting, answered on
-            // the other side. Nothing about them is read in this browser, which
-            // is the whole point: a file in Drive is not downloaded here so it
-            // can be uploaded back.
-            if (fromDrive.length > 0) {
-                form.set(
-                    "borrowed",
-                    JSON.stringify(fromDrive.map((one) => ({ c: one.connectionId, p: one.path })))
-                );
-            }
-            setReplyingTo(null);
-            const response = await fetch(`/api/chat/channels/${channelId}/messages`, {
-                method: "POST",
-                body: form
-            }).catch(() => null);
-            if (!response?.ok) {
-                const answer: unknown = await response?.json().catch(() => null);
-                // The files that went up are this message's; a retry stages them
-                // again, so these would only wait for the sweep.
-                await Promise.all(uploaded.map((id) => discardUpload(channelId, id)));
-                return {
-                    error:
-                        typeof answer === "object" && answer !== null && "error" in answer
-                            ? String((answer as { error: unknown }).error)
-                            : t("errors.notSent")
-                };
-            }
+            // The files go first and the message names them - see `sendWithFiles`.
+            const answered = await sendWithFiles({
+                channelId,
+                body,
+                files,
+                sounds,
+                spoilers,
+                fromDrive,
+                viewOnce,
+                translation,
+                report,
+                track,
+                fields: replyingTo ? { replyToId: replyingTo.id } : {},
+                notUploaded,
+                notSent: t("errors.notSent"),
+                beforePost: () => setReplyingTo(null)
+            });
+            if (answered !== "sent") return answered;
             await load();
             refresh();
             return;

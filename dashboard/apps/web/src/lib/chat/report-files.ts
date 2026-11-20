@@ -38,6 +38,10 @@ export interface ChatReportFileView {
      *  does rather than a link with no length on it. */
     readonly durationMs: number | null;
     readonly waveform: string | null;
+    /** The picture's own size and blur, or null where nothing was measured. */
+    readonly width: number | null;
+    readonly height: number | null;
+    readonly thumbhash: string | null;
     /** Whether the bytes now belong to the report, which is to say whether the
      *  message has been deleted since. Drawn, because "this is the copy that was
      *  kept" is a different claim from "this is the live file". */
@@ -62,7 +66,10 @@ export async function copyOntoReport(reportId: string, messageId: string): Promi
             connectionId: true,
             path: true,
             durationMs: true,
-            waveform: true
+            waveform: true,
+            width: true,
+            height: true,
+            thumbhash: true
         },
         orderBy: { createdAt: "asc" }
     });
@@ -85,7 +92,10 @@ export async function copyOntoReport(reportId: string, messageId: string): Promi
                 connectionId: file.connectionId,
                 path: file.path,
                 durationMs: file.durationMs,
-                waveform: file.waveform
+                waveform: file.waveform,
+                width: file.width,
+                height: file.height,
+                thumbhash: file.thumbhash
             }))
         });
     }
@@ -168,6 +178,9 @@ export async function reportFiles(reportIds: readonly string[]): Promise<
             contentType: true,
             durationMs: true,
             waveform: true,
+            width: true,
+            height: true,
+            thumbhash: true,
             held: true
         }
     });
@@ -184,6 +197,10 @@ export async function reportFiles(reportIds: readonly string[]): Promise<
             contentType: row.contentType,
             durationMs: row.durationMs,
             waveform: row.waveform,
+            // Zero is what the backfill writes for a picture it could not read.
+            width: row.width || null,
+            height: row.height || null,
+            thumbhash: row.thumbhash,
             held: row.held
         };
         byReport.set(row.reportId, [...(byReport.get(row.reportId) ?? []), view]);

@@ -730,6 +730,18 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         run: sweepDueScheduledMessages
     },
     {
+        key: "chat-media-shapes",
+        // Hourly, a bounded number of pictures a pass: the size and blur of
+        // pictures sent before they were measured, filled in a little at a time
+        // - see `lib/chat/media-backfill`. Nothing waits on it.
+        everyMs: HOUR,
+        // Leased so two runners do not read the same pictures off the storage;
+        // a row is only ever written while it is still unmeasured, so a second
+        // pass is harmless either way.
+        leaseMs: 2 * HOUR,
+        run: async () => (await import("@/lib/chat/media-backfill")).backfillMediaShapes()
+    },
+    {
         key: "chat-reminders",
         // Every minute, for the same reason as the scheduled messages above: a
         // reminder is asked for at a minute, and the soonest one may be set is

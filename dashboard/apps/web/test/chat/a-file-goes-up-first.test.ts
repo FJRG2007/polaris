@@ -22,7 +22,11 @@ import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const VIEW = readFileSync(join(process.cwd(), "src/app/(app)/chat/channel-view.tsx"), "utf8");
+/** The conversation and the sender it hands a message with files to. */
+const VIEW = ["channel-view.tsx", "send-with-files.ts"]
+    .map((name) => readFileSync(join(process.cwd(), "src/app/(app)/chat", name), "utf8"))
+    .join("\n");
+const THREAD = readFileSync(join(process.cwd(), "src/app/(app)/chat/thread-panel.tsx"), "utf8");
 const ROUTE = readFileSync(
     join(process.cwd(), "src/app/api/chat/channels/[channelId]/messages/route.ts"),
     "utf8"
@@ -33,6 +37,15 @@ const UPLOADS = readFileSync(
 );
 
 describe("the composer", () => {
+    it("sends a thread reply's files the same way, each with a ring, drawn under the replies", () => {
+        expect(THREAD).toContain("await sendWithFiles({");
+        expect(THREAD).toContain("fields: { parentId: root.id }");
+        expect(THREAD).not.toContain('form.append("files", file)');
+        expect(THREAD).toContain("<OutgoingBubbles outgoing={outgoing} />");
+        expect(THREAD).toContain("useOutgoing(threadDraftKey(root.id))");
+        expect(THREAD).toMatch(/<Composer[\s\S]*?outgoingInConversation/);
+    });
+
     it("sends each file to the streaming route, through the shared sender", () => {
         expect(VIEW).toMatch(/import \{ sendFile[ ,]/);
         expect(VIEW).toContain("/api/chat/channels/${channelId}/uploads?");
