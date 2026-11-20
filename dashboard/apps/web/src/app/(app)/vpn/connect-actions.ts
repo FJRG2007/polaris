@@ -1,7 +1,8 @@
 "use server";
 
 /** What the VPN's own screen asks for: anybody's devices, and an administrator's nodes
- *  and who may use them. Every limit is decided in the service, never on the screen. */
+ *  and each person's limits. Who has the VPN is `vpn.use`, set under Management >
+ *  Users; every limit is decided in the service, never on the screen. */
 
 import { z } from "zod";
 import { serverOptionsWhere } from "@/lib/server-options";
@@ -145,7 +146,6 @@ export interface NodesAnswer {
     /** Whether one of their servers could still become a node. */
     readonly canAdd: boolean;
     readonly access: Awaited<ReturnType<typeof service.listAccess>>;
-    readonly open: boolean;
     /** Whether the device mesh integration is switched on. */
     readonly mesh: boolean;
 }
@@ -153,7 +153,7 @@ export interface NodesAnswer {
 export async function vpnAdminAction(): Promise<Result<NodesAnswer>> {
     const user = await requireAdmin();
     try {
-        const [nodes, free, access, open, mesh] = await Promise.all([
+        const [nodes, free, access, mesh] = await Promise.all([
             service.listNodes(),
             // Only whether one exists: the dialog reads the servers themselves a
             // page at a time, under the same filters.
@@ -162,14 +162,13 @@ export async function vpnAdminAction(): Promise<Result<NodesAnswer>> {
                 select: { id: true }
             }),
             service.listAccess(),
-            service.openAccess(),
             vpnMeshOn()
         ]);
         const owned = await prisma.host.findMany({
             where: { ownerId: user.id, id: { in: nodes.map(({ hostId }) => hostId) } },
             select: { id: true }
         });
-        return { nodes, access, open, mine: owned.map(({ id }) => id), canAdd: free !== null, mesh };
+        return { nodes, access, mine: owned.map(({ id }) => id), canAdd: free !== null, mesh };
     } catch (error) {
         return failed(error);
     }
@@ -297,29 +296,24 @@ export async function placeVpnNodeAction(input: unknown): Promise<Result> {
     return audited(user.id, "vpn.node.place", id, () => service.placeNodeByHand(id, place));
 }
 
-export async function setVpnOpenAccessAction(input: unknown): Promise<Result> {
-    const user = await requireAdmin();
-    const open = z.boolean().safeParse(input);
-    if (!open.success) return failed(open.error);
-    // Who the private network lets in follows who may use the VPN, so every change
-    // to that rewrites its policy too.
-    return audited(user.id, "vpn.access.open", "instance", () =>
-        service.setOpenAccess(open.data).then(refreshVpnAccessLater)
-    );
-}
-
 const grantSchema = wg.accessInputSchema
     .omit({ userId: true })
     .extend({ email: z.string().trim().toLowerCase().email() });
 
-/** Find somebody by the email they signed up with, and set what they may do. */
+/** Find somebody by the email they signed up with, and set their limits. Only for
+ *  somebody who has the VPN: a limits row grants nothing by itself. */
 export async function grantVpnAccessAction(input: unknown): Promise<Result> {
     const user = await requireAdmin();
     const parsed = grantSchema.safeParse(input);
     if (!parsed.success) return failed(parsed.error);
     const { email, ...access } = parsed.data;
-    const person = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+    const person = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true, isAdmin: true }
+    });
     if (!person) return failed(new service.WireGuardRefusal("noSuchPerson"));
+    if (!person.isAdmin && (await service.vpnPermission(person.id)) !== "allow")
+        return failed(new service.WireGuardRefusal("noVpnPermission"));
     return audited(user.id, "vpn.access.grant", person.id, () =>
         service.grantAccess({ ...access, userId: person.id }).then(refreshVpnAccessLater)
     );

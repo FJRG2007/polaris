@@ -121,7 +121,10 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "vault.use",
         "notes.use",
         "office.use",
-        "vpn.use",
+        // Deliberately not "vpn.use": the VPN is somebody's way into this
+        // network, given person by person under Management > Users, never to
+        // everybody signed in (the VPN's carry takes it off this role on an
+        // install that kept the VPN closed).
         "mail.use",
         "calendar.use",
         "crm.use",

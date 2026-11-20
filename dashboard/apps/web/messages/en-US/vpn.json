@@ -285,6 +285,7 @@
             "nodeNotReady": "That server is still being set up. Try again in a minute.",
             "notFound": "That is no longer here.",
             "noSuchPerson": "Nobody here has that email.",
+            "noVpnPermission": "They do not have the VPN. Give it to them in Management > Users first.",
             "tooManyNodes": "This Polaris has reached its limit of servers.",
             "invalid": "Check the fields and try again."
         },
@@ -402,11 +403,11 @@
         }
     },
     "people": {
-        "title": "People",
-        "hint": "Who may connect, through which servers, and how much.",
-        "add": "Give access",
-        "addBody": "They need an account on this Polaris.",
-        "edit": "Edit access",
+        "title": "Limits per person",
+        "hint": "Servers, devices and data for one person. Who has the VPN is set in Management > Users.",
+        "add": "Set limits",
+        "addBody": "For somebody who already has the VPN.",
+        "edit": "Edit limits",
         "editBody": "Changes reach the servers right away.",
         "email": "Email",
         "deviceLimit": "Devices",
@@ -416,13 +417,14 @@
         "allNodes": "All servers",
         "suspend": "Suspended",
         "suspended": "Suspended",
-        "open": "Open to everyone here",
-        "openHint": "Anyone with an account may connect, with {count} devices. Limits below still apply to the people listed.",
         "gb": "{used} of {count} GB",
         "used": "{used} GB this month",
         "editLabel": "Edit",
-        "remove": "Remove access",
-        "empty": "Nobody has been given access yet. Administrators can always connect."
+        "remove": "Back to defaults",
+        "empty": "Everybody with the VPN gets {count} devices on every server.",
+        "noVpn": "No VPN",
+        "noVpnHint": "These limits apply once they have the VPN in Management > Users.",
+        "manage": "Who has the VPN"
     },
     "mesh": {
         "title": "Device network",

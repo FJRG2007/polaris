@@ -10,7 +10,8 @@ const db = vi.hoisted(() => ({
     } | null,
     accounts: [] as { id: string; bannedAt: Date | null; disabledAt: Date | null }[],
     admins: [] as { id: string; name: string; email: string }[],
-    open: false,
+    /** The role grants each account holds. */
+    roles: [] as { userId: string; grants: string[] }[],
     permissions: [] as { userId: string; permission: string; effect: string }[],
     grants: [] as {
         userId: string;
@@ -23,7 +24,18 @@ const db = vi.hoisted(() => ({
     }[]
 }));
 
-vi.mock("@polaris/auth", () => ({ resolveGlobalStatementsBySource: async () => [] }));
+vi.mock("@polaris/auth", () => ({
+    resolveGlobalStatements: async (userId: string) => [
+        ...db.roles
+            .filter((row) => row.userId === userId)
+            .flatMap((row) => row.grants)
+            .map((key) => ({ effect: "allow", actions: [key], resources: ["*"] })),
+        ...db.permissions
+            .filter((row) => row.userId === userId)
+            .map((row) => ({ effect: row.effect, actions: [row.permission], resources: ["*"] }))
+    ]
+}));
+vi.mock("@/lib/vpn/access-carry", () => ({ ensureVpnAccessCarried: async () => {} }));
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
@@ -36,25 +48,29 @@ vi.mock("@polaris/db", () => ({
                     ? db.admins
                     : db.accounts.filter((account) => where.id?.in.includes(account.id))
         },
+        userRole: {
+            findMany: async ({ where }: { where: { userId: { in: string[] } } }) =>
+                db.roles
+                    .filter((row) => where.userId.in.includes(row.userId))
+                    .map((row) => ({
+                        userId: row.userId,
+                        role: { permissions: JSON.stringify(row.grants) }
+                    }))
+        },
         userPermission: {
             findMany: async ({
                 where
             }: {
-                where: { permission: string; effect?: string; userId?: { in: string[] } };
+                where: { permission: { startsWith: string }; userId: { in: string[] } };
             }) =>
                 db.permissions.filter(
                     (row) =>
-                        row.permission === where.permission &&
-                        (!where.effect || row.effect === where.effect) &&
-                        (!where.userId || where.userId.in.includes(row.userId)) &&
-                        (!where.effect || !db.grants.some((grant) => grant.userId === row.userId))
+                        row.permission.startsWith(where.permission.startsWith) &&
+                        where.userId.in.includes(row.userId)
                 )
         },
         policy: { findMany: async () => [] },
-        setting: {
-            findUnique: async ({ where }: { where: { key: string } }) =>
-                where.key === "vpn.openAccess" && db.open ? { value: "true" } : null
-        },
+        setting: { findUnique: async () => null },
         vpnAccess: {
             findMany: async ({ where }: { where: { userId?: { in: string[] } } }) =>
                 where.userId
@@ -131,10 +147,15 @@ beforeEach(() => {
         { id: DISABLED, bannedAt: null, disabledAt: new Date("2026-10-29T10:00:00Z") }
     ];
     db.admins = [];
-    db.open = false;
+    db.roles = [];
     db.permissions = [];
     db.grants = [];
 });
+
+/** Every account the tailnet knows, each holding `grants` through a role. */
+function everybody(grants: string[]) {
+    return [KEPT, GONE, BANNED, DISABLED].map((userId) => ({ userId, grants }));
+}
 
 function grant(userId: string, suspended: boolean) {
     return {
@@ -195,7 +216,7 @@ describe("bringing the VPN in line with the accounts", () => {
             .mocked(fetch)
             .mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === "PUT");
         const { policy } = JSON.parse(String((put?.[1] as RequestInit).body)) as { policy: string };
-        // Nobody granted and not open to all: the administrators are the whole VPN.
+        // Nobody holds `vpn.use`: the administrators are the whole VPN.
         expect(JSON.parse(policy).groups).toEqual({
             "group:admins": [`${headscaleUserName(KEPT)}@`],
             "group:vpn": [`${headscaleUserName(KEPT)}@`]
@@ -227,16 +248,16 @@ describe("bringing the VPN in line with the accounts", () => {
         error.mockRestore();
     });
 
-    it("lets everybody in when open to all and nobody is held back", async () => {
-        db.open = true;
+    it("lets everybody in when everybody holds vpn.use and nobody is held back", async () => {
+        db.roles = everybody(["vpn.use"]);
         headscale();
         await refreshVpnAccess();
         const policy = await appliedPolicy();
         expect(policy.grants.some((grant) => grant.src.includes("autogroup:member"))).toBe(true);
     });
 
-    it("keeps a suspended grant out even when the VPN is open to all", async () => {
-        db.open = true;
+    it("keeps a suspended limits row out even with vpn.use", async () => {
+        db.roles = everybody(["vpn.use"]);
         db.grants = [grant(BANNED, true)];
         headscale();
         await refreshVpnAccess();
@@ -246,7 +267,7 @@ describe("bringing the VPN in line with the accounts", () => {
         expect(policy.groups["group:vpn"]).not.toContain(`${headscaleUserName(BANNED)}@`);
     });
 
-    it("names an account switched On with no grant of its own while the VPN is closed", async () => {
+    it("names an account switched On under Management > Users", async () => {
         db.permissions = [{ userId: KEPT, permission: "vpn.use", effect: "allow" }];
         headscale();
         await refreshVpnAccess();
@@ -254,8 +275,25 @@ describe("bringing the VPN in line with the accounts", () => {
         expect(policy.groups["group:vpn"]).toEqual([`${headscaleUserName(KEPT)}@`]);
     });
 
-    it("holds back an account switched Off even when the VPN is open to all", async () => {
-        db.open = true;
+    it("names an account whose role holds vpn.use, and nobody for a limits row alone", async () => {
+        db.roles = [{ userId: KEPT, grants: ["vpn.use"] }];
+        db.grants = [grant(GONE, false)];
+        headscale();
+        await refreshVpnAccess();
+        const policy = await appliedPolicy();
+        expect(policy.groups["group:vpn"]).toEqual([`${headscaleUserName(KEPT)}@`]);
+    });
+
+    it("never takes a role holding * for the VPN", async () => {
+        db.roles = [{ userId: KEPT, grants: ["*"] }];
+        headscale();
+        await refreshVpnAccess();
+        const policy = await appliedPolicy();
+        expect(policy.groups["group:vpn"] ?? []).not.toContain(`${headscaleUserName(KEPT)}@`);
+    });
+
+    it("holds back an account switched Off whatever its role says", async () => {
+        db.roles = everybody(["vpn.use"]);
         db.permissions = [{ userId: BANNED, permission: "vpn.use", effect: "deny" }];
         headscale();
         await refreshVpnAccess();
@@ -267,15 +305,17 @@ describe("bringing the VPN in line with the accounts", () => {
 });
 
 describe("who may put a device on the VPN", () => {
-    it("asks somebody's own grant before open access", async () => {
-        db.open = true;
+    it("asks somebody's limits once vpn.use lets them in", async () => {
+        db.roles = everybody(["vpn.use"]);
         db.grants = [grant(BANNED, true)];
         await expect(mayJoin({ id: BANNED, isAdmin: false })).resolves.toBe(false);
         await expect(mayJoin({ id: KEPT, isAdmin: false })).resolves.toBe(true);
     });
 
-    it("lets in only a grant in good standing when closed", async () => {
+    it("lets nobody in on a limits row alone", async () => {
         db.grants = [grant(KEPT, false)];
+        await expect(mayJoin({ id: KEPT, isAdmin: false })).resolves.toBe(false);
+        db.roles = [{ userId: KEPT, grants: ["vpn.use"] }];
         await expect(mayJoin({ id: KEPT, isAdmin: false })).resolves.toBe(true);
         await expect(mayJoin({ id: GONE, isAdmin: false })).resolves.toBe(false);
         await expect(mayJoin({ id: GONE, isAdmin: true })).resolves.toBe(true);

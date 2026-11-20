@@ -18,16 +18,14 @@ import { getTranslations } from "@/lib/i18n/request";
 import {
     PERMISSIONS,
     PERMISSION_META,
-    evaluateStatements,
     isAllowed,
     listedPermissions,
     parseResource,
     type Permission
 } from "@polaris/core";
 import { polarAccessWith } from "@/lib/polar/access";
-import { vpnStanding } from "@/lib/vpn/wireguard";
+import { vpnGrantOf } from "@/lib/vpn/wireguard";
 import { refreshVpnAccessLater } from "@/lib/vpn/refresh";
-import { openAccess } from "@/lib/vpn/wireguard-service";
 import { installedPermissionApps } from "@/lib/permission-presence";
 import { explainUserAccess, type AccessExplanation } from "@/lib/access-explain-service";
 import {
@@ -138,16 +136,14 @@ export async function userCapabilitiesAction(
     const parsed = idSchema.safeParse(userId);
     if (!parsed.success) return { error: t("usersDetail.errors.unknownAccount") };
 
-    const [account, sourced, overrides, installed, vpnRow, vpnOpen] = await Promise.all([
+    const [account, sourced, overrides, installed] = await Promise.all([
         prisma.user.findUnique({ where: { id: parsed.data }, select: { isAdmin: true } }),
         resolveGlobalStatementsBySource(parsed.data),
         prisma.userPermission.findMany({
             where: { userId: parsed.data },
             select: { permission: true, effect: true }
         }),
-        installedPermissionApps(),
-        prisma.vpnAccess.findUnique({ where: { userId: parsed.data }, select: { userId: true } }),
-        openAccess()
+        installedPermissionApps()
     ]);
     if (!account) return { error: t("usersDetail.errors.unknownAccount") };
 
@@ -160,14 +156,8 @@ export async function userCapabilitiesAction(
     // Polar reads only statements that name it (`polarGrantsOf`), and an
     // administrator always has it, so its "role allows" is that answer.
     const polar = await polarAccessWith(parsed.data, inheritedStatements);
-    const vpn =
-        vpnStanding({
-            isAdmin: account.isAdmin,
-            hasRow: vpnRow !== null,
-            open: vpnOpen,
-            permission: evaluateStatements(inheritedStatements, "vpn.use", "*"),
-            accountAllows: false
-        }) !== "none";
+    // The VPN, likewise, reads only statements that name it (`vpnGrantOf`).
+    const vpn = account.isAdmin || vpnGrantOf(inheritedStatements) === "allow";
     const inheritedOf = (permission: Permission): boolean =>
         permission === "polar.use"
             ? polar.use

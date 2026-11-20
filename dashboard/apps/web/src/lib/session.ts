@@ -250,9 +250,9 @@ export function accessFor(user: SessionUser): AppAccessInput {
         reachesSubject: async (subject) =>
             user.viewingAs?.mode !== "role" &&
             (await import("@/lib/access/grants")).reachesAnySubject(user.id, [subject]),
-        // Polar's own audience, the same answer every Polar route checks, and
-        // the VPN's: an administrator, somebody given access, or everybody once
-        // an administrator opens it to all - never merely being signed in.
+        // Polar and the VPN read only statements that name them, so a role
+        // holding `*` does not open either: the same answer every Polar and VPN
+        // route checks - never merely being signed in.
         closes: async (appId) => {
             if (user.viewingAs?.mode === "role") return false;
             if (appId === "polar")

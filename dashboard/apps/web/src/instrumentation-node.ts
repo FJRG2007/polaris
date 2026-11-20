@@ -178,6 +178,13 @@ export async function registerNode(): Promise<void> {
         console.error("polaris: could not carry Polar's access into roles:", error)
     );
 
+    // The VPN likewise: its open switch and per-person list are carried into
+    // roles and overrides once; its rows stay, as each person's limits.
+    const { ensureVpnAccessCarried } = await import("./lib/vpn/access-carry");
+    await ensureVpnAccessCarried().catch((error) =>
+        console.error("polaris: could not carry the VPN's access into roles:", error)
+    );
+
     // A password kept under any id but its account's is refused at sign-in with
     // the right password; whatever wrote it (an old install, a transfer from
     // one), it does not survive a start.

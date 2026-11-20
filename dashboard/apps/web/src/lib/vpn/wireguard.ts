@@ -8,6 +8,7 @@
  */
 
 import { z } from "zod";
+import { evaluateStatements, type AuthzDecision, type PolicyStatement } from "@polaris/core";
 import {
     PROXY_KEY,
     PROXY_PORT,
@@ -157,37 +158,47 @@ export interface VpnAccess {
 }
 
 /**
- * Where somebody's VPN comes from, with the `vpn.use` permission read the way
- * every other app reads its own: `row` is the access an administrator gave them
- * on the VPN's screen, `open` the deployment-wide defaults, `none` no VPN.
+ * Where somebody's VPN comes from. Whether they have it at all is the `vpn.use`
+ * permission, decided like every other app's: roles, group policies and the
+ * account's own override under Management > Users, a deny over an allow, and an
+ * administrator always. Nothing of the VPN's own decides it - the open switch
+ * and the per-person list an earlier release kept were carried into roles and
+ * overrides once (`access-carry.ts`).
  *
- * - An administrator is always in, as everywhere else in Polaris.
- * - A deny of `vpn.use` - switched Off under Management > Users, or a group
- *   policy - shuts it, whatever access the VPN's own screen gave.
- * - Switching it On for one account is the same as giving them the defaults.
- * - Open access still reaches everybody nothing denies, roles included that do
- *   not carry `vpn.use` (the seeded viewer role does not): that is what open
- *   meant before the permission was read here, and an update keeps it.
- *
- * Holding `vpn.use` through a role is not enough on its own: the seeded member
- * role carries it, and the VPN is never open just because somebody is signed in.
+ * What they may do with it is the VPN's: `row` is the limits an administrator
+ * set for them on the VPN's screen, `defaults` the limits everybody else gets,
+ * `none` no VPN. A limits row grants nothing by itself.
  */
-export type VpnStanding = "row" | "open" | "none";
+export type VpnStanding = "row" | "defaults" | "none";
 
 export function vpnStanding(input: {
     readonly isAdmin: boolean;
     readonly hasRow: boolean;
-    readonly open: boolean;
-    /** `vpn.use` across roles, group policies and the account's own override. */
-    readonly permission: "allow" | "deny" | "implicit-deny";
-    /** Whether the account's own override switches it On. */
-    readonly accountAllows: boolean;
+    /** `vpn.use` across roles, group policies and the account's own override,
+     *  read with `vpnGrantOf`. */
+    readonly permission: AuthzDecision;
 }): VpnStanding {
-    if (input.isAdmin) return input.hasRow ? "row" : "open";
-    if (input.permission === "deny") return "none";
-    if (input.hasRow) return "row";
-    if (input.accountAllows) return "open";
-    return input.open ? "open" : "none";
+    if (!input.isAdmin && input.permission !== "allow") return "none";
+    return input.hasRow ? "row" : "defaults";
+}
+
+/**
+ * The permission system's word on `vpn.use`, out of one account's statements.
+ * Pure. Any matching deny counts, `*` included; an allow counts only from a
+ * statement that names the VPN (`vpn.use`, `vpn.*`), so a role or policy that
+ * allows `*` - which never meant the VPN - does not open it. The built-in roles
+ * hold `vpn.use` by name, and administrators are allowed regardless.
+ */
+export function vpnGrantOf(statements: readonly PolicyStatement[]): AuthzDecision {
+    const decision = evaluateStatements(statements, "vpn.use", "*");
+    if (decision !== "allow") return decision;
+    const naming = statements
+        .filter((statement) => statement.effect === "allow")
+        .map((statement) => ({
+            ...statement,
+            actions: statement.actions.filter((pattern) => pattern.startsWith("vpn."))
+        }));
+    return evaluateStatements(naming, "vpn.use", "*");
 }
 
 export type AccessStanding = "active" | "suspended" | "expired" | "overLimit";

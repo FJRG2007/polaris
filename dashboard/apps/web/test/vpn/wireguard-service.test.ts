@@ -6,6 +6,7 @@ const db = vi.hoisted(() => ({
     $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(tx)),
     user: { findMany: vi.fn() },
     userPermission: { findMany: vi.fn(async () => []) },
+    userRole: { findMany: vi.fn(async () => []) },
     policy: { findMany: vi.fn(async () => []) },
     vpnProxyUsage: { findUnique: vi.fn(), upsert: vi.fn() },
     vpnAccess: { findUnique: vi.fn(), deleteMany: vi.fn(), upsert: vi.fn() },
@@ -25,10 +26,18 @@ const db = vi.hoisted(() => ({
         findUnique: vi.fn()
     }
 }));
-const script = vi.hoisted(() => ({ run: vi.fn(), setting: vi.fn(), taken: vi.fn() }));
+const script = vi.hoisted(() => ({
+    run: vi.fn(),
+    setting: vi.fn(),
+    taken: vi.fn(),
+    statements: vi.fn(async (): Promise<unknown[]> => [])
+}));
+/** What an account holding `vpn.use` reads. */
+const HOLDS_VPN = [{ effect: "allow", actions: ["vpn.use"], resources: ["*"] }];
 
 vi.mock("@polaris/db", () => ({ prisma: db }));
-vi.mock("@polaris/auth", () => ({ resolveGlobalStatementsBySource: async () => [] }));
+vi.mock("@polaris/auth", () => ({ resolveGlobalStatements: script.statements }));
+vi.mock("@/lib/vpn/access-carry", () => ({ ensureVpnAccessCarried: async () => {} }));
 vi.mock("@/lib/setting-store", () => ({ getSetting: script.setting, setSetting: vi.fn() }));
 vi.mock("@/lib/deploy/server-edge", () => ({ edgeLauncher: () => "sh" }));
 vi.mock("@/lib/app-edge", () => ({ edgeHostnameTaken: script.taken }));
@@ -71,20 +80,21 @@ beforeEach(() => {
     db.vpnPeer.findUnique.mockResolvedValue(null);
     db.vpnPeer.create.mockImplementation(async ({ data }) => ({ id: "peer", ...data }));
     script.setting.mockResolvedValue(null);
+    script.statements.mockResolvedValue([]);
     script.run.mockResolvedValue({ code: 0 });
     script.taken.mockResolvedValue(false);
     db.vpnNode.update.mockImplementation(async ({ data }) => ({ ...node, ...data }));
 });
 
 describe("who may add a device", () => {
-    it("refuses somebody with no access while the VPN is not open", async () => {
+    it("refuses somebody who does not hold vpn.use", async () => {
         await expect(service.connectClient(person, device)).rejects.toMatchObject({
             code: "noAccess"
         });
     });
 
-    it("lets everybody in once it is open", async () => {
-        script.setting.mockResolvedValue("true");
+    it("lets in somebody who holds vpn.use, with the defaults", async () => {
+        script.statements.mockResolvedValue(HOLDS_VPN);
         const made = await service.connectClient(person, device);
         expect(made.nodePublicKey).toBe(node.publicKey);
     });
@@ -323,7 +333,7 @@ describe("an app connecting", () => {
     const input = { nodeId: NODE_ID, name: "Laptop", publicKey: key };
 
     it("registers only the key it was sent", async () => {
-        script.setting.mockResolvedValue("true");
+        script.statements.mockResolvedValue(HOLDS_VPN);
         db.vpnPeer.findUnique.mockResolvedValue(null);
         const made = await service.connectClient(person, input);
         expect(made.address).toMatch(/^10\./);
@@ -331,7 +341,7 @@ describe("an app connecting", () => {
     });
 
     it("gives the same device back and spends no slot reconnecting", async () => {
-        script.setting.mockResolvedValue("true");
+        script.statements.mockResolvedValue(HOLDS_VPN);
         db.vpnPeer.count.mockResolvedValue(5);
         db.vpnPeer.findUnique.mockResolvedValue({
             id: "peer",
@@ -344,7 +354,7 @@ describe("an app connecting", () => {
     });
 
     it("will not hand over somebody else's device", async () => {
-        script.setting.mockResolvedValue("true");
+        script.statements.mockResolvedValue(HOLDS_VPN);
         db.vpnPeer.findUnique.mockResolvedValue({
             id: "peer",
             userId: "other",

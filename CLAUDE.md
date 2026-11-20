@@ -371,9 +371,13 @@ it off did nothing.
   are the only place access is decided, and an administrator always has it.
   When an app that had one moves over, what each install had saved is carried
   into roles, group policies and per-person overrides once, at startup
-  (`lib/polar/access-carry.ts` did it for Polar), so nobody gains or loses access
-  on the update. The VPN still has its own open-to-everyone switch and
-  per-person limits and is the one exception left.
+  (`lib/polar/access-carry.ts` for Polar, `lib/vpn/access-carry.ts` for the
+  VPN), so nobody gains or loses access on the update. There is no exception
+  left.
+- **Limits are not access.** An app may keep per-person settings of its own
+  (the VPN's servers, devices, data and expiry per person), but a row there
+  grants nothing: whoever holds the permission and has no row gets the app's
+  defaults, and its screen offers the row only for people who hold it.
 - A new permission is also listed in every table typed over `Permission` (API
   key scopes, MCP categories, the minors presets) and labelled in both locales.
 - `apps/web/test/access/app-route-guards.test.ts` fails for an app closed per

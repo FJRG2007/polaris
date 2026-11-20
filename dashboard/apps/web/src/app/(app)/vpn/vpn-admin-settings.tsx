@@ -1,6 +1,7 @@
 "use client";
 
-/** The VPN's settings: the machines people connect through, and who may use them. */
+/** The VPN's settings: the machines people connect through, and each person's limits.
+ *  Who has the VPN at all is `vpn.use`, set under Management > Users. */
 
 import Link from "next/link";
 import * as ui from "@polaris/ui";
@@ -210,27 +211,24 @@ export function VpnAdminSettings() {
                         <h2 className="text-sm font-medium">{t("people.title")}</h2>
                         <p className="text-xs text-muted-foreground">{t("people.hint")}</p>
                     </div>
-                    <ui.Button size="sm" variant="secondary" onClick={() => setAccessDialog("new")}>
-                        <Plus />
-                        {t("people.add")}
-                    </ui.Button>
-                </div>
-                <div className="flex min-w-0 items-center justify-between gap-3">
-                    <div className="min-w-0">
-                        <p className="text-sm font-medium">{t("people.open")}</p>
-                        <p className="text-xs text-muted-foreground">
-                            {t("people.openHint", { count: DEFAULT_DEVICE_LIMIT })}
-                        </p>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <ui.Button size="sm" variant="ghost" asChild>
+                            <Link href="/admin/users">{t("people.manage")}</Link>
+                        </ui.Button>
+                        <ui.Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setAccessDialog("new")}
+                        >
+                            <Plus />
+                            {t("people.add")}
+                        </ui.Button>
                     </div>
-                    <ui.Switch
-                        aria-label={t("people.open")}
-                        checked={data?.open ?? false}
-                        disabled={data === null || pending}
-                        onChange={(open) => run(() => actions.setVpnOpenAccessAction(open))}
-                    />
                 </div>
                 {data?.access.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">{t("people.empty")}</p>
+                    <p className="text-sm text-muted-foreground">
+                        {t("people.empty", { count: DEFAULT_DEVICE_LIMIT })}
+                    </p>
                 ) : null}
                 <ul className="flex flex-col gap-2">
                     {data?.access.map((row) => (
@@ -258,6 +256,11 @@ export function VpnAdminSettings() {
                             {row.suspended ? (
                                 <ui.Badge variant="warning">{t("people.suspended")}</ui.Badge>
                             ) : null}
+                            {row.holdsVpn ? null : (
+                                <ui.Badge variant="neutral" title={t("people.noVpnHint")}>
+                                    {t("people.noVpn")}
+                                </ui.Badge>
+                            )}
                             <ui.Button
                                 size="icon"
                                 variant="ghost"

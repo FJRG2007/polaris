@@ -19,8 +19,14 @@ import { wordsFor } from "@/lib/notifications/notice-words";
 import { DEFAULT_LOCALE } from "@polaris/core";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { prisma, VISIBLE_USER } from "@polaris/db";
-import { evaluateStatements, policyDocumentSchema } from "@polaris/core";
-import { resolveGlobalStatementsBySource } from "@polaris/auth";
+import { ensureVpnAccessCarried } from "./access-carry";
+import { resolveGlobalStatements } from "@polaris/auth";
+import {
+    evaluateStatements,
+    policyDocumentSchema,
+    type AuthzDecision,
+    type PolicyStatement
+} from "@polaris/core";
 import { edgeHostnameTaken } from "@/lib/app-edge";
 import { edgeLauncher } from "@/lib/deploy/server-edge";
 import { isIP } from "node:net";
@@ -35,9 +41,6 @@ import { execCommand, openSshClient } from "@polaris/ssh";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { getHostConnectionUnscoped, type HostConnection } from "@/lib/host-service";
 
-/** Whether somebody with no access of their own may connect, and with how many devices. */
-const OPEN_ACCESS_KEY = "vpn.openAccess";
-
 export type WireGuardRefusalCode =
     | "noRoot"
     | "unreachable"
@@ -48,6 +51,7 @@ export type WireGuardRefusalCode =
     | "nodeNotReady"
     | "notFound"
     | "noSuchPerson"
+    | "noVpnPermission"
     | "tooManyNodes"
     | "invalid";
 
@@ -106,15 +110,8 @@ function planOf(node: NodeRow): wg.NodePlan {
     return { index: node.subnetIndex, port: node.port, exit: node.exit as wg.NodeExit };
 }
 
-export async function openAccess(): Promise<boolean> {
-    return (await getSetting(OPEN_ACCESS_KEY)) === "true";
-}
-
-export async function setOpenAccess(open: boolean): Promise<void> {
-    await setSetting(OPEN_ACCESS_KEY, open ? "true" : null);
-}
-
-const OPEN: Omit<wg.VpnAccess, "usedBytes"> = {
+/** What somebody with `vpn.use` and no limits of their own may do. */
+const DEFAULTS: Omit<wg.VpnAccess, "usedBytes"> = {
     nodes: [],
     deviceLimit: wg.DEFAULT_DEVICE_LIMIT,
     dataLimitGb: null,
@@ -122,106 +119,105 @@ const OPEN: Omit<wg.VpnAccess, "usedBytes"> = {
     suspended: false
 };
 
-/** The permission system's word on `vpn.use`, as `wg.vpnStanding` reads it. */
-export interface VpnPermission {
-    permission: "allow" | "deny" | "implicit-deny";
-    accountAllows: boolean;
-}
-
-/** What the permission system says about `vpn.use` for one account. */
-export async function vpnPermission(userId: string): Promise<VpnPermission> {
-    const sourced = await resolveGlobalStatementsBySource(userId);
-    const statements = sourced.flatMap((entry) => entry.statements);
-    const own = sourced
-        .filter((entry) => entry.source.kind === "account")
-        .flatMap((entry) => entry.statements);
-    return {
-        permission: evaluateStatements(statements, "vpn.use", "*"),
-        accountAllows: evaluateStatements(own, "vpn.use", "*") === "allow"
-    };
+/** What the permission system says about `vpn.use` for one account (`wg.vpnGrantOf`). */
+export async function vpnPermission(userId: string): Promise<AuthzDecision> {
+    await ensureVpnAccessCarried();
+    return wg.vpnGrantOf(await resolveGlobalStatements(userId));
 }
 
 /** How many accounts one sync resolves in full at once. */
 const RESOLVE_BATCH = 16;
 
-/** Whether a stored policy document can deny `vpn.use` to anybody it is attached to. */
-function deniesVpn(raw: string): boolean {
+/** Whether a stored policy document says anything `wg.vpnGrantOf` would read:
+ *  a deny that reaches `vpn.use`, or an allow that names the VPN. */
+function policyNamesVpn(raw: string): boolean {
     try {
         const parsed = policyDocumentSchema.safeParse(JSON.parse(raw));
         if (!parsed.success) return false;
-        const denials = parsed.data.statements.filter((statement) => statement.effect === "deny");
-        return evaluateStatements(denials, "vpn.use", "*") === "deny";
+        return parsed.data.statements.some((statement) =>
+            statement.effect === "deny"
+                ? evaluateStatements([statement], "vpn.use", "*") === "deny"
+                : statement.actions.some((pattern) => pattern.startsWith("vpn."))
+        );
     } catch {
         return false;
     }
 }
 
+/** A role's stored grant list. Malformed JSON grants nothing. */
+function roleGrants(raw: string): string[] {
+    try {
+        const parsed: unknown = JSON.parse(raw);
+        return Array.isArray(parsed)
+            ? parsed.filter((value): value is string => typeof value === "string")
+            : [];
+    } catch {
+        return [];
+    }
+}
+
 /**
- * `vpnPermission` for many accounts, as `wg.vpnStanding` reads it, in a fixed
- * number of queries: the accounts' own switches in one, and every policy in
- * another. Only when some policy can deny `vpn.use` is each account resolved in
- * full, a batch at a time. Otherwise nothing but an account's own switch can
- * deny it, and an allow from a role or a policy is reported as `implicit-deny`,
- * which `wg.vpnStanding` treats the same.
+ * `vpnPermission` for many accounts, in a fixed number of queries: their roles
+ * and their own switches in two, and every policy in a third. Only when some
+ * policy says something about the VPN is each account resolved in full, a batch
+ * at a time; otherwise roles and switches are the whole answer.
  */
 export async function vpnPermissionsAmong(
     ids: readonly string[]
-): Promise<Map<string, VpnPermission>> {
+): Promise<Map<string, AuthzDecision>> {
     const unique = [...new Set(ids)];
     if (unique.length === 0) return new Map();
-    const [overrides, policies] = await Promise.all([
+    await ensureVpnAccessCarried();
+    const [roles, overrides, policies] = await Promise.all([
+        prisma.userRole.findMany({
+            where: { userId: { in: unique } },
+            select: { userId: true, role: { select: { permissions: true } } }
+        }),
         prisma.userPermission.findMany({
-            where: { userId: { in: unique }, permission: "vpn.use" },
-            select: { userId: true, effect: true }
+            where: { userId: { in: unique }, permission: { startsWith: "vpn." } },
+            select: { userId: true, permission: true, effect: true }
         }),
         prisma.policy.findMany({ select: { document: true } })
     ]);
-    if (policies.some((policy) => deniesVpn(policy.document))) {
-        const answers = new Map<string, VpnPermission>();
+    const answers = new Map<string, AuthzDecision>();
+    if (policies.some((policy) => policyNamesVpn(policy.document))) {
         for (let start = 0; start < unique.length; start += RESOLVE_BATCH) {
             const batch = unique.slice(start, start + RESOLVE_BATCH);
-            const resolved = await Promise.all(batch.map((id) => vpnPermission(id)));
-            batch.forEach((id, index) => answers.set(id, resolved[index] as VpnPermission));
+            const resolved = await Promise.all(
+                batch.map(async (id) => wg.vpnGrantOf(await resolveGlobalStatements(id)))
+            );
+            batch.forEach((id, index) => answers.set(id, resolved[index] as AuthzDecision));
         }
         return answers;
     }
-    const own = new Map(
-        overrides.map((row) => [row.userId, row.effect === "deny" ? "deny" : "allow"])
-    );
-    return new Map(
-        unique.map((id) => {
-            const effect = own.get(id);
-            return [
-                id,
-                {
-                    permission:
-                        effect === "deny" ? "deny" : effect === "allow" ? "allow" : "implicit-deny",
-                    accountAllows: effect === "allow"
-                }
-            ];
-        })
-    );
+    const statements = new Map<string, PolicyStatement[]>(unique.map((id) => [id, []]));
+    for (const row of roles) {
+        for (const key of roleGrants(row.role.permissions))
+            statements.get(row.userId)?.push({ effect: "allow", actions: [key], resources: ["*"] });
+    }
+    for (const row of overrides) {
+        statements.get(row.userId)?.push({
+            effect: row.effect === "deny" ? "deny" : "allow",
+            actions: [row.permission],
+            resources: ["*"]
+        });
+    }
+    for (const [id, list] of statements) answers.set(id, wg.vpnGrantOf(list));
+    return answers;
 }
 
-/** What a person may do, or null for no access. An administrator always has it, unless
- *  somebody gave them limits of their own. `vpn.use` is read as `wg.vpnStanding` says. */
+/** What a person may do, or null for no VPN. `vpn.use` decides whether they have
+ *  it (an administrator always does); their limits row, or the defaults, what
+ *  they may do with it. */
 export async function accessOf(user: {
     id: string;
     isAdmin: boolean;
 }): Promise<wg.VpnAccess | null> {
-    const [row, open, granted] = await Promise.all([
+    const [row, permission] = await Promise.all([
         prisma.vpnAccess.findUnique({ where: { userId: user.id } }),
-        openAccess(),
-        user.isAdmin
-            ? Promise.resolve({ permission: "allow" as const, accountAllows: false })
-            : vpnPermission(user.id)
+        user.isAdmin ? Promise.resolve("allow" as const) : vpnPermission(user.id)
     ]);
-    const standing = wg.vpnStanding({
-        isAdmin: user.isAdmin,
-        hasRow: row !== null,
-        open,
-        ...granted
-    });
+    const standing = wg.vpnStanding({ isAdmin: user.isAdmin, hasRow: row !== null, permission });
     if (standing === "none") return null;
     if (standing === "row" && row) {
         return {
@@ -233,7 +229,7 @@ export async function accessOf(user: {
             usedBytes: row.usedBytes
         };
     }
-    return { ...OPEN, usedBytes: 0n };
+    return { ...DEFAULTS, usedBytes: 0n };
 }
 
 /** The peers a node should let in: every device whose owner is in good standing. */
@@ -247,7 +243,6 @@ async function allowedPeers(nodeId: string): Promise<{ publicKey: string; host: 
             user: { select: { isAdmin: true, vpnAccess: true } }
         }
     });
-    const open = await openAccess();
     const now = new Date();
     const granted = await vpnPermissionsAmong(
         peers.filter((peer) => !peer.user.isAdmin).map((peer) => peer.userId)
@@ -257,14 +252,10 @@ async function allowedPeers(nodeId: string): Promise<{ publicKey: string; host: 
         const standing = wg.vpnStanding({
             isAdmin: user.isAdmin,
             hasRow: row !== null,
-            open,
-            ...(granted.get(userId) ?? {
-                permission: "implicit-deny" as const,
-                accountAllows: false
-            })
+            permission: granted.get(userId) ?? "implicit-deny"
         });
         if (standing === "none") return [];
-        if (standing === "open" || !row) return [{ publicKey, host: hostIndex }];
+        if (standing === "defaults" || !row) return [{ publicKey, host: hostIndex }];
         const allowed = wg.accessStanding(row, now) === "active" && wg.mayUseNode(row, nodeId);
         return allowed ? [{ publicKey, host: hostIndex }] : [];
     });
@@ -540,8 +531,8 @@ export async function grantAccess(input: wg.AccessInput): Promise<void> {
     await syncNodesOf(userId);
 }
 
-/** Back to what somebody gets by default. Their devices stay; whether they still work
- *  depends on that default. */
+/** Back to the default limits. Their devices stay, and whether they work is still
+ *  `vpn.use`. */
 export async function revokeAccess(userId: string): Promise<void> {
     await prisma.vpnAccess.deleteMany({ where: { userId } });
     await syncNodesOf(userId);
@@ -570,10 +561,19 @@ export async function listAccess() {
             expiresAt: true,
             suspended: true,
             usedBytes: true,
-            user: { select: { name: true, email: true } }
+            user: { select: { name: true, email: true, isAdmin: true } }
         }
     });
-    return rows.map(({ usedBytes, ...row }) => ({ ...row, usedBytes: usedBytes.toString() }));
+    // A row is limits only: whether its person has the VPN at all is `vpn.use`.
+    const granted = await vpnPermissionsAmong(
+        rows.filter((row) => !row.user.isAdmin).map((row) => row.userId)
+    );
+    return rows.map(({ usedBytes, user, ...row }) => ({
+        ...row,
+        user: { name: user.name, email: user.email },
+        holdsVpn: user.isAdmin || granted.get(row.userId) === "allow",
+        usedBytes: usedBytes.toString()
+    }));
 }
 
 /** The nodes a person may pick from. */

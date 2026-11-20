@@ -285,6 +285,7 @@
             "nodeNotReady": "Ese servidor aún se está preparando. Reinténtalo en un minuto.",
             "notFound": "Eso ya no está aquí.",
             "noSuchPerson": "Nadie tiene ese correo aquí.",
+            "noVpnPermission": "No tiene la VPN. Dásela primero en Administración > Usuarios.",
             "tooManyNodes": "Este Polaris ha llegado a su límite de servidores.",
             "invalid": "Revisa los campos y reinténtalo."
         },
@@ -402,11 +403,11 @@
         }
     },
     "people": {
-        "title": "Personas",
-        "hint": "Quién puede conectarse, por qué servidores y cuánto.",
-        "add": "Dar acceso",
-        "addBody": "Necesita una cuenta en este Polaris.",
-        "edit": "Editar acceso",
+        "title": "Límites por persona",
+        "hint": "Servidores, equipos y datos de una persona. Quién tiene la VPN se decide en Administración > Usuarios.",
+        "add": "Poner límites",
+        "addBody": "Para alguien que ya tiene la VPN.",
+        "edit": "Editar límites",
         "editBody": "Los cambios llegan a los servidores al momento.",
         "email": "Correo",
         "deviceLimit": "Equipos",
@@ -416,13 +417,14 @@
         "allNodes": "Todos",
         "suspend": "Suspendido",
         "suspended": "Suspendido",
-        "open": "Abierta a todos aquí",
-        "openHint": "Cualquiera con cuenta puede conectarse, con {count} dispositivos. Las personas de abajo mantienen sus límites.",
         "gb": "{used} de {count} GB",
         "used": "{used} GB este mes",
         "editLabel": "Editar",
-        "remove": "Quitar acceso",
-        "empty": "Aún no has dado acceso a nadie. Los administradores siempre pueden conectarse."
+        "remove": "Volver a lo normal",
+        "empty": "Quien tiene la VPN puede usar {count} equipos en cada servidor.",
+        "noVpn": "Sin VPN",
+        "noVpnHint": "Estos límites se aplican cuando tenga la VPN en Administración > Usuarios.",
+        "manage": "Quién tiene la VPN"
     },
     "mesh": {
         "title": "Red de equipos",
