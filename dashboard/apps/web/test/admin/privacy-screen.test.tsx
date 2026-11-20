@@ -113,8 +113,10 @@ describe("privacy screen", () => {
         expect(html).toContain('href="/admin/privacy"');
         for (const subapp of APP_SUBAPPS.filter((entry) => entry.parentAppId === "admin")) {
             for (const section of subapp.sections) {
-                // Setup opens itself; Domains' own screens hang off its card.
+                // Setup opens itself; Domains' own screens hang off its card; a
+                // hidden entry is there for search only, opened from another card.
                 if (section.href === "/admin/setup" || section.href.startsWith("/admin/domains/")) continue;
+                if ("hidden" in section && section.hidden) continue;
                 expect(html, section.href).toContain(`href="${section.href}"`);
             }
         }
