@@ -17,7 +17,8 @@
  * backwards rather than as a spike nobody can explain.
  */
 
-import { withDriver } from "./open";
+import { addressKey, withDriver } from "./open";
+import { coalescer } from "@/lib/coalesce";
 import { addressOf } from "./connections";
 import type { DataAddress } from "./driver";
 import type { RedisDriver } from "./drivers/redis";
@@ -45,8 +46,17 @@ export async function engineStats(userId: string, connectionId: string): Promise
     return engineStatsAt(await addressOf(userId, connectionId));
 }
 
+// Every open tab on a database's screen polls these; the same address asked at
+// once is one round of queries against the server, not one per tab.
+const statsReads = coalescer<DatabaseStats>({ maxKeys: 1000 });
+
 /** `engineStats`, for an address already resolved and authorized by the caller. */
 export async function engineStatsAt(address: DataAddress): Promise<DatabaseStats> {
+    const key = addressKey(address);
+    return key ? statsReads.run(key, () => statsOf(address)) : statsOf(address);
+}
+
+async function statsOf(address: DataAddress): Promise<DatabaseStats> {
     switch (address.engine) {
         case "redis":
             return redisStats(address);

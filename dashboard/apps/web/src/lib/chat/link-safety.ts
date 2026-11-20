@@ -37,6 +37,7 @@ import { knownReputation, rememberReputation, type Verdict } from "@/lib/reputat
 import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
 import { takeServedLookup } from "@/lib/integrations/provider-pause";
 import { resetLookupBudget } from "@/lib/reputation-budget";
+import { coalescer } from "@/lib/coalesce";
 
 /** In the order they are asked and listed: Dymo first, since it reads the page
  *  itself and answers from one call, and a flag from it means VirusTotal is not
@@ -96,7 +97,7 @@ const CHAT_SHARE = 0.5;
 /** Forget what was spent. For the tests. */
 export function resetLinkSafetyBudget(): void {
     resetLookupBudget();
-    inFlight.clear();
+    inFlight.forget();
 }
 
 /** Host endings that only resolve inside somebody's own network. */
@@ -127,14 +128,10 @@ export function lookupAddress(url: string): string {
 
 /** The same question asked twice at once is asked once: two messages posted
  *  together with one link share the lookup. */
-const inFlight = new Map<string, Promise<Verdict | null>>();
+const inFlight = coalescer<Verdict | null>();
 
 function once(key: string, work: () => Promise<Verdict | null>): Promise<Verdict | null> {
-    const running = inFlight.get(key);
-    if (running) return running;
-    const started = work().finally(() => inFlight.delete(key));
-    inFlight.set(key, started);
-    return started;
+    return inFlight.run(key, work);
 }
 
 /** What VirusTotal says about the host, cached under the same entry the mail

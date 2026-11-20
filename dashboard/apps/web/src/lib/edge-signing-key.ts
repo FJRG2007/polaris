@@ -17,7 +17,7 @@
 
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
-import { getSetting } from "@/lib/setting-store";
+import { forgetSettingReads, getSetting } from "@/lib/setting-store";
 import { decryptSecret, encryptSecret } from "@polaris/storage";
 import {
     createPrivateKey,
@@ -98,6 +98,8 @@ async function loadOrCreate(): Promise<EdgeSigningKey> {
             data: { value }
         });
     }
+    // Read back by a fresh query, never one another caller started before this write.
+    forgetSettingReads();
     const settled = readKey(await getSetting(KEY_SETTING));
     if (!settled) throw new Error("The edge signing key could not be stored");
     return settled;

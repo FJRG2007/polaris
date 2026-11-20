@@ -8,10 +8,25 @@
  * the ones that only listed connections.
  */
 
+import { createHash } from "node:crypto";
 import * as data from "./driver";
 import { tlsRefusal } from "./tls";
 import { openTunnel, TunnelError } from "./tunnel";
 import { SessionCache, type SessionRoute } from "./sessions";
+
+/**
+ * One address as a key: two asks share an answer only when every field - the
+ * credentials and the session's account and id among them - is the same. Hashed,
+ * so a password never sits in a map key. Null for one that cannot be written
+ * out (a tunnel holding a live socket): that ask simply runs on its own.
+ */
+export function addressKey(address: data.DataAddress): string | null {
+    try {
+        return createHash("sha256").update(JSON.stringify(address)).digest("hex");
+    } catch {
+        return null;
+    }
+}
 
 export async function openDriver(address: data.DataAddress): Promise<data.DataDriver> {
     switch (address.engine) {

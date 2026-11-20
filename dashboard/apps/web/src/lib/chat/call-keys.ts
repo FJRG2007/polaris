@@ -25,6 +25,7 @@ import { join } from "node:path";
 import { loadEnv } from "@polaris/config";
 import { randomBytes } from "node:crypto";
 import { chmod, readFile, stat, writeFile } from "node:fs/promises";
+import { coalescer } from "@/lib/coalesce";
 
 /** The volume both containers mount. */
 function keysDir(): string {
@@ -62,7 +63,7 @@ const RETRY_AFTER_MS = 30_000;
 
 let cached: { file: string; key: CallKey } | null = null;
 let missed: { file: string; at: number } | null = null;
-let inflight: { file: string; work: Promise<CallKey | null> } | null = null;
+const inflight = coalescer<CallKey | null>();
 
 /** Throw the cached pair away. For a test asserting what is on disk rather than
  *  what this module already answered; nothing in the app calls it, since the file
@@ -70,7 +71,7 @@ let inflight: { file: string; work: Promise<CallKey | null> } | null = null;
 export function forgetCallKey(): void {
     cached = null;
     missed = null;
-    inflight = null;
+    inflight.forget();
 }
 
 /**
@@ -90,33 +91,26 @@ export async function ensureCallKey(): Promise<CallKey | null> {
     const file = callKeyFile();
     if (cached?.file === file) return cached.key;
     if (missed?.file === file && Date.now() - missed.at < RETRY_AFTER_MS) return null;
-    if (inflight?.file !== file) inflight = { file, work: resolve(file) };
-    return inflight.work;
+    // Shared while it runs, and let go however it ended: a rejection kept would be
+    // the answer every later caller got for the life of the process.
+    return inflight.run(file, () => resolve(file));
 }
 
 async function resolve(file: string): Promise<CallKey | null> {
-    try {
-        const existing = await read(file);
-        // A pair somebody else left here is used as it is, but its permissions
-        // are not somebody else's to decide: a file the world can read is a
-        // media server that refuses to start, and one that is never rewritten
-        // is never repaired either.
-        if (existing) await secure(file);
-        const key = existing ?? (await mint(file));
-        if (key) {
-            cached = { file, key };
-            missed = null;
-        } else {
-            missed = { file, at: Date.now() };
-        }
-        return key;
-    } finally {
-        // Cleared however this ended. Left behind on a throw, the rejected
-        // promise is the answer every later caller gets for the life of the
-        // process, and a request that could have degraded to "calls are
-        // unavailable" fails outright instead.
-        if (inflight?.file === file) inflight = null;
+    const existing = await read(file);
+    // A pair somebody else left here is used as it is, but its permissions
+    // are not somebody else's to decide: a file the world can read is a
+    // media server that refuses to start, and one that is never rewritten
+    // is never repaired either.
+    if (existing) await secure(file);
+    const key = existing ?? (await mint(file));
+    if (key) {
+        cached = { file, key };
+        missed = null;
+    } else {
+        missed = { file, at: Date.now() };
     }
+    return key;
 }
 
 /**

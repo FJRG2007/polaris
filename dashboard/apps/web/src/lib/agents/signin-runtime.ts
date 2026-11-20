@@ -41,6 +41,7 @@ import * as homes from "./home-signins";
 import * as machine from "./machine-login-rows";
 import { machineLoginCheck, machineLoginEnv, type MachineLoginCheck } from "./machine-login-config";
 import * as folders from "./account-folders";
+import { createGate } from "@/lib/concurrency-gate";
 
 /** Stamped on every container this starts, so the sweep finds them by label
  *  rather than by matching names it does not own. */
@@ -1198,9 +1199,14 @@ export function signinStatusCommand(env: string): string | null {
 /** How long one status container may take to answer before every tool in it
  *  reads as unknown. */
 const STATUS_TIMEOUT_MS = 45_000;
-/** How many status containers run at once across the deployment. Past it a
- *  check answers unknown rather than queueing a container per page view. */
+/** How many status containers run at once across the deployment. The rest wait
+ *  their turn - one place in line per person, so nobody holds more than one check
+ *  and a busy deployment queues them rather than answering "unknown". */
 const STATUS_CONCURRENCY = 4;
+/** How many checks may wait for a place. Past it the screen keeps its last
+ *  answer, as it does while one runs, and the next read asks again. */
+const STATUS_WAITING_MAX = 1000;
+const statusGate = createGate(STATUS_CONCURRENCY);
 const statusRuns = new Map<string, Promise<Map<string, status.SigninState>>>();
 
 /**
@@ -1398,22 +1404,27 @@ async function keptChecks(userId: string): Promise<Map<string, MachineLoginCheck
 
 /**
  * Run the status checks behind the read that asked: one container per person
- * at a time, and no more than a few across the deployment - past that the
- * screen keeps its last answer. What comes back is cached, kept on the rows,
- * and moves the person's list of connected agents. Returns whether it started.
+ * at a time, and no more than a few across the deployment - past that it waits
+ * its turn, and the screen shows the last answer as pending meanwhile. What
+ * comes back is cached, kept on the rows, and moves the person's list of
+ * connected agents. Returns whether it started.
  */
 function startStatusCheck(
     userId: string,
     toCheck: readonly { env: string; command: string }[],
     firstRead: boolean
 ): boolean {
-    if (statusRuns.has(userId) || statusRuns.size >= STATUS_CONCURRENCY) return false;
-    const run = Promise.race([
-        runStatusChecks(userId, toCheck),
-        new Promise<Map<string, status.SigninState>>((resolve) =>
-            setTimeout(() => resolve(new Map()), STATUS_TIMEOUT_MS)
+    if (statusRuns.has(userId) || statusGate.waiting >= STATUS_WAITING_MAX) return false;
+    // The clock starts when the container does, not while the check waits in line.
+    const run = statusGate
+        .run(() =>
+            Promise.race([
+                runStatusChecks(userId, toCheck),
+                new Promise<Map<string, status.SigninState>>((resolve) =>
+                    setTimeout(() => resolve(new Map()), STATUS_TIMEOUT_MS)
+                )
+            ])
         )
-    ])
         .catch((error: unknown) => {
             console.warn("[agent-signin] status check failed:", error instanceof Error ? error.name : "unknown");
             return new Map<string, status.SigninState>();

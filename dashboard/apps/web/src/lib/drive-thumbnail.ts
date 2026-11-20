@@ -30,6 +30,7 @@
 import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { coalescer } from "@/lib/coalesce";
 import { getSetting } from "@/lib/setting-store";
 import type { StorageDriver } from "@polaris/storage";
 import { PERSONAL_LOCAL_FOLDER } from "@/lib/storage-service";
@@ -308,7 +309,7 @@ async function drawDocument(bytes: Buffer): Promise<Buffer> {
  * them are routinely the same file seen from two places - a folder and a search
  * result. Without this, each one opens the original.
  */
-const inFlight = new Map<string, Promise<Buffer | null>>();
+const inFlight = coalescer<Buffer | null>();
 
 /**
  * How many originals may be open at once, across everybody.
@@ -366,10 +367,7 @@ export async function thumbnailFor(
     key: string,
     read: () => Promise<Buffer>
 ): Promise<Buffer | null> {
-    const running = inFlight.get(key);
-    if (running) return await running;
-
-    const work = (async () => {
+    return inFlight.run(key, async () => {
         const cached = await fromCache(key);
         // An entry with nothing in it is a file that was tried once and could
         // not be drawn. It keeps its icon, and the original stays shut.
@@ -398,12 +396,5 @@ export async function thumbnailFor(
         // edited asks a fresh question anyway.
         await intoCache(key, drawn ?? NOTHING);
         return drawn;
-    })();
-
-    inFlight.set(key, work);
-    try {
-        return await work;
-    } finally {
-        inFlight.delete(key);
-    }
+    });
 }

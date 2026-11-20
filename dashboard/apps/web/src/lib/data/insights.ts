@@ -23,7 +23,8 @@
  * Server-only.
  */
 
-import { withDriver } from "./open";
+import { addressKey, withDriver } from "./open";
+import { coalescer } from "@/lib/coalesce";
 import { addressOf } from "./connections";
 import { POSTGRES_SYSTEM_SCHEMA_LIKE, type DataAddress } from "./driver";
 
@@ -77,8 +78,16 @@ export async function databaseInsights(
     return databaseInsightsAt(await addressOf(userId, connectionId));
 }
 
+// The same address asked at once is one round of queries, not one per open tab.
+const insightReads = coalescer<DatabaseInsights>({ maxKeys: 1000 });
+
 /** `databaseInsights`, for an address already resolved and authorized by the caller. */
 export async function databaseInsightsAt(address: DataAddress): Promise<DatabaseInsights> {
+    const key = addressKey(address);
+    return key ? insightReads.run(key, () => insightsOf(address)) : insightsOf(address);
+}
+
+async function insightsOf(address: DataAddress): Promise<DatabaseInsights> {
     switch (address.engine) {
         case "postgres":
             return postgresInsights(address);

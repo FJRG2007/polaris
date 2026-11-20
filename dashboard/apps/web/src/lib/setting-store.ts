@@ -6,34 +6,60 @@
  */
 
 import { prisma } from "@polaris/db";
+import { coalescer } from "@/lib/coalesce";
+
+// Every screen reads a few of these, so a burst of page loads asks for the same
+// keys at once. Shared only while in flight - never kept - and dropped on every
+// write here, so an ask that starts after a write never joins a read from before it.
+const singleReads = coalescer<string | null>();
+const groupReads = coalescer<Map<string, string>>();
+
+/**
+ * Drop the reads in flight, after a write that did not go through this module.
+ * Only needed where the same flow reads the key back right after writing it.
+ */
+export function forgetSettingReads(): void {
+    singleReads.forget();
+    groupReads.forget();
+}
 
 /** The stored value for a key, or null when unset. */
 export async function getSetting(key: string): Promise<string | null> {
-    const row = await prisma.setting.findUnique({ where: { key }, select: { value: true } });
-    return row?.value ?? null;
+    return singleReads.run(key, async () => {
+        const row = await prisma.setting.findUnique({ where: { key }, select: { value: true } });
+        return row?.value ?? null;
+    });
 }
 
 /** Several keys in one query; an unset key is absent from the map. */
 export async function getSettings(keys: readonly string[]): Promise<Map<string, string>> {
     if (keys.length === 0) return new Map();
-    const rows = await prisma.setting.findMany({
-        where: { key: { in: [...keys] } },
-        select: { key: true, value: true }
+    const shared = await groupReads.run(JSON.stringify([...new Set(keys)].sort()), async () => {
+        const rows = await prisma.setting.findMany({
+            where: { key: { in: [...keys] } },
+            select: { key: true, value: true }
+        });
+        return new Map(rows.map((row) => [row.key, row.value]));
     });
-    return new Map(rows.map((row) => [row.key, row.value]));
+    // A copy each, since the map is the caller's to change.
+    return new Map(shared);
 }
 
 /** Store a value, or forget the key when null. */
 export async function setSetting(key: string, value: string | null): Promise<void> {
-    if (value === null) {
-        await prisma.setting.deleteMany({ where: { key } });
-        return;
+    try {
+        if (value === null) {
+            await prisma.setting.deleteMany({ where: { key } });
+            return;
+        }
+        await prisma.setting.upsert({
+            where: { key },
+            create: { key, value, scope: "global" },
+            update: { value }
+        });
+    } finally {
+        forgetSettingReads();
     }
-    await prisma.setting.upsert({
-        where: { key },
-        create: { key, value, scope: "global" },
-        update: { value }
-    });
 }
 
 /**
@@ -46,6 +72,14 @@ export async function swapSetting(
     expected: string | null,
     value: string
 ): Promise<boolean> {
+    try {
+        return await swap(key, expected, value);
+    } finally {
+        forgetSettingReads();
+    }
+}
+
+async function swap(key: string, expected: string | null, value: string): Promise<boolean> {
     if (expected === null) {
         // A plain create and its unique-key refusal, rather than `createMany` with
         // `skipDuplicates`: SQLite, which a local Polaris runs on, has no such

@@ -45,6 +45,7 @@ import { readPublishedImage } from "./registry";
 import { getUpdateSource } from "./update-source";
 import { getSetting, setSetting } from "@/lib/setting-store";
 import { settleInstalled } from "@/lib/update-installed";
+import { coalescer } from "@/lib/coalesce";
 import { DEFAULT_UPDATE_SOURCE, type UpdateSource } from "@polaris/core";
 
 /** Where a deployment stands relative to what has been published. */
@@ -118,7 +119,7 @@ export const WEB_IMAGE_PATHS =
 const WEB_IMAGE_CHECKS = /^(changes|web|tag|dashboard-ci \/ .+)$/;
 
 let cache: { status: UpdateStatus; at: number } | null = null;
-let inflight: Promise<UpdateStatus> | null = null;
+const inflight = coalescer<UpdateStatus>();
 /** False once the cached answer was thrown away on purpose (`resetUpdateStatus`):
  *  the kept copy describes the same past, so it is not read back either. */
 let trustKept = true;
@@ -446,7 +447,7 @@ export async function getUpdateStatus(force = false): Promise<UpdateStatus> {
     if (!force) {
         if (!cache && trustKept) cache = await keptStatus();
         if (cache) {
-            if (now - cache.at >= CACHE_TTL_MS && !inflight) void check();
+            if (now - cache.at >= CACHE_TTL_MS && inflight.size === 0) void check();
             return cache.status;
         }
     }
@@ -454,40 +455,36 @@ export async function getUpdateStatus(force = false): Promise<UpdateStatus> {
 }
 
 function check(): Promise<UpdateStatus> {
-    if (inflight) return inflight;
-
-    inflight = query()
-        .then(async (status) => {
-            // The answer about to be replaced was made by whichever build ran
-            // last; when that is not this one, it names the build this update
-            // was installed over - the only record an install started by an
-            // older build leaves behind.
-            await settleInstalled(loadEnv().POLARIS_BUILD_SHA, await keptBuild()).catch(() => undefined);
-            cache = { status, at: Date.now() };
-            void setSetting(KEPT_KEY, JSON.stringify(cache)).catch(() => undefined);
-            return status;
-        })
-        .catch((caught): UpdateStatus => {
-            const env = loadEnv();
-            const message = caught instanceof Error ? caught.message : "Update check failed";
-            const fallback: UpdateStatus = cache?.status ?? {
-                phase: "unknown",
-                source: DEFAULT_UPDATE_SOURCE,
-                current: env.POLARIS_BUILD_SHA ? short(env.POLARIS_BUILD_SHA) : null,
-                latest: null,
-                behindBy: null,
-                upToDate: false,
-                buildingCount: null,
-                publishedAt: null,
-                checks: null,
-                checksUrl: null,
-                url: `https://github.com/${env.POLARIS_REPO}/commits/${env.POLARIS_UPDATE_BRANCH}`,
-                checkedAt: new Date().toISOString()
-            };
-            return { ...fallback, error: message };
-        })
-        .finally(() => {
-            inflight = null;
-        });
-    return inflight;
+    return inflight.run("status", () =>
+        query()
+            .then(async (status) => {
+                // The answer about to be replaced was made by whichever build ran
+                // last; when that is not this one, it names the build this update
+                // was installed over - the only record an install started by an
+                // older build leaves behind.
+                await settleInstalled(loadEnv().POLARIS_BUILD_SHA, await keptBuild()).catch(() => undefined);
+                cache = { status, at: Date.now() };
+                void setSetting(KEPT_KEY, JSON.stringify(cache)).catch(() => undefined);
+                return status;
+            })
+            .catch((caught): UpdateStatus => {
+                const env = loadEnv();
+                const message = caught instanceof Error ? caught.message : "Update check failed";
+                const fallback: UpdateStatus = cache?.status ?? {
+                    phase: "unknown",
+                    source: DEFAULT_UPDATE_SOURCE,
+                    current: env.POLARIS_BUILD_SHA ? short(env.POLARIS_BUILD_SHA) : null,
+                    latest: null,
+                    behindBy: null,
+                    upToDate: false,
+                    buildingCount: null,
+                    publishedAt: null,
+                    checks: null,
+                    checksUrl: null,
+                    url: `https://github.com/${env.POLARIS_REPO}/commits/${env.POLARIS_UPDATE_BRANCH}`,
+                    checkedAt: new Date().toISOString()
+                };
+                return { ...fallback, error: message };
+            })
+    );
 }

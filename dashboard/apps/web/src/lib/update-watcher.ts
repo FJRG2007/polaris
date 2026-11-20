@@ -27,7 +27,7 @@ import { dataSaverActive } from "@/lib/backup-access";
 import { usersWithPermission } from "@polaris/auth";
 import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus, type UpdateStatus } from "@/lib/update-service";
-import { getSetting, setSetting } from "@/lib/setting-store";
+import { forgetSettingReads, getSetting, setSetting } from "@/lib/setting-store";
 import { recordInstallFrom } from "@/lib/update-installed";
 import { currentUpdateRun, markUpdateStarted } from "@/lib/update-timing-store";
 import { notifyOperators, type OperatorAlert } from "@/lib/notifications/operators";
@@ -158,6 +158,14 @@ export async function saveAutoUpdatePolicy(policy: AutoUpdatePolicy): Promise<vo
  * caller can win. Returns false for everyone else.
  */
 async function claim(key: string, sha: string, value: string): Promise<boolean> {
+    try {
+        return await claimRow(key, sha, value);
+    } finally {
+        forgetSettingReads();
+    }
+}
+
+async function claimRow(key: string, sha: string, value: string): Promise<boolean> {
     try {
         await prisma.setting.create({ data: { key, value, scope: "global" } });
         return true;

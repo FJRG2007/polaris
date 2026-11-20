@@ -19,10 +19,13 @@ import { isNativeApp } from "@/lib/apps/native-apps";
 import { GAMES, GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 import { vpnMeshOn } from "@/lib/vpn/mesh";
 import { VPN_MESH } from "@/lib/vpn/settings";
+import { coalescer } from "@/lib/coalesce";
 
 const CACHE_TTL_MS = 15_000;
 
-const cache = new Map<string, { present: boolean; at: number }>();
+// Shared while in flight as well as for the TTL, so the burst of page loads that
+// lands on an expired answer asks the database once rather than once each.
+const presence = coalescer<boolean>({ ttlMs: CACHE_TTL_MS });
 
 /**
  * What else means an app is here, for one that was part of every Polaris before
@@ -63,21 +66,18 @@ const IMPLIED_BY: Readonly<Record<string, () => Promise<boolean>>> = {
 export async function isAppInstalled(catalogId: string): Promise<boolean> {
     // Part of every Polaris, with or without a row (see `native-apps`).
     if (isNativeApp(catalogId)) return true;
-    const hit = cache.get(catalogId);
-    if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.present;
-    const row = await prisma.installedApp.findFirst({
-        where: { catalogId, status: { not: "removed" } },
-        select: { id: true }
+    return presence.run(catalogId, async () => {
+        const row = await prisma.installedApp.findFirst({
+            where: { catalogId, status: { not: "removed" } },
+            select: { id: true }
+        });
+        const implied = IMPLIED_BY[catalogId];
+        return row !== null || (implied ? await implied() : false);
     });
-    const implied = IMPLIED_BY[catalogId];
-    const present = row !== null || (implied ? await implied() : false);
-    cache.set(catalogId, { present, at: Date.now() });
-    return present;
 }
 
 /** Forget what was cached, so an install or an uninstall shows up at once rather
  *  than at the end of the TTL. Called with no argument it forgets everything. */
 export function invalidateInstallPresence(catalogId?: string): void {
-    if (catalogId) cache.delete(catalogId);
-    else cache.clear();
+    presence.forget(catalogId || undefined);
 }

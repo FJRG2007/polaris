@@ -15,8 +15,9 @@ import { refreshGitlabTokens } from "@/lib/agents/signin-gitlab";
 import { refreshOpencodeTokens } from "@/lib/agents/signin-opencode";
 import { asDirectPost, loginRequest, type LoginRequest } from "@/lib/agents/provider-login-http";
 import { oauthNeedsRefresh, writeOAuthSecret, type StoredOAuth } from "@/lib/agents/provider-oauth";
+import { coalescer } from "@/lib/coalesce";
 
-const inFlight = new Map<string, Promise<StoredOAuth>>();
+const inFlight = coalescer<StoredOAuth>();
 
 async function renew(provider: string, login: StoredOAuth, request: LoginRequest, now: number): Promise<StoredOAuth> {
     if (provider === "xai") {
@@ -50,9 +51,7 @@ export async function freshLogin(
     now = Date.now()
 ): Promise<StoredOAuth> {
     if (!oauthNeedsRefresh(login, now)) return login;
-    const running = inFlight.get(rowId);
-    if (running) return running;
-    const job = (async () => {
+    return inFlight.run(rowId, async () => {
         try {
             const renewed = await renew(provider, login, request, now);
             if (renewed !== login) await persist(writeOAuthSecret(renewed));
@@ -60,10 +59,6 @@ export async function freshLogin(
         } catch (caught) {
             console.warn(`[provider-login] ${provider} refresh failed:`, caught instanceof Error ? caught.message : "error");
             return login;
-        } finally {
-            inFlight.delete(rowId);
         }
-    })();
-    inFlight.set(rowId, job);
-    return job;
+    });
 }
