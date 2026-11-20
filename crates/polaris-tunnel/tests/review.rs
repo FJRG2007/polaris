@@ -266,7 +266,10 @@ async fn media_stays_fast_under_inbound_bulk() {
         );
     }
     assert!(lost <= 15, "{lost} of 150 media datagrams lost");
-    assert!(p95 < Duration::from_millis(100), "p95 {p95:?}");
+    // Latency is bounded the same way: a quiet machine sees a p95 of a few ms, a
+    // loaded CI runner has shown 121 ms, and a broken path (media queued behind
+    // the bulk, or waiting out a turn) shows up as the 1 s timeout instead.
+    assert!(p95 < Duration::from_millis(300), "p95 {p95:?}");
 }
 
 /// Accept on `listener` and echo, but never close after the other side does,
