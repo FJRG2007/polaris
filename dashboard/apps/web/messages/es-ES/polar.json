@@ -1979,7 +1979,7 @@
         "code": {
             "page": {
                 "title": "Polar",
-                "description": "Lo que alcanzan los chats de Polar, su enrutado base y dónde se ejecutan las sesiones de Code."
+                "description": "Lo que alcanzan los chats de Polar, su enrutado base, dónde se ejecutan las sesiones de Code y cuánto pueden gastar los agentes."
             },
             "pool": {
                 "title": "Dónde se ejecutan",
@@ -2024,7 +2024,60 @@
         },
         "links": {
             "access": "Quién puede usar Polar y gastar las claves del despliegue es un permiso: <link>Roles</link>, o las Capacidades de cada persona en Usuarios.",
-            "shared": "Las claves de proveedor, los límites de uso y el catálogo de modelos se comparten con Agentes, en <link>Ajustes de agentes</link>."
+            "shared": "Las claves de proveedor y el catálogo de modelos del despliegue están en <link>Proveedores de IA</link>. Los límites de uso y los ajustes de agentes, más abajo."
+        },
+        "providers": {
+            "title": "Proveedores IA",
+            "intro": "Las cuentas propias de este despliegue con los proveedores de modelos. Una clave se entrega a una ejecución mediante una llamada autenticada y nunca se escribe en un repositorio, así que al sustituirla aquí el cambio se aplica en todas partes a la vez. Cada proveedor te factura directamente: Polaris no añade nada.",
+            "keys": {
+                "title": "Las claves de proveedor del despliegue",
+                "hint": "Se prueban de arriba abajo. La primera clave cuyo proveedor sirve el modelo es la que usa una ejecución.",
+                "empty": "Aún no hay claves. Sin ninguna, solo puede ejecutar algo quien traiga la suya.",
+                "adding": "La cuenta del proveedor a la que se facturan las ejecuciones de este despliegue."
+            },
+            "accounts": {
+                "title": "Las cuentas de agente del despliegue",
+                "hint": "Inicia sesión con un agente para quien no lo haga con su propia cuenta. Primero se prueba la de cada cuenta.",
+                "empty": "Aún no hay ninguna. Sin una, solo puede iniciar una sesión aquí quien traiga la suya."
+            },
+            "custom": {
+                "title": "Tus proveedores",
+                "hint": "Cualquier endpoint compatible con OpenAI o Anthropic, en todos los selectores.",
+                "empty": "Aún no hay ninguno.",
+                "add": "Añadir",
+                "remove": "Quitar",
+                "removeTitle": "¿Quitar {name}?",
+                "removeBody": "Deja de ofrecerse para claves nuevas.",
+                "removeKeys": "{count, plural, one {# clave guardada es suya y deja de funcionar hasta que se vuelva a añadir.} other {# claves guardadas son suyas y dejan de funcionar hasta que se vuelva a añadir.}}",
+                "keys": "{count, plural, one {# clave} other {# claves}}",
+                "dialog": {
+                    "title": "Añadir proveedor",
+                    "intro": "Sus claves se añaden como las demás, y las ejecuciones y Polar lo llaman aquí.",
+                    "name": "Nombre",
+                    "baseUrl": "URL base",
+                    "wire": "Formato API",
+                    "wireOpenai": "Compatible OpenAI",
+                    "wireAnthropic": "Compatible Anthropic",
+                    "envVar": "Variable",
+                    "defaultModel": "Modelo base",
+                    "probe": "URL de prueba",
+                    "docsUrl": "URL de docs",
+                    "optional": "(opcional)",
+                    "save": "Añadir",
+                    "cancel": "Cancelar"
+                },
+                "errors": {
+                    "taken": "Ya existe un proveedor con este nombre.",
+                    "envTaken": "Otro proveedor ya lee esta variable.",
+                    "invalid": "Revisa este valor.",
+                    "name": "Usa de 2 a 60 caracteres.",
+                    "publicHttps": "Usa una dirección https:// pública.",
+                    "envVar": "Mayúsculas, dígitos y _, empezando por letra.",
+                    "envVarReserved": "Polaris reserva esta variable.",
+                    "model": "Usa el id del modelo, sin espacios.",
+                    "failed": "No se pudo guardar. Inténtalo otra vez."
+                }
+            }
         }
     },
     "routing": {

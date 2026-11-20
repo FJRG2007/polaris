@@ -17,7 +17,7 @@ Automations and Settings.
 1. **A GitHub App.** It lets the agent comment, review and open pull requests
    as itself, and lets Polaris hear about issues and pull requests. A personal
    access token cannot do either. An administrator creates it in one click
-   under **Management > Integrations & AI > Integrations** (see
+   under **Management > Integrations** (see
    [Setting up integrations](../integrations-setup.md#github)).
 2. **A model provider.** Your own key with Anthropic, OpenAI, Google, xAI,
    DeepSeek, Moonshot, Groq, Cerebras or OpenRouter, or an OpenAI-compatible

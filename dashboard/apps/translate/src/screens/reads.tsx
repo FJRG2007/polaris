@@ -39,7 +39,7 @@ export function ReadsNotice({ kind, manager }: { kind: "images" | "audio"; manag
             <p className="min-w-0 flex-1 text-sm text-muted-foreground">{text}</p>
             {manager ? (
                 <Button asChild size="sm" variant="outline">
-                    <Link href="/admin/integrations/models">{t("reads.setUp")}</Link>
+                    <Link href="/admin/apps/polar/settings/providers">{t("reads.setUp")}</Link>
                 </Button>
             ) : null}
         </div>

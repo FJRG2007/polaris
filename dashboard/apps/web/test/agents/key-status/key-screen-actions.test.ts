@@ -1,7 +1,7 @@
 /**
  * The limit and revive writes on both key screens: each hands the shared write
  * its own scope - the signed-in person's keys on /polar/settings/providers, the
- * deployment's on /integrations/models - so neither screen can reach the
+ * deployment's on /admin/apps/polar/settings/providers - so neither screen can reach the
  * other's rows.
  */
 
@@ -42,7 +42,7 @@ vi.mock("@/lib/agents/model-key-actions", () => {
 });
 
 const account = await import("@/app/(app)/polar/settings/providers/actions");
-const instance = await import("@/app/(app)/admin/integrations/models/actions");
+const instance = await import("@/app/(app)/admin/apps/[appId]/settings/_polar/providers/actions");
 
 const ID = "0190a3c2-7a3e-7000-8000-000000000001";
 
@@ -62,8 +62,8 @@ describe("key screen actions", () => {
         await instance.limitInstanceModelKeyAction({ id: ID, limits: {} });
         await instance.reviveInstanceModelKeyAction({ id: ID });
         expect(calls.map((call) => [call.write, call.owner, call.path])).toEqual([
-            ["limit", null, "/admin/integrations/models"],
-            ["revive", null, "/admin/integrations/models"]
+            ["limit", null, "/admin/apps/polar/settings/providers"],
+            ["revive", null, "/admin/apps/polar/settings/providers"]
         ]);
     });
 });

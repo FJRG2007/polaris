@@ -47,7 +47,7 @@ const { configuredFetch, RefusedAddressError } = await import("@/lib/safe-fetch"
 const { gatewayKeyConfigSchema } = await import("@polaris/core");
 
 const account = { owner: "user-1", actorId: "user-1", path: "/polar/settings/providers", audit: "account" as const };
-const instance = { owner: "instance", actorId: "admin-1", path: "/admin/integrations/models", audit: "instance" as const };
+const instance = { owner: "instance", actorId: "admin-1", path: "/admin/apps/polar/settings/providers", audit: "instance" as const };
 const ID = "0190a3c2-7a3e-7000-8000-000000000001";
 
 const gateway = (baseUrl: string) => ({

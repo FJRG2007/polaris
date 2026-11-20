@@ -11,7 +11,6 @@
  */
 
 import { z } from "zod";
-import * as agents from "./agents/data";
 import * as apps from "./apps/data";
 import * as appSettings from "./apps/[appId]/settings/data";
 import * as billing from "./billing/data";
@@ -46,7 +45,6 @@ export const PAINT_READS = {
     "users.access": read(person, ({ id }) => user.loadUserAccessAction(id)),
     "users.security": read(person, ({ id }) => user.loadUserSecurityAction(id)),
     "users.danger": read(person, ({ id }) => user.loadUserDangerAction(id)),
-    agents: read(none, () => agents.loadAgentsAdminAction()),
     apps: read(none, () => apps.loadPolarisAppsAction()),
     "apps.settings": read(z.object({ appId: z.string().trim().min(1).max(100) }), ({ appId }) =>
         appSettings.loadAppSettingsAction(appId)

@@ -35,7 +35,7 @@
  */
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
@@ -43,7 +43,8 @@ import { useDisplayFormat } from "@/components/display-format";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ApiKeyView } from "@polaris/auth";
-import { deleteApiKeyAction, revokeApiKeyAction, toggleApiKeyAction } from "./actions";
+import { deleteApiKeyAction, deleteApiKeysAction, revokeApiKeyAction, toggleApiKeyAction } from "./actions";
+import { SelectionBar } from "@/components/selection-bar";
 import { Ban, BarChart3, BookOpen, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { API_KEY_ENVIRONMENTS, describeDevice, type ApiKeyEnvironment } from "@polaris/core";
 import * as list from "./api-keys-filter";
@@ -58,7 +59,9 @@ import {
     Input,
     Select,
     Switch,
-    cn
+    cn,
+    Checkbox,
+    useRowSelection
 } from "@polaris/ui";
 
 /** The one line that says a key is narrower than it looks, or nothing when it is
@@ -127,6 +130,38 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
     const apps = useMemo(() => list.appsInKeys(keys), [keys]);
     const shown = useMemo(() => list.filterKeys(keys, filters), [keys, filters]);
     const narrowed = shown.length !== keys.length;
+    const shownIds = useMemo(() => shown.map((key) => key.id), [shown]);
+    const selection = useRowSelection(shownIds);
+    const [bulkBusy, setBulkBusy] = useState(false);
+
+    // One write for every chosen key; the rows leave at once and any the server
+    // kept come back.
+    async function removeChosen() {
+        const ids = selection.chosen;
+        if (ids.length === 0) return;
+        const ok = await confirm({
+            title: t("apiKeys.list.bulkDeleteTitle", { count: ids.length }),
+            description: t("apiKeys.list.deleteDescription"),
+            confirmLabel: t("apiKeys.list.delete"),
+            danger: true
+        });
+        if (!ok) return;
+        const previous = keys;
+        setKeys(keys.filter((row) => !ids.includes(row.id)));
+        setError(null);
+        setBulkBusy(true);
+        const result = await deleteApiKeysAction({ ids }).catch(() => null);
+        setBulkBusy(false);
+        if (!result) {
+            setKeys(previous);
+            return;
+        }
+        const gone = new Set(result.done);
+        setKeys(previous.filter((row) => !gone.has(row.id)));
+        selection.forget(result.done);
+        if (result.error) setError(result.error);
+        router.refresh();
+    }
 
     function change<K extends keyof list.KeyFilters>(field: K, value: list.KeyFilters[K]) {
         setFilters((current) => ({ ...current, [field]: value }));
@@ -292,10 +327,30 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
                 // Scrolls sideways rather than shrinking: nine columns on a phone
                 // would be nine unreadable ones. The same table every list in
                 // Polaris is drawn as - servers, containers, game servers.
-                <div className="overflow-x-auto rounded-lg border border-border">
+                <div className="flex flex-col gap-2">
+                {selection.chosen.length > 0 ? (
+                    <SelectionBar
+                        count={selection.chosen.length}
+                        label={t("apiKeys.list.selectionLabel")}
+                        busy={bulkBusy}
+                        onDelete={() => void removeChosen()}
+                        onClear={selection.clear}
+                    />
+                ) : null}
+                {/* Ctrl+A and Escape are heard here, as Drive's file list hears them. */}
+                <div className="overflow-x-auto rounded-lg border border-border" onKeyDown={selection.onKeyDown}>
                     <table className="w-full min-w-[62rem] text-sm">
                         <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                             <tr>
+                                <th scope="col" className="w-8 px-2 py-2">
+                                    <Checkbox
+                                        aria-label={t("apiKeys.list.selectAll")}
+                                        checked={selection.all}
+                                        indeterminate={selection.some}
+                                        disabled={shownIds.length === 0}
+                                        onChange={selection.toggleAll}
+                                    />
+                                </th>
                                 <th scope="col" className="w-full max-w-0 px-3 py-2 font-medium">
                                     {t("apiKeys.list.columns.name")}
                                 </th>
@@ -339,12 +394,14 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
                                     onRevoke={() => void revoke(key)}
                                     onToggle={(enabled) => void toggle(key, enabled)}
                                     onDelete={() => void remove(key)}
+                                    chosen={selection.isChosen(key.id)}
+                                    onChoose={(event) => selection.pressBox(key.id, event)}
                                 />
                             ))}
                             {shown.length === 0 ? (
                                 <tr>
                                     <td
-                                        colSpan={10}
+                                        colSpan={11}
                                         className="px-3 py-10 text-center text-sm text-muted-foreground"
                                     >
                                         <span className="flex flex-col items-center gap-2">
@@ -363,6 +420,7 @@ export function ApiKeysView({ keys: served }: { keys: ApiKeyView[] }) {
                         </tbody>
                     </table>
                 </div>
+                </div>
             )}
 
             {confirmElement}
@@ -375,13 +433,17 @@ function KeyRow({
     date,
     onRevoke,
     onToggle,
-    onDelete
+    onDelete,
+    chosen,
+    onChoose
 }: {
     entry: ApiKeyView;
     date: (iso: string) => string;
     onRevoke: () => void;
     onToggle: (enabled: boolean) => void;
     onDelete: () => void;
+    chosen: boolean;
+    onChoose: (event: ReactMouseEvent) => void;
 }) {
     const t = useTranslations("account");
     const href = `/account/api-keys/${entry.id}`;
@@ -390,7 +452,18 @@ function KeyRow({
     const limits = describeLimits(entry, t);
 
     return (
-        <tr className="border-t border-border hover:bg-card-hover">
+        <tr aria-selected={chosen} className={`border-t border-border hover:bg-card-hover ${chosen ? "bg-primary/5" : ""}`}>
+            <td className="px-2 py-2 align-top">
+                <Checkbox
+                    aria-label={t("apiKeys.list.selectNamed", { name: entry.name })}
+                    checked={chosen}
+                    onClick={(event) => {
+                        event.stopPropagation();
+                        onChoose(event);
+                    }}
+                    onChange={() => undefined}
+                />
+            </td>
             <td className="max-w-0 px-3 py-2 align-top">
                 <span className="flex min-w-0 items-center gap-2">
                     <Link

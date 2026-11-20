@@ -4,7 +4,7 @@
  * The provider keys an owner brought, in the order they want them tried.
  *
  * One screen serving two owners: the account under /polar/settings/providers and the
- * deployment under /integrations/models. They ask for the same things and behave
+ * deployment under /admin/apps/polar/settings/providers. They ask for the same things and behave
  * the same way, so they are the same component - the caller supplies the writes,
  * the wording around the table, and whatever belongs under it.
  *
@@ -25,13 +25,14 @@ import { IntegrationLogo } from "@/components/logos";
 import type { AgentSignin } from "@/lib/agents/agent-signins";
 import { SigninDialog, type SigninDialogActions, type SigninDialogMode } from "./signin-dialog";
 import { useConfirm } from "@/components/confirm-dialog";
-import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import type { SigninStatus } from "@/lib/agents/signin-status";
 import { machineLoginCheck, machineLoginEnv } from "@/lib/agents/machine-login-config";
 import { RelativeTime } from "@/components/relative-time";
 import type { ModelKeyView } from "@/lib/agents/model-keys";
 import type { ProviderRow } from "@/lib/agents/model-key-providers";
-import type { KeyActionResult } from "@/lib/agents/model-key-actions";
+import type { BulkKeyResult, KeyActionResult } from "@/lib/agents/model-key-actions";
+import { SelectionBar } from "@/components/selection-bar";
 import { anthropicWorkspaceIdSchema, modelKeyNameSchema } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -84,6 +85,8 @@ import {
     Select,
     SortHeader,
     Switch,
+    Checkbox,
+    useRowSelection,
     DateInput,
     type TableSortDirection
 } from "@polaris/ui";
@@ -105,6 +108,10 @@ export interface ModelKeyActions {
     reorder: (input: unknown) => Promise<KeyActionResult>;
     /** Switching one on or off. Absent where the screen offers no switch. */
     toggle?: (input: unknown) => Promise<KeyActionResult>;
+    /** Removing several chosen rows in one write. Absent where rows cannot be chosen. */
+    removeMany?: (input: unknown) => Promise<BulkKeyResult>;
+    /** Switching several chosen rows on or off in one write. */
+    toggleMany?: (input: unknown) => Promise<BulkKeyResult>;
     /** Setting a key's own allowance. Absent where the table offers none. */
     limit?: (input: unknown) => Promise<KeyActionResult>;
     /** Putting a cooled key back in rotation now. */
@@ -506,6 +513,15 @@ export function ModelKeysView({
     const sortBy = (order: ConnectionSort) => setSort((current) => nextSort(current, order));
     const applied = useMemo(() => ({ ...filters, query: typed }), [filters, typed]);
     const arranged = useMemo(() => arrangeConnections(entries, applied, sort), [entries, applied, sort]);
+    // Rows are chosen the way Drive's file list chooses them. Only stored rows
+    // can be: the deployment's keys shown on an account's table are not its own.
+    const selectable = Boolean(actions.removeMany);
+    const choosableIds = useMemo(
+        () => arranged.filter((entry) => entry.kind !== "deployment").map((entry) => entry.id),
+        [arranged]
+    );
+    const selection = useRowSelection(choosableIds);
+    const [bulkBusy, setBulkBusy] = useState(false);
     // A row can only be moved where the table shows the order it moves in.
     const sortedOtherwise = sort.order !== "priority" || sort.direction !== "asc";
     const reorderable = !sortedOtherwise && !isNarrowed({ ...filters, query: search });
@@ -616,6 +632,55 @@ export function ModelKeysView({
         setLimiting(null);
         router.refresh();
         return null;
+    };
+
+    // One write for every chosen row. The rows leave the table at once; any the
+    // server did not remove come back, with its reason.
+    const removeChosen = async () => {
+        const ids = selection.chosen;
+        if (!actions.removeMany || ids.length === 0) return;
+        const ok = await confirm({
+            title: t("modelKeys.bulk.deleteTitle", { count: ids.length }),
+            description: t("modelKeys.bulk.deleteBody", { count: ids.length }),
+            confirmLabel: t("selectionBar.delete", { count: ids.length }),
+            danger: true
+        });
+        if (!ok) return;
+        const previous = rows;
+        setRows(rows.filter((row) => !ids.includes(row.id)));
+        setError(null);
+        setBulkBusy(true);
+        const result = await runAction(() => actions.removeMany!({ ids }), setError);
+        setBulkBusy(false);
+        if (!result) {
+            setRows(previous);
+            return;
+        }
+        const gone = new Set(result.done);
+        setRows(previous.filter((row) => !gone.has(row.id)));
+        if (result.error) setError(result.error);
+        selection.forget(result.done);
+        router.refresh();
+    };
+
+    // Flipped at once and put back where the server refused.
+    const toggleChosen = async (enabled: boolean) => {
+        const ids = selection.chosen;
+        if (!actions.toggleMany || ids.length === 0) return;
+        const previous = rows;
+        setRows(rows.map((row) => (ids.includes(row.id) ? { ...row, enabled } : row)));
+        setError(null);
+        setBulkBusy(true);
+        const result = await runAction(() => actions.toggleMany!({ ids, enabled }), setError);
+        setBulkBusy(false);
+        if (!result) {
+            setRows(previous);
+            return;
+        }
+        const done = new Set(result.done);
+        setRows(previous.map((row) => (done.has(row.id) ? { ...row, enabled } : row)));
+        if (result.error) setError(result.error);
+        router.refresh();
     };
 
     const remove = async (key: ModelKeyView) => {
@@ -751,7 +816,32 @@ export function ModelKeysView({
                     </div>
                 ) : null}
 
-                <div className="overflow-x-auto rounded-lg border border-border">
+                {selectable && selection.chosen.length > 0 ? (
+                    <SelectionBar
+                        count={selection.chosen.length}
+                        label={t("modelKeys.bulk.label")}
+                        busy={bulkBusy}
+                        onDelete={() => void removeChosen()}
+                        onClear={selection.clear}
+                    >
+                        {actions.toggleMany ? (
+                            <>
+                                <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => void toggleChosen(true)}>
+                                    {t("modelKeys.bulk.turnOn")}
+                                </Button>
+                                <Button size="sm" variant="secondary" disabled={bulkBusy} onClick={() => void toggleChosen(false)}>
+                                    {t("modelKeys.bulk.turnOff")}
+                                </Button>
+                            </>
+                        ) : null}
+                    </SelectionBar>
+                ) : null}
+
+                {/* Ctrl+A and Escape are heard here, as Drive's file list hears them. */}
+                <div
+                    className="overflow-x-auto rounded-lg border border-border"
+                    onKeyDown={selectable ? selection.onKeyDown : undefined}
+                >
                     <table className="w-full text-sm">
                         {/* Each column waits for the width that holds it, and nothing
                             arrives at md: that is where the navigation rail appears, so
@@ -759,6 +849,17 @@ export function ModelKeysView({
                             earlier. */}
                         <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
                             <tr>
+                                {selectable ? (
+                                    <th className="w-8 px-2 py-2">
+                                        <Checkbox
+                                            aria-label={t("modelKeys.bulk.selectAll")}
+                                            checked={selection.all}
+                                            indeterminate={selection.some}
+                                            disabled={choosableIds.length === 0}
+                                            onChange={selection.toggleAll}
+                                        />
+                                    </th>
+                                ) : null}
                                 <SortHeader
                                     className="w-10"
                                     label={<span className="sr-only sm:not-sr-only">#</span>}
@@ -805,7 +906,7 @@ export function ModelKeysView({
                         <tbody>
                             {arranged.length === 0 ? (
                                 <tr>
-                                    <td colSpan={showStatus ? 8 : 7} className="text-muted-foreground px-3 py-8 text-center">
+                                    <td colSpan={(showStatus ? 8 : 7) + (selectable ? 1 : 0)} className="text-muted-foreground px-3 py-8 text-center">
                                         {entries.length === 0 ? copy.empty : t("modelKeys.table.noMatch")}
                                     </td>
                                 </tr>
@@ -821,6 +922,7 @@ export function ModelKeysView({
                                                 yours={held.yours}
                                                 columns={columns}
                                                 showStatus={showStatus}
+                                                selectable={selectable}
                                             />
                                         );
                                     }
@@ -840,6 +942,15 @@ export function ModelKeysView({
                                             onMove={move}
                                             onEdit={() => setEditing(row)}
                                             onRemove={() => void remove(row)}
+                                            choose={
+                                                selectable
+                                                    ? {
+                                                          chosen: selection.isChosen(row.id),
+                                                          onPress: (event) => selection.pressBox(row.id, event),
+                                                          onRowPress: (event) => selection.pressRow(row.id, event)
+                                                      }
+                                                    : null
+                                            }
                                             onToggle={toggle ? (enabled) => void toggle(row, enabled) : null}
                                             status={showStatus ? (statuses?.[row.id] ?? null) : undefined}
                                             onLimits={
@@ -983,13 +1094,16 @@ function DeploymentRow({
     name,
     yours,
     columns,
-    showStatus
+    showStatus,
+    selectable
 }: {
     slug: string;
     name: string;
     yours: boolean;
     columns: Columns;
     showStatus: boolean;
+    /** Whether the table has a column of checkboxes, which this row leaves empty. */
+    selectable: boolean;
 }) {
     const t = useTranslations("components");
     const label = yours ? t("modelKeys.table.usingYours") : t("modelKeys.table.usingDeployment");
@@ -1000,6 +1114,7 @@ function DeploymentRow({
     );
     return (
         <tr className="border-t border-border bg-surface/30" title={t("modelKeys.table.deploymentHint")}>
+            {selectable ? <td className="px-2 py-2" /> : null}
             <td className="px-2 py-2">
                 <span className="sr-only">{t("modelKeys.table.readOnly")}</span>
             </td>
@@ -1102,6 +1217,7 @@ function KeyRow({
     status,
     onLimits,
     onRevive,
+    choose = null,
     machine = null
 }: {
     row: ModelKeyView;
@@ -1120,6 +1236,12 @@ function KeyRow({
     status?: KeyHealthView | null;
     onLimits?: (() => void) | null;
     onRevive?: (() => void) | null;
+    /** Where rows can be chosen: whether this one is, and its two ways of being pressed. */
+    choose?: {
+        chosen: boolean;
+        onPress: (event: ReactMouseEvent) => void;
+        onRowPress: (event: ReactMouseEvent) => boolean;
+    } | null;
     /**
      * The machine's own login: no key to show, its state is the login's
      * (undefined while asked, null where nothing is known), and its menu
@@ -1158,8 +1280,23 @@ function KeyRow({
                 const from = Number(event.dataTransfer.getData("text/plain"));
                 if (Number.isInteger(from)) onMove(from, index);
             }}
-            className={`border-t border-border ${over ? "bg-muted/40" : ""} ${expired || !row.enabled ? "opacity-60" : ""}`}
+            aria-selected={choose ? choose.chosen : undefined}
+            onClick={choose ? (event) => void choose.onRowPress(event) : undefined}
+            className={`border-t border-border ${over ? "bg-muted/40" : ""} ${choose?.chosen ? "bg-primary/5" : ""} ${expired || !row.enabled ? "opacity-60" : ""}`}
         >
+            {choose ? (
+                <td className="px-2 py-2">
+                    <Checkbox
+                        aria-label={t("modelKeys.bulk.selectNamed", { name: row.name })}
+                        checked={choose.chosen}
+                        onClick={(event) => {
+                            event.stopPropagation();
+                            choose.onPress(event);
+                        }}
+                        onChange={() => undefined}
+                    />
+                </td>
+            ) : null}
             <td className="px-2 py-2" title={reorderable ? undefined : reorderReason}>
                 <div className="flex items-center gap-1">
                     <GripVertical

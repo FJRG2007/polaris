@@ -2945,7 +2945,7 @@ export function PolarChat({
                                         </Link>
                                         {isAdmin ? (
                                             <Link
-                                                href="/admin/integrations/models"
+                                                href="/admin/apps/polar/settings/providers"
                                                 className="text-primary hover:underline"
                                             >
                                                 {t("noKeys.admin")}

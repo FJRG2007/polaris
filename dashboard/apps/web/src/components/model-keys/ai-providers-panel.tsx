@@ -47,7 +47,8 @@ export type ProvidersOwner =
           /** The sign-ins kept on this person's sessions' machine. */
           signin: AssistedSignin["actions"];
       }
-    | { kind: "deployment"; sharedFooter: ReactNode; privateFooter: ReactNode };
+    /** `footer` is drawn under the table, told whether the keys are shared. */
+    | { kind: "deployment"; footer: (shared: boolean) => ReactNode };
 
 export async function AiProvidersPanel({
     owner,
@@ -114,7 +115,7 @@ export async function AiProvidersPanel({
                         connectOptions={connectOptions(assisted)}
                         actions={actions.keys}
                         copy={{ ...words, empty: fallback?.covered && emptyShared ? emptyShared : words.empty }}
-                        footer={owner.kind === "deployment" ? (shared ? owner.sharedFooter : owner.privateFooter) : undefined}
+                        footer={owner.kind === "deployment" ? owner.footer(shared) : undefined}
                         assist={
                             account && fallback
                                 ? { signins: assisted, connected: fallback.connected, actions: account.signin }

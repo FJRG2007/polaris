@@ -36,9 +36,9 @@ ungrouped; People, Access and Communication are as they were.
 | Updates & settings | `/admin/settings` | Platform | General |
 | Display defaults | `/admin/display` | Platform | General |
 | Domains | `/admin/domains` | Platform | General |
-| Integrations | `/admin/integrations` | Platform | Integrations & AI |
-| AI providers | `/admin/integrations/models` | Platform | Integrations & AI |
-| Agent defaults | `/admin/agents` | Platform | Integrations & AI |
+| Integrations | `/admin/integrations` | Platform | Integrations |
+| AI providers | `/admin/apps/polar/settings/providers` | Platform | Polaris apps > Polar > Settings |
+| Agent defaults | `/admin/apps/polar/settings` | Platform | Polaris apps > Polar > Settings |
 | Storage locations | `/admin/storage` | Platform | Storage & data |
 | Uploads | `/admin/uploads` | Platform | Storage & data |
 | Keeping records | `/admin/retention` | Platform | Storage & data |

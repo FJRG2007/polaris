@@ -1057,6 +1057,54 @@ const ADMIN_AREAS: AppSubapp[] = [
                 keywords: ["marketplace", "install", "catalog", "built in"]
             },
             {
+                // Opened from Polar's card under Polaris apps; kept for search only.
+                label: "Polar", // i18n-ignore
+                href: "/admin/apps/polar/settings",
+                adminOnly: true,
+                icon: Bot,
+                hidden: true,
+                keywords: [
+                    "agents",
+                    "quality gate",
+                    "enigma",
+                    "public",
+                    "private",
+                    "pull requests",
+                    "issues",
+                    "usage limits",
+                    "spend",
+                    "routing",
+                    "code sessions",
+                    "agent defaults"
+                ]
+            },
+            {
+                // The deployment's provider keys, a screen of Polar's settings.
+                label: "AI providers", // i18n-ignore
+                href: "/admin/apps/polar/settings/providers",
+                adminOnly: true,
+                icon: Sparkles,
+                hidden: true,
+                keywords: [
+                    "models",
+                    "providers",
+                    "anthropic",
+                    "claude",
+                    "openai",
+                    "gemini",
+                    "grok",
+                    "deepseek",
+                    "kimi",
+                    "groq",
+                    "cerebras",
+                    "openrouter",
+                    "api key",
+                    "agents",
+                    "model catalog",
+                    "key sharing"
+                ]
+            },
+            {
                 // Opened from Chat's card under Polaris apps, like every other
                 // app's settings; kept for search only.
                 label: "Chat", // i18n-ignore
@@ -1147,10 +1195,9 @@ const ADMIN_AREAS: AppSubapp[] = [
     },
     {
         id: "admin-integrations",
-        label: "Integrations & AI", // i18n-ignore
+        label: "Integrations", // i18n-ignore
         icon: Blocks,
         base: "/admin/integrations",
-        match: ["/admin/agents"],
         parent: { label: "Management", href: "/admin" }, // i18n-ignore
         parentAppId: "admin",
         sections: [
@@ -1160,28 +1207,6 @@ const ADMIN_AREAS: AppSubapp[] = [
                 adminOnly: true,
                 icon: Blocks,
                 keywords: ["github", "cloudflare", "connect"]
-            },
-            {
-                label: "AI providers", // i18n-ignore
-                href: "/admin/integrations/models",
-                adminOnly: true,
-                icon: Sparkles,
-                keywords: [
-                    "models",
-                    "providers",
-                    "anthropic",
-                    "claude",
-                    "openai",
-                    "gemini",
-                    "grok",
-                    "deepseek",
-                    "kimi",
-                    "groq",
-                    "cerebras",
-                    "openrouter",
-                    "api key",
-                    "agents"
-                ]
             },
             {
                 // Senders belong to whoever added them, so anybody holding
@@ -1218,21 +1243,6 @@ const ADMIN_AREAS: AppSubapp[] = [
                     "verification codes",
                     "twilio",
                     "360dialog"
-                ]
-            },
-            {
-                label: "Agent defaults", // i18n-ignore
-                href: "/admin/agents",
-                adminOnly: true,
-                icon: Bot,
-                keywords: [
-                    "agents",
-                    "quality gate",
-                    "enigma",
-                    "public",
-                    "private",
-                    "pull requests",
-                    "issues"
                 ]
             }
         ]

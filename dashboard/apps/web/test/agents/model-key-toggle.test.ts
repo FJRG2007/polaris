@@ -20,7 +20,12 @@ vi.mock("@/lib/agents/model-keys", () => ({
         return true;
     },
     createModelKey: vi.fn(),
-    deleteModelKey: vi.fn(),
+    deleteModelKey: async (owner: string | null, id: string) => {
+        const row = state.rows.get(id);
+        if (!row || row.userId !== owner) return false;
+        state.rows.delete(id);
+        return true;
+    },
     heldModelKey: vi.fn(),
     isStorableProvider: vi.fn(),
     ownerHasModelKeyName: vi.fn(),
@@ -37,13 +42,16 @@ vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
 vi.mock("@/lib/agents/provider-key-check", () => ({ checkProviderKey: vi.fn() }));
 vi.mock("@/lib/i18n/reader-words", () => ({ readerWords: async () => (key: string) => key }));
 
-const { toggleKey } = await import("@/lib/agents/model-key-actions");
+vi.mock("@/lib/agents/agent-signins", () => ({ agentSignins: () => [] }));
+vi.mock("@/lib/agents/machine-logins", () => ({ machineLoginOf: async () => null }));
+
+const { removeKeys, toggleKey, toggleKeys } = await import("@/lib/agents/model-key-actions");
 
 const ID = "0190a3c2-7a3e-7000-8000-000000000001";
 const scope = {
     owner: null,
     actorId: "admin-1",
-    path: "/admin/integrations/models",
+    path: "/admin/apps/polar/settings/providers",
     audit: "instance" as const
 };
 
@@ -96,5 +104,38 @@ describe("toggleKey", () => {
         state.rows.set(ID, { userId: "user-2", enabled: true });
         expect((await toggleKey(own, { id: ID, enabled: false })).error).toBeTruthy();
         expect(state.rows.get(ID)?.enabled).toBe(true);
+    });
+});
+
+describe("bulk writes", () => {
+    const OTHER = "0190a3c2-7a3e-7000-8000-000000000002";
+    const THEIRS = "0190a3c2-7a3e-7000-8000-000000000003";
+
+    beforeEach(() => {
+        state.rows.set(OTHER, { userId: null, enabled: true });
+        state.rows.set(THEIRS, { userId: "someone", enabled: true });
+    });
+
+    it("switches every chosen row this owner holds, and skips the rest", async () => {
+        expect(await toggleKeys(scope, { ids: [ID, OTHER, THEIRS], enabled: false })).toEqual({ done: [ID, OTHER] });
+        expect(state.rows.get(ID)?.enabled).toBe(false);
+        expect(state.rows.get(THEIRS)?.enabled).toBe(true);
+        expect(state.audits).toHaveLength(2);
+    });
+
+    it("removes every chosen row this owner holds, and never another owner's", async () => {
+        expect(await removeKeys(scope, { ids: [ID, THEIRS, OTHER] })).toEqual({ done: [ID, OTHER] });
+        expect(state.rows.has(THEIRS)).toBe(true);
+        expect(state.audits.map((entry) => entry.action)).toEqual(["instance.ai-key.deleted", "instance.ai-key.deleted"]);
+    });
+
+    it("says so when none of the chosen rows was there to remove", async () => {
+        expect(await removeKeys(scope, { ids: [THEIRS] })).toEqual({ done: [], error: "refusals.aiKeys.keyGone" });
+    });
+
+    it("refuses an empty or unbounded list", async () => {
+        expect((await removeKeys(scope, { ids: [] })).error).toBe("refusals.aiKeys.pickKey");
+        const many = Array.from({ length: 201 }, () => ID);
+        expect((await toggleKeys(scope, { ids: many, enabled: true })).error).toBe("refusals.aiKeys.pickKey");
     });
 });

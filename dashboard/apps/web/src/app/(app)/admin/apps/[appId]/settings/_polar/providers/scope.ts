@@ -9,5 +9,5 @@ import type { KeyScope } from "@/lib/agents/model-key-actions";
 
 export async function instanceScope(): Promise<KeyScope> {
     const admin = await requireAdmin();
-    return { owner: INSTANCE, actorId: admin.id, path: "/admin/integrations/models", audit: "instance" };
+    return { owner: INSTANCE, actorId: admin.id, path: "/admin/apps/polar/settings/providers", audit: "instance" };
 }

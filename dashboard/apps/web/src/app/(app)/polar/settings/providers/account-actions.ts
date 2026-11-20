@@ -13,8 +13,10 @@ export const ACCOUNT_ACTIONS = {
         add: keys.addModelKeyAction,
         update: keys.updateModelKeyAction,
         remove: keys.deleteModelKeyAction,
+        removeMany: keys.deleteModelKeysAction,
         reorder: keys.reorderModelKeysAction,
         toggle: keys.toggleModelKeyAction,
+        toggleMany: keys.toggleModelKeysAction,
         limit: keys.limitModelKeyAction,
         revive: keys.reviveModelKeyAction
     },

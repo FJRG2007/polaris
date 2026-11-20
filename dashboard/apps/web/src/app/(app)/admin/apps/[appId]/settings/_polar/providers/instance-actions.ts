@@ -13,8 +13,10 @@ export const INSTANCE_ACTIONS = {
         add: keys.addInstanceModelKeyAction,
         update: keys.updateInstanceModelKeyAction,
         remove: keys.deleteInstanceModelKeyAction,
+        removeMany: keys.deleteInstanceModelKeysAction,
         reorder: keys.reorderInstanceModelKeysAction,
         toggle: keys.toggleInstanceModelKeyAction,
+        toggleMany: keys.toggleInstanceModelKeysAction,
         limit: keys.limitInstanceModelKeyAction,
         revive: keys.reviveInstanceModelKeyAction
     },

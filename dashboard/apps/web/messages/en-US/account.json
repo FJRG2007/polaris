@@ -270,7 +270,12 @@
             "more": "More",
             "edit": "Edit",
             "reference": "API reference",
-            "usage": "Usage"
+            "usage": "Usage",
+            "bulkGone": "Those keys are already gone.",
+            "bulkDeleteTitle": "{count, plural, one {Delete # key?} other {Delete # keys?}}",
+            "selectionLabel": "Chosen keys",
+            "selectAll": "Select all keys",
+            "selectNamed": "Select {name}"
         },
         "form": {
             "neverExpires": "Never expires",

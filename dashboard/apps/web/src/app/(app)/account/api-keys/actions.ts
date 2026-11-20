@@ -12,6 +12,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { prisma } from "@polaris/db";
 import {
     createApiKey,
     deleteApiKey,
@@ -112,6 +113,33 @@ export async function deleteApiKeyAction(id: string): Promise<{ error?: string }
     });
     revalidatePath("/account/api-keys");
     return {};
+}
+
+const deleteApiKeysSchema = z.object({ ids: z.array(z.string().uuid()).min(1).max(200) });
+
+/**
+ * Delete several of this account's keys at once. Each id is looked up against
+ * the signed-in person first, so a key that is not theirs is skipped rather than
+ * touched, and the result names only the keys that went.
+ */
+export async function deleteApiKeysAction(input: unknown): Promise<{ done: string[]; error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ done: [] as string[], error: blocked });
+    const parsed = deleteApiKeysSchema.safeParse(input);
+    if (!parsed.success) return { done: [], error: (await getTranslations("account"))("apiKeys.list.bulkGone") };
+    const owned = await prisma.apiKey.findMany({
+        where: { id: { in: [...new Set(parsed.data.ids)] }, userId: user.id },
+        select: { id: true }
+    });
+    const done: string[] = [];
+    for (const { id } of owned) {
+        await deleteApiKey(user.id, id);
+        await recordAudit({ actorId: user.id, action: "account.api-key.deleted", targetType: "apiKey", targetId: id });
+        done.push(id);
+    }
+    revalidatePath("/account/api-keys");
+    return { done };
 }
 
 const toggleApiKeySchema = z.object({ id: z.string().uuid(), enabled: z.boolean() });

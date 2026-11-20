@@ -16,7 +16,7 @@ import { useState, useTransition } from "react";
 import { Button, Card, CardBody, Switch, useOptimisticToggle } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { refreshModelCatalogAction, setInstanceKeySharingAction } from "./actions";
+import { refreshModelCatalogAction, setInstanceKeySharingAction } from "./agent-actions";
 
 /**
  * Whether an account with no key of its own runs on the deployment's.

@@ -1226,6 +1226,15 @@
             "usingDeployment": "Disponible para ti",
             "agentKey": "En la máquina de tus sesiones",
             "checkedAt": "Comprobado <time></time>"
+        },
+        "bulk": {
+            "label": "Selección",
+            "selectAll": "Elegir todas",
+            "selectNamed": "Elegir {name}",
+            "turnOn": "Activar",
+            "turnOff": "Desactivar",
+            "deleteTitle": "{count, plural, one {¿Eliminar # clave?} other {¿Eliminar # claves?}}",
+            "deleteBody": "{count, plural, one {Se deja de usar al instante. No se puede deshacer.} other {Se dejan de usar al instante. No se puede deshacer.}}"
         }
     },
     "signinDialog": {
@@ -2150,5 +2159,10 @@
     "openInApp": {
         "opened": "Abriendo en la app de Polaris",
         "how": "Para quedarte en el navegador, desactívalo en Preferencias."
+    },
+    "selectionBar": {
+        "selected": "{count} seleccionados",
+        "delete": "Eliminar {count}",
+        "clear": "Quitar la selección"
     }
 }

@@ -12,9 +12,9 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
-import { builtInHasSettings } from "@/lib/apps/app-settings";
+import { appSettingsPath, builtInHasSettings } from "@/lib/apps/app-settings";
 import { ChatSettingsPage } from "./_chat/chat-screen";
-import { PolarAdminSettings, PolarChatSettings } from "./_polar/polar-settings";
+import { PolarAdminSettings, PolarAgentSettings, PolarChatSettings } from "./_polar/polar-settings";
 import { Suspense } from "react";
 import { PageHeader, Skeleton } from "@polaris/ui";
 import { VpnAdminSettings } from "@/app/(app)/vpn/vpn-admin-settings";
@@ -97,7 +97,7 @@ async function PolarSettings() {
         getTranslations("polar")
     ]);
     return (
-        <Messages namespaces={["polar"]}>
+        <Messages namespaces={["polar", "agents"]}>
             <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-4">
                 <Link data-swipe-back
                     href="/admin/apps"
@@ -110,9 +110,9 @@ async function PolarSettings() {
                     title={polar("admin.code.page.title")}
                     description={polar("admin.code.page.description")}
                 />
-                {/* Who may use Polar is a permission, and the keys, limits and
-                    catalogue are the Agents app's too: each said once, where it
-                    is edited. */}
+                {/* Who may use Polar is a permission, and the deployment's
+                    provider keys are a screen of their own: each said once,
+                    where it is edited. */}
                 <div className="text-muted-foreground space-y-1 text-xs">
                     <p>
                         {polar.rich("admin.links.access", {
@@ -126,7 +126,7 @@ async function PolarSettings() {
                     <p>
                         {polar.rich("admin.links.shared", {
                             link: (chunks) => (
-                                <Link key="agents" href="/admin/agents" className="text-primary hover:underline">
+                                <Link key="providers" href={`${appSettingsPath("polar")}/providers`} className="text-primary hover:underline">
                                     {chunks}
                                 </Link>
                             )
@@ -138,6 +138,9 @@ async function PolarSettings() {
                 </Suspense>
                 <Suspense fallback={<Skeleton className="h-96 w-full max-w-2xl rounded-lg" />}>
                     <PolarAdminSettings />
+                </Suspense>
+                <Suspense fallback={<Skeleton className="h-96 w-full max-w-2xl rounded-lg" />}>
+                    <PolarAgentSettings />
                 </Suspense>
             </div>
         </Messages>

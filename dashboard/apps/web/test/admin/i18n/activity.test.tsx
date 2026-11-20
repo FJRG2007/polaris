@@ -15,7 +15,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 let status: unknown = null;
 
 vi.mock("@/app/(app)/admin/activity/actions", () => ({ verifyAuditChainAction: async () => ({}) }));
-vi.mock("@/app/(app)/admin/agents/actions", () => ({
+vi.mock("@/app/(app)/admin/apps/[appId]/settings/_polar/agent-actions", () => ({
     refreshModelCatalogAction: async () => ({}),
     setInstanceKeySharingAction: async () => ({}),
     setSharedWorkspaceAction: async () => ({})
@@ -25,7 +25,7 @@ vi.mock("@/components/use-live-resource", () => ({
 }));
 
 const { AuditIntegrity } = await import("@/app/(app)/admin/activity/audit-integrity");
-const { CatalogCard } = await import("@/app/(app)/admin/agents/catalog-card");
+const { CatalogCard } = await import("@/app/(app)/admin/apps/[appId]/settings/_polar/catalog-card");
 
 const SEALED = {
     sealed: 1200,

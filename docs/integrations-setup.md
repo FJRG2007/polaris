@@ -3,7 +3,7 @@
 [Leer en español](integrations-setup.es.md) - [Back to the README](../README.md)
 
 Where to click, what to paste and what each service enables. Most are set up
-once by an administrator under **Management > Integrations & AI >
+once by an administrator under **Management >
 Integrations**: press **Set up** on a card, follow the numbered links, and paste
 what the service gives you. Whatever is set up there works everywhere at once.
 
@@ -135,7 +135,7 @@ the API key from the My Information page.
 Anthropic, OpenAI, Google Gemini, xAI, DeepSeek, Moonshot AI, Groq, Cerebras
 and OpenRouter have their own list. Each person adds keys under **Polar > AI
 providers**, and an administrator adds the deployment's under **Management
-> Integrations & AI > AI providers**. Keys are tried from the top; the first
+> Polaris apps > Polar > Settings > AI providers**. Keys are tried from the top; the first
 one whose provider serves the model is used. The same page holds agent
 accounts, which sign a coding agent in for its sessions.
 

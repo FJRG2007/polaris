@@ -140,7 +140,7 @@ export function PolarFailureNotice({
                         href={
                             failure.payer === "own"
                                 ? "/polar/settings/providers"
-                                : "/admin/integrations/models"
+                                : "/admin/apps/polar/settings/providers"
                         }
                         className="font-medium underline"
                     >

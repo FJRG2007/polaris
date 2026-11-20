@@ -12,7 +12,6 @@ import {
     Trash2,
     Award,
     Blocks,
-    Bot,
     Building2,
     ChevronRight,
     ClipboardCheck,
@@ -31,7 +30,6 @@ import {
     ShieldCheck,
     KeyRound,
     SlidersHorizontal,
-    Sparkles,
     Users,
     UsersRound,
     Wallet
@@ -89,10 +87,8 @@ const GROUPS = [
         key: "integrations",
         sections: [
             { key: "integrations", href: "/admin/integrations", icon: Blocks },
-            { key: "integrationsModels", href: "/admin/integrations/models", icon: Sparkles },
             { key: "email", href: "/admin/integrations/email", icon: Mail },
-            { key: "messaging", href: "/admin/integrations/messaging", icon: MessageCircle },
-            { key: "agents", href: "/admin/agents", icon: Bot }
+            { key: "messaging", href: "/admin/integrations/messaging", icon: MessageCircle }
         ]
     },
     {

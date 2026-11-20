@@ -92,7 +92,7 @@ export async function sweepExpiringModelKeys(now = new Date()): Promise<void> {
         const provider = modelProviderName(row.provider);
         const expiring = phase === "soon" && row.expiresAt;
         const mine = row.userId !== null;
-        const href = mine ? "/polar/settings/providers" : "/admin/integrations/models";
+        const href = mine ? "/polar/settings/providers" : "/admin/apps/polar/settings/providers";
         // Nobody to tell is not the same as nothing to say: the row is left
         // alone so the next pass tries again, rather than recorded as announced
         // to an empty room.

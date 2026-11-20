@@ -2,7 +2,7 @@
  * Adding, renaming, replacing, removing and reordering a provider key.
  *
  * The same four writes serve both screens: an account's own keys under
- * /polar/settings/providers and the deployment's under /integrations/models. Only who is
+ * /polar/settings/providers and the deployment's under /admin/apps/polar/settings/providers. Only who is
  * allowed to ask differs, and that is settled by the caller before it gets here
  * - each screen's actions file is the gate, and passes the owner it just
  * established. Nothing in this module decides who anybody is.
@@ -303,13 +303,42 @@ export async function editKey(scope: KeyScope, input: unknown): Promise<KeyActio
 export async function removeKey(scope: KeyScope, input: unknown): Promise<KeyActionResult> {
     const parsed = z.object({ id: z.string().uuid() }).safeParse(input);
     if (!parsed.success) return { error: (await readerWords("api"))("refusals.aiKeys.pickKey") };
+    if (!(await removeOne(scope, parsed.data.id)))
+        return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
+    revalidatePath(scope.path);
+    return {};
+}
 
+/** What a write over several rows reports: the rows it did change. */
+export interface BulkKeyResult extends KeyActionResult {
+    done: string[];
+}
+
+/** The rows a bulk write names: at least one, never an unbounded list. */
+const bulkIds = z.array(z.string().uuid()).min(1).max(200);
+
+/**
+ * Remove several at once. Each row is deleted through the same owner-scoped
+ * write a single remove uses, so a row that is not this scope's is skipped
+ * rather than touched, and the result names only what went.
+ */
+export async function removeKeys(scope: KeyScope, input: unknown): Promise<BulkKeyResult> {
+    const parsed = z.object({ ids: bulkIds }).safeParse(input);
+    if (!parsed.success) return { done: [], error: (await readerWords("api"))("refusals.aiKeys.pickKey") };
+    const done: string[] = [];
+    for (const id of new Set(parsed.data.ids)) if (await removeOne(scope, id)) done.push(id);
+    revalidatePath(scope.path);
+    if (done.length === 0) return { done, error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
+    return { done };
+}
+
+/** One row gone, with what has to follow it; false when the scope holds no such row. */
+async function removeOne(scope: KeyScope, id: string): Promise<boolean> {
     // A login kept in an account folder: read which folder before the row goes,
     // so its sign-out - clearing that folder - can follow.
-    const folder = scope.owner ? await accountFolderOf(scope.owner, parsed.data.id) : null;
-    const machine = await machineLoginOf(scope.owner, parsed.data.id);
-    if (!(await deleteModelKey(scope.owner, parsed.data.id)))
-        return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
+    const folder = scope.owner ? await accountFolderOf(scope.owner, id) : null;
+    const machine = await machineLoginOf(scope.owner, id);
+    if (!(await deleteModelKey(scope.owner, id))) return false;
     if (folder && scope.owner) void clearAccountFolder(scope.owner, folder.env, folder.id);
     // Off the list too, or the next read would write the row straight back. The
     // login on the machine stays until it is signed out, which the screen offers.
@@ -318,10 +347,9 @@ export async function removeKey(scope: KeyScope, input: unknown): Promise<KeyAct
         actorId: scope.actorId,
         action: `${scope.audit}.ai-key.deleted`,
         targetType: "modelKey",
-        targetId: parsed.data.id
+        targetId: id
     });
-    revalidatePath(scope.path);
-    return {};
+    return true;
 }
 
 /** The account folder a stored row names (`account-folders.ts`), or null for
@@ -338,18 +366,33 @@ async function accountFolderOf(owner: string, id: string): Promise<{ env: string
 export async function toggleKey(scope: KeyScope, input: unknown): Promise<KeyActionResult> {
     const parsed = z.object({ id: z.string().uuid(), enabled: z.boolean() }).safeParse(input);
     if (!parsed.success) return { error: (await readerWords("api"))("refusals.aiKeys.pickKey") };
-
-    if (!(await setModelKeyEnabled(scope.owner, parsed.data.id, parsed.data.enabled))) {
+    if (!(await toggleOne(scope, parsed.data.id, parsed.data.enabled)))
         return { error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
-    }
-    await recordAudit({
-        actorId: scope.actorId,
-        action: `${scope.audit}.ai-key.${parsed.data.enabled ? "enabled" : "disabled"}`,
-        targetType: "modelKey",
-        targetId: parsed.data.id
-    });
     revalidatePath(scope.path);
     return {};
+}
+
+/** Switch several on or off, each through the owner-scoped write one switch uses. */
+export async function toggleKeys(scope: KeyScope, input: unknown): Promise<BulkKeyResult> {
+    const parsed = z.object({ ids: bulkIds, enabled: z.boolean() }).safeParse(input);
+    if (!parsed.success) return { done: [], error: (await readerWords("api"))("refusals.aiKeys.pickKey") };
+    const done: string[] = [];
+    for (const id of new Set(parsed.data.ids))
+        if (await toggleOne(scope, id, parsed.data.enabled)) done.push(id);
+    revalidatePath(scope.path);
+    if (done.length === 0) return { done, error: (await readerWords("api"))("refusals.aiKeys.keyGone") };
+    return { done };
+}
+
+async function toggleOne(scope: KeyScope, id: string, enabled: boolean): Promise<boolean> {
+    if (!(await setModelKeyEnabled(scope.owner, id, enabled))) return false;
+    await recordAudit({
+        actorId: scope.actorId,
+        action: `${scope.audit}.ai-key.${enabled ? "enabled" : "disabled"}`,
+        targetType: "modelKey",
+        targetId: id
+    });
+    return true;
 }
 
 /** The order to try them in, as the table now reads top to bottom. */

@@ -86,7 +86,7 @@ describe("voice in the composer", () => {
         );
         expect(
             screen.getByRole("link", { name: "Manage this Polaris's keys" }).getAttribute("href")
-        ).toBe("/admin/integrations/models");
+        ).toBe("/admin/apps/polar/settings/providers");
         fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
         expect(screen.queryByRole("alert")).toBeNull();
     });

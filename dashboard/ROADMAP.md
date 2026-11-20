@@ -331,7 +331,7 @@ Agents (coding sessions):
       repository's owner, and its working directory lives inside the persistent
       home so files survive between sessions, unlike a checkout
 - [x] A machine everybody shares, off unless an administrator turns it on under
-      `/admin/agents`: one shared home rather than one per account, so anybody
+      `/admin/apps/polar/settings`: one shared home rather than one per account, so anybody
       opening it is signed in with what the last person signed in there, and
       finds what the last person left. The toggle and the session form both
       warn that a personal Claude or ChatGPT subscription is licensed to one

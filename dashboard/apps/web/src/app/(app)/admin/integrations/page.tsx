@@ -3,7 +3,6 @@
  * installed state. Admin-only: configuring one stores an instance-wide secret.
  */
 
-import Link from "next/link";
 import { IntegrationsLoader } from "./loader";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
@@ -29,17 +28,7 @@ export default async function IntegrationsPage({
                     {t("integrations.page.title")}
                 </h1>
                 <p className="text-muted-foreground text-sm">
-                    {t.rich("integrations.page.intro", {
-                        link: (chunks) => (
-                            <Link
-                                key="link"
-                                href="/admin/integrations/models"
-                                className="text-primary hover:underline"
-                            >
-                                {chunks}
-                            </Link>
-                        )
-                    })}
+                    {t("integrations.page.intro")}
                 </p>
             </div>
             <IntegrationsLoader configure={configure} revision={Date.now()} />

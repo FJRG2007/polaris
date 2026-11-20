@@ -1979,7 +1979,7 @@
         "code": {
             "page": {
                 "title": "Polar",
-                "description": "What Polar's chats may reach, their default routing, and where Code sessions run."
+                "description": "What Polar's chats may reach, their default routing, where Code sessions run, and what agent runs may spend."
             },
             "pool": {
                 "title": "Where sessions run",
@@ -2024,7 +2024,60 @@
         },
         "links": {
             "access": "Who may use Polar and spend this deployment's keys is a permission: <link>Roles</link>, or a person's Capabilities under Users.",
-            "shared": "Provider keys, usage limits and the model catalog are shared with Agents, under <link>Agent defaults</link>."
+            "shared": "The deployment's provider keys and model catalog are under <link>AI providers</link>. Usage limits and agent defaults are below."
+        },
+        "providers": {
+            "title": "AI providers",
+            "intro": "This deployment's own accounts with the model providers. A key is handed to a run over an authenticated call and never written into a repository, so replacing it here takes effect everywhere at once. Every provider bills you directly - Polaris adds nothing.",
+            "keys": {
+                "title": "The deployment's provider keys",
+                "hint": "Tried from the top. The first key whose provider serves the model is the one a run uses.",
+                "empty": "No keys yet. Without one, only people who bring their own can run anything.",
+                "adding": "The provider account this deployment's runs bill to."
+            },
+            "accounts": {
+                "title": "The deployment's agent accounts",
+                "hint": "Signs an agent in for anybody whose own account does not. Each account's own is tried first.",
+                "empty": "None yet. Without one, only people who bring their own can start a session here."
+            },
+            "custom": {
+                "title": "Your own providers",
+                "hint": "Any OpenAI- or Anthropic-compatible endpoint, offered in every key picker.",
+                "empty": "None added yet.",
+                "add": "Add provider",
+                "remove": "Remove",
+                "removeTitle": "Remove {name}?",
+                "removeBody": "It stops being offered for new keys.",
+                "removeKeys": "{count, plural, one {# stored key belongs to it and stops working until the provider is added back.} other {# stored keys belong to it and stop working until the provider is added back.}}",
+                "keys": "{count, plural, one {# key} other {# keys}}",
+                "dialog": {
+                    "title": "Add a provider",
+                    "intro": "Keys for it are added like any other, and runs and Polar call it at this address.",
+                    "name": "Name",
+                    "baseUrl": "Base URL",
+                    "wire": "API format",
+                    "wireOpenai": "OpenAI-compatible",
+                    "wireAnthropic": "Anthropic-compatible",
+                    "envVar": "Key variable",
+                    "defaultModel": "Default model",
+                    "probe": "Key check URL",
+                    "docsUrl": "Docs URL",
+                    "optional": "(optional)",
+                    "save": "Add provider",
+                    "cancel": "Cancel"
+                },
+                "errors": {
+                    "taken": "A provider with this name already exists.",
+                    "envTaken": "Another provider already reads this variable.",
+                    "invalid": "Check this value.",
+                    "name": "Use 2 to 60 characters.",
+                    "publicHttps": "Use a public https:// address.",
+                    "envVar": "Use capitals, digits and _, starting with a letter.",
+                    "envVarReserved": "This variable is reserved by Polaris.",
+                    "model": "Use the model id, with no spaces.",
+                    "failed": "Could not save it. Try again."
+                }
+            }
         }
     },
     "routing": {

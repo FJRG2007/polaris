@@ -68,7 +68,7 @@ export async function setInstanceKeySharingAction(input: unknown): Promise<{ err
         action: "agents.keys.share",
         metadata: { shared: parsed.data.shared }
     });
-    revalidatePath("/admin/agents");
+    revalidatePath("/admin/apps/polar/settings");
     return {};
 }
 
@@ -113,7 +113,7 @@ export async function saveUsageLimitAction(input: unknown): Promise<{ error?: st
             amount: parsed.data.amount
         }
     });
-    revalidatePath("/admin/agents");
+    revalidatePath("/admin/apps/polar/settings");
     return {};
 }
 
@@ -129,7 +129,7 @@ export async function deleteUsageLimitAction(input: unknown): Promise<{ error?: 
         action: "agents.limit.delete",
         targetId: parsed.data.id
     });
-    revalidatePath("/admin/agents");
+    revalidatePath("/admin/apps/polar/settings");
     return {};
 }
 
@@ -158,7 +158,7 @@ export async function refreshModelCatalogAction(): Promise<{
         action: "agents.catalog.refresh",
         metadata: { models: result.models }
     });
-    revalidatePath("/admin/agents");
+    revalidatePath("/admin/apps/polar/settings");
     const [at, index] = await Promise.all([catalogRefreshedAt(), providerIndexState()]);
     return { models: result.models, at: at?.toISOString(), index };
 }
@@ -197,8 +197,8 @@ export async function savePlatformAgentDefaultsAction(input: unknown): Promise<{
     }
 
     await savePlatformAgentDefaults(parsed.data);
-    await recordAudit({ actorId: admin.id, action: "admin.agents.defaults.updated" });
-    revalidatePath("/admin/agents");
+    await recordAudit({ actorId: admin.id, action: "agents.defaults.updated" });
+    revalidatePath("/admin/apps/polar/settings");
     revalidatePath("/automations/code-review/settings");
     return {};
 }

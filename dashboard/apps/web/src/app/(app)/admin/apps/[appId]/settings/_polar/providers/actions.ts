@@ -27,9 +27,12 @@ import {
     editKey,
     limitKey,
     removeKey,
+    removeKeys,
     reorderKeys,
     reviveKey,
     toggleKey,
+    toggleKeys,
+    type BulkKeyResult,
     type KeyActionResult
 } from "@/lib/agents/model-key-actions";
 
@@ -45,6 +48,14 @@ export async function updateInstanceModelKeyAction(input: unknown): Promise<KeyA
 
 export async function deleteInstanceModelKeyAction(input: unknown): Promise<KeyActionResult> {
     return removeKey(await scope(), input);
+}
+
+export async function deleteInstanceModelKeysAction(input: unknown): Promise<BulkKeyResult> {
+    return removeKeys(await scope(), input);
+}
+
+export async function toggleInstanceModelKeysAction(input: unknown): Promise<BulkKeyResult> {
+    return toggleKeys(await scope(), input);
 }
 
 export async function reorderInstanceModelKeysAction(input: unknown): Promise<KeyActionResult> {
@@ -87,7 +98,7 @@ export async function addCustomProviderAction(input: unknown): Promise<CustomPro
             targetId: provider.slug,
             metadata: { name: provider.name, wire: provider.wire }
         });
-        revalidatePath("/admin/integrations/models");
+        revalidatePath("/admin/apps/polar/settings/providers");
         return { ok: true, provider };
     } catch (error) {
         console.error("polaris: custom provider not stored", error);
@@ -112,7 +123,7 @@ export async function removeCustomProviderAction(
             targetType: "modelProvider",
             targetId: parsed.data.slug
         });
-        revalidatePath("/admin/integrations/models");
+        revalidatePath("/admin/apps/polar/settings/providers");
         return { ok: true };
     } catch (error) {
         console.error("polaris: custom provider not removed", error);

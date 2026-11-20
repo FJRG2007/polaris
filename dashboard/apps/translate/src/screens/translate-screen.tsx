@@ -777,7 +777,7 @@ export function TranslateScreen({ manager }: { manager: boolean }) {
                                     </Link>
                                 </Button>
                                 <Button asChild size="sm" variant="outline">
-                                    <Link href="/admin/integrations/models">{t("none.polar")}</Link>
+                                    <Link href="/admin/apps/polar/settings/providers">{t("none.polar")}</Link>
                                 </Button>
                             </div>
                         ) : undefined

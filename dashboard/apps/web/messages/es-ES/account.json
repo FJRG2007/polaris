@@ -270,7 +270,12 @@
             "more": "Más",
             "edit": "Editar",
             "reference": "Referencia API",
-            "usage": "Uso"
+            "usage": "Uso",
+            "bulkGone": "Esas claves ya no existen.",
+            "bulkDeleteTitle": "{count, plural, one {¿Eliminar # clave?} other {¿Eliminar # claves?}}",
+            "selectionLabel": "Selección",
+            "selectAll": "Elegir todas",
+            "selectNamed": "Elegir {name}"
         },
         "form": {
             "neverExpires": "No caduca",

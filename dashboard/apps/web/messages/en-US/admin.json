@@ -27,18 +27,13 @@
         }
     },
     "agents": {
-        "page": {
-            "title": "Agent defaults",
-            "description": "What agent runs do on every repository, who pays for them and how much they may spend. Each account can narrow it under Apps > Agents, and a repository can override it again.",
-            "polar": "Polar's own settings are under <link>Polaris apps > Polar > Settings</link>."
-        },
         "defaults": {
             "title": "Every repository on this deployment",
             "inheritedFrom": "the built-in defaults"
         },
         "keySharing": {
             "label": "Share this deployment's provider keys",
-            "on": "Anybody without a key of their own runs on the keys stored under Integrations, and those accounts are billed to you.",
+            "on": "Anybody without a key of their own runs on the keys above, and those accounts are billed to you.",
             "off": "Runs only use keys people add themselves, under Polar > AI providers. Nobody spends this deployment's providers.",
             "switch": "Share provider keys"
         },
@@ -111,7 +106,7 @@
             "pickLimit": "Pick a limit",
             "catalogUnread": "The catalog could not be read.",
             "checkSettings": "Check the settings",
-            "providerNotConnected": "Connect {provider} under Integrations before defaulting to this model.",
+            "providerNotConnected": "Connect {provider} under AI providers before defaulting to this model.",
             "poolGone": "That runner pool no longer exists."
         },
         "polarAccess": {
@@ -1813,7 +1808,7 @@
     "integrations": {
         "page": {
             "title": "Integrations",
-            "intro": "The outside services Polaris can use, grouped by the job connecting one does. Whatever is set up here works everywhere at once - there is nothing to switch on per screen. The model providers agents run on have their own list under <link>AI providers</link>."
+            "intro": "The outside services Polaris can use, grouped by the job connecting one does. Whatever is set up here works everywhere at once - there is nothing to switch on per screen."
         },
         "grid": {
             "search": "Search integrations",
@@ -2455,65 +2450,6 @@
             }
         }
     },
-    "integrationsModels": {
-        "title": "AI providers",
-        "intro": "This deployment's own accounts with the model providers. A key is handed to a run over an authenticated call and never written into a repository, so replacing it here takes effect everywhere at once. Every provider bills you directly - Polaris adds nothing.",
-        "keys": {
-            "title": "The deployment's provider keys",
-            "hint": "Tried from the top. The first key whose provider serves the model is the one a run uses.",
-            "empty": "No keys yet. Without one, only people who bring their own can run anything.",
-            "adding": "The provider account this deployment's runs bill to."
-        },
-        "accounts": {
-            "title": "The deployment's agent accounts",
-            "hint": "Signs an agent in for anybody whose own account does not. Each account's own is tried first.",
-            "empty": "None yet. Without one, only people who bring their own can start a session here."
-        },
-        "elsewhere": "Everything else Polaris connects to lives under <link>Integrations</link>.",
-        "sharing": {
-            "title": "Who these keys run for",
-            "shared": "Anybody whose own keys do not cover a provider runs on these, and the bill is yours. Each account's own keys are used first. <link>Change this under Agent defaults</link>.",
-            "private": "Nobody but you. Runs use only the keys people add themselves, so a provider nobody has a key for cannot be reached. <link>Change this under Agent defaults</link>."
-        },
-        "custom": {
-            "title": "Your own providers",
-            "hint": "Any OpenAI- or Anthropic-compatible endpoint, offered in every key picker.",
-            "empty": "None added yet.",
-            "add": "Add provider",
-            "remove": "Remove",
-            "removeTitle": "Remove {name}?",
-            "removeBody": "It stops being offered for new keys.",
-            "removeKeys": "{count, plural, one {# stored key belongs to it and stops working until the provider is added back.} other {# stored keys belong to it and stop working until the provider is added back.}}",
-            "keys": "{count, plural, one {# key} other {# keys}}",
-            "dialog": {
-                "title": "Add a provider",
-                "intro": "Keys for it are added like any other, and runs and Polar call it at this address.",
-                "name": "Name",
-                "baseUrl": "Base URL",
-                "wire": "API format",
-                "wireOpenai": "OpenAI-compatible",
-                "wireAnthropic": "Anthropic-compatible",
-                "envVar": "Key variable",
-                "defaultModel": "Default model",
-                "probe": "Key check URL",
-                "docsUrl": "Docs URL",
-                "optional": "(optional)",
-                "save": "Add provider",
-                "cancel": "Cancel"
-            },
-            "errors": {
-                "taken": "A provider with this name already exists.",
-                "envTaken": "Another provider already reads this variable.",
-                "invalid": "Check this value.",
-                "name": "Use 2 to 60 characters.",
-                "publicHttps": "Use a public https:// address.",
-                "envVar": "Use capitals, digits and _, starting with a letter.",
-                "envVarReserved": "This variable is reserved by Polaris.",
-                "model": "Use the model id, with no spaces.",
-                "failed": "Could not save it. Try again."
-            }
-        }
-    },
     "organizations": {
         "showMore": "Show more organizations",
         "page": {
@@ -2658,10 +2594,6 @@
                 "title": "Badges",
                 "description": "Badges of your own to give people, beside the ones they earn."
             },
-            "agents": {
-                "title": "Agent defaults",
-                "description": "Where coding agents may run, and what they may open on their own."
-            },
             "uploads": {
                 "title": "Uploads",
                 "description": "Where files attached to work are kept, and how big one may be."
@@ -2669,10 +2601,6 @@
             "integrations": {
                 "title": "Integrations",
                 "description": "Third-party services (label printing, file scanning)."
-            },
-            "integrationsModels": {
-                "title": "AI providers",
-                "description": "The model providers agents run on, and the keys this deployment holds."
             },
             "settings": {
                 "title": "General settings",
@@ -2732,7 +2660,7 @@
             "people": "People & access",
             "communication": "Communication",
             "platform": "Platform",
-            "integrations": "Integrations & AI",
+            "integrations": "Integrations",
             "storage": "Storage & data",
             "usage": "Usage & health"
         }

@@ -27,18 +27,13 @@
         }
     },
     "agents": {
-        "page": {
-            "title": "Ajustes de agentes",
-            "description": "Lo que hacen las ejecuciones de agentes en cada repositorio, quién las paga y cuánto pueden gastar. Cada cuenta puede acotarlo en Apps > Agentes, y un repositorio puede sobrescribirlo de nuevo.",
-            "polar": "Los ajustes propios de Polar están en <link>Apps de Polaris > Polar > Ajustes</link>."
-        },
         "defaults": {
             "title": "Todos los repositorios de este despliegue",
             "inheritedFrom": "los valores integrados"
         },
         "keySharing": {
             "label": "Compartir las claves de proveedor de este despliegue",
-            "on": "Quien no tenga clave propia usa las claves guardadas en Integraciones, y esas cuentas se te facturan a ti.",
+            "on": "Quien no tenga clave propia usa las claves de arriba, y esas cuentas se te facturan a ti.",
             "off": "Las ejecuciones solo usan claves que cada persona añade en Cuenta > Claves de proveedores de IA. Nadie gasta los proveedores de este despliegue.",
             "switch": "Compartir claves"
         },
@@ -111,7 +106,7 @@
             "pickLimit": "Elige un límite",
             "catalogUnread": "No se ha podido leer el catálogo.",
             "checkSettings": "Revisa los ajustes",
-            "providerNotConnected": "Conecta {provider} en Integraciones antes de usar este modelo por defecto.",
+            "providerNotConnected": "Conecta {provider} en Proveedores de IA antes de usar este modelo por defecto.",
             "poolGone": "Ese grupo de runners ya no existe."
         },
         "polarAccess": {
@@ -1813,7 +1808,7 @@
     "integrations": {
         "page": {
             "title": "Integraciones",
-            "intro": "Los servicios externos que Polaris puede usar, agrupados por lo que hace cada uno al conectarlo. Lo que configures aquí funciona en todas partes a la vez: no hay nada que activar pantalla por pantalla. Los proveedores de modelos con los que trabajan los agentes tienen su propia lista en <link>Proveedores de IA</link>."
+            "intro": "Los servicios externos que Polaris puede usar, agrupados por lo que hace cada uno al conectarlo. Lo que configures aquí funciona en todas partes a la vez: no hay nada que activar pantalla por pantalla."
         },
         "grid": {
             "search": "Buscar integraciones",
@@ -2455,65 +2450,6 @@
             }
         }
     },
-    "integrationsModels": {
-        "title": "Proveedores IA",
-        "intro": "Las cuentas propias de este despliegue con los proveedores de modelos. Una clave se entrega a una ejecución mediante una llamada autenticada y nunca se escribe en un repositorio, así que al sustituirla aquí el cambio se aplica en todas partes a la vez. Cada proveedor te factura directamente: Polaris no añade nada.",
-        "keys": {
-            "title": "Las claves de proveedor del despliegue",
-            "hint": "Se prueban de arriba abajo. La primera clave cuyo proveedor sirve el modelo es la que usa una ejecución.",
-            "empty": "Aún no hay claves. Sin ninguna, solo puede ejecutar algo quien traiga la suya.",
-            "adding": "La cuenta del proveedor a la que se facturan las ejecuciones de este despliegue."
-        },
-        "accounts": {
-            "title": "Las cuentas de agente del despliegue",
-            "hint": "Inicia sesión con un agente para quien no lo haga con su propia cuenta. Primero se prueba la de cada cuenta.",
-            "empty": "Aún no hay ninguna. Sin una, solo puede iniciar una sesión aquí quien traiga la suya."
-        },
-        "elsewhere": "Todo lo demás a lo que se conecta Polaris está en <link>Integraciones</link>.",
-        "sharing": {
-            "title": "Para quién son las claves",
-            "shared": "Quien no tenga claves propias para un proveedor usa estas, y la factura es tuya. Primero se usan las claves propias de cada cuenta. <link>Cámbialo en Ajustes de agentes</link>.",
-            "private": "Solo para ti. Las ejecuciones usan solo las claves que cada persona añade, así que no se puede usar un proveedor para el que nadie tenga clave. <link>Cámbialo en Ajustes de agentes</link>."
-        },
-        "custom": {
-            "title": "Tus proveedores",
-            "hint": "Cualquier endpoint compatible con OpenAI o Anthropic, en todos los selectores.",
-            "empty": "Aún no hay ninguno.",
-            "add": "Añadir",
-            "remove": "Quitar",
-            "removeTitle": "¿Quitar {name}?",
-            "removeBody": "Deja de ofrecerse para claves nuevas.",
-            "removeKeys": "{count, plural, one {# clave guardada es suya y deja de funcionar hasta que se vuelva a añadir.} other {# claves guardadas son suyas y dejan de funcionar hasta que se vuelva a añadir.}}",
-            "keys": "{count, plural, one {# clave} other {# claves}}",
-            "dialog": {
-                "title": "Añadir proveedor",
-                "intro": "Sus claves se añaden como las demás, y las ejecuciones y Polar lo llaman aquí.",
-                "name": "Nombre",
-                "baseUrl": "URL base",
-                "wire": "Formato API",
-                "wireOpenai": "Compatible OpenAI",
-                "wireAnthropic": "Compatible Anthropic",
-                "envVar": "Variable",
-                "defaultModel": "Modelo base",
-                "probe": "URL de prueba",
-                "docsUrl": "URL de docs",
-                "optional": "(opcional)",
-                "save": "Añadir",
-                "cancel": "Cancelar"
-            },
-            "errors": {
-                "taken": "Ya existe un proveedor con este nombre.",
-                "envTaken": "Otro proveedor ya lee esta variable.",
-                "invalid": "Revisa este valor.",
-                "name": "Usa de 2 a 60 caracteres.",
-                "publicHttps": "Usa una dirección https:// pública.",
-                "envVar": "Mayúsculas, dígitos y _, empezando por letra.",
-                "envVarReserved": "Polaris reserva esta variable.",
-                "model": "Usa el id del modelo, sin espacios.",
-                "failed": "No se pudo guardar. Inténtalo otra vez."
-            }
-        }
-    },
     "organizations": {
         "showMore": "Mostrar más organizaciones",
         "page": {
@@ -2658,10 +2594,6 @@
                 "title": "Insignias",
                 "description": "Insignias propias para dar a gente, junto a las que ganan."
             },
-            "agents": {
-                "title": "Ajustes de agentes",
-                "description": "Dónde pueden ejecutarse los agentes de código y qué pueden abrir por su cuenta."
-            },
             "uploads": {
                 "title": "Subidas",
                 "description": "Dónde se guardan los archivos adjuntos al trabajo y cuánto puede ocupar uno."
@@ -2669,10 +2601,6 @@
             "integrations": {
                 "title": "Integraciones",
                 "description": "Servicios de terceros (impresión de etiquetas, análisis de archivos)."
-            },
-            "integrationsModels": {
-                "title": "Proveedores IA",
-                "description": "Los proveedores de modelos que usan los agentes y las claves que guarda este despliegue."
             },
             "settings": {
                 "title": "Ajustes generales",
@@ -2732,7 +2660,7 @@
             "people": "Personas y acceso",
             "communication": "Comunicación",
             "platform": "Plataforma",
-            "integrations": "Integraciones e IA",
+            "integrations": "Integraciones",
             "storage": "Almacenamiento",
             "usage": "Uso y estado"
         }

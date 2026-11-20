@@ -5,7 +5,7 @@
  *
  * The gate, and nothing else: every action here establishes the signed-in person
  * and hands the writes their own rows to work on. The writes themselves are
- * shared with the deployment's own keys under /integrations/models, so the two
+ * shared with the deployment's own keys under /admin/apps/polar/settings/providers, so the two
  * screens cannot drift apart in what they check before storing a credential.
  */
 
@@ -36,9 +36,12 @@ import {
     editKey,
     limitKey,
     removeKey,
+    removeKeys,
     reorderKeys,
     reviveKey,
     toggleKey,
+    toggleKeys,
+    type BulkKeyResult,
     type KeyActionResult
 } from "@/lib/agents/model-key-actions";
 
@@ -55,6 +58,14 @@ export async function updateModelKeyAction(input: unknown): Promise<KeyActionRes
 
 export async function deleteModelKeyAction(input: unknown): Promise<KeyActionResult> {
     return removeKey(await scope(), input);
+}
+
+export async function deleteModelKeysAction(input: unknown): Promise<BulkKeyResult> {
+    return removeKeys(await scope(), input);
+}
+
+export async function toggleModelKeysAction(input: unknown): Promise<BulkKeyResult> {
+    return toggleKeys(await scope(), input);
 }
 
 export async function reorderModelKeysAction(input: unknown): Promise<KeyActionResult> {

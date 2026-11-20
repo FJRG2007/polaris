@@ -1226,6 +1226,15 @@
             "usingDeployment": "Available to you",
             "agentKey": "On your sessions' machine",
             "checkedAt": "Checked <time></time>"
+        },
+        "bulk": {
+            "label": "Chosen keys",
+            "selectAll": "Select all keys",
+            "selectNamed": "Select {name}",
+            "turnOn": "Turn on",
+            "turnOff": "Turn off",
+            "deleteTitle": "{count, plural, one {Delete # key?} other {Delete # keys?}}",
+            "deleteBody": "{count, plural, one {Runs stop using it at once. This cannot be undone.} other {Runs stop using them at once. This cannot be undone.}}"
         }
     },
     "signinDialog": {
@@ -2150,5 +2159,10 @@
     "openInApp": {
         "opened": "Opening in the Polaris app",
         "how": "To stay in the browser instead, turn this off in Preferences."
+    },
+    "selectionBar": {
+        "selected": "{count} selected",
+        "delete": "Delete {count}",
+        "clear": "Clear the selection"
     }
 }

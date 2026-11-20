@@ -88,7 +88,7 @@ export function formErrors(form: Form): Partial<Record<Field, string>> {
 }
 
 export function CustomProvidersCard({ initial }: { initial: CustomProviderView[] }) {
-    const t = useTranslations("admin");
+    const t = useTranslations("polar");
     const [confirm, confirmElement] = useConfirm();
     const [rows, setRows] = useState(initial);
     const [served, setServed] = useState(initial);
@@ -101,7 +101,7 @@ export function CustomProvidersCard({ initial }: { initial: CustomProviderView[]
     const [refusal, setRefusal] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
-    const words = (code: string) => t(`integrationsModels.custom.errors.${code as ErrorCode}`);
+    const words = (code: string) => t(`admin.providers.custom.errors.${code as ErrorCode}`);
 
     const add = (values: Form) => {
         const slug = slugifyProviderName(values.name);
@@ -137,12 +137,12 @@ export function CustomProvidersCard({ initial }: { initial: CustomProviderView[]
 
     const remove = async (row: CustomProviderView) => {
         const ok = await confirm({
-            title: t("integrationsModels.custom.removeTitle", { name: row.name }),
+            title: t("admin.providers.custom.removeTitle", { name: row.name }),
             description:
                 row.keys > 0
-                    ? t("integrationsModels.custom.removeKeys", { count: row.keys })
-                    : t("integrationsModels.custom.removeBody"),
-            confirmLabel: t("integrationsModels.custom.remove"),
+                    ? t("admin.providers.custom.removeKeys", { count: row.keys })
+                    : t("admin.providers.custom.removeBody"),
+            confirmLabel: t("admin.providers.custom.remove"),
             danger: true
         });
         if (!ok) return;
@@ -161,9 +161,9 @@ export function CustomProvidersCard({ initial }: { initial: CustomProviderView[]
             <CardBody className="flex flex-col gap-3">
                 <div className="flex min-w-0 items-start gap-3">
                     <div className="min-w-0 flex-1">
-                        <h2 className="text-sm font-medium">{t("integrationsModels.custom.title")}</h2>
+                        <h2 className="text-sm font-medium">{t("admin.providers.custom.title")}</h2>
                         <p className="text-muted-foreground text-xs">
-                            {t("integrationsModels.custom.hint")}
+                            {t("admin.providers.custom.hint")}
                         </p>
                     </div>
                     <Button
@@ -175,12 +175,12 @@ export function CustomProvidersCard({ initial }: { initial: CustomProviderView[]
                         }}
                     >
                         <Plus className="size-4 shrink-0" />
-                        {t("integrationsModels.custom.add")}
+                        {t("admin.providers.custom.add")}
                     </Button>
                 </div>
                 {rows.length === 0 ? (
                     <p className="text-muted-foreground text-sm">
-                        {t("integrationsModels.custom.empty")}
+                        {t("admin.providers.custom.empty")}
                     </p>
                 ) : (
                     <ul className="divide-border flex flex-col divide-y">
@@ -201,17 +201,17 @@ export function CustomProvidersCard({ initial }: { initial: CustomProviderView[]
                                     >
                                         {row.baseUrl} - {row.envVar}
                                         {row.keys > 0
-                                            ? ` - ${t("integrationsModels.custom.keys", { count: row.keys })}`
+                                            ? ` - ${t("admin.providers.custom.keys", { count: row.keys })}`
                                             : ""}
                                     </p>
                                 </div>
                                 <Button
                                     size="sm"
                                     variant="ghost"
-                                    aria-label={t("integrationsModels.custom.removeTitle", {
+                                    aria-label={t("admin.providers.custom.removeTitle", {
                                         name: row.name
                                     })}
-                                    title={t("integrationsModels.custom.remove")}
+                                    title={t("admin.providers.custom.remove")}
                                     onClick={() => void remove(row)}
                                 >
                                     <Trash2 className="size-4 shrink-0" />
@@ -252,7 +252,7 @@ function AddProviderDialog({
     onClose: () => void;
     onSave: (form: Form) => void;
 }) {
-    const t = useTranslations("admin");
+    const t = useTranslations("polar");
     const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({});
     const errors = formErrors(form);
     if (!errors.name && taken.has(slugifyProviderName(form.name))) errors.name = "taken";
@@ -266,7 +266,7 @@ function AddProviderDialog({
     const shown = (name: Field): string | null => {
         const code = errors[name];
         return touched[name] && form[name].trim() !== "" && code
-            ? t(`integrationsModels.custom.errors.${code as ErrorCode}`)
+            ? t(`admin.providers.custom.errors.${code as ErrorCode}`)
             : null;
     };
 
@@ -275,13 +275,13 @@ function AddProviderDialog({
         return (
             <label className="flex min-w-0 flex-col gap-1 text-sm">
                 <span>
-                    {t(`integrationsModels.custom.dialog.${name}`)}
+                    {t(`admin.providers.custom.dialog.${name}`)}
                     {required ? (
                         <span aria-hidden="true"> *</span>
                     ) : (
                         <span className="text-muted-foreground">
                             {" "}
-                            {t("integrationsModels.custom.dialog.optional")}
+                            {t("admin.providers.custom.dialog.optional")}
                         </span>
                     )}
                 </span>
@@ -303,9 +303,9 @@ function AddProviderDialog({
         <Dialog open onOpenChange={(next) => !next && onClose()}>
             <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto overscroll-contain">
                 <DialogHeader>
-                    <DialogTitle>{t("integrationsModels.custom.dialog.title")}</DialogTitle>
+                    <DialogTitle>{t("admin.providers.custom.dialog.title")}</DialogTitle>
                     <DialogDescription>
-                        {t("integrationsModels.custom.dialog.intro")}
+                        {t("admin.providers.custom.dialog.intro")}
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -319,21 +319,21 @@ function AddProviderDialog({
                     {field("name", true, "Acme AI")}
                     {field("baseUrl", true, "https://api.example.com/v1")}
                     <label className="flex min-w-0 flex-col gap-1 text-sm">
-                        <span>{t("integrationsModels.custom.dialog.wire")}</span>
+                        <span>{t("admin.providers.custom.dialog.wire")}</span>
                         <Select
                             value={form.wire}
                             onValueChange={set("wire")}
                             options={[
                                 {
                                     value: "openai",
-                                    label: t("integrationsModels.custom.dialog.wireOpenai")
+                                    label: t("admin.providers.custom.dialog.wireOpenai")
                                 },
                                 {
                                     value: "anthropic",
-                                    label: t("integrationsModels.custom.dialog.wireAnthropic")
+                                    label: t("admin.providers.custom.dialog.wireAnthropic")
                                 }
                             ]}
-                            aria-label={t("integrationsModels.custom.dialog.wire")}
+                            aria-label={t("admin.providers.custom.dialog.wire")}
                         />
                     </label>
                     {field("envVar", true, "ACME_API_KEY")}
@@ -343,10 +343,10 @@ function AddProviderDialog({
                     {refusal ? <p className="text-danger text-sm">{refusal}</p> : null}
                     <div className="flex justify-end gap-2">
                         <Button type="button" variant="ghost" onClick={onClose}>
-                            {t("integrationsModels.custom.dialog.cancel")}
+                            {t("admin.providers.custom.dialog.cancel")}
                         </Button>
                         <Button type="submit" aria-disabled={!ready}>
-                            {t("integrationsModels.custom.dialog.save")}
+                            {t("admin.providers.custom.dialog.save")}
                         </Button>
                     </div>
                 </form>
