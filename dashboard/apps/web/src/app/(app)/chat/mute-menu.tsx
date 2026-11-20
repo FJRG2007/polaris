@@ -11,6 +11,11 @@
  * lapses makes somebody re-mute the same noisy channel every morning; one that
  * never does makes them forget a conversation exists. Offering both, and saying
  * which is on, is the whole of it.
+ *
+ * Beside them, whether the mute holds back mentions too. Off by default, as in
+ * Discord, WhatsApp and Telegram: a message that names the reader, or replies
+ * to them, gets through a mute. Offered while choosing a length and while
+ * muted, and kept open on a click so the choice can be seen to take.
  */
 
 import * as core from "@polaris/core";
@@ -25,8 +30,8 @@ const MUTE_KEYS: Readonly<Record<number, NamespaceKey<"chat">>> = {
     480: "muteMenu.durations.h8",
     1440: "muteMenu.durations.h24"
 };
-import { Bell, BellOff } from "lucide-react";
-import type { ComponentType, ReactNode } from "react";
+import { AtSign, Bell, BellOff, Check } from "lucide-react";
+import { useState, type ComponentType, type ReactNode } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 
@@ -44,27 +49,52 @@ export interface MenuParts {
 export function MuteOptions({
     channel,
     parts,
-    onChoose
+    onChoose,
+    onMentions
 }: {
     channel: ChatChannelView;
     parts: MenuParts;
     /** Minutes, `MUTE_FOREVER`, or null to let it through again. */
     onChoose: (minutes: number | null) => void;
+    /** Whether the mute holds back mentions too. Settles once the change is
+     *  saved, or refused - then the saved answer is drawn again. */
+    onMentions: (on: boolean) => Promise<unknown> | void;
 }) {
     const t = useTranslations("chat");
     const { Item, Sub, SubTrigger, SubContent } = parts;
     const format = useDisplayFormat();
+    // Drawn at once, and back to the saved answer when the change settles.
+    const [pending, setPending] = useState<boolean | null>(null);
+    const mentionsMuted = pending ?? channel.muteMentions;
+
+    const mentions = (
+        <Item
+            onSelect={(event) => {
+                event.preventDefault();
+                const next = !mentionsMuted;
+                setPending(next);
+                void Promise.resolve(onMentions(next)).finally(() => setPending(null));
+            }}
+        >
+            <AtSign className="size-3.5" />
+            <span className="min-w-0 flex-1 truncate">{t("muteMenu.muteMentions")}</span>
+            {mentionsMuted ? <Check className="size-3.5" aria-label={t("muteMenu.on")} /> : null}
+        </Item>
+    );
 
     // Already quiet: the useful option is turning it back on, with the answer to
     // "until when" in front of it rather than left to be discovered.
     if (channel.muted) {
         return (
-            <Item onSelect={() => onChoose(null)}>
-                <Bell className="size-3.5" />
-                {channel.mutedUntil
-                    ? t("muteMenu.unmuteUntil", { time: format.time(channel.mutedUntil) })
-                    : t("muteMenu.unmute")}
-            </Item>
+            <>
+                <Item onSelect={() => onChoose(null)}>
+                    <Bell className="size-3.5" />
+                    {channel.mutedUntil
+                        ? t("muteMenu.unmuteUntil", { time: format.time(channel.mutedUntil) })
+                        : t("muteMenu.unmute")}
+                </Item>
+                {mentions}
+            </>
         );
     }
 
@@ -83,6 +113,7 @@ export function MuteOptions({
                 <Item onSelect={() => onChoose(core.MUTE_FOREVER)}>
                     {t("muteMenu.durations.forever")}
                 </Item>
+                {mentions}
             </SubContent>
         </Sub>
     );

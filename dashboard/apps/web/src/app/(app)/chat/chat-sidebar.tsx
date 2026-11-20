@@ -2054,6 +2054,10 @@ function RowMenu({
                                         await actions.setMutedAction(channel.id, minutes);
                                         refresh();
                                     }}
+                                    onMentions={async (on) => {
+                                        await actions.setMuteMentionsAction(channel.id, on);
+                                        refresh();
+                                    }}
                                 />,
                                 // Not in a one-to-one conversation: every
                                 // message in one is addressed to you, so "only

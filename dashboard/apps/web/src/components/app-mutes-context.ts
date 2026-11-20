@@ -13,6 +13,9 @@ export interface AppMutesState {
     readonly holds: NotificationHolds;
     /** Mute the app's notifications for a while, or null to let them through. */
     readonly mute: (appId: string, duration: NotificationMuteDuration | null) => void;
+    /** Whether the app's mute holds back mentions too. Absent where nothing
+     *  can save it, and then the menu does not offer it. */
+    readonly muteMentions?: (appId: string, on: boolean) => void;
 }
 
 export const AppMutesContext = createContext<AppMutesState>({

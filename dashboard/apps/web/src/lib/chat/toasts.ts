@@ -12,8 +12,10 @@
  * are about access or about somebody's settings:
  *
  * - only conversations this reader is actually in;
- * - never a muted one, muted being worked out rather than read, since a mute
- *   with an end that has passed is not a mute;
+ * - in a muted one - the conversation, or Chat as a whole - only a message
+ *   that names them or replies to them, unless the mute holds mentions too
+ *   (`core.chatMuteHolds`), muted being worked out rather than read, since a
+ *   mute with an end that has passed is not a mute;
  * - never one they set to nothing, and in one they set to mentions only the
  *   messages that name them or the room - the standing preference beside the
  *   mute, which is the whole of what a toast, a sound and a desktop notice
@@ -35,9 +37,8 @@ import { isVoiceFileName } from "./voice-name";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { reachableChannelIds, type ChatActor } from "./access";
 import { isInlineImage, isPlayableMedia } from "./attachments";
-import { mentionsReader, notifyLevels, readerTeams } from "./notify";
+import { mentionsReader, muteStates, notifyLevels, readerTeams, repliesToReader } from "./notify";
 import * as history from "./history-visibility";
-import { chatMutedUsers } from "./app-mute";
 
 /** How much of a message the toast carries. A line, like every other
  *  notification anywhere. */
@@ -224,19 +225,15 @@ export async function messageToasts(
         .filter((id) => reachable.has(id))
         .slice(0, MOST_CHANNELS);
     if (asked.length === 0) return [];
-    // Chat muted as a whole: no toast, chime or desktop notice for any of them.
-    if ((await chatMutedUsers([actor.id])).has(actor.id)) return [];
 
-    const memberships = await prisma.chatChannelMember.findMany({
-        where: { userId: actor.id, channelId: { in: asked } },
-        select: {
-            channelId: true,
-            muted: true,
-            mutedUntil: true,
-            locked: true,
-            lastReadAt: true
-        }
-    });
+    const [memberships, levels, mutes] = await Promise.all([
+        prisma.chatChannelMember.findMany({
+            where: { userId: actor.id, channelId: { in: asked } },
+            select: { channelId: true, locked: true, lastReadAt: true }
+        }),
+        notifyLevels(actor.id, asked),
+        muteStates(asked, [actor.id])
+    ]);
     // How far the reader has read in each. Sending a message wakes every other
     // tab and the desktop app with a "posted" frame for that conversation, and
     // the newest message in it that is not the reader's own is then the one
@@ -246,16 +243,20 @@ export async function messageToasts(
         memberships.flatMap((row) => (row.lastReadAt ? [[row.channelId, row.lastReadAt.getTime()]] : []))
     );
     const locked = new Set(memberships.filter((row) => row.locked).map((row) => row.channelId));
-    const quiet = new Set(
-        memberships.filter((row) => core.muteInForce(row)).map((row) => row.channelId)
-    );
 
     // What each of them is allowed to interrupt with. A conversation set to
-    // nothing is dropped here; one set to mentions keeps its place and has its
-    // messages sifted below, because the newest message in it is usually not the
-    // one that names anybody.
-    const levels = await notifyLevels(actor.id, asked);
-    const wanted = asked.filter((id) => !quiet.has(id) && levels.get(id) !== "none");
+    // nothing is dropped here, and so is one whose mute holds even a mention;
+    // one set to mentions, or muted - by itself or with Chat as a whole - keeps
+    // its place and has its messages sifted below, because the newest message
+    // in it is usually not the one that names anybody.
+    const mentionsOnly = new Set<string>();
+    const wanted: string[] = [];
+    for (const id of asked) {
+        const state = mutes(id, actor.id);
+        if (levels.get(id) === "none" || core.chatMuteHolds(state, true)) continue;
+        wanted.push(id);
+        if (levels.get(id) === "mentions" || core.chatMuteHolds(state, false)) mentionsOnly.add(id);
+    }
     if (wanted.length === 0) return [];
 
     const since = new Date(Date.now() - RECENT_MS);
@@ -264,8 +265,8 @@ export async function messageToasts(
     // in it, and then that room's traffic pushes everybody else's mention out of
     // the window and the mention is never announced at all - Chat writes no
     // record for one, so it is lost rather than waiting in the bell.
-    const sifted = wanted.filter((id) => levels.get(id) === "mentions");
-    const plain = wanted.filter((id) => levels.get(id) !== "mentions");
+    const sifted = wanted.filter((id) => mentionsOnly.has(id));
+    const plain = wanted.filter((id) => !mentionsOnly.has(id));
     const [teams, windows] = await Promise.all([
         // Only where something is being sifted: everywhere else a `@team` is
         // just another message, which is already being announced.
@@ -278,6 +279,14 @@ export async function messageToasts(
     // Newest first within each window, which is all the loop below reads, and no
     // conversation is in two of them.
     const rows = windows.flat();
+    // A reply to something the reader wrote names them as much as their name
+    // does. Only asked where something is being sifted, in one read.
+    const replied = await repliesToReader(
+        actor.id,
+        rows.map((row) =>
+            mentionsOnly.has(row.channelId) && !row.forwarded ? row.replyToId : null
+        )
+    );
 
     // The author is not a relation - a message outlives the account that wrote
     // it - so the names are a second, small lookup.
@@ -313,8 +322,9 @@ export async function messageToasts(
         // for mentions is announced by the mention rather than by whatever was
         // said after it.
         if (
-            levels.get(row.channelId) === "mentions" &&
-            !mentionsReader(row.body, actor.id, teams)
+            mentionsOnly.has(row.channelId) &&
+            !mentionsReader(row.body, actor.id, teams) &&
+            !(row.replyToId && !row.forwarded && replied.has(row.replyToId))
         ) {
             continue;
         }
@@ -368,6 +378,8 @@ async function recentIn(userId: string, channelIds: readonly string[], since: Da
             body: true,
             createdAt: true,
             authorId: true,
+            replyToId: true,
+            forwarded: true,
             // In the order they were sent, which is the order the message draws
             // them - the first is the one a toast shows.
             attachments: {

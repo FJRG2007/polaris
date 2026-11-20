@@ -10767,6 +10767,11 @@ model ChatChannelMember {
     // the screen can say which one is on. A lapsed row is cleared on the next
     // read rather than by a job: nothing else has to run for it to be right.
     mutedUntil        DateTime?
+    // Whether the mute holds back mentions as well. Off by default, as in
+    // Discord, WhatsApp and Telegram: a mute silences the room, and a message
+    // that names this person, or replies to them, still reaches them. Kept
+    // across mutes, so the choice stays made the next time they mute it.
+    muteMentions      Boolean   @default(false)
     // Held at the top of this person's list, and nobody else's: a conversation
     // being important to one person says nothing about the others in it. The
     // time rather than a flag, so several pinned conversations keep the order

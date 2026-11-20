@@ -71,7 +71,10 @@ export function muteUntil(duration: NotificationMuteDuration, now: Date): string
 
 export const notificationMuteSchema = z.object({
     /** When it lifts by itself, or null for "until I turn it back on". */
-    until: z.string().datetime().nullable()
+    until: z.string().datetime().nullable(),
+    /** Chat's own hold only: whether it holds back a mention of the reader as
+     *  well. Absent is no, so a mention gets through a mute, as in Discord. */
+    mentions: z.boolean().optional()
 });
 
 export type NotificationMute = z.infer<typeof notificationMuteSchema>;
@@ -205,6 +208,17 @@ function holdKeys(eventId: string): { own: string; group: string } | null {
  *  A critical event is never one of these: they go through the catalogue. */
 export function appHoldMuted(holds: NotificationHolds, appId: AppHoldId, now: Date): boolean {
     return muteActive(holds.mutes[holdKey({ kind: "app", id: appId })], now);
+}
+
+/** Whether a mute on a whole app is in force at `now` and holds back a mention
+ *  of the reader too. */
+export function appHoldMutesMentions(
+    holds: NotificationHolds,
+    appId: AppHoldId,
+    now: Date
+): boolean {
+    const mute = holds.mutes[holdKey({ kind: "app", id: appId })];
+    return muteActive(mute, now) && mute?.mentions === true;
 }
 
 /** Whether a mute on the event or its group holds it back at `now`. */

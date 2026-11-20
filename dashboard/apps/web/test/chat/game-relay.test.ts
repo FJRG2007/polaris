@@ -118,7 +118,14 @@ vi.mock("@/lib/chat/notify", () => ({
     notifyLevels: async (userId: string, ids: string[]) =>
         new Map(ids.map((id) => [id, fake.levels.get(userId) ?? "all"])),
     readerTeams: async () => new Set<string>(),
-    mentionsReader: (body: string, userId: string) => body.includes(`@${userId}`)
+    mentionsReader: (body: string, userId: string) => body.includes(`@${userId}`),
+    // The conversation's own mute, as the fake members hold it.
+    muteStates: async () => (_channelId: string, userId: string) => ({
+        conversation: fake.members.find((member) => member.userId === userId)?.muted ?? false,
+        conversationMentions: false,
+        app: false,
+        appMentions: false
+    })
 }));
 vi.mock("@/lib/blocks", () => ({
     blockedBy: async (userId: string) => fake.blocked.get(userId) ?? new Set()

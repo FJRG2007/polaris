@@ -17,11 +17,13 @@
  * decoration - and sending a notification for it would mean every message
  * containing the word could ping somebody twice.
  *
- * Somebody who has muted the conversation is not told. Muting is the answer to
- * "stop telling me about this room", and a mention of the room is the room. Nor
- * is somebody who set it, or the space it is in, to notify them about nothing -
- * the standing version of the same answer. Setting it to mentions does not skip
- * them: this is the mention.
+ * Somebody who has muted the conversation, or Chat as a whole, is still told:
+ * Discord counts `@everyone` and `@here` as mentions that get through a mute,
+ * and so does this. Only a mute set to hold mentions too keeps them out - the
+ * same answer Discord's "Suppress @everyone and @here" gives - see
+ * `core.chatMuteHolds`. Somebody who set the conversation, or the space it is
+ * in, to notify them about nothing is not told, as with Discord's "Nothing".
+ * Setting it to mentions does not skip them: this is the mention.
  *
  * Nor is somebody who has blocked whoever wrote it. `@everyone` is the one place
  * a blocked account can still reach a whole room's notifications without
@@ -34,8 +36,7 @@
 import { prisma } from "@polaris/db";
 import { lockedFor } from "./chat-lock";
 import * as core from "@polaris/core";
-import { silencedIn } from "./notify";
-import { chatMutedUsers } from "./app-mute";
+import { muteStates, silencedIn } from "./notify";
 import { blockersOf } from "@/lib/blocks";
 import { onlineUserIds } from "@/lib/notifications/presence";
 import { createNotification } from "@/lib/notification-service";
@@ -134,9 +135,9 @@ export async function announceRoomMention(
     const online = everyone ? null : onlineUserIds();
     const label = everyone ? "@everyone" : "@here";
 
-    const quiet = await mutedIn(channelId);
-    // Chat muted as a whole is the conversation's mute, everywhere at once.
-    const appMuted = await chatMutedUsers(audience);
+    // A mention gets through the conversation's mute and Chat's as a whole,
+    // unless that mute holds mentions too.
+    const mutes = await muteStates([channelId], [...audience]);
     const silenced = await silencedIn(channelId, [...audience]);
     const shut = await blockersOf(authorId, [...audience]);
     const where = channel.spaceId ? `#${channel.name}` : channel.name;
@@ -152,8 +153,7 @@ export async function announceRoomMention(
     await Promise.all(
         [...audience]
             .filter((userId) => userId !== authorId)
-            .filter((userId) => !quiet.has(userId))
-            .filter((userId) => !appMuted.has(userId))
+            .filter((userId) => !core.chatMuteHolds(mutes(channelId, userId), true))
             .filter((userId) => !silenced.has(userId))
             .filter((userId) => !shut.has(userId))
             .filter((userId) => online === null || online.has(userId))
@@ -203,13 +203,4 @@ async function reachable(channel: {
         select: { userId: true }
     });
     return new Set(members.map((row) => row.userId));
-}
-
-/** Who has asked this conversation to stay quiet, right now. */
-async function mutedIn(channelId: string): Promise<Set<string>> {
-    const rows = await prisma.chatChannelMember.findMany({
-        where: { channelId, muted: true },
-        select: { userId: true, muted: true, mutedUntil: true }
-    });
-    return new Set(rows.filter((row) => core.muteInForce(row)).map((row) => row.userId));
 }

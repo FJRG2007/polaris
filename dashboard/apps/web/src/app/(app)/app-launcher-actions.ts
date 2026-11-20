@@ -23,7 +23,14 @@ import { setAppLock } from "@/lib/app-lock-service";
 import { setAppLockSchema } from "@/lib/app-locks";
 import type { NotificationHolds } from "@polaris/core";
 import { updateNotificationHolds } from "@/lib/notifications/preferences";
-import { applyAppMute, mutableApp, setAppMuteSchema } from "@/lib/app-mutes";
+import {
+    applyAppMute,
+    applyAppMuteMentions,
+    mentionsMutable,
+    mutableApp,
+    setAppMuteMentionsSchema,
+    setAppMuteSchema
+} from "@/lib/app-mutes";
 
 export async function saveFavoriteAppsAction(input: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
@@ -71,6 +78,26 @@ export async function setAppMuteAction(
     const { appId, duration } = parsed.data;
     const holds = await updateNotificationHolds(user.id, (current) =>
         applyAppMute(current, appId, duration, new Date())
+    );
+    return { holds };
+}
+
+/**
+ * Whether an app's mute holds back a mention of the reader too, or lets it
+ * through. Only Chat's own hold carries it, and only while it is muted.
+ */
+export async function setAppMuteMentionsAction(
+    input: unknown
+): Promise<{ holds?: NotificationHolds; error?: string }> {
+    const user = await requireUser();
+    const t = await getTranslations("nav");
+    const parsed = setAppMuteMentionsSchema.safeParse(input);
+    if (!parsed.success || !mentionsMutable(parsed.data.appId)) {
+        return { error: t("switcher.muteFailed") };
+    }
+    const { appId, on } = parsed.data;
+    const holds = await updateNotificationHolds(user.id, (current) =>
+        applyAppMuteMentions(current, appId, on, new Date())
     );
     return { holds };
 }

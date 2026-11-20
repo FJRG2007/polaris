@@ -50,6 +50,8 @@ export interface ConversationInfoEntries {
     readonly onMembers?: () => void;
     readonly onShared?: (kind: SharedKind) => void;
     readonly onMute: (minutes: number | null) => void;
+    /** Whether the mute holds back mentions too; settles once saved. */
+    readonly onMuteMentions: (on: boolean) => Promise<unknown>;
     /** Refused with its reason rather than missing - see the header's `adder`. */
     readonly addPeople?: { readonly reason: string | null; readonly onSelect: () => void };
     readonly onNickname?: () => void;
@@ -211,6 +213,7 @@ export function ConversationInfo({
                             onOpenChange(false);
                             entries.onMute(minutes);
                         }}
+                        onMentions={entries.onMuteMentions}
                     />
                 </Group>
 

@@ -490,6 +490,9 @@ export function ChannelHeader({
                                 onChoose={(minutes) =>
                                     void act(() => actions.setMutedAction(channel.id, minutes))
                                 }
+                                onMentions={(on) =>
+                                    act(() => actions.setMuteMentionsAction(channel.id, on))
+                                }
                             />
                             {/* Not in a one-to-one conversation, where the mute
                                 is the whole of the question: every message in
@@ -689,6 +692,8 @@ export function ChannelHeader({
                         onShared,
                         onMute: (minutes) =>
                             void act(() => actions.setMutedAction(channel.id, minutes)),
+                        onMuteMentions: (on) =>
+                            act(() => actions.setMuteMentionsAction(channel.id, on)),
                         addPeople: adder
                             ? { reason: adder.reason, onSelect: () => setAdding(true) }
                             : undefined,

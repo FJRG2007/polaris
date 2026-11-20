@@ -38,11 +38,15 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/chat/access", () => ({ reachableChannelIds: async () => new Set(["c1"]) }));
-vi.mock("@/lib/chat/notify", () => ({
-    notifyLevels: async () => new Map([["c1", "all"]]),
-    readerTeams: async () => new Set(),
-    mentionsReader: () => false
-}));
+vi.mock("@/lib/chat/notify", async () => {
+    const actual = await vi.importActual<typeof import("@/lib/chat/notify")>("@/lib/chat/notify");
+    return {
+        ...actual,
+        notifyLevels: async () => new Map([["c1", "all"]]),
+        readerTeams: async () => new Set(),
+        mentionsReader: () => false
+    };
+});
 vi.mock("@/lib/chat/history-visibility", () => ({
     historyFloors: async () => new Map(),
     readableWhere: () => ({})

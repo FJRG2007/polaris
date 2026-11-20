@@ -114,6 +114,9 @@ export interface ChatChannelView {
     /** When the quiet ends, or null when it does not - either because the
      *  conversation is not muted or because it was muted with no end. */
     readonly mutedUntil: string | null;
+    /** Whether this reader's mute holds back a mention of them too. Theirs
+     *  alone, and kept across mutes. */
+    readonly muteMentions: boolean;
     /** Whether this reader administers the conversation, which is what decides
      *  whether the screen offers them anything only a moderator may do. Always
      *  false in a direct message, where everybody in one is equal in it. */
@@ -761,6 +764,7 @@ export async function listChannels(
                 lastReadAt: true,
                 muted: true,
                 mutedUntil: true,
+                muteMentions: true,
                 notifyLevel: true,
                 pinnedAt: true,
                 locked: true,
@@ -991,6 +995,7 @@ export async function listChannels(
             // not a mute, and nothing runs to clear the flag.
             muted: membership ? core.muteInForce(membership) : false,
             mutedUntil: membership?.mutedUntil?.toISOString() ?? null,
+            muteMentions: membership?.muteMentions ?? false,
             notifyLevel: channelNotifyOf(membership?.notifyLevel),
             translation: core.readChatTranslation(membership?.translation),
             pinned: membership?.pinnedAt !== null && membership?.pinnedAt !== undefined,
@@ -1802,6 +1807,26 @@ export async function setMuted(
     });
     // The rail draws the bell, and the tab that pressed it is not the only one
     // showing this conversation.
+    publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [actor.id] });
+}
+
+/**
+ * Whether this reader's mute here holds back a mention of them too. Off, a
+ * message that names them or replies to them gets through the mute.
+ */
+export async function setMuteMentions(
+    actor: ChatActor,
+    channelId: string,
+    on: boolean
+): Promise<void> {
+    await requireChannel(actor, channelId);
+    const parsed = core.muteMentionsSchema.safeParse({ channelId, on });
+    if (!parsed.success) throw new ChatAccessError({ key: "errors.muteMentionsInvalid" });
+    await prisma.chatChannelMember.upsert({
+        where: { channelId_userId: { channelId, userId: actor.id } },
+        update: { muteMentions: parsed.data.on },
+        create: { channelId, userId: actor.id, muteMentions: parsed.data.on }
+    });
     publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: [actor.id] });
 }
 

@@ -1463,6 +1463,17 @@ export async function setMutedAction(
     return result;
 }
 
+/** @param on - Whether the mute holds back a mention of the reader too. */
+export async function setMuteMentionsAction(
+    channelId: string,
+    on: boolean
+): Promise<{ error?: string }> {
+    const me = await actor();
+    const result = await guard(() => chat.setMuteMentions(me, channelId, on));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result;
+}
+
 /**
  * What one conversation is allowed to interrupt with: every message, only the
  * ones that name you or the room, or nothing. Separate from the mute above it,

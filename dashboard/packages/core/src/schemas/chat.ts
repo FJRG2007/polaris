@@ -1063,6 +1063,12 @@ export const muteSchema = z.object({
         .nullable()
 });
 
+/** Whether a conversation's mute holds back mentions too. */
+export const muteMentionsSchema = z.object({
+    channelId: z.string().uuid(),
+    on: z.boolean()
+});
+
 export type MuteInput = z.infer<typeof muteSchema>;
 
 /** When a mute of this length ends, or null when it does not. */
@@ -1084,6 +1090,40 @@ export function muteInForce(
     if (!row.muted) return false;
     if (row.mutedUntil === null) return true;
     return new Date(row.mutedUntil).getTime() > now.getTime();
+}
+
+/** The mutes in force for one reader of one conversation: its own and Chat's
+ *  as a whole, each with whether it holds back mentions too. */
+export interface ChatMuteState {
+    readonly conversation: boolean;
+    readonly conversationMentions: boolean;
+    readonly app: boolean;
+    readonly appMentions: boolean;
+}
+
+/** No mute at all. */
+export const CHAT_UNMUTED: ChatMuteState = {
+    conversation: false,
+    conversationMentions: false,
+    app: false,
+    appMentions: false
+};
+
+/**
+ * Whether the reader's mutes keep a message from interrupting them.
+ *
+ * A mute silences the room, not the reader: a message that names them - their
+ * name, a team they are in, the room itself, or a reply to something they
+ * wrote - still gets through, the way it does in Discord, WhatsApp and
+ * Telegram. Only a mute set to hold back mentions too stops that one.
+ *
+ * @param mentioned - The message names the reader, from `mentionsReader` and
+ *   the reply it answers.
+ */
+export function chatMuteHolds(state: ChatMuteState, mentioned: boolean): boolean {
+    if (!state.conversation && !state.app) return false;
+    if (!mentioned) return true;
+    return (state.conversation && state.conversationMentions) || (state.app && state.appMentions);
 }
 
 /**

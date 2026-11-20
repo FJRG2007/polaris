@@ -38,7 +38,9 @@
             "24h": "For 24 hours",
             "1w": "For 1 week",
             "off": "Until I turn it back on"
-        }
+        },
+        "muteAppMentions": "Mute mentions too",
+        "muteAppMentionsOn": "On"
     },
     "waiting": {
         "unread": "{count, plural, one {# unread message} other {# unread messages}}",

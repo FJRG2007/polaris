@@ -9,11 +9,14 @@
  *
  * It is deliberately not the mute. A mute is a silence with an end and takes the
  * unread badge with it; this decides what interrupts and leaves the counting
- * alone. Both are checked, and either one is enough to stay quiet.
+ * alone. Both are checked, and either one is enough to stay quiet - except that
+ * a mention of the reader gets through a mute unless it holds mentions too,
+ * where `none` silences it as well, as Discord's "Nothing" does.
  */
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { chatMutes } from "./app-mute";
 import { channelMentions, extractReferences } from "@/components/rich-text/markdown";
 
 /**
@@ -160,4 +163,77 @@ export function mentionsReader(
             ? !author && reference.id.toLowerCase() === me
             : reference.kind === "team" && teamIds.has(reference.id.toLowerCase())
     );
+}
+
+/** Who is asking about a mute: one reader across conversations, or one
+ *  conversation across readers. */
+export type MuteLookup = (channelId: string, userId: string) => core.ChatMuteState;
+
+/**
+ * The mutes in force for these readers in these conversations, conversation's
+ * and Chat's as a whole, for `core.chatMuteHolds` to decide on.
+ *
+ * Two reads whatever the size: the muted membership rows and the accounts'
+ * holds. Called for one reader (a toast) or one conversation (a room
+ * mention); with one reader the rows are narrowed to them, otherwise to the
+ * muted rows of the conversations, which are the few.
+ */
+export async function muteStates(
+    channelIds: readonly string[],
+    userIds: readonly string[],
+    now = new Date()
+): Promise<MuteLookup> {
+    const channels = [...new Set(channelIds)];
+    const users = [...new Set(userIds)];
+    if (channels.length === 0 || users.length === 0) return () => core.CHAT_UNMUTED;
+    const [rows, app] = await Promise.all([
+        prisma.chatChannelMember.findMany({
+            where: {
+                channelId: { in: channels },
+                muted: true,
+                ...(users.length === 1 ? { userId: users[0] } : {})
+            },
+            select: {
+                channelId: true,
+                userId: true,
+                muted: true,
+                mutedUntil: true,
+                muteMentions: true
+            }
+        }),
+        chatMutes(users, now)
+    ]);
+    const conversation = new Map(
+        rows
+            .filter((row) => core.muteInForce(row, now))
+            .map((row) => [`${row.channelId}:${row.userId}`, row.muteMentions])
+    );
+    return (channelId, userId) => {
+        const own = conversation.get(`${channelId}:${userId}`);
+        const whole = app.get(userId);
+        return {
+            conversation: own !== undefined,
+            conversationMentions: own ?? false,
+            app: whole !== undefined,
+            appMentions: whole?.mentions ?? false
+        };
+    };
+}
+
+/**
+ * Which of these quoted messages the reader wrote, so a reply to them counts as
+ * naming them - as a reply does in Discord, WhatsApp and Telegram. One read for
+ * the whole batch.
+ */
+export async function repliesToReader(
+    userId: string,
+    replyToIds: readonly (string | null)[]
+): Promise<Set<string>> {
+    const ids = [...new Set(replyToIds.filter((id): id is string => id !== null))];
+    if (ids.length === 0) return new Set();
+    const rows = await prisma.chatMessage.findMany({
+        where: { id: { in: ids }, authorId: userId },
+        select: { id: true }
+    });
+    return new Set(rows.map((row) => row.id));
 }

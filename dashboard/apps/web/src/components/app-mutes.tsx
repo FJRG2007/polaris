@@ -9,9 +9,9 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import { useToast } from "@polaris/ui";
 import type { NotificationHolds, NotificationMuteDuration } from "@polaris/core";
-import { applyAppMute } from "@/lib/app-mutes";
+import { applyAppMute, applyAppMuteMentions } from "@/lib/app-mutes";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { setAppMuteAction } from "@/app/(app)/app-launcher-actions";
+import { setAppMuteAction, setAppMuteMentionsAction } from "@/app/(app)/app-launcher-actions";
 import { AppMutesContext } from "@/components/app-mutes-context";
 
 export function AppMutesProvider({
@@ -26,10 +26,13 @@ export function AppMutesProvider({
     const [holds, setHolds] = useState<NotificationHolds>(initial);
     const latest = useRef(holds);
 
-    const mute = useCallback(
-        (appId: string, duration: NotificationMuteDuration | null) => {
-            const before = latest.current;
-            const next = applyAppMute(before, appId, duration, new Date());
+    // Drawn at once; the saved holds the server answers with replace the guess.
+    const save = useCallback(
+        (
+            next: NotificationHolds,
+            before: NotificationHolds,
+            send: () => Promise<{ holds?: NotificationHolds; error?: string }>
+        ) => {
             latest.current = next;
             setHolds(next);
             const rollback = (message: string) => {
@@ -38,7 +41,7 @@ export function AppMutesProvider({
                 setHolds(before);
                 toast.show({ title: message });
             };
-            void setAppMuteAction({ appId, duration })
+            void send()
                 .then((answer) => {
                     if (answer.error || !answer.holds) {
                         rollback(answer.error ?? t("switcher.muteFailed"));
@@ -53,6 +56,26 @@ export function AppMutesProvider({
         [t, toast]
     );
 
-    const value = useMemo(() => ({ holds, mute }), [holds, mute]);
+    const mute = useCallback(
+        (appId: string, duration: NotificationMuteDuration | null) => {
+            const before = latest.current;
+            save(applyAppMute(before, appId, duration, new Date()), before, () =>
+                setAppMuteAction({ appId, duration })
+            );
+        },
+        [save]
+    );
+
+    const muteMentions = useCallback(
+        (appId: string, on: boolean) => {
+            const before = latest.current;
+            save(applyAppMuteMentions(before, appId, on, new Date()), before, () =>
+                setAppMuteMentionsAction({ appId, on })
+            );
+        },
+        [save]
+    );
+
+    const value = useMemo(() => ({ holds, mute, muteMentions }), [holds, mute, muteMentions]);
     return <AppMutesContext.Provider value={value}>{children}</AppMutesContext.Provider>;
 }

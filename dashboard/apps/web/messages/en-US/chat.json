@@ -259,7 +259,8 @@
         "locationNotYours": "Only whoever shared it can stop it",
         "locationNotLive": "That is not a live location",
         "placesBusy": "Too many searches. Try again in a minute.",
-        "placesUnavailable": "Place search is unavailable right now"
+        "placesUnavailable": "Place search is unavailable right now",
+        "muteMentionsInvalid": "That mute could not be changed"
     },
     "media": {
         "refused": {
@@ -1807,7 +1808,9 @@
             "h8": "For 8 hours",
             "h24": "For 24 hours",
             "forever": "Until I turn it back on"
-        }
+        },
+        "muteMentions": "Mute mentions too",
+        "on": "On"
     },
     "diagnosis": {
         "whatWasChecked": "What was checked"

@@ -7,7 +7,7 @@
  * chat as well, where only that player sees them.
  *
  * Who gets one is exactly who the corner note would have been for - the same
- * mute, the same "all / mentions / nothing" level, the same blocks, read through
+ * mute, a mention getting through it the same way, the same "all / mentions / nothing" level, the same blocks, read through
  * the same functions - and then only the accounts it is on for
  * (`User.inGameMessages`): by default every conversation, channels included; set
  * to direct, only a direct message or a group of up to `SMALL_GROUP_SIZE`, where
@@ -26,8 +26,7 @@ import { conversationName, filesLabel } from "./toasts";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { SMALL_GROUP_SIZE, inGameChoice } from "./in-game-choice";
 import { messageable, reachableChannelIds } from "./access";
-import { mentionsReader, notifyLevels, readerTeams } from "./notify";
-import { chatMutedUsers } from "./app-mute";
+import { mentionsReader, muteStates, notifyLevels, readerTeams } from "./notify";
 
 /** How much of a message goes into the game: a line of chat, not an essay. */
 export const RELAY_EXCERPT = 200;
@@ -63,6 +62,7 @@ export async function relayToGames(messageId: string): Promise<void> {
             channelId: true,
             deletedAt: true,
             forwarded: true,
+            replyToId: true,
             attachments: {
                 orderBy: { createdAt: "asc" },
                 select: { name: true, contentType: true, spoiler: true }
@@ -102,6 +102,17 @@ export async function relayToGames(messageId: string): Promise<void> {
 
     const readers = await readersOf(channelId, channel.spaceId, authorId);
     if (readers.length === 0) return;
+    // The same mutes as the corner note, a mention getting through them, and
+    // a reply to somebody naming them as much as their name does.
+    const [mutes, quoted] = await Promise.all([
+        muteStates([channelId], readers),
+        message.replyToId && !message.forwarded
+            ? prisma.chatMessage.findUnique({
+                  where: { id: message.replyToId },
+                  select: { authorId: true }
+              })
+            : null
+    ]);
 
     // A channel is called by its name; only a direct message or a group needs
     // the people in it, and only once somebody is going to be shown it.
@@ -118,12 +129,16 @@ export async function relayToGames(messageId: string): Promise<void> {
     let relayed = 0;
     for (const reader of readers) {
         if (relayed >= MOST_READERS) break;
-        if (!(await interrupts(reader, channelId, authorId, message.body))) continue;
+        const repliedTo = quoted?.authorId === reader;
+        const state = mutes(channelId, reader);
+        if (!(await interrupts(reader, state, channelId, authorId, message.body, repliedTo))) {
+            continue;
+        }
         relayed += 1;
         await relay({
-            userId: reader.userId,
+            userId: reader,
             author: author?.name || "Somebody",
-            conversation: conversationName({ ...channel, members }, reader.userId),
+            conversation: conversationName({ ...channel, members }, reader),
             inChannel: channel.spaceId !== null,
             text,
             files,
@@ -151,7 +166,7 @@ async function readersOf(
     channelId: string,
     spaceId: string | null,
     authorId: string
-): Promise<{ userId: string; muted: boolean; mutedUntil: Date | null }[]> {
+): Promise<string[]> {
     const candidates = spaceId
         ? await everythingReaders(authorId)
         : await groupMembers(channelId, authorId);
@@ -164,22 +179,7 @@ async function readersOf(
             reading.push(userId);
         }
     }
-    if (reading.length === 0) return [];
-    // Chat muted as a whole holds every conversation back, in a game as well.
-    const appMuted = await chatMutedUsers(reading);
-    const listening = reading.filter((userId) => !appMuted.has(userId));
-    if (listening.length === 0) return [];
-
-    const rows = await prisma.chatChannelMember.findMany({
-        where: { channelId, userId: { in: listening } },
-        select: { userId: true, muted: true, mutedUntil: true }
-    });
-    const muting = new Map(rows.map((row) => [row.userId, row]));
-    return listening.map((userId) => ({
-        userId,
-        muted: muting.get(userId)?.muted ?? false,
-        mutedUntil: muting.get(userId)?.mutedUntil ?? null
-    }));
+    return reading;
 }
 
 /** The accounts it is on everything for, among those playing right now when the
@@ -238,23 +238,23 @@ export function groupCandidates(
 
 /**
  * Whether this message is one the corner note would have told this reader
- * about: not muted, not a conversation set to nothing, named in it where it is
- * set to mentions, and not from somebody they blocked.
+ * about: not a conversation set to nothing, named in it where it is set to
+ * mentions or muted - by itself or with Chat as a whole - unless the mute
+ * holds mentions too, and not from somebody they blocked.
  */
 async function interrupts(
-    reader: { userId: string; muted: boolean; mutedUntil: Date | null },
+    reader: string,
+    mute: core.ChatMuteState,
     channelId: string,
     authorId: string,
-    body: string
+    body: string,
+    repliedTo: boolean
 ): Promise<boolean> {
-    if (core.muteInForce(reader)) return false;
-    const level = (await notifyLevels(reader.userId, [channelId])).get(channelId) ?? "all";
+    const level = (await notifyLevels(reader, [channelId])).get(channelId) ?? "all";
     if (level === "none") return false;
-    if (
-        level === "mentions" &&
-        !mentionsReader(body, reader.userId, await readerTeams(reader.userId))
-    ) {
-        return false;
+    if (level === "mentions" || core.chatMuteHolds(mute, false)) {
+        const named = repliedTo || mentionsReader(body, reader, await readerTeams(reader));
+        if (!named || core.chatMuteHolds(mute, true)) return false;
     }
-    return !(await blockedBy(reader.userId, [authorId])).has(authorId);
+    return !(await blockedBy(reader, [authorId])).has(authorId);
 }

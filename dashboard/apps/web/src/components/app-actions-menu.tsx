@@ -4,15 +4,16 @@
  * What a right click on an app offers, in the app menu and on the Overview's
  * rail: marking what is waiting in it read, keeping it on the rail, and opening
  * it on entering Polaris, keeping it behind the account's PIN, and muting
- * its notifications for a while. A long press does the same on a touch screen.
+ * its notifications for a while - Chat's, while muted, with or without the
+ * mentions of the reader, which get through by default as in Discord. A long press does the same on a touch screen.
  */
 
 import * as core from "@polaris/core";
-import { Bell, BellOff, House, Lock, LockOpen, Star } from "lucide-react";
+import { AtSign, Bell, BellOff, Check, House, Lock, LockOpen, Star } from "lucide-react";
 import type { ReactNode } from "react";
 import { OVERVIEW_APP_ID } from "@/lib/apps";
 import { lockableApp } from "@/lib/app-locks";
-import { appMuteState, mutableApp } from "@/lib/app-mutes";
+import { appMuteState, appMutesMentions, mentionsMutable, mutableApp } from "@/lib/app-mutes";
 import { useAppLocks } from "@/components/app-locks-context";
 import { useAppMutes } from "@/components/app-mutes-context";
 import { useDisplayFormat } from "@/components/display-format";
@@ -46,10 +47,11 @@ export function AppActionsMenu({
     const favorite = favorites.includes(appId);
     const { locked, hasPin, toggleLock, setUpPin } = useAppLocks();
     const isLocked = locked.includes(appId);
-    const { holds, mute } = useAppMutes();
+    const { holds, mute, muteMentions } = useAppMutes();
     const format = useDisplayFormat();
     const now = new Date();
     const muteState = appMuteState(holds, appId, now);
+    const mentionsMuted = appMutesMentions(holds, appId, now);
     // Today's end as a time, a later one with its date.
     const untilLabel = (until: string) => {
         const at = new Date(until);
@@ -106,12 +108,36 @@ export function AppActionsMenu({
                     would be a switch that does nothing. */}
                 {mutableApp(appId) ? (
                     muteState.muted ? (
-                        <ContextMenuItem onSelect={() => mute(appId, null)}>
-                            <Bell className="size-4 shrink-0" aria-hidden="true" />
-                            {muteState.until
-                                ? t("switcher.unmuteAppUntil", { time: untilLabel(muteState.until) })
-                                : t("switcher.unmuteApp")}
-                        </ContextMenuItem>
+                        <>
+                            <ContextMenuItem onSelect={() => mute(appId, null)}>
+                                <Bell className="size-4 shrink-0" aria-hidden="true" />
+                                {muteState.until
+                                    ? t("switcher.unmuteAppUntil", {
+                                          time: untilLabel(muteState.until)
+                                      })
+                                    : t("switcher.unmuteApp")}
+                            </ContextMenuItem>
+                            {/* Kept open on a click, so the check can be seen to take. */}
+                            {muteMentions && mentionsMutable(appId) ? (
+                                <ContextMenuItem
+                                    onSelect={(event) => {
+                                        event.preventDefault();
+                                        muteMentions(appId, !mentionsMuted);
+                                    }}
+                                >
+                                    <AtSign className="size-4 shrink-0" aria-hidden="true" />
+                                    <span className="min-w-0 flex-1 truncate">
+                                        {t("switcher.muteAppMentions")}
+                                    </span>
+                                    {mentionsMuted ? (
+                                        <Check
+                                            className="size-4 shrink-0"
+                                            aria-label={t("switcher.muteAppMentionsOn")}
+                                        />
+                                    ) : null}
+                                </ContextMenuItem>
+                            ) : null}
+                        </>
                     ) : (
                         <ContextMenuSub>
                             <ContextMenuSubTrigger>
