@@ -1,6 +1,6 @@
 /**
  * A Polaris link followed in a browser, opened in the Polaris app instead - the
- * desktop app on a computer, the phone app on Android - the way WhatsApp and
+ * desktop app on a computer, the phone app on Android and on iPhone - the way WhatsApp and
  * Discord hand their links to their apps.
  *
  * Tried only where it can work and nobody is put out by it: the account has the
@@ -15,7 +15,15 @@
 
 import { clientFromUserAgent } from "@polaris/core";
 
-export type AppTarget = "phone" | "desktop";
+export type AppTarget = "phone" | "iphone" | "desktop";
+
+/** The phone app on iPhone adds this to its User-Agent (`mobile/ios` WebViewController). */
+const IPHONE_APP = /\bPolarisMobile\/\d[^\s]*\s+\(iOS\)/;
+
+/** Whether a session's User-Agent is the phone app on iPhone rather than on Android. */
+export function isIphoneApp(userAgent: string | null | undefined): boolean {
+    return IPHONE_APP.test(userAgent ?? "");
+}
 
 /** The Android app's package, which an `intent:` link names so Chrome opens it. */
 export const PHONE_APP_PACKAGE = "app.polaris.mobile";
@@ -26,13 +34,14 @@ const NEVER = /^\/(?:api|login|sign-in|sign-up|signup|register|auth|logout|oauth
 /** Which app this browser's device would open the link in, or null for none. */
 export function appTarget(
     userAgent: string,
-    signedIn: { readonly phone: boolean; readonly desktop: boolean }
+    signedIn: { readonly phone: boolean; readonly iphone?: boolean; readonly desktop: boolean }
 ): AppTarget | null {
     // Already inside one of the apps: nothing to hand over.
     if (clientFromUserAgent(userAgent) !== "browser") return null;
     if (/\bAndroid\b/i.test(userAgent)) return signedIn.phone ? "phone" : null;
-    // A phone or tablet with no app to offer, which iOS has none of yet.
-    if (/\b(?:iPhone|iPad|iPod|Mobile)\b/i.test(userAgent)) return null;
+    if (/\b(?:iPhone|iPad|iPod)\b/i.test(userAgent)) return signedIn.iphone ? "iphone" : null;
+    // Another phone or tablet, with no app to offer.
+    if (/\bMobile\b/i.test(userAgent)) return null;
     return signedIn.desktop ? "desktop" : null;
 }
 
@@ -64,7 +73,9 @@ export function arrivedFromOutside({
 /** The link that opens this page in the app. */
 export function appLink(target: AppTarget, origin: string, path: string): string {
     const query = `server=${encodeURIComponent(origin)}&path=${encodeURIComponent(path)}`;
-    if (target === "desktop") return `polaris://open?${query}`;
+    // The desktop app and the iPhone app both answer the `polaris:` scheme; Safari
+    // asks before it hands the link over.
+    if (target === "desktop" || target === "iphone") return `polaris://open?${query}`;
     // Chrome on Android opens an `intent:` link in the named app, and with the app
     // missing goes to the fallback - this same page - instead of the Play Store.
     const fallback = encodeURIComponent(`${origin}${path}`);

@@ -2,6 +2,7 @@ import { prisma } from "@polaris/db";
 import { NextResponse } from "next/server";
 import { backgroundUser } from "@/lib/session";
 import { clientFromUserAgent } from "@polaris/core";
+import { isIphoneApp } from "@/lib/open-in-app";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +34,10 @@ export async function GET(): Promise<Response> {
     return NextResponse.json(
         {
             open: user?.openLinksInApp ?? true,
-            phone: clients.has("phone"),
+            phone: sessions.some(
+                (row) => clientFromUserAgent(row.userAgent) === "phone" && !isIphoneApp(row.userAgent)
+            ),
+            iphone: sessions.some((row) => isIphoneApp(row.userAgent)),
             desktop: clients.has("desktop")
         },
         { headers: { "cache-control": "private, no-store" } }

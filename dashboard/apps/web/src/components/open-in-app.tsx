@@ -54,10 +54,11 @@ export function OpenInApp() {
         const controller = new AbortController();
         void fetch("/api/account/app-links", { cache: "no-store", signal: controller.signal })
             .then((response) => (response.ok ? response.json() : null))
-            .then((answer: { open?: boolean; phone?: boolean; desktop?: boolean } | null) => {
+            .then((answer: { open?: boolean; phone?: boolean; iphone?: boolean; desktop?: boolean } | null) => {
                 if (!answer?.open) return;
                 const target = appTarget(navigator.userAgent, {
                     phone: answer.phone === true,
+                    iphone: answer.iphone === true,
                     desktop: answer.desktop === true
                 });
                 if (!target) return;

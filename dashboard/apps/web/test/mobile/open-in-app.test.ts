@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { appLink, appTarget, arrivedFromOutside } from "@/lib/open-in-app";
+import { appLink, appTarget, arrivedFromOutside, isIphoneApp } from "@/lib/open-in-app";
 
 const ANDROID_CHROME =
     "Mozilla/5.0 (Linux; Android 15; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36";
@@ -27,10 +27,26 @@ describe("which app a link is handed to", () => {
         expect(appTarget(WINDOWS_CHROME, { phone: true, desktop: false })).toBeNull();
     });
 
-    it("is none inside one of the apps already, or on an iPhone", () => {
+    it("is none inside one of the apps already", () => {
         expect(appTarget(PHONE_APP, BOTH)).toBeNull();
         expect(appTarget(DESKTOP_APP, BOTH)).toBeNull();
+        expect(appTarget(`${IPHONE} PolarisMobile/0.1.2 (iOS)`, { ...BOTH, iphone: true })).toBeNull();
+    });
+
+    it("is the iPhone app on an iPhone, only where the account signed in to that app", () => {
+        expect(appTarget(IPHONE, { ...BOTH, iphone: true })).toBe("iphone");
+        // Signed in to the Android app only: nothing to open on an iPhone.
         expect(appTarget(IPHONE, BOTH)).toBeNull();
+        expect(appLink("iphone", "https://polaris.example.com", "/chat")).toBe(
+            "polaris://open?server=https%3A%2F%2Fpolaris.example.com&path=%2Fchat"
+        );
+    });
+
+    it("tells the iPhone app's sessions from the Android app's", () => {
+        expect(isIphoneApp(`${IPHONE} PolarisMobile/0.1.2 (iOS)`)).toBe(true);
+        expect(isIphoneApp(PHONE_APP)).toBe(false);
+        expect(isIphoneApp(IPHONE)).toBe(false);
+        expect(isIphoneApp(null)).toBe(false);
     });
 });
 
