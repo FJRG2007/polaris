@@ -16,10 +16,13 @@
 
 import * as core from "@polaris/core";
 import { useEffect, useMemo, useState } from "react";
+import { appMutesMentions, mentionsMutable } from "@/lib/app-mutes";
 import {
+    AtSign,
     Bell,
     BellOff,
     CalendarClock,
+    Check,
     ChevronRight,
     Mail,
     MoreHorizontal,
@@ -106,6 +109,9 @@ export interface HoldControls {
     timeZone: string;
     onMute: (target: core.HoldTarget, duration: core.NotificationMuteDuration | null) => void;
     onSchedule: (target: core.HoldTarget, schedule: core.NotificationSchedule | null) => void;
+    /** Whether a whole app's mute holds back mentions too. Absent where nothing
+     *  saves it, and then it is not offered. */
+    onMuteMentions?: (app: core.AppHoldId, on: boolean) => void;
 }
 
 export function EventGroups({
@@ -422,6 +428,15 @@ function HoldMenu({
     const key = core.holdKey(target);
     const muted = core.muteActive(hold.holds.mutes[key], new Date());
     const schedule = hold.holds.schedules[key];
+    // Chat's mute lets a mention through unless it is set to hold it too, the
+    // same switch the app menu offers while muted.
+    const mentionsApp =
+        target.kind === "app" && muted && hold.onMuteMentions && mentionsMutable(target.id)
+            ? target.id
+            : null;
+    const mentionsMuted = mentionsApp
+        ? appMutesMentions(hold.holds, mentionsApp, new Date())
+        : false;
 
     return (
         <>
@@ -442,6 +457,20 @@ function HoldMenu({
                         <DropdownMenuItem onSelect={() => hold.onMute(target, null)}>
                             <Bell />
                             {t("holds.unmute")}
+                        </DropdownMenuItem>
+                    ) : null}
+                    {mentionsApp ? (
+                        <DropdownMenuItem
+                            onSelect={(event) => {
+                                event.preventDefault();
+                                hold.onMuteMentions?.(mentionsApp, !mentionsMuted);
+                            }}
+                        >
+                            <AtSign />
+                            <span className="min-w-0 flex-1 truncate">
+                                {t("holds.muteMentions")}
+                            </span>
+                            {mentionsMuted ? <Check aria-label={t("holds.mentionsOn")} /> : null}
                         </DropdownMenuItem>
                     ) : null}
                     <DropdownMenuLabel>{t("holds.muteFor")}</DropdownMenuLabel>

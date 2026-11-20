@@ -167,7 +167,9 @@
         "weekdays": "Lun-Vie",
         "weekends": "Sáb y dom",
         "allDay": "día entero",
-        "hours": "{from}-{to}"
+        "hours": "{from}-{to}",
+        "muteMentions": "Silenciar menciones",
+        "mentionsOn": "Sí"
     },
     "destinations": {
         "title": "Destinos",

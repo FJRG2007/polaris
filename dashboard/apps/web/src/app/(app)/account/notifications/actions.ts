@@ -15,6 +15,7 @@ import * as webPush from "@/lib/notifications/web-push";
 import { prisma } from "@polaris/db";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
+import { applyHoldMute } from "@/lib/app-mutes";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { testDestination } from "@/lib/notifications/dispatch";
 import { soundVolumeSchema } from "@/lib/notifications/sound-volume";
@@ -25,7 +26,6 @@ import {
     holdKey,
     holdTargetSchema,
     NOTIFICATION_MUTE_DURATIONS,
-    muteUntil,
     notificationScheduleSchema,
     type NotificationHolds,
     isNotificationEvent,
@@ -296,14 +296,10 @@ export async function setNotificationMuteAction(
     const parsed = muteInputSchema.safeParse(input);
     if (!parsed.success)
         return { error: (await getTranslations("accountNotifications"))("errors.notSaved") };
-    const key = holdKey(parsed.data.target);
-    const duration = parsed.data.duration;
-    const holds = await updateNotificationHolds(user.id, (current) => {
-        const mutes = { ...current.mutes };
-        if (duration === null) delete mutes[key];
-        else mutes[key] = { until: muteUntil(duration, new Date()) };
-        return { ...current, mutes };
-    });
+    const { target, duration } = parsed.data;
+    const holds = await updateNotificationHolds(user.id, (current) =>
+        applyHoldMute(current, target, duration, new Date())
+    );
     return { holds };
 }
 

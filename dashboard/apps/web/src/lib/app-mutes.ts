@@ -61,6 +61,28 @@ export function appMuteState(
     return { muted: true, until };
 }
 
+/**
+ * The holds with one target muted for `duration` from `now`, or unmuted for
+ * null. A new length keeps whether the mute holds mentions too, so muting again
+ * from any screen does not quietly let them back through. The one way every
+ * screen sets a mute.
+ */
+export function applyHoldMute(
+    holds: core.NotificationHolds,
+    target: core.HoldTarget,
+    duration: core.NotificationMuteDuration | null,
+    now: Date
+): core.NotificationHolds {
+    const key = core.holdKey(target);
+    const mutes = { ...holds.mutes };
+    if (duration === null) delete mutes[key];
+    else {
+        const until = core.muteUntil(duration, now);
+        mutes[key] = mutes[key]?.mentions ? { until, mentions: true } : { until };
+    }
+    return { ...holds, mutes };
+}
+
 /** The holds with the app muted for `duration` from `now`, or unmuted for null.
  *  The end is always worked out here, never taken from a browser. */
 export function applyAppMute(
@@ -69,15 +91,10 @@ export function applyAppMute(
     duration: core.NotificationMuteDuration | null,
     now: Date
 ): core.NotificationHolds {
-    const mutes = { ...holds.mutes };
-    const until = duration === null ? null : core.muteUntil(duration, now);
-    for (const target of appMuteTargets(appId)) {
-        const key = core.holdKey(target);
-        if (duration === null) delete mutes[key];
-        // A new length keeps whether it holds mentions too.
-        else mutes[key] = mutes[key]?.mentions ? { until, mentions: true } : { until };
-    }
-    return { ...holds, mutes };
+    return appMuteTargets(appId).reduce(
+        (next, target) => applyHoldMute(next, target, duration, now),
+        holds
+    );
 }
 
 /** Whether the app's mute can be set to hold back a mention of the reader too:

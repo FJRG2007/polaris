@@ -167,7 +167,9 @@
         "weekdays": "Mon-Fri",
         "weekends": "Weekends",
         "allDay": "all day",
-        "hours": "{from}-{to}"
+        "hours": "{from}-{to}",
+        "muteMentions": "Mute mentions too",
+        "mentionsOn": "On"
     },
     "destinations": {
         "title": "Destinations",

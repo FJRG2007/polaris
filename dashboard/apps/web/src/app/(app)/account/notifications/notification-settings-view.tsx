@@ -15,6 +15,8 @@ import type { QuietHours } from "@polaris/core";
 import Link from "next/link";
 import { DeliveryLog } from "./delivery-log";
 import { EventGroups } from "./event-groups";
+import { applyAppMuteMentions, applyHoldMute } from "@/lib/app-mutes";
+import { setAppMuteMentionsAction } from "@/app/(app)/app-launcher-actions";
 import { useClient, useTranslations } from "@/components/i18n/i18n-provider";
 import { useConnectionsHref } from "@/components/use-connections-href";
 import { DestinationsCard } from "./destinations-card";
@@ -85,7 +87,6 @@ import {
 import {
     EMPTY_NOTIFICATION_HOLDS,
     holdKey,
-    muteUntil,
     type HoldTarget,
     type NotificationMuteDuration,
     type AppHoldId,
@@ -174,11 +175,16 @@ export function NotificationSettingsView({
     }
 
     function mute(target: HoldTarget, duration: NotificationMuteDuration | null) {
-        const key = holdKey(target);
-        const mutes = { ...holds.mutes };
-        if (duration === null) delete mutes[key];
-        else mutes[key] = { until: muteUntil(duration, new Date()) };
-        saveHolds({ ...holds, mutes }, () => setNotificationMuteAction({ target, duration }));
+        saveHolds(applyHoldMute(holds, target, duration, new Date()), () =>
+            setNotificationMuteAction({ target, duration })
+        );
+    }
+
+    /** Whether Chat's mute holds back a mention of the reader too. */
+    function muteMentions(app: AppHoldId, on: boolean) {
+        saveHolds(applyAppMuteMentions(holds, app, on, new Date()), () =>
+            setAppMuteMentionsAction({ appId: app, on })
+        );
     }
 
     function schedule(target: HoldTarget, next: NotificationSchedule | null) {
@@ -212,7 +218,7 @@ export function NotificationSettingsView({
                 state={state}
                 destinations={destinations}
                 onChange={update}
-                hold={{ holds, timeZone, onMute: mute, onSchedule: schedule }}
+                hold={{ holds, timeZone, onMute: mute, onSchedule: schedule, onMuteMentions: muteMentions }}
                 appHolds={appHolds}
             />
 
