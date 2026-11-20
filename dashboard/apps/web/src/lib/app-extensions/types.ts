@@ -221,9 +221,11 @@ export interface AppExtension {
 
     /** Variables a release running this image always gets, over the stored
      *  environment, so an install made before they existed has them on its next
-     *  deploy. Undefined adds nothing. */
+     *  deploy. Undefined adds nothing. `env` is the stored environment, for a
+     *  variable that has to be rewritten for the image rather than added. */
     readonly releaseEnv?: (
-        imageRef: string | undefined
+        imageRef: string | undefined,
+        env: Readonly<Record<string, string>>
     ) => Readonly<Record<string, string>> | undefined;
 
     /** Whether an install's settings describe a server that loads plugins, which

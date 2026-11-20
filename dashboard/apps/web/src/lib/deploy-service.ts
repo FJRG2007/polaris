@@ -3109,7 +3109,7 @@ async function buildAppPlan(
     const imageRef = releaseImageFor(storedImage, env);
     // And may decide variables it always runs with, over whatever was stored, so
     // an install made before one existed gets it on its next deploy.
-    Object.assign(env, releaseEnvFor(imageRef));
+    Object.assign(env, releaseEnvFor(imageRef, env));
     const healthcheck = app.healthcheck
         ? (JSON.parse(app.healthcheck) as AppDeployPlan["healthcheck"])
         : undefined;

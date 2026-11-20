@@ -31,9 +31,21 @@ describe("the runtime a release needs", () => {
         }
     });
 
-    it("is Java 21 for the 1.x line and anything it cannot read", () => {
-        for (const version of ["1.21.4", "1.20.6", "1.16.5", "1.21.4-pre1", "21w13a", "custom"]) {
+    it("is Java 21 for 1.17 to 1.21 and anything it cannot read", () => {
+        for (const version of ["1.21.4", "1.20.6", "1.17", "1.17.1", "1.21.4-pre1", "21w13a", "custom"]) {
             expect(javaTagFor(version), version).toBe("java21");
+        }
+    });
+
+    it("is Java 11 for 1.13 to 1.16, which refuse anything newer than 16", () => {
+        for (const version of ["1.16.5", "1.16", "1.13.2"]) {
+            expect(javaTagFor(version), version).toBe("java11");
+        }
+    });
+
+    it("is Java 8 for 1.12 and older", () => {
+        for (const version of ["1.12.2", "1.8.9", "1.7.10"]) {
+            expect(javaTagFor(version), version).toBe("java8");
         }
     });
 });
@@ -49,6 +61,11 @@ describe("the image a server deploys", () => {
             "itzg/minecraft-server:java21"
         );
         expect(minecraftImageFor(managed, {})).toBe("itzg/minecraft-server:java25");
+        // A map pinned to 1.16.5 starts on a Java it accepts, and moves back once unpinned.
+        expect(minecraftImageFor(managed, { VERSION: "1.16.5" })).toBe("itzg/minecraft-server:java11");
+        expect(minecraftImageFor("itzg/minecraft-server:java11", { VERSION: "1.21.4" })).toBe(
+            "itzg/minecraft-server:java21"
+        );
     });
 
     it("leaves any other image alone, including one pinned by hand", () => {
@@ -80,5 +97,21 @@ describe("the settings every Minecraft Java server runs with", () => {
         for (const image of ["nginx:1.27", "itzg/minecraft-bedrock-server:latest", "", undefined]) {
             expect(minecraftReleaseEnv(image), String(image)).toBeUndefined();
         }
+    });
+});
+
+describe("the environment a Java 8 or 11 server gets", () => {
+    it("leaves out the optional Modrinth projects its older helper cannot read", () => {
+        expect(
+            minecraftReleaseEnv("itzg/minecraft-server:java11", {
+                MODRINTH_PROJECTS: "coreprotect?,luckperms?,worldedit"
+            })
+        ).toEqual({ BROADCAST_RCON_TO_OPS: "false", MODRINTH_PROJECTS: "worldedit" });
+    });
+
+    it("keeps them on the current tags", () => {
+        expect(
+            minecraftReleaseEnv("itzg/minecraft-server:java21", { MODRINTH_PROJECTS: "luckperms?" })
+        ).toEqual({ BROADCAST_RCON_TO_OPS: "false" });
     });
 });

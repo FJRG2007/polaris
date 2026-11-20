@@ -11,9 +11,14 @@
  *   still requires by name, so NeoForge (and Forge) on 1.21.x die on it before a
  *   mod loads: `FindException: Module jdk.crypto.ec not found`.
  *
+ * - 1.16.5 and older refuse anything newer than Java 16 ("Unsupported Java
+ *   detected (65.0). Only up to Java 16 is supported."), and 1.12 and older
+ *   mods need Java 8. A map pinned to one of those releases (Luckyblock Towers
+ *   is held to 1.16.5) exited at every start on Java 21, in a restart loop.
+ *
  * So the tag follows the release: Java 25 from 26.x (and for `LATEST` and
- * snapshots), Java 21 for everything before, which is what the 1.21 line targets
- * and what older plugin servers have always run on here. The server software
+ * snapshots), Java 21 for 1.17 to 1.21, which is what the 1.21 line targets,
+ * Java 11 for 1.13 to 1.16 and Java 8 for 1.12 and older. The server software
  * does not change the answer today: every software's `LATEST` resolves to 26.x.
  *
  * Applied when a server is deployed, which every create, settings save, reset and
@@ -34,12 +39,15 @@
 export const MINECRAFT_IMAGE = "itzg/minecraft-server";
 
 /** The tags this module chooses between, and so the only ones it replaces. */
-const MANAGED_TAGS = ["java21", "java25"] as const;
+const MANAGED_TAGS = ["java8", "java11", "java21", "java25"] as const;
 
 export type JavaTag = (typeof MANAGED_TAGS)[number];
 
 /** The first Minecraft release that needs Java 25. */
 const JAVA25_SINCE = 26;
+/** The last 1.x minor that runs on Java 8, and the last that runs on Java 16 or older. */
+const JAVA8_UNTIL = 12;
+const JAVA11_UNTIL = 16;
 
 export function javaTagFor(version: string): JavaTag {
     const value = version.trim().toUpperCase();
@@ -48,7 +56,12 @@ export function javaTagFor(version: string): JavaTag {
     // A release (26.1, 1.21.4) or a snapshot (26w14a) leads with the number that decides.
     const lead = /^(\d+)[.W]/.exec(value);
     if (!lead) return "java21";
-    return Number(lead[1]) >= JAVA25_SINCE ? "java25" : "java21";
+    if (Number(lead[1]) >= JAVA25_SINCE) return "java25";
+    // A 1.x release: its minor decides how old a Java it needs.
+    const minor = /^1\.(\d+)(?:\D|$)/.exec(value);
+    if (minor && Number(minor[1]) <= JAVA8_UNTIL) return "java8";
+    if (minor && Number(minor[1]) <= JAVA11_UNTIL) return "java11";
+    return "java21";
 }
 
 /** The image a server with this environment should run, or `imageRef` unchanged
@@ -76,12 +89,29 @@ export function minecraftImageFor(
  * settings save and reset is one) without anybody editing its settings. The image
  * writes the variable into an existing `server.properties` on every start, since
  * `OVERRIDE_SERVER_PROPERTIES` defaults to true.
+ *
+ * The Java 8 and Java 11 tags carry an older helper, frozen upstream, that reads
+ * an optional Modrinth project's trailing "?" as part of its name and stops the
+ * container on "Project(s) could not be located: [luckperms?]". On those the
+ * optional projects are left out - optional means the server runs without them
+ * - and the required ones kept.
  */
 export function minecraftReleaseEnv(
-    imageRef: string | undefined
+    imageRef: string | undefined,
+    env: Readonly<Record<string, string>> = {}
 ): Readonly<Record<string, string>> | undefined {
     if (!imageRef) return undefined;
     const repository = imageRef.replace(/^(docker\.io\/)?(library\/)?/, "").split(/[:@]/)[0];
     if (repository !== MINECRAFT_IMAGE) return undefined;
-    return { BROADCAST_RCON_TO_OPS: "false" };
+    const tag = imageRef.split(":")[1] ?? "";
+    const projects = env.MODRINTH_PROJECTS;
+    if (!LEGACY_HELPER_TAGS.has(tag) || projects === undefined) return { BROADCAST_RCON_TO_OPS: "false" };
+    const required = projects
+        .split(/[,\n]/)
+        .map((project) => project.trim())
+        .filter((project) => project !== "" && !project.endsWith("?"));
+    return { BROADCAST_RCON_TO_OPS: "false", MODRINTH_PROJECTS: required.join(",") };
 }
+
+/** The tags whose image helper cannot read an optional project. */
+const LEGACY_HELPER_TAGS: ReadonlySet<string> = new Set(["java8", "java11"]);

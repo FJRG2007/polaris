@@ -190,10 +190,13 @@ export function releaseImageFor(
 
 /** The environment apps lay over a release that runs this image, every deploy.
  *  Empty when no app has an opinion about it. */
-export function releaseEnvFor(imageRef: string | undefined): Record<string, string> {
+export function releaseEnvFor(
+    imageRef: string | undefined,
+    env: Readonly<Record<string, string>> = {}
+): Record<string, string> {
     return Object.assign(
         {},
-        ...extensions().map((extension) => extension.releaseEnv?.(imageRef) ?? {})
+        ...extensions().map((extension) => extension.releaseEnv?.(imageRef, env) ?? {})
     );
 }
 
