@@ -28,6 +28,8 @@ interface PolarisMobileBridge {
     /** Whether the screen has a back of its own; the app hands its back gesture to
      *  the page while it does. Called by useSwipeBack in `@polaris/ui`. */
     swipeBack?(available: boolean): void;
+    /** The app's own settings: its servers, notifications, language, version. */
+    changeServer?(): void;
 }
 
 /** The VPN the same shape the desktop app gives it, so the VPN page has one way to connect. */
@@ -157,4 +159,21 @@ export function onPhoneVpnChange(listener: () => void): () => void {
     if (typeof window === "undefined") return () => undefined;
     window.addEventListener(VPN_EVENT, listener);
     return () => window.removeEventListener(VPN_EVENT, listener);
+}
+
+/** Whether this app has a settings screen of its own to open. */
+export function hasAppSettings(): boolean {
+    return typeof bridge()?.changeServer === "function";
+}
+
+/** Open the app's own settings screen. False in a browser. */
+export function openAppSettings(): boolean {
+    const found = bridge();
+    if (typeof found?.changeServer !== "function") return false;
+    try {
+        found.changeServer();
+        return true;
+    } catch {
+        return false;
+    }
 }

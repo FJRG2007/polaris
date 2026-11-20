@@ -72,6 +72,7 @@
         "notifications": "Notifications",
         "getApps": "Get the apps",
         "servers": "Desktop app settings",
+        "appSettings": "App settings",
         "signOut": "Sign out",
         "friends": "Friends",
         "switcher": {

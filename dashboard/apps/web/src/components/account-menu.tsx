@@ -11,6 +11,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDesktopBridge } from "@/components/desktop-app";
+import * as phoneApp from "@/lib/mobile-bridge";
 import { usePresence, usePresenceRefresh } from "@/components/presence-store";
 import { openTourList } from "@/lib/tours/target";
 import { PRESENCE_CHOICE_DOTS } from "@/components/presence-dots";
@@ -427,6 +428,10 @@ export function AccountMenu({
         setWriting(true);
     }
 
+    // Read after mount: the phone app's bridge only exists in the browser.
+    const [appSettings, setAppSettings] = useState(false);
+    useEffect(() => setAppSettings(phoneApp.hasAppSettings()), []);
+
     async function onSignOut() {
         // Only this account: any other signed in on this browser takes over.
         const refused = await signOut();
@@ -667,6 +672,12 @@ export function AccountMenu({
                             {t("account.servers")}
                         </DropdownMenuItem>
                     ) : null}
+                    {appSettings ? (
+                        <DropdownMenuItem onSelect={() => void phoneApp.openAppSettings()}>
+                            <AppWindow className="size-4" />
+                            {t("account.appSettings")}
+                        </DropdownMenuItem>
+                    ) : null}
                     <DropdownMenuItem onSelect={onSignOut}>
                         <LogOut className="size-4" />
                         {t("account.signOut")}
@@ -684,6 +695,7 @@ export function AccountMenu({
                 onStatus={editStatus}
                 onTours={openTourList}
                 onServers={desktop?.openServers ? () => void desktop.openServers?.() : undefined}
+                onAppSettings={appSettings ? () => void phoneApp.openAppSettings() : undefined}
                 onSignOut={() => void onSignOut()}
                 gate={gate}
             />

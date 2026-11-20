@@ -40,6 +40,7 @@ export function AccountSheet({
     onStatus,
     onTours,
     onServers,
+    onAppSettings,
     onSignOut,
     gate = NO_GATE
 }: {
@@ -57,6 +58,8 @@ export function AccountSheet({
     onTours: () => void;
     /** Only in the desktop app, which has servers to switch between. */
     onServers?: () => void;
+    /** Only in the phone app, whose settings hold its servers. */
+    onAppSettings?: () => void;
     onSignOut: () => void;
     /** What this account can open, for which screens of My account to offer. */
     gate?: nav.SectionGate;
@@ -167,6 +170,12 @@ export function AccountSheet({
                             <button type="button" className={ROW} onClick={then(onServers)}>
                                 <AppWindow className="size-5 shrink-0 text-muted-foreground" />
                                 <RowLabel>{t("account.servers")}</RowLabel>
+                            </button>
+                        ) : null}
+                        {onAppSettings ? (
+                            <button type="button" className={ROW} onClick={then(onAppSettings)}>
+                                <AppWindow className="size-5 shrink-0 text-muted-foreground" />
+                                <RowLabel>{t("account.appSettings")}</RowLabel>
                             </button>
                         ) : null}
                     </Group>
