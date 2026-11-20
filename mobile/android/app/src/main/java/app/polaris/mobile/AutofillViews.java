@@ -56,6 +56,11 @@ final class AutofillViews {
         return inlineR(context, request, index, title, subtitle);
     }
 
+    // Content.getSlice() is the documented way to hand a chip to the keyboard, yet
+    // androidx.autofill (1.1.0 through 1.3.0) marks it library-restricted, so lint
+    // flags the one call every autofill service makes. Scoped to this method only,
+    // as Bitwarden does (InlinePresentationSpecExtensions.kt).
+    @SuppressLint("RestrictedApi")
     @RequiresApi(Build.VERSION_CODES.R)
     private static InlinePresentation inlineR(Context context, InlineSuggestionsRequest request, int index,
             String title, String subtitle) {
