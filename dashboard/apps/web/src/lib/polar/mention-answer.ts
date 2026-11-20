@@ -135,24 +135,37 @@ export async function answerMentionWithReason(turn: MentionTurn): Promise<Mentio
     const allowed = await rateLimit(`polar-chat:${userId}`, 30, 60_000);
     if (!allowed.ok) return fail("tooFast", words("polar.tooFast"));
 
-    const [{ resolvePolarModel, answeredBy }, { automaticChoice }, { PLAIN_TURN, noteModelEchoed }, usage, { echoesPrompt }] =
+    const [{ answeredBy }, { automaticChoice }, { PLAIN_TURN, noteModelEchoed }, usage, { echoesPrompt }, plan] =
         await Promise.all([
             import("@/lib/polar/models"),
             import("@/lib/polar/shared"),
             import("@/lib/polar/automatic"),
             import("@/lib/polar/usage"),
-            import("@/lib/polar/mention-echo")
+            import("@/lib/polar/mention-echo"),
+            import("@/lib/polar/turn-plan")
         ]);
     const { withoutPseudoToolCalls } = await import("@/lib/polar/pseudo-tools");
     const echo = { prompt: turn.prompt, question: turn.echo?.question ?? "", names: turn.echo?.names ?? [] };
 
+    const signals = {
+        ...PLAIN_TURN,
+        contextChars: turn.system.length + turn.prompt.length,
+        lastChars: turn.prompt.length,
+        agentic: !!turn.toolkit
+    };
     turn.typing?.();
     const dots = turn.typing ? setInterval(turn.typing, TYPING_EVERY_MS) : null;
     try {
         for (let tries = 0; tries < ECHO_TRIES; tries++) {
-            // Resolved again after an echo: Automatic leaves the model that
-            // echoed out (`noteModelEchoed`), so the next candidate answers.
-            const resolved = await resolvePolarModel(userId, automaticChoice(), PLAIN_TURN, access);
+            // Planned as the Polar panel plans a turn (`turn-plan.ts`): the
+            // model this person talks to Polar with, its subscription and
+            // stand-ins included, and a turn offered tools never goes to a
+            // model too small to call them. Resolved again after an echo, on
+            // Automatic, which leaves the model that echoed out
+            // (`noteModelEchoed`), so the next candidate answers.
+            const picked = tries === 0 ? await plan.lastPolarChoice(userId) : automaticChoice();
+            const planned = await plan.planPolarTurn(userId, picked, signals, access);
+            const resolved = typeof planned === "string" ? planned : planned.resolved;
             if (typeof resolved === "string") {
                 return tries === 0
                     ? fail("noProvider", noProviderText(words, access.spend))

@@ -19,6 +19,20 @@ vi.mock("@/lib/polar/access", () => ({
     polarAccessFor: async () => ({ use: true, spend: true, web: true, connectors: true })
 }));
 vi.mock("@/lib/polar/automatic", () => ({ PLAIN_TURN: {}, noteModelEchoed: () => undefined }));
+// The turn is planned as the panel plans it (`turn-plan.ts`); here it is the
+// mocked resolver's answer, on Automatic.
+vi.mock("@/lib/polar/turn-plan", async () => {
+    const models = await import("@/lib/polar/models");
+    return {
+        lastPolarChoice: async () => ({ kind: "language", provider: "automatic", model: "automatic", payer: null }),
+        planPolarTurn: async (userId: string, choice: any, signals: any, access: any) => {
+            planned.push({ choice, signals });
+            const resolved = await models.resolvePolarModel(userId, choice, signals, access);
+            return typeof resolved === "string" ? resolved : { resolved, choice, fellBackFrom: null };
+        }
+    };
+});
+const planned: { choice: any; signals: any }[] = [];
 vi.mock("@/lib/polar/models", () => ({
     resolvePolarModel: async () => ({
         model: { id: "labs-devstral" },

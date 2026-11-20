@@ -95,7 +95,8 @@ export async function runAppCommand(messageId: string, actorId: string): Promise
         if (!(await rateLimit(`chat-app-command:${actorId}`, COMMANDS_PER_MINUTE, 60_000)).ok) return;
 
         if (command.name === "polar") {
-            const { answerPolarMention } = await import("./polar-mention");
+            const { answerPolarMention, claimPolarAnswer } = await import("./polar-mention");
+            if (!claimPolarAnswer(messageId)) return;
             await answerPolarMention({
                 channelId: message.channelId,
                 messageId,

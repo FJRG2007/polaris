@@ -40,6 +40,7 @@ vi.mock("@/lib/chat/agent-message", () => ({
     }
 }));
 vi.mock("@/lib/chat/polar-mention", () => ({
+    claimPolarAnswer: () => true,
     answerPolarMention: async (mention: Record<string, unknown>) => {
         asked.push(mention);
         return "m1";

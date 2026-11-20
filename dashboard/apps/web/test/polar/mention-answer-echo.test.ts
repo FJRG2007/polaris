@@ -24,6 +24,20 @@ vi.mock("@/lib/polar/automatic", () => ({
     noteModelEchoed: (_user: string, provider: string, model: string) => echoed.add(`${provider}/${model}`)
 }));
 // Automatic leaves out what was noted, as `unusableModels` makes it do.
+// The turn is planned as the panel plans it (`turn-plan.ts`); here it is the
+// mocked resolver's answer, on Automatic.
+vi.mock("@/lib/polar/turn-plan", async () => {
+    const models = await import("@/lib/polar/models");
+    return {
+        lastPolarChoice: async () => ({ kind: "language", provider: "automatic", model: "automatic", payer: null }),
+        planPolarTurn: async (userId: string, choice: any, signals: any, access: any) => {
+            planned.push({ choice, signals });
+            const resolved = await models.resolvePolarModel(userId, choice, signals, access);
+            return typeof resolved === "string" ? resolved : { resolved, choice, fellBackFrom: null };
+        }
+    };
+});
+const planned: { choice: any; signals: any }[] = [];
 vi.mock("@/lib/polar/models", () => ({
     resolvePolarModel: async () => {
         const model = MODELS.find((id) => !echoed.has(`openrouter/${id}`));

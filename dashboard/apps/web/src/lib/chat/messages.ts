@@ -699,9 +699,10 @@ export async function send(
     // Not awaited, and never allowed to fail the send: a message going out
     // matters more than the notification about it.
     void announceRoomMention(input.channelId, actor.id, input.body, id).catch(() => undefined);
-    // `@polar` asks Polar, which answers in the conversation - see `polar-mention`.
-    // Loaded only for a message that names it.
-    if (/@polar/i.test(input.body)) {
+    // `@polar`, or a reply to one of Polar's messages, asks Polar, which answers
+    // in the conversation - see `polar-mention`. Loaded only for a message that
+    // may ask it.
+    if (/@polar/i.test(input.body) || quoted) {
         void import("./polar-mention")
             .then((polar) =>
                 polar.answerPolarLater({
@@ -709,7 +710,8 @@ export async function send(
                     messageId: id,
                     authorId: actor.id,
                     parentId: input.parentId ?? null,
-                    body: input.body
+                    body: input.body,
+                    replyToId: quoted
                 })
             )
             .catch((error: unknown) => console.error("chat: Polar could not be asked:", error));

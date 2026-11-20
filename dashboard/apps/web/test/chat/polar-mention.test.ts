@@ -96,6 +96,20 @@ vi.mock("@/lib/chat/rules", () => ({ rulesForChannel: async () => ({ maxMessageL
 vi.mock("@/lib/chat/text", () => ({ chatWordsFor: async () => (key: string) => key }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true }) }));
 vi.mock("@/lib/polar/access", () => ({ polarAccessFor: async () => access }));
+// The turn is planned as the panel plans it (`turn-plan.ts`); here it is the
+// mocked resolver's answer, on Automatic.
+vi.mock("@/lib/polar/turn-plan", async () => {
+    const models = await import("@/lib/polar/models");
+    return {
+        lastPolarChoice: async () => ({ kind: "language", provider: "automatic", model: "automatic", payer: null }),
+        planPolarTurn: async (userId: string, choice: any, signals: any, access: any) => {
+            planned.push({ choice, signals });
+            const resolved = await models.resolvePolarModel(userId, choice, signals, access);
+            return typeof resolved === "string" ? resolved : { resolved, choice, fellBackFrom: null };
+        }
+    };
+});
+const planned: { choice: any; signals: any }[] = [];
 vi.mock("@/lib/polar/models", () => ({
     resolvePolarModel: async () => resolved,
     answeredBy: (value: any) => value
@@ -122,7 +136,7 @@ vi.mock("ai", () => ({
     }
 }));
 
-const { answerPolarMention } = await import("@/lib/chat/polar-mention");
+const { answerPolarMention, asksPolar, claimPolarAnswer } = await import("@/lib/chat/polar-mention");
 const { polarMentioned } = await import("@/components/rich-text/markdown");
 
 const mention = {
@@ -301,6 +315,8 @@ describe("Polar's tools in a mention", () => {
         offer();
         await answerPolarMention(mention);
         expect(sentTools[0]).toEqual({ tasks_list: {} });
+        // Offered tools, so planned as the panel plans a tool turn.
+        expect(planned.at(-1)?.signals.agentic).toBe(true);
         expect(asked[0]?.system).toContain("runs only when Ana approves it");
         expect(asked[0]?.system).not.toContain("You have no tools here");
     });
@@ -337,5 +353,24 @@ describe("Polar's tools in a mention", () => {
             { tool: "tasks_create", title: "Create task", ok: true, text: "Created T-12" }
         ]);
         expect(asked[0]?.prompt).toContain("<done>\nCreate task (tasks_create): done. Created T-12\n</done>");
+    });
+});
+
+describe("what asks Polar", () => {
+    it("is a mention or a reply to one of Polar's messages", () => {
+        expect(asksPolar("@polar what time is it", false)).toBe(true);
+        expect(asksPolar("and tomorrow?", true)).toBe(true);
+        expect(asksPolar("and tomorrow?", false)).toBe(false);
+    });
+
+    it("leaves a /polar command to the command", () => {
+        expect(asksPolar("/polar what is @polar", false)).toBe(false);
+        expect(asksPolar("/polar hi", true)).toBe(false);
+    });
+
+    it("answers one message once, however many times it asks", () => {
+        expect(claimPolarAnswer("m-once")).toBe(true);
+        expect(claimPolarAnswer("m-once")).toBe(false);
+        expect(claimPolarAnswer("m-other")).toBe(true);
     });
 });

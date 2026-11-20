@@ -62,8 +62,7 @@ import * as subagentTasks from "@/lib/polar/subagents/task-tool";
 import { subagentTypes } from "@/lib/polar/subagents/types";
 import { takeFinishedBackground } from "@/lib/polar/subagents/store";
 import { TASK_TOOL } from "@/lib/polar/subagents/shared";
-import { agentPrompt, agentTurnChoices, polarTurnChoices } from "@/lib/polar/agents/shared";
-import { polarAgentDefault } from "@/lib/polar/agents/defaults";
+import { agentPrompt, agentTurnChoices } from "@/lib/polar/agents/shared";
 import { trialSkillSchema } from "@/lib/polar/skills/shared";
 import { ownEnigma } from "@/lib/agents/agent-defaults-service";
 import { enigmaCatalogue } from "@/lib/polar/skills/enigma-catalogue";
@@ -123,16 +122,11 @@ import { ensurePolarThread, polarThreadInstructions, savePolarMessages } from "@
 import {
     answeredBy,
     failedTurn,
-    followedBy,
-    polarModelOptions,
     reasoningFor,
     rememberRefusal,
-    resolvePolarModel,
-    sameModelElsewhere,
-    type ResolvedModel
+    resolvePolarModel
 } from "@/lib/polar/models";
-import { pinnedByHand, turnStandIns } from "@/lib/polar/turn-fallback";
-import { polarRouting } from "@/lib/polar/router/store";
+import { planPolarTurn } from "@/lib/polar/turn-plan";
 import { isToolFailure, toolFailureText, withTaggedToolErrors } from "@/lib/polar/tool-failure";
 import { POLAR_RUNS_MAX, beginPolarRun } from "@/lib/polar/runs";
 import { GOAL_CONDITION_MAX, goalHasRoom, goalTurnOf } from "@/lib/polar/goals";
@@ -151,12 +145,10 @@ import {
     type StoredFailure
 } from "@/lib/polar/provider-failure";
 import {
-    automaticChoice,
     modelChoiceSchema,
     pageContextSchema,
     storedScreen,
-    withScreenNotes,
-    type ModelChoice
+    withScreenNotes
 } from "@/lib/polar/shared";
 
 import { localFailureOf, subscriptionFailureOf } from "@/lib/polar/claude-subscription/model";
@@ -355,60 +347,13 @@ export async function POST(request: Request): Promise<Response> {
     // the first model this person can use, and the answer says so.
     // An agent answers on its own models, the first that can be used
     // (`agentTurnChoices`); one that keeps to its list goes no further.
-    const polarWork = agent ? null : await polarAgentDefault(user.id);
-    const tries = agent
-        ? agentTurnChoices(agent, body.data.choice)
-        : polarTurnChoices(polarWork, body.data.choice);
-    const listed = agent ?? polarWork;
-    const keepsToList = listed?.modelPolicy === "required" && listed.models.length > 0;
-    let choice: ModelChoice = tries[0] ?? body.data.choice;
     // Every chat turn is offered Polaris's tools, so it never goes to a model
     // too small to call them (`automaticCandidates`).
     const signals = { ...turnSignals(messages), agentic: true };
-    let resolved = await resolvePolarModel(user.id, choice, signals, access);
-    for (const next of tries.slice(1)) {
-        if (typeof resolved !== "string") break;
-        const attempt = await resolvePolarModel(user.id, next, signals, access);
-        if (typeof attempt !== "string") {
-            choice = next;
-            resolved = attempt;
-        }
-    }
-    let fellBackFrom: string | null = null;
-    if (resolved === "unknown_model" && !keepsToList) {
-        const first = (await polarModelOptions(user.id, access))[0]?.models[0];
-        if (first) {
-            fellBackFrom = choice.model;
-            choice = { ...choice, provider: first.provider, model: first.model, payer: null };
-            resolved = await resolvePolarModel(user.id, choice, signals, access);
-        }
-    }
-    if (typeof resolved === "string") return refuse(resolved, 409);
-    // A turn hands itself on when its model cannot answer: the same model
-    // through an aggregator, the rest of the list it came from, then
-    // Automatic - for a model picked by hand too, unless the person switched
-    // that off (`turn-fallback.ts`). Automatic resolves with tool use, as
-    // every chat turn is offered tools (`signals.agentic`).
-    const pinned = pinnedByHand(body.data.choice, choice);
-    const routing = pinned ? await polarRouting(user.id) : null;
-    {
-        const later = turnStandIns(
-            body.data.choice,
-            tries,
-            choice,
-            keepsToList,
-            automaticChoice(choice.intelligence),
-            routing?.pinnedFallsBack ?? true
-        );
-        const others: ResolvedModel[] = [];
-        const twin = resolved.automatic ? null : await sameModelElsewhere(user.id, resolved.option, access);
-        if (twin) others.push(twin);
-        for (const next of later) {
-            const attempt = await resolvePolarModel(user.id, next, signals, access);
-            if (typeof attempt !== "string") others.push(attempt);
-        }
-        resolved = followedBy(user.id, resolved, others);
-    }
+    const planned = await planPolarTurn(user.id, body.data.choice, signals, access, agent);
+    if (typeof planned === "string") return refuse(planned, 409);
+    let { resolved } = planned;
+    const { choice, fellBackFrom } = planned;
 
     const owned = await ensurePolarThread(
         user.id,

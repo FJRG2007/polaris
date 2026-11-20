@@ -21,6 +21,7 @@
 
 import { prisma } from "@polaris/db";
 import { chatWordsFor } from "./text";
+import { appCommandIn } from "./chat-command";
 import { channelAccess } from "./access";
 import { publishChatChange } from "./live";
 import { postAgentMessage, updateAgentMessage } from "./agent-message";
@@ -52,14 +53,52 @@ export interface PolarMention {
     readonly authorId: string;
     readonly parentId: string | null;
     readonly body: string;
+    /** The message this one replies to, if any. */
+    readonly replyToId?: string | null;
+}
+
+/**
+ * Messages Polar is answering in this process. One message asks Polar once,
+ * however it asks: `@polar` written twice, a reply to Polar that also names it,
+ * or `/polar` with a mention after it (`app-commands.ts` answers those).
+ */
+const answering = new Set<string>();
+
+/** Claim `messageId` for one answer; false when it already has one coming. */
+export function claimPolarAnswer(messageId: string): boolean {
+    if (answering.has(messageId)) return false;
+    answering.add(messageId);
+    // Long enough to cover the answer; the set never grows past what is in flight.
+    setTimeout(() => answering.delete(messageId), 10 * 60_000).unref?.();
+    return true;
+}
+
+/** Whether `replyToId` is one of Polar's own messages in this conversation. */
+async function repliesToPolar(channelId: string, replyToId: string | null | undefined): Promise<boolean> {
+    if (!replyToId) return false;
+    const row = await prisma.chatMessage.findFirst({
+        where: { id: replyToId, channelId, agent: POLAR_AGENT, authorId: null, deletedAt: null },
+        select: { id: true }
+    });
+    return row !== null;
+}
+
+/** Whether a sent message asks Polar: it names it, or it answers one of its messages. Pure. */
+export function asksPolar(body: string, repliedToPolar: boolean): boolean {
+    // A `/polar` command is answered by the command itself.
+    if (appCommandIn(body)?.name === "polar") return false;
+    return repliedToPolar || polarMentioned(body);
 }
 
 /** Called for every message sent; does nothing unless it asks Polar. Never throws. */
 export function answerPolarLater(mention: PolarMention): void {
-    if (!polarMentioned(mention.body)) return;
-    void answerPolarMention(mention).catch((error: unknown) =>
-        console.error("chat: Polar could not answer a mention:", error)
-    );
+    void (async () => {
+        const replied = polarMentioned(mention.body)
+            ? false
+            : await repliesToPolar(mention.channelId, mention.replyToId);
+        if (!asksPolar(mention.body, replied) || !claimPolarAnswer(mention.messageId)) return;
+        await answerPolarMention(mention);
+    })().catch((error: unknown) => console.error("chat: Polar could not answer a mention:", error));
 }
 
 
