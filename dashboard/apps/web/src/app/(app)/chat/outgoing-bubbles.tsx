@@ -195,7 +195,7 @@ function OutgoingBubble({ one }: { one: Outgoing }) {
             <div
                 className={cn(
                     "flex w-fit min-w-0 max-w-[min(22rem,85%)] flex-col gap-1.5 rounded-lg border p-1.5",
-                    failed ? "border-danger/40 bg-danger-soft" : "border-border bg-muted/50"
+                    failed ? "border-danger-edge bg-danger-soft" : "border-border bg-muted/50"
                 )}
             >
                 {tiles.length === 1 && (
