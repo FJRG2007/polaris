@@ -189,7 +189,7 @@ export function LocationDialog({
                     )}
                 </div>
 
-                <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+                <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain">
                     {step === "main" ? (
                         <>
                             <Row
