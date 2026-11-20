@@ -2204,5 +2204,10 @@
                 "llamacpp": "llama.cpp"
             }
         }
+    },
+    "openInApp": {
+        "title": "Abrir enlaces en la app de Polaris",
+        "body": "Un enlace de Polaris que abras en el navegador se abre en la app de escritorio o del móvil, en los dispositivos donde hayas iniciado sesión en la app.",
+        "failed": "No se pudo guardar. Inténtalo de nuevo."
     }
 }

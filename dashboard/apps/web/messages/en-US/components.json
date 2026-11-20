@@ -2149,5 +2149,9 @@
         "zoomIn": "Zoom in",
         "zoomOut": "Zoom out",
         "whole": "Whole map"
+    },
+    "openInApp": {
+        "opened": "Opening in the Polaris app",
+        "how": "To stay in the browser instead, turn this off in Preferences."
     }
 }

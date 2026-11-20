@@ -2149,5 +2149,9 @@
         "zoomIn": "Acercar",
         "zoomOut": "Alejar",
         "whole": "Mapa entero"
+    },
+    "openInApp": {
+        "opened": "Abriendo en la app de Polaris",
+        "how": "Para quedarte en el navegador, desactívalo en Preferencias."
     }
 }

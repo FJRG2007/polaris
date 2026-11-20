@@ -167,6 +167,10 @@ model User {
     // size, and the links it pinned - as stringified JSON. Cards absent here (and
     // a null column) follow the catalogue, so one added later still appears.
     overviewPrefs String?
+    // Whether a Polaris link followed in a browser opens in the Polaris app this
+    // account uses on that device (desktop or phone), the way WhatsApp and Discord
+    // do. On by default; tried only where the account has signed in to the app.
+    openLinksInApp Boolean @default(true)
     // Which apps this account pinned to the top of the app switcher, in its own
     // order, as a stringified JSON array of app ids. Null is none pinned, which
     // fills that row with recent and suggested apps instead.

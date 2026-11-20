@@ -2204,5 +2204,10 @@
                 "llamacpp": "llama.cpp"
             }
         }
+    },
+    "openInApp": {
+        "title": "Open links in the Polaris app",
+        "body": "A Polaris link you open in a browser opens in the desktop or phone app instead, on devices where you've signed in to the app.",
+        "failed": "Couldn't save that. Try again."
     }
 }

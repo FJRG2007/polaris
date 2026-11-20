@@ -103,6 +103,7 @@ import { seasonPreviewFor } from "@/lib/seasonal-preview";
 import { getSeasonalChoice, seasonCalendar, seasonsAllowed } from "@/lib/seasonal-service";
 import { SeasonalBadge, SeasonalFrame } from "@/components/seasonal/seasonal-frame";
 import { NewBuildBanner } from "@/components/new-build-banner";
+import { OpenInApp } from "@/components/open-in-app";
 import { SnapshotBuild } from "@/components/snapshot-build";
 import { NotificationsProvider } from "@/components/notifications/notifications-provider";
 import { shelfKey } from "@/lib/shelf";
@@ -362,6 +363,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                         {/* An update landing under an open tab, said out
                                             loud before a click is refused by a server that
                                             no longer knows this bundle. */}
+                                                                                        <OpenInApp />
                                                                                         <NewBuildBanner
                                                                                             served={
                                                                                                 build

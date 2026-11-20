@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import { prisma } from "@polaris/db";
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
@@ -206,4 +207,16 @@ export async function setStatusAction(
 
     await setStatus(user.id, parsed.data.text, parsed.data);
     return { status: await ownStatus(user.id) };
+}
+
+/** Whether a Polaris link followed in a browser opens in the Polaris app. */
+export async function setOpenLinksInAppAction(on: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = z.boolean().safeParse(on);
+    if (!parsed.success) return { error: (await getTranslations("account"))("errors.unsupportedChoice") };
+    await prisma.user.update({
+        where: { id: user.viewingAs?.actorId ?? user.id },
+        data: { openLinksInApp: parsed.data }
+    });
+    return {};
 }

@@ -28,7 +28,9 @@ import { LanguageCard } from "./language-card";
 import { SidebarPresetCard } from "@/components/setup/sidebar-preset-card";
 import { getLocale, getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
-import { saveDisplayPreferencesAction, saveTextSizeAction, setLocaleAction } from "./actions";
+import { saveDisplayPreferencesAction, saveTextSizeAction, setLocaleAction, setOpenLinksInAppAction } from "./actions";
+import { OpenInAppCard } from "./open-in-app-card";
+import { prisma } from "@polaris/db";
 import { DisplayPreferencesForm } from "@/components/display-preferences-form";
 import {
     getPlatformDisplayPreferences,
@@ -40,7 +42,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PreferencesPage() {
     const session = await requireUser();
-    const [platform, mine, mayChooseTheme, locale, t, seasonsOn, seasonal, calendar] =
+    const [platform, mine, mayChooseTheme, locale, t, seasonsOn, seasonal, calendar, links] =
         await Promise.all([
             getPlatformDisplayPreferences(),
             getUserDisplayPreferences(session.id),
@@ -49,7 +51,11 @@ export default async function PreferencesPage() {
             getTranslations("account"),
             seasonsAllowed(),
             getSeasonalChoice(session.id),
-            seasonCalendar()
+            seasonCalendar(),
+            prisma.user.findUnique({
+                where: { id: session.viewingAs?.actorId ?? session.id },
+                select: { openLinksInApp: true }
+            })
         ]);
 
     const effective = resolveDisplayPreferences(platform, mine, locale);
@@ -85,6 +91,7 @@ export default async function PreferencesPage() {
                 />
                 <SidebarPresetCard />
                 <SeasonalCard allowed={seasonsOn} initial={seasonal} calendar={calendar} />
+                <OpenInAppCard initial={links?.openLinksInApp ?? true} save={setOpenLinksInAppAction} />
                 <SpoilersCard />
                 <DeviceCacheCard />
                 {/* The install offer used to be on this page, because this is where the
