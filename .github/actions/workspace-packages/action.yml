@@ -1,0 +1,38 @@
+# The dashboard's workspace packages (dashboard/packages/*/dist), built once per
+# set of package sources instead of once per job: `npm run build:packages` takes
+# two minutes and most commits touch only an app. The one definition of the key,
+# so every workflow that needs the packages shares the same cache entries.
+#
+# The key hashes everything a package build reads - its sources, the lockfile and
+# patches, the shared tsconfig and the two build scripts - and leaves out what the
+# build writes, so a changed package always misses and rebuilds. No restore-keys:
+# this is build output, and a partial match would be output from other sources.
+# Saved only when this build succeeded, never from a failed one.
+#
+# Expects the checkout and `npm ci` in `dashboard/` to have run already.
+name: Workspace packages
+description: Restore the built dashboard packages for these sources, or build and cache them.
+
+outputs:
+  cache-hit:
+    description: "'true' when the packages came from the cache."
+    value: ${{ steps.restore.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - id: restore
+      uses: actions/cache/restore@v6
+      with:
+        path: dashboard/packages/*/dist
+        key: packages-v1-${{ runner.os }}-node22-${{ hashFiles('dashboard/packages/**', 'dashboard/package-lock.json', 'dashboard/patches/**', 'dashboard/tsconfig.base.json', 'dashboard/scripts/build-packages.mjs', 'dashboard/scripts/scope-editor-styles.mjs', '!dashboard/packages/*/dist/**', '!dashboard/packages/**/node_modules/**', '!dashboard/packages/db/generated/**') }}
+    - id: build
+      if: steps.restore.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: dashboard
+      run: npm run build:packages
+    - if: steps.build.outcome == 'success'
+      uses: actions/cache/save@v6
+      with:
+        path: dashboard/packages/*/dist
+        key: ${{ steps.restore.outputs.cache-primary-key }}

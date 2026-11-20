@@ -65,7 +65,7 @@ jobs:
       # The extension imports @polaris/core and @polaris/vault-crypto as workspace
       # packages and reads their built declarations, so nothing below resolves until
       # these exist.
-      - run: npm run build:packages
+      - uses: ./.github/actions/workspace-packages
 
       # Both targets. Chrome gets manifest v3 and Firefox v2, from one source - and
       # `zip` also writes the sources package that Firefox's review asks for.

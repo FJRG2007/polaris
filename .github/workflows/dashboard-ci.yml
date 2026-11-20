@@ -175,13 +175,7 @@ jobs:
       # the shared tsconfig and the two build scripts - and leaves out what the
       # build writes, so a changed package always misses and rebuilds. Most changes
       # touch only the app, and then all six jobs skip the two minutes.
-      - id: packages
-        uses: actions/cache@v6
-        with:
-          path: dashboard/packages/*/dist
-          key: packages-v1-${{ runner.os }}-node22-${{ hashFiles('dashboard/packages/**', 'dashboard/package-lock.json', 'dashboard/patches/**', 'dashboard/tsconfig.base.json', 'dashboard/scripts/build-packages.mjs', 'dashboard/scripts/scope-editor-styles.mjs', '!dashboard/packages/*/dist/**', '!dashboard/packages/**/node_modules/**', '!dashboard/packages/db/generated/**') }}
-      - if: steps.packages.outputs.cache-hit != 'true'
-        run: npm run build:packages
+      - uses: ./.github/actions/workspace-packages
       # Next's route types (.next/types), which tsconfig.typecheck.json includes.
       # Without them this job never saw the route checks only `next build` made,
       # so the image build had to keep its own type check; generated here, the
@@ -231,16 +225,7 @@ jobs:
 
       - run: npm ci --prefer-offline || npm ci --prefer-offline || npm ci --prefer-offline
       - run: npm run db:generate
-      # The same cache as the checks job above, and the same key, written out
-      # again because a key cannot be shared between jobs. dashboard-cache.yml
-      # carries it a fourth time; the four must stay identical.
-      - id: packages
-        uses: actions/cache@v6
-        with:
-          path: dashboard/packages/*/dist
-          key: packages-v1-${{ runner.os }}-node22-${{ hashFiles('dashboard/packages/**', 'dashboard/package-lock.json', 'dashboard/patches/**', 'dashboard/tsconfig.base.json', 'dashboard/scripts/build-packages.mjs', 'dashboard/scripts/scope-editor-styles.mjs', '!dashboard/packages/*/dist/**', '!dashboard/packages/**/node_modules/**', '!dashboard/packages/db/generated/**') }}
-      - if: steps.packages.outputs.cache-hit != 'true'
-        run: npm run build:packages
+      - uses: ./.github/actions/workspace-packages
       - run: npm run test -w @polaris/web -- --shard=${{ matrix.shard }}/4
 
   # Proof that the app compiles, for branches and pull requests. The publish workflow
@@ -302,16 +287,7 @@ jobs:
 
       - run: npm ci --prefer-offline || npm ci --prefer-offline || npm ci --prefer-offline
       - run: npm run db:generate
-      # The same cache as the checks job above, and the same key, written out
-      # again because a key cannot be shared between jobs. dashboard-cache.yml
-      # carries it a fourth time; the four must stay identical.
-      - id: packages
-        uses: actions/cache@v6
-        with:
-          path: dashboard/packages/*/dist
-          key: packages-v1-${{ runner.os }}-node22-${{ hashFiles('dashboard/packages/**', 'dashboard/package-lock.json', 'dashboard/patches/**', 'dashboard/tsconfig.base.json', 'dashboard/scripts/build-packages.mjs', 'dashboard/scripts/scope-editor-styles.mjs', '!dashboard/packages/*/dist/**', '!dashboard/packages/**/node_modules/**', '!dashboard/packages/db/generated/**') }}
-      - if: steps.packages.outputs.cache-hit != 'true'
-        run: npm run build:packages
+      - uses: ./.github/actions/workspace-packages
       # Node's default heap tops out near 4 GB, and the app build now peaks right
       # at it: the same commit passed on one run and died with "JavaScript heap
       # out of memory" on the next. The runner has 16 GB, so the build gets room

@@ -54,7 +54,7 @@ jobs:
       # as dashboard-ci.yml. Without them every import of a workspace package is
       # an unresolved module, and the report fills with thousands of errors that
       # are not in the code.
-      - run: npm run build:packages
+      - uses: ./.github/actions/workspace-packages
 
       - name: Run maintenance checks
         id: checks

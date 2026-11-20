@@ -77,7 +77,7 @@ jobs:
           cache-dependency-path: dashboard/package-lock.json
       - run: npm ci --prefer-offline
       - run: npm run db:generate
-      - run: npm run build:packages
+      - uses: ./.github/actions/workspace-packages
       - run: npm run test -w @polaris/site
       - name: Build
         run: npm run build -w @polaris/site

@@ -42,7 +42,7 @@ jobs:
 
       - run: npm ci --prefer-offline
       - run: npm run db:generate
-      - run: npm run build:packages
+      - uses: ./.github/actions/workspace-packages
 
       - name: Install the browser
         run: npx playwright install --with-deps chromium
