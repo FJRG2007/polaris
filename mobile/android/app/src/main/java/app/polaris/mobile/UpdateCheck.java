@@ -106,6 +106,36 @@ final class UpdateCheck {
         }
     }
 
+    /** Whether a store keeps this install updated, so a check by hand has nothing to offer. */
+    static boolean byStore(Context context) {
+        return storeInstalled(installer(context));
+    }
+
+    /**
+     * A check asked for by hand, from Settings: offers the newer version as the daily check does, or says on `status`
+     * that this one is the newest, or that the check could not reach the releases.
+     */
+    static void checkNow(Activity activity, android.widget.TextView status) {
+        status.setText(R.string.settings_update_checking);
+        new Thread(() -> {
+            String[] found;
+            try {
+                found = newest(fetch(), BuildConfig.VERSION_NAME);
+            } catch (Exception offline) {
+                activity.runOnUiThread(() -> status.setText(R.string.settings_update_failed));
+                return;
+            }
+            activity.runOnUiThread(() -> {
+                if (found == null) {
+                    status.setText(R.string.settings_update_latest);
+                    return;
+                }
+                status.setText(activity.getString(R.string.update_title, found[0]));
+                offer(activity, found[0], found[1]);
+            });
+        }, "update-check-now").start();
+    }
+
     static void maybeRun(Activity activity) {
         if (storeInstalled(installer(activity))) return;
         SharedPreferences prefs = activity.getSharedPreferences("update", Context.MODE_PRIVATE);

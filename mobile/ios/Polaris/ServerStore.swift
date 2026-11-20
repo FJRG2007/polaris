@@ -102,6 +102,26 @@ enum ServerStore {
         save(hosts)
     }
 
+    /// Gives a host another address, keeping its name and its place in the list. False when another host already has
+    /// that address: two entries for one origin would be two sign-ins to the same place.
+    static func changeAddress(_ id: String, to origin: String) -> Bool {
+        var hosts = all
+        guard !hosts.contains(where: { $0.id != id && $0.origin == origin }),
+              let index = hosts.firstIndex(where: { $0.id == id }) else { return false }
+        hosts[index] = Host(id: hosts[index].id, origin: origin, name: hosts[index].name)
+        save(hosts)
+        return true
+    }
+
+    /// Moves a host from one place in the list to another, as the list's reorder handles do.
+    static func move(from source: Int, to destination: Int) {
+        var hosts = all
+        guard hosts.indices.contains(source), hosts.indices.contains(destination), source != destination else { return }
+        let host = hosts.remove(at: source)
+        hosts.insert(host, at: destination)
+        save(hosts)
+    }
+
     /// Take a Polaris off the list and forget what this phone kept for it: its own store where it has one, its
     /// cookies and site data in the shared one where it does not.
     @MainActor

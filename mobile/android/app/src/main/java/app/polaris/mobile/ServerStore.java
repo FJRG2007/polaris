@@ -156,6 +156,43 @@ final class ServerStore {
         write(context, hosts);
     }
 
+    /**
+     * Gives a host another address, keeping its name and its place in the list. False when another host already has
+     * that address: two entries for one origin would be two sign-ins to the same place. The session kept for the old
+     * address does not carry over, so the host asks to sign in again.
+     */
+    static synchronized boolean changeAddress(Context context, String id, String origin) {
+        List<Host> hosts = read(context);
+        for (Host host : hosts) {
+            if (!host.id.equals(id) && host.origin.equals(origin)) return false;
+        }
+        for (int i = 0; i < hosts.size(); i++) {
+            Host host = hosts.get(i);
+            if (host.id.equals(id)) hosts.set(i, new Host(host.id, origin, host.name, host.profile));
+        }
+        write(context, hosts);
+        return true;
+    }
+
+    /** Moves a host one place up (-1) or down (+1) in the list. */
+    static synchronized void move(Context context, String id, int step) {
+        List<Host> hosts = read(context);
+        for (int i = 0; i < hosts.size(); i++) {
+            if (hosts.get(i).id.equals(id)) {
+                if (moved(hosts, i, step)) write(context, hosts);
+                return;
+            }
+        }
+    }
+
+    /** Swaps the item at `from` with its neighbour `step` away. False, and nothing changes, past either end. */
+    static <T> boolean moved(List<T> list, int from, int step) {
+        int to = from + step;
+        if (from < 0 || from >= list.size() || to < 0 || to >= list.size() || to == from) return false;
+        Collections.swap(list, from, to);
+        return true;
+    }
+
     /** Forgets a host. Its cookies are cleared by the caller; its profile is deleted on the next start. */
     static synchronized void remove(Context context, String id) {
         List<Host> hosts = read(context);

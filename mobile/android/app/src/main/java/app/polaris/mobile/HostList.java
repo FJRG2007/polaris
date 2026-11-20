@@ -61,6 +61,31 @@ final class HostList {
         return null;
     }
 
+    /**
+     * The list as the code the desktop app copies, read back by {@link #read}: rows of `[address]` or `[address, name]`,
+     * https left out of each address to keep it short, base64url without padding. Capped at {@link #MAX}.
+     */
+    static String encode(List<Entry> hosts) {
+        JSONArray rows = new JSONArray();
+        for (Entry entry : hosts) {
+            if (rows.length() >= MAX) break;
+            String origin = originOf(entry.origin);
+            if (origin == null) continue;
+            JSONArray row = new JSONArray();
+            row.put(origin.startsWith("https://") ? origin.substring("https://".length()) : origin);
+            String name = nameOf(entry.name);
+            if (name != null) row.put(name);
+            rows.put(row);
+        }
+        byte[] json = rows.toString().getBytes(StandardCharsets.UTF_8);
+        return PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(json);
+    }
+
+    /** The same list as the link the desktop app's QR holds, which opens this app wherever it is scanned. */
+    static String link(List<Entry> hosts) {
+        return LINK + "?list=" + encode(hosts);
+    }
+
     /** One parameter of a query string, decoded, or null. */
     private static String query(String query, String key) {
         for (String pair : query.split("&")) {

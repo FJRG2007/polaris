@@ -51,8 +51,6 @@
     <string name="hosts_add">Add a Polaris</string>
     <string name="hosts_current">Open now - %1$s</string>
     <string name="hosts_open">Open %1$s</string>
-    <string name="hosts_rename">Rename</string>
-    <string name="hosts_rename_title">Name this Polaris</string>
     <string name="hosts_remove">Remove</string>
     <string name="hosts_remove_title">Remove %1$s?</string>
     <string name="hosts_remove_message">This phone signs out of it and forgets it. You can add it again later.</string>
@@ -147,4 +145,37 @@
     <string name="vpn_error_node_full">That location is full. Try another.</string>
     <string name="vpn_error_node_gone">That location isn\'t available any more. Pick another in Polaris.</string>
     <string name="vpn_error_failed">The VPN couldn\'t start. Try again.</string>
+
+    <!-- App settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_app">App</string>
+    <string name="settings_about">About</string>
+    <string name="settings_version">Polaris %1$s</string>
+    <string name="settings_update_check">Check for updates</string>
+    <string name="settings_update_checking">Checking...</string>
+    <string name="settings_update_latest">This is the latest version.</string>
+    <string name="settings_update_failed">The check didn\'t go through. Check your connection and try again.</string>
+    <string name="settings_update_store">Your app store keeps Polaris updated.</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_notifications_hint">Messages, calls and sign-in requests while the app is closed.</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_hint">This app\'s language. Polaris pages follow your account\'s language.</string>
+    <string name="settings_browser">Open in the browser</string>
+    <string name="hosts_options">Options for %1$s</string>
+    <string name="hosts_edit">Edit</string>
+    <string name="hosts_edit_title">Edit %1$s</string>
+    <string name="hosts_address">Address *</string>
+    <string name="hosts_name">Name</string>
+    <string name="hosts_name_hint">Optional. Shown instead of the address.</string>
+    <string name="hosts_move_up">Move up</string>
+    <string name="hosts_move_down">Move down</string>
+    <string name="hosts_taken">Another server on this phone already has that address.</string>
+    <string name="hosts_checking">Checking...</string>
+    <string name="hosts_import">Import</string>
+    <string name="hosts_export">Export</string>
+    <string name="hosts_import_title">Import servers</string>
+    <string name="hosts_import_hint">Paste the code from Export on another device, or open the file it saved.</string>
+    <string name="hosts_import_file">Open a file</string>
+    <string name="hosts_export_subject">Polaris servers</string>
+    <string name="hosts_export_title">Send your servers</string>
 </resources>

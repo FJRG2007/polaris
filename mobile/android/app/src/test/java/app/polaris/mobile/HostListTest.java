@@ -22,6 +22,48 @@ public class HostListTest {
     }
 
     @Test
+    public void writesTheSameCodeTheDesktopAppDoes() {
+        List<HostList.Entry> hosts = java.util.Arrays.asList(
+                new HostList.Entry("https://polaris.example.com", "Casa ñ"),
+                new HostList.Entry("http://192.168.1.10:3000", null));
+        assertEquals(CODE, HostList.encode(hosts));
+        assertEquals("polaris://hosts?list=" + CODE, HostList.link(hosts));
+    }
+
+    @Test
+    public void writesWhatItReadsBack() {
+        List<HostList.Entry> hosts = java.util.Arrays.asList(
+                new HostList.Entry("https://a.example.com", "  Home   office "),
+                new HostList.Entry("https://a.example.com", "Duplicate"),
+                new HostList.Entry("not a url at all", "Dropped"),
+                new HostList.Entry("http://10.0.0.2:8080", ""));
+        List<HostList.Entry> read = HostList.read(HostList.encode(hosts));
+        assertEquals(2, read.size());
+        assertEquals("https://a.example.com", read.get(0).origin);
+        assertEquals("Home office", read.get(0).name);
+        assertEquals("http://10.0.0.2:8080", read.get(1).origin);
+        assertNull(read.get(1).name);
+    }
+
+    @Test
+    public void writesAnEmptyListAsAList() {
+        assertEquals(0, HostList.read(HostList.encode(java.util.Collections.emptyList())).size());
+    }
+
+    @Test
+    public void movesOnePlaceAndStopsAtEitherEnd() {
+        List<String> order = new java.util.ArrayList<>(java.util.Arrays.asList("a", "b", "c"));
+        org.junit.Assert.assertTrue(ServerStore.moved(order, 2, -1));
+        assertEquals(java.util.Arrays.asList("a", "c", "b"), order);
+        org.junit.Assert.assertTrue(ServerStore.moved(order, 0, 1));
+        assertEquals(java.util.Arrays.asList("c", "a", "b"), order);
+        org.junit.Assert.assertFalse(ServerStore.moved(order, 0, -1));
+        org.junit.Assert.assertFalse(ServerStore.moved(order, 2, 1));
+        org.junit.Assert.assertFalse(ServerStore.moved(order, 5, -1));
+        assertEquals(java.util.Arrays.asList("c", "a", "b"), order);
+    }
+
+    @Test
     public void readsTheLinkTheQrHolds() {
         List<HostList.Entry> hosts = HostList.read("polaris://hosts?list=" + CODE);
         assertEquals(2, hosts.size());

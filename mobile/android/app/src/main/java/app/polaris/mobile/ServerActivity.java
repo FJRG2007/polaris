@@ -84,7 +84,7 @@ public final class ServerActivity extends Activity {
         });
     }
 
-    private static int reason(ServerProbe.Verdict verdict) {
+    static int reason(ServerProbe.Verdict verdict) {
         switch (verdict) {
             case STARTING:
                 return R.string.server_starting;

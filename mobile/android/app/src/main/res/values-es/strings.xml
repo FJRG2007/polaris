@@ -49,8 +49,6 @@
     <string name="hosts_add">Añadir un Polaris</string>
     <string name="hosts_current">Abierto ahora - %1$s</string>
     <string name="hosts_open">Abrir %1$s</string>
-    <string name="hosts_rename">Renombrar</string>
-    <string name="hosts_rename_title">Nombre de este Polaris</string>
     <string name="hosts_remove">Quitar</string>
     <string name="hosts_remove_title">¿Quitar %1$s?</string>
     <string name="hosts_remove_message">Este móvil cierra la sesión y lo olvida. Puedes volver a añadirlo después.</string>
@@ -145,4 +143,37 @@
     <string name="vpn_error_node_full">Esa ubicación está llena. Prueba otra.</string>
     <string name="vpn_error_node_gone">Esa ubicación ya no está disponible. Elige otra en Polaris.</string>
     <string name="vpn_error_failed">No se pudo iniciar la VPN. Inténtalo de nuevo.</string>
+
+    <!-- App settings -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_app">App</string>
+    <string name="settings_about">Acerca de</string>
+    <string name="settings_version">Polaris %1$s</string>
+    <string name="settings_update_check">Buscar actualizaciones</string>
+    <string name="settings_update_checking">Buscando...</string>
+    <string name="settings_update_latest">Es la última versión.</string>
+    <string name="settings_update_failed">No se pudo comprobar. Revisa la conexión y vuelve a intentarlo.</string>
+    <string name="settings_update_store">Tu tienda de apps mantiene Polaris al día.</string>
+    <string name="settings_notifications">Notificaciones</string>
+    <string name="settings_notifications_hint">Mensajes, llamadas y solicitudes de inicio de sesión con la app cerrada.</string>
+    <string name="settings_language">Idioma</string>
+    <string name="settings_language_hint">El idioma de esta app. Las páginas de Polaris siguen el idioma de tu cuenta.</string>
+    <string name="settings_browser">Abrir en el navegador</string>
+    <string name="hosts_options">Opciones de %1$s</string>
+    <string name="hosts_edit">Editar</string>
+    <string name="hosts_edit_title">Editar %1$s</string>
+    <string name="hosts_address">Dirección *</string>
+    <string name="hosts_name">Nombre</string>
+    <string name="hosts_name_hint">Opcional. Se muestra en lugar de la dirección.</string>
+    <string name="hosts_move_up">Subir</string>
+    <string name="hosts_move_down">Bajar</string>
+    <string name="hosts_taken">Otro servidor de este teléfono ya tiene esa dirección.</string>
+    <string name="hosts_checking">Comprobando...</string>
+    <string name="hosts_import">Importar</string>
+    <string name="hosts_export">Exportar</string>
+    <string name="hosts_import_title">Importar servidores</string>
+    <string name="hosts_import_hint">Pega el código de Exportar de otro dispositivo, o abre el archivo que guardó.</string>
+    <string name="hosts_import_file">Abrir un archivo</string>
+    <string name="hosts_export_subject">Servidores de Polaris</string>
+    <string name="hosts_export_title">Enviar tus servidores</string>
 </resources>

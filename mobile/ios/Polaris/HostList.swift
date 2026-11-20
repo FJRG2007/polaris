@@ -67,6 +67,24 @@ enum HostList {
         return hosts
     }
 
+    /// The list as the code the desktop app copies, read back by `read`: rows of `[address]` or `[address, name]`,
+    /// https left out of each address to keep it short, base64url without padding. Capped at `max`.
+    static func encode(_ entries: [Entry]) -> String {
+        var rows: [[String]] = []
+        for entry in entries {
+            if rows.count == max { break }
+            guard let origin = originOf(entry.origin) else { continue }
+            let short = origin.hasPrefix("https://") ? String(origin.dropFirst("https://".count)) : origin
+            if let name = nameOf(entry.name) { rows.append([short, name]) } else { rows.append([short]) }
+        }
+        let json = (try? JSONSerialization.data(withJSONObject: rows, options: [.withoutEscapingSlashes])) ?? Data("[]".utf8)
+        let base64 = json.base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+        return prefix + base64
+    }
+
     /// A bare http(s) origin, or nil. A bare host in the compact form is https, the only scheme left out of it.
     static func originOf(_ value: String?) -> String? {
         guard let value, value.count <= 2048 else { return nil }
