@@ -11,11 +11,9 @@
  */
 
 import { createHash } from "node:crypto";
-import { DATA_DIR } from "../../world";
 import * as pack from "./snowball-pack";
 import type { ServerContainer } from "../../service";
-import { levelOf } from "../../mod-announcements-service";
-import { readContainerFiles, writeContainerFile } from "../../../container-files";
+import { ensureDatapack } from "../../datapack-install";
 
 /** Whether the pack is on the server and switched on - the files written where
  *  they were missing or older, and the pack taken in again when they were. */
@@ -28,39 +26,10 @@ export function packVersion(): string {
 }
 
 export async function ensurePack(server: ServerContainer): Promise<boolean> {
-    const level = await levelOf(server);
-    if (!level) return false;
-    const root = `${DATA_DIR}/${level}/datapacks/${pack.PACK_DIR}`;
-    const files = pack.packFiles();
-    const retired = pack.RETIRED_FILES.map((path) => `${root}/${path}`);
-    const paths = [...files.keys()].map((path) => `${root}/${path}`);
-    const there = await readContainerFiles(server, [...paths, ...retired]);
-    let changed = false;
-    for (const [path, content] of files) {
-        if (there.get(`${root}/${path}`) === content) continue;
-        await writeContainerFile(server, `${root}/${path}`, content);
-        changed = true;
-    }
-    // What an older Polaris wrote and this one does not: the game would go on
-    // loading it, and logging it as broken at every start.
-    const stale = retired.filter((path) => there.has(path));
-    if (stale.length > 0) {
-        await server.run(["rm", "-f", "--", ...stale]);
-        changed = true;
-    }
-    const enabled = async () => pack.packEnabled(await server.say(["datapack list enabled"]));
-    if (await enabled()) {
-        if (!changed) return true;
-        // Already on, with older functions: off and on again is what reads them.
-        await server.say([`datapack disable "${pack.PACK_ID}"`]);
-    }
-    const reloading = Date.now();
-    await server.say(["datapack list available"]);
-    await server.say([`datapack enable "${pack.PACK_ID}"`]);
-    // Switching it on reloads the game's data; on a server with many mods that
-    // is the pause somebody notices, so it is measured.
-    console.info(
-        `[minecraft-events] event pack switched on in ${Math.round((Date.now() - reloading) / 1000)}s`
-    );
-    return enabled();
+    return ensureDatapack(server, {
+        dir: pack.PACK_DIR,
+        files: pack.packFiles(),
+        retired: pack.RETIRED_FILES,
+        label: "event"
+    });
 }

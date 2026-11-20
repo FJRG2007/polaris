@@ -1047,6 +1047,11 @@
                 "summary": "Break a block, take what it gives you, hope it was not the bad one.",
                 "setup": "Lucky blocks turn up across the world, and anyone can craft one from eight gold ingots around a quartz. Everyone starts with three. No mod or resource pack needed to join."
             },
+            "luckyrace": {
+                "name": "Lucky Block Race",
+                "summary": "A lane each, a row of lucky blocks to break, and an arena at the end.",
+                "setup": "Polaris builds the course on the first start: everyone waits in the lobby, and standing on the emerald block starts a round for up to four racers. The last one standing wins, and the course rebuilds itself after every round. No mod or resource pack needed to join."
+            },
             "shrinking-world": {
                 "name": "Shrinking world",
                 "summary": "A border that keeps moving, so nobody settles down.",

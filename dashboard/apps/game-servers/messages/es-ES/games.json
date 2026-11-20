@@ -1047,6 +1047,11 @@
                 "summary": "Rompe un bloque, llévate lo que te dé, y ojalá no sea el malo.",
                 "setup": "Los lucky blocks aparecen por todo el mundo, y cualquiera puede fabricar uno con ocho lingotes de oro alrededor de un cuarzo. Todos empiezan con tres. Para entrar no hace falta ningún mod ni paquete de recursos."
             },
+            "luckyrace": {
+                "name": "Lucky Block Race",
+                "summary": "Un carril por jugador, lucky blocks que romper y una arena al final.",
+                "setup": "Polaris construye el circuito al arrancar por primera vez: todos esperan en el lobby, y pisar el bloque de esmeralda empieza una ronda de hasta cuatro jugadores. Gana el último en pie, y el circuito se reconstruye solo tras cada ronda. Para entrar no hace falta ningún mod ni paquete de recursos."
+            },
             "shrinking-world": {
                 "name": "Mundo menguante",
                 "summary": "Un borde que no para de moverse, para que nadie se asiente.",

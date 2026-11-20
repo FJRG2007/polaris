@@ -207,6 +207,30 @@ export const GAME_BLUEPRINTS: readonly GameBlueprint[] = [
         weight: "normal"
     },
     {
+        id: "luckyrace",
+        name: gameMessage("games", "lib.blueprints.luckyrace.name"),
+        summary: gameMessage("games", "lib.blueprints.luckyrace.summary"),
+        editions: ["java"],
+        software: "PAPER",
+        // The same Lucky Blocks pack, without the add-on that scatters them
+        // through a generated world: the course is the only ground, built and
+        // refereed by a pack Polaris writes once the server is up (see
+        // `lucky-race.ts`). The lobby is adventure so nothing in it can be
+        // broken; the lanes switch each racer to survival.
+        projects: ["datapack:ly-lucky-blocks"],
+        levelType: FLAT_LEVEL_TYPE,
+        env: {
+            GENERATOR_SETTINGS: VOID_GENERATOR_SETTINGS,
+            MODE: "adventure",
+            DIFFICULTY: "normal",
+            PVP: "true",
+            SPAWN_PROTECTION: "0"
+        },
+        setup: gameMessage("games", "lib.blueprints.luckyrace.setup"),
+        docs: "https://modrinth.com/datapack/ly-lucky-blocks",
+        weight: "light"
+    },
+    {
         id: "shrinking-world",
         name: gameMessage("games", "lib.blueprints.shrinking-world.name"),
         summary: gameMessage("games", "lib.blueprints.shrinking-world.summary"),

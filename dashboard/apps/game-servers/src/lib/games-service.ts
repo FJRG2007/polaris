@@ -906,6 +906,10 @@ export async function syncFirewallBans(
         await import("./minecraft/oneblock-service")
             .then((service) => service.applyOneBlockSetup(ownerId, install.id, install.config))
             .catch(() => undefined);
+        // A Lucky Block Race server gets its course and referee, once.
+        await import("./minecraft/lucky-race-service")
+            .then((service) => service.applyLuckyRaceSetup(ownerId, install.id, install.config))
+            .catch(() => undefined);
         // A server on the Skyblock 2.1 map gets the islands the map is missing,
         // put into its sky once, with nobody stopping it.
         await import("./minecraft/skyblock-islands-service")
