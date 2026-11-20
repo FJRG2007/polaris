@@ -10,6 +10,7 @@
 import type { Metadata } from "next";
 import { SiteShell } from "@/components/site-shell";
 import { NotFoundView } from "@/components/not-found-view";
+import { LOCALE_CHOICE_KEY } from "@/lib/locale-detect";
 import { pageMetadata, SITE_VIEWPORT, words } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -21,7 +22,10 @@ export const viewport = SITE_VIEWPORT;
 const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 /** Runs first in the body. A constant, with nothing from the address in it. */
-const SPANISH = `(function(){try{var b=${JSON.stringify(BASE)};var p=location.pathname;if(b&&p.indexOf(b)===0)p=p.slice(b.length);var first=p.split("/")[1]||"";var es=first==="es"||(first!=="en"&&/^es\\b/i.test(navigator.language||""));if(es)location.replace(b+"/es/missing/");}catch(e){}})();`;
+/** Runs first in the body. A constant, with nothing from the address in it:
+ *  Spanish when the address was, or when it named no language and the reader
+ *  chose Spanish in the picker or, having chosen nothing, reads in it. */
+const SPANISH = `(function(){try{var b=${JSON.stringify(BASE)};var p=location.pathname;if(b&&p.indexOf(b)===0)p=p.slice(b.length);var first=p.split("/")[1]||"";var c=null;try{c=localStorage.getItem(${JSON.stringify(LOCALE_CHOICE_KEY)})}catch(e){}var es=first==="es"||(first!=="en"&&(c?c==="es":/^es\\b/i.test(navigator.language||"")));if(es)location.replace(b+"/es/missing/");}catch(e){}})();`;
 
 export default function GlobalNotFound() {
     return (

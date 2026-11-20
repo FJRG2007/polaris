@@ -10,6 +10,7 @@ import { scriptDirection } from "@polaris/core";
 import type { SiteLocale } from "@/data/builders";
 import { sans } from "@/lib/fonts";
 import { href, siteData, words } from "@/lib/site";
+import { localeScript } from "@/lib/locale-detect";
 import { NavLink } from "@/components/nav-link";
 import { LanguagePicker } from "@/components/language-picker";
 import { GitHubMark } from "@polaris/ui/account-downloads/brand-icons";
@@ -29,8 +30,8 @@ export function SiteShell({
     children
 }: {
     locale: SiteLocale;
-    /** Drawn first in the body, ahead of the bar: the not-found page's language
-     *  check, which has to run before anything is painted. */
+    /** Drawn first in the body, ahead of the bar, in place of the language
+     *  check every page runs (`lib/locale-detect`): the not-found page's own. */
     before?: ReactNode;
     children: ReactNode;
 }) {
@@ -40,7 +41,7 @@ export function SiteShell({
         // "system": the dashboard's theme class that follows the reader's machine.
         <html lang={locale} dir={scriptDirection(locale)} className={`system ${sans.variable}`}>
             <body className="min-h-screen bg-background text-foreground antialiased">
-                {before}
+                {before ?? <LocaleCheck locale={locale} />}
                 <a
                     href="#main"
                     className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4"
@@ -103,4 +104,10 @@ export function SiteShell({
             </body>
         </html>
     );
+}
+
+/** Moves an English page to the reader's Spanish before it is drawn. */
+function LocaleCheck({ locale }: { locale: SiteLocale }) {
+    const script = localeScript(process.env.NEXT_PUBLIC_BASE_PATH ?? "", locale);
+    return script ? <script dangerouslySetInnerHTML={{ __html: script }} /> : null;
 }
