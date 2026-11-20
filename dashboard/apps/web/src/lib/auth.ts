@@ -14,8 +14,10 @@
  */
 
 import { createRequestAuth } from "@polaris/auth";
+import { androidAppOrigins } from "./mobile/asset-links";
 
 const requestAuth = createRequestAuth({
+    appOrigins: () => androidAppOrigins(),
     configuredHosts: async (request) => {
         const [
             { dashboardHosts, publicHostname },

@@ -27,6 +27,16 @@ export function androidCertFingerprints(extra: string | undefined = loadEnv().PO
     return [...new Set([RELEASE_CERT_SHA256, ...listed])];
 }
 
+/**
+ * The origin Android reports for a passkey the app makes or uses, one per
+ * certificate: `android:apk-key-hash:` and the certificate's SHA-256 in base64url.
+ */
+export function androidAppOrigins(fingerprints: readonly string[] = androidCertFingerprints()): string[] {
+    return fingerprints.map(
+        (fingerprint) => `android:apk-key-hash:${Buffer.from(fingerprint.replace(/:/g, ""), "hex").toString("base64url")}`
+    );
+}
+
 /** The statement list Android reads: the app may sign in with this host's credentials. */
 export function assetLinks(fingerprints: readonly string[]) {
     return [

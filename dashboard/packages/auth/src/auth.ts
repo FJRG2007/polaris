@@ -102,7 +102,7 @@ export const MIN_PASSWORD_LENGTH = 10;
  * assertion stamps the credential it used, so a passkey nobody recognises can be
  * told apart from one that has simply been forgotten.
  */
-function passkeyPlugin(address: string): BetterAuthPlugin | null {
+function passkeyPlugin(address: string, appOrigins: readonly string[] = []): BetterAuthPlugin | null {
     const rpID = passkeyRelyingPartyId(address);
     if (!rpID) return null;
     return passkey({
@@ -110,8 +110,11 @@ function passkeyPlugin(address: string): BetterAuthPlugin | null {
         rpName: "Polaris",
         // Pinned rather than left for the client to supply: an origin the caller
         // chooses is an origin an attacker chooses. The port rides along, since
-        // it is part of the origin the browser reports.
-        origin: origins(address),
+        // it is part of the origin the browser reports. The phone app's WebView
+        // makes passkeys as the app, so what it reports is the app's own origin
+        // (`android:apk-key-hash:...`), accepted only for the certificates this
+        // instance's asset links already vouch for.
+        origin: [...origins(address), ...appOrigins],
         registration: {
             afterVerification: async ({ ctx, user }) => {
                 await assertPasskeyNameFree(user.id, (ctx.body as { name?: unknown })?.name);
@@ -582,7 +585,7 @@ function buildPlugins(options: AuthOptions, address: string): BetterAuthPlugin[]
         connectionSignInPlugin(),
         samlSsoPlugin()
     ];
-    const webauthn = passkeyPlugin(address);
+    const webauthn = passkeyPlugin(address, options.appOrigins?.() ?? []);
     if (webauthn) plugins.push(webauthn);
     // Registered only when the app can send at all. Whether a channel is
     // nominated right now is the send callback's business.
@@ -620,6 +623,15 @@ export interface AuthOptions {
      * machine's IP typed by hand. Absent where hosts are listed without one.
      */
     readonly configuredHosts?: (request?: Request) => Promise<readonly string[]>;
+
+    /**
+     * Origins a passkey ceremony may also report beyond this address's own: the
+     * phone app's, `android:apk-key-hash:<sha256 of its signing certificate>`,
+     * which is what Android puts in the client data when the app's WebView makes
+     * or uses a passkey. Only certificates the app's asset links name belong here.
+     * Read when the plugins are built, like the environment it comes from.
+     */
+    readonly appOrigins?: () => readonly string[];
 
     /**
      * Told about every session that opens, whatever the method, after it is stored,

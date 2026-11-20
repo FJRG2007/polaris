@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@polaris/config", () => ({ loadEnv: () => ({}) }));
 
-import { androidCertFingerprints, assetLinks, ANDROID_PACKAGE } from "@/lib/mobile/asset-links";
+import { androidAppOrigins, androidCertFingerprints, assetLinks, ANDROID_PACKAGE } from "@/lib/mobile/asset-links";
 
 describe("asset links", () => {
     it("always names the release key, and adds only well-formed listed ones", () => {
@@ -17,5 +17,10 @@ describe("asset links", () => {
         const [statement] = assetLinks(["X"]);
         expect(statement.relation).toContain("delegate_permission/common.get_login_creds");
         expect(statement.target).toEqual({ namespace: "android_app", package_name: ANDROID_PACKAGE, sha256_cert_fingerprints: ["X"] });
+    });
+
+    it("names the origin Android reports for a passkey made in the app", () => {
+        // The exact origin the release app sent when it was refused.
+        expect(androidAppOrigins()).toEqual(["android:apk-key-hash:DYLKRWUkRokQsP4AEYPEWvrhxooU7Eps-_x5atHqPI8"]);
     });
 });
