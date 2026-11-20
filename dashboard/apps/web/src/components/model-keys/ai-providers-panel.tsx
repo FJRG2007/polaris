@@ -17,6 +17,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
 import type { ComponentProps, ReactNode } from "react";
 import { homeSigninsOf } from "@/lib/agents/home-signins";
+import { keyStatus } from "@/lib/agents/key-status";
 import { keyStatuses } from "@/lib/agents/key-status-read";
 import { assistedSignins, syncMachineLogins } from "@/lib/agents/signin-runtime";
 import { ModelKeysView, type AssistedSignin } from "./model-keys-view";
@@ -75,7 +76,16 @@ export async function AiProvidersPanel({
     if (account) await syncMachineLogins(account.userId);
     const [rows, shared] = await Promise.all([listModelKeys(keyOwner), instanceKeysAreShared(), ensureProviderCatalog()]);
     const keys = rows.filter((row) => !isSigninRow(row.provider));
-    const [health, fallback] = await Promise.all([keyStatuses(keys), account ? accountFallback(account.userId, shared) : null]);
+    const [spent, fallback] = await Promise.all([keyStatuses(keys), account ? accountFallback(account.userId, shared) : null]);
+    // An agent's account or machine login spends nothing the router counts, but
+    // the rotation cools it down on a limit or a refusal: only that is said on
+    // its row, never a spend of nothing.
+    const now = Date.now();
+    const cooled = rows
+        .filter((row) => isSigninRow(row.provider))
+        .map((row) => [row.id, keyStatus(row, undefined, "ready", now)] as const)
+        .filter(([, standing]) => standing.state !== "ready");
+    const health = { ...spent, ...Object.fromEntries(cooled) };
 
     // Only an account signs in on its own sessions' machine: the deployment
     // has no home, and an administrator would be signing a subscription that

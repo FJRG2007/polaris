@@ -36,7 +36,7 @@ import { instanceKeysAreShared } from "@/lib/agents/model-keys";
 import { refusedAccountName } from "@/lib/agents/signin-refusal";
 import { addSessionMessage } from "@/lib/agents/session-service";
 import { rotationSlugs } from "@/lib/agents/machine-logins";
-import { isMachineLogin } from "@/lib/agents/machine-login-config";
+import { isMachineLogin, machineLoginSignedOut } from "@/lib/agents/machine-login-config";
 import { noteLimitHit } from "@/lib/agents/limit-history";
 
 const SECOND = 1_000;
@@ -434,7 +434,11 @@ export async function rotationAccounts(
         orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
         take: 50
     });
-    const own = rows.filter((row) => row.userId !== null);
+    // A machine login the last check found signed out is no account to move
+    // to: the tool would come up asking to sign in. The current one stays.
+    const own = rows.filter(
+        (row) => row.userId !== null && (row.id === accountId || !machineLoginSignedOut(row.config))
+    );
     // A machine login is only ever its owner's: the deployment has no home.
     const instance = rows.filter((row) => row.userId === null && !isMachineLogin(row.config));
     return [...own, ...instance].map((row) => ({

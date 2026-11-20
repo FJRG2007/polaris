@@ -1192,12 +1192,8 @@
         "signoutKeep": "Keep it",
         "homeSignin": "Sign in",
         "machineLoginName": "{tool} login",
-        "statusIn": "Signed in",
         "statusOut": "Not signed in",
-        "statusUnknown": "Unknown",
         "statusChecking": "Checking sign-in",
-        "statusLastKnown": "{status}, last known",
-        "statusLastKnownHint": "From the last sign-in or sign-out run here, not from the tool itself.",
         "cancel": "Cancel",
         "table": {
             "search": "Search connections",
@@ -1228,7 +1224,8 @@
             "readOnly": "Read-only",
             "usingYours": "Your key is used",
             "usingDeployment": "Available to you",
-            "agentKey": "Signed in on your sessions' machine"
+            "agentKey": "On your sessions' machine",
+            "checkedAt": "Checked <time></time>"
         }
     },
     "signinDialog": {

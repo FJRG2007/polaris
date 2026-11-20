@@ -27,7 +27,7 @@ interface KeyRow {
     secretFingerprint: string | null;
 }
 
-const db = vi.hoisted(() => ({ keys: [] as KeyRow[], creates: 0 }));
+const db = vi.hoisted(() => ({ keys: [] as KeyRow[], creates: 0, updates: 0 }));
 
 /** Enough of Prisma's `where` for these reads: equality, `in`, OR and AND. */
 function matches(row: Record<string, unknown>, where: Record<string, unknown>): boolean {
@@ -58,6 +58,12 @@ vi.mock("@polaris/db", () => ({
                     .filter((row) => matches(row as unknown as Record<string, unknown>, where))
                     .sort((x, y) => x.priority - y.priority)
                     .map((row) => ({ ...row })),
+            update: async ({ where, data }: { where: { id: string }; data: Partial<KeyRow> }) => {
+                db.updates += 1;
+                const row = db.keys.find((one) => one.id === where.id)!;
+                Object.assign(row, data);
+                return row;
+            },
             create: async ({ data }: { data: KeyRow }) => {
                 // Yields first, so two reads started together both get here.
                 await Promise.resolve();
@@ -105,6 +111,7 @@ const logins = await import("@/lib/agents/machine-logins");
 const rotation = await import("@/lib/agents/account-rotation");
 const { sessionCredentials } = await import("@/lib/agents/agent-readiness");
 const core = await import("@polaris/core");
+const config = await import("@/lib/agents/machine-login-config");
 
 const SIGNIN = { env: MACHINE_ENV, slug: MACHINE, label: "Claude Code" };
 
@@ -129,6 +136,7 @@ function stored(id: string, priority: number, extra: Partial<KeyRow> = {}): KeyR
 beforeEach(() => {
     db.keys = [];
     db.creates = 0;
+    db.updates = 0;
 });
 
 describe("ensureMachineLogins", () => {
@@ -204,5 +212,46 @@ describe("rotation and launch", () => {
         // With no stored account to outrank, nothing changes.
         db.keys = db.keys.filter((row) => row.provider === MACHINE);
         expect(await logins.machineLoginChosen(OWNER, "claude", null)).toBe(false);
+    });
+});
+
+describe("the last check, kept on the row", () => {
+    it("is written onto the row beside the login it names, and only when it says something new", async () => {
+        await rows.ensureMachineLogins(OWNER, [SIGNIN]);
+        await rows.recordMachineLoginCheck(OWNER, MACHINE_ENV, { state: "in", at: 1_000 });
+        const row = db.keys[0]!;
+        expect(JSON.parse(row.config)).toEqual({ machineLogin: MACHINE_ENV, checked: { state: "in", at: 1_000 } });
+        expect(config.machineLoginEnv(row.config)).toBe(MACHINE_ENV);
+        expect(config.machineLoginCheck(row.config)).toEqual({ state: "in", at: 1_000 });
+        // The same answer a minute later is not a write; a different one is.
+        await rows.recordMachineLoginCheck(OWNER, MACHINE_ENV, { state: "in", at: 61_000 });
+        expect(db.updates).toBe(1);
+        await rows.recordMachineLoginCheck(OWNER, MACHINE_ENV, { state: "out", at: 62_000 });
+        expect(config.machineLoginCheck(row.config)).toEqual({ state: "out", at: 62_000 });
+        // An older answer arriving late never overwrites a newer one.
+        await rows.recordMachineLoginCheck(OWNER, MACHINE_ENV, { state: "in", at: 50_000 });
+        expect(config.machineLoginSignedOut(row.config)).toBe(true);
+    });
+
+    it("reads nothing from a row that is not a machine login, or a check of the wrong shape", () => {
+        expect(config.machineLoginCheck(JSON.stringify({ checked: { state: "in", at: 1 } }))).toBeNull();
+        expect(config.machineLoginCheck(JSON.stringify({ machineLogin: MACHINE_ENV, checked: { state: "yes", at: 1 } }))).toBeNull();
+        expect(config.machineLoginCheck("not json")).toBeNull();
+    });
+
+    it("keeps a session off a machine login found signed out unless it was picked", async () => {
+        await rows.ensureMachineLogins(OWNER, [SIGNIN]);
+        const machine = db.keys[0]!;
+        machine.priority = -1;
+        db.keys.push(stored("a", 5));
+        expect(await logins.machineLoginChosen(OWNER, "claude", null)).toBe(true);
+        await rows.recordMachineLoginCheck(OWNER, MACHINE_ENV, { state: "out", at: 1_000 });
+        // First in the order but signed out: the stored account is used.
+        expect(await logins.machineLoginChosen(OWNER, "claude", null)).toBe(false);
+        // Picked by name, it is still what the session asked for.
+        expect(await logins.machineLoginChosen(OWNER, "claude", machine.id)).toBe(true);
+        // The rotation does not move a session onto it, but keeps it as the current one.
+        expect((await rotation.rotationAccounts(OWNER, "claude", "a")).map((one) => one.id)).toEqual(["a"]);
+        expect((await rotation.rotationAccounts(OWNER, "claude", machine.id)).map((one) => one.id)).toEqual([machine.id, "a"]);
     });
 });

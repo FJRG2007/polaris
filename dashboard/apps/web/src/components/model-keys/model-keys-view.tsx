@@ -27,7 +27,7 @@ import { SigninDialog, type SigninDialogActions, type SigninDialogMode } from ".
 import { useConfirm } from "@/components/confirm-dialog";
 import { useDeferredValue, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { SigninStatus } from "@/lib/agents/signin-status";
-import { machineLoginEnv } from "@/lib/agents/machine-login-config";
+import { machineLoginCheck, machineLoginEnv } from "@/lib/agents/machine-login-config";
 import { RelativeTime } from "@/components/relative-time";
 import type { ModelKeyView } from "@/lib/agents/model-keys";
 import type { ProviderRow } from "@/lib/agents/model-key-providers";
@@ -82,7 +82,6 @@ import {
     SearchableSelect,
     SearchField,
     Select,
-    Skeleton,
     SortHeader,
     Switch,
     DateInput,
@@ -131,8 +130,9 @@ export interface AssistedSignin {
     actions: Omit<SigninDialogActions, "save"> & {
         /** Starts the vendor's own sign-out, for a sign-in whose docs name one. */
         signout?: (env: unknown) => Promise<{ id?: string; error?: string }>;
-        /** Whether each home login is signed in, asked after the page is drawn. */
-        status?: (envs: unknown) => Promise<{ statuses: Record<string, SigninStatus> }>;
+        /** Whether each home login is signed in, asked after the page is drawn:
+         *  answered at once from the last check, `pending` while a newer runs. */
+        status?: (envs: unknown) => Promise<{ statuses: Record<string, SigninStatus>; pending: boolean }>;
     };
 }
 
@@ -346,10 +346,13 @@ export function ModelKeysView({
     );
     const canSignOut = (signin: AgentSignin) => Boolean(signin.signout && assist?.actions.signout);
 
-    // Each home login's status, null while it is being asked. Asked after the
-    // first paint and again whenever a sign-in or sign-out dialog closes. Never
-    // cached in the browser: it is a statement about a login.
-    const [homeStatus, setHomeStatus] = useState<Record<string, SigninStatus> | null>(null);
+    // Each home login's status as the last read said it. A row is drawn at once
+    // from the check kept on it; this replaces that only where an answer came
+    // back different. Asked after the first paint, again while a check is
+    // still running behind it, and whenever a sign-in or sign-out dialog closes.
+    const [homeStatus, setHomeStatus] = useState<Record<string, SigninStatus>>({});
+    // Until the first answer: a row with nothing kept says it is being checked.
+    const [checking, setChecking] = useState(true);
     const [statusTick, setStatusTick] = useState(0);
     const askStatus = assist?.actions.status;
     // The machine logins this person has a row for; every home login while an
@@ -366,22 +369,45 @@ export function ModelKeysView({
     useEffect(() => {
         if (!askStatus || !homeEnvs) return;
         let live = true;
-        setHomeStatus(null);
-        askStatus(homeEnvs.split(","))
-            .then((result) => {
-                if (!live) return;
-                setHomeStatus(result.statuses);
-                // That first read wrote a row for each one signed in.
-                if (connectedList === null && Object.values(result.statuses).some((one) => one.state === "in"))
-                    router.refresh();
-            })
-            .catch(() => {
-                if (live) setHomeStatus({});
-            });
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        let polls = 0;
+        const ask = () => {
+            askStatus(homeEnvs.split(","))
+                .then((result) => {
+                    if (!live) return;
+                    setHomeStatus((current) =>
+                        sameStatuses(current, result.statuses) ? current : { ...current, ...result.statuses }
+                    );
+                    setChecking(result.pending);
+                    if (result.pending && polls++ < STATUS_POLLS) {
+                        timer = setTimeout(ask, STATUS_POLL_MS);
+                        return;
+                    }
+                    // That first read wrote a row for each one signed in.
+                    if (connectedList === null && Object.values(result.statuses).some((one) => one.state === "in"))
+                        router.refresh();
+                })
+                .catch(() => {
+                    if (live) setChecking(false);
+                });
+        };
+        ask();
         return () => {
             live = false;
+            if (timer) clearTimeout(timer);
         };
     }, [askStatus, homeEnvs, statusTick, connectedList, router]);
+
+    // A machine login's status: the last answer this page got, else the check
+    // kept on its row, else undefined while one is still running and null when
+    // nothing is known.
+    const machineStatusOf = (row: ModelKeyView, env: string): SigninStatus | null | undefined => {
+        const live = homeStatus[env];
+        if (live && (live.state !== "unknown" || !machineLoginCheck(row.config))) return live;
+        const kept = machineLoginCheck(row.config);
+        if (kept) return { state: kept.state, lastKnown: false, checkedAt: kept.at };
+        return askStatus && homeEnvs && checking ? undefined : null;
+    };
 
     // The offer a sign-out replaced, put back if the sign-out does not finish.
     const offerBack = useRef<AgentSignin | null>(null);
@@ -432,7 +458,7 @@ export function ModelKeysView({
             // The machine's own login: its state is the login's, asked after
             // the first paint, and switched off is off whatever that says.
             const machine = machineLoginEnv(row.config);
-            const known = machine ? homeStatus?.[machine] : undefined;
+            const known = machine ? machineStatusOf(row, machine) : undefined;
             return {
                 id: row.id,
                 kind: machine ? "agent" : accountSlugs.has(row.provider) ? "account" : "key",
@@ -442,13 +468,11 @@ export function ModelKeysView({
                 status: !row.enabled
                     ? "off"
                     : machine
-                      ? !askStatus
-                          ? "working"
-                          : homeStatus === null
+                      ? known?.state === "out" || (health && health.state !== "ready")
+                          ? "problem"
+                          : known === undefined
                             ? "checking"
-                            : known?.state === "out"
-                              ? "problem"
-                              : "working"
+                            : "working"
                       : expired || (health && health.state !== "ready")
                         ? "problem"
                         : "working",
@@ -469,7 +493,8 @@ export function ModelKeysView({
             position: rows.length + index
         }));
         return [...stored, ...held];
-    }, [rows, statuses, accountSlugs, byslug, homeStatus, askStatus, deployment, t]);
+        // machineStatusOf reads only homeStatus, checking, homeEnvs and askStatus.
+    }, [rows, statuses, accountSlugs, byslug, homeStatus, checking, homeEnvs, askStatus, deployment, t]);
 
     const [search, setSearch] = useState("");
     const typed = useDeferredValue(search);
@@ -819,8 +844,13 @@ export function ModelKeysView({
                                             status={showStatus ? (statuses?.[row.id] ?? null) : undefined}
                                             onLimits={
                                                 // Only a key the router spends has limits: an agent's
-                                                // account in the same list is not one.
-                                                actions.limit && statuses && row.id in statuses
+                                                // account in the same list is not one, though its
+                                                // cool-down is shown.
+                                                actions.limit &&
+                                                statuses &&
+                                                row.id in statuses &&
+                                                !env &&
+                                                !accountSlugs.has(row.provider)
                                                     ? () => setLimiting(row)
                                                     : null
                                             }
@@ -828,11 +858,7 @@ export function ModelKeysView({
                                             machine={
                                                 signin
                                                     ? {
-                                                          status: askStatus
-                                                              ? homeStatus
-                                                                  ? (homeStatus[signin.env] ?? null)
-                                                                  : undefined
-                                                              : null,
+                                                          status: machineStatusOf(row, signin.env),
                                                           onSignIn: () => setRunning({ signin, mode: "login" }),
                                                           onSignOut: canSignOut(signin)
                                                               ? () => void signOut(signin)
@@ -1002,36 +1028,63 @@ function DeploymentRow({
     );
 }
 /**
- * A home login's status: a skeleton while it is asked (undefined), unknown when
- * nothing came back for it (null), and "last known" when the answer is the last
- * sign-in or sign-out run here rather than the tool's own.
+ * A machine login's problem, beside its name: signed out, with the sign-in that
+ * fixes it. Signed in says nothing - the row being listed is what that means -
+ * and neither does a login nobody could check yet.
  */
-function HomeStatusBadge({
+function MachineProblem({
     status,
+    onSignIn,
     t
 }: {
     status: SigninStatus | null | undefined;
+    onSignIn: () => void;
     t: NamespaceTranslator<"components">;
 }) {
-    if (status === undefined) {
-        return <Skeleton className="h-[18px] w-20" aria-label={t("modelKeys.statusChecking")} />;
-    }
-    const state = status?.state ?? "unknown";
-    const label =
-        state === "in"
-            ? t("modelKeys.statusIn")
-            : state === "out"
-              ? t("modelKeys.statusOut")
-              : t("modelKeys.statusUnknown");
-    const lastKnown = status?.lastKnown === true;
+    if (status?.state !== "out") return null;
     return (
-        <Badge
-            variant={state === "in" ? "success" : "neutral"}
-            title={lastKnown ? t("modelKeys.statusLastKnownHint") : undefined}
-        >
-            {lastKnown ? t("modelKeys.statusLastKnown", { status: label }) : label}
-        </Badge>
+        <span className="flex items-center gap-2">
+            <Badge variant="danger" className="shrink-0">
+                {t("modelKeys.statusOut")}
+            </Badge>
+            <Button variant="outline" size="sm" className="h-6 shrink-0 px-2 text-xs" onClick={onSignIn}>
+                {t("modelKeys.homeSignin")}
+            </Button>
+        </span>
     );
+}
+
+/** Under a machine login's name: where it is, and when it was last checked. */
+function machineKeyText(
+    status: SigninStatus | null | undefined,
+    t: NamespaceTranslator<"components">
+): ReactNode {
+    if (status === undefined) return t("modelKeys.statusChecking");
+    const at = status?.checkedAt;
+    if (!at) return t("modelKeys.table.agentKey");
+    return (
+        <>
+            {t("modelKeys.table.agentKey")}
+            {" - "}
+            {t.rich("modelKeys.table.checkedAt", {
+                time: () => <RelativeTime key="time" iso={new Date(at).toISOString()} />
+            })}
+        </>
+    );
+}
+
+/** How often, and how many times, a check still running behind the screen is
+ *  asked about again: past a status check's own timeout. */
+const STATUS_POLL_MS = 4_000;
+const STATUS_POLLS = 15;
+
+/** Whether two status reads say the same thing, so an unchanged answer keeps
+ *  the rows as they are. */
+function sameStatuses(current: Record<string, SigninStatus>, next: Record<string, SigninStatus>): boolean {
+    return Object.entries(next).every(([env, one]) => {
+        const was = current[env];
+        return was?.state === one.state && was.lastKnown === one.lastKnown && was.checkedAt === one.checkedAt;
+    });
 }
 
 function KeyRow({
@@ -1081,7 +1134,8 @@ function KeyRow({
     const t = useTranslations("components");
     const [over, setOver] = useState(false);
     const label = provider?.name ?? row.provider;
-    const keyText = machine ? t("modelKeys.table.agentKey") : row.keyHint;
+    const keyText: ReactNode = machine ? machineKeyText(machine.status, t) : row.keyHint;
+    const keyTitle = machine ? undefined : row.keyHint;
     const signedIn = machine?.status?.state === "in";
     const standing = expiryStanding(row.expiresAt, t);
     const expired = standing?.tone === "danger";
@@ -1142,9 +1196,9 @@ function KeyRow({
                     {row.enabled ? null : <Badge className="shrink-0">{t("modelKeys.off")}</Badge>}
                     {/* The standing rides with the name below sm, where its own
                         column is dropped; a ready key says nothing there. */}
-                    {machine ? (
+                    {machine && machine.status?.state === "out" ? (
                         <span className={`shrink-0 ${status === undefined ? "" : columns.status.fold}`}>
-                            <HomeStatusBadge status={machine.status} t={t} />
+                            <MachineProblem status={machine.status} onSignIn={machine.onSignIn} t={t} />
                         </span>
                     ) : status && status.state !== "ready" ? (
                         <span className={`shrink-0 ${columns.status.fold}`}>
@@ -1157,7 +1211,7 @@ function KeyRow({
                 {keyText ? (
                     <span
                         className={`text-muted-foreground block truncate text-xs ${machine ? "" : "font-mono"} ${columns.key.fold}`}
-                        title={keyText}
+                        title={keyTitle}
                     >
                         {keyText}
                     </span>
@@ -1172,9 +1226,9 @@ function KeyRow({
                 <td className={`${columns.status.cell} px-3 py-2`}>
                     {/* The cap is on a block inside the cell: a max-width on an auto
                         table cell is ignored. */}
-                    {machine ? (
-                        <HomeStatusBadge status={machine.status} t={t} />
-                    ) : status ? (
+                    {machine && machine.status?.state === "out" ? (
+                        <MachineProblem status={machine.status} onSignIn={machine.onSignIn} t={t} />
+                    ) : status && (!machine || status.state !== "ready") ? (
                         <div className="max-w-56">
                             <KeyStanding status={status} />
                         </div>

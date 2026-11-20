@@ -13,7 +13,14 @@
 import { prisma } from "@polaris/db";
 import { translate } from "@/lib/i18n/translate";
 import { getUserLocale } from "@/lib/i18n/locale-service";
-import { isMachineLogin, MACHINE_LOGIN } from "@/lib/agents/machine-login-config";
+import {
+    isMachineLogin,
+    machineLoginCheck,
+    machineLoginEnv,
+    withMachineLoginCheck,
+    MACHINE_LOGIN,
+    type MachineLoginCheck
+} from "@/lib/agents/machine-login-config";
 
 /** An agent's login on the machine, as the row for it needs it. */
 export interface MachineSignin {
@@ -87,5 +94,37 @@ export async function ensureMachineLogins(userId: string, signins: readonly Mach
                 taken.add(name.toLowerCase());
             }
         }
+    }
+}
+
+/** How far apart two checks with the same answer may be before the newer one
+ *  is written anyway, so "checked 3 min ago" stays true without a write per read. */
+const RECHECK_WRITE_MS = 10 * 60_000;
+
+/**
+ * Keep what a check (or a sign-in or sign-out run here) found on this person's
+ * row for that login: the screen draws it at once next time, across restarts,
+ * and the rotation stops handing sessions a login found signed out. Writes only
+ * when the answer changed or the stored one is old. Never throws.
+ */
+export async function recordMachineLoginCheck(userId: string, env: string, check: MachineLoginCheck): Promise<void> {
+    try {
+        const rows = await prisma.userModelKey.findMany({
+            where: { userId, secretFingerprint: fingerprintOf(env) },
+            select: { id: true, config: true },
+            take: 5
+        });
+        for (const row of rows) {
+            if (machineLoginEnv(row.config) !== env) continue;
+            const stored = machineLoginCheck(row.config);
+            if (stored && stored.state === check.state && check.at - stored.at < RECHECK_WRITE_MS) continue;
+            if (stored && stored.at > check.at) continue;
+            await prisma.userModelKey.update({
+                where: { id: row.id },
+                data: { config: withMachineLoginCheck(row.config, check) }
+            });
+        }
+    } catch (error) {
+        console.warn("[agent-signin] could not keep a machine login check:", error instanceof Error ? error.name : "unknown");
     }
 }

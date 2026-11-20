@@ -145,16 +145,17 @@ function signinStatusRequestSchema() {
 
 /**
  * Whether each of this person's home logins is signed in, for the rows that
- * list them. Asked after the page is drawn; never fails - what could not be
- * read comes back unknown.
+ * list them. Asked after the page is drawn and answered at once from the last
+ * check; `pending` while a newer one runs behind it. Never fails - what could
+ * not be read comes back unknown.
  */
 export async function agentSigninStatusAction(
     envs: unknown
-): Promise<{ statuses: Record<string, SigninStatus> }> {
+): Promise<{ statuses: Record<string, SigninStatus>; pending: boolean }> {
     const user = await requireUser();
     const parsed = signinStatusRequestSchema().safeParse(envs);
-    if (!parsed.success) return { statuses: {} };
-    return { statuses: await signinStatuses(user.id, parsed.data) };
+    if (!parsed.success) return { statuses: {}, pending: false };
+    return signinStatuses(user.id, parsed.data);
 }
 
 /** Type the login's own in-tool command (`/login`) into its terminal, once. */

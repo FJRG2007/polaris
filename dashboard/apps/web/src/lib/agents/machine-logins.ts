@@ -14,7 +14,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { homeSigninSlugs } from "@/lib/agents/signin-runtime";
-import { isMachineLogin, machineLoginEnv } from "@/lib/agents/machine-login-config";
+import { isMachineLogin, machineLoginEnv, machineLoginSignedOut } from "@/lib/agents/machine-login-config";
 import { agentSignins, signinSlug } from "@/lib/agents/agent-signins";
 
 /** The login variable this owner's row stands for, or null when it is not a
@@ -41,7 +41,9 @@ export function rotationSlugs(cli: string): { stored: string[]; machine: string[
  * login is ahead of the tool's stored accounts in the owner's order. With no
  * stored account to outrank, nothing changes: the session is handed what it was
  * handed before these rows existed. Only the person's own rows count, as the
- * login is in their home. A tool with no machine login never asks.
+ * login is in their home. A machine login the last check found signed out is
+ * passed over unless it was picked by name: the tool would only ask to sign in.
+ * A tool with no machine login never asks.
  */
 export async function machineLoginChosen(
     userId: string | null,
@@ -63,7 +65,8 @@ export async function machineLoginChosen(
         orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
         take: 50
     });
-    const first = rows[0];
+    const usable = accountId ? rows : rows.filter((row) => !machineLoginSignedOut(row.config));
+    const first = usable[0];
     if (!first || !machine.includes(first.provider) || !isMachineLogin(first.config)) return false;
-    return accountId !== null || rows.some((row) => stored.includes(row.provider));
+    return accountId !== null || usable.some((row) => stored.includes(row.provider));
 }

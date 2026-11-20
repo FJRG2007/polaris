@@ -39,6 +39,7 @@ import { configuredRequest, readCapped } from "@/lib/safe-fetch";
 import * as status from "./signin-status";
 import * as homes from "./home-signins";
 import * as machine from "./machine-login-rows";
+import { machineLoginCheck, machineLoginEnv, type MachineLoginCheck } from "./machine-login-config";
 import * as folders from "./account-folders";
 
 /** Stamped on every container this starts, so the sweep finds them by label
@@ -1311,6 +1312,9 @@ function inOf(statuses: Record<string, status.SigninStatus>): string[] {
  *  the person's list of connected agents (`home-signins`). */
 function recordOutcome(userId: string, env: string, mode: "login" | "logout"): void {
     status.recordSigninOutcome(userId, env, mode);
+    if (isHomeSignin(env)) {
+        void machine.recordMachineLoginCheck(userId, env, { state: mode === "login" ? "in" : "out", at: Date.now() });
+    }
     void homes.markHomeSignin(userId, env, mode === "login").catch((error: unknown) =>
         console.warn("[agent-signin] could not record a connected agent:", error instanceof Error ? error.name : "unknown")
     );
@@ -1318,17 +1322,25 @@ function recordOutcome(userId: string, env: string, mode: "login" | "logout"): v
     if (mode === "login" && isHomeSignin(env)) void ensureMachineRows(userId, [env]);
 }
 
+/** Each home login's status, and whether a check of some of them is still
+ *  running - the screen asks again shortly when it is. */
+export interface SigninStatusRead {
+    statuses: Record<string, status.SigninStatus>;
+    pending: boolean;
+}
+
 /**
- * Each home login's status, by variable.
+ * Each home login's status, by variable. Never waits on the machine.
  *
- * Checked where the vendor documents a status command - one container for all
- * of them, its answers reused for a minute - and the last sign-in or sign-out
- * otherwise. Never throws: a check that fails is "unknown" for the tools in it.
+ * A tool whose vendor documents a status command is asked in one container for
+ * all of them, in the background: this answers at once with the last check -
+ * this process's for a minute, else the one kept on the login's row - and says
+ * `pending` while the next one runs. The check's answer is kept on the row, so
+ * the next read, here or after a restart, has it. Every other tool reads as the
+ * last sign-in or sign-out. Never throws: a check that fails leaves the last
+ * answer in place.
  */
-export async function signinStatuses(
-    userId: string,
-    envs: readonly string[]
-): Promise<Record<string, status.SigninStatus>> {
+export async function signinStatuses(userId: string, envs: readonly string[]): Promise<SigninStatusRead> {
     const now = Date.now();
     const out: Record<string, status.SigninStatus> = {};
     const toCheck: { env: string; command: string }[] = [];
@@ -1336,6 +1348,7 @@ export async function signinStatuses(
     // is not theirs and costs a container to ask. An account from before the
     // list is checked in full once, and the answer becomes its list.
     const connected = await homes.homeSigninsOf(userId).catch(() => null);
+    const kept = await keptChecks(userId);
     for (const env of new Set(envs)) {
         if (!isHomeSignin(env)) continue;
         if (connected && !connected.has(env)) {
@@ -1349,45 +1362,85 @@ export async function signinStatuses(
             continue;
         }
         const hit = status.cachedStatus(userId, env, now);
-        if (hit) out[env] = hit;
-        else toCheck.push({ env, command });
+        if (hit) {
+            out[env] = hit;
+            continue;
+        }
+        const last = kept.get(env);
+        out[env] = last ? { state: last.state, lastKnown: false, checkedAt: last.at } : status.lastKnownStatus(userId, env);
+        toCheck.push({ env, command });
     }
     if (toCheck.length === 0) {
         if (connected === null) await firstList(userId, inOf(out));
-        return out;
+        return { statuses: out, pending: false };
     }
+    const started = startStatusCheck(userId, toCheck, connected === null);
+    return { statuses: out, pending: started || statusRuns.has(userId) };
+}
 
-    let run = statusRuns.get(userId);
-    if (!run && statusRuns.size < STATUS_CONCURRENCY) {
-        run = Promise.race([
-            runStatusChecks(userId, toCheck),
-            new Promise<Map<string, status.SigninState>>((resolve) =>
-                setTimeout(() => resolve(new Map()), STATUS_TIMEOUT_MS)
-            )
-        ])
-            .catch((error: unknown) => {
-                console.warn("[agent-signin] status check failed:", error instanceof Error ? error.name : "unknown");
-                return new Map<string, status.SigninState>();
-            })
-            .finally(() => statusRuns.delete(userId));
-        statusRuns.set(userId, run);
+/** The checks kept on this person's machine login rows, by variable. */
+async function keptChecks(userId: string): Promise<Map<string, MachineLoginCheck>> {
+    const found = new Map<string, MachineLoginCheck>();
+    const rows = await prisma.userModelKey
+        .findMany({
+            where: { userId, secretFingerprint: { startsWith: "machine-login:" } },
+            select: { config: true },
+            take: 50
+        })
+        .catch(() => []);
+    for (const row of rows) {
+        const env = machineLoginEnv(row.config);
+        const check = machineLoginCheck(row.config);
+        if (env && check) found.set(env, check);
     }
-    const answers = run ? await run : new Map<string, status.SigninState>();
-    const at = Date.now();
-    for (const { env } of toCheck) {
-        const state = answers.get(env) ?? "unknown";
-        status.cacheStatus(userId, env, state, at);
-        // An unanswered check falls back to what the last sign-in said.
-        out[env] = state === "unknown" ? status.lastKnownStatus(userId, env) : { state, lastKnown: false };
-    }
-    if (connected === null) {
-        await firstList(userId, inOf(out));
-    } else {
-        // A login signed in or out outside Polaris, seen by a check.
-        for (const { env } of toCheck) {
-            const state = answers.get(env);
-            if (state === "out") await homes.markHomeSignin(userId, env, false).catch(() => undefined);
-        }
-    }
-    return out;
+    return found;
+}
+
+/**
+ * Run the status checks behind the read that asked: one container per person
+ * at a time, and no more than a few across the deployment - past that the
+ * screen keeps its last answer. What comes back is cached, kept on the rows,
+ * and moves the person's list of connected agents. Returns whether it started.
+ */
+function startStatusCheck(
+    userId: string,
+    toCheck: readonly { env: string; command: string }[],
+    firstRead: boolean
+): boolean {
+    if (statusRuns.has(userId) || statusRuns.size >= STATUS_CONCURRENCY) return false;
+    const run = Promise.race([
+        runStatusChecks(userId, toCheck),
+        new Promise<Map<string, status.SigninState>>((resolve) =>
+            setTimeout(() => resolve(new Map()), STATUS_TIMEOUT_MS)
+        )
+    ])
+        .catch((error: unknown) => {
+            console.warn("[agent-signin] status check failed:", error instanceof Error ? error.name : "unknown");
+            return new Map<string, status.SigninState>();
+        })
+        .then(async (answers) => {
+            const at = Date.now();
+            const found: Record<string, status.SigninStatus> = {};
+            for (const { env } of toCheck) {
+                const state = answers.get(env) ?? "unknown";
+                status.cacheStatus(userId, env, state, at);
+                found[env] = state === "unknown" ? status.lastKnownStatus(userId, env) : { state, lastKnown: false };
+                // An unanswered check says nothing about the login: the last
+                // answer stays on the row.
+                if (state !== "unknown") await machine.recordMachineLoginCheck(userId, env, { state, at });
+            }
+            if (firstRead) {
+                await firstList(userId, inOf(found));
+            } else {
+                // A login signed in or out outside Polaris, seen by a check.
+                for (const { env } of toCheck) {
+                    if (answers.get(env) === "out") await homes.markHomeSignin(userId, env, false).catch(() => undefined);
+                }
+            }
+            return answers;
+        })
+        .catch(() => new Map<string, status.SigninState>())
+        .finally(() => statusRuns.delete(userId));
+    statusRuns.set(userId, run);
+    return true;
 }

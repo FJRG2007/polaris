@@ -105,7 +105,8 @@ describe("outcomes and the cache", () => {
         cacheStatus("user-c", "CURSOR_HOME_LOGIN", "in", 1_000);
         expect(cachedStatus("user-c", "CURSOR_HOME_LOGIN", 1_000 + STATUS_TTL_MS - 1)).toEqual({
             state: "in",
-            lastKnown: false
+            lastKnown: false,
+            checkedAt: 1_000
         });
         expect(cachedStatus("user-c", "CURSOR_HOME_LOGIN", 1_000 + STATUS_TTL_MS)).toBeNull();
     });

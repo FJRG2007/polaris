@@ -1192,12 +1192,8 @@
         "signoutKeep": "Dejarla",
         "homeSignin": "Entrar",
         "machineLoginName": "Sesión de {tool}",
-        "statusIn": "Con sesión",
         "statusOut": "Sin sesión",
-        "statusUnknown": "Sin datos",
         "statusChecking": "Comprobando acceso",
-        "statusLastKnown": "{status}, último dato",
-        "statusLastKnownHint": "Del último acceso o cierre hecho aquí, no de la propia herramienta.",
         "cancel": "Cancelar",
         "table": {
             "search": "Buscar conexiones",
@@ -1228,7 +1224,8 @@
             "readOnly": "Solo lectura",
             "usingYours": "Se usa tu clave",
             "usingDeployment": "Disponible para ti",
-            "agentKey": "Sesión iniciada en la máquina de tus sesiones"
+            "agentKey": "En la máquina de tus sesiones",
+            "checkedAt": "Comprobado <time></time>"
         }
     },
     "signinDialog": {

@@ -7,9 +7,9 @@
  * in, labelled as last known - because a login that expired on the vendor's side
  * since then is something only the tool could have said.
  *
- * Both stores are this process's memory: a restart forgets them and the rows
- * read "unknown" until somebody checks or signs in again. That is the honest
- * answer, and it needs no table for a value that goes stale on its own.
+ * Both stores here are this process's memory. What a check found is also kept
+ * on the login's connection row (`machine-login-rows.ts`), so after a restart
+ * the screen draws the last answer at once while the next check runs.
  *
  * Pure apart from the two maps, so the reading and the cache are tested
  * without a container.
@@ -24,6 +24,8 @@ export interface SigninStatus {
     readonly state: SigninState;
     /** Recorded from the last sign-in or sign-out rather than asked of the tool. */
     readonly lastKnown: boolean;
+    /** When the tool was last asked (epoch ms), where it was. */
+    readonly checkedAt?: number | null;
 }
 
 export const UNKNOWN_STATUS: SigninStatus = { state: "unknown", lastKnown: false };
@@ -122,7 +124,7 @@ export function lastKnownStatus(userId: string, env: string): SigninStatus {
 export function cachedStatus(userId: string, env: string, now: number): SigninStatus | null {
     const hit = checked.get(keyOf(userId, env));
     if (!hit || now - hit.at >= STATUS_TTL_MS) return null;
-    return { state: hit.state, lastKnown: false };
+    return { state: hit.state, lastKnown: false, checkedAt: hit.at };
 }
 
 /** Keep a checked answer. An unknown is not kept, so a failed check is retried. */
