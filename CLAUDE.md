@@ -366,9 +366,14 @@ permission, so it could not be given to anybody from where every other app is
 given; the VPN listed `vpn.use` in Capabilities and never read it, so switching
 it off did nothing.
 
-- An app with an audience of its own (Polar, the VPN) keeps it as the default,
-  and the permission decides over it: an explicit deny shuts the app, an allow
-  set on the account opens it. Existing installs keep the access they had.
+- **An app has no audience card of its own.** No "who may use this" picker on
+  the app's screen or beside the roles: roles, group policies and Capabilities
+  are the only place access is decided, and an administrator always has it.
+  When an app that had one moves over, what each install had saved is carried
+  into roles, group policies and per-person overrides once, at startup
+  (`lib/polar/access-carry.ts` did it for Polar), so nobody gains or loses access
+  on the update. The VPN still has its own open-to-everyone switch and
+  per-person limits and is the one exception left.
 - A new permission is also listed in every table typed over `Permission` (API
   key scopes, MCP categories, the minors presets) and labelled in both locales.
 - `apps/web/test/access/app-route-guards.test.ts` fails for an app closed per
