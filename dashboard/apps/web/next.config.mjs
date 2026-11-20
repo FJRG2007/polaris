@@ -479,6 +479,11 @@ const nextConfig = {
         if (!dev && config.cache && typeof config.cache === "object") {
             config.cache.maxAge = WEBPACK_CACHE_MAX_AGE_MS;
         }
+        // The image build (docker/Dockerfile) starts from an empty .next and never
+        // keeps it, so a compile cache there is only written, never read. Holding
+        // and serializing it is what pushed the compile past the memory of CI's
+        // runner and the box that builds an update.
+        if (!dev && process.env.POLARIS_BUILD_COMPILE_CACHE === "off") config.cache = false;
         return config;
     }
 };

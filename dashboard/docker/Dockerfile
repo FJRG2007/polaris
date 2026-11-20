@@ -119,7 +119,10 @@ ARG POLARIS_BUILD_SKIP_LINT=""
 # by dashboard-publish.yml, whose tag waits on dashboard-ci's checks job, which
 # generates Next's route types (`next typegen`) and type-checks them with the rest.
 ARG POLARIS_BUILD_SKIP_TYPECHECK=""
-RUN NODE_OPTIONS="$NODE_BUILD_OPTIONS" npm run build
+# No compile cache: this stage starts from an empty .next and nothing keeps it,
+# and holding and serializing that cache took the compile from about 8 GB to
+# nearly 15 GB - past the 16 GB runner CI builds on (next.config.mjs).
+RUN NODE_OPTIONS="$NODE_BUILD_OPTIONS" POLARIS_BUILD_COMPILE_CACHE=off npm run build
 
 # Bundle the deploy terminal sidecar into one self-contained CJS file. It runs as
 # a separate process alongside the Next server, outside the standalone bundle, so
