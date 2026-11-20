@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { headscaleClient } from "@/lib/vpn/headscale-client";
-import { connectCommand, deviceKeysOf, keyState } from "@/lib/vpn/device-keys";
+import { connectCommand, deviceKeysOf, keyState, usableDeviceKeys } from "@/lib/vpn/device-keys";
 
 
 interface StoredKey {
@@ -117,5 +117,17 @@ describe("VPN device keys against a control server", () => {
         expect(connectCommand("https://vpn.example.test", "hskey-1")).toBe(
             "tailscale up --login-server=https://vpn.example.test --authkey=hskey-1"
         );
+    });
+
+    it("lists only keys that can still add a device", () => {
+        const row = (id: string, state: "unused" | "used" | "expired") => ({
+            id,
+            hint: "hskey-auth-t...",
+            state,
+            createdAt: null,
+            expiresAt: null
+        });
+        const listed = usableDeviceKeys([row("1", "expired"), row("2", "unused"), row("3", "used")]);
+        expect(listed.map((key) => key.id)).toEqual(["2"]);
     });
 });

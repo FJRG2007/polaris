@@ -144,7 +144,7 @@ export function VpnDeviceKeys() {
         if (result.error !== undefined) setError(result.error);
         else {
             setError(null);
-            setKeys(result.keys?.filter((key) => key.state === "unused") ?? null);
+            setKeys(result.keys);
         }
     }, [t]);
 

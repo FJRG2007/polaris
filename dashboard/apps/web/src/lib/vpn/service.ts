@@ -28,7 +28,7 @@ import { listDeployZones } from "@/lib/domain-zones";
 import { hostPortForApp } from "@/lib/deploy/host-port";
 import { dnsBlockerStatus } from "@/lib/dns-blocker/service";
 import { readNetworks, sharedCidrs, type PrivateNetwork } from "./networks";
-import { deviceKeysOf, type DeviceKey } from "./device-keys";
+import { deviceKeysOf, usableDeviceKeys, type DeviceKey } from "./device-keys";
 export type { DeviceKey } from "./device-keys";
 import type { RuntimePorts } from "@polaris/deploy";
 import { GATEWAY_PROJECT } from "@/lib/polaris-parts";
@@ -767,7 +767,7 @@ export async function createDeviceKey(
     };
 }
 
-/** The device keys `account` made, as the control server has them. Nothing
+/** The device keys `account` made that can still add a device. Nothing
  *  when the VPN is off or the account may not join it, so the account screen
  *  can leave the section out. */
 export async function listDeviceKeys(
@@ -780,7 +780,7 @@ export async function listDeviceKeys(
     });
     if (!api) return null;
     const user = await ensureUser(api, account);
-    return deviceKeysOf(await api.listPreAuthKeys(user.id), user.id, Date.now());
+    return usableDeviceKeys(deviceKeysOf(await api.listPreAuthKeys(user.id), user.id, Date.now()));
 }
 
 /** Stop one of `account`'s device keys from adding any more devices. A key of

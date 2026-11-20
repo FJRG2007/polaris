@@ -58,6 +58,15 @@ export function deviceKeysOf(
         .sort((left, right) => (right.createdAt ?? "").localeCompare(left.createdAt ?? ""));
 }
 
+/**
+ * The keys that can still add a device. A used or expired key does nothing on
+ * the control server and is left there, so the list would only grow; it is
+ * dropped here, before it reaches any screen.
+ */
+export function usableDeviceKeys(keys: readonly DeviceKey[]): DeviceKey[] {
+    return keys.filter((key) => key.state === "unused");
+}
+
 /** The command that connects a router or server with a key. The device runs
  *  the Tailscale client, which is what reads it. */
 export function connectCommand(server: string, key: string): string {
