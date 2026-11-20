@@ -37,7 +37,8 @@ import { MicSlot } from "./mic-slot";
 import { VoiceMicButton } from "./voice-mic-button";
 import { MediaEditor, isEditorMedia } from "./media-editor";
 import { planMediaSend, type EditedMedia } from "./media-edit";
-import { useKeyboardDictates } from "@/components/use-phone";
+import { useKeyboardDictates, usePhone } from "@/components/use-phone";
+import { AttachSheet } from "./attach-sheet";
 import { speechRecognizer, useDictation, usePrivateDictation } from "./use-dictation";
 import { VideoPreview } from "@/components/video-preview";
 import { ImageViewer } from "@/components/image-viewer";
@@ -79,6 +80,7 @@ import {
     EyeOff,
     MicOff,
     Paperclip,
+    Plus,
     SendHorizontal,
     Square,
     Timer,
@@ -435,6 +437,9 @@ export function Composer({
     // button belongs: `capture` on a laptop opens the same file dialog as every
     // other picker, so the button would be a second paperclip wearing a camera.
     const [handheld, setHandheld] = useState(false);
+    // On a phone the ways to add something sit behind one "+", in a sheet.
+    const phone = usePhone();
+    const [attaching, setAttaching] = useState(false);
     // A phone's keyboard has a microphone key of its own, so the box offers no
     // second one for dictating (`useKeyboardDictates`); the voice message stays.
     const keyboardDictates = useKeyboardDictates();
@@ -1611,12 +1616,24 @@ export function Composer({
                 ) : null}
 
                 <div className="flex items-center gap-0.5 px-2 pb-1.5">
+                    {!editing && phone && (mayAttach || onPoll) && (
+                        <button
+                            type="button"
+                            disabled={disabled}
+                            onClick={() => setAttaching(true)}
+                            aria-label={t("attachSheet.title")}
+                            title={t("attachSheet.title")}
+                            className="me-1 grid size-8 shrink-0 place-items-center rounded-full bg-muted text-foreground transition-colors active:bg-muted/70 disabled:opacity-50 [-webkit-tap-highlight-color:transparent]"
+                        >
+                            <Plus className="size-5" />
+                        </button>
+                    )}
                     {!editing && (
                         <>
                             {/* Gone rather than disabled where the instance
                                 allows no files at all: a permanently dead
                                 button is a promise the room cannot keep. */}
-                            {mayAttach && (
+                            {mayAttach && !phone && (
                                 <button
                                     type="button"
                                     disabled={disabled || files.length >= rules.maxAttachments}
@@ -1634,7 +1651,7 @@ export function Composer({
                                 said. Only where a file may be sent, since what
                                 it makes is one, and only in a browser that can
                                 share a screen - which is no phone. */}
-                            {mayAttach && clippable && !inCall && (
+                            {mayAttach && clippable && !inCall && !phone && (
                                 <button
                                     type="button"
                                     disabled={disabled || files.length >= rules.maxAttachments}
@@ -1651,7 +1668,7 @@ export function Composer({
                                 goes with what is in the box - so it opens a
                                 dialog and sends from there. Not drawn at all
                                 where a poll has nowhere to go. */}
-                            {onPoll && (
+                            {onPoll && !phone && (
                                 <button
                                     type="button"
                                     disabled={disabled}
@@ -1848,6 +1865,23 @@ export function Composer({
                     onRemove={(file) => setInEditor((current) => current.filter((one) => one !== file))}
                     onClose={() => setInEditor([])}
                     onSend={sendEdited}
+                />
+            )}
+
+            {phone && (mayAttach || onPoll) && (
+                <AttachSheet
+                    open={attaching}
+                    onOpenChange={setAttaching}
+                    onMedia={mayAttach ? pickMedia : undefined}
+                    onFiles={mayAttach ? () => setPicking(true) : undefined}
+                    onPoll={
+                        onPoll
+                            ? () => {
+                                  setPollError("");
+                                  setPolling(true);
+                              }
+                            : undefined
+                    }
                 />
             )}
 

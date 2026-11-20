@@ -631,6 +631,13 @@
         "appHint": "Lo ha escrito una app de Polaris, no una persona",
         "systemMessage": "aviso del sistema"
     },
+    "attachSheet": {
+        "title": "Añadir al mensaje",
+        "camera": "Cámara",
+        "photos": "Fotos",
+        "files": "Archivos",
+        "poll": "Sondeo"
+    },
     "composer": {
         "replyingTo": "Respondiendo a",
         "somebodyWhoHasLeft": "alguien que se fue",
