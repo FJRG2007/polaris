@@ -43,6 +43,7 @@ model User {
     translateGlossaries TranslateGlossary[]
     translateKeepList TranslateKeepList?
     polarToolGrants   PolarToolGrant[]
+    polarChatCalls    PolarChatCall[]
     polarCustomTools  PolarCustomTool[]
     polarPlugins      PolarPlugin[]
     polarProjectToolApprovals PolarProjectToolApproval[]
@@ -10909,6 +10910,7 @@ model ChatMessage {
     linkFlags   ChatMessageLinkFlag[]
     edits       ChatMessageEdit[]
     reports     ChatReport[]
+    polarCalls  PolarChatCall[]
     hiddenFor   ChatMessageHidden[]
 
     @@index([channelId, createdAt])
@@ -17288,6 +17290,30 @@ model PolarToolGrant {
     createdAt  DateTime @default(now())
 
     @@unique([ownerId, tool, target])
+}
+
+// A change Polar wants to make after an @polar mention in Chat, waiting on the
+// person who asked to approve it from the buttons under Polar's message
+// (`lib/chat/polar-calls.ts`). Nothing in a shared room changes anything in
+// somebody's name until they press Approve. `done` is the calls already
+// approved earlier in the same answer, so a chain of changes carries on where
+// it stopped. Removed once settled; one left waiting is dropped after a day.
+model PolarChatCall {
+    id        String      @id @default(uuid(7)) @db.Uuid
+    ownerId   String      @db.Uuid
+    owner     User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    // Polar's message carrying the buttons.
+    messageId String      @db.Uuid
+    message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+    // The message that asked.
+    mentionId String      @db.Uuid
+    tool      String
+    input     Json
+    done      Json        @default("[]")
+    createdAt DateTime    @default(now())
+
+    @@index([messageId])
+    @@index([createdAt])
 }
 
 // A custom tool one person wrote: a script the model may call, with the input

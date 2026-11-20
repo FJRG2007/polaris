@@ -21,6 +21,11 @@ let contextWhere: Record<string, unknown> | null = null;
 /** The message the question replies to, when the test gives it one. */
 let repliedRow: { authorId: string | null; authorLabel: string | null; body: string } | null = null;
 let repliedWhere: Record<string, unknown> | null = null;
+/** The asker's tools, when the test offers some, and the change the turn stops on. */
+let kit: Record<string, unknown> | null = null;
+let pendingCall: { tool: string; title: string; input: unknown } | null = null;
+const held: Record<string, unknown>[] = [];
+const sentTools: unknown[] = [];
 
 const history: Array<Record<string, unknown>> = [
     // Polar's own refusal with its "Try again" button: never read back.
@@ -49,6 +54,13 @@ vi.mock("@polaris/db", () => {
     return {
         prisma: {
             $transaction: async (run: (client: typeof tx) => unknown) => run(tx),
+            polarChatCall: {
+                create: async ({ data }: any) => {
+                    held.push(data);
+                    return data;
+                },
+                deleteMany: async () => ({ count: 0 })
+            },
             chatMessage: {
                 findUnique: async () => ({ createdAt: new Date(), replyToId: repliedRow ? "r1" : null }),
                 findFirst: async ({ where }: { where: Record<string, unknown> }) => {
@@ -96,9 +108,15 @@ vi.mock("@/lib/polar/usage", () => ({
         recorded.push(input);
     }
 }));
+vi.mock("@/lib/chat/polar-calls", async (original) => ({
+    ...(await original<typeof import("@/lib/chat/polar-calls")>()),
+    mentionToolkit: async () => kit
+}));
 vi.mock("ai", () => ({
-    generateText: async (input: { system: string; prompt: string }) => {
+    stepCountIs: () => () => false,
+    generateText: async (input: { system: string; prompt: string; tools?: unknown }) => {
         asked.push(input);
+        sentTools.push(input.tools);
         if (answer instanceof Error) throw answer;
         return { text: answer, totalUsage: { inputTokens: 10, outputTokens: 5 } };
     }
@@ -134,6 +152,10 @@ beforeEach(() => {
     resolved = model("instance");
     limit = null;
     answer = "Use `git rebase`.";
+    kit = null;
+    pendingCall = null;
+    held.length = 0;
+    sentTools.length = 0;
 });
 
 describe("a message that names Polar", () => {
@@ -267,5 +289,53 @@ describe("Polar's answer in Chat", () => {
         answer = 'Done.\n<polar_remember>{"text":"x"}</polar_remember>';
         await answerPolarMention(mention);
         expect(posted[0]?.body).toBe("Done.");
+    });
+});
+
+describe("Polar's tools in a mention", () => {
+    function offer() {
+        kit = { tools: { tasks_list: {} }, first: ["find_tools"], activeFor: () => [], pending: () => pendingCall };
+    }
+
+    it("answers with the asker's tools and says a change waits for them", async () => {
+        offer();
+        await answerPolarMention(mention);
+        expect(sentTools[0]).toEqual({ tasks_list: {} });
+        expect(asked[0]?.system).toContain("runs only when Ana approves it");
+        expect(asked[0]?.system).not.toContain("You have no tools here");
+    });
+
+    it("offers a change for the asker's approval instead of making it", async () => {
+        offer();
+        pendingCall = { tool: "tasks_create", title: "Create task", input: { list: "Inbox", name: "Fix `staging`" } };
+        answer = "I'll make that task.";
+        await answerPolarMention({ ...mention, body: "@polar make a task of this" });
+        expect(posted).toHaveLength(1);
+        expect(posted[0]?.body).toBe("I'll make that task.\n\npolar.wantsTo\n- list: Inbox\n- name: Fix 'staging'");
+        const buttons = posted[0]?.components as { action: string; value: string; for: string }[];
+        expect(buttons.map((button) => [button.action, button.for])).toEqual([
+            ["polar.approve", "u1"],
+            ["polar.cancel", "u1"]
+        ]);
+        expect(buttons[0]?.value).toBe(buttons[1]?.value);
+        expect(held).toEqual([
+            expect.objectContaining({
+                id: buttons[0]?.value,
+                ownerId: "u1",
+                messageId: "m1",
+                mentionId: "q1",
+                tool: "tasks_create",
+                input: { list: "Inbox", name: "Fix `staging`" },
+                done: []
+            })
+        ]);
+    });
+
+    it("reads back the changes approved so far", async () => {
+        offer();
+        await answerPolarMention(mention, null, [
+            { tool: "tasks_create", title: "Create task", ok: true, text: "Created T-12" }
+        ]);
+        expect(asked[0]?.prompt).toContain("<done>\nCreate task (tasks_create): done. Created T-12\n</done>");
     });
 });

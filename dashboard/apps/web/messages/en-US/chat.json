@@ -2382,7 +2382,11 @@
         "limitReached": "You've reached your limit on this Polaris's shared key. [Add a key of your own](/polar/settings/providers) to keep asking.",
         "failed": "I couldn't answer that just now. Try again in a moment.",
         "setUpProviders": "Set up AI providers",
-        "tryAgain": "Try again"
+        "tryAgain": "Try again",
+        "wantsTo": "**{action}** - waiting for your approval:",
+        "approve": "Approve",
+        "cancel": "Cancel",
+        "callCancelled": "Cancelled. Nothing was changed."
     },
     "gameServerCard": {
         "gameServer": "Game server",

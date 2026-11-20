@@ -2382,7 +2382,11 @@
         "limitReached": "Has llegado a tu límite con la clave compartida de este Polaris. [Añade una clave tuya](/polar/settings/providers) para seguir preguntando.",
         "failed": "No he podido responder ahora mismo. Inténtalo de nuevo en un momento.",
         "setUpProviders": "Configurar proveedores",
-        "tryAgain": "Reintentar"
+        "tryAgain": "Reintentar",
+        "wantsTo": "**{action}** - pendiente de tu aprobación:",
+        "approve": "Aprobar",
+        "cancel": "Cancelar",
+        "callCancelled": "Cancelado. No se ha cambiado nada."
     },
     "gameServerCard": {
         "gameServer": "Servidor",

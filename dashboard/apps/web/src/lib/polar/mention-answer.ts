@@ -9,12 +9,14 @@
  * the sentence that says so, with the link that fixes it, so the caller posts
  * that instead of staying silent.
  *
- * No tools: the place is shared, and a tool would act in the asker's name in
- * front of everybody there. Server-only.
+ * Tools only when the caller hands a toolkit (`lib/chat/polar-calls.ts`):
+ * reads run as the asker, and a change stops the turn so the caller can offer
+ * it for approval instead of running it in front of everybody. Server-only.
  */
 
-import { generateText } from "ai";
+import { generateText, stepCountIs } from "ai";
 import type { chatWordsFor } from "@/lib/chat/text";
+import type { MentionToolkit, PendingCall } from "@/lib/chat/polar-calls";
 
 type Words = Awaited<ReturnType<typeof chatWordsFor>>;
 
@@ -35,6 +37,10 @@ export interface MentionTurn {
     /** The question and the names in the prompt, to tell an answer from the
      *  prompt handed back (`echoesPrompt`); the prompt alone otherwise. */
     readonly echo?: { readonly question: string; readonly names: readonly string[] };
+    /** The asker's tools, when the place offers them. */
+    readonly toolkit?: MentionToolkit | null;
+    /** Most steps with tools; one without. */
+    readonly steps?: number;
 }
 
 /** Models asked at most for one mention when each answers with an echo. */
@@ -55,6 +61,8 @@ export interface MentionAnswer {
     readonly text: string;
     /** Null when Polar answered. */
     readonly problem: MentionProblem | null;
+    /** The change the answer stopped on, waiting for the asker's approval. */
+    readonly pending?: PendingCall | null;
 }
 
 /** Polar's answer to one mention, or the sentence that says why there is none. Never throws for a model failure. */
@@ -104,6 +112,8 @@ export async function answerMentionWithReason(turn: MentionTurn): Promise<Mentio
             }
             let text: string;
             let spent: Parameters<typeof usage.answerUsage>[0];
+            const kit = turn.toolkit ?? null;
+            const stepMax = turn.steps ?? 1;
             try {
                 const answer = await generateText({
                     // The router retries and walks keys and fallbacks itself.
@@ -111,7 +121,22 @@ export async function answerMentionWithReason(turn: MentionTurn): Promise<Mentio
                     model: resolved.model,
                     maxOutputTokens: ANSWER_TOKENS,
                     system: turn.system,
-                    prompt: turn.prompt
+                    prompt: turn.prompt,
+                    ...(kit
+                        ? {
+                              tools: kit.tools,
+                              activeTools: kit.first,
+                              // What discovery found is sent from the next
+                              // step on, and the last step has to answer.
+                              prepareStep: async ({ stepNumber, steps }: { stepNumber: number; steps: readonly unknown[] }) => {
+                                  const { nextStep } = await import("@/lib/polar/tool-relevance");
+                                  return nextStep(stepNumber, stepMax, steps as never, kit.activeFor);
+                              },
+                              // A change asked for ends the turn: it waits for
+                              // the asker, not for the model.
+                              stopWhen: [stepCountIs(stepMax), () => kit.pending() !== null]
+                          }
+                        : {})
                 });
                 text = answer.text;
                 spent = answer.totalUsage;
@@ -139,6 +164,11 @@ export async function answerMentionWithReason(turn: MentionTurn): Promise<Mentio
             }
             const said = withoutPseudoToolCalls(text).trim();
             const who = `${answered.option.provider}/${answered.option.model}`;
+            const pending = kit?.pending() ?? null;
+            if (pending) {
+                console.info(`polar: ${turn.where} answered by ${who} (${payer}), asking to run ${pending.tool}`);
+                return { text: said && !echoesPrompt(said, echo) ? said : "", problem: null, pending };
+            }
             if (said && !echoesPrompt(said, echo)) {
                 console.info(`polar: ${turn.where} answered by ${who} (${payer})`);
                 return { text: said, problem: null };

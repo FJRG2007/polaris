@@ -78,6 +78,9 @@ export type Action = (pressed: Pressed) => Promise<void>;
 
 const ACTIONS: Record<string, Action> = {
     "polar.retry": retryPolar,
+    // A change Polar offered after a mention (`polar-calls.ts`).
+    "polar.approve": async (pressed) => (await import("./polar-calls")).approveCall(pressed),
+    "polar.cancel": async (pressed) => (await import("./polar-calls")).cancelCall(pressed),
     "tasks.create": createTask
 };
 
