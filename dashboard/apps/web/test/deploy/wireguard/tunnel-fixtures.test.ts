@@ -51,7 +51,9 @@ function rendered(): Record<string, string> {
         "relay-web-relay.conf": configs.relay.wireguard,
         "relay-web-home.conf": configs.home.wireguard,
         "relay-side-relay.conf": configs.relay.side ?? "",
-        "relay-side-home.conf": configs.home.side ?? ""
+        "relay-side-home.conf": configs.home.side ?? "",
+        "relay-call-relay.conf": configs.relay.call ?? "",
+        "relay-call-home.conf": configs.home.call ?? ""
     };
 }
 

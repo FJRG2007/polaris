@@ -13,6 +13,8 @@ use polaris_tunnel::status::render_metrics;
 /// The relay's side link rides its web link over IPv4: IP 20, UDP 8, WireGuard 32.
 const NESTED_OVERHEAD_V4: u16 = 20 + 8 + 32;
 const SIDE_WIRE_PORT: u16 = 52000;
+/// The call link's wire port, the next one up (`CALL_WIRE_PORT` in relay.ts).
+const CALL_WIRE_PORT: u16 = 52001;
 
 fn dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -38,6 +40,8 @@ fn every_rendered_config_parses() {
         [
             "deploy-nat.conf",
             "deploy-public.conf",
+            "relay-call-home.conf",
+            "relay-call-relay.conf",
             "relay-side-home.conf",
             "relay-side-relay.conf",
             "relay-web-home.conf",
@@ -72,8 +76,11 @@ fn relay_links_nest_without_fragmenting() {
     let web_home = load("relay-web-home.conf");
     let side_relay = load("relay-side-relay.conf");
     let side_home = load("relay-side-home.conf");
+    let call_relay = load("relay-call-relay.conf");
+    let call_home = load("relay-call-home.conf");
 
-    // The web link carries only the web ports and one constant UDP forward...
+    // The web link carries only the web ports and two constant UDP forwards, one
+    // per inner link...
     let web_ports: Vec<u16> = web_relay
         .tcp_clients
         .iter()
@@ -81,10 +88,18 @@ fn relay_links_nest_without_fragmenting() {
         .collect();
     assert_eq!(web_ports, [80, 443]);
     assert!(web_relay.udp_proxies.is_empty());
-    assert_eq!(web_relay.udp_servers.len(), 1);
-    assert_eq!(web_relay.udp_servers[0].listen_port, SIDE_WIRE_PORT);
-    assert_eq!(web_home.udp_proxies.len(), 1);
-    assert_eq!(web_home.udp_proxies[0].bind.port(), SIDE_WIRE_PORT);
+    let wires: Vec<u16> = web_relay
+        .udp_servers
+        .iter()
+        .map(|u| u.listen_port)
+        .collect();
+    assert_eq!(wires, [SIDE_WIRE_PORT, CALL_WIRE_PORT]);
+    let home_wires: Vec<u16> = web_home
+        .udp_proxies
+        .iter()
+        .map(|u| u.bind.port())
+        .collect();
+    assert_eq!(home_wires, [SIDE_WIRE_PORT, CALL_WIRE_PORT]);
     // ... to the relay end's tunnel address, inside the web link.
     assert_eq!(
         web_home.udp_proxies[0].target.ip(),
@@ -94,6 +109,12 @@ fn relay_links_nest_without_fragmenting() {
     let endpoint = side_home.peer.endpoint.as_deref().unwrap();
     assert!(
         endpoint.ends_with(&format!(":{SIDE_WIRE_PORT}")),
+        "{endpoint}"
+    );
+    assert_eq!(call_relay.interface.listen_port, Some(CALL_WIRE_PORT));
+    let endpoint = call_home.peer.endpoint.as_deref().unwrap();
+    assert!(
+        endpoint.ends_with(&format!(":{CALL_WIRE_PORT}")),
         "{endpoint}"
     );
 
@@ -106,7 +127,7 @@ fn relay_links_nest_without_fragmenting() {
             .iter()
             .all(|a| matches!(a.addr, IpAddr::V4(_))));
     }
-    for c in [&side_relay, &side_home] {
+    for c in [&side_relay, &side_home, &call_relay, &call_home] {
         assert_eq!(c.interface.mtu, 1360);
         assert_eq!(
             c.interface.mtu + NESTED_OVERHEAD_V4,
@@ -114,7 +135,22 @@ fn relay_links_nest_without_fragmenting() {
         );
     }
 
-    // Every side port natively, TCP as TCP and UDP as UDP.
+    // The call ports on their own link, so a game added or removed never
+    // recreates what a call rides.
+    let call_tcp: Vec<u16> = call_relay
+        .tcp_clients
+        .iter()
+        .map(|t| t.bind.port())
+        .collect();
+    let call_udp: Vec<u16> = call_relay
+        .udp_proxies
+        .iter()
+        .map(|u| u.bind.port())
+        .collect();
+    assert_eq!(call_tcp, [7881]);
+    assert_eq!(call_udp, [7882]);
+
+    // Every other side port natively, TCP as TCP and UDP as UDP.
     let mut tcp: Vec<u16> = side_relay
         .tcp_clients
         .iter()
@@ -127,15 +163,15 @@ fn relay_links_nest_without_fragmenting() {
         .collect();
     tcp.sort_unstable();
     udp.sort_unstable();
-    assert_eq!(tcp, [7881, 25565]);
-    assert_eq!(udp, [7882, 19132]);
+    assert_eq!(tcp, [25565]);
+    assert_eq!(udp, [19132]);
     let mut home_udp: Vec<u16> = side_home
         .udp_servers
         .iter()
         .map(|u| u.listen_port)
         .collect();
     home_udp.sort_unstable();
-    assert_eq!(home_udp, [7882, 19132]);
+    assert_eq!(home_udp, [19132]);
     assert!(side_home
         .udp_servers
         .iter()

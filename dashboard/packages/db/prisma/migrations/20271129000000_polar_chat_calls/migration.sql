@@ -21,20 +21,8 @@ CREATE INDEX IF NOT EXISTS "PolarChatCall_messageId_idx" ON "PolarChatCall"("mes
 
 CREATE INDEX IF NOT EXISTS "PolarChatCall_createdAt_idx" ON "PolarChatCall"("createdAt");
 
-DO $$
-BEGIN
-    ALTER TABLE "PolarChatCall"
-        ADD CONSTRAINT "PolarChatCall_ownerId_fkey"
-        FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION
-    WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "PolarChatCall" DROP CONSTRAINT IF EXISTS "PolarChatCall_ownerId_fkey";
+ALTER TABLE "PolarChatCall" ADD CONSTRAINT "PolarChatCall_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
-DO $$
-BEGIN
-    ALTER TABLE "PolarChatCall"
-        ADD CONSTRAINT "PolarChatCall_messageId_fkey"
-        FOREIGN KEY ("messageId") REFERENCES "ChatMessage"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION
-    WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "PolarChatCall" DROP CONSTRAINT IF EXISTS "PolarChatCall_messageId_fkey";
+ALTER TABLE "PolarChatCall" ADD CONSTRAINT "PolarChatCall_messageId_fkey" FOREIGN KEY ("messageId") REFERENCES "ChatMessage"("id") ON DELETE CASCADE ON UPDATE CASCADE;
