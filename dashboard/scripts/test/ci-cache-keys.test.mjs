@@ -1,5 +1,5 @@
 import { test } from "node:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -7,9 +7,10 @@ import { dirname, join } from "node:path";
 /**
  * Dashboard CI restores the built packages and the Next cache that
  * dashboard-cache.yml saves on main, and a cache is only found by its exact key.
- * The keys cannot be shared between files, so each is written out where it is
- * used; one edited and the others not is a cache nobody ever hits, and CI quietly goes
- * back to building everything. These fail first.
+ * The packages key lives once, in .github/actions/workspace-packages; the Next
+ * key is written out where it is used, and one edited without the other is a
+ * cache nobody ever hits, so CI quietly goes back to building everything. These
+ * fail first.
  */
 
 const workflows = join(
@@ -33,18 +34,22 @@ function keys(source, prefix) {
 const ci = read("dashboard-ci.yml");
 const warm = read("dashboard-cache.yml");
 
-test("every job reads the built packages under the key main saves them with", () => {
-    const used = keys(ci, "packages-");
-    const saved = keys(warm, "packages-");
-    assert.equal(used.length, 3, "the checks job, the web test shards and the app build");
-    assert.equal(saved.length, 2, "restored, then saved only after a build that passed");
-    for (const key of [...used, saved[1]]) assert.equal(key, saved[0]);
+test("every workflow takes the built packages from the one shared action", () => {
+    const uses = /uses:\s*\.\/\.github\/actions\/workspace-packages/g;
+    assert.equal(ci.match(uses)?.length, 3, "the checks job, the web test shards and the app build");
+    assert.equal(warm.match(uses)?.length, 1, "the warming build");
+    for (const name of readdirSync(workflows).filter((file) => file.endsWith(".yml")))
+        assert.deepEqual(keys(read(name), "packages-"), [], `${name} writes its own packages key`);
 });
 
-test("the packages key leaves out everything the build writes", () => {
-    const [key] = keys(warm, "packages-");
+test("the packages key leaves out everything the build writes, and is saved as restored", () => {
+    const action = readFileSync(join(workflows, "..", "actions", "workspace-packages", "action.yml"), "utf8");
+    const [key] = keys(action, "packages-");
+    assert.ok(key, "the action defines the packages key");
     for (const output of ["dist", "node_modules", "db/generated"])
         assert.match(key, new RegExp(`'!dashboard/packages/[^']*${output}/\\*\\*'`), output);
+    assert.match(action, /key:\s*\$\{\{\s*steps\.restore\.outputs\.cache-primary-key\s*\}\}/);
+    assert.match(action, /if:\s*steps\.build\.outcome == 'success'/, "saved only after a build that passed");
 });
 
 test("pull requests restore the Next cache under the prefix main saves it with", () => {
