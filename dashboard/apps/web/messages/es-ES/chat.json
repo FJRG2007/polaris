@@ -2388,6 +2388,12 @@
         "addKey": "Añadir clave",
         "limitReached": "Has llegado a tu límite con la clave compartida de este Polaris. [Añade una clave tuya](/polar/settings/providers) para seguir preguntando.",
         "failed": "No he podido responder ahora mismo. Inténtalo de nuevo en un momento.",
+        "providersRefused": "Ninguno de los proveedores de IA que puedes usar ha podido responder ({reasons}). Añade saldo u otra clave y vuelve a preguntarme.",
+        "refusedBy": {
+            "credit": "sin saldo en {providers}",
+            "key": "{providers} ha rechazado la clave",
+            "model": "{providers} ya no ofrece el modelo"
+        },
         "setUpProviders": "Configurar proveedores",
         "tryAgain": "Reintentar",
         "wantsTo": "**{action}** - pendiente de tu aprobación:",

@@ -917,7 +917,8 @@ export async function sameModelElsewhere(
  * for, on each of its provider's keys, then - in this order - its own
  * provider's next free candidate (and, for a paid first pick, the next paid
  * one), the person's fallback list, and the first candidate of every other
- * provider they may spend on - one key read each, the plan bounded by
+ * provider they may spend on, with that provider's first free candidate
+ * behind a paid one - one key read each, the plan bounded by
  * `STEPS_MOST` with a place kept for every key (`breadthFirst`). Another provider's key from this Polaris
  * is offered only while the administrator's ceilings leave room, as the turn
  * itself would be. A provider that refused for want of credit lately is
@@ -965,6 +966,15 @@ async function resolveAutomatic(
             const keys = await keysOf(entry.provider);
             if (keys.length === 0) continue;
             entries.push(entryOf(userId, entry, keys, options));
+            // A key with no credit still answers with its provider's free
+            // models - the router keeps only free steps on a key refused for
+            // credit - so a paid pick brings the provider's first free one
+            // behind it. Without it an account with no credit that answered
+            // yesterday on a free model fails the whole turn on a paid one.
+            const free = isFreeModel(entry)
+                ? undefined
+                : later.find((other) => other.provider === entry.provider && isFreeModel(other));
+            if (free) entries.push(entryOf(userId, free, keys, options));
         }
         await endOnZen(entries, userId, access, signals, options);
         const steps = await planSteps(entries, async () => !(await polarLimitReached(userId)));

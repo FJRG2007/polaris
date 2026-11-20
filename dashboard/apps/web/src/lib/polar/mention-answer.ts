@@ -54,8 +54,59 @@ export function noProviderText(words: Words, spendsShared: boolean): string {
     ].join(" ");
 }
 
-/** Why there is no answer, for a caller that offers the way out under it. */
-export type MentionProblem = "notAvailable" | "tooFast" | "noProvider" | "limitReached" | "failed";
+/** Why there is no answer, for a caller that offers the way out under it.
+ *  `providersRefused`: every model the turn could use refused for a reason
+ *  asking again does not change - no credit, a key refused, a model gone. */
+export type MentionProblem =
+    | "notAvailable"
+    | "tooFast"
+    | "noProvider"
+    | "limitReached"
+    | "providersRefused"
+    | "failed";
+
+/** The refusals that are the person's set-up rather than a bad moment. */
+const SETTLED_KINDS = ["credit", "paid", "key", "model"] as const;
+type SettledKind = (typeof SETTLED_KINDS)[number];
+const isSettled = (kind: string): kind is SettledKind => (SETTLED_KINDS as readonly string[]).includes(kind);
+
+/** The providers of a failed turn by why they refused, when every refusal was
+ *  settled; null when any was a rate limit, an outage or unexplained, since
+ *  asking again may then work. `last` is the failure the call ended on, for a
+ *  turn whose plan was one step. Pure. */
+export function settledRefusals(
+    refusals: ReadonlyArray<{ step: { option: { providerName: string } }; kind: string }>,
+    last: string
+): Map<SettledKind, string[]> | null {
+    if (!isSettled(last)) return null;
+    if (refusals.some((entry) => !isSettled(entry.kind))) return null;
+    const byKind = new Map<SettledKind, string[]>();
+    for (const { step, kind } of refusals) {
+        const reason = kind === "paid" ? "credit" : (kind as SettledKind);
+        const names = byKind.get(reason) ?? [];
+        if (!names.includes(step.option.providerName)) names.push(step.option.providerName);
+        byKind.set(reason, names);
+    }
+    return byKind.size > 0 ? byKind : null;
+}
+
+/** Each settled reason with its words, in the order they are listed. */
+const REASON_WORDS = [
+    ["credit", "polar.refusedBy.credit"],
+    ["key", "polar.refusedBy.key"],
+    ["model", "polar.refusedBy.model"]
+] as const;
+
+/** What Polar says when every provider refused for good: who, why, and the way to fix it. */
+export function providersRefusedText(words: Words, refused: Map<SettledKind, string[]>): string {
+    const reasons = REASON_WORDS.filter(([kind]) => refused.has(kind)).map(([kind, key]) =>
+        words(key, { providers: refused.get(kind)!.join(", ") })
+    );
+    return [
+        words("polar.providersRefused", { reasons: reasons.join("; ") }),
+        `[${words("polar.setUpProviders")}](/polar/settings/providers)`
+    ].join(" ");
+}
 
 export interface MentionAnswer {
     readonly text: string;
@@ -142,8 +193,19 @@ export async function answerMentionWithReason(turn: MentionTurn): Promise<Mentio
                 spent = answer.totalUsage;
             } catch (error) {
                 const { classifyProviderFailure, failureLogLine } = await import("@/lib/polar/provider-failure");
-                console.warn(failureLogLine(turn.where, resolved.option.providerName, classifyProviderFailure(error), error));
-                return fail("failed", words("polar.failed"));
+                const failure = classifyProviderFailure(error);
+                const refusals = resolved.routed?.refusals() ?? [];
+                // Named for the step that refused last, not the one chosen: a
+                // walk that ended on Cerebras's refusal must not say Mistral.
+                const last = refusals.at(-1)?.step.option.providerName ?? resolved.option.providerName;
+                console.warn(failureLogLine(turn.where, last, failure, error));
+                const refused = settledRefusals(
+                    refusals.length > 0 ? refusals : [{ step: resolved, kind: failure.kind }],
+                    failure.kind
+                );
+                return refused
+                    ? fail("providersRefused", providersRefusedText(words, refused))
+                    : fail("failed", words("polar.failed"));
             }
 
             const answered = answeredBy(resolved);

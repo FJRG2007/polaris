@@ -2388,6 +2388,12 @@
         "addKey": "Add a key",
         "limitReached": "You've reached your limit on this Polaris's shared key. [Add a key of your own](/polar/settings/providers) to keep asking.",
         "failed": "I couldn't answer that just now. Try again in a moment.",
+        "providersRefused": "None of the AI providers you can use could answer ({reasons}). Add credit or another key, then ask me again.",
+        "refusedBy": {
+            "credit": "no credit left on {providers}",
+            "key": "{providers} refused the key",
+            "model": "{providers} no longer offers the model"
+        },
         "setUpProviders": "Set up AI providers",
         "tryAgain": "Try again",
         "wantsTo": "**{action}** - waiting for your approval:",

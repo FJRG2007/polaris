@@ -122,6 +122,9 @@ describe("Automatic's stand-ins across providers", () => {
             "gemma-free",
             "qwen-32b",
             "openai/gpt-mini",
+            // A paid pick brings its provider's first free model behind it:
+            // a key with no credit still answers on that one.
+            "meta/llama:free",
             "deepseek-chat"
         ]);
     });

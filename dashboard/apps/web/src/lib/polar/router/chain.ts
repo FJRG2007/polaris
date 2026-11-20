@@ -415,9 +415,25 @@ function adjust(step: RouteStep, params: CallParams, origin: string, ownReasonin
     if (step.provider !== origin) {
         // A provider's own tool (its web search) runs only there: another
         // provider is sent every other tool, unchanged, and answers without it.
-        next = { ...next, maxOutputTokens: step.outputTokens, ...withoutProviderTools(params) };
+        next = {
+            ...next,
+            maxOutputTokens: stepOutputTokens(params.maxOutputTokens, step.outputTokens),
+            ...withoutProviderTools(params)
+        };
     }
     return next;
+}
+
+/**
+ * The answer length another provider's step is asked for: the step's own
+ * ceiling, never above the caller's. A caller's cap is the most it wants back
+ * (a chat mention asks for a short reply) - replacing it with the step's
+ * larger default asks an account low on credit to reserve far more than the
+ * turn needs, and OpenRouter refuses that with a 402. Pure.
+ */
+export function stepOutputTokens(asked: number | undefined, step: number | undefined): number | undefined {
+    if (asked === undefined) return step;
+    return step === undefined ? asked : Math.min(asked, step);
 }
 
 /** What each refusal rules out for the rest of the call. */

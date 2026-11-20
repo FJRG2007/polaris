@@ -159,7 +159,9 @@ type Words = Awaited<ReturnType<typeof chatWordsFor>>;
 
 /** The sentence as Chat shows it: the provider link moves to its button. */
 function shownText(text: string, problem: MentionProblem | null): string {
-    return problem === "noProvider" ? text.replace(/\s*\[[^\]]+\]\(\/polar\/settings\/providers\)\s*$/, "") : text;
+    return problem === "noProvider" || problem === "providersRefused"
+        ? text.replace(/\s*\[[^\]]+\]\(\/polar\/settings\/providers\)\s*$/, "")
+        : text;
 }
 
 /** What Polar offers under a reply that is not an answer: the way to fix it. */
@@ -170,6 +172,7 @@ export function problemComponents(
 ): MessageComponentInput[] {
     switch (problem) {
         case "noProvider":
+        case "providersRefused":
         case "limitReached":
             return [{ type: "link", label: words("polar.setUpProviders"), href: "/polar/settings/providers" }];
         case "failed":
