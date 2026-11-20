@@ -17,6 +17,21 @@ export const LOCALES = { en: "en-US", es: "es-ES" };
  *  capture freezes the page's clock here, and the fixtures count from it. */
 export const MOMENT = Date.UTC(2026, 2, 18, 10, 24, 0);
 
+/**
+ * The Google Play listing's phone screenshots (`capture.mjs --play`): the phone
+ * app is the dashboard in a WebView, so its screens are these scenes in a phone
+ * frame. Play wants 9:16 and at least 1080x1920 to promote a listing, which is
+ * this frame at the scale below. In this order on the listing, eight at most.
+ */
+export const PLAY = {
+    viewport: { width: 405, height: 720 },
+    scale: 1080 / 405,
+    theme: "dark",
+    scenes: ["chat", "call-group", "tasks", "drive", "mail", "vault", "polar", "places"],
+    /** Where fastlane (`supply`) looks for them, per Play language. */
+    dir: (locale) => `mobile/android/fastlane/metadata/android/${locale}/images/phoneScreenshots`
+};
+
 /** Where the pictures live, from the repository root. */
 export const MEDIA_DIR = "docs/assets/media";
 

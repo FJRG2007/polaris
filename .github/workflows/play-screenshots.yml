@@ -1,0 +1,60 @@
+name: Play screenshots
+
+# Take the Google Play listing's phone screenshots from the same scenes the
+# README pictures come from (capture.mjs --play): 1080x1920, English and
+# Spanish. By hand only, like the README pictures, and kept as an artifact
+# rather than pushed: somebody looks at them before they reach the listing.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: play-screenshots
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: dashboard
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_AUDIT: "false"
+  PUPPETEER_SKIP_DOWNLOAD: "true"
+  ONNXRUNTIME_NODE_INSTALL: "skip"
+  NPM_CONFIG_FOREGROUND_SCRIPTS: "true"
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - run: npm ci --prefer-offline
+      - run: npm run db:generate
+      - run: npm run build:packages
+
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Bundle the scenes
+        run: node scripts/readme-media/build.mjs
+
+      - name: Take the screenshots
+        run: node scripts/readme-media/capture.mjs --play
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: play-screenshots
+          path: mobile/android/fastlane/metadata/android/*/images/phoneScreenshots/*.png
+          if-no-files-found: error

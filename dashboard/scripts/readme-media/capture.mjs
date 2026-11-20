@@ -16,6 +16,12 @@
  * a screen that was missing its data is a picture of a bug.
  *
  *   node scripts/readme-media/capture.mjs [--only chat,tasks] [--quick] [--check] [--jobs 4]
+ *   node scripts/readme-media/capture.mjs --play
+ *
+ * `--play` takes the Google Play listing's phone screenshots instead (`PLAY` in
+ * `variants.mjs`): a few scenes, one theme, each language, 1080x1920 PNGs with
+ * no transparency, written where fastlane uploads them from. An animated scene
+ * is pictured as it opens.
  *
  * `--check` renders every variant, walking each animated one through its frames,
  * and saves nothing - the test a developer runs before trusting the pictures, and
@@ -33,7 +39,7 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { dirname, extname, join, normalize, resolve, sep } from "node:path";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { LOCALES, MEDIA_DIR, MOMENT, THEMES, VIEWPORTS, mediaName } from "./variants.mjs";
+import { LOCALES, MEDIA_DIR, MOMENT, PLAY, THEMES, VIEWPORTS, mediaName } from "./variants.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..", "..");
@@ -78,6 +84,9 @@ const onlyAt = args.indexOf("--only");
 const only = onlyAt >= 0 ? new Set(args[onlyAt + 1].split(",")) : null;
 /** One variant (dark, English, desktop) instead of all eight: for working on a scene. */
 const quick = args.includes("--quick");
+/** The Google Play screenshots rather than the README's pictures. */
+const play = args.includes("--play");
+if (play) VIEWPORTS.play = PLAY.viewport;
 const jobsAt = args.indexOf("--jobs");
 /** How many quarter seconds of the scene's clock a tour step may take. */
 const STEP_TICKS = 120;
@@ -254,17 +263,27 @@ async function run() {
     let saved = 0;
     try {
         const lister = await browser.newPage();
-        const ids = (await scenes(lister, base)).filter((scene) => !only || only.has(scene.id));
+        const wanted = play ? new Set(PLAY.scenes) : only;
+        const ids = (await scenes(lister, base)).filter((scene) => !wanted || wanted.has(scene.id));
+        if (play) ids.sort((a, b) => PLAY.scenes.indexOf(a.id) - PLAY.scenes.indexOf(b.id));
+        const missingScenes = play ? PLAY.scenes.filter((id) => !ids.some((s) => s.id === id)) : [];
+        if (missingScenes.length > 0) throw new Error(`no such scenes: ${missingScenes.join(", ")}`);
         await lister.close();
         if (ids.length === 0) throw new Error("no scenes to capture");
-        if (!check) mkdirSync(output, { recursive: true });
+        if (!check && !play) mkdirSync(output, { recursive: true });
 
         const variants = [];
-        for (const scene of ids)
-            for (const [short, locale] of Object.entries(quick ? { en: LOCALES.en } : LOCALES))
-                for (const theme of quick ? ["dark"] : THEMES)
-                    for (const viewport of quick ? ["desktop"] : Object.keys(VIEWPORTS))
-                        variants.push({ scene, short, locale, theme, viewport });
+        if (play) {
+            for (const scene of ids)
+                for (const [short, locale] of Object.entries(LOCALES))
+                    variants.push({ scene, short, locale, theme: PLAY.theme, viewport: "play" });
+        } else {
+            for (const scene of ids)
+                for (const [short, locale] of Object.entries(quick ? { en: LOCALES.en } : LOCALES))
+                    for (const theme of quick ? ["dark"] : THEMES)
+                        for (const viewport of quick ? ["desktop"] : ["desktop", "mobile"])
+                            variants.push({ scene, short, locale, theme, viewport });
+        }
 
         const shoot = async (
             context,
@@ -324,6 +343,16 @@ async function run() {
             for (const what of new Set(missing)) problems.push(`not answered: ${what}`);
             if (problems.length > 0) return;
             const frames = await page.evaluate(() => window.__scene.frames);
+            if (play) {
+                if (check) return;
+                const dir = resolve(root, "..", PLAY.dir(locale));
+                mkdirSync(dir, { recursive: true });
+                const index = PLAY.scenes.indexOf(scene.id) + 1;
+                // Play refuses a screenshot with an alpha channel.
+                const image = (await picture(page, scene, viewport)).flatten().removeAlpha();
+                writeFileSync(join(dir, `${index}_${scene.id}.png`), await image.png().toBuffer());
+                return;
+            }
             if (frames <= 1) {
                 if (check) return;
                 const image = await picture(page, scene, viewport);
@@ -371,7 +400,7 @@ async function run() {
             const name = file.replace(/\.webp$/, "");
             const context = await browser.newContext({
                 viewport: VIEWPORTS[viewport],
-                deviceScaleFactor: SCALE,
+                deviceScaleFactor: play ? PLAY.scale : SCALE,
                 colorScheme: theme,
                 locale,
                 timezoneId: "Europe/Madrid",
@@ -440,7 +469,7 @@ async function run() {
     }
     if (failures.length > 0) process.exit(1);
     process.stdout.write(
-        `[readme-media] ${check ? "checked" : `saved ${saved} pictures to ${output}`}\n`
+        `[readme-media] ${check ? "checked" : `saved ${saved} pictures${play ? "" : ` to ${output}`}`}\n`
     );
 }
 
