@@ -9,10 +9,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { listApiKeys } from "@polaris/auth";
 import { requireUser } from "@/lib/session";
 import { ApiKeysView } from "./api-keys-view";
-import { Messages } from "@/components/i18n/messages";
-import { VpnDeviceKeys } from "@/components/vpn/device-keys";
 import { isClientKey } from "@/lib/vault/client-key";
-import { vpnMeshOn } from "@/lib/vpn/mesh";
 import { isDeviceSessionKind } from "@/lib/device-sessions/kinds";
 
 export const dynamic = "force-dynamic";
@@ -30,12 +27,9 @@ export default async function ApiKeysPage() {
     // app signed in with (the command line, a Stream Deck, a TV, the browser
     // extension): those are sessions, listed and signed out under Account >
     // Sessions.
-    // VPN device keys belong to the VPN's device network, an integration that is
-    // off unless an administrator switched it on.
-    const [all, mesh] = await Promise.all([
-        listApiKeys(user.id),
-        vpnMeshOn().catch(() => false)
-    ]);
+    // Nor a VPN device key: it adds a device to the VPN and is made, listed and
+    // revoked in the VPN, under Add a device (`/vpn/add`).
+    const all = await listApiKeys(user.id);
     const keys = all.filter(
         (key) => !isClientKey(key.description) && !isDeviceSessionKind(key.kind)
     );
@@ -52,11 +46,6 @@ export default async function ApiKeysPage() {
                 <p className="text-sm text-muted-foreground">{t("apiKeys.page.intro")}</p>
             </div>
             <ApiKeysView keys={keys} />
-            {mesh ? (
-                <Messages namespaces={["vpn"]}>
-                    <VpnDeviceKeys />
-                </Messages>
-            ) : null}
         </div>
     );
 }

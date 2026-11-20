@@ -126,8 +126,9 @@ function when(value: string | null): string {
 }
 
 /**
- * The account's device keys, for Account > API keys. Renders nothing when the
- * VPN is off or the account may not join it: there is nothing to manage then.
+ * The account's device keys that can still add a device, under the VPN's Add a
+ * device. A used or expired key does nothing any more, so it is not listed.
+ * Renders nothing when the VPN is off or the account may not join it.
  */
 export function VpnDeviceKeys() {
     const t = useTranslations("vpn");
@@ -143,7 +144,7 @@ export function VpnDeviceKeys() {
         if (result.error !== undefined) setError(result.error);
         else {
             setError(null);
-            setKeys(result.keys);
+            setKeys(result.keys?.filter((key) => key.state === "unused") ?? null);
         }
     }, [t]);
 

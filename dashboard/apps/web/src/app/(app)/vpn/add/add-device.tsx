@@ -24,7 +24,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { useVpnRead } from "../use-vpn-read";
 import { desktopBridge } from "@/lib/desktop-bridge";
 import { Loader2, Network } from "lucide-react";
-import { VpnKeyCreator } from "@/components/vpn/device-keys";
+import { VpnDeviceKeys, VpnKeyCreator } from "@/components/vpn/device-keys";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useRef, useState, useTransition, type KeyboardEvent } from "react";
 
@@ -226,6 +226,7 @@ export function AddDeviceSection() {
                         withCommand={platform === "router"}
                         disabledReason={status?.state === "running" ? null : t("add.notRunning")}
                     />
+                    <VpnDeviceKeys />
                 </ui.CardBody>
             </ui.Card>
         </div>
