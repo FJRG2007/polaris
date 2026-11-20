@@ -3217,5 +3217,14 @@
             "tooManyPlayers": "Máximo {max} jugadores con rango",
             "taken": "{player} ya tiene otro rango"
         }
+    },
+    "mapRelease": {
+        "title": "{map} solo funciona en Minecraft {version}",
+        "text": "Este servidor usa {current}. En otra versión los bloques o herramientas del mapa dejan de ir.",
+        "latest": "la última versión",
+        "switch": "Cambiar a {version}",
+        "confirmTitle": "¿Cambiar a {version} y reiniciar?",
+        "confirmText": "Los jugadores conectados se desconectan al reiniciar. El mundo se conserva.",
+        "askManager": "Quien gestiona este servidor puede cambiarlo."
     }
 }

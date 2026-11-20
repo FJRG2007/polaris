@@ -41,7 +41,8 @@ import type { GameContext } from "./game-context";
 import { MinecraftRules } from "./minecraft-rules";
 import { MinecraftReset } from "./minecraft-reset";
 import { MinecraftWorld } from "./minecraft-world";
-import { findMap } from "../../lib/minecraft/maps";
+import { findMap, pinnedRelease } from "../../lib/minecraft/maps";
+import { MapReleaseNotice } from "./map-release-notice";
 import { MinecraftAccess } from "./minecraft-access";
 import { MinecraftDomain } from "./minecraft-domain";
 import { ServerStorage } from "./server-storage";
@@ -597,6 +598,10 @@ export function MinecraftPanel({
                         settings={settings}
                         blueprintId={game?.blueprintId ?? null}
                         mapId={game?.mapId ?? null}
+                        installedAppId={installedAppId}
+                        running={isRunning}
+                        canManage={canManage}
+                        onSaved={reloadSettings}
                         onOpenPlayers={() => openTab("players")}
                         heard={status !== null}
                     />
@@ -1303,6 +1308,10 @@ function OverviewTab({
     settings,
     blueprintId,
     mapId,
+    installedAppId,
+    running,
+    canManage,
+    onSaved,
     onOpenPlayers,
     heard
 }: {
@@ -1312,6 +1321,11 @@ function OverviewTab({
     blueprintId: string | null;
     /** The map it is standing on, which is somebody's work and is credited. */
     mapId: string | null;
+    installedAppId: string;
+    running: boolean;
+    /** Whether this person may change the server's settings. */
+    canManage: boolean;
+    onSaved: () => void;
     onOpenPlayers: () => void;
     /** Whether the poll has answered on this visit: a kept reading only paints. */
     heard: boolean;
@@ -1327,6 +1341,7 @@ function OverviewTab({
     );
     const blueprint = findBlueprint(blueprintId ?? "");
     const map = findMap(mapId ?? "");
+    const pinned = pinnedRelease(map);
     // A map is the game on the servers that have one, so the blueprint's note
     // about the plugin it replaced would be describing something that is not here.
     const note = map
@@ -1353,6 +1368,17 @@ function OverviewTab({
                 empty world with no explanation reads as a broken install rather
                 than as the next step. Full width, because it is the answer to the
                 question anybody who just created this is about to ask. */}
+            {pinned && (
+                <MapReleaseNotice
+                    installedAppId={installedAppId}
+                    mapName={map?.name ?? ""}
+                    pinned={pinned}
+                    current={settings.find((setting) => setting.key === VERSION_KEY)?.value ?? ""}
+                    running={running}
+                    canManage={canManage}
+                    onSaved={onSaved}
+                />
+            )}
             {note && (note.text || map) && (
                 <Card className="lg:col-span-2">
                     <CardBody className="flex flex-col gap-2">

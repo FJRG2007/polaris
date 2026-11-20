@@ -3217,5 +3217,14 @@
             "tooManyPlayers": "At most {max} ranked players",
             "taken": "{player} already has another rank"
         }
+    },
+    "mapRelease": {
+        "title": "{map} only works on Minecraft {version}",
+        "text": "This server runs {current}. On any other release the map's lucky blocks or tools stop working.",
+        "latest": "the latest release",
+        "switch": "Switch to {version}",
+        "confirmTitle": "Switch to {version} and restart?",
+        "confirmText": "Players online are disconnected while it restarts. The world is kept.",
+        "askManager": "Someone who manages this server can switch it."
     }
 }
