@@ -23,13 +23,24 @@ const PAGES = [
     { key: "roadmap", page: "docs/roadmap/" }
 ] as const;
 
-export function SiteShell({ locale, children }: { locale: SiteLocale; children: ReactNode }) {
+export function SiteShell({
+    locale,
+    before,
+    children
+}: {
+    locale: SiteLocale;
+    /** Drawn first in the body, ahead of the bar: the not-found page's language
+     *  check, which has to run before anything is painted. */
+    before?: ReactNode;
+    children: ReactNode;
+}) {
     const t = words(locale);
     const { repo } = siteData();
     return (
         // "system": the dashboard's theme class that follows the reader's machine.
         <html lang={locale} dir={scriptDirection(locale)} className={`system ${sans.variable}`}>
             <body className="min-h-screen bg-background text-foreground antialiased">
+                {before}
                 <a
                     href="#main"
                     className="sr-only focus:not-sr-only focus:absolute focus:start-4 focus:top-4"

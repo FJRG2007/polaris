@@ -1,38 +1,32 @@
-/** Any address the export has no page for, in the site's own frame. */
+/**
+ * Any address the export has no page for, in the site's own frame.
+ *
+ * GitHub Pages serves this one file for every missing address in either
+ * language, so it is English, and a reader who was on a Spanish address - or,
+ * on an address with no language in it, whose browser is in Spanish - is sent
+ * to the Spanish one (`[locale]/missing`) before anything is drawn.
+ */
 
-import Link from "next/link";
 import type { Metadata } from "next";
-import { buttonVariants } from "@polaris/ui";
 import { SiteShell } from "@/components/site-shell";
-import { href, pageMetadata, SITE_VIEWPORT, words } from "@/lib/site";
+import { NotFoundView } from "@/components/not-found-view";
+import { pageMetadata, SITE_VIEWPORT, words } from "@/lib/site";
 
-export const metadata: Metadata = pageMetadata("en", { title: words("en").notFound.title });
+export const metadata: Metadata = {
+    ...pageMetadata("en", { title: words("en").notFound.title }),
+    robots: { index: false }
+};
 export const viewport = SITE_VIEWPORT;
 
+const BASE = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+
+/** Runs first in the body. A constant, with nothing from the address in it. */
+const SPANISH = `(function(){try{var b=${JSON.stringify(BASE)};var p=location.pathname;if(b&&p.indexOf(b)===0)p=p.slice(b.length);var first=p.split("/")[1]||"";var es=first==="es"||(first!=="en"&&/^es\\b/i.test(navigator.language||""));if(es)location.replace(b+"/es/missing/");}catch(e){}})();`;
+
 export default function GlobalNotFound() {
-    const en = words("en").notFound;
-    const es = words("es").notFound;
     return (
-        <SiteShell locale="en">
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-                <h1 className="text-3xl font-semibold tracking-tight">{en.title}</h1>
-                <p className="text-muted-foreground">{en.intro}</p>
-                <p lang="es" className="text-sm text-muted-foreground">
-                    {es.intro}
-                </p>
-                <div className="flex flex-wrap justify-center gap-2">
-                    <Link href={href("en")} className={buttonVariants({ variant: "primary" })}>
-                        {en.home}
-                    </Link>
-                    <Link
-                        href={href("es")}
-                        hrefLang="es"
-                        className={buttonVariants({ variant: "secondary" })}
-                    >
-                        {es.home}
-                    </Link>
-                </div>
-            </div>
+        <SiteShell locale="en" before={<script dangerouslySetInnerHTML={{ __html: SPANISH }} />}>
+            <NotFoundView locale="en" />
         </SiteShell>
     );
 }
