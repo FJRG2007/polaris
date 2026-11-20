@@ -43,6 +43,7 @@ import {
     type StoredAttachment
 } from "@/lib/chat/attachments";
 import { claimUploads, UploadRefused } from "@/lib/chat/uploads";
+import { readMediaShapes } from "@/lib/chat/media-shape";
 import { fromPhoneApp } from "@/lib/mobile/device-proof";
 import { senderWatermark } from "@/lib/chat/view-once";
 import { readViewOnceChoices, VIEW_ONCE_TEXT_NAME, viewOnceAllowed, viewOnceText } from "@/lib/chat/view-once-choice";
@@ -395,6 +396,24 @@ export async function POST(
                       // copy nobody watched.
                       await copiedFromDrive(channelId, user.id, reference, biggest, spoiler)
             );
+        }
+
+        // The size and blur each picture or video was measured at, by position
+        // over the files this request named. Checked in `readMediaShapes`; one
+        // that does not check out is dropped and the file is drawn the way an
+        // older one is. Never believed for anything that is not a picture or a
+        // video, whatever the browser said.
+        const shapes = readMediaShapes(form.get("media"));
+        for (const [position, shape] of shapes.entries()) {
+            const file = stored[position];
+            if (!shape || !file || position >= uploads.length + files.length) continue;
+            if (!/^(image|video)\//.test(file.contentType)) continue;
+            stored[position] = {
+                ...file,
+                width: shape.width,
+                height: shape.height,
+                thumbhash: shape.thumbhash
+            };
         }
 
         // Sent to be seen once. Only a photo or a video, and only one whose bytes

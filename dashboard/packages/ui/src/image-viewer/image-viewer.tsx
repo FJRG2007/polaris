@@ -78,6 +78,9 @@ export interface ViewedImage {
     /** Whether whoever sent it lets it be passed on. The menu offers the action
      *  or does not; it never offers one that would be refused. */
     readonly forwardable?: boolean;
+    /** A blurred stand-in (an image address, such as a decoded ThumbHash) shown
+     *  at the picture's shape until the picture itself has arrived. */
+    readonly placeholder?: string;
 }
 
 /** The viewer's own words, in the reader's language. */
@@ -169,6 +172,8 @@ export function ImageViewer({
     const press = useRef<ViewerPress | null>(null);
     const root = useRef<HTMLDivElement | null>(null);
     const picture = useRef<HTMLImageElement | null>(null);
+    // Which picture has arrived, for its blurred stand-in to step aside.
+    const [arrivedUrl, setArrivedUrl] = useState<string | null>(null);
     // Whether this opening has flown in yet, and whether it is on its way out.
     // Moving to the next picture is not an opening, so it does not fly.
     const flown = useRef(false);
@@ -395,11 +400,22 @@ export function ImageViewer({
                 press.current = null;
             }}
         >
+            {image.placeholder && arrivedUrl !== image.url && (
+                // eslint-disable-next-line @next/next/no-img-element -- a few-pixel data URL
+                <img
+                    src={image.placeholder}
+                    alt=""
+                    aria-hidden
+                    draggable={false}
+                    className="pointer-events-none absolute inset-0 size-full select-none object-contain"
+                />
+            )}
             {/* eslint-disable-next-line @next/next/no-img-element -- one picture, sized by the viewer */}
             <img
                 ref={picture}
                 data-viewer-picture=""
                 onLoad={(event) => {
+                    setArrivedUrl(image.url);
                     flyIn();
                     slideIn();
                     onPictureLoad?.(event.currentTarget);

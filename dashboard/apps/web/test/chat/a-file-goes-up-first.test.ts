@@ -54,7 +54,10 @@ describe("the composer", () => {
 
     it("still sends the stills and the sound measurements with the message", () => {
         expect(VIEW).toContain('form.append("posters"');
-        expect(VIEW).toContain('form.set("sounds", JSON.stringify(sounds))');
+        expect(VIEW).toContain('form.set("sounds", JSON.stringify(left.sounds))');
+        // And the size and blur of each picture, for the bubble to have its
+        // final shape before the bytes arrive.
+        expect(VIEW).toContain('form.set("media", JSON.stringify(keptShapes.map(writeMediaShape)))');
     });
 });
 

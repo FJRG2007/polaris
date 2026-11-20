@@ -9,6 +9,7 @@
 
 import type { ChatMessageView } from "@/lib/chat/messages";
 import type { ViewedImage } from "@/components/image-viewer";
+import { placeholderUrl } from "@/lib/chat/media-shape";
 
 /** Where an attachment's picture is served - the address the viewer opens. */
 export function attachmentImageUrl(id: string): string {
@@ -27,6 +28,7 @@ export function messageGallery(
             url: attachmentImageUrl(file.id),
             name: file.name,
             messageId: message.id,
-            forwardable: message.forwardable
+            forwardable: message.forwardable,
+            placeholder: placeholderUrl(file.thumbhash)
         }));
 }

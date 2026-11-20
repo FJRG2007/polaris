@@ -232,6 +232,12 @@ export interface ChatAttachmentView {
     /** Whether there is a still to draw before anybody plays it. Not the still
      *  itself: it is fetched by its own route, like the file. */
     readonly hasPoster: boolean;
+    /** Its pixel size and blurred stand-in, measured by the sender, so the
+     *  bubble has its final size before the bytes come - see
+     *  `lib/chat/media-shape`. Null for files sent before they were kept. */
+    readonly width: number | null;
+    readonly height: number | null;
+    readonly thumbhash: string | null;
     /** Sent covered, to be uncovered by whoever wants to see it. */
     readonly spoiler: boolean;
     /**
@@ -2203,6 +2209,9 @@ export async function decorateMessages(
                 posterPath: true,
                 spoiler: true,
                 borrowed: true,
+                width: true,
+                height: true,
+                thumbhash: true,
                 messageId: true,
                 durationMs: true,
                 contentType: true,
@@ -2369,6 +2378,10 @@ export async function decorateMessages(
             size: Number(file.size),
             waveform: file.waveform,
             hasPoster: file.posterPath !== null && !file.viewOnce,
+            // A view-once file is a closed card: nothing about it is drawn.
+            width: file.viewOnce ? null : file.width,
+            height: file.viewOnce ? null : file.height,
+            thumbhash: file.viewOnce ? null : file.thumbhash,
             spoiler: file.spoiler,
             durationMs: file.durationMs,
             contentType: file.contentType,

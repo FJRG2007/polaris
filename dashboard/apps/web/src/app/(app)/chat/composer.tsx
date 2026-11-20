@@ -92,12 +92,18 @@ import { SendButton } from "./send-button";
 import { SavedDraftsBar, useSavedDrafts } from "./saved-drafts";
 import {
     OutgoingList,
+    outgoingById,
+    outgoingSignals,
     patchOutgoing,
     putOutgoing,
+    setOutgoingHandlers,
     useOutgoing,
+    withoutFiles,
     type Outgoing,
+    type OutgoingItem,
     type SendOutcome,
-    type SendProgress
+    type SendProgress,
+    type SendTrack
 } from "./outgoing";
 
 /** The space's emoji where there are none, as one value rather than a fresh
@@ -146,7 +152,8 @@ export function Composer({
     onCancelEdit,
     emoji = null,
     divided = true,
-    translateOutgoing = null
+    translateOutgoing = null,
+    outgoingInConversation = false
 }: {
     /**
      * The conversation this box belongs to, or null where it is not one.
@@ -276,8 +283,17 @@ export function Composer({
         translation?: core.ChatSentTranslation,
         /** Which of `files` go to be seen once, with their timer. Only ever set
          *  for a caller that said it can send them (`canViewOnce`). */
-        viewOnce?: readonly ViewOnceChoice[]
+        viewOnce?: readonly ViewOnceChoice[],
+        /** Each file followed and stoppable on its own - see `SendTrack`. A
+         *  caller that ignores it sends the way it always did. */
+        track?: SendTrack
     ) => void | Promise<SendOutcome>;
+    /**
+     * Whether the messages on their way are drawn in the conversation, as
+     * bubbles with a ring on each picture (`OutgoingBubbles`), rather than as
+     * lines under this box. The conversation says so; a task's box does not.
+     */
+    outgoingInConversation?: boolean;
     /**
      * The language what is written goes out in, or null to send it as written:
      * this reader's live translation of the conversation, handed in by the
@@ -750,7 +766,37 @@ export function Composer({
     const deliver = async (one: Omit<Outgoing, "phase" | "error" | "progress">): Promise<void> => {
         const settle = (change: (was: Outgoing) => Outgoing | null) =>
             patchOutgoing(one.id, change);
-        if (!putOutgoing({ ...one, phase: "sending" })) return;
+        // What an earlier try already put on the server is not sent again: a
+        // retry after one picture of an album failed sends that picture alone.
+        const staged = one.staged ?? one.files.map(() => null);
+        const items: OutgoingItem[] = one.files.map((_, at) =>
+            staged[at] ? { phase: "sent", fraction: 1 } : { phase: "waiting", fraction: 0 }
+        );
+        if (!putOutgoing({ ...one, phase: "sending", error: undefined, items, staged })) return;
+        setOutgoingHandlers(one.id, {
+            retry: () => {
+                const now = outgoingById(one.id);
+                if (now) void deliver(now);
+            },
+            remove: () => {
+                const now = outgoingById(one.id);
+                if (now) abandon(now);
+            }
+        });
+        const track: SendTrack = {
+            staged,
+            signal: outgoingSignals(one.id, one.files.length),
+            onFile: (index, item) =>
+                settle((was) => ({
+                    ...was,
+                    items: (was.items ?? []).map((entry, at) => (at === index ? item : entry))
+                })),
+            onStaged: (index, id) =>
+                settle((was) => ({
+                    ...was,
+                    staged: (was.staged ?? []).map((entry, at) => (at === index ? id : entry))
+                }))
+        };
         let outcome: SendOutcome;
         try {
             outcome = await onSend(
@@ -762,14 +808,41 @@ export function Composer({
                 (progress) =>
                     settle((was) => (was.phase === "sending" ? { ...was, progress } : was)),
                 one.translation,
-                one.viewOnce
+                one.viewOnce,
+                track
             );
         } catch {
             outcome = { error: t("composer.outgoing.notSent") };
         }
-        const error = outcome && typeof outcome === "object" ? outcome.error : undefined;
-        if (error) settle((was) => ({ ...was, phase: "failed", error, progress: undefined }));
-        else settle(() => null);
+        const answer = outcome && typeof outcome === "object" ? outcome : undefined;
+        if (answer?.cancelled) {
+            // Every file was taken out of it: the words go back in the box.
+            const now = outgoingById(one.id);
+            if (now) abandon(now);
+            return;
+        }
+        if (answer?.error) {
+            const error = answer.error;
+            settle((was) => {
+                // The files the sender stopped are out of the message for good.
+                const stopped = new Set(
+                    (was.items ?? []).flatMap((item, at) => (item.phase === "cancelled" ? [at] : []))
+                );
+                const kept = withoutFiles(was, stopped);
+                return {
+                    ...kept,
+                    phase: "failed",
+                    error,
+                    progress: undefined,
+                    staged: answer.keepStaged ? kept.staged : undefined,
+                    items: (kept.items ?? []).map((item, at) =>
+                        answer.keepStaged && kept.staged?.[at]
+                            ? item
+                            : { phase: "failed" as const, fraction: 0 }
+                    )
+                };
+            });
+        } else settle(() => null);
     };
 
     /**
@@ -781,6 +854,16 @@ export function Composer({
      */
     const abandon = (one: Outgoing) => {
         patchOutgoing(one.id, () => null);
+        // What already went up for it is taken off the storage now rather than
+        // waiting for the sweep.
+        if (channelId) {
+            for (const id of one.staged ?? []) {
+                if (!id) continue;
+                void fetch(`/api/chat/channels/${channelId}/uploads?id=${encodeURIComponent(id)}`, {
+                    method: "DELETE"
+                }).catch(() => undefined);
+            }
+        }
         if (one.body && isBlankMarkdown(body)) {
             setBody(one.body);
             emptyTheBox();
@@ -1314,11 +1397,13 @@ export function Composer({
                 outgoingTo && <OutgoingLanguageNote to={outgoingTo} />
             )}
 
-            <OutgoingList
-                outgoing={outgoing}
-                onRetry={(one) => void deliver(one)}
-                onRemove={abandon}
-            />
+            {!outgoingInConversation && (
+                <OutgoingList
+                    outgoing={outgoing}
+                    onRetry={(one) => void deliver(one)}
+                    onRemove={abandon}
+                />
+            )}
 
             {(files.length > 0 || kept.length > 0) && (
                 <ul className="mb-2 flex flex-wrap items-end gap-2">

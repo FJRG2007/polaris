@@ -36,8 +36,32 @@ export interface SendProgress {
     readonly total: number;
 }
 
-/** What a send answers: nothing when it landed, the reason when it did not. */
-export type SendOutcome = void | { readonly error?: string };
+/** What a send answers: nothing when it landed, the reason when it did not.
+ *  `keepStaged` says the files that did go up are still waiting on the server
+ *  for a retry; `cancelled` that the sender took every file out of it. */
+export type SendOutcome =
+    | void
+    | { readonly error?: string; readonly keepStaged?: boolean; readonly cancelled?: boolean };
+
+/** Where one file of a message on its way has got. */
+export interface OutgoingItem {
+    readonly phase: "waiting" | "sending" | "processing" | "sent" | "failed" | "cancelled";
+    /** 0..1 of the bytes, for the ring. */
+    readonly fraction: number;
+}
+
+/**
+ * What a box hands a send so each file can be followed and stopped on its own,
+ * the way WhatsApp draws a ring on every picture of an album.
+ */
+export interface SendTrack {
+    /** Ids already on the server from an earlier try, by file index. */
+    readonly staged: readonly (string | null)[];
+    /** Aborted when the sender taps that file's ring. */
+    signal(index: number): AbortSignal;
+    onFile(index: number, item: OutgoingItem): void;
+    onStaged(index: number, id: string | null): void;
+}
 
 export interface Outgoing {
     readonly id: string;
@@ -57,6 +81,43 @@ export interface Outgoing {
     readonly phase: "sending" | "failed";
     readonly error?: string;
     readonly progress?: SendProgress;
+    /** Each of `files`, by index - see `SendTrack`. */
+    readonly items?: readonly OutgoingItem[];
+    /** Upload ids that survive a failed try, by file index. */
+    readonly staged?: readonly (string | null)[];
+}
+
+/** What the box that sent one does when it is retried or given up on, kept
+ *  here so the bubble in the conversation can offer both. */
+interface OutgoingHandlers {
+    readonly retry: () => void;
+    readonly remove: () => void;
+}
+const handlers = new Map<string, OutgoingHandlers>();
+const stoppers = new Map<string, AbortController[]>();
+
+export function setOutgoingHandlers(id: string, given: OutgoingHandlers): void {
+    handlers.set(id, given);
+}
+
+export function retryOutgoing(id: string): void {
+    handlers.get(id)?.retry();
+}
+
+export function removeOutgoing(id: string): void {
+    handlers.get(id)?.remove();
+}
+
+/** A fresh stopper per file for one try of one message. */
+export function outgoingSignals(id: string, files: number): (index: number) => AbortSignal {
+    const made = Array.from({ length: files }, () => new AbortController());
+    stoppers.set(id, made);
+    return (index) => made[index]?.signal ?? new AbortController().signal;
+}
+
+/** Stop one file of a message on its way; the rest keep going. */
+export function cancelOutgoingFile(id: string, index: number): void {
+    stoppers.get(id)?.[index]?.abort();
 }
 
 /**
@@ -96,6 +157,10 @@ export function patchOutgoing(id: string, change: (was: Outgoing) => Outgoing | 
     pending = pending.flatMap((entry) => {
         if (entry.id !== id) return [entry];
         const next = change(entry);
+        if (!next) {
+            handlers.delete(id);
+            stoppers.delete(id);
+        }
         return next ? [next] : [];
     });
     announce();
@@ -219,4 +284,59 @@ export function progressSaid(progress: SendProgress | undefined, t: Words): stri
               percent
           })
         : t("composer.outgoing.sending", { percent });
+}
+
+/** The record of one message on its way, or undefined once it has gone. */
+export function outgoingById(id: string): Outgoing | undefined {
+    return pending.find((entry) => entry.id === id);
+}
+
+/**
+ * The parts of a message that are indexed by file, with some files taken out.
+ *
+ * `hidden` is indexed over the files and then the Drive picks after them, so a
+ * pick's position moves down by however many files went; `viewOnce` and the
+ * per-file lists are indexed over the files alone.
+ */
+export function withoutFiles<
+    T extends {
+        readonly files: readonly File[];
+        readonly hidden: readonly number[];
+        readonly sounds?: readonly RecordedSound[];
+        readonly viewOnce?: readonly ViewOnceChoice[];
+        readonly items?: readonly OutgoingItem[];
+        readonly staged?: readonly (string | null)[];
+    }
+>(one: T, removed: ReadonlySet<number>): T {
+    if (removed.size === 0) return one;
+    const count = one.files.length;
+    const moved = (at: number): number | null => {
+        if (at >= count) return at - removed.size;
+        if (removed.has(at)) return null;
+        let before = 0;
+        for (const gone of removed) if (gone < at) before += 1;
+        return at - before;
+    };
+    const keep = <V,>(list: readonly V[] | undefined): V[] | undefined =>
+        list?.filter((_, at) => !removed.has(at));
+    return {
+        ...one,
+        files: one.files.filter((_, at) => !removed.has(at)),
+        hidden: one.hidden.flatMap((at) => {
+            const next = moved(at);
+            return next === null ? [] : [next];
+        }),
+        ...(one.sounds ? { sounds: keep(one.sounds) } : {}),
+        ...(one.items ? { items: keep(one.items) } : {}),
+        ...(one.staged ? { staged: keep(one.staged) } : {}),
+        ...(one.viewOnce
+            ? {
+                  viewOnce: one.viewOnce.flatMap((choice) => {
+                      if (choice.index >= count) return [];
+                      const next = moved(choice.index);
+                      return next === null ? [] : [{ ...choice, index: next }];
+                  })
+              }
+            : {})
+    };
 }

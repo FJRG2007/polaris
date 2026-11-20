@@ -18,6 +18,7 @@
  * was taken back.
  */
 
+import { fittedSize, placeholderUrl } from "@/lib/chat/media-shape";
 import { VanishMark } from "./vanish-controls";
 import { InviteCards } from "./invite-card";
 import Link from "next/link";
@@ -1277,6 +1278,7 @@ function Message({
                                             {file.inline ? (
                                                 <KeepableImage
                                                     href={attachmentImageUrl(file.id)}
+                                                    shape={file}
                                                     alt={file.name}
                                                     source={`attachment:${file.id}`}
                                                     name={file.name}
@@ -1285,7 +1287,10 @@ function Message({
                                                             url: attachmentImageUrl(file.id),
                                                             name: file.name,
                                                             messageId: message.id,
-                                                            forwardable: message.forwardable
+                                                            forwardable: message.forwardable,
+                                                            placeholder: placeholderUrl(
+                                                                file.thumbhash
+                                                            )
                                                         })
                                                     }
                                                 />
@@ -1319,6 +1324,15 @@ function Message({
                                                     poster={
                                                         file.hasPoster
                                                             ? `/api/chat/attachments/${file.id}?poster=1`
+                                                            : undefined
+                                                    }
+                                                    // Its blur under the still, and its own
+                                                    // shape rather than 16:9, so the frame
+                                                    // is right before the still has come.
+                                                    placeholder={placeholderUrl(file.thumbhash)}
+                                                    aspect={
+                                                        file.width && file.height
+                                                            ? file.width / file.height
                                                             : undefined
                                                     }
                                                     download={`/api/chat/attachments/${file.id}?download=1`}
@@ -1583,15 +1597,30 @@ function Marks({ pinned, starred }: { pinned: boolean; starred: boolean }) {
  * than for every picture on screen: a channel of forty GIFs would otherwise be
  * forty questions on every render, to draw a control nobody has looked at.
  */
+/** The largest a picture is drawn inside a message, before it is opened. */
+const PICTURE_BOX = { width: 320, height: 288 } as const;
+
 function KeepableImage({
     href,
     alt,
     source,
     name,
-    onOpen
+    onOpen,
+    shape
 }: {
     href: string;
     alt: string;
+    /**
+     * Its pixel size and blur, measured by the sender - see
+     * `lib/chat/media-shape`. With it the picture is drawn at its final size,
+     * blurred, and faded in over the blur once it arrives; without it (a file
+     * sent before they were kept) a neutral box holds the place.
+     */
+    shape?: {
+        readonly width: number | null;
+        readonly height: number | null;
+        readonly thumbhash: string | null;
+    };
     /** What is stored: `attachment:<id>`, or the address for a remote one. */
     source: string;
     name: string;
@@ -1602,6 +1631,9 @@ function KeepableImage({
     const t = useTranslations("chat");
     const [kept, setKept] = useState<boolean | null>(null);
     const [busy, setBusy] = useState(false);
+    const [arrived, setArrived] = useState(false);
+    const fitted = fittedSize(shape?.width, shape?.height, PICTURE_BOX);
+    const blur = placeholderUrl(shape?.thumbhash);
 
     const toggle = async () => {
         setBusy(true);
@@ -1622,12 +1654,37 @@ function KeepableImage({
                 type="button"
                 onClick={onOpen}
                 aria-label={t("messageList.openNamed", { name })}
-                className="block cursor-zoom-in"
+                className={cn(
+                    "relative block max-w-full cursor-zoom-in overflow-hidden rounded-md",
+                    // Its place is held before a byte of it has come: at its own
+                    // size when the sender measured it, a neutral box otherwise.
+                    !arrived && "bg-muted",
+                    !arrived && !fitted && "h-40 w-56"
+                )}
+                style={
+                    fitted
+                        ? {
+                              width: fitted.width,
+                              aspectRatio: `${shape!.width} / ${shape!.height}`,
+                              ...(blur && !arrived
+                                  ? { backgroundImage: `url(${blur})`, backgroundSize: "cover" }
+                                  : {})
+                          }
+                        : undefined
+                }
             >
                 {/* eslint-disable-next-line @next/next/no-img-element -- one image per attachment, no loader wanted */}
                 <img
                     src={href}
                     alt={alt}
+                    decoding="async"
+                    // A picture the browser already had is complete before
+                    // `onLoad` could be listened for.
+                    ref={(node) => {
+                        if (node?.complete && node.naturalWidth > 0) setArrived(true);
+                    }}
+                    onLoad={() => setArrived(true)}
+                    onError={() => setArrived(true)}
                     // Dragged onto Polar, it is attached there - read again on
                     // the server through this conversation's own access.
                     onDragStart={(event) => {
@@ -1640,7 +1697,12 @@ function KeepableImage({
                             { kind: "chat-attachment", id, title: name.slice(0, 255) || undefined }
                         ]);
                     }}
-                    className="max-h-72 max-w-full rounded-md border border-border object-contain"
+                    className={cn(
+                        "rounded-md border border-border transition-opacity duration-300 motion-reduce:transition-none",
+                        fitted ? "size-full object-cover" : "max-h-72 max-w-full object-contain",
+                        arrived ? "opacity-100" : "opacity-0",
+                        !arrived && !fitted && "absolute"
+                    )}
                 />
             </button>
             <button

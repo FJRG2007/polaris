@@ -187,6 +187,11 @@ export interface StoredAttachment {
     readonly posterConnectionId: string | null;
     /** Whether it arrives covered - the sender's decision, per file. */
     readonly spoiler: boolean;
+    /** Pixel size and ThumbHash, as measured by the sender - see
+     *  `lib/chat/media-shape`. Absent for anything not measured. */
+    readonly width?: number | null;
+    readonly height?: number | null;
+    readonly thumbhash?: string | null;
     /** Whether the bytes are somebody else's, shared out of a Drive rather than
      *  copied in here. See `borrowAttachment`. */
     readonly borrowed: boolean;

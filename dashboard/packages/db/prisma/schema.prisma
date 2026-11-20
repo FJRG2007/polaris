@@ -11392,6 +11392,14 @@ model ChatAttachment {
     // Chosen by the sender, per file rather than per message: a photograph of a
     // spoiler and the sentence explaining it are usually sent together, and it
     // is the picture that has to be hidden.
+    // Its pixel size and a ThumbHash of it (base64, a few dozen bytes), measured
+    // by the browser that sent it and checked where it arrives. They let a
+    // reader draw the bubble at its final size, blurred, before a byte of the
+    // picture has come - see `lib/chat/media-shape`. Null for everything that
+    // is not a picture or a video, and for files sent before they existed.
+    width        Int?
+    height       Int?
+    thumbhash    String?
     spoiler      Boolean  @default(false)
     // Seen once, on a phone, and never kept. The bytes and the still are served
     // only to the Polaris phone app, signed with that phone's own key, once per

@@ -46,6 +46,8 @@ export function VideoPreview({
     download,
     poster,
     eager = false,
+    placeholder,
+    aspect,
     className
 }: {
     src: string;
@@ -59,6 +61,12 @@ export function VideoPreview({
     poster?: string;
     /** Draw the player straight away. For bytes that are already here. */
     eager?: boolean;
+    /** A blurred stand-in (an image address) drawn under the still while it
+     *  comes, or alone when there is no still. */
+    placeholder?: string;
+    /** Width over height, when known, for the frame to have its final shape
+     *  before anything has loaded. 16:9 otherwise. */
+    aspect?: number;
     className?: string;
 }) {
     const t = useTranslations("components");
@@ -111,14 +119,27 @@ export function VideoPreview({
                 onClick={() => setWatching(true)}
                 aria-label={name ? t("viewer.playNamed", { name }) : t("viewer.play")}
                 className={cn(
-                    "group relative flex aspect-video w-full max-w-md items-center justify-center overflow-hidden rounded-md border border-border bg-black/80 transition-colors hover:bg-black",
+                    "group relative flex w-full max-w-md items-center justify-center overflow-hidden rounded-md border border-border bg-black/80 transition-colors hover:bg-black",
+                    // A tall phone clip is not stretched into a wide box: kept
+                    // at its own shape, and no taller than a picture would be.
+                    aspect ? "max-h-72" : "aspect-video",
                     className
                 )}
-                style={
-                    poster
-                        ? { backgroundImage: `url(${poster})`, backgroundSize: "cover" }
-                        : undefined
-                }
+                style={{
+                    ...(aspect
+                        ? { aspectRatio: String(aspect), maxWidth: `min(28rem, ${Math.round(288 * aspect)}px)` }
+                        : {}),
+                    ...(poster || placeholder
+                        ? {
+                              backgroundImage: [poster, placeholder]
+                                  .filter(Boolean)
+                                  .map((url) => `url(${url})`)
+                                  .join(", "),
+                              backgroundSize: "cover",
+                              backgroundPosition: "center"
+                          }
+                        : {})
+                }}
             >
                 <span className="grid size-14 place-items-center rounded-full bg-black/60 ring-1 ring-white/30 transition-transform group-hover:scale-105">
                     <Play className="size-6 translate-x-0.5 fill-white text-white" />

@@ -699,7 +699,11 @@
             "retry": "Reintentar",
             "retryNamed": "Volver a enviar {name}",
             "remove": "Quitar",
-            "removeNamed": "Quitar {name} y no enviarlo"
+            "removeNamed": "Quitar {name} y no enviarlo",
+            "cancelNamed": "Dejar de enviar {name}",
+            "sendingNamed": "Enviando {name}",
+            "failedNamed": "{name} no se envió: reintenta",
+            "more": "{count} más"
         },
         "refused": {
             "notAllowed": "No puedes enviar archivos aquí.",

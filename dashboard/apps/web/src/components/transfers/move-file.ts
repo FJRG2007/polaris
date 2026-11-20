@@ -67,6 +67,17 @@ export async function sendFile(
          * file (an instance being restored, a mail archive being read in).
          */
         readonly answerWithinMs?: number | null;
+        /**
+         * Whether it goes on the transfer list in the corner. True for a file
+         * that leaves the screen it was sent from - a folder upload, a restore -
+         * because that list is then the only place its progress is. False where
+         * the thing being made draws its own: a chat message shows a ring on
+         * each picture in the conversation, and a second bar in the corner for
+         * the same bytes is noise.
+         */
+        readonly listed?: boolean;
+        /** Aborting it stops the upload, answered as `problem: "stopped"`. */
+        readonly signal?: AbortSignal;
     } = {}
 ): Promise<Sent> {
     // Either shape, because Polaris has both: the streaming routes take one file as
@@ -79,12 +90,17 @@ export async function sendFile(
     const name = options.name ?? (asForm ? formName(asForm) : asFile!.name) ?? "file";
 
     const request = new XMLHttpRequest();
-    const transfer = beginTransfer({
-        name,
-        way: "up",
-        total: weight,
-        stop: () => request.abort()
-    });
+    const transfer =
+        options.listed === false
+            ? unlistedTransfer
+            : beginTransfer({
+                  name,
+                  way: "up",
+                  total: weight,
+                  stop: () => request.abort()
+              });
+    if (options.signal?.aborted) return { ok: false, status: 0, body: "", problem: "stopped" };
+    options.signal?.addEventListener("abort", () => request.abort(), { once: true });
 
     const answerWithin =
         options.answerWithinMs === undefined ? ANSWER_WITHIN_MS : options.answerWithinMs;
@@ -156,6 +172,15 @@ export async function sendFile(
         request.send(payload);
     });
 }
+
+/** What an unlisted upload reports to: nobody. Same calls, no entry. */
+const unlistedTransfer: Pick<TransferHandle, "moved" | "processing" | "done" | "failed" | "stopped"> = {
+    moved: () => undefined,
+    processing: () => undefined,
+    done: () => undefined,
+    failed: () => undefined,
+    stopped: () => undefined
+};
 
 /** What a form weighs, which is what its files weigh - the fields beside them are
  *  bytes nobody is waiting on. */

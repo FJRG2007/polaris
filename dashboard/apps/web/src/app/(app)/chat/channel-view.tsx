@@ -69,7 +69,11 @@ import { MAX_REREAD } from "@/lib/chat/reread-limit";
 import { applyChanged, changedTargets, inBatches } from "./message-changes";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { sendFile, type Sent } from "@/components/transfers/move-file";
-import type { SendOutcome, SendProgress } from "./outgoing";
+import { withoutFiles, type SendOutcome, type SendProgress, type SendTrack } from "./outgoing";
+import { measureMedia } from "./media-measure";
+import { useOutgoing } from "./outgoing";
+import { OutgoingBubbles } from "./outgoing-bubbles";
+import { writeMediaShape } from "@/lib/chat/media-shape";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CallPreview, CallPreviewLine } from "./call-preview";
 import { CallStage } from "./call-stage";
@@ -392,6 +396,16 @@ export function ChannelView({
      *  rather than guessed at. */
     const bandBox = useRef<HTMLDivElement>(null);
     const scroller = useRef<HTMLDivElement>(null);
+    // Messages with files on their way from this conversation's box, drawn at
+    // the bottom of it as they go - the same scope the box keeps them under.
+    const outgoing = useOutgoing(channelDraftKey(channelId));
+    const outgoingCount = outgoing.length;
+    useEffect(() => {
+        // A message just sent is where the sender is looking.
+        if (outgoingCount === 0 || !following.current) return;
+        const list = scroller.current;
+        if (list) list.scrollTop = list.scrollHeight;
+    }, [outgoingCount]);
     // The end of the list, scrolled to rather than computed. `scrollTop =
     // scrollHeight` is arithmetic over a height that is still changing; an
     // element at the bottom is the bottom whatever the height turns out to be,
@@ -1795,7 +1809,8 @@ export function ChannelView({
         fromDrive: readonly KeptPick[] = [],
         report?: (progress: SendProgress) => void,
         translation?: core.ChatSentTranslation,
-        viewOnce: readonly ViewOnceChoice[] = []
+        viewOnce: readonly ViewOnceChoice[] = [],
+        track?: SendTrack
     ): Promise<SendOutcome> => {
         if (files.length > 0 || fromDrive.length > 0) {
             following.current = true;
@@ -1805,35 +1820,105 @@ export function ChannelView({
             // `components/transfers`. The message that follows names what was
             // written rather than carrying it, which is what lets a file be
             // measured in gigabytes instead of in what one request may hold.
-            const uploaded: string[] = [];
+            // What an earlier try already put on the server, by file index.
+            const staged: (string | null)[] = files.map((_, at) => track?.staged[at] ?? null);
             // A message sent to be seen once is a few kilobytes of text and rides
             // the message itself, where the server reads it before keeping it.
             const inForm =
                 files.length === 1 && viewOnce.length === 1 && viewOnceText(files[0]!.type) ? files[0]! : null;
-            for (const [at, file] of (inForm ? [] : files).entries()) {
+            // The still and the shape of each picture or video are worked out
+            // while the bytes go, not before: nothing waits on them.
+            const stills = files.map((file) => posterFor(file).catch(() => null));
+            const shapes = files.map((file, at) =>
+                stills[at]!.then((still) => measureMedia(file, still)).catch(() => null)
+            );
+            let failure: { sent: Sent; name: string } | null = null;
+            // The files the sender tapped the ring of while they were going.
+            const stopped = new Set<number>();
+            const upload = async (at: number): Promise<void> => {
+                const file = files[at]!;
+                if (staged[at]) return;
                 const query = new URLSearchParams({ name: file.name });
                 // Covered is chosen before the upload, because that is when the
                 // sender marked it.
                 if (spoilers.includes(at)) query.set("spoiler", "1");
+                const signal = track?.signal(at);
+                track?.onFile(at, { phase: "sending", fraction: 0 });
                 const sent = await sendFile(
                     `/api/chat/channels/${channelId}/uploads?${query.toString()}`,
                     file,
                     {
-                        onProgress: (moved, total) =>
-                            report?.({ file: at, files: files.length, moved, total })
+                        // The ring on the picture in the conversation is where
+                        // this one's progress is - see `OutgoingBubbles`.
+                        listed: !track,
+                        signal,
+                        onProgress: (moved, total) => {
+                            report?.({ file: at, files: files.length, moved, total });
+                            track?.onFile(at, {
+                                phase: total > 0 && moved >= total ? "processing" : "sending",
+                                fraction: total > 0 ? Math.min(1, moved / total) : 0
+                            });
+                        }
                     }
                 );
-                if (!sent.ok) {
-                    // Nothing was sent, so nothing is left behind: the files that
-                    // did go up are taken off the storage rather than waiting for
-                    // the sweep. The message is not sent without them - the
-                    // composer keeps it, with this reason on it and a retry.
-                    await Promise.all(uploaded.map((id) => discardUpload(channelId, id)));
-                    return { error: notUploaded(sent, file.name) };
+                if (!sent.ok && signal?.aborted) {
+                    stopped.add(at);
+                    track?.onFile(at, { phase: "cancelled", fraction: 0 });
+                    return;
                 }
-                const staged: unknown = JSON.parse(sent.body || "{}");
-                uploaded.push(String((staged as { id?: unknown }).id ?? ""));
+                if (!sent.ok) {
+                    failure ??= { sent, name: file.name };
+                    track?.onFile(at, { phase: "failed", fraction: 0 });
+                    return;
+                }
+                const answer: unknown = JSON.parse(sent.body || "{}");
+                const id = String((answer as { id?: unknown }).id ?? "");
+                staged[at] = id;
+                track?.onStaged(at, id);
+                track?.onFile(at, { phase: "sent", fraction: 1 });
+            };
+            const going = inForm ? [] : files.map((_, at) => at);
+            if (track) {
+                // Each file on its own, three at a time, the way an album goes:
+                // one slow picture does not hold up the rest, and one that fails
+                // is retried alone.
+                let next = 0;
+                await Promise.all(
+                    Array.from({ length: Math.min(3, going.length) }, async () => {
+                        while (next < going.length) await upload(going[next++]!);
+                    })
+                );
+            } else {
+                for (const at of going) {
+                    await upload(at);
+                    if (failure) break;
+                }
             }
+            const failed = failure as { sent: Sent; name: string } | null;
+            if (failed) {
+                // With a ring on each file, the ones that went up wait on the
+                // server and a retry sends only what is missing. Without, nothing
+                // is left behind: the files that did go up are taken off the
+                // storage rather than waiting for the sweep. Either way the
+                // message is not sent without them.
+                if (!track) {
+                    await Promise.all(
+                        staged.flatMap((id) => (id ? [discardUpload(channelId, id)] : []))
+                    );
+                }
+                return { error: notUploaded(failed.sent, failed.name), keepStaged: Boolean(track) };
+            }
+            // Every file was stopped and there is nothing else to carry them.
+            if (stopped.size > 0 && stopped.size === files.length && fromDrive.length === 0) {
+                return { cancelled: true };
+            }
+            const left = withoutFiles(
+                { files, hidden: spoilers, sounds, viewOnce, staged },
+                stopped
+            );
+            const uploaded = inForm ? [] : (left.staged ?? []).filter((id): id is string => Boolean(id));
+            const keptShapes = await Promise.all(shapes.filter((_, at) => !stopped.has(at)));
+            const keptStills = stills.filter((_, at) => !stopped.has(at));
 
             const form = new FormData();
             form.set("body", body);
@@ -1842,10 +1927,15 @@ export function ChannelView({
             // Which of them arrive covered, by position. Sent only when there
             // are any, which is nearly never - an empty field on every message
             // in Polaris to say "none" is a field nobody needed.
-            if (spoilers.length > 0) form.set("spoilers", spoilers.join(","));
-            if (viewOnce.length > 0) form.set("viewOnce", JSON.stringify(viewOnce));
+            if (left.hidden.length > 0) form.set("spoilers", left.hidden.join(","));
+            if ((left.viewOnce ?? []).length > 0) form.set("viewOnce", JSON.stringify(left.viewOnce));
             if (uploaded.length > 0) form.set("uploads", JSON.stringify(uploaded));
             if (inForm) form.append("files", inForm);
+            // The size and blur of each picture and video, in file order, for
+            // every reader to draw it at its final size before it arrives.
+            if (keptShapes.some(Boolean)) {
+                form.set("media", JSON.stringify(keptShapes.map(writeMediaShape)));
+            }
             // A still per video, in the same order as the files that were just
             // uploaded, with an empty one standing in for everything that is not
             // a video - so the two lists line up on the other side without
@@ -1853,14 +1943,14 @@ export function ChannelView({
             // is kilobytes. Taken here rather than on the server: the bytes are
             // already in this browser, and the alternative is a transcoder on
             // the machine Polaris runs on.
-            for (const file of files) {
-                const still = await posterFor(file).catch(() => null);
+            for (const pending of keptStills) {
+                const still = await pending;
                 form.append("posters", still ?? new Blob([], { type: "image/jpeg" }));
             }
             // How long each recording is and what it looks like, measured while
             // it was made. Sent as one field in file order rather than one per
             // file, so a message with no recording in it sends nothing.
-            if (sounds.length > 0) form.set("sounds", JSON.stringify(sounds));
+            if ((left.sounds ?? []).length > 0) form.set("sounds", JSON.stringify(left.sounds));
             // The files that are staying where they are: where to find each one
             // and nothing else. What happens to them - copied into the
             // conversation or pointed at - is the instance's setting, answered on
@@ -2397,6 +2487,8 @@ export function ChannelView({
                     />
                 )}
 
+                <OutgoingBubbles outgoing={outgoing} />
+
                 {/* The way back, for somebody who has read a long way up.
                             Scrolling down would work and would take a page at a
                             time; this is one press.
@@ -2537,6 +2629,7 @@ export function ChannelView({
                     <Composer
                         channelId={channelId}
                         emoji={composerEmoji}
+                        outgoingInConversation
                         // The chat's own announcement, handed in: the box is also
                         // the one under a task, where there is nobody to tell.
                         onTyping={(kind) => void actions.typingAction(channelId, kind)}
