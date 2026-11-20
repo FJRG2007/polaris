@@ -30,9 +30,13 @@ vi.mock("@polaris/hostd-client", () => ({
     }
 }));
 
-const { hostSpace, reclaimBuildCache, reclaimHostSpace, unusedImagesPrunePath } = await import(
-    "@/lib/deploy/host-space"
-);
+const {
+    hostSpace,
+    reclaimBuildCache,
+    reclaimHostSpace,
+    staleBuildCachePrunePath,
+    unusedImagesPrunePath
+} = await import("@/lib/deploy/host-space");
 
 const GB = 1024 * 1024 * 1024;
 
@@ -201,3 +205,33 @@ describe("emptying the build cache on its own", () => {
         expect(await reclaimBuildCache()).toBeNull();
     });
 });
+
+describe("keeping the build cache a recent deploy made", () => {
+    it("asks only for cache no build has read for three days", async () => {
+        const path = staleBuildCachePrunePath();
+        expect(path.startsWith("/build/prune?all=true&filters=")).toBe(true);
+        const filters = JSON.parse(decodeURIComponent(path.split("filters=")[1] ?? "{}")) as Record<
+            string,
+            string[]
+        >;
+        expect(filters).toEqual({ until: ["72h"] });
+        expect(path).not.toContain(" ");
+    });
+
+    it("uses that prune, and the image prune, when asked to keep recent builds", async () => {
+        replies[staleBuildCachePrunePath()] = {
+            status: 200,
+            body: JSON.stringify({ SpaceReclaimed: 2 * GB })
+        };
+        replies[unusedImagesPrunePath()] = {
+            status: 200,
+            body: JSON.stringify({ SpaceReclaimed: 1 * GB })
+        };
+        expect(await reclaimHostSpace({ keepRecentBuilds: true })).toBe(3 * GB);
+        expect(asked.map((call) => call.path)).toEqual([
+            staleBuildCachePrunePath(),
+            unusedImagesPrunePath()
+        ]);
+    });
+});
+

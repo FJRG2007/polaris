@@ -175,6 +175,24 @@ export function unusedImagesPrunePath(): string {
  */
 export const BUILD_CACHE_PRUNE_PATH = "/build/prune?all=true";
 
+/** How long a build cache entry nothing has read is kept by the timed sweep. */
+export const RECENT_BUILD_CACHE_HOURS = 72;
+
+/**
+ * The build cache no build has read for `hours`, and nothing newer.
+ *
+ * What the timed sweep asks for first. Emptying the whole cache is what made
+ * the next deploy of every project after a sweep a cold build: the layers its
+ * install step had made yesterday were gone with the ones from a branch nobody
+ * builds any more. `until` is measured against when an entry was last used, so
+ * a project deployed this week keeps its cache and an abandoned one does not.
+ * Encoded for the same reason as the image filter below: no space or brace
+ * reaches the daemon's allowlist raw.
+ */
+export function staleBuildCachePrunePath(hours: number = RECENT_BUILD_CACHE_HOURS): string {
+    return `${BUILD_CACHE_PRUNE_PATH}&filters=${encodeURIComponent(JSON.stringify({ until: [`${hours}h`] }))}`;
+}
+
 /** What one prune removed, read from the daemon's own answer; null when the
  *  daemon did not answer at all. */
 async function prune(daemon: HostdClient, path: string): Promise<number | null> {
@@ -221,7 +239,7 @@ export async function reclaimBuildCache(
  * all and throws ImageStoreBusy - see `image-store-lock`.
  */
 export async function reclaimHostSpace(
-    options: { whenIdle?: boolean } = {}
+    options: { whenIdle?: boolean; keepRecentBuilds?: boolean } = {}
 ): Promise<number | null> {
     return withImagePrune(
         LOCAL_MACHINE,
@@ -230,7 +248,10 @@ export async function reclaimHostSpace(
             let freed = 0;
             let answered = false;
 
-            for (const path of [BUILD_CACHE_PRUNE_PATH, unusedImagesPrunePath()]) {
+            const cache = options.keepRecentBuilds
+                ? staleBuildCachePrunePath()
+                : BUILD_CACHE_PRUNE_PATH;
+            for (const path of [cache, unusedImagesPrunePath()]) {
                 const removed = await prune(daemon, path);
                 if (removed === null) continue;
                 answered = true;

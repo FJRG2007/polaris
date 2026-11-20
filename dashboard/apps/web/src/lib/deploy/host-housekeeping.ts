@@ -128,16 +128,33 @@ export async function sweepHostSpace(): Promise<HousekeepingSweep> {
     // Skipped, not queued, while a deploy is fetching or building here: that
     // deploy tidies up when it finishes, and the next sweep is six hours away
     // rather than never. Nothing is reported, because nothing was decided.
+    //
+    // The build cache a recent deploy made is kept on the first pass: it is what
+    // makes the next deploy of that project a warm build rather than a cold one.
+    // Only when that was not enough to bring the disk under the line does the
+    // second pass take the rest of it, the way the sweep always did.
     let freed: number;
+    let after: number | null;
     try {
-        freed = (await reclaimHostSpace({ whenIdle: true })) ?? 0;
+        freed = (await reclaimHostSpace({ whenIdle: true, keepRecentBuilds: true })) ?? 0;
+        const settled = await localDisk();
+        after = settled ? diskFullness(settled) : before;
     } catch (error) {
         if (error instanceof ImageStoreBusy)
             return { before, after: before, freed: 0, reclaimed: false };
         throw error;
     }
-    const settled = await localDisk();
-    const after = settled ? diskFullness(settled) : before;
+    if (after !== null && after >= HIGH_WATER) {
+        // A deploy that started between the two passes keeps what is left: the
+        // first pass already counts, and the next sweep can take the rest.
+        const more = await reclaimHostSpace({ whenIdle: true }).catch((error: unknown) => {
+            if (error instanceof ImageStoreBusy) return 0;
+            throw error;
+        });
+        freed += more ?? 0;
+        const emptied = await localDisk();
+        after = emptied ? diskFullness(emptied) : after;
+    }
 
     if (after !== null && after >= STILL_TIGHT) await warn(after, freed);
     else await clearWarning();
