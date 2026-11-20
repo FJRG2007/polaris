@@ -12,6 +12,7 @@
  */
 
 import { useState } from "react";
+import { openLink } from "@/lib/open-link";
 import { TriangleAlert } from "lucide-react";
 import {
     Button,
@@ -40,7 +41,7 @@ export function FlaggedAnchor({
 
     const proceed = () => {
         setOpen(false);
-        window.open(href, "_blank", "noopener,noreferrer");
+        openLink(href);
     };
 
     return (

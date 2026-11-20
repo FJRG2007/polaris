@@ -9,6 +9,7 @@
 
 import { Cloud, ExternalLink, Router } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { openLink } from "@/lib/open-link";
 import {
     Button,
     DropdownMenu,
@@ -24,7 +25,7 @@ const UNIFI_CLOUD_URL = "https://unifi.ui.com";
 export function UnifiConsoleButton({ webUrl }: { webUrl?: string }) {
     const t = useTranslations("drive");
     function open(url: string) {
-        window.open(url, "_blank", "noopener,noreferrer");
+        openLink(url);
     }
 
     return (

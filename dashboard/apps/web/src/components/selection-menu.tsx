@@ -23,6 +23,7 @@ import {
     TextSelect
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { openLink } from "@/lib/open-link";
 import { desktopBridge } from "@/lib/desktop-bridge";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
@@ -460,7 +461,7 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
                             </DropdownMenuItem>
                         ) : null}
                         <DropdownMenuItem
-                            onSelect={() => void window.open(link.href, "_blank", "noopener")}
+                            onSelect={() => void openLink(link.href)}
                         >
                             <ExternalLink />
                             {desktopBridge() && link.internal

@@ -31,6 +31,7 @@ import { useDisplayFormat, useDisplayPreferences } from "@/components/display-fo
 import { REMINDER_PRESETS, reminderMoment, type ReminderPreset } from "./reminder-times";
 import { copyText, messageLink } from "./links";
 import { useAppUrl } from "@/components/app-url";
+import { openLink } from "@/lib/open-link";
 import { imageItems } from "@/components/image-actions";
 import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { plainText } from "@/components/rich-text/excerpt";
@@ -433,7 +434,7 @@ export function MessageMenu({
                                 work from here. */}
                             <ContextMenuItem
                                 onSelect={() =>
-                                    window.open(link.open, "_blank", "noopener,noreferrer")
+                                    openLink(link.open)
                                 }
                             >
                                 <ExternalLink className="size-3.5" />

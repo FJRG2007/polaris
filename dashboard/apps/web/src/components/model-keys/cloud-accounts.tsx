@@ -34,6 +34,7 @@ import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { cloudCredentialSchema, type CloudProvider } from "@/lib/agents/cloud-credentials";
 import type * as cloudActions from "@/app/(app)/polar/settings/providers/cloud-actions";
 import type { CloudAddResult } from "@/lib/agents/connection-actions";
+import { openLink } from "@/lib/open-link";
 
 const CLOUDS: readonly { provider: CloudProvider; name: string }[] = [
     { provider: "amazon-bedrock", name: "Amazon Bedrock" }, // i18n-ignore: product name
@@ -318,7 +319,7 @@ function CloudDialog({ provider, name, onClose }: { provider: CloudProvider; nam
         void runAction(() => startDigitaloceanLoginAction(), setFailure).then((started) => {
             if (!started) return;
             setLogin(started);
-            window.open(started.url, "_blank", "noopener,noreferrer");
+            openLink(started.url);
         });
     };
 

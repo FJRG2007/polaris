@@ -16,6 +16,7 @@ import { VariableGroupsButton } from "./variable-groups";
 import { createProjectAction, deleteProjectAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
+import { openLink } from "@/lib/open-link";
 import {
     forwardRef,
     useEffect,
@@ -401,7 +402,7 @@ function ProjectMenu({
                         <MenuShortcut keys="Enter" />
                     </ContextMenuItem>
                     <ContextMenuItem
-                        onSelect={() => window.open(href, "_blank", "noopener,noreferrer")}
+                        onSelect={() => openLink(href)}
                     >
                         <SquareArrowOutUpRight className="size-4" /> {t("projects.openNewTab")}
                         <MenuShortcut keys="Mod+Enter" />

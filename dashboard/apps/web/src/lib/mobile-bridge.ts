@@ -13,6 +13,8 @@ interface PolarisMobileBridge {
     lastPickSource?(): string;
     canViewOnce?(): boolean;
     openViewOnce?(attachmentId: string): void;
+    /** Hand a web or mail address to the phone's browser or mail app. */
+    openExternal?(url: string): void;
 }
 
 function bridge(): PolarisMobileBridge | null {
@@ -41,6 +43,21 @@ export function openViewOnce(attachmentId: string): boolean {
     if (!found?.openViewOnce || !canViewOnce()) return false;
     found.openViewOnce(attachmentId);
     return true;
+}
+
+/**
+ * Open an outside address in the phone's own browser or mail app. False in a
+ * browser and in an app too old to, so the caller opens it the web's way.
+ */
+export function openExternal(url: string): boolean {
+    const found = bridge();
+    if (typeof found?.openExternal !== "function") return false;
+    try {
+        found.openExternal(url);
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 /** Where the last picked file came from, when the app knows. */

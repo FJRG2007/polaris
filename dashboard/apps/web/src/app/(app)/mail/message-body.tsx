@@ -34,6 +34,7 @@ import * as core from "@polaris/core";
 import { ShieldCheck } from "lucide-react";
 import { cleanedAlready, sanitizeMail } from "./sanitize";
 import * as selectionMenu from "@/lib/selection-menu";
+import { framedOpenHref, openLink } from "@/lib/open-link";
 import { TrimmedPill } from "./trimmed-pill";
 import { trimReceivedHtml, trimReceivedText } from "./trimmed-content";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -259,7 +260,7 @@ function readerColors(): { foreground: string; link: string; dark: boolean } {
 
 /** The wrapper the message is drawn inside. Nothing here is the message's: the
  *  policy, the base target, the colours and the height reporter are all ours. */
-function frameDocument(
+export function frameDocument(
     body: string,
     showRemote: boolean,
     paper: MessagePaper,
@@ -373,6 +374,27 @@ function frameDocument(
       event.preventDefault();
       parent.postMessage({ polarisMailMenu: { x: x, y: y, text: text } }, "*");
     }, true);
+    // A click on a link is handed to the page, which opens it the way every
+    // other link in Polaris opens. Left to the frame, it is a popup out of a
+    // sandbox, and the phone app's WebView has nowhere to put one: the click
+    // did nothing. A link to a place in the message scrolls there instead.
+    function follow(event) {
+      if (event.button !== 0 && event.button !== 1) return;
+      var anchor = event.target && event.target.closest ? event.target.closest("a[href]") : null;
+      if (!anchor) return;
+      event.preventDefault();
+      var raw = anchor.getAttribute("href") || "";
+      if (raw.charAt(0) === "#") {
+        var name = raw.slice(1);
+        var spot = name && (document.getElementById(name) || document.getElementsByName(name)[0]);
+        if (spot && spot.scrollIntoView) spot.scrollIntoView();
+        return;
+      }
+      if (!/^(https?:|mailto:)/i.test(anchor.href)) return;
+      parent.postMessage({ polarisMailOpen: anchor.href }, "*");
+    }
+    document.addEventListener("click", follow, true);
+    document.addEventListener("auxclick", follow, true);
   })();
 </script>
 </head><body><div id="polaris-body">${body}</div>
@@ -515,6 +537,12 @@ export function SandboxedHtml({
             // Only the frame this component owns, and only a number. Anything
             // else on the wire is somebody else's message.
             if (event.source !== frame.current?.contentWindow) return;
+            const opened = (event.data as { polarisMailOpen?: unknown } | null)?.polarisMailOpen;
+            if (opened !== undefined) {
+                const href = framedOpenHref(opened);
+                if (href) openLink(href);
+                return;
+            }
             const menu = (event.data as { polarisMailMenu?: unknown } | null)?.polarisMailMenu;
             if (menu !== undefined) {
                 const box = frame.current.getBoundingClientRect();

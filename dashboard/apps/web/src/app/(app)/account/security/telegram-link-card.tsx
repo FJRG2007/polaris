@@ -17,6 +17,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TwoFactorMethodStatus } from "@/lib/two-factor-delivery";
 import { checkTelegramLinkAction, startTelegramLinkAction, unlinkTelegramAction } from "./two-factor-actions";
+import { openLink } from "@/lib/open-link";
 
 const CHECK_EVERY_MS = 3_000;
 /** Matches the link's lifetime on the server. */
@@ -64,7 +65,7 @@ export function TelegramLinkCard({ status, locked }: { status: TwoFactorMethodSt
             const result = await startTelegramLinkAction();
             if (result.error || !result.url) return setError(result.error ?? t("telegram.failed"));
             setUrl(result.url);
-            window.open(result.url, "_blank", "noopener,noreferrer");
+            openLink(result.url);
         });
     }
 
