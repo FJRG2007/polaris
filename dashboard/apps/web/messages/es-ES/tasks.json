@@ -180,6 +180,7 @@
         }
     },
     "errors": {
+        "polarPress": "Polar no pudo hacerlo. Inténtalo en un momento.",
         "ruleNeedsSpace": "Una regla tiene que ser de un espacio",
         "viewNeedsPlace": "Una vista tiene que pertenecer a una lista o a un espacio",
         "checkDates": "Revisa las fechas y reinténtalo",
@@ -339,6 +340,8 @@
         "folderGone": "Esa carpeta ya no existe",
         "listGone": "Esa lista ya no existe",
         "taskGone": "Esa tarea ya no existe",
+        "polarButtonGone": "Este botón ya no funciona. Pregunta a Polar.",
+        "polarButtonNotYours": "Solo quien preguntó a Polar puede usar esto.",
         "goalGone": "Ese objetivo ya no existe",
         "targetGone": "Esa meta ya no existe",
         "pageGone": "Esa página ya no existe",

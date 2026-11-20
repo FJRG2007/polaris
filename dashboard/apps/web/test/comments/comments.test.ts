@@ -103,7 +103,8 @@ describe("reading", () => {
                 resolvedAt: null,
                 createdAt: AT.toISOString(),
                 author: { id: "u1", name: "Ana", image: null },
-                files: []
+                files: [],
+                components: []
             }
         ]);
         // An app's thread carries no files, so it does not pay for the query.

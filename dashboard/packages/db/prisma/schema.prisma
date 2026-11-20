@@ -44,6 +44,7 @@ model User {
     translateKeepList TranslateKeepList?
     polarToolGrants   PolarToolGrant[]
     polarChatCalls    PolarChatCall[]
+    polarCommentCalls PolarCommentCall[]
     polarCustomTools  PolarCustomTool[]
     polarPlugins      PolarPlugin[]
     polarProjectToolApprovals PolarProjectToolApproval[]
@@ -7983,6 +7984,10 @@ model Comment {
     // answering a mention. Null for everything else.
     agent        String?
     body         String
+    // The buttons under an assistant's comment, in Chat's component shape
+    // (lib/chat/message-components): Approve/Cancel for a change Polar waits to
+    // make, Try again after a failure. Null for every comment a person wrote.
+    components   Json?
     // No FKs: both are display references that must survive the account leaving.
     assignedToId String?   @db.Uuid
     resolvedById String?   @db.Uuid
@@ -7993,6 +7998,7 @@ model Comment {
     user    User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
     parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
     replies Comment[] @relation("CommentReplies")
+    polarCalls PolarCommentCall[]
 
     @@index([subjectType, subjectId, createdAt])
     @@index([parentId])
@@ -17317,6 +17323,27 @@ model PolarChatCall {
     createdAt DateTime    @default(now())
 
     @@index([messageId])
+    @@index([createdAt])
+}
+
+// A change Polar wants to make after an @polar mention in a comment thread
+// (a task's), waiting on the person who asked to approve it. PolarChatCall's
+// twin for a thread whose rows are comments rather than chat messages.
+model PolarCommentCall {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    ownerId   String   @db.Uuid
+    owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    // Polar's comment carrying the buttons.
+    commentId String   @db.Uuid
+    comment   Comment  @relation(fields: [commentId], references: [id], onDelete: Cascade)
+    // The comment that asked.
+    mentionId String   @db.Uuid
+    tool      String
+    input     Json
+    done      Json     @default("[]")
+    createdAt DateTime @default(now())
+
+    @@index([commentId])
     @@index([createdAt])
 }
 

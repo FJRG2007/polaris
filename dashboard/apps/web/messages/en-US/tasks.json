@@ -180,6 +180,7 @@
         }
     },
     "errors": {
+        "polarPress": "Polar could not do that. Try again in a moment.",
         "ruleNeedsSpace": "A rule has to belong to a space",
         "viewNeedsPlace": "A view has to belong to a list or a space",
         "checkDates": "Check the dates and try again",
@@ -339,6 +340,8 @@
         "folderGone": "That folder no longer exists",
         "listGone": "That list no longer exists",
         "taskGone": "That task no longer exists",
+        "polarButtonGone": "This button no longer works. Ask Polar again.",
+        "polarButtonNotYours": "Only the person who asked Polar can use this.",
         "goalGone": "That goal no longer exists",
         "targetGone": "That target no longer exists",
         "pageGone": "That page no longer exists",

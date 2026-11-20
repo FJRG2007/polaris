@@ -17,8 +17,9 @@
  * the subject.
  */
 
-import { prisma, type Prisma } from "@polaris/db";
+import { prisma, Prisma } from "@polaris/db";
 import type { ActivitySubject } from "@/lib/activity/activity";
+import { messageComponentSchema, type MessageComponentInput } from "@/lib/chat/message-components";
 
 /** The same vocabulary of subjects the history uses. A thing worth discussing is
  *  a thing worth a history, so there is one list rather than two that drift. */
@@ -45,6 +46,44 @@ export interface CommentView {
      * view so the bubble that draws a comment does not need two of them.
      */
     readonly files: readonly CommentFile[];
+    /** The buttons under an assistant's comment (Approve, Try again...), each
+     *  with whom it is for. Empty for every comment a person wrote. */
+    readonly components: readonly CommentButton[];
+}
+
+/** A button or link under an assistant's comment, as the thread draws it. */
+export type CommentButton =
+    | { readonly type: "link"; readonly label: string; readonly href: string }
+    | {
+          readonly type: "button";
+          readonly label: string;
+          readonly style: string;
+          readonly action: string;
+          readonly value: string | null;
+          /** The only person it is drawn for and answers; null for everybody. */
+          readonly for: string | null;
+      };
+
+/** The stored buttons, read total: anything malformed or of another kind is left out. */
+export function commentButtons(value: unknown): CommentButton[] {
+    if (!Array.isArray(value)) return [];
+    return value.flatMap((item): CommentButton[] => {
+        const parsed = messageComponentSchema.safeParse(item);
+        if (!parsed.success) return [];
+        const component = parsed.data;
+        if (component.type === "link") return [{ type: "link", label: component.label, href: component.href }];
+        if (component.type !== "button") return [];
+        return [
+            {
+                type: "button",
+                label: component.label,
+                style: component.style,
+                action: component.action,
+                value: component.value ?? null,
+                for: component.for ?? null
+            }
+        ];
+    });
 }
 
 /** A file sent with a comment, as the thread draws it. */
@@ -72,11 +111,14 @@ export async function post(
     input: CommentInput,
     client: Prisma.TransactionClient = prisma,
     /** An assistant writing it, with no account behind it. */
-    agent: string | null = null
+    agent: string | null = null,
+    /** The buttons under an assistant's comment; never a person's. */
+    components: readonly MessageComponentInput[] = []
 ): Promise<string> {
     const comment = await client.comment.create({
         data: {
             agent: actorId ? null : agent,
+            ...(!actorId && agent && components.length > 0 ? { components: components as object[] } : {}),
             subjectType: input.subjectType,
             subjectId: input.subjectId,
             parentId: input.parentId ?? null,
@@ -107,6 +149,7 @@ export async function thread(
             resolvedAt: true,
             createdAt: true,
             agent: true,
+            components: true,
             // Not the picture an OAuth provider handed better-auth: a face is
             // resolved from the account id, through the one route that puts an
             // uploaded photo first. Read here, it outranked the photo somebody
@@ -147,8 +190,27 @@ export async function thread(
         createdAt: row.createdAt.toISOString(),
         author: row.user,
         agent: row.agent,
-        files: byComment.get(row.id) ?? []
+        files: byComment.get(row.id) ?? [],
+        components: row.agent ? commentButtons(row.components) : []
     }));
+}
+
+/**
+ * Writes an assistant's comment again - its answer after "Try again" or
+ * "Approve" - with its new buttons. Only a comment that assistant wrote, on the
+ * subject named: false when there is none.
+ */
+export async function rewriteAgentComment(
+    ref: { readonly subjectType: CommentSubject; readonly subjectId: string; readonly commentId: string },
+    agent: string,
+    body: string,
+    components: readonly MessageComponentInput[]
+): Promise<boolean> {
+    const updated = await prisma.comment.updateMany({
+        where: { id: ref.commentId, subjectType: ref.subjectType, subjectId: ref.subjectId, userId: null, agent },
+        data: { body, components: components.length > 0 ? (components as object[]) : Prisma.DbNull }
+    });
+    return updated.count > 0;
 }
 
 /** Only the author may rewrite what they said. */

@@ -36,6 +36,7 @@ import { cn, Input, Button, SegmentedControl, Checkbox } from "@polaris/ui";
 import { Composer } from "@/app/(app)/chat/composer";
 import { PolarBadge, PolarBotCard, PolarFace, POLAR_NAME } from "@/components/polar/polar-bot";
 import { CheckCircle2, Paperclip, Play, Square, Trash2 } from "lucide-react";
+import Link from "next/link";
 import type { ActivityView, CommentView, TimeEntryView } from "@/lib/tasks/task-service";
 import { describeActivity, mergeConversation, type ConversationFilter } from "./conversation";
 
@@ -63,6 +64,73 @@ const COMMENT_RULES: core.ChatRules = {
     // composer. It was zero, which is why the buttons were not drawn at all.
     maxAttachments: core.DEFAULT_CHAT_RULES.maxAttachments
 };
+
+/** Chat's button styles, as the shared Button draws them. */
+const BUTTON_VARIANT = { primary: "primary", success: "primary", danger: "danger" } as const;
+
+/**
+ * The buttons under Polar's comment: Approve and Cancel for a change it waits
+ * to make, Try again after a failure, the link that fixes a missing provider.
+ * A button meant for one person is drawn only for them, and the server checks
+ * it again. Pressing one waits for Polar; the new answer arrives live.
+ */
+function PolarButtons({
+    taskId,
+    comment,
+    currentUserId,
+    onChanged,
+    onError
+}: {
+    taskId: string;
+    comment: CommentView;
+    currentUserId: string;
+    onChanged: () => void;
+    onError: (message: string) => void;
+}) {
+    const [pressing, setPressing] = useState<string | null>(null);
+    const shown = comment.components.filter((item) => item.type === "link" || !item.for || item.for === currentUserId);
+    if (shown.length === 0) return null;
+    return (
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+            {shown.map((item, index) =>
+                item.type === "link" ? (
+                    <Button key={index} asChild size="sm" variant="secondary">
+                        <Link href={item.href} prefetch={false}>
+                            {item.label}
+                        </Link>
+                    </Button>
+                ) : (
+                    <Button
+                        key={index}
+                        size="sm"
+                        variant={BUTTON_VARIANT[item.style as keyof typeof BUTTON_VARIANT] ?? "secondary"}
+                        disabled={pressing !== null}
+                        aria-busy={pressing === `${item.action}:${item.value}`}
+                        onClick={async () => {
+                            setPressing(`${item.action}:${item.value}`);
+                            onError("");
+                            const result = await runAction(
+                                () =>
+                                    actions.pressPolarCommentAction({
+                                        taskId,
+                                        commentId: comment.id,
+                                        action: item.action,
+                                        value: item.value
+                                    }),
+                                onError
+                            );
+                            if (result?.error) onError(result.error);
+                            setPressing(null);
+                            onChanged();
+                        }}
+                    >
+                        <span className="min-w-0 truncate">{item.label}</span>
+                    </Button>
+                )
+            )}
+        </div>
+    );
+}
 
 export function ActivityStream({
     taskId,
@@ -228,6 +296,15 @@ export function ActivityStream({
                             )
                         )}
                     </div>
+                )}
+                {comment.components.length > 0 && (
+                    <PolarButtons
+                        taskId={taskId}
+                        comment={comment}
+                        currentUserId={currentUserId}
+                        onChanged={onChanged}
+                        onError={onError}
+                    />
                 )}
                 <div className="mt-1 flex items-center gap-3 text-[0.6875rem] text-muted-foreground">
                     {!nested && (

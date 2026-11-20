@@ -44,6 +44,7 @@ import * as commits from "@/lib/tasks/commit-service";
 import * as files from "@/lib/tasks/attachment-service";
 import * as planning from "@/lib/tasks/planning-service";
 import * as details from "@/lib/tasks/task-detail-service";
+import * as polarComment from "@/lib/tasks/polar-comment";
 import * as automations from "@/lib/tasks/automation-service";
 
 const TASKS_PATH = "/tasks";
@@ -977,6 +978,36 @@ export async function addCommentAction(
         return { commentId };
     } catch (caught) {
         return failure(caught, "errors.postComment");
+    }
+}
+
+const polarPressSchema = z.object({
+    taskId: z.string().uuid(),
+    commentId: z.string().uuid(),
+    action: z.enum(["polar.retry", "polar.approve", "polar.cancel"]),
+    value: z.string().trim().min(1).max(200).nullable()
+});
+
+/**
+ * A button under Polar's comment: Try again, or Approve/Cancel for a change it
+ * offered. Only the person who asked may press it, and an approved change runs
+ * with their permissions, checked again now. Anything but a refusal written for
+ * people is logged and answered with one readable line.
+ */
+export async function pressPolarCommentAction(input: unknown): Promise<{ error?: string }> {
+    const caller = await actor("tasks.read");
+    const parsed = polarPressSchema.safeParse(input);
+    if (!parsed.success) return { error: await errorText("errors.polarPress") };
+    try {
+        await access.requireTask(caller, parsed.data.taskId, "guest");
+        await polarComment.pressTaskPolar(caller, parsed.data);
+        revalidatePath(TASKS_PATH, "layout");
+        return {};
+    } catch (caught) {
+        const refused = refusalText(await getTranslations("tasks"), caught);
+        if (refused) return { error: refused };
+        console.error("tasks: a Polar button failed:", caught);
+        return { error: await errorText("errors.polarPress") };
     }
 }
 

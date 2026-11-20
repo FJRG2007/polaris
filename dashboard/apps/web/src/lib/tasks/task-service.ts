@@ -20,6 +20,7 @@ import { prisma, type Prisma } from "@polaris/db";
 import * as activity from "@/lib/activity/activity";
 import * as follow from "@/lib/follow/follow";
 import * as comments from "@/lib/comments/comments";
+import { commentButtons } from "@/lib/comments/comments";
 import { dropGrantsFor } from "@/lib/access/grants";
 import { notify } from "@/lib/notifications/dispatch";
 import type { PersonRef, TagRef, TaskRow } from "./facts";
@@ -363,6 +364,7 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
                 resolvedAt: true,
                 createdAt: true,
                 agent: true,
+                components: true,
                 user: { select: { id: true, name: true } }
             }
         }),
@@ -466,7 +468,8 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
             assignedToId: comment.assignedToId,
             resolvedAt: comment.resolvedAt?.toISOString() ?? null,
             createdAt: comment.createdAt.toISOString(),
-            files: filesByComment.get(comment.id) ?? []
+            files: filesByComment.get(comment.id) ?? [],
+            components: comment.agent ? commentButtons(comment.components) : []
         })),
         dependencies: [
             ...blocking.map((edge) => toDependency(edge.id, edge.type, "blocking", edge.blocked)),
