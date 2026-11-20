@@ -819,6 +819,7 @@ export function MailShell({
                         </Button>
                         {reading ? (
                             <Link
+                                data-swipe-back
                                 href={pathname.startsWith("/mail/t/") ? "/mail" : pathname}
                                 className="text-[13px] text-muted-foreground"
                             >

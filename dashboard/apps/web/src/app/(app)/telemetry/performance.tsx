@@ -301,7 +301,7 @@ export function RouteView({
     return (
         <div className="flex min-w-0 flex-col gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <Link
+                <Link data-swipe-back
                     href={backHref}
                     aria-label={t("performance.back")}
                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

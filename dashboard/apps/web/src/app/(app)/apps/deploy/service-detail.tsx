@@ -1391,7 +1391,7 @@ function DeploymentLogsView({
     return (
         <div className="flex flex-col gap-2 py-2">
             <div className="flex items-center gap-2">
-                <button
+                <button data-swipe-back
                     type="button"
                     onClick={onBack}
                     className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

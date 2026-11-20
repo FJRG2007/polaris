@@ -272,7 +272,7 @@ export function BookingPageEditor({
         <div className="flex flex-col gap-4">
             {confirmNode}
             <div className="flex flex-wrap items-center gap-2">
-                <Link
+                <Link data-swipe-back
                     href="/calendar/booking"
                     className={buttonVariants({ size: "sm", variant: "ghost" })}
                 >

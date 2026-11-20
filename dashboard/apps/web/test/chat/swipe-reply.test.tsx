@@ -11,6 +11,7 @@
  * came before. Last, the hook on a real row, with touch events.
  */
 
+import { SWIPE_BACK_EDGE } from "@polaris/ui";
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -276,12 +277,16 @@ function Row({ onReply, folded }: { onReply?: () => void; folded?: boolean }) {
     );
 }
 
+/** Where the row's touches land across the screen: clear of the strip along
+ *  its edge, which is the swipe back to the list's (see the last test). */
+const LANE = 40;
+
 /** A touch event with the lists jsdom's plain Event does not carry. */
-function touchEvent(type: string, touches: readonly TouchPoint[], cancelable = true): Event {
+function touchEvent(type: string, touches: readonly TouchPoint[], cancelable = true, lane = LANE): Event {
     const event = new Event(type, { bubbles: true, cancelable });
     const list = touches.map((touch) => ({
         identifier: touch.id,
-        clientX: touch.x,
+        clientX: touch.x + lane,
         clientY: touch.y
     }));
     Object.defineProperty(event, "touches", { value: list });
@@ -309,6 +314,17 @@ beforeEach(() => {
 });
 
 describe("the row", () => {
+    it("leaves a swipe from the screen's edge to the swipe back to the list", () => {
+        const onReply = vi.fn();
+        const { getByTestId } = render(<Row onReply={onReply} />);
+        const row = getByTestId("row");
+        row.dispatchEvent(touchEvent("touchstart", at(SWIPE_BACK_EDGE - 4, 100), true, 0));
+        row.dispatchEvent(touchEvent("touchmove", at(SWIPE_BACK_EDGE + 100, 100), true, 0));
+        row.dispatchEvent(touchEvent("touchend", [], true, 0));
+        expect(onReply).not.toHaveBeenCalled();
+        expect(row.style.transform).toBe("");
+    });
+
     it("replies on a short swipe, ticks, claims the moves and the lift", () => {
         const onReply = vi.fn();
         const { getByTestId } = render(<Row onReply={onReply} />);

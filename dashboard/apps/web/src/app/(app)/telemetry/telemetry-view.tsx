@@ -303,7 +303,7 @@ export function TelemetryView({
         <div className="flex min-w-0 flex-col gap-4">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <Button variant="ghost" size="sm" asChild>
-                    <Link href={paths.PROJECTS_HREF}>
+                    <Link data-swipe-back href={paths.PROJECTS_HREF}>
                         <ArrowLeft className="size-3.5" />
                         {t("view.projects")}
                     </Link>
@@ -591,7 +591,7 @@ function IssueScreen({
         return (
             <div className="flex flex-col gap-4" aria-busy={!error}>
                 <div className="flex items-center gap-2">
-                    <Link
+                    <Link data-swipe-back
                         href={back}
                         aria-label={t("issue.back")}
                         className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -624,7 +624,7 @@ function IssueScreen({
     return (
         <div className="flex min-w-0 flex-col gap-4">
             <div className="flex min-w-0 flex-wrap items-start gap-2">
-                <Link
+                <Link data-swipe-back
                     href={back}
                     aria-label={t("issue.back")}
                     className="mt-0.5 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

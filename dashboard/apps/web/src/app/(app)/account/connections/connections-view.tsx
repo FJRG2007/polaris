@@ -224,7 +224,7 @@ export function ConnectionsView({
             {returnTo ? (
                 <div>
                     <Button asChild size="sm" variant="secondary">
-                        <Link href={returnTo}>
+                        <Link data-swipe-back href={returnTo}>
                             <ArrowLeft className="size-4" />
                             {t("connections.hub.back")}
                         </Link>

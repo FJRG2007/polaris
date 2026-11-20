@@ -156,7 +156,7 @@ export function SavedView() {
     return (
         <div className="flex min-h-0 flex-1 flex-col">
             <div className="flex h-header shrink-0 items-center gap-2 border-b border-border px-3">
-                <Link
+                <Link data-swipe-back
                     href="/chat"
                     aria-label={t("saved.backToConversations")}
                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"

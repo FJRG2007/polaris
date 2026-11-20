@@ -411,7 +411,7 @@ export function FilterEditor({
         <flow.IssueProvider value={issueLookup}>
             <div className="flex min-w-0 flex-col gap-4">
                 <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" variant="ghost" className="px-2" onClick={onClose}>
+                    <Button data-swipe-back size="sm" variant="ghost" className="px-2" onClick={onClose}>
                         <ArrowLeft className="size-4 shrink-0" />
                         {t("rules.editor.back")}
                     </Button>

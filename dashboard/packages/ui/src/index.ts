@@ -230,6 +230,7 @@ export {
     PHONE_TABS_HIDE,
     shellScroller
 } from "./shell/app-shell";
+export { SWIPE_BACK_EDGE } from "./shell/swipe-back";
 export {
     fitBoard,
     useBoardGestures,

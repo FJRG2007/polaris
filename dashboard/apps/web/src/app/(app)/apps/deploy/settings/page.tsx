@@ -22,7 +22,7 @@ export default async function DeploySettingsPage() {
     ]);
     return (
         <div className="mx-auto flex w-full max-w-2xl flex-col">
-            <Link
+            <Link data-swipe-back
                 href="/apps/deploy"
                 className="mb-3 inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
             >

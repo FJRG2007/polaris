@@ -63,7 +63,7 @@ export function ServerView({
     return (
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
             <div className="flex items-center gap-2">
-                <Link
+                <Link data-swipe-back
                     href="/mail-server"
                     className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                     aria-label={t("view.back")}

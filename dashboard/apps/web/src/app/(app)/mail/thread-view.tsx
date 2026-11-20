@@ -469,7 +469,7 @@ export function ThreadView({
                 room at all, and it was printed one letter to a line. */}
             <header className="flex shrink-0 flex-wrap items-start gap-2 border-b border-border px-4 py-3">
                 {onBack ? (
-                    <Button
+                    <Button data-swipe-back
                         variant="ghost"
                         size="icon"
                         aria-label={t("shell.backToList")}

@@ -14,6 +14,7 @@
  */
 
 import { cn } from "../lib/cn";
+import { useSwipeBack } from "./swipe-back";
 import { useEffect, useRef, type ReactNode } from "react";
 
 /** How long a return keeps trying to reach its old position while the screen
@@ -27,6 +28,7 @@ const here = () => `${location.pathname}${location.search}`;
 
 export function ShellMain({ className, children }: { className?: string; children: ReactNode }) {
     const ref = useRef<HTMLElement>(null);
+    useSwipeBack(ref);
 
     useEffect(() => {
         const main = ref.current;

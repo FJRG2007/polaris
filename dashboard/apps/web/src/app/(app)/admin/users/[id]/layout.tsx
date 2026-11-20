@@ -31,7 +31,7 @@ export default async function UserRecordLayout({
         <>
             {/* Above the name, because that is where somebody looks for the way
                 back out of a record they opened from a list. */}
-            <Link
+            <Link data-swipe-back
                 href="/admin/users"
                 className="mb-2 flex w-fit items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
             >

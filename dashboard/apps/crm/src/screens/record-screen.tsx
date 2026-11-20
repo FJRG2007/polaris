@@ -154,7 +154,7 @@ export function RecordScreen({ object, id, panel = false, onSaved }: RecordScree
         <div className={cn("flex min-w-0 flex-wrap items-center gap-2", panel && "pe-10")}>
             {panel ? null : (
                 <Button variant="ghost" size="sm" asChild>
-                    <Link href={`/crm/${object}`}>
+                    <Link data-swipe-back href={`/crm/${object}`}>
                         <ArrowLeft className="size-4" />
                         <span className="truncate" title={plural}>
                             {plural}

@@ -2154,7 +2154,7 @@ export function FilesView({
                 <div className="flex min-w-0 flex-1 flex-col lg:pe-72">
                     <div className="mb-3 flex items-center justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-2">
-                            <Button size="sm" variant="ghost" onClick={closeViewer}>
+                            <Button data-swipe-back size="sm" variant="ghost" onClick={closeViewer}>
                                 <ChevronLeft className="size-4" />
                                 {t("filesView.viewer.back")}
                             </Button>
@@ -2245,8 +2245,13 @@ export function FilesView({
                 ) : (
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                         <div className="flex min-w-0 flex-wrap items-center gap-1 text-sm text-muted-foreground">
+                            {/* The crumb one up from here is where a swipe back
+                                goes on a phone (useSwipeBack). */}
                             <Link
                                 href={href(connectionId, rootPath)}
+                                data-swipe-back={
+                                    segments.length === depthOf(rootPath) + 1 ? "" : undefined
+                                }
                                 {...segmentDropProps(rootPath)}
                                 className={cn(
                                     "rounded px-1 py-0.5 hover:text-foreground",
@@ -2278,6 +2283,12 @@ export function FilesView({
                                             <ContextMenuTrigger asChild>
                                                 <Link
                                                     href={href(connectionId, target)}
+                                                    data-swipe-back={
+                                                        depthOf(rootPath) + index + 2 ===
+                                                        segments.length
+                                                            ? ""
+                                                            : undefined
+                                                    }
                                                     {...segmentDropProps(target)}
                                                     className={cn(
                                                         "truncate rounded px-1 py-0.5 hover:text-foreground",

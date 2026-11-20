@@ -66,7 +66,7 @@ export function RunDetailView({ runId }: { runId: string }) {
 
     return (
         <div className="space-y-4">
-            <Link
+            <Link data-swipe-back
                 href="/automations/runs"
                 className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >

@@ -17,7 +17,7 @@ export function PageHeader({ title, onBack }: { title: string; onBack: () => voi
     const t = useTranslations("firewall");
     return (
         <div className="flex items-center gap-2">
-            <button
+            <button data-swipe-back
                 type="button"
                 onClick={onBack}
                 aria-label={t("page.backToList")}

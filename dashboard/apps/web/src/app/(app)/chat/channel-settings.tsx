@@ -331,7 +331,7 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
                 )}
             >
                 <header className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2.5 md:border-b-0 md:px-8 md:pt-6">
-                    <Link
+                    <Link data-swipe-back
                         href={base}
                         aria-label={t("channelSettings.back")}
                         title={t("channelSettings.back")}

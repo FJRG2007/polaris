@@ -42,6 +42,7 @@
  * gesture that stutters.
  */
 
+import { SWIPE_BACK_EDGE } from "@polaris/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /** How far the finger has to travel before the gesture decides which way it is
@@ -215,6 +216,12 @@ function inSideScroller(target: Element | null, row: Element): boolean {
     return false;
 }
 
+/** Whether a press at `x` lands on the strip along the screen's leading edge. */
+function edgeOfScreen(x: number): boolean {
+    const rtl = typeof document !== "undefined" && document.documentElement.dir === "rtl";
+    return rtl ? x >= window.innerWidth - SWIPE_BACK_EDGE : x <= SWIPE_BACK_EDGE;
+}
+
 /** Whether the reader has text selected inside this row, and so is adjusting a
  *  selection rather than swiping. */
 function selecting(row: Element): boolean {
@@ -290,9 +297,13 @@ export function useSwipeReply(onReply: (() => void) | undefined) {
 
         const onStart = (event: TouchEvent) => {
             const target = event.target as Element | null;
+            const first = event.touches[0];
             if (
                 event.touches.length === 1 &&
-                (selecting(row) ||
+                // The screen's edge is the swipe back to the list's, as it is
+                // over a message in WhatsApp (see useSwipeBack).
+                ((first !== undefined && edgeOfScreen(first.clientX)) ||
+                    selecting(row) ||
                     inSideScroller(target, row) ||
                     // Somewhere a finger already means something else: a field, a
                     // player, a slider. Buttons and links are fine - a tap still

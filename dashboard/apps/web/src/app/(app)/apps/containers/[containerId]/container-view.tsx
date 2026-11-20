@@ -267,7 +267,7 @@ export function ContainerView({
         <div className="flex flex-col gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
-                    <Link
+                    <Link data-swipe-back
                         href={listHref}
                         className="mb-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                     >

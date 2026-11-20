@@ -95,39 +95,46 @@ export const DialogContent = forwardRef<
         showClose?: boolean;
         phone?: PhoneLayout;
     }
->(({ className, children, showClose = true, phone, ...props }, ref) => (
-    <RadixDialog.Portal>
-        <RadixDialog.Overlay className={OVERLAY} />
-        <RadixDialog.Content
-            ref={ref}
-            className={cn(
-                // Centred, so a dialog taller than the window would hang off both
-                // ends of it with no way to reach either - including the buttons.
-                // Capping it and letting the content scroll is what keeps a long
-                // one (a confirmation that explains itself, a form with options)
-                // usable on a laptop in a small window and on a phone.
-                // Its width leaves a margin on each side, so in a narrow window
-                // (a phone, the extension's side panel) it never touches the edges.
-                "fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-xl border border-border-strong bg-elevated p-5 shadow-modal",
-                CENTRED_MOTION,
-                className,
-                // Last, so it wins over the caller's desktop placement on a phone.
-                PHONE_CLASSES[phoneLayout(className, phone)]
-            )}
-            {...props}
-        >
-            {children}
-            {showClose ? (
-                <RadixDialog.Close className={CLOSE}>
-                    <X className="size-4" />
-                    <span className="sr-only">
-                        <CloseWord />
-                    </span>
-                </RadixDialog.Close>
-            ) : null}
-        </RadixDialog.Content>
-    </RadixDialog.Portal>
-));
+>(({ className, children, showClose = true, phone, ...props }, ref) => {
+    const layout = phoneLayout(className, phone);
+    // A dialog that fills a phone is a screen of its own there, and its close
+    // is that screen's back: a swipe from the left takes it away (useSwipeBack).
+    const screen = layout === "full" ? "" : undefined;
+    return (
+        <RadixDialog.Portal>
+            <RadixDialog.Overlay className={OVERLAY} />
+            <RadixDialog.Content
+                ref={ref}
+                className={cn(
+                    // Centred, so a dialog taller than the window would hang off both
+                    // ends of it with no way to reach either - including the buttons.
+                    // Capping it and letting the content scroll is what keeps a long
+                    // one (a confirmation that explains itself, a form with options)
+                    // usable on a laptop in a small window and on a phone.
+                    // Its width leaves a margin on each side, so in a narrow window
+                    // (a phone, the extension's side panel) it never touches the edges.
+                    "fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto overscroll-contain rounded-xl border border-border-strong bg-elevated p-5 shadow-modal",
+                    CENTRED_MOTION,
+                    className,
+                    // Last, so it wins over the caller's desktop placement on a phone.
+                    PHONE_CLASSES[layout]
+                )}
+                data-swipe-back-pane={screen}
+                {...props}
+            >
+                {children}
+                {showClose ? (
+                    <RadixDialog.Close className={CLOSE} data-swipe-back={screen}>
+                        <X className="size-4" />
+                        <span className="sr-only">
+                            <CloseWord />
+                        </span>
+                    </RadixDialog.Close>
+                ) : null}
+            </RadixDialog.Content>
+        </RadixDialog.Portal>
+    );
+});
 DialogContent.displayName = "DialogContent";
 
 /**
@@ -154,11 +161,14 @@ export const SheetContent = forwardRef<
                 "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-right-8 data-[state=closed]:slide-out-to-right-8 data-[state=closed]:duration-fast",
                 className
             )}
+            // Full screen on a phone, where a swipe from the left puts it back
+            // the way a screen goes back (useSwipeBack).
+            data-swipe-back-pane=""
             {...props}
         >
             {children}
             {showClose ? (
-                <RadixDialog.Close className={CLOSE}>
+                <RadixDialog.Close className={CLOSE} data-swipe-back="">
                     <X className="size-4" />
                     <span className="sr-only">
                         <CloseWord />

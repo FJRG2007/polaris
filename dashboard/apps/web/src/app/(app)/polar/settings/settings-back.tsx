@@ -22,7 +22,7 @@ export function SettingsBack({ label }: { label: string }) {
         }
     }, []);
     return (
-        <Link
+        <Link data-swipe-back
             href={href}
             onClick={() => {
                 try {

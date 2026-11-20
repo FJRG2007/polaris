@@ -112,7 +112,7 @@ export function AutomationEditor({ id }: { id: string }) {
 
     return (
         <div className="space-y-6">
-            <Link
+            <Link data-swipe-back
                 href={listHref(data?.automation)}
                 className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >

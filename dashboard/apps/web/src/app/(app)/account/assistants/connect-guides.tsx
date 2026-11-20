@@ -300,7 +300,7 @@ export function ConnectGuides({ urls }: { urls: ServerUrls }) {
                         aria-label={t("guideFor", { client: name })}
                     >
                         <div className="flex min-w-0 items-center gap-3">
-                            <Button
+                            <Button data-swipe-back
                                 ref={back}
                                 variant="ghost"
                                 size="icon"

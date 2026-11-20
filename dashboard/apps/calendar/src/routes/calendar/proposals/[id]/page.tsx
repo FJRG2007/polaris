@@ -27,7 +27,7 @@ export default async function ProposalPage({
                 title={t("proposals.detailTitle")}
                 actions={
                     <Button asChild size="sm" variant="ghost">
-                        <Link
+                        <Link data-swipe-back
                             href="/calendar/proposals"
                             aria-label={t("proposals.backToList")}
                             title={t("proposals.backToList")}

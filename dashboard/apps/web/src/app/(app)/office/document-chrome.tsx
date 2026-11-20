@@ -96,7 +96,7 @@ export function DocumentChrome({
                         aria-label={t("chrome.backToOffice")}
                         title={t("chrome.back")}
                     >
-                        <Link href="/office">
+                        <Link data-swipe-back href="/office">
                             <ArrowLeft className="size-4 shrink-0" aria-hidden />
                         </Link>
                     </Button>

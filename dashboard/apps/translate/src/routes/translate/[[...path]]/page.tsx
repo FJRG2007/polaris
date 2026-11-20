@@ -49,7 +49,7 @@ export default async function TranslatePage({
         );
     return (
         <div className="mx-auto flex w-full min-w-0 max-w-3xl flex-col gap-4">
-            <Link
+            <Link data-swipe-back
                 href="/translate"
                 className="inline-flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >

@@ -59,7 +59,7 @@ export function ApiReferenceView({
         <div className="mx-auto flex max-w-6xl flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                    <Link
+                    <Link data-swipe-back
                         href="/account/api-keys"
                         className="inline-flex items-center gap-1 text-xs text-muted-foreground no-underline hover:text-foreground"
                     >

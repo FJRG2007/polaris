@@ -47,7 +47,7 @@ export default async function PolarisAppSettingsPage({
     return (
         <Messages namespaces={["vpn"]}>
             <div className="mx-auto flex w-full min-w-0 max-w-4xl flex-col gap-4">
-                <Link
+                <Link data-swipe-back
                     href={`/admin/apps/${app.id}`}
                     className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
                 >
@@ -99,7 +99,7 @@ async function PolarSettings() {
     return (
         <Messages namespaces={["polar"]}>
             <div className="mx-auto flex w-full min-w-0 max-w-2xl flex-col gap-4">
-                <Link
+                <Link data-swipe-back
                     href="/admin/apps"
                     className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
                 >

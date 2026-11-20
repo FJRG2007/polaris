@@ -673,7 +673,7 @@ export function AutomationEditor({
     const header = (
         <div className="flex flex-wrap items-center gap-2">
             <Button asChild size="sm" variant="ghost" className="px-2">
-                <Link href={auto.placesAutomationsHref(loaded?.context.placeId)}>
+                <Link data-swipe-back href={auto.placesAutomationsHref(loaded?.context.placeId)}>
                     <ArrowLeft className="size-4 shrink-0" />
                     {t("automations.editor.back")}
                 </Link>

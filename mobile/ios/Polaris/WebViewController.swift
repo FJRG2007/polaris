@@ -60,6 +60,9 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             },
             vpnDown: function (id) {
                 window.webkit.messageHandlers.polarisMobile.postMessage({ kind: "vpnDown", id: String(id) });
+            },
+            swipeBack: function (available) {
+                window.webkit.messageHandlers.polarisMobile.postMessage(available ? "swipeBack:on" : "swipeBack:off");
             }
         });
         """
@@ -173,6 +176,11 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         decisionHandler(.allow)
     }
 
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        // A new document says for itself whether it has a back; until it does, the history swipe is the back.
+        webView.allowsBackForwardNavigationGestures = true
+    }
+
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         retry?.invalidate()
         retry = nil
@@ -253,6 +261,13 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.frameInfo.isMainFrame, ServerAddress.sameOrigin(origin, message.frameInfo.request.url) else { return }
         if message.body as? String == "changeServer" { changeServer() }
+        // The page has a back of its own on screen - a conversation's arrow, a folder's parent - and slides the
+        // screen away under the finger itself; the history swipe would go somewhere else (the conversation opened
+        // before this one, not the list), so it steps aside while the page's is there.
+        if let flag = message.body as? String, flag.hasPrefix("swipeBack:") {
+            web.allowsBackForwardNavigationGestures = flag != "swipeBack:on"
+            return
+        }
         // A link the page opens outside itself: a WebView has no tabs, and a link in a sandboxed frame (a mail
         // body) cannot open a window of its own. Only the web and mail leave.
         if let body = message.body as? [String: Any], let raw = body["openExternal"] as? String,

@@ -304,7 +304,7 @@ export function DropPointDetail({
 
     return (
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
-            <Link
+            <Link data-swipe-back
                 href="/drive/drop-points"
                 className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >

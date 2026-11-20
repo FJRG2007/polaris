@@ -151,7 +151,7 @@ export function DatabasesView() {
         return (
             <div className="flex min-h-0 flex-1 flex-col gap-4">
                 <div className="flex flex-wrap items-center gap-2">
-                    <Button
+                    <Button data-swipe-back
                         variant="ghost"
                         size="sm"
                         onClick={() => router.push("/apps/databases")}

@@ -118,7 +118,7 @@ export function NasDetailView({
 
     return (
         <>
-            <Link
+            <Link data-swipe-back
                 href="/places/nas"
                 className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >

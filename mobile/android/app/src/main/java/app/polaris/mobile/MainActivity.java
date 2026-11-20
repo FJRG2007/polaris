@@ -81,6 +81,9 @@ public final class MainActivity extends Activity {
      *  page the system's own back - and its predictive animation home - is what happens. */
     private Object pageBack;
     private boolean pageBackRegistered;
+    /** Whether the page has a back of its own on screen (a conversation's arrow, a folder's parent), told by the
+     *  page through {@link PageBridge#swipeBack(boolean)}. While it does, back is the page's to take. */
+    private boolean pageSwipeBack;
 
     @Override
     protected void onCreate(Bundle saved) {
@@ -213,6 +216,8 @@ public final class MainActivity extends Activity {
         @Override
         public void onPageStarted(WebView view, String url, Bitmap icon) {
             loading.setVisibility(View.VISIBLE);
+            // A new document says for itself whether it has a back; until it does, history is the back.
+            setPageSwipeBack(false);
         }
 
         @Override
@@ -517,25 +522,94 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /** The page has a back of its own on screen, or no longer has. */
+    void setPageSwipeBack(boolean available) {
+        pageSwipeBack = available;
+        syncBack();
+    }
+
+    /**
+     * Back, wherever it came from: the page's own back first when it has one - it slides the screen away and goes
+     * where the screen's back arrow goes - then the page's history. Returns false when there was neither, which on
+     * Android 12 and earlier leaves the system to take the app home.
+     */
+    private boolean goBack() {
+        if (web == null) return false;
+        if (pageSwipeBack) {
+            WebView page = web;
+            page.evaluateJavascript("(function(){var d=window.polarisSwipeBack;return !!(d&&d.commit());})()", answer -> {
+                if (!"true".equals(answer) && page.canGoBack()) page.goBack();
+                syncBack();
+            });
+            return true;
+        }
+        if (!web.canGoBack()) return false;
+        web.goBack();
+        syncBack();
+        return true;
+    }
+
+    /** Hands a gesture's progress to the page, which moves the screen with it. */
+    void driveSwipeBack(String call) {
+        if (web != null && pageSwipeBack) web.evaluateJavascript("window.polarisSwipeBack&&window.polarisSwipeBack." + call, null);
+    }
+
     /**
      * Android 13 and later deliver back through a callback instead of onBackPressed, and from Android 16 on an app
-     * that targets it is never sent onBackPressed at all. The page's own history goes first; with none left, the
-     * callback is withdrawn and the system takes the app home.
+     * that targets it is never sent onBackPressed at all. The page's own back and its history go first; with neither
+     * left, the callback is withdrawn and the system takes the app home. From Android 14 the system's predictive back
+     * reports how far the gesture has gone, and the page's screen follows it (see {@link PredictiveBack}).
      */
     private void syncBack() {
         if (android.os.Build.VERSION.SDK_INT < 33) return;
-        boolean wanted = web != null && web.canGoBack();
+        boolean wanted = web != null && (pageSwipeBack || web.canGoBack());
         if (wanted == pageBackRegistered) return;
         OnBackInvokedDispatcher dispatcher = getOnBackInvokedDispatcher();
         if (pageBack == null) {
-            pageBack = (OnBackInvokedCallback) () -> {
-                if (web != null && web.canGoBack()) web.goBack();
-                syncBack();
-            };
+            pageBack = android.os.Build.VERSION.SDK_INT >= 34
+                ? PredictiveBack.create(this)
+                : (OnBackInvokedCallback) this::goBack;
         }
         if (wanted) dispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, (OnBackInvokedCallback) pageBack);
         else dispatcher.unregisterOnBackInvokedCallback((OnBackInvokedCallback) pageBack);
         pageBackRegistered = wanted;
+    }
+
+    /**
+     * Android 14's predictive back: while the finger is still on the edge, the page's screen slides with it, and
+     * letting go short of the system's threshold puts it back. Kept in its own class so its types are only loaded on
+     * the systems that have them.
+     */
+    @android.annotation.TargetApi(34)
+    private static final class PredictiveBack {
+        static Object create(MainActivity activity) {
+            return new android.window.OnBackAnimationCallback() {
+                private boolean driving;
+
+                @Override
+                public void onBackStarted(android.window.BackEvent event) {
+                    driving = activity.pageSwipeBack;
+                    if (driving) activity.driveSwipeBack("begin()");
+                }
+
+                @Override
+                public void onBackProgressed(android.window.BackEvent event) {
+                    if (driving) activity.driveSwipeBack("progress(" + event.getProgress() + ")");
+                }
+
+                @Override
+                public void onBackCancelled() {
+                    if (driving) activity.driveSwipeBack("cancel()");
+                    driving = false;
+                }
+
+                @Override
+                public void onBackInvoked() {
+                    driving = false;
+                    activity.goBack();
+                }
+            };
+        }
     }
 
     /**
@@ -591,8 +665,7 @@ public final class MainActivity extends Activity {
     @SuppressLint("GestureBackNavigation")
     @Override
     public void onBackPressed() {
-        if (web != null && web.canGoBack()) web.goBack();
-        else super.onBackPressed();
+        if (!goBack()) super.onBackPressed();
     }
 
     @Override

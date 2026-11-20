@@ -127,4 +127,10 @@ final class PageBridge {
     private static boolean validId(String id) {
         return id != null && id.matches("[A-Za-z0-9-]{1,40}");
     }
+
+    /** Whether the page has a back of its own on screen; while it does, the system back is the page's to take. */
+    @JavascriptInterface
+    public void swipeBack(boolean available) {
+        activity.runOnUiThread(() -> activity.setPageSwipeBack(available));
+    }
 }

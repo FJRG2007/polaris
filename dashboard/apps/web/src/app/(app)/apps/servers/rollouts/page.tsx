@@ -20,7 +20,7 @@ export default async function AgentRolloutsPage() {
                 description={t("page.description")}
                 actions={
                     <Button asChild variant="ghost" size="sm">
-                        <Link href="/apps/servers">
+                        <Link data-swipe-back href="/apps/servers">
                             <ChevronLeft className="size-4 shrink-0" aria-hidden />
                             {t("page.back")}
                         </Link>

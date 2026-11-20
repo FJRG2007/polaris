@@ -149,7 +149,7 @@ export function InstalledAppDashboard({
 
     return (
         <div className="flex flex-col gap-4">
-            <Link
+            <Link data-swipe-back
                 href={backHref}
                 className="flex w-fit items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
             >

@@ -183,7 +183,7 @@ export function AccountsView({
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
             <div className="flex flex-col gap-1">
-                <Link
+                <Link data-swipe-back
                     href="/calendar"
                     className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
                 >

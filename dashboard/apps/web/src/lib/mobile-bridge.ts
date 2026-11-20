@@ -25,6 +25,9 @@ interface PolarisMobileBridge {
     vpnUp?(id: string, input: string): void;
     vpnDown?(id: string): void;
     vpnStatus?(): string;
+    /** Whether the screen has a back of its own; the app hands its back gesture to
+     *  the page while it does. Called by useSwipeBack in `@polaris/ui`. */
+    swipeBack?(available: boolean): void;
 }
 
 /** The VPN the same shape the desktop app gives it, so the VPN page has one way to connect. */

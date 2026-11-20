@@ -210,7 +210,7 @@ export function TextDropPointDetail({
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                     <Button asChild size="sm" variant="ghost" className="-ms-2 mb-1">
-                        <Link href="/drive/drop-points">
+                        <Link data-swipe-back href="/drive/drop-points">
                             <ArrowLeft className="size-4" />
                             {t("detail.back")}
                         </Link>

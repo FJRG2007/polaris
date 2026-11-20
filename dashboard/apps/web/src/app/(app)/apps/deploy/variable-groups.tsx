@@ -245,7 +245,7 @@ function GroupDetail({
         <div className="flex min-w-0 flex-col gap-4">
             <DialogHeader>
                 <div className="flex min-w-0 items-center gap-2">
-                    <button
+                    <button data-swipe-back
                         type="button"
                         onClick={onBack}
                         className={ICON_BUTTON}

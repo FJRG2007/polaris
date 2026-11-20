@@ -43,7 +43,7 @@ export default async function PanelPage({
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             <div className="flex flex-col items-start gap-2">
-                <Link
+                <Link data-swipe-back
                     href="/places/panels"
                     className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
                 >

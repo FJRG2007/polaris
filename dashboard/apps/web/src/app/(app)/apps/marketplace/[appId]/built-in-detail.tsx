@@ -39,7 +39,7 @@ export function BuiltInAppDetail({ appId }: { appId: string }) {
     const shots = builtInScreenshots(entry.id, locale);
     return (
         <div className="flex min-w-0 flex-col gap-6">
-            <Link
+            <Link data-swipe-back
                 href={POLARIS_APPS_PATH}
                 className="text-muted-foreground hover:text-foreground inline-flex w-fit items-center gap-1 text-sm"
             >

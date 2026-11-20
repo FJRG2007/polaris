@@ -111,7 +111,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                 <CardBody className="flex flex-col items-start gap-3 py-10">
                     <p className="text-sm text-muted-foreground">{t("detail.gone")}</p>
                     <Button asChild variant="ghost" size="sm">
-                        <Link href="/apps/backups">
+                        <Link data-swipe-back href="/apps/backups">
                             <ArrowLeft className="size-4" />
                             {t("detail.backToList")}
                         </Link>
@@ -142,7 +142,7 @@ export function ResourceDetailView({ resourceId }: { resourceId: string }) {
                 </div>
                 <div className="flex items-center gap-2">
                     <Button asChild variant="ghost" size="sm">
-                        <Link href="/apps/backups">
+                        <Link data-swipe-back href="/apps/backups">
                             <ArrowLeft className="size-4" />
                             {t("detail.back")}
                         </Link>

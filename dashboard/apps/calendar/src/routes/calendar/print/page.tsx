@@ -30,7 +30,7 @@ export default async function CalendarPrintPage({
                     description={t("printPage.description")}
                     actions={
                         <Button asChild size="sm" variant="ghost">
-                            <Link href="/calendar">
+                            <Link data-swipe-back href="/calendar">
                                 <ArrowLeft />
                                 {t("screen.backToCalendar")}
                             </Link>

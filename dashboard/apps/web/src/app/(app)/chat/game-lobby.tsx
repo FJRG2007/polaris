@@ -105,7 +105,7 @@ export function GameLobby({ sessionId }: { sessionId: string }) {
         <div className="flex h-full min-h-0 min-w-0 flex-col gap-3 p-3 sm:p-4">
             <header className="flex min-w-0 items-center gap-2">
                 <Button asChild size="sm" variant="ghost">
-                    <Link href={back}>
+                    <Link data-swipe-back href={back}>
                         <ArrowLeft className="size-4" />
                         {t("lobby.back")}
                     </Link>

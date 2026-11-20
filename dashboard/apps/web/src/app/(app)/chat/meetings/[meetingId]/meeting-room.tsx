@@ -242,7 +242,7 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                 <header className="flex h-header shrink-0 flex-wrap items-center gap-2 border-b border-border px-4">
                     {/* On a phone this page has the whole screen, so it carries the
                         way back to the list, as a conversation's header does. */}
-                    <Link
+                    <Link data-swipe-back
                         href="/chat"
                         aria-label={t("channelHeader.backToConversations")}
                         className="-ms-1.5 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"

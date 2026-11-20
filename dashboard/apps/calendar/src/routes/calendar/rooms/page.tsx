@@ -19,7 +19,7 @@ export default async function CalendarRoomsPage() {
                 description={t("rooms.pageDescription")}
                 actions={
                     <Button asChild size="sm" variant="ghost">
-                        <Link href="/calendar" aria-label={t("rooms.back")} title={t("rooms.back")}>
+                        <Link data-swipe-back href="/calendar" aria-label={t("rooms.back")} title={t("rooms.back")}>
                             <ArrowLeft />
                             <span className="hidden sm:inline">{t("rooms.back")}</span>
                         </Link>

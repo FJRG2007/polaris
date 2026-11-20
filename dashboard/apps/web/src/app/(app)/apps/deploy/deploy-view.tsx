@@ -955,7 +955,7 @@ export function NewServiceDialog({
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         {view !== "list" && (
-                            <button
+                            <button data-swipe-back
                                 type="button"
                                 onClick={() => onViewChange("list")}
                                 className="-ms-1 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

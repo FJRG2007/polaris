@@ -308,7 +308,7 @@ function PageEditor({ pageId, manager }: { pageId: string; manager: boolean }) {
 
     const header = (
         <div className="mb-4 space-y-3">
-            <Link
+            <Link data-swipe-back
                 href="/status-pages"
                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >

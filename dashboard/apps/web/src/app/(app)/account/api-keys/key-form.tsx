@@ -261,7 +261,7 @@ export function KeyForm({
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
             <div className="flex flex-col gap-1">
-                <Link
+                <Link data-swipe-back
                     href="/account/api-keys"
                     className="flex w-fit items-center gap-1 text-xs text-muted-foreground no-underline transition-colors hover:text-foreground"
                 >

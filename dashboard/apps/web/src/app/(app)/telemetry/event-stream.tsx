@@ -156,7 +156,7 @@ export function EventView({
     return (
         <div className="flex flex-col gap-3">
             <div className="flex min-w-0 items-center gap-2">
-                <Link
+                <Link data-swipe-back
                     href={backHref}
                     aria-label={t("issue.back")}
                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

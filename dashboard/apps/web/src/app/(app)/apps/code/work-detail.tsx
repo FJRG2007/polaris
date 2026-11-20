@@ -326,7 +326,7 @@ export function WorkDetail({
 function BackLink() {
     const t = useTranslations("code");
     return (
-        <Link
+        <Link data-swipe-back
             href="/apps/code"
             className="flex w-fit items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >

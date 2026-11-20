@@ -23,7 +23,7 @@ export default async function CalendarSettingsPage() {
                 description={t("settingsPage.description")}
                 actions={
                     <Button asChild size="sm" variant="ghost">
-                        <Link href="/calendar">
+                        <Link data-swipe-back href="/calendar">
                             <ArrowLeft />
                             {t("screen.backToCalendar")}
                         </Link>
