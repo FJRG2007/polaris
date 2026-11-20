@@ -586,6 +586,9 @@ public final class MainActivity extends Activity {
         web.evaluateJavascript(call, null);
     }
 
+    // Only Android 12 and older reach this: from 13 on, back arrives through the OnBackInvokedCallback above. Lint
+    // flags it once an AndroidX library is on the classpath (the VPN's tunnel library brings androidx.annotation).
+    @SuppressLint("GestureBackNavigation")
     @Override
     public void onBackPressed() {
         if (web != null && web.canGoBack()) web.goBack();
