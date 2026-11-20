@@ -36,7 +36,6 @@ final class ServerViewController: UIViewController, UITextFieldDelegate {
         hint.numberOfLines = 0
         hint.adjustsFontForContentSizeCategory = true
 
-        field.text = ServerStore.origin
         field.setHint("polaris.example.com")
         field.keyboardType = .URL
         field.textContentType = .URL
@@ -64,7 +63,19 @@ final class ServerViewController: UIViewController, UITextFieldDelegate {
         logo.heightAnchor.constraint(equalToConstant: 64).isActive = true
         let logoRow = UIStackView(arrangedSubviews: [logo, UIView()])
 
-        let stack = UIStackView(arrangedSubviews: [logoRow, title, hint, field, problem, connect, busy])
+        let scan = UILabel()
+        scan.text = String(localized: "server.scanHint")
+        scan.font = Plex.font(.regular, 13, .footnote)
+        scan.textColor = Palette.muted
+        scan.numberOfLines = 0
+        scan.adjustsFontForContentSizeCategory = true
+
+        var rows: [UIView] = [logoRow, title, hint, field, problem, connect, busy, scan]
+        // Back to the Polaris open before, when this screen was reached to add another.
+        if ServerStore.active != nil {
+            rows.append(PolarisButton.ghost(String(localized: "dialog.cancel"), UIAction { [weak self] _ in self?.done() }))
+        }
+        let stack = UIStackView(arrangedSubviews: rows)
         stack.axis = .vertical
         stack.spacing = 12
         stack.setCustomSpacing(24, after: logoRow)
@@ -91,6 +102,12 @@ final class ServerViewController: UIViewController, UITextFieldDelegate {
     }
 
     private func submit() {
+        // The code the desktop app copies, pasted here instead of an address: every server on it, at once.
+        if let list = HostList.read(field.text) {
+            guard !list.isEmpty else { return show(String(localized: "link.hostsInvalid")) }
+            ServerStore.importHosts(list)
+            return done()
+        }
         guard let origin = ServerAddress.origin(field.text) else {
             show(String(localized: "server.invalid"))
             return
@@ -104,7 +121,7 @@ final class ServerViewController: UIViewController, UITextFieldDelegate {
             guard mine == attempt else { return }
             setBusy(false)
             if verdict == .polaris {
-                ServerStore.origin = origin
+                ServerStore.add(origin)
                 done()
             } else {
                 show(reason(verdict))

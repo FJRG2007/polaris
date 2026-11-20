@@ -5,17 +5,27 @@ import WebKit
 /// camera and microphone for calls, swipe back, and links to anywhere else opening in Safari instead of inside
 /// Polaris.
 final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
-    private let origin: String
+    private let host: Host
+    private var origin: String { host.origin }
+    /// The page to open first, from a `polaris://open` link; the start otherwise.
+    private let path: String?
     private let changeServer: () -> Void
     private var web: WKWebView!
     private let failure = UIStackView()
     private let failureText = UILabel()
+    /// While Polaris is not answering (an update restarting it), the page is tried again on its own: every few
+    /// seconds at first, then less often, so it comes back as soon as Polaris does without anybody pressing a button.
+    private var retry: Timer?
+    private var retries = 0
 
-    init(origin: String, changeServer: @escaping () -> Void) {
-        self.origin = origin
+    init(host: Host, path: String? = nil, changeServer: @escaping () -> Void) {
+        self.host = host
+        self.path = path
         self.changeServer = changeServer
         super.init(nibName: nil, bundle: nil)
     }
+
+    deinit { retry?.invalidate() }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("not used") }
@@ -25,7 +35,8 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         view.backgroundColor = Palette.background
 
         let config = WKWebViewConfiguration()
-        config.websiteDataStore = .default()
+        // Each Polaris in its own cookies and storage where iOS allows it (`ServerStore.dataStore`).
+        config.websiteDataStore = ServerStore.dataStore(for: host)
         config.allowsInlineMediaPlayback = true
         // A call starts its audio from a tap that already happened on the page.
         config.mediaTypesRequiringUserActionForPlayback = []
@@ -69,7 +80,7 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             web.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
 
-        if let url = URL(string: origin + "/") { web.load(URLRequest(url: url)) }
+        if let url = URL(string: origin + (path ?? "/")) { web.load(URLRequest(url: url)) }
     }
 
     private func buildFailure() {
@@ -83,14 +94,20 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         failureText.textAlignment = .center
 
         let retry = PolarisButton.primary(String(localized: "page.retry"), UIAction { [weak self] _ in
-            self?.failure.isHidden = true
-            self?.web.reload()
+            self?.tryAgain()
         })
         let other = PolarisButton.ghost(String(localized: "page.changeServer"), UIAction { [weak self] _ in
             self?.changeServer()
         })
 
-        [title, failureText, retry, other].forEach(failure.addArrangedSubview)
+        let waiting = UILabel()
+        waiting.text = String(localized: "page.retrying")
+        waiting.font = Plex.font(.regular, 13, .footnote)
+        waiting.textColor = Palette.muted
+        waiting.numberOfLines = 0
+        waiting.textAlignment = .center
+
+        [title, failureText, waiting, retry, other].forEach(failure.addArrangedSubview)
         failure.axis = .vertical
         failure.alignment = .center
         failure.spacing = 12
@@ -125,6 +142,48 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         if (error as NSError).code == NSURLErrorCancelled { return }
         failureText.text = String(format: String(localized: "page.unreachable"), origin)
         failure.isHidden = false
+        scheduleRetry()
+    }
+
+    /// A gateway error from the edge in front of Polaris is the same outage as no answer at all.
+    func webView(
+        _ webView: WKWebView, decidePolicyFor response: WKNavigationResponse,
+        decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
+    ) {
+        if response.isForMainFrame, let http = response.response as? HTTPURLResponse,
+           [502, 503, 504].contains(http.statusCode) {
+            failureText.text = String(format: String(localized: "page.unreachable"), origin)
+            failure.isHidden = false
+            scheduleRetry()
+            return decisionHandler(.cancel)
+        }
+        decisionHandler(.allow)
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        retry?.invalidate()
+        retry = nil
+        retries = 0
+        failure.isHidden = true
+    }
+
+    private func scheduleRetry() {
+        retry?.invalidate()
+        let delay: TimeInterval = retries < 20 ? 3 : 15
+        retries += 1
+        retry = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
+            Task { @MainActor in self?.tryAgain() }
+        }
+    }
+
+    private func tryAgain() {
+        retry?.invalidate()
+        retry = nil
+        if let url = web.url, ServerAddress.sameOrigin(origin, url) {
+            web.reload()
+        } else if let url = URL(string: origin + (path ?? "/")) {
+            web.load(URLRequest(url: url))
+        }
     }
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

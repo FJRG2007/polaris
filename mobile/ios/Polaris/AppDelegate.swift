@@ -11,7 +11,8 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 }
 
-/// The one window: Polaris when the phone knows which one, the address screen when it does not.
+/// The one window: the Polaris the phone opens now, the address screen when it has none, and the list of them when
+/// asked for. `polaris://` links land here too, from the camera reading a desktop app's QR or a link followed in Safari.
 final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
@@ -23,11 +24,17 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         self.window = window
         showStart()
         window.makeKeyAndVisible()
+        if let url = options.urlContexts.first?.url { open(url) }
     }
 
-    func showStart() {
-        if let origin = ServerStore.origin {
-            window?.rootViewController = WebViewController(origin: origin) { [weak self] in self?.showServer() }
+    func scene(_ scene: UIScene, openURLContexts contexts: Set<UIOpenURLContext>) {
+        if let url = contexts.first?.url { open(url) }
+    }
+
+    /// The Polaris open now, on `path` when one is given.
+    func showStart(path: String? = nil) {
+        if let host = ServerStore.active {
+            window?.rootViewController = WebViewController(host: host, path: path) { [weak self] in self?.showHosts() }
         } else {
             showServer()
         }
@@ -35,6 +42,85 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     func showServer() {
         window?.rootViewController = ServerViewController { [weak self] in self?.showStart() }
+    }
+
+    /// Every Polaris on this phone.
+    func showHosts() {
+        let list = HostsViewController(
+            open: { [weak self] in self?.showStart() },
+            add: { [weak self] in self?.showServer() }
+        )
+        window?.rootViewController = UINavigationController(rootViewController: list)
+    }
+
+    // MARK: Links
+
+    private func open(_ url: URL) {
+        let link = url.absoluteString
+        if link.lowercased().hasPrefix(HostList.link) {
+            takeHosts(link)
+        } else if let page = DeepLink.read(link) {
+            openPage(page)
+        } else {
+            tell(String(localized: "link.invalid"))
+        }
+    }
+
+    /// Every host on a desktop app's QR, taken in at once - on a phone with none yet as much as on one with some.
+    private func takeHosts(_ link: String) {
+        guard let hosts = HostList.read(link) else {
+            tell(String(localized: "link.hostsInvalid"))
+            return
+        }
+        let counts = ServerStore.importHosts(hosts)
+        showHosts()
+        var said = counts.added > 0
+            ? String(format: String(localized: "link.hostsAdded"), counts.added)
+            : String(localized: "link.hostsNoneNew")
+        if counts.skipped > 0 { said += " " + String(format: String(localized: "link.hostsSkipped"), counts.skipped) }
+        tell(said)
+    }
+
+    /// A page of a Polaris on this phone opens here; one that is not is added only after a yes and a check that it
+    /// really is a Polaris, since a link can name any address at all.
+    private func openPage(_ page: DeepLink) {
+        if let host = ServerStore.find(origin: page.server) {
+            ServerStore.select(host.id)
+            showStart(path: page.path)
+            return
+        }
+        let name = URL(string: page.server)?.host ?? page.server
+        let ask = UIAlertController(
+            title: String(format: String(localized: "link.addTitle"), name),
+            message: String(localized: "link.addMessage"),
+            preferredStyle: .alert
+        )
+        ask.addAction(UIAlertAction(title: String(localized: "dialog.cancel"), style: .cancel))
+        ask.addAction(UIAlertAction(title: String(localized: "link.addConfirm"), style: .default) { [weak self] _ in
+            Task { @MainActor in
+                let verdict = await ServerProbe.probe(page.server)
+                if verdict == .polaris {
+                    ServerStore.add(page.server)
+                    self?.showStart(path: page.path)
+                } else {
+                    self?.tell(verdict == .unreachable
+                        ? String(localized: "server.unreachable") : String(localized: "server.notPolaris"))
+                }
+            }
+        })
+        present(ask)
+    }
+
+    private func tell(_ text: String) {
+        let note = UIAlertController(title: nil, message: text, preferredStyle: .alert)
+        note.addAction(UIAlertAction(title: String(localized: "dialog.ok"), style: .default))
+        present(note)
+    }
+
+    private func present(_ controller: UIViewController) {
+        var top = window?.rootViewController
+        while let shown = top?.presentedViewController { top = shown }
+        top?.present(controller, animated: true)
     }
 }
 
@@ -116,14 +202,4 @@ final class PolarisField: UITextField {
 
     override func textRect(forBounds bounds: CGRect) -> CGRect { bounds.insetBy(dx: 14, dy: 0) }
     override func editingRect(forBounds bounds: CGRect) -> CGRect { bounds.insetBy(dx: 14, dy: 0) }
-}
-
-/// The one Polaris this phone opens, kept between launches.
-enum ServerStore {
-    private static let key = "server.origin"
-
-    static var origin: String? {
-        get { UserDefaults.standard.string(forKey: key) }
-        set { UserDefaults.standard.set(newValue, forKey: key) }
-    }
 }
