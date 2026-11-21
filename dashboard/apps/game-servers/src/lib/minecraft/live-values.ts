@@ -38,7 +38,6 @@ import {
 } from "./text-vars";
 
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
-const { voicePresence } = host.chatCalls;
 
 /** The names in a call, joined the way a line on screen reads them. */
 function joined(names: readonly string[]): string {
@@ -76,7 +75,7 @@ async function callSize(link: ChatLink): Promise<number | null> {
  * chat had stopped showing them.
  */
 async function callMembers(channelId: string): Promise<string[]> {
-    const byChannel = await voicePresence([channelId]);
+    const byChannel = await host.chatCalls.voicePresence([channelId]);
     return [...new Set((byChannel.get(channelId) ?? []).map((one) => one.name))];
 }
 

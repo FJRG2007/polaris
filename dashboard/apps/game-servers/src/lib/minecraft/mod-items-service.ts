@@ -49,7 +49,10 @@ import {
 import { host } from "@polaris/app-host";
 import { LOCALES, findSoftware, type Locale } from "@polaris/core";
 import { mayBeCut } from "../container-files";
-import { withServerContainer, type ServerContainer } from "./service";
+// The server module is loaded when a folder is actually read: it pulls in the
+// router, the catalogue and every host service behind them, and the jar route
+// that only needs the cache must not carry all of that to start.
+import type { ServerContainer } from "./service";
 
 const { listEnvVars } = host.envVarService;
 
@@ -172,6 +175,7 @@ export async function serverModItems(
     const gathered = new Gathered();
 
     if (readsModFolder(settings.software)) {
+        const { withServerContainer } = await import("./service");
         const local = await withServerContainer(ownerId, installedAppId, async (server) =>
             server.edition === "java"
                 ? sharedFolderRead(installedAppId, () =>

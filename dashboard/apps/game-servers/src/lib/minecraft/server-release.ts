@@ -13,8 +13,6 @@ import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { wantsLatest } from "./blueprint-version";
 
-const { listEnvVars } = host.envVarService;
-
 /** The first of these that names a real release, or null. */
 export function concreteRelease(...candidates: readonly (string | null | undefined)[]): string | null {
     for (const candidate of candidates) {
@@ -30,7 +28,7 @@ export async function installRelease(
 ): Promise<string | null> {
     const recorded = typeof install.config.mcRelease === "string" ? install.config.mcRelease : null;
     if (concreteRelease(recorded) || !install.applicationId) return concreteRelease(recorded);
-    const vars = await listEnvVars("application", install.applicationId, install.ownerId).catch(() => []);
+    const vars = await host.envVarService.listEnvVars("application", install.applicationId, install.ownerId).catch(() => []);
     const setting = vars.find((entry: { key: string }) => entry.key === "VERSION")?.value ?? null;
     return concreteRelease(recorded, setting);
 }

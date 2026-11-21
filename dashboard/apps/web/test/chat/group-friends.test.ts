@@ -103,8 +103,11 @@ vi.mock("@polaris/db", () => ({
             findMany: async ({
                 where
             }: {
-                where: { OR: [{ blockerId: string; blockedId: { in: string[] } }, unknown] };
+                where: { OR?: [{ blockerId: string; blockedId: { in: string[] } }, unknown] };
             }) => {
+                // The spam restriction's own read (blocks naming one account)
+                // has no OR; nobody here is restricted.
+                if (!where.OR) return [];
                 const self = where.OR[0].blockerId;
                 const wanted = where.OR[0].blockedId.in;
                 return blocks.filter(
