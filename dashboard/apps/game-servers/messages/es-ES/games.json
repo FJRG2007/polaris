@@ -883,7 +883,7 @@
         "titleOneLine": "Título de una línea",
         "oneLineEach": "Una por línea",
         "bedrockNoSidebar": "Bedrock no tiene un panel lateral en el que Polaris pueda escribir",
-        "sidebarNeeds1203": "El panel lateral necesita Minecraft 1.20.3 o posterior en este servidor",
+        "sidebarNeeds116": "El panel lateral necesita Minecraft 1.16 o posterior en este servidor",
         "sidebarSharedOnly": "El panel es igual para todos: solo van en él '{server.*}' y '{call.*}'",
         "sidebarAddLine": "Añade una línea al panel",
         "chooseYourGroup": "Elige un grupo en el que estés",

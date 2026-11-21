@@ -32,6 +32,7 @@ import {
     readSidebar,
     sidebarCommands,
     sidebarProblems,
+    sidebarLegacy,
     sidebarSupported
 } from "@polaris-app/game-servers/src/lib/minecraft/sidebar";
 import { english } from "../setup/game-english";
@@ -265,8 +266,14 @@ describe("keeping it on screen", () => {
 });
 
 describe("the side panel", () => {
-    it("is only for Java 1.20.3 and newer", () => {
-        expect(sidebarSupported("java", "1.20.2")).toBe(false);
+    it("is for Java 1.16 and newer, the old way before 1.20.3", () => {
+        expect(sidebarSupported("java", "1.15.2")).toBe(false);
+        expect(sidebarSupported("java", "1.16.5")).toBe(true);
+        expect(sidebarSupported("java", "1.20.1")).toBe(true);
+        expect(sidebarLegacy("1.20.1")).toBe(true);
+        expect(sidebarLegacy("1.20.2")).toBe(true);
+        expect(sidebarLegacy("1.20.3")).toBe(false);
+        expect(sidebarLegacy(null)).toBe(false);
         expect(sidebarSupported("java", "1.20.3")).toBe(true);
         expect(sidebarSupported("java", "1.21.4")).toBe(true);
         expect(sidebarSupported("java", null)).toBe(true);
@@ -309,6 +316,29 @@ describe("the side panel", () => {
         const fewer = sidebarCommands("Server", ["a"], shown);
         expect(fewer).toContain("scoreboard players reset polaris.line.02 polaris_side");
         expect(fewer).toContain("scoreboard players reset polaris.line.03 polaris_side");
+    });
+
+    it("before 1.20.3 draws each line as a team's prefix, with no number format", () => {
+        const first = sidebarCommands("Server", ["a", "b"], null, true);
+        expect(first).not.toContain("scoreboard objectives modify polaris_side numberformat blank");
+        expect(first).toContain("scoreboard objectives remove polaris_side");
+        expect(first).toContain("team remove polaris_side_15");
+        expect(first).toContain("team add polaris_side_01");
+        expect(first).toContain("team join polaris_side_01 §0§r");
+        expect(first).toContain("scoreboard players set §1§r polaris_side 1");
+        expect(first).toContain(`team modify polaris_side_02 prefix ${javaComponent("b", false)}`);
+        expect(first.some((line) => line.includes("display name"))).toBe(false);
+
+        const shown = { title: "Server", lines: ["a", "b"] };
+        expect(sidebarCommands("Server", ["a", "B"], shown, true)).toEqual([
+            `team modify polaris_side_02 prefix ${javaComponent("B", false)}`
+        ]);
+        const more = sidebarCommands("Server", ["a", "b", "c"], shown, true);
+        expect(more).toContain("team add polaris_side_03");
+        expect(more).not.toContain("team add polaris_side_01");
+        const fewer = sidebarCommands("Server", ["a"], shown, true);
+        expect(fewer).toContain("scoreboard players reset §1§r polaris_side");
+        expect(fewer).toContain("team remove polaris_side_02");
     });
 
     it("reads a stored panel that no longer passes as the default", () => {

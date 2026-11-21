@@ -4,10 +4,13 @@
  * the call of the linked chat - and kept current while the server runs.
  *
  * It is the game's scoreboard sidebar. One objective, `polaris_side`, is shown
- * there; each line is a score holder with a display name, and the scores only
- * put the lines in order - their numbers are hidden. Both of those (display
- * names and hidden numbers) arrived in Java 1.20.3, which is why an older server
- * or Bedrock is told it cannot have one rather than shown a panel of numbers.
+ * there; each line is a score holder, and the scores only put the lines in
+ * order. From Java 1.20.3 a holder carries its own display name and the numbers
+ * are hidden. Before that (1.16 to 1.20.2, where most modpacks live) each holder
+ * is an invisible name in a team of its own, and the team's prefix is the line -
+ * the way servers drew a panel for years - and the game shows a number beside
+ * each line that cannot be hidden. Older than 1.16 has no colours by hex, and
+ * Bedrock has no panel Polaris can write to; both are told so.
  *
  * The panel is the same for everybody, so only the server's own variables go on
  * it: `{player}` would have to be one player's.
@@ -166,22 +169,32 @@ export function sidebarTexts(sidebar: SidebarConfig): string[] {
     return [sidebar.title, ...sidebar.lines].flatMap((line) => line.frames);
 }
 
-/** Whether this server can draw the panel: Java 1.20.3 or newer. A server on
- *  "latest" has no release recorded, and is. */
-export function sidebarSupported(edition: MinecraftEdition, release: string | null): boolean {
-    if (edition === "bedrock") return false;
+/** Whether `release` is `minor.patch` of 1.x or newer. A server on "latest"
+ *  has no release recorded, and is. */
+function atLeast(release: string | null, minor: number, patch: number): boolean {
     if (!release) return true;
-    const [major = 0, minor = 0, patch = 0] = release.split(".").map((part) => Number(part) || 0);
+    const [major = 0, has = 0, fix = 0] = release.split(".").map((part) => Number(part) || 0);
     if (major !== 1) return major > 1;
-    if (minor !== 20) return minor > 20;
-    return patch >= 3;
+    if (has !== minor) return has > minor;
+    return fix >= patch;
+}
+
+/** Whether this server can draw the panel: Java 1.16 or newer. */
+export function sidebarSupported(edition: MinecraftEdition, release: string | null): boolean {
+    return edition !== "bedrock" && atLeast(release, 16, 0);
+}
+
+/** Whether the panel is drawn the old way, through teams, with numbers showing:
+ *  before 1.20.3. */
+export function sidebarLegacy(release: string | null): boolean {
+    return !atLeast(release, 20, 3);
 }
 
 /** Why the panel cannot be switched on here, or null. */
 export function sidebarRefusal(edition: MinecraftEdition, release: string | null): string | null {
     if (edition === "bedrock") return gameMessage("games", "lib.bedrockNoSidebar");
     if (!sidebarSupported(edition, release)) {
-        return gameMessage("games", "lib.sidebarNeeds1203");
+        return gameMessage("games", "lib.sidebarNeeds116");
     }
     return null;
 }
@@ -240,26 +253,40 @@ function holder(index: number): string {
     return `polaris.line.${String(index + 1).padStart(2, "0")}`;
 }
 
+/** Before 1.20.3: the holder behind line `index`, a colour code and a reset -
+ *  a name that draws as nothing and is never a player's - and the team whose
+ *  prefix is the line. */
+function legacyHolder(index: number): string {
+    return `§${index.toString(16)}§r`;
+}
+
+function legacyTeam(index: number): string {
+    return `polaris_side_${String(index + 1).padStart(2, "0")}`;
+}
+
 /**
  * The commands that make the panel read `title` and `lines`, already filled in,
  * given what it read last time (`shown`, or null when nothing of Polaris's is
  * on screen). Only what changed is sent, so a panel that ticks over every few
- * seconds costs a command or two rather than twenty.
+ * seconds costs a command or two rather than twenty. `legacy` draws it the way a
+ * server before 1.20.3 can (`sidebarLegacy`).
  */
 export function sidebarCommands(
     title: string,
     lines: readonly string[],
-    shown: { readonly title: string; readonly lines: readonly string[] } | null
+    shown: { readonly title: string; readonly lines: readonly string[] } | null,
+    legacy = false
 ): string[] {
+    const placed = (index: number) => (legacy ? legacyHolder(index) : holder(index));
     const commands: string[] = [];
     const heading = javaComponent(title, false);
     if (!shown) {
         // Taken down first: a panel left from before Polaris restarted may hold
         // more lines than this one, and nothing here remembers how many.
         commands.push(
-            ...sidebarOffCommands(),
+            ...sidebarOffCommands(legacy),
             `scoreboard objectives add ${SIDEBAR_OBJECTIVE} dummy ${heading}`,
-            `scoreboard objectives modify ${SIDEBAR_OBJECTIVE} numberformat blank`,
+            ...(legacy ? [] : [`scoreboard objectives modify ${SIDEBAR_OBJECTIVE} numberformat blank`]),
             `scoreboard objectives setdisplay sidebar ${SIDEBAR_OBJECTIVE}`
         );
     }
@@ -270,22 +297,36 @@ export function sidebarCommands(
     lines.forEach((line, index) => {
         // Higher scores sit higher, so the first line gets the most.
         const order = lines.length - index;
+        if (legacy && index >= before.length) {
+            // Made and joined once; refused harmlessly when it is already there.
+            commands.push(`team add ${legacyTeam(index)}`, `team join ${legacyTeam(index)} ${legacyHolder(index)}`);
+        }
         if (before.length !== lines.length || !shown) {
-            commands.push(`scoreboard players set ${holder(index)} ${SIDEBAR_OBJECTIVE} ${order}`);
+            commands.push(`scoreboard players set ${placed(index)} ${SIDEBAR_OBJECTIVE} ${order}`);
         }
         if (before[index] !== line || !shown) {
+            const text = javaComponent(line, false);
             commands.push(
-                `scoreboard players display name ${holder(index)} ${SIDEBAR_OBJECTIVE} ${javaComponent(line, false)}`
+                legacy
+                    ? `team modify ${legacyTeam(index)} prefix ${text}`
+                    : `scoreboard players display name ${holder(index)} ${SIDEBAR_OBJECTIVE} ${text}`
             );
         }
     });
     for (let index = lines.length; index < before.length; index += 1) {
-        commands.push(`scoreboard players reset ${holder(index)} ${SIDEBAR_OBJECTIVE}`);
+        commands.push(`scoreboard players reset ${placed(index)} ${SIDEBAR_OBJECTIVE}`);
+        if (legacy) commands.push(`team remove ${legacyTeam(index)}`);
     }
     return commands;
 }
 
-/** Take the panel off every screen. */
-export function sidebarOffCommands(): string[] {
-    return [`scoreboard objectives remove ${SIDEBAR_OBJECTIVE}`];
+/** Take the panel off every screen, and before 1.20.3 the teams that drew its
+ *  lines with it. */
+export function sidebarOffCommands(legacy = false): string[] {
+    return [
+        `scoreboard objectives remove ${SIDEBAR_OBJECTIVE}`,
+        ...(legacy
+            ? Array.from({ length: SIDEBAR_LINES_MAX }, (_, index) => `team remove ${legacyTeam(index)}`)
+            : [])
+    ];
 }

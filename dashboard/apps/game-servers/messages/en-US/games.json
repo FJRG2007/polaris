@@ -883,7 +883,7 @@
         "titleOneLine": "A title is one line",
         "oneLineEach": "One line each",
         "bedrockNoSidebar": "Bedrock has no side panel Polaris can write to",
-        "sidebarNeeds1203": "The side panel needs Minecraft 1.20.3 or newer on this server",
+        "sidebarNeeds116": "The side panel needs Minecraft 1.16 or newer on this server",
         "sidebarSharedOnly": "The panel is the same for everybody: only '{server.*}' and '{call.*}' go on it",
         "sidebarAddLine": "Add a line for the panel to show",
         "chooseYourGroup": "Choose a group you are in",

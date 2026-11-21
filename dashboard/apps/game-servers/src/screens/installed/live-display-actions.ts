@@ -20,6 +20,7 @@ import {
     SIDEBAR_KEY,
     hasSidebarProblems,
     readSidebar,
+    sidebarLegacy,
     sidebarRefusal,
     sidebarSchema,
     type SidebarConfig
@@ -40,6 +41,9 @@ export interface LiveDisplayState {
     readonly sidebar: SidebarConfig;
     /** Why this server cannot have a panel, or null. */
     readonly sidebarRefusal: string | null;
+    /** The server draws the panel the way the game could before 1.20.3, with a
+     *  number beside each line that cannot be hidden. */
+    readonly sidebarNumbers?: boolean;
     /** Whether the server is linked to a chat with a call, which is what
      *  `{call.*}` reads. */
     readonly callLinked: boolean;
@@ -60,6 +64,7 @@ async function stateOf(installedAppId: string): Promise<LiveDisplayState> {
         pinned: pinned ? { announcement: pinned.announcement, endsAt: pinned.endsAt } : null,
         sidebar: readSidebar(config),
         sidebarRefusal: sidebarRefusal(editionOf(row?.catalogId ?? "minecraft"), release),
+        sidebarNumbers: sidebarLegacy(release),
         callLinked: linkedChannels(readChatLink(config)).call !== null,
         known: row?.name ? { "server.name": row.name } : {}
     };

@@ -45,6 +45,7 @@ import {
     animationPeriod,
     readSidebar,
     sidebarCommands,
+    sidebarLegacy,
     sidebarOffCommands,
     sidebarRefusal,
     sidebarTexts,
@@ -84,7 +85,7 @@ interface Loop {
     roster: { at: number; value: Roster } | null;
     /** What a panel that moves by itself is drawn from between ticks: its
      *  settings and the values last read. Null when it does not move. */
-    moving: { sidebar: SidebarConfig; context: SendContext } | null;
+    moving: { sidebar: SidebarConfig; context: SendContext; legacy: boolean } | null;
     /** The timer that draws it, while there is one. */
     frames: ReturnType<typeof setInterval> | null;
     /** The frame being drawn, which a tick waits for rather than racing it. */
@@ -259,6 +260,7 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
         sidebar.enabled &&
         !sidebarHeld.has(installedAppId) &&
         sidebarRefusal(settings.edition, settings.release) === null;
+    const legacy = sidebarLegacy(settings.release);
 
     // Down at its moment, and taken off the screen rather than left to fade;
     // a held one it went over is back straight away.
@@ -276,7 +278,7 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
 
     if (!pinned && !panelOn) {
         if (loop.panel) {
-            await say(loop.ownerId, installedAppId, sidebarOffCommands()).catch(() => undefined);
+            await say(loop.ownerId, installedAppId, sidebarOffCommands(legacy)).catch(() => undefined);
         }
         return stopLoop(installedAppId);
     }
@@ -335,15 +337,15 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
             (text) => fillValues(text, context.values),
             context.lists ?? {}
         );
-        lines.push(...sidebarCommands(shown.title, shown.lines, loop.panel));
+        lines.push(...sidebarCommands(shown.title, shown.lines, loop.panel, legacy));
         panel = shown;
         loop.lastPanel = now;
     } else if (!panelOn && loop.panel) {
-        lines.push(...sidebarOffCommands());
+        lines.push(...sidebarOffCommands(legacy));
     }
     // Between reads, a panel that moves is drawn by the frame timer from these.
     const moves = panelOn && animationPeriod(sidebar) !== null;
-    loop.moving = moves ? { sidebar, context } : null;
+    loop.moving = moves ? { sidebar, context, legacy } : null;
     if (moves) startFrames(installedAppId, loop);
     else stopFrames(loop);
     if (loop.pinVersion !== version) return;
@@ -450,7 +452,7 @@ async function drawFrame(installedAppId: string, loop: Loop): Promise<void> {
         (text) => fillValues(text, moving.context.values),
         moving.context.lists ?? {}
     );
-    const commands = sidebarCommands(shown.title, shown.lines, before);
+    const commands = sidebarCommands(shown.title, shown.lines, before, moving.legacy);
     if (commands.length === 0) return;
     let sent = false;
     try {
@@ -570,7 +572,7 @@ export async function applySidebar(ownerId: string, installedAppId: string): Pro
     const sidebar = settings ? readSidebar(settings.config) : null;
     if (!sidebar?.enabled) {
         if (loop) loop.panel = null;
-        await say(ownerId, installedAppId, sidebarOffCommands());
+        await say(ownerId, installedAppId, sidebarOffCommands(sidebarLegacy(settings?.release ?? null)));
         return;
     }
     startLiveDisplay(ownerId, installedAppId);

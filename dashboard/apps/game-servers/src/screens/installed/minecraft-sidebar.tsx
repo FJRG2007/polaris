@@ -259,6 +259,9 @@ export function MinecraftSidebar({
                         {refused && (
                             <p className="text-xs text-muted-foreground">{schemaText(refused)}.</p>
                         )}
+                        {!refused && state.sidebarNumbers && (
+                            <p className="text-xs text-muted-foreground">{t("sidebar.numbersShown")}</p>
+                        )}
 
                         <div className="flex flex-col gap-1.5">
                             <span className="text-sm font-medium">{t("sidebar.title")}</span>

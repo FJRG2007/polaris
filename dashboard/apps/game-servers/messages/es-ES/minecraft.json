@@ -1077,7 +1077,8 @@
             "server": {
                 "levels": "El nivel de todos"
             }
-        }
+        },
+        "numbersShown": "Antes de Minecraft 1.20.3 el juego muestra un número junto a cada línea. No se puede ocultar."
     },
     "panel": {
         "polarisLoginHasAnUpdate": "El mod de Polaris tiene novedades",
