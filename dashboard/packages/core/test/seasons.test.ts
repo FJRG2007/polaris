@@ -27,8 +27,9 @@ describe("seasonOn", () => {
         expect(seasonOn(on(2026, 11, 3))).toBeNull();
     });
 
-    it("runs winter from 1 December to 9 January, with New Year's Eve and Day apart", () => {
-        expect(seasonOn(on(2026, 11, 30))).toBeNull();
+    it("runs winter from 15 November to 9 January, with New Year's Eve and Day apart", () => {
+        expect(seasonOn(on(2026, 11, 14))).toBeNull();
+        expect(seasonOn(on(2026, 11, 15))).toBe("winter");
         expect(seasonOn(on(2026, 12, 1))).toBe("winter");
         expect(seasonOn(on(2026, 12, 25))).toBe("winter");
         expect(seasonOn(on(2026, 12, 31))).toBe("newYear");

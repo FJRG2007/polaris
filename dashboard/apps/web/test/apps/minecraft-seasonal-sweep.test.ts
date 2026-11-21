@@ -15,7 +15,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const INSTALL = "aaaaaaaa-1111-4111-8111-111111111111";
 const OWNER = "11111111-1111-4111-8111-111111111111";
 const HALLOWEEN = new Date("2026-10-20T12:00:00Z");
-const NOVEMBER = new Date("2026-11-20T12:00:00Z");
+// Between Halloween and the winter pack (15 November).
+const NOVEMBER = new Date("2026-11-10T12:00:00Z");
 
 let config: Record<string, unknown> = {};
 let allowed = true;

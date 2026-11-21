@@ -5,9 +5,11 @@
  * Modelled on Discord's seasonal events: Polaris carries the packs and runs each
  * one on its dates - a light decoration and a set of sounds - with nothing to
  * set up. The windows are Discord's: Halloween from 7 October to 2 November (its
- * 2026 event), the winter pack from 1 December to 9 January, with New Year's
- * Eve and Day carved out of winter for confetti, and the Lunar New Year (the
- * first fifteen days of the first lunar month, up to the Lantern Festival).
+ * 2026 event), the winter pack from 15 November to 9 January (earlier than
+ * Discord's 1 December, so it is up for the whole run-up to the holidays), with
+ * New Year's Eve and Day carved out of winter for confetti, and the Lunar New
+ * Year (the first fifteen days of the first lunar month, up to the Lantern
+ * Festival).
  *
  * Decided in the reader's own calendar, on their device: a holiday is a date on
  * the wall where somebody is sitting, not one on the server's clock.
@@ -65,13 +67,13 @@ export interface SeasonRule {
 /** Every season's rule: what every reader of the calendar decides by. */
 export type SeasonCalendar = Readonly<Record<Season, SeasonRule>>;
 
-/** The windows Polaris ships with, Discord's. */
+/** The windows Polaris ships with: Discord's, with winter starting on 15 November. */
 export const DEFAULT_SEASON_CALENDAR: SeasonCalendar = {
     halloween: {
         enabled: true,
         window: { from: { month: 10, day: 7 }, to: { month: 11, day: 2 } }
     },
-    winter: { enabled: true, window: { from: { month: 12, day: 1 }, to: { month: 1, day: 9 } } },
+    winter: { enabled: true, window: { from: { month: 11, day: 15 }, to: { month: 1, day: 9 } } },
     newYear: { enabled: true, window: { from: { month: 12, day: 31 }, to: { month: 1, day: 1 } } },
     lunarNewYear: {
         enabled: true,

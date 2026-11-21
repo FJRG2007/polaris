@@ -28,8 +28,9 @@ describe("the season a server dresses for", () => {
         expect(on("2026-11-03T00:00:00Z")).toBeNull();
     });
 
-    it("is winter from 1 December through New Year to 9 January", () => {
-        expect(on("2026-11-30T23:59:00Z")).toBeNull();
+    it("is winter from 15 November through New Year to 9 January", () => {
+        expect(on("2026-11-14T23:59:00Z")).toBeNull();
+        expect(on("2026-11-15T00:00:00Z")).toBe("winter");
         expect(on("2026-12-01T00:00:00Z")).toBe("winter");
         expect(on("2026-12-31T12:00:00Z")).toBe("winter");
         expect(on("2027-01-01T12:00:00Z")).toBe("winter");

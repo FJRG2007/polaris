@@ -85,7 +85,7 @@ describe("saving a season", () => {
     it("forgets a season put back to its defaults, so nothing is stored", async () => {
         await actions.saveSeasonRuleAction("winter", {
             enabled: false,
-            from: md(12, 1),
+            from: md(11, 15),
             to: md(1, 9)
         });
         expect(JSON.parse(settings.get("seasonal.calendar")!)).toEqual({
@@ -93,7 +93,7 @@ describe("saving a season", () => {
         });
         await actions.saveSeasonRuleAction("winter", {
             enabled: true,
-            from: md(12, 1),
+            from: md(11, 15),
             to: md(1, 9)
         });
         expect(JSON.parse(settings.get("seasonal.calendar")!)).toEqual({});
