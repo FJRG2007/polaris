@@ -76,6 +76,9 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             },
             protectScreen: function (on) {
                 window.webkit.messageHandlers.polarisMobile.postMessage(on ? "protect:on" : "protect:off");
+            },
+            setSeasonIcon: function (season) {
+                window.webkit.messageHandlers.polarisMobile.postMessage({ seasonIcon: String(season) });
             }
         });
         """
@@ -322,6 +325,11 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         if let body = message.body as? [String: Any], let raw = body["openExternal"] as? String,
            let url = Self.externalURL(raw) {
             UIApplication.shared.open(url)
+            return
+        }
+        // The season the page decorates with, for the app icon (SeasonIcon).
+        if let body = message.body as? [String: Any], let season = body["seasonIcon"] as? String {
+            if season.count <= 32 { SeasonIcon.apply(season) }
             return
         }
         guard let body = message.body as? [String: Any], let kind = body["kind"] as? String,
