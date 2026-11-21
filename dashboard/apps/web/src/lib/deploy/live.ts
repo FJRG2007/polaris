@@ -20,6 +20,15 @@
  * in at most three bounded reads for the whole process - never a read per
  * write, nor per open page - and each stream coalesces its own frames again.
  *
+ * The hook fires when a write's query returns, which inside an interactive
+ * `$transaction` is before the commit. Nothing is read here in that tick: a
+ * burst is resolved `GATHER_MS` later, the stream waits again before its frame,
+ * and the page reads after that - and no write this listens for runs inside a
+ * transaction today (the one transactional Application write, the public
+ * networking config, changes no column in `SHOWN`). Should one ever land in a
+ * long transaction, the page's poll is still there to catch what the early
+ * frame read too soon.
+ *
  * Held on globalThis rather than in a module binding, because a dev server
  * re-evaluates a module on edit and the bundle may hold more than one copy, and
  * either would strand every open stream on a set nobody writes to. Best effort:

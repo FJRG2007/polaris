@@ -247,15 +247,30 @@ export function onModelWrite(models: readonly string[], listener: ModelWriteList
     };
 }
 
+/**
+ * Tell this model's listeners about a write that landed. With nobody listening
+ * it is one map-size check per query; it never throws into the write path.
+ *
+ * Fired when the query returns, which inside an interactive `$transaction` is
+ * before the commit. A listener that reads the database back must therefore
+ * defer that read rather than make it here (the deploy live channel gathers for
+ * 100 ms first, and the page it wakes reads later still).
+ */
 function announceModelWrite(model: string, operation: string, args: unknown): void {
-    const listeners = modelWriteListeners().get(model);
-    if (!listeners || !WRITES.has(operation)) return;
-    for (const listener of listeners) {
-        try {
-            listener({ model, operation, args });
-        } catch (caught) {
-            console.error(caught);
+    try {
+        const byModel = modelWriteListeners();
+        if (byModel.size === 0 || !WRITES.has(operation)) return;
+        const listeners = byModel.get(model);
+        if (!listeners) return;
+        for (const listener of listeners) {
+            try {
+                listener({ model, operation, args });
+            } catch (caught) {
+                console.error(caught);
+            }
         }
+    } catch (caught) {
+        console.error(caught);
     }
 }
 
