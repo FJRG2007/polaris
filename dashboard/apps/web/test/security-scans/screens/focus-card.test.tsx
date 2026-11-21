@@ -127,7 +127,7 @@ describe("FocusCard", () => {
         ).toBeTruthy();
         expect(
             screen.getByText(
-                "Update Network filter DNS server to its newest version, then scan again."
+                "Update Network filter DNS server to its latest version, then scan again."
             )
         ).toBeTruthy();
         expect(screen.getByRole("link", { name: "Open app" }).getAttribute("href")).toBe(

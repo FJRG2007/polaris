@@ -45,17 +45,28 @@ vi.mock("@/lib/audit-service", () => ({
         audit = input;
     }
 }));
-vi.mock("@/lib/network-rules", () => ({
-    evaluateAccountAccess: async (_userId: string, ip: string | undefined) => {
+vi.mock("@/lib/network-rules", () => {
+    const judge = (ip: string | undefined) => {
         verdicts += 1;
         return { allowed: ip !== undefined && permitted.includes(ip), reason: null, country: null };
-    }
+    };
+    return {
+        evaluateAccountAccess: async (_userId: string, ip: string | undefined) => judge(ip),
+        // The limit an administrator imposed is judged here before the account's own rules.
+        evaluateNetworkRules: async (_rules: unknown, ip: string | undefined) => judge(ip)
+    };
+});
+// The account has no rules of its own: only the imposed limit decides.
+vi.mock("@/lib/account-rules", async (original) => ({
+    ...(await original<typeof import("../../src/lib/account-rules")>()),
+    listAccountRules: async () => []
 }));
 vi.mock("@polaris/auth", () => ({
     consumeSessionRotation: async () => false,
     markPrincipalsMoved: async (userIds: string[]) => principalsMoved(userIds as never),
     rememberAccountDevice: async () => undefined,
     resolveSignInRules: async () => ({ allowedCidrs: [], allowedCountries: [], allowedContinents: [] }),
+    resolveEnforcedRules: async () => ({ allowedCidrs: [OFFICE], allowedCountries: [], allowedContinents: [] }),
     takeSignInRecord: async () => ({ method: null, secondFactor: null }),
     updateEnforcedRules: async () => undefined
 }));

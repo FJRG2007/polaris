@@ -24,7 +24,13 @@ vi.mock("@/lib/notifications/dispatch", () => ({ notify: vi.fn() }));
 vi.mock("@/lib/session-directory", () => ({ describeOrigin: vi.fn(() => "here") }));
 vi.mock("@/lib/notifications/notice-words", () => ({ wordsFor: vi.fn(async () => (key: string) => key) }));
 vi.mock("@/lib/network-rules", () => ({
-    evaluateAccountAccess: vi.fn(async () => ({ allowed: true, reason: null, country: null }))
+    evaluateAccountAccess: vi.fn(async () => ({ allowed: true, reason: null, country: null })),
+    evaluateNetworkRules: vi.fn(async () => ({ allowed: true, reason: null, country: null }))
+}));
+// No access rule of the account's own, and no limit on it: this file is about factors.
+vi.mock("@/lib/account-rules", () => ({
+    listAccountRules: vi.fn(async () => []),
+    evaluateAccountRequest: vi.fn(async () => ({ action: "allow", source: null, ruleName: null, country: null }))
 }));
 vi.mock("@/lib/instance-security", () => ({ getInstanceSecurity: vi.fn(async () => ({ requireSecondFactor: false })) }));
 vi.mock("@/lib/notifications/session-events", () => ({ notifySessionOpened: vi.fn(), notifySessionsClosed: vi.fn() }));
@@ -33,6 +39,7 @@ vi.mock("@polaris/auth", () => ({
     consumeSessionRotation: vi.fn(async () => false),
     rememberAccountDevice: vi.fn(),
     resolveSignInRules: vi.fn(async () => ({})),
+    resolveEnforcedRules: vi.fn(async () => ({ allowedCidrs: [], allowedCountries: [], allowedContinents: [] })),
     takeSignInRecord: vi.fn(async () => ({ method: "password", secondFactor: "totp", authorizedBy: null }))
 }));
 vi.mock("@/lib/request-context", () => ({

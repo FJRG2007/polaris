@@ -198,10 +198,10 @@ describe("a loader still following the newest release", () => {
             );
         });
 
-        expect(screen.getByText("Fabric, newest version")).toBeTruthy();
+        expect(screen.getByText("Fabric, latest version")).toBeTruthy();
         expect(
             screen.getByText(
-                "Each start asks Fabric's repository for the newest version. Polaris pins the installed one once the server is up."
+                "Each start asks Fabric's repository for the latest version. Polaris pins the installed one once the server is up."
             )
         ).toBeTruthy();
         expect(screen.queryByRole("button", { name: /Update loader/ })).toBeNull();

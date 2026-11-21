@@ -25,14 +25,19 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         // Nobody has blocked anybody here; blocking has its own test.
         userBlock: { findMany: async () => [] },
+        // No instance setting is stored: every default holds.
+        setting: { findUnique: async () => null, findMany: async () => [] },
+        // Nobody has narrowed who may add them; the defaults hold.
+        userPrivacy: { findMany: async () => [], findUnique: async () => null },
         // And everybody is friends; who may be added to a group has its own test.
         friendship: {
             findMany: async ({
                 where
             }: {
-                where: { OR: [{ requesterId: string; addresseeId: { in: string[] } }] };
+                where: { OR: [{ requesterId: string; addresseeId?: { in: string[] } }] };
             }) =>
-                where.OR[0].addresseeId.in.map((addresseeId) => ({
+                // Asked about some people, or about everybody one person is friends with.
+                (where.OR[0].addresseeId?.in ?? [ADA, GRACE]).map((addresseeId) => ({
                     requesterId: where.OR[0].requesterId,
                     addresseeId,
                     status: "accepted"
