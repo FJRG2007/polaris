@@ -34,6 +34,7 @@ import { copyOntoReport, reportFiles, type ChatReportFileView } from "./report-f
 import { alertAdmins } from "@/lib/notifications/admins";
 import { ChatAccessError, ChatRuleError, requireChannel, type ChatActor } from "./access";
 import * as history from "./history-visibility";
+import { readReportContext, recentReadable, type ReportContextEntry } from "./report-context";
 
 /** How much of a message is copied onto the report. Enough to triage without
  *  opening the conversation, short of copying the conversation. */
@@ -100,6 +101,10 @@ export interface ChatReportView {
     readonly channelName: string;
     /** Whether the message is still there to be read or removed. */
     readonly live: boolean;
+    /** "message" for one message, "conversation" for a whole conversation. */
+    readonly kind: "message" | "conversation";
+    /** The last messages the reporter could read, for a conversation. */
+    readonly context: readonly ReportContextEntry[];
 }
 
 /**
@@ -220,6 +225,61 @@ export async function reportMessage(
 }
 
 /**
+ * Report a whole conversation, with the last messages the reporter can read in
+ * it (`report-context.ts`).
+ *
+ * Idempotent per person while it is open: a second press updates the same row
+ * and takes the messages again.
+ */
+export async function reportConversation(
+    actor: ChatActor,
+    input: core.ChatConversationReportInput
+): Promise<{ already: boolean }> {
+    // The same check that lets them read it, so an id somebody guessed is
+    // answered the same as one that does not exist.
+    await requireChannel(actor, input.channelId);
+    const context = await recentReadable(actor, input.channelId);
+    if (context.length === 0) throw new ChatRuleError({ key: "errors.reportNothingToSend" });
+    const shape = { reason: input.reason, note: input.note, context };
+    const existing = await prisma.chatReport.findFirst({
+        where: {
+            channelId: input.channelId,
+            reporterId: actor.id,
+            kind: "conversation",
+            status: "open"
+        },
+        select: { id: true }
+    });
+    if (existing) {
+        await prisma.chatReport.update({ where: { id: existing.id }, data: shape });
+        return { already: true };
+    }
+    await prisma.chatReport.create({
+        data: {
+            channelId: input.channelId,
+            reporterId: actor.id,
+            kind: "conversation",
+            ...shape
+        }
+    });
+    // The same announcement a message report makes, for the same queue.
+    if (await claimQueueAnnouncement()) {
+        const said = (locale: core.Locale) => ({
+            title: translate(locale, "chat.report.alertTitle"),
+            body: translate(locale, "chat.report.alertBody", {
+                reason: translate(locale, `chat.report.reasons.${input.reason}`)
+            })
+        });
+        await alertAdmins({
+            ...said(core.DEFAULT_LOCALE),
+            say: said,
+            actionRequired: true
+        }).catch(releaseQueueAnnouncement);
+    }
+    return { already: false };
+}
+
+/**
  * The queue, newest first.
  *
  * Open by default, because a moderator arriving here is arriving to do the ones
@@ -241,6 +301,8 @@ export async function listReports(
             authorId: true,
             messageId: true,
             channelId: true,
+            kind: true,
+            context: true,
             createdAt: true,
             handledAt: true,
             reporter: { select: { name: true } },
@@ -315,7 +377,9 @@ export async function listReports(
                     ? `#${channel.name}`
                     : "A private conversation"
                 : "A conversation that is gone",
-            live: row.messageId !== null && row.message?.deletedAt === null
+            live: row.messageId !== null && row.message?.deletedAt === null,
+            kind: row.kind === "conversation" ? "conversation" : "message",
+            context: readReportContext(row.context)
         };
     });
 }

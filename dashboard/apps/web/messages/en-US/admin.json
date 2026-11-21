@@ -2849,6 +2849,8 @@
         "reportedBy": "reported by {name}",
         "noText": "No text",
         "noTextSeeBelow": "No text - see below",
+        "recentMessages": "{count, plural, one {The last message} other {The last # messages}} the reporter could see",
+        "unknownAuthor": "Somebody",
         "writtenBy": "Written by {name}{live, select, true {} other { - the message is no longer there}}",
         "writtenByGone": "Written by an account that is gone{live, select, true {} other { - the message is no longer there}}",
         "remove": "Remove the message",

@@ -123,7 +123,10 @@ export const MAX_REPORT_NOTE = 1000;
 export const userReportSchema = z.object({
     subjectId: z.string().uuid(),
     reason: z.enum(USER_REPORT_REASONS),
-    note: z.string().trim().max(MAX_REPORT_NOTE).default("")
+    note: z.string().trim().max(MAX_REPORT_NOTE).default(""),
+    /** The conversation it was reported from, whose last messages from them
+     *  the reporter can read travel with it. */
+    channelId: z.string().uuid().optional()
 });
 
 export type UserReportInput = z.infer<typeof userReportSchema>;

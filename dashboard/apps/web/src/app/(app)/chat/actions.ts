@@ -923,6 +923,15 @@ export async function setGroupOptionsAction(
     return result.error ? { error: result.error } : {};
 }
 
+/** Report a whole conversation. The service decides what travels with it. */
+export async function reportConversationAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = core.chatConversationReportSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notAllowedHere") };
+    const result = await guard(() => reports.reportConversation(me, parsed.data));
+    return result.error ? { error: result.error } : {};
+}
+
 /** Advanced chat privacy, on or off. The service decides who may. */
 const advancedPrivacySchema = z
     .object({ channelId: z.string().uuid(), on: z.boolean() })

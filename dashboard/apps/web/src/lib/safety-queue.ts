@@ -22,6 +22,7 @@ import { translatorFor } from "@/lib/i18n/translate";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { readReportContext, recentReadable, type ReportContextEntry } from "@/lib/chat/report-context";
 
 /** One case, as the queue draws it. */
 export interface SafetyCaseView {
@@ -41,6 +42,9 @@ export interface SafetyCaseView {
      *  Read live rather than from the row: an owner can lift it themselves, and a
      *  queue saying otherwise would send somebody to look at nothing. */
     readonly stillLocked: boolean;
+    /** For a person reported from a conversation, the last messages of theirs
+     *  the reporter could read there. */
+    readonly context: readonly ReportContextEntry[];
 }
 
 const CASE_SELECT = {
@@ -50,6 +54,7 @@ const CASE_SELECT = {
     reason: true,
     note: true,
     outcome: true,
+    context: true,
     handledAt: true,
     createdAt: true,
     subject: {
@@ -66,6 +71,7 @@ interface CaseRow {
     reason: string;
     note: string;
     outcome: string;
+    context: unknown;
     handledAt: Date | null;
     createdAt: Date;
     subject: {
@@ -91,7 +97,8 @@ function toView(row: CaseRow): SafetyCaseView {
         handledBy: row.handledBy,
         handledAt: row.handledAt?.toISOString() ?? null,
         createdAt: row.createdAt.toISOString(),
-        stillLocked: row.subject.security?.lockdownAt != null
+        stillLocked: row.subject.security?.lockdownAt != null,
+        context: readReportContext(row.context)
     };
 }
 
@@ -160,6 +167,13 @@ export async function reportUser(
     // i18n-ignore said in the reader's words by the report action
     if (!subject) return { error: "That account could not be reported." };
 
+    // Reported from a conversation: their last messages there that the
+    // reporter can read go with it. Nothing when the reporter cannot reach it,
+    // so a report never carries what its reporter could not see.
+    const context = input.channelId
+        ? await recentReadable({ id: reporterId }, input.channelId, input.subjectId)
+        : [];
+
     // One open report per person per reporter. A second press is the same
     // report, and what it says is the newer of the two.
     const existing = await prisma.safetyCase.findFirst({
@@ -169,7 +183,11 @@ export async function reportUser(
     if (existing) {
         await prisma.safetyCase.update({
             where: { id: existing.id },
-            data: { reason: input.reason, note: input.note }
+            data: {
+                reason: input.reason,
+                note: input.note,
+                ...(context.length > 0 ? { context } : {})
+            }
         });
         return {};
     }
@@ -180,7 +198,8 @@ export async function reportUser(
             subjectId: input.subjectId,
             reporterId,
             reason: input.reason,
-            note: input.note
+            note: input.note,
+            context
         }
     });
     await recordAudit({

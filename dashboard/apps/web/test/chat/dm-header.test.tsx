@@ -81,6 +81,8 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
 }));
 
 vi.mock("@/components/activity-card", () => ({ ActivityLine: () => null }));
+// Its block-after-report step reaches the account actions, which need a server.
+vi.mock("@/app/(app)/chat/report-dialog", () => ({ ReportDialog: () => null }));
 vi.mock("@/app/(app)/chat/game-link-badge", () => ({ GameLinkChips: () => null }));
 // The picker is its own component with its own tests; here it is a button that
 // picks one person, so what is asserted is what the dialog does with them.

@@ -2849,6 +2849,8 @@
         "reportedBy": "denunciado por {name}",
         "noText": "Sin texto",
         "noTextSeeBelow": "Sin texto, mira abajo",
+        "recentMessages": "{count, plural, one {El último mensaje} other {Los últimos # mensajes}} que veía",
+        "unknownAuthor": "Alguien",
         "writtenBy": "Escrito por {name}{live, select, true {} other {; el mensaje ya no está}}",
         "writtenByGone": "Escrito por una cuenta que ya no existe{live, select, true {} other {; el mensaje ya no está}}",
         "remove": "Eliminar el mensaje",

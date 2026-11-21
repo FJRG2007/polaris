@@ -122,6 +122,15 @@ export const chatReportSchema = z.object({
 
 export type ChatReportInput = z.infer<typeof chatReportSchema>;
 
+/** A whole conversation reported, with the last messages the reporter can read. */
+export const chatConversationReportSchema = z.object({
+    channelId: z.string().uuid(),
+    reason: z.enum(CHAT_REPORT_REASONS),
+    note: z.string().trim().max(MAX_CHAT_REPORT_NOTE).default("")
+});
+
+export type ChatConversationReportInput = z.infer<typeof chatConversationReportSchema>;
+
 /** Typing when a tab does not say - one running a build from before recordings
  *  were announced still sends the bare call. */
 export const chatActivitySchema = z.enum(CHAT_ACTIVITIES).catch("typing").default("typing");

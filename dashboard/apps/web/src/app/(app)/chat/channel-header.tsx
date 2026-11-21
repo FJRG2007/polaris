@@ -36,6 +36,7 @@ import { NotifyOptions } from "./notify-menu";
 import { GameLinkChips } from "./game-link-badge";
 import { MuteOptions, type MenuParts } from "./mute-menu";
 import { GroupSettingsDialog } from "./group-settings-dialog";
+import { ReportDialog } from "./report-dialog";
 import { ConversationInfo, type SharedKind } from "./conversation-info";
 import { TOUCH_TARGET, usePhone } from "@/components/use-phone";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
@@ -63,7 +64,8 @@ import {
     UserPlus,
     UserRound,
     Users,
-    Video
+    Video,
+    Flag
 } from "lucide-react";
 import {
     ConfirmDeleteDialog,
@@ -152,6 +154,7 @@ export function ChannelHeader({
     const [settings, setSettings] = useState(false);
     const [naming, setNaming] = useState(false);
     const [translating, setTranslating] = useState(false);
+    const [reportingChat, setReportingChat] = useState(false);
     /** Live translation is offered only where the reader has an app that
      *  translates. */
     const translator = useTextTranslator();
@@ -590,6 +593,15 @@ export function ChannelHeader({
                                     </DropdownMenuItem>
                                 </>
                             )}
+                            {/* The whole conversation, with its last messages:
+                                for what no single message shows. */}
+                            <DropdownMenuItem
+                                variant="danger"
+                                onSelect={() => setReportingChat(true)}
+                            >
+                                <Flag className="size-3.5" />
+                                {t("channelHeader.reportConversation")}
+                            </DropdownMenuItem>
                             {vanish && (
                                 <VanishMenu
                                     rules={vanish.rules}
@@ -723,6 +735,12 @@ export function ChannelHeader({
                 />
             ) : null}
 
+            <ReportDialog
+                messageId={null}
+                channelId={channel.id}
+                open={reportingChat}
+                onOpenChange={setReportingChat}
+            />
             <TranslationDialog
                 open={translating}
                 onOpenChange={setTranslating}

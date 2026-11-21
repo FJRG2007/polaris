@@ -26,6 +26,7 @@ import { settleReportAction } from "./actions";
 import { VoiceNote } from "@/app/(app)/chat/voice-note";
 import type { ChatReportView } from "@/lib/chat/reports";
 import { useDisplayFormat } from "@/components/display-format";
+import { ReportContextList } from "@/components/report-context-list";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
 import type { ChatReportFileView } from "@/lib/chat/report-files";
 import { placeholderUrl } from "@/lib/chat/media-shape";
@@ -101,18 +102,21 @@ export function ReportsView({
                             it. Quoted rather than rendered: this is a moderation
                             surface, and a report is not a place to run somebody
                             else's formatting. */}
-                        <blockquote className="whitespace-pre-wrap break-words border-s-2 border-border ps-3 text-sm">
-                            {report.excerpt || (
-                                <span className="text-muted-foreground">
-                                    {report.files.length > 0 ? t("reports.noTextSeeBelow") : t("reports.noText")}
-                                </span>
-                            )}
-                        </blockquote>
+                        {report.kind === "message" && (
+                            <blockquote className="whitespace-pre-wrap break-words border-s-2 border-border ps-3 text-sm">
+                                {report.excerpt || (
+                                    <span className="text-muted-foreground">
+                                        {report.files.length > 0 ? t("reports.noTextSeeBelow") : t("reports.noText")}
+                                    </span>
+                                )}
+                            </blockquote>
+                        )}
 
                         {/* What was actually attached. Most reports are about a
                             picture, and until this was here the queue showed the
                             words and not the thing anybody was objecting to. */}
                         <ReportFiles reportId={report.id} files={report.files} />
+                        <ReportContextList entries={report.context} />
 
                         {/* The card the message drew, for a report about a link.
                             Drawn from what was already looked up: nothing here
@@ -123,11 +127,15 @@ export function ReportsView({
                             ) : null
                         )}
 
-                        <p className="text-xs text-muted-foreground">
-                            {report.authorName
-                                ? t("reports.writtenBy", { name: report.authorName, live: String(report.live) })
-                                : t("reports.writtenByGone", { live: String(report.live) })}
-                        </p>
+                        {/* A whole conversation has no one author; its
+                            messages above each say who wrote them. */}
+                        {report.kind === "message" && (
+                            <p className="text-xs text-muted-foreground">
+                                {report.authorName
+                                    ? t("reports.writtenBy", { name: report.authorName, live: String(report.live) })
+                                    : t("reports.writtenByGone", { live: String(report.live) })}
+                            </p>
+                        )}
 
                         {report.note && (
                             <p className="rounded-md bg-muted px-3 py-2 text-sm">{report.note}</p>

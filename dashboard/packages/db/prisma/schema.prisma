@@ -11160,6 +11160,14 @@ model ChatReport {
     handledBy User?      @relation("ChatReportsHandled", fields: [handledById], references: [id], onDelete: SetNull)
     files    ChatReportFile[]
 
+    // message - one message, the row's own excerpt and files; conversation - the
+    // whole conversation, carried by `context`. Message by default, which is
+    // every report made before a conversation could be reported.
+    kind       String  @default("message")
+    // The last messages the reporter could read when they reported it, copied
+    // (`lib/chat/report-context.ts`). Empty for a report of one message.
+    context    Json    @default("[]")
+
     // One report per person per message. A second press is the same report.
     @@unique([messageId, reporterId])
     @@index([status, createdAt])
@@ -11199,6 +11207,9 @@ model SafetyCase {
     // What an administrator wrote when they settled it, which is the record of
     // why - and, for a lockdown, what the owner is told when it is lifted.
     outcome     String    @default("")
+    // For a person reported from a conversation: the last messages of theirs
+    // the reporter could read there, copied when it was made. Empty otherwise.
+    context     Json      @default("[]")
     createdAt   DateTime  @default(now())
 
     subject   User  @relation("SafetyCasesAbout", fields: [subjectId], references: [id], onDelete: Cascade)

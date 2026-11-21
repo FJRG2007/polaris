@@ -29,7 +29,8 @@ const REPORT: SafetyCaseView = {
     handledBy: { id: "u3", name: "Grace Hopper" },
     handledAt: null,
     createdAt: "2026-01-02T10:00:00.000Z",
-    stillLocked: false
+    stillLocked: false,
+    context: []
 };
 
 const LOCKDOWN: SafetyCaseView = {
@@ -40,7 +41,8 @@ const LOCKDOWN: SafetyCaseView = {
     reason: "",
     reporter: null,
     handledBy: null,
-    stillLocked: true
+    stillLocked: true,
+    context: []
 };
 
 function draw(cases: SafetyCaseView[], locale: "en-US" | "es-ES") {

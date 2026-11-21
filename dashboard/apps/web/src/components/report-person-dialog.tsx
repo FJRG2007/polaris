@@ -34,11 +34,15 @@ import {
 export function ReportPersonDialog({
     open,
     person,
+    channelId,
     onOpenChange,
     onReported
 }: {
     open: boolean;
     person: { id: string; name: string };
+    /** The conversation it is reported from: their last messages there that
+     *  the reader can see go with it. */
+    channelId?: string;
     onOpenChange: (open: boolean) => void;
     onReported?: () => void;
 }) {
@@ -53,7 +57,7 @@ export function ReportPersonDialog({
         setBusy(true);
         setError(null);
         const result = await runAction(
-            () => reportPersonAction({ subjectId: person.id, reason, note }),
+            () => reportPersonAction({ subjectId: person.id, reason, note, channelId }),
             setError
         );
         setBusy(false);

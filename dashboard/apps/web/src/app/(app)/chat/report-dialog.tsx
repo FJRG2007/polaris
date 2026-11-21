@@ -17,7 +17,7 @@ import { useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { runAction } from "@/lib/run-action";
 import { BlockAfterReport } from "@/components/block-after-report";
-import { reportMessageAction } from "./actions";
+import { reportConversationAction, reportMessageAction } from "./actions";
 import type { ChatReportReason } from "@polaris/core";
 import {
     CHAT_REPORT_REASONS,
@@ -40,6 +40,7 @@ import {
 
 export function ReportDialog({
     messageId,
+    channelId = null,
     body = "",
     author = null,
     open,
@@ -47,6 +48,9 @@ export function ReportDialog({
 }: {
     /** The message being reported, or null when nothing is. */
     messageId: string | null;
+    /** The conversation being reported as a whole, with no message: its last
+     *  messages the reader can see go with it. */
+    channelId?: string | null;
     /** What it said, so the dialog can say up front that there is nothing here
      *  to report. The server decides; this is the same rule, one step earlier,
      *  so nobody writes a note about a message that will be refused. */
@@ -59,7 +63,8 @@ export function ReportDialog({
     onOpenChange: (open: boolean) => void;
 }) {
     const t = useTranslations("chat");
-    const nothingToReport = isPleasantry(body);
+    const whole = messageId === null && channelId !== null;
+    const nothingToReport = !whole && isPleasantry(body);
     const [reason, setReason] = useState<ChatReportReason>("spam");
     const [note, setNote] = useState("");
     const [busy, setBusy] = useState(false);
@@ -67,11 +72,14 @@ export function ReportDialog({
     const [sent, setSent] = useState(false);
 
     const send = async () => {
-        if (!messageId) return;
+        if (!messageId && !whole) return;
         setBusy(true);
         setError("");
         const result = await runAction(
-            () => reportMessageAction({ messageId, reason, note }),
+            () =>
+                messageId
+                    ? reportMessageAction({ messageId, reason, note })
+                    : reportConversationAction({ channelId, reason, note }),
             setError
         );
         setBusy(false);
@@ -94,13 +102,17 @@ export function ReportDialog({
         <Dialog open={open} onOpenChange={close}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{t("report.reportThisMessage")}</DialogTitle>
+                    <DialogTitle>
+                        {whole ? t("report.reportThisConversation") : t("report.reportThisMessage")}
+                    </DialogTitle>
                     <DialogDescription>
                         {sent
                             ? t("report.itHasGoneToWhoever")
                             : nothingToReport
                               ? t("report.thereIsNothingHereFor")
-                              : t("report.itGoesToWhoeverRuns")}
+                              : whole
+                                ? t("report.conversationGoesWithRecent")
+                                : t("report.itGoesToWhoeverRuns")}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -156,7 +168,7 @@ export function ReportDialog({
                     {!sent && !nothingToReport && (
                         <Button
                             variant="danger"
-                            disabled={busy || !messageId}
+                            disabled={busy || (!messageId && !whole)}
                             onClick={() => void send()}
                             className={cn(busy && "opacity-70")}
                         >

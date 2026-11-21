@@ -662,6 +662,7 @@ export function MemberMenu({
             <ReportPersonDialog
                 open={reporting}
                 person={{ id: member.userId, name: member.name }}
+                channelId={channel.id}
                 onOpenChange={setReporting}
             />
             {removeFriendDialog}

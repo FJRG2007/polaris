@@ -23,6 +23,7 @@ import type { ChatReportView } from "@/lib/chat/reports";
 import type { SafetyCaseView } from "@/lib/safety-queue";
 import { ShieldAlert, Flag, Check, X } from "lucide-react";
 import { useDisplayFormat } from "@/components/display-format";
+import { ReportContextList } from "@/components/report-context-list";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Card, CardBody, Input, Select } from "@polaris/ui";
 
@@ -164,6 +165,8 @@ function CaseCard({ entry }: { entry: SafetyCaseView }) {
                             : t("safety.case.noNoteReport")}
                     </p>
                 )}
+
+                <ReportContextList entries={entry.context} />
 
                 {entry.status === "open" ? (
                     <div className="flex flex-wrap items-center gap-2">
