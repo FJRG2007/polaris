@@ -41,7 +41,14 @@ export interface DeviceSessionView {
      *  sessions screen can name the machine its other rows run on. */
     readonly hostname: string | null;
     readonly os: string;
+    /** The system's own version string ("Windows 11 Pro"), where the app reported it. */
+    readonly osVersion: string | null;
     readonly version: string | null;
+    /** The device it reported, per account; null for older apps. Groups it with
+     *  the other rows from the same computer. */
+    readonly deviceKey: string | null;
+    /** Which of this deployment's names it signed in on, when recorded. */
+    readonly host: string | null;
     /** The address the sign-in was approved from. */
     readonly signedInIp: string | null;
     /** When it was approved. */
@@ -105,6 +112,9 @@ export async function listDeviceSessions(
                 clientName: true,
                 clientOs: true,
                 clientVersion: true,
+                clientOsVersion: true,
+                clientDeviceKey: true,
+                clientHost: true,
                 signedInIp: true,
                 createdAt: true,
                 lastUsedAt: true,
@@ -124,7 +134,10 @@ export async function listDeviceSessions(
             ? row.clientName
             : null,
         os: row.clientOs ?? "Unknown OS", // i18n-ignore the parser's own word for it
+        osVersion: row.clientOsVersion,
         version: row.clientVersion,
+        deviceKey: row.clientDeviceKey,
+        host: row.clientHost,
         signedInIp: row.signedInIp,
         createdAt: row.createdAt.toISOString(),
         lastUsedAt: row.lastUsedAt?.toISOString() ?? null,

@@ -322,6 +322,7 @@ model User {
     vpnProfiles         VpnProfile[]
     vpnProxyUsage       VpnProxyUsage[]
     apiKeys             ApiKey[]
+    blockedDevices      BlockedDevice[]
     oauthGrants         OAuthGrant[]
     twoFactors          TwoFactor[]
     sessionStates       SessionState[]
@@ -1672,6 +1673,12 @@ model ApiKey {
     // The build number Polaris TV reports beside its version (Android's
     // versionCode). Null for every other kind, and for a TV that never said.
     clientBuild       Int?
+    // The computer a device sign-in runs on (see SessionState.deviceKey), the
+    // system's version it reported, and which of this deployment's names it
+    // signed in on. Null for keys made by hand and for older clients.
+    clientDeviceKey   String?
+    clientOsVersion   String?
+    clientHost        String?
     signedInIp        String?
     pinToAddress      Boolean?
     createdAt         DateTime  @default(now())
@@ -1952,6 +1959,12 @@ model SessionState {
     // are otherwise indistinguishable. Client-supplied, like the user-agent: a
     // label to tell them apart, never an input to a decision.
     host       String?
+    // The computer this session runs on, as Polaris Desktop claims it
+    // (x-polaris-device), hashed with the account id. Groups rows on the
+    // sessions screen and is what a blocked device is matched by. A claim:
+    // null for every browser, which cannot read a machine id.
+    deviceKey  String?
+    deviceName String?
     // How this session proved who it was. `signInMethod` is what identified the
     // account (password, passkey, email-link, qr-code); `secondFactor` is what
     // was asked for on top of it (totp, email-code, whatsapp-code, code,
@@ -3850,6 +3863,10 @@ model CliAuthorization {
     requestIp        String?
     requestUserAgent String?
     requestHost      String?
+    // The hashed machine id and system version the client reported, carried to
+    // the key it is handed. Null for clients from before they reported one.
+    deviceId         String?
+    deviceOsVersion  String?
     // pending | approved | denied
     status    String
     userId    String?  @db.Uuid
@@ -18716,4 +18733,22 @@ model ChatGroupInvite {
 
     @@unique([channelId, inviteeId])
     @@index([inviteeId, createdAt])
+}
+
+// A computer its owner blocked from Account > Sessions: every session and
+// device sign-in claiming it was ended, and none may sign in again while the
+// row stands. Matched by the per-account device key (SessionState.deviceKey,
+// ApiKey.clientDeviceKey), so it holds against clients that report their
+// device; one that hides it is not recognised, which the screen says.
+model BlockedDevice {
+    id        String   @id @default(uuid()) @db.Uuid
+    userId    String   @db.Uuid
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    deviceKey String
+    // What the device was called when it was blocked, so the list can name it.
+    label     String
+    os        String?
+    createdAt DateTime @default(now())
+
+    @@unique([userId, deviceKey])
 }

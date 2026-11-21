@@ -23,6 +23,7 @@ import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { sessionClient } from "@/lib/session-device";
 import { followClientVersion } from "@/lib/session-client-version";
+import { deviceKeyFor, isDeviceBlocked, requestDeviceClaim } from "@/lib/device-sessions/device-key";
 import { restoreAccount } from "@/lib/account-lifecycle";
 import { notifySessionCompromised } from "@/lib/notifications/session-breach";
 import {
@@ -310,6 +311,40 @@ export async function guardSession({
 
     const ip = await clientIp();
 
+    // 1b. A device its owner blocked. The key is the one this request claims
+    //     (Polaris Desktop sends it on every request), or the one the session
+    //     recorded, so dropping the header does not undo the block for a
+    //     session already known to be on that device. A browser claims none
+    //     and costs no query.
+    const device = await requestDeviceClaim();
+    const claimedKey = deviceKeyFor(userId, device.id);
+    if (await isDeviceBlocked(userId, claimedKey ?? state?.deviceKey ?? null)) {
+        if (await revokeSession(sessionId)) {
+            await recordAudit({
+                actorId: userId,
+                action: "account.device.refused",
+                targetType: "session",
+                targetId: sessionId,
+                metadata: { ip: ip ?? null }
+            });
+        }
+        return { ok: false, redirect: "/oauth/login?blocked=1" };
+    }
+    // Recorded once, and again only if the claim changes. Never cleared by a
+    // request that leaves the header out.
+    if (
+        state &&
+        claimedKey &&
+        (claimedKey !== state.deviceKey || (device.name && device.name !== state.deviceName))
+    ) {
+        await prisma.sessionState
+            .update({
+                where: { sessionId },
+                data: { deviceKey: claimedKey, deviceName: device.name ?? state.deviceName }
+            })
+            .catch((error: unknown) => console.error("polaris: could not record the device:", error));
+    }
+
     // 2. Somebody else holding this session.
     //
     //    Everything else an account can arm guards the moment of signing in and
@@ -403,7 +438,9 @@ export async function guardSession({
                 country: decision.country,
                 requireApproval:
                     settings?.requireLoginApproval === true && record.twoFactorEnabled !== true,
-                twoFactorEnabled: record.twoFactorEnabled === true
+                twoFactorEnabled: record.twoFactorEnabled === true,
+                deviceKey: claimedKey,
+                deviceName: claimedKey ? device.name : null
             });
             if (created.approval === "pending") return { ok: false, redirect: "/oauth/pending" };
             // The sign-in owes more factors than the one it answered: held until
@@ -604,6 +641,9 @@ async function createSessionState(input: {
     country: string | null;
     requireApproval: boolean;
     twoFactorEnabled: boolean;
+    /** The device the session runs on, when its client claimed one. */
+    deviceKey?: string | null;
+    deviceName?: string | null;
 }): Promise<{ approval: string; stepUp: boolean }> {
     let approval = "approved";
     if (input.requireApproval && !(await consumeSessionRotation(input.userId, input.ip ?? null))) {
@@ -646,7 +686,9 @@ async function createSessionState(input: {
                 userAgent: userAgent ?? null,
                 userAgentBrands: userAgentBrands ?? null,
                 userAgentPlatform: userAgentPlatform ?? null,
-                host: host ?? null
+                host: host ?? null,
+                deviceKey: input.deviceKey ?? null,
+                deviceName: input.deviceName ?? null
             }
         });
     } catch {

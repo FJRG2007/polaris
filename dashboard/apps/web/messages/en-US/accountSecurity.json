@@ -100,7 +100,9 @@
         "deviceEnded": "That sign-in has already ended.",
         "policyTooMany": "Too many tries. Wait a few minutes.",
         "keepOneMethod": "Keep at least one method accepted.",
-        "policyWrongPassword": "Current password is incorrect."
+        "policyWrongPassword": "Current password is incorrect.",
+        "blockOwnDevice": "You are using this device, so it cannot be blocked from here.",
+        "unknownDevice": "That device is no longer listed. Reload the page."
     },
     "phone": {
         "confirmationMessage": "{code} is your Polaris confirmation code. It expires in {minutes} minutes."
@@ -198,6 +200,24 @@
             "title": "Sign out {app} on {name}?",
             "description": "It stops working at its next request and has to be connected again from that device.",
             "confirm": "Sign out"
+        },
+        "machine": {
+            "signOutTitle": "Sign out {device}?",
+            "signOutDescription": "Every session and app signed in on {device} is signed out. This browser stays signed in.",
+            "signOutConfirm": "Sign out device",
+            "blockTitle": "Block {device}?",
+            "blockDescription": "Everything signed in on {device} is signed out, and the Polaris apps on it cannot sign in to this account again until you unblock it. A browser on that computer does not identify the device, so it is not affected: change your password if you no longer trust whoever has it.",
+            "blockConfirm": "Block device"
+        },
+        "blocked": {
+            "title": "Blocked devices",
+            "hint": "These devices cannot sign in to your account through the Polaris apps.",
+            "unblock": "Unblock",
+            "unblockNamed": "Unblock {device}",
+            "unblockTitle": "Unblock {device}?",
+            "unblockDescription": "The Polaris apps on {device} can sign in to this account again.",
+            "unblockConfirm": "Unblock",
+            "blockedAt": "Blocked <time></time>"
         }
     },
     "stepUp": {

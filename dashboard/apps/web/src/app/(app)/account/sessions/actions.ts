@@ -23,6 +23,12 @@ import { newDeviceRefusal } from "@/lib/device-grace";
 import { getTranslations } from "@/lib/i18n/request";
 import { localized } from "../security/action-messages";
 import { revokeTrustedDevice, revokeTrustedDevices } from "@polaris/auth";
+import {
+    blockDevice,
+    DEVICE_KEY_PATTERN,
+    signOutDevice,
+    unblockDevice
+} from "@/lib/device-sessions/device-block";
 import { pinDeviceSession, revokeDeviceSession } from "@/lib/device-sessions/sessions";
 import { pinExtensionSession, revokeExtensionSession } from "@/lib/extension/sessions";
 import {
@@ -53,7 +59,9 @@ type SessionError =
     | "errors.deviceForgotten"
     | "errors.unknownConnection"
     | "errors.connectionEnded"
-    | "errors.deviceEnded";
+    | "errors.deviceEnded"
+    | "errors.blockOwnDevice"
+    | "errors.unknownDevice";
 
 /** One of this file's own refusals, in the reader's language. */
 async function refuse(key: SessionError): Promise<{ error: string }> {
@@ -354,6 +362,66 @@ export async function pinDeviceSessionAction(
         targetId: parsed.data,
         metadata: { pinToAddress: pinned }
     });
+    revalidatePath("/account/sessions");
+    return {};
+}
+
+/** A device as the sessions screen names it: its per-account key, and the name
+ *  and system shown on its row, kept for the audit and the blocked list. */
+const deviceGroupSchema = z.object({
+    key: z.string().regex(DEVICE_KEY_PATTERN),
+    label: z.string().trim().min(1).max(120),
+    os: z.string().trim().min(1).max(80).nullable().default(null)
+});
+
+/** Sign out every session and app on one device. The reader's own session is
+ *  spared; the key only ever matches the caller's own rows. */
+export async function signOutDeviceGroupAction(device: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    const parsed = deviceGroupSchema.safeParse(device);
+    if (!parsed.success) return refuse("errors.unknownDevice");
+    await signOutDevice(user.id, parsed.data.key, user.sessionId, parsed.data.label);
+    revalidatePath("/account/sessions");
+    return {};
+}
+
+/**
+ * Block a device: everything on it is signed out and it cannot sign in again
+ * until it is unblocked. The device in hand is refused - it would end the page
+ * the press was made on and leave nothing to undo it from.
+ */
+export async function blockDeviceAction(device: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    const parsed = deviceGroupSchema.safeParse(device);
+    if (!parsed.success) return refuse("errors.unknownDevice");
+    const here = await prisma.sessionState.findUnique({
+        where: { sessionId: user.sessionId },
+        select: { deviceKey: true }
+    });
+    if (here?.deviceKey === parsed.data.key) return refuse("errors.blockOwnDevice");
+    await blockDevice(
+        user.id,
+        parsed.data.key,
+        user.sessionId,
+        parsed.data.label,
+        parsed.data.os
+    );
+    revalidatePath("/account/sessions");
+    return {};
+}
+
+/** Lift a block. Scoped to the caller, so another account's id matches nothing. */
+export async function unblockDeviceAction(id: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    const parsed = sessionIdSchema.safeParse(id);
+    if (!parsed.success) return refuse("errors.unknownDevice");
+    if (!(await unblockDevice(user.id, parsed.data))) return refuse("errors.unknownDevice");
     revalidatePath("/account/sessions");
     return {};
 }

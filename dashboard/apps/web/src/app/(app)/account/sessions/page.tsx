@@ -17,6 +17,7 @@ import { SessionsView } from "./sessions-view";
 import { DeviceAccountsCard } from "@/components/device-accounts";
 import { listVaultClients } from "@/lib/vault/devices";
 import { listDeviceSessions } from "@/lib/device-sessions/sessions";
+import { listBlockedDevices } from "@/lib/device-sessions/device-block";
 import { listExtensionSessions } from "@/lib/extension/sessions";
 import { listTrustedDeviceRows, listUserSessions } from "@/lib/session-directory";
 
@@ -28,7 +29,8 @@ export default async function SessionsPage() {
     // The apps as well as the browsers. A client is a different credential from a
     // session and was listed only under the vault, so somebody who connected the
     // extension and came here to check found no trace of it.
-    const [sessions, trusted, extensions, clients, terminals, pinLength] = await Promise.all([
+    const [sessions, trusted, extensions, clients, terminals, pinLength, blockedDevices] =
+        await Promise.all([
         listUserSessions(user.id, user.sessionId),
         listTrustedDeviceRows(user.id),
         // The browser extensions, which are connections rather than vault
@@ -38,7 +40,9 @@ export default async function SessionsPage() {
         // The command-line sign-ins, each an API key listed here as a session.
         listDeviceSessions(user.id),
         // So approving a sign-in checks the PIN on its last digit.
-        getUserSecurity(user.id).then((security) => security.pinLength)
+        getUserSecurity(user.id).then((security) => security.pinLength),
+        // The devices this account refused, each with its Unblock.
+        listBlockedDevices(user.id)
     ]);
 
     // One browser, one row. A vault client let in under a connection is that
@@ -68,6 +72,7 @@ export default async function SessionsPage() {
                 clients={apps}
                 deviceSessions={terminals}
                 pinLength={pinLength}
+                blockedDevices={blockedDevices}
             />
         </div>
     );

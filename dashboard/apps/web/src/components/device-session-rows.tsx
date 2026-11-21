@@ -17,7 +17,7 @@ import { Badge, Button, cn } from "@polaris/ui";
 import { LogOut } from "lucide-react";
 import { SystemMark } from "@/components/client-marks";
 import { DeviceAddress } from "@/components/device-address";
-import { ActivityLink, MachineBadge, PinButton } from "@/components/sessions-table";
+import { ActivityLink, HostName, MachineBadge, PinButton } from "@/components/sessions-table";
 import type { Machine } from "@/lib/device-sessions/machines";
 import { DEVICE_SESSION_KINDS } from "@/lib/device-sessions/kinds";
 import type { DeviceSessionView } from "@/lib/device-sessions/sessions";
@@ -162,8 +162,11 @@ export function DeviceSessionRows({
                                 <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell">
                                     <span className="flex items-center gap-2">
                                         <SystemMark os={session.os} />
-                                        <span className="truncate" title={session.os}>
-                                            {session.os}
+                                        <span
+                                            className="truncate"
+                                            title={session.osVersion ?? session.os}
+                                        >
+                                            {session.osVersion ?? session.os}
                                         </span>
                                     </span>
                                 </td>
@@ -172,8 +175,8 @@ export function DeviceSessionRows({
                                         address={{ ip: address ?? null, publicIp: null }}
                                     />
                                 </td>
-                                <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
-                                    {t("sessionsTable.notRecorded")}
+                                <td className="hidden max-w-[12rem] px-3 py-2 text-xs xl:table-cell">
+                                    <HostName host={session.host} />
                                 </td>
                                 <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                     {session.lastUsedAt ? (

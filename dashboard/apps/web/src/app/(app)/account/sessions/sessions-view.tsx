@@ -25,12 +25,17 @@ import type { DeviceSessionView } from "@/lib/device-sessions/sessions";
 import { DEVICE_SESSION_KINDS } from "@/lib/device-sessions/kinds";
 import type { ExtensionSessionView } from "@/lib/extension/sessions";
 import { TrustedDevicesCard } from "./trusted-devices-card";
+import { BlockedDevicesCard } from "./blocked-devices-card";
+import type { DeviceGroup } from "@/lib/device-sessions/device-groups";
+import type { BlockedDeviceView } from "@/lib/device-sessions/device-block";
 import { signInParts, signInText } from "@/lib/sign-in-words";
 import { SessionsTable, sessionOrigin } from "@/components/sessions-table";
 import type { SessionView, TrustedDeviceRow } from "@/lib/session-directory";
 import {
+    blockDeviceAction,
     decideLoginApprovalAction,
     disconnectExtensionAction,
+    signOutDeviceGroupAction,
     revokeOtherSessionsAction,
     pinDeviceSessionAction,
     pinExtensionAction,
@@ -82,7 +87,8 @@ export function SessionsView({
     extensions,
     clients,
     deviceSessions,
-    pinLength
+    pinLength,
+    blockedDevices = []
 }: {
     sessions: SessionView[];
     /** Browsers allowed to skip the second-factor challenge. Empty on an account
@@ -100,6 +106,8 @@ export function SessionsView({
     deviceSessions: DeviceSessionView[];
     /** The PIN's length, null when unknown, so approving checks it on its last digit. */
     pinLength: number | null;
+    /** The devices this account blocked, listed with their Unblock. */
+    blockedDevices?: readonly BlockedDeviceView[];
 }) {
     const router = useRouter();
     const t = useTranslations("accountSecurity");
@@ -224,6 +232,43 @@ export function SessionsView({
         else router.refresh();
     }
 
+    /** Sign out every session on one device. Confirmed first: it can reach
+     *  several apps at once. */
+    async function signOutGroup(group: DeviceGroup) {
+        const device = group.name ?? words("sessionsTable.deviceGroup.unnamed");
+        const ok = await confirm({
+            title: t("sessions.machine.signOutTitle", { device }),
+            description: t("sessions.machine.signOutDescription", { device }),
+            confirmLabel: t("sessions.machine.signOutConfirm"),
+            danger: true
+        });
+        if (!ok) return;
+        setBusyId(group.key);
+        setError(null);
+        const result = await signOutDeviceGroupAction({ key: group.key, label: device, os: group.os });
+        setBusyId(null);
+        if (result.error) setError(result.error);
+        else router.refresh();
+    }
+
+    /** Block one device. What it does and does not reach is said before it is done. */
+    async function blockGroup(group: DeviceGroup) {
+        const device = group.name ?? words("sessionsTable.deviceGroup.unnamed");
+        const ok = await confirm({
+            title: t("sessions.machine.blockTitle", { device }),
+            description: t("sessions.machine.blockDescription", { device }),
+            confirmLabel: t("sessions.machine.blockConfirm"),
+            danger: true
+        });
+        if (!ok) return;
+        setBusyId(group.key);
+        setError(null);
+        const result = await blockDeviceAction({ key: group.key, label: device, os: group.os });
+        setBusyId(null);
+        if (result.error) setError(result.error);
+        else router.refresh();
+    }
+
     /** Ending your own session goes through the auth client, so the cookie is
      *  dropped here too - deleting the row alone would leave a stale one. */
     async function signOutHere() {
@@ -342,6 +387,8 @@ export function SessionsView({
                         deviceSessions={deviceSessions}
                         onSignOutDevice={(session) => void signOutDevice(session)}
                         onPinDevice={(session, pinned) => void pinDevice(session, pinned)}
+                        onSignOutGroup={(group) => void signOutGroup(group)}
+                        onBlockGroup={(group) => void blockGroup(group)}
                     />
 
                     {/* The table says nothing about apps until one is connected,
@@ -370,6 +417,8 @@ export function SessionsView({
             </Card>
 
             {trusted.length > 0 ? <TrustedDevicesCard devices={trusted} /> : null}
+
+            {blockedDevices.length > 0 ? <BlockedDevicesCard devices={blockedDevices} /> : null}
 
             <ApproveSignInDialog
                 pinLength={pinLength}

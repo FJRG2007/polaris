@@ -110,6 +110,8 @@ export interface VerifiedApiKey {
     /** The system a CLI sign-in reported, which the account's rule reads
      *  ("computers only"). Null on every other key. */
     clientOs: string | null;
+    /** The device a sign-in reported, per account (see BlockedDevice). */
+    clientDeviceKey: string | null;
 }
 
 /** What a CLI sign-in says about the computer it runs on. Labels, never
@@ -120,6 +122,11 @@ export interface ApiKeyClient {
     readonly version: string | null;
     /** The address the sign-in was approved from, read off that request. */
     readonly ip: string | null;
+    /** The per-account key of the device it reported, the system's version and
+     *  the deployment name it signed in on. Absent for older clients. */
+    readonly deviceKey?: string | null;
+    readonly osVersion?: string | null;
+    readonly host?: string | null;
 }
 
 /** The public half of a key: "plk_" plus 8 URL-safe characters. */
@@ -199,6 +206,9 @@ export async function createApiKey(
             clientName: options.client?.name ?? null,
             clientOs: options.client?.os ?? null,
             clientVersion: options.client?.version ?? null,
+            clientDeviceKey: options.client?.deviceKey ?? null,
+            clientOsVersion: options.client?.osVersion ?? null,
+            clientHost: options.client?.host ?? null,
             signedInIp: options.client?.ip ?? null,
             groups: { createMany: { data: owned.map((group) => ({ groupId: group.id })) } }
         },
@@ -402,7 +412,8 @@ export async function verifyApiKey(presented: string): Promise<VerifiedApiKey | 
         kind: apiKeyKindOf(row.kind),
         lastUsedIp: row.lastUsedIp,
         pinToAddress: row.pinToAddress,
-        clientOs: row.clientOs
+        clientOs: row.clientOs,
+        clientDeviceKey: row.clientDeviceKey ?? null
     };
 }
 

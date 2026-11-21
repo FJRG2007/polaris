@@ -18,7 +18,9 @@
  */
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
+import { DeviceGroupRow } from "@/components/device-group-row";
+import { groupByDevice, type DeviceGroup } from "@/lib/device-sessions/device-groups";
 import { Badge, Button, cn } from "@polaris/ui";
 import type { DeviceSessionView } from "@/lib/device-sessions/sessions";
 import { RelativeTime } from "@/components/relative-time";
@@ -204,7 +206,9 @@ export function SessionsTable({
     compact = false,
     deviceSessions = [],
     onSignOutDevice,
-    onPinDevice
+    onPinDevice,
+    onSignOutGroup,
+    onBlockGroup
 }: {
     sessions: SessionView[];
     /**
@@ -260,8 +264,14 @@ export function SessionsTable({
     deviceSessions?: readonly DeviceSessionView[];
     onSignOutDevice?: (session: DeviceSessionView) => void;
     onPinDevice?: (session: DeviceSessionView, pinned: boolean | null) => void;
+    /** Signs out every session of one device. Left out where the reader is not its owner. */
+    onSignOutGroup?: (group: DeviceGroup) => void;
+    /** Blocks one device. Left out where the reader is not its owner. */
+    onBlockGroup?: (group: DeviceGroup) => void;
 }) {
     const t = useTranslations("components");
+    // Devices folded shut by the reader; every one starts open.
+    const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
     // A clock that ticks, so a row stops reading "Active now" once it is not
     // without the page having to be reloaded - and starts when it is.
     const now = useNow();
@@ -286,62 +296,34 @@ export function SessionsTable({
             hostname: device.hostname
         }))
     ]);
-    return (
-        <div className="overflow-x-auto rounded-lg border border-border">
-            <table className="w-full text-sm">
-                <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
-                    {/* Nothing arrives at md: the navigation rail appears there, so the
-                        content area is narrower than it was a breakpoint earlier and a
-                        column added then only scrolls the table sideways. */}
-                    <tr>
-                        {/* w-full max-w-0: without the cap, the folded origin line is
-                            nowrap text and sets a floor under the column that no
-                            amount of truncating gets below, so the table spills
-                            sideways. Capped, the column takes what is left instead. */}
-                        <th className="w-full max-w-0 px-3 py-2 font-medium">
-                            {t("sessionsTable.device")}
-                        </th>
-                        {compact ? null : (
-                            <>
-                                {/* The two halves of what the device claims to be,
-                                    each its own column so a list can be scanned down
-                                    one of them. They arrive before the address: what
-                                    it is is asked more often than where it was. */}
-                                <th className="hidden px-3 py-2 font-medium md:table-cell">
-                                    {t("sessionsTable.app")}
-                                </th>
-                                <th className="hidden px-3 py-2 font-medium md:table-cell">
-                                    {t("sessionsTable.system")}
-                                </th>
-                                <th className="hidden px-3 py-2 font-medium lg:table-cell">
-                                    {t("sessionsTable.address")}
-                                </th>
-                                <th className="hidden px-3 py-2 font-medium xl:table-cell">
-                                    {t("sessionsTable.domain")}
-                                </th>
-                                <th className="hidden px-3 py-2 font-medium lg:table-cell">
-                                    {t("sessionsTable.lastActive")}
-                                </th>
-                            </>
-                        )}
-                        <th className="px-3 py-2" />
-                    </tr>
-                </thead>
-                <tbody>
-                    {sessions.length === 0 &&
-                    extensions.length === 0 &&
-                    clients.length === 0 &&
-                    deviceSessions.length === 0 ? (
-                        <tr>
-                            <td
-                                colSpan={compact ? 2 : 7}
-                                className="px-3 py-8 text-center text-muted-foreground"
-                            >
-                                {emptyLabel}
-                            </td>
-                        </tr>
-                    ) : (
-                        sessionRows.map((session) => (
+    const groups = groupByDevice([
+        ...sessions.map((session) => ({
+            id: session.id,
+            deviceKey: session.deviceKey,
+            name: session.deviceName,
+            os: session.os,
+            lastSeenAt: session.lastSeenAt,
+            current: session.current
+        })),
+        ...deviceSessions.map((device) => ({
+            id: device.id,
+            deviceKey: device.deviceKey,
+            name: device.hostname,
+            os: device.os,
+            lastSeenAt: device.lastUsedAt ?? device.createdAt
+        }))
+    ]);
+    const grouped = new Set(groups.flatMap((group) => group.memberIds));
+    function toggle(key: string) {
+        setCollapsed((was) => {
+            const next = new Set(was);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+            return next;
+        });
+    }
+    function renderSession(session: SessionView) {
+        return (
                             <tr
                                 key={session.id}
                                 className={cn(
@@ -497,7 +479,103 @@ export function SessionsTable({
                                     </div>
                                 </td>
                             </tr>
-                        ))
+        );
+    }
+    return (
+        <div className="overflow-x-auto rounded-lg border border-border">
+            <table className="w-full text-sm">
+                <thead className="bg-surface/60 text-start text-xs text-muted-foreground">
+                    {/* Nothing arrives at md: the navigation rail appears there, so the
+                        content area is narrower than it was a breakpoint earlier and a
+                        column added then only scrolls the table sideways. */}
+                    <tr>
+                        {/* w-full max-w-0: without the cap, the folded origin line is
+                            nowrap text and sets a floor under the column that no
+                            amount of truncating gets below, so the table spills
+                            sideways. Capped, the column takes what is left instead. */}
+                        <th className="w-full max-w-0 px-3 py-2 font-medium">
+                            {t("sessionsTable.device")}
+                        </th>
+                        {compact ? null : (
+                            <>
+                                {/* The two halves of what the device claims to be,
+                                    each its own column so a list can be scanned down
+                                    one of them. They arrive before the address: what
+                                    it is is asked more often than where it was. */}
+                                <th className="hidden px-3 py-2 font-medium md:table-cell">
+                                    {t("sessionsTable.app")}
+                                </th>
+                                <th className="hidden px-3 py-2 font-medium md:table-cell">
+                                    {t("sessionsTable.system")}
+                                </th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                                    {t("sessionsTable.address")}
+                                </th>
+                                <th className="hidden px-3 py-2 font-medium xl:table-cell">
+                                    {t("sessionsTable.domain")}
+                                </th>
+                                <th className="hidden px-3 py-2 font-medium lg:table-cell">
+                                    {t("sessionsTable.lastActive")}
+                                </th>
+                            </>
+                        )}
+                        <th className="px-3 py-2" />
+                    </tr>
+                </thead>
+                <tbody>
+                    {sessions.length === 0 &&
+                    extensions.length === 0 &&
+                    clients.length === 0 &&
+                    deviceSessions.length === 0 ? (
+                        <tr>
+                            <td
+                                colSpan={compact ? 2 : 7}
+                                className="px-3 py-8 text-center text-muted-foreground"
+                            >
+                                {emptyLabel}
+                            </td>
+                        </tr>
+                    ) : (
+                        <>
+                            {groups.map((group) => {
+                                const open = !collapsed.has(group.key);
+                                const members = new Set(group.memberIds);
+                                return (
+                                    <Fragment key={`group-${group.key}`}>
+                                        <DeviceGroupRow
+                                            group={group}
+                                            open={open}
+                                            compact={compact}
+                                            busy={busyId !== null}
+                                            onToggle={() => toggle(group.key)}
+                                            onSignOut={onSignOutGroup}
+                                            onBlock={onBlockGroup}
+                                        />
+                                        {open
+                                            ? sessionRows
+                                                  .filter((session) => members.has(session.id))
+                                                  .map(renderSession)
+                                            : null}
+                                        {open ? (
+                                            <DeviceSessionRows
+                                                sessions={deviceSessions.filter((device) =>
+                                                    members.has(device.id)
+                                                )}
+                                                machines={machines}
+                                                busyId={busyId}
+                                                compact={compact}
+                                                activityHref={activityHref}
+                                                onSignOut={onSignOutDevice}
+                                                onPin={onPinDevice}
+                                            />
+                                        ) : null}
+                                    </Fragment>
+                                );
+                            })}
+                            {sessionRows
+                                .filter((session) => !grouped.has(session.id))
+                                .map(renderSession)}
+                        </>
                     )}
                     {/* The extensions, between the browsers and the apps: each is
                         a connection Polaris made and watches, so it carries the same
@@ -615,7 +693,7 @@ export function SessionsTable({
                         </tr>
                     ))}
                     <DeviceSessionRows
-                        sessions={deviceSessions}
+                        sessions={deviceSessions.filter((device) => !grouped.has(device.id))}
                         machines={machines}
                         busyId={busyId}
                         compact={compact}

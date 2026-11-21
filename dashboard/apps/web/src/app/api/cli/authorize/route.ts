@@ -10,6 +10,7 @@
  */
 
 import { z } from "zod";
+import { DEVICE_ID_PATTERN, DEVICE_NAME_MAX, readDeviceName } from "@polaris/core";
 import { openCliSignIn } from "@/lib/cli/sign-in";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { readerWords } from "@/lib/i18n/reader-words";
@@ -25,6 +26,14 @@ const LIMIT = 10;
 const WINDOW_MS = 10 * 60 * 1000;
 
 const askSchema = z.object({
+    /** The computer it runs on: a hashed machine id and the system's version.
+     *  Left out by clients from before it existed, which still sign in. */
+    device: z
+        .object({
+            id: z.string().trim().toLowerCase().regex(DEVICE_ID_PATTERN).optional(),
+            osVersion: z.string().trim().min(1).max(DEVICE_NAME_MAX).optional()
+        })
+        .optional(),
     /** The machine's name, as the CLI read it. Shown on the approval screen. */
     deviceName: z.string().trim().min(1).max(80),
     clientVersion: z
@@ -63,6 +72,8 @@ export async function POST(request: Request): Promise<Response> {
         {
             deviceName: asked.data.deviceName,
             clientVersion: asked.data.clientVersion ?? null,
+            deviceId: asked.data.device?.id ?? null,
+            deviceOsVersion: readDeviceName(asked.data.device?.osVersion) ?? null,
             scopes: asked.data.scopes,
             requestIp: ip ?? null,
             requestUserAgent: (await clientUserAgent()) ?? null,

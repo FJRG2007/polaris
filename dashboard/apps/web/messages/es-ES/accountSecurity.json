@@ -100,7 +100,9 @@
         "deviceEnded": "Esa sesión ya ha terminado.",
         "policyTooMany": "Demasiados intentos. Espera unos minutos.",
         "keepOneMethod": "Deja al menos un método aceptado.",
-        "policyWrongPassword": "La contraseña actual no es correcta."
+        "policyWrongPassword": "La contraseña actual no es correcta.",
+        "blockOwnDevice": "Estás usando este dispositivo, así que no se puede bloquear desde aquí.",
+        "unknownDevice": "Ese dispositivo ya no aparece. Recarga la página."
     },
     "phone": {
         "confirmationMessage": "{code} es tu código de confirmación de Polaris. Caduca en {minutes} minutos."
@@ -198,6 +200,24 @@
             "title": "¿Cerrar {app} en {name}?",
             "description": "Deja de funcionar en su próxima petición y hay que volver a conectarlo.",
             "confirm": "Cerrar"
+        },
+        "machine": {
+            "signOutTitle": "¿Cerrar sesión en {device}?",
+            "signOutDescription": "Se cierran todas las sesiones y apps de {device}. Este navegador sigue conectado.",
+            "signOutConfirm": "Cerrar sesión en el equipo",
+            "blockTitle": "¿Bloquear {device}?",
+            "blockDescription": "Se cierra todo lo conectado en {device} y las apps de Polaris de ese equipo no podrán volver a entrar en esta cuenta hasta que lo desbloquees. Un navegador de ese equipo no identifica el dispositivo, así que no le afecta: cambia tu contraseña si ya no confías en quien lo tiene.",
+            "blockConfirm": "Bloquear dispositivo"
+        },
+        "blocked": {
+            "title": "Dispositivos bloqueados",
+            "hint": "Estos dispositivos no pueden entrar en tu cuenta con las apps de Polaris.",
+            "unblock": "Desbloquear",
+            "unblockNamed": "Desbloquear {device}",
+            "unblockTitle": "¿Desbloquear {device}?",
+            "unblockDescription": "Las apps de Polaris de {device} podrán volver a entrar en esta cuenta.",
+            "unblockConfirm": "Desbloquear",
+            "blockedAt": "Bloqueado <time></time>"
         }
     },
     "stepUp": {

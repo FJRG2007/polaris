@@ -21,6 +21,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { deviceKeyFor, isDeviceBlocked } from "@/lib/device-sessions/device-key";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { CLI_TOKEN_DAYS, isCliScope, type CliScope } from "./scopes";
 import { TV_TOKEN_DAYS } from "@/lib/tv/scopes";
@@ -55,6 +56,9 @@ export interface OpenedCliSignIn {
 export interface CliSignInRequest {
     readonly deviceName: string;
     readonly clientVersion: string | null;
+    /** The hashed machine id and system version it reported; null from older clients. */
+    readonly deviceId?: string | null;
+    readonly deviceOsVersion?: string | null;
     readonly scopes: readonly SignInScope[];
     /** "cli" when it does not say, which is every caller from before the deck. */
     readonly kind?: SignInKind;
@@ -161,6 +165,8 @@ export async function openCliSignIn(
                     status: "pending",
                     deviceName: input.deviceName,
                     clientVersion: input.clientVersion,
+                    deviceId: input.deviceId ?? null,
+                    deviceOsVersion: input.deviceOsVersion ?? null,
                     scopes: stringifyList([...input.scopes]),
                     kind: input.kind ?? "cli",
                     requestIp: input.requestIp,
@@ -269,6 +275,10 @@ export async function claimCliSignIn(
         }
     });
     if (!account || account.bannedAt || account.disabledAt) return { status: "denied" };
+    // A device its owner blocked is refused here, after the approval: the code
+    // was answered, but the key is never minted.
+    const deviceKey = deviceKeyFor(account.id, row.deviceId);
+    if (await isDeviceBlocked(account.id, deviceKey)) return { status: "denied" };
 
     const held = new Set<string>(await scopesAvailableTo(account.id, account.isAdmin));
     const kind = storedKind(row.kind);
@@ -320,7 +330,10 @@ export async function claimCliSignIn(
             name: row.deviceName,
             os: cliOs(row.requestUserAgent),
             version: row.clientVersion,
-            ip: row.requestIp
+            ip: row.requestIp,
+            deviceKey,
+            osVersion: row.deviceOsVersion ?? null,
+            host: row.requestHost
         }
     });
     return {

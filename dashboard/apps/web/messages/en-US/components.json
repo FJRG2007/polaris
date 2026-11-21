@@ -1053,6 +1053,18 @@
             "notUsedYet": "Not used yet",
             "named": "{app} on {name}",
             "signOutNamed": "Sign out {app} on {name}"
+        },
+        "deviceGroup": {
+            "unnamed": "Unnamed device",
+            "expand": "Show the sessions on {device}",
+            "collapse": "Hide the sessions on {device}",
+            "count": "{count, plural, one {# session} other {# sessions}}",
+            "lastActive": "Active <time></time>",
+            "signOut": "Sign out this device",
+            "signOutNamed": "Sign out every session on {device}",
+            "block": "Block this device",
+            "blockHere": "You are using this device, so it cannot be blocked from here",
+            "blockNamed": "Block {device}"
         }
     },
     "modelKeys": {

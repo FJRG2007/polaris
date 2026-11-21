@@ -120,6 +120,10 @@ export interface SessionView {
     /** What the account's own rule decides for this session, so a row can say
      *  what "whatever the account says" currently amounts to. */
     pinnedByRule: boolean;
+    /** The device Polaris Desktop says this session runs on, per account, and
+     *  the computer's name it reported. Null for browsers and older apps. */
+    deviceKey: string | null;
+    deviceName: string | null;
 }
 
 /** One line describing where a sign-in came from, for a notification body. */
@@ -225,6 +229,8 @@ function toSessionView(
         createdAt: row.createdAt.toISOString(),
         expiresAt: row.expiresAt.toISOString(),
         pinToAddress: row.state?.pinToAddress ?? null,
+        deviceKey: row.state?.deviceKey ?? null,
+        deviceName: row.state?.deviceName ?? null,
         pinnedByRule: addressPinned(
             { bindClient: true, pinScope, pinThisSession: null },
             { os: client.os, browser: client.browser, ip, handheld: isHandheld(client.os) }

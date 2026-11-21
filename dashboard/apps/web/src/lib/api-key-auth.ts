@@ -11,6 +11,7 @@
  */
 
 import { touchApiKey, verifyApiKey, type ApiKeyKind } from "@polaris/auth";
+import { isDeviceBlocked } from "@/lib/device-sessions/device-key";
 import { deviceAddressAllows } from "@/lib/device-sessions/sessions";
 import { isDeviceSessionKind } from "@/lib/device-sessions/kinds";
 import { evaluateAccountAccess } from "@/lib/network-rules";
@@ -73,6 +74,9 @@ export async function authenticateApiKey(
     // locked, it is signed out rather than let through.
     if (isDeviceSessionKind(verified.kind) && !(await deviceAddressAllows(verified, ip)))
         return null;
+    // And a device its owner blocked. Blocking revokes the key already; this is
+    // the check that still holds should a key on that device outlive the write.
+    if (await isDeviceBlocked(verified.userId, verified.clientDeviceKey)) return null;
 
     // Not waited for: a usage stamp is two or three writes that decide nothing
     // about this request, and every API call was paying for them before its

@@ -20,6 +20,7 @@ interface Row {
 let authorizations: Row[] = [];
 let users: Row[] = [];
 let held: string[] = [];
+let blocked: Row[] = [];
 const minted: { userId: string; input: Row; kind?: string; client?: Row }[] = [];
 const revoked: { userId: string; id: string }[] = [];
 
@@ -66,6 +67,10 @@ vi.mock("@polaris/db", () => ({
         user: {
             findUnique: async ({ where }: { where: Row }) =>
                 users.find((row) => row["id"] === where["id"]) ?? null
+        },
+        blockedDevice: {
+            findUnique: async ({ where }: { where: { userId_deviceKey: Row } }) =>
+                blocked.find((row) => match(row, where.userId_deviceKey)) ?? null
         }
     }
 }));
@@ -96,6 +101,8 @@ vi.mock("@/lib/device-sessions/sessions", () => ({
 const { answerCliSignIn, claimCliSignIn, cliOs, describeCliSignIn, endCliSignIn, openCliSignIn } =
     await import("@/lib/cli/sign-in");
 
+const { deviceKeyFor } = await import("@/lib/device-sessions/device-key");
+
 const fixedRandom = (size: number) => new Uint8Array(size).fill(3);
 
 const REQUEST = {
@@ -120,6 +127,7 @@ beforeEach(() => {
         }
     ];
     held = ["deploy.read", "deploy.manage", "drive.read"];
+    blocked = [];
     minted.length = 0;
     revoked.length = 0;
 });
@@ -219,11 +227,16 @@ describe("collecting it", () => {
         });
         expect(minted[0]).toMatchObject({ userId: ADA, kind: "cli" });
         // What the sessions screen lists it by.
+        // A client that reports no device (every CLI before it did) still signs
+        // in, and its key carries no device: it is listed on its own.
         expect(minted[0]!.client).toEqual({
             name: "ada-laptop",
             os: "macOS",
             version: "0.4.6",
-            ip: "203.0.113.4"
+            ip: "203.0.113.4",
+            deviceKey: null,
+            osVersion: null,
+            host: "polaris.example"
         });
         expect(minted[0]!.input).toMatchObject({
             name: "CLI - ada-laptop",
@@ -302,4 +315,35 @@ it("names the system from the CLI's user-agent, and from a browser's otherwise",
     expect(cliOs("polaris-streamdeck/0.1.0 (darwin; arm64; node 24.0.0)")).toBe("macOS");
     expect(cliOs("polaris-companion/0.1.0 (linux; x64; node 22.20.0)")).toBe("Linux");
     expect(cliOs("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")).toBe("macOS");
+});
+
+describe("a sign-in that reports its device", () => {
+    const DEVICE = "d".repeat(64);
+    const withDevice = { ...REQUEST, deviceId: DEVICE, deviceOsVersion: "macOS 15.1" };
+
+    it("carries a per-account key, never the claimed id itself", async () => {
+        const opened = await openCliSignIn(withDevice, fixedRandom);
+        await answerCliSignIn({ userId: ADA, userCode: opened!.userCode, approve: true });
+        expect(await claimCliSignIn(opened!.deviceCode)).toMatchObject({ status: "approved" });
+        const key = deviceKeyFor(ADA, DEVICE);
+        expect(key).toMatch(/^[a-f0-9]{64}$/);
+        expect(key).not.toBe(DEVICE);
+        expect(deviceKeyFor("22222222-2222-4222-8222-222222222222", DEVICE)).not.toBe(key);
+        expect(minted[0]!.client).toMatchObject({ deviceKey: key, osVersion: "macOS 15.1" });
+    });
+
+    it("is refused once approved when its owner blocked the device", async () => {
+        blocked = [{ userId: ADA, deviceKey: deviceKeyFor(ADA, DEVICE) }];
+        const opened = await openCliSignIn(withDevice, fixedRandom);
+        await answerCliSignIn({ userId: ADA, userCode: opened!.userCode, approve: true });
+        expect(await claimCliSignIn(opened!.deviceCode)).toEqual({ status: "denied" });
+        expect(minted).toHaveLength(0);
+    });
+
+    it("does not reach another account's block", async () => {
+        blocked = [{ userId: "22222222-2222-4222-8222-222222222222", deviceKey: deviceKeyFor(ADA, DEVICE) }];
+        const opened = await openCliSignIn(withDevice, fixedRandom);
+        await answerCliSignIn({ userId: ADA, userCode: opened!.userCode, approve: true });
+        expect(await claimCliSignIn(opened!.deviceCode)).toMatchObject({ status: "approved" });
+    });
 });
