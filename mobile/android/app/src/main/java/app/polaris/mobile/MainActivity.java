@@ -19,6 +19,7 @@ import android.provider.Settings;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.view.View;
+import android.view.WindowManager;
 import android.webkit.CookieManager;
 import android.webkit.PermissionRequest;
 import android.webkit.URLUtil;
@@ -219,6 +220,8 @@ public final class MainActivity extends Activity {
             loading.setVisibility(View.VISIBLE);
             // A new document says for itself whether it has a back; until it does, history is the back.
             setPageSwipeBack(false);
+            // Nor does it inherit a protection the last one asked for and never got to release.
+            protectScreen(false);
         }
 
         @Override
@@ -412,6 +415,12 @@ public final class MainActivity extends Activity {
 
     void openViewOnce(String attachmentId) {
         startActivity(ViewOnceActivity.intent(this, origin, attachmentId));
+    }
+
+    /** FLAG_SECURE on the page's own window, for as long as the page asks. */
+    void protectScreen(boolean on) {
+        if (on) getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
     }
 
     /** Grants what Android already allows, and nothing it does not. */

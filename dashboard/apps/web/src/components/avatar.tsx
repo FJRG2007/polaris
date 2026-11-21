@@ -18,7 +18,8 @@
 import { initials, initialsInk, tintFor } from "@polaris/core";
 import { cn } from "@polaris/ui";
 import { createPortal } from "react-dom";
-import { useState, useCallback, useRef, type CSSProperties } from "react";
+import { useState, useCallback, useEffect, useRef, type CSSProperties } from "react";
+import { protectScreen } from "@/lib/mobile-bridge";
 import { ImageViewer } from "@/components/image-viewer";
 import { usePresence } from "@/components/presence-store";
 import { lastSeenLine } from "@/components/last-seen";
@@ -412,6 +413,11 @@ export function Avatar({
     ) : (
         pressable
     );
+
+    // A photo shown full size is kept out of screenshots in the phone apps, as
+    // WhatsApp's are. A browser cannot do it, so nothing claims it there.
+    const showing = opened && Boolean(source);
+    useEffect(() => (showing ? protectScreen() : undefined), [showing]);
 
     // Put on the body rather than beside the face: the viewer covers the window,
     // and a face sits inside scrolling panels and transformed rows that a fixed

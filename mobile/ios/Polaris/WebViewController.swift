@@ -19,6 +19,10 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     private var retries = 0
     /// The phone's gallery for chat's "+" sheet, made the first time the page asks.
     private lazy var media = DeviceMedia(presenter: self) { [weak self] id, result in self?.mediaAnswer(id, result) }
+    /// While the page shows something private (a profile photo full size): the page is covered whenever the screen
+    /// is being recorded or mirrored, and in the app switcher's snapshot. iOS lets no app refuse a screenshot.
+    private var protecting = false
+    private let shield = UIView()
 
     init(host: Host, path: String? = nil, changeServer: @escaping () -> Void) {
         self.host = host
@@ -69,6 +73,9 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             },
             swipeBack: function (available) {
                 window.webkit.messageHandlers.polarisMobile.postMessage(available ? "swipeBack:on" : "swipeBack:off");
+            },
+            protectScreen: function (on) {
+                window.webkit.messageHandlers.polarisMobile.postMessage(on ? "protect:on" : "protect:off");
             }
         });
         """
@@ -102,7 +109,36 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             web.trailingAnchor.constraint(equalTo: view.trailingAnchor)
         ])
 
+        shield.backgroundColor = Palette.background
+        shield.isHidden = true
+        shield.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(shield)
+        NSLayoutConstraint.activate([
+            shield.topAnchor.constraint(equalTo: view.topAnchor),
+            shield.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            shield.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            shield.trailingAnchor.constraint(equalTo: view.trailingAnchor)
+        ])
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(updateShield), name: UIScreen.capturedDidChangeNotification, object: nil)
+        center.addObserver(self, selector: #selector(coverForSwitcher), name: UIApplication.willResignActiveNotification, object: nil)
+        center.addObserver(self, selector: #selector(updateShield), name: UIApplication.didBecomeActiveNotification, object: nil)
+
         if let url = URL(string: origin + (path ?? "/")) { web.load(URLRequest(url: url)) }
+    }
+
+    private func protect(_ on: Bool) {
+        protecting = on
+        updateShield()
+    }
+
+    @objc private func updateShield() {
+        shield.isHidden = !(protecting && (view.window?.screen ?? UIScreen.main).isCaptured)
+    }
+
+    /// The app switcher keeps a picture of the screen as the app leaves it.
+    @objc private func coverForSwitcher() {
+        if protecting { shield.isHidden = false }
     }
 
     private func buildFailure() {
@@ -185,6 +221,8 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
     func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
         // A new document says for itself whether it has a back; until it does, the history swipe is the back.
         webView.allowsBackForwardNavigationGestures = true
+        // Nor does it inherit a protection the last one asked for and never got to release.
+        protect(false)
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
@@ -272,6 +310,9 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         // The page has a back of its own on screen - a conversation's arrow, a folder's parent - and slides the
         // screen away under the finger itself; the history swipe would go somewhere else (the conversation opened
         // before this one, not the list), so it steps aside while the page's is there.
+        if let flag = message.body as? String, flag.hasPrefix("protect:") {
+            return protect(flag == "protect:on")
+        }
         if let flag = message.body as? String, flag.hasPrefix("swipeBack:") {
             web.allowsBackForwardNavigationGestures = flag != "swipeBack:on"
             return

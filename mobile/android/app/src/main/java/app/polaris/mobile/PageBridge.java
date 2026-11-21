@@ -94,6 +94,13 @@ final class PageBridge {
         activity.runOnUiThread(() -> activity.openViewOnce(attachmentId));
     }
 
+    /** Keep the window out of screenshots, recordings and the recent apps list while the page shows something private
+     *  (a profile photo full size), the way the view-once screen always is. */
+    @JavascriptInterface
+    public void protectScreen(boolean on) {
+        activity.runOnUiThread(() -> activity.protectScreen(on));
+    }
+
     /** A link the page opens outside itself. Only the web and mail leave: any other scheme would launch whatever app
      *  claims it. A WebView has no tabs, and a link in a sandboxed frame (a mail body) cannot open a window of its
      *  own, so the page hands every outside link here. */

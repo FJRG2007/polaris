@@ -18,6 +18,10 @@ interface PolarisMobileBridge {
     mediaCall?(id: string, op: string, args: string): void;
     canViewOnce?(): boolean;
     openViewOnce?(attachmentId: string): void;
+    /** Keep the screen out of screenshots and recordings while on: Android's
+     *  secure window; iOS blanks the page while the screen is being recorded or
+     *  mirrored. Absent from an app older than the feature. */
+    protectScreen?(on: boolean): void;
     /** Hand a web or mail address to the phone's browser or mail app. */
     openExternal?(url: string): void;
     /** The VPN, run by the app itself. Absent from an app older than the feature. */
@@ -85,6 +89,40 @@ export function openViewOnce(attachmentId: string): boolean {
     if (!found?.openViewOnce || !canViewOnce()) return false;
     found.openViewOnce(attachmentId);
     return true;
+}
+
+/** How many screens asked for protection: two open viewers, one closed, keep it on. */
+let protecting = 0;
+
+/**
+ * Ask the phone app to keep the screen out of screenshots and recordings for as
+ * long as something private is open (a profile photo shown full size). Returns
+ * the release. Does nothing in a browser, where no page can stop a screenshot,
+ * and in an app too old to.
+ */
+export function protectScreen(): () => void {
+    const found = bridge();
+    if (typeof found?.protectScreen !== "function") return () => undefined;
+    protecting += 1;
+    if (protecting === 1) {
+        try {
+            found.protectScreen(true);
+        } catch {
+            // An app that cannot: the photo still opens.
+        }
+    }
+    let released = false;
+    return () => {
+        if (released) return;
+        released = true;
+        protecting -= 1;
+        if (protecting > 0) return;
+        try {
+            found.protectScreen?.(false);
+        } catch {
+            // Gone with the page.
+        }
+    };
 }
 
 /**
