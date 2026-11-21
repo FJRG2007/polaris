@@ -19,6 +19,7 @@
 import { join } from "node:path";
 import { release } from "node:os";
 import { textSize } from "./settings";
+import { createPresenter, launchedByInstaller } from "./window-front";
 import { hideFromSharing } from "./screen-share";
 import { CHANNELS, TEXT_SIZE_ARGUMENT, VERSION_ARGUMENT } from "@/shared/bridge";
 import { defaultTitleBarColors, foreignPageCss, overlayHeight } from "@/shared/title-bar";
@@ -113,6 +114,9 @@ function register(contents: WebContents, kind: WindowKind): void {
     contents.once("destroyed", () => kinds.delete(id));
     contents.on("will-attach-webview", (event) => event.preventDefault());
 }
+
+/** Shows a window, in front on the installer's first run (`window-front.ts`). */
+const present = createPresenter(launchedByInstaller(process.platform, process.argv));
 
 function windowOptions(options: BrowserWindowConstructorOptions): BrowserWindowConstructorOptions {
     return {
@@ -242,7 +246,7 @@ export function openPolarisWindow(
             return;
         }
         if (maximized) window.maximize();
-        window.show();
+        present(window);
     });
     void window.loadURL(url);
     return window;
@@ -402,7 +406,7 @@ export function openLocalWindow(
     window.webContents.on("will-navigate", (event) => event.preventDefault());
     window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     window.on("page-title-updated", (event) => event.preventDefault());
-    window.once("ready-to-show", () => window.show());
+    window.once("ready-to-show", () => present(window));
     void window.loadFile(join(__dirname, "..", "renderer", `${kind}.html`));
     return window;
 }

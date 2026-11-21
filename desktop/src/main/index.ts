@@ -39,6 +39,7 @@ import { CHANNELS, type AddressCheck, type Outcome } from "@/shared/bridge";
 import { allowLocalPermission, allowPermission } from "./permissions";
 import * as hostTransfer from "./host-transfer";
 import { handledSquirrelEvent } from "./squirrel";
+import { closeOnceShown } from "./window-front";
 import { installScreenShare } from "./screen-share";
 import { installTray } from "./tray";
 import { appItems, hideMenuBar, installMenu, type MenuActions, type MenuUpdate } from "./menu";
@@ -519,9 +520,16 @@ function backOnline(): void {
         if (!alternate) moveTo(main, null);
         return;
     }
-    // The window first, then the list goes: closing the last window quits the app.
+    showPolarisFromList();
+}
+
+/** Polaris in place of the servers window, which stays until Polaris is on
+ *  screen (`closeOnceShown`, BUG-0005). */
+function showPolarisFromList(): void {
+    // Picked by hand: a start at login kept minimized does not hide it.
+    startHidden = false;
     showPolaris();
-    closeConnect();
+    closeOnceShown(main, closeConnect);
 }
 /** The one live check in flight; a newer address cancels it. */
 let checking: AbortController | null = null;
@@ -616,8 +624,7 @@ function openServer(origin: string): void {
     void runner().use(origin);
     loadError = null;
     refreshMenu();
-    showPolaris();
-    closeConnect();
+    showPolarisFromList();
 }
 
 /** A row edited: its name, and its address if that changed. A new address must be
