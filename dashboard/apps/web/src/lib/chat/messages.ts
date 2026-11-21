@@ -11,6 +11,7 @@
  * rather than a channel id.
  */
 
+import { AUTHOR_SELECT, authorNameOf } from "./author-name";
 import { readComponents, type MessageComponent } from "./message-components";
 import { viewOnceSpent } from "@/lib/chat/view-once";
 import { inviteCards, type ChatInviteCard } from "./invite-cards";
@@ -2236,7 +2237,7 @@ export async function decorateMessages(
                   select: {
                       id: true,
                       channelId: true,
-                      authorId: true,
+                      ...AUTHOR_SELECT,
                       kind: true,
                       body: true,
                       deletedAt: true,
@@ -2430,11 +2431,7 @@ export async function decorateMessages(
             authorId: row.authorId,
             // A webhook's message has no account behind it; the name it posted
             // under is the whole of who wrote it.
-            authorName: row.authorId
-                ? (names.get(row.authorId) ?? null)
-                : row.webhookId || row.agent
-                  ? (row.authorLabel ?? null)
-                  : null,
+            authorName: authorNameOf(row, names),
             ...(row.webhookId ? { fromWebhook: true } : {}),
             ...faceOf(webhookFace(row, hookFaces)),
             ...(row.agent ? { fromAgent: row.agent } : {}),
@@ -2623,6 +2620,9 @@ function quoteViewOf(
             id: string;
             channelId: string;
             authorId: string | null;
+            authorLabel?: string | null;
+            webhookId?: string | null;
+            agent?: string | null;
             kind: string;
             body: string;
             deletedAt: Date | null;
@@ -2656,7 +2656,7 @@ function quoteViewOf(
             !hidden.has(original.id)
                 ? original.channelId
                 : null,
-        authorName: original.authorId ? (names.get(original.authorId) ?? null) : null,
+        authorName: authorNameOf(original, names),
         // The words, not the Markdown they were written in. A quote that read
         // "```py print(1) ```" showed the reader the fence rather than the code.
         excerpt: original.deletedAt ? "" : quotedWords(original, names, viewerId),

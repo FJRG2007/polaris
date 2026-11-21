@@ -26,6 +26,7 @@
  * Server-only.
  */
 
+import { AUTHOR_SELECT, authorNameOf } from "./author-name";
 import { prisma } from "@polaris/db";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { ageClearedWhere } from "./age-gate";
@@ -199,7 +200,7 @@ export async function resolveChatReferences(
                   id: true,
                   body: true,
                   kind: true,
-                  authorId: true,
+                  ...AUTHOR_SELECT,
                   channelId: true,
                   deletedAt: true,
                   createdAt: true,
@@ -311,7 +312,7 @@ export async function resolveChatReferences(
             spaceName: channel?.space?.name ?? "",
             channelKind: channel?.kind ?? "",
             channelId: message.channelId,
-            authorName: message.authorId ? (authorNames.get(message.authorId) ?? "") : "",
+            authorName: authorNameOf(message, authorNames) ?? "",
             excerpt: message.kind === "system" ? "" : plainExcerpt(message.body, EXCERPT),
             attachments: message._count.attachments,
             at: message.createdAt.toISOString()

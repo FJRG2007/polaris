@@ -291,3 +291,26 @@ describe("permissions are unchanged", () => {
         expect(deleteMessageAction).toHaveBeenCalledWith("m1");
     });
 });
+
+describe("the message in the question", () => {
+    it("is drawn as Polar wrote it: its name and its AI tag, not a stranger's", () => {
+        const polar = {
+            ...message("p1", "polar"),
+            authorId: null,
+            authorName: "Polar",
+            fromAgent: "polar"
+        } as unknown as ChatMessageView;
+        draw(
+            <DeleteMessageDialog
+                message={polar}
+                leavesTrace={false}
+                onOpenChange={() => undefined}
+                onConfirm={() => undefined}
+            />
+        );
+        const preview = screen.getByTestId("delete-preview");
+        expect(preview.textContent).toContain("Polar");
+        expect(preview.textContent).toContain("AI");
+        expect(preview.textContent).not.toContain("somebody who has left");
+    });
+});

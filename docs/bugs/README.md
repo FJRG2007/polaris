@@ -13,3 +13,5 @@ Security findings are not kept here; they live in
 |----|-------|------|--------|----------|----------|
 | BUG-0001 | A shared screen goes out at low quality on a line that can carry the source | Calls | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/call-quality.ts | 2026-11-21 |
 | BUG-0002 | A conversation scrolls up into older messages on its own | Chat | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/channel-view.tsx | 2026-11-21 |
+| BUG-0003 | Polar's messages are named "somebody who has left", and its delete preview has no face or AI tag | Chat | Fixed, watching | dashboard/apps/web/src/lib/chat/author-name.ts | 2026-11-21 |
+| BUG-0004 | Polar answers a mention with its tool call written out as text | Polar | Fixed, watching | dashboard/apps/web/src/lib/polar/mention-answer.ts | 2026-11-21 |

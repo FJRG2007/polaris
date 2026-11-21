@@ -16,7 +16,7 @@
 
 import * as actions from "./actions";
 import * as core from "@polaris/core";
-import { Avatar } from "@/components/avatar";
+import { AuthorFace, AuthorTag } from "./author-face";
 import { runAction } from "@/lib/run-action";
 import { useAppUrl } from "@/components/app-url";
 import { referenced } from "./message-references";
@@ -183,13 +183,14 @@ function MessagePreview({
             className="flex max-h-60 min-w-0 gap-3 overflow-y-auto overscroll-contain rounded-md bg-muted/50 px-3 py-2.5"
         >
             <span className="shrink-0 pt-0.5">
-                <Avatar person={{ id: message.authorId, name: author }} size={28} />
+                <AuthorFace message={message} name={author} />
             </span>
             <div className="min-w-0 flex-1">
                 <p className="flex min-w-0 items-baseline gap-2">
                     <span className="truncate text-sm font-medium">
-                        <PersonName id={message.authorId} name={author} />
+                        {message.authorId ? <PersonName id={message.authorId} name={author} /> : author}
                     </span>
+                    <AuthorTag message={message} />
                     <MessageTime
                         iso={message.createdAt}
                         className="whitespace-nowrap text-[0.6875rem] text-foreground-subtle"

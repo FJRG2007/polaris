@@ -28,6 +28,7 @@
  *   a GIF, a voice message), with a preview of the first attachment beside it.
  */
 
+import { AUTHOR_SELECT, authorNameOf } from "./author-name";
 import { prisma } from "@polaris/db";
 import { redactAlert } from "./chat-lock";
 import * as core from "@polaris/core";
@@ -341,7 +342,7 @@ export async function messageToasts(
             inChannel: row.channel.spaceId !== null,
             direct: row.channel.kind === "dm",
             authorId: row.authorId,
-            authorName: (row.authorId && names.get(row.authorId)) || "Somebody",
+            authorName: authorNameOf(row, names) || "Somebody",
             excerpt: plainExcerpt(row.body, EXCERPT) || describeFiles(row.attachments),
             media: previewOf(row.attachments),
             at: row.createdAt.toISOString()
@@ -377,7 +378,7 @@ async function recentIn(userId: string, channelIds: readonly string[], since: Da
             channelId: true,
             body: true,
             createdAt: true,
-            authorId: true,
+            ...AUTHOR_SELECT,
             replyToId: true,
             forwarded: true,
             // In the order they were sent, which is the order the message draws

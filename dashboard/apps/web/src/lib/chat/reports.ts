@@ -23,6 +23,7 @@
  * nothing.
  */
 
+import { authorNameOf } from "./author-name";
 import { remove } from "./messages";
 import { translate } from "@/lib/i18n/translate";
 import { prisma } from "@polaris/db";
@@ -244,7 +245,7 @@ export async function listReports(
             handledAt: true,
             reporter: { select: { name: true } },
             handledBy: { select: { name: true } },
-            message: { select: { deletedAt: true } }
+            message: { select: { deletedAt: true, authorLabel: true, webhookId: true, agent: true } }
         }
     });
     if (rows.length === 0) return [];
@@ -299,7 +300,9 @@ export async function listReports(
             handledAt: row.handledAt?.toISOString() ?? null,
             handledByName: row.handledBy?.name ?? null,
             reporterName: row.reporter.name,
-            authorName: row.authorId ? (named.get(row.authorId) ?? null) : null,
+            // The message's own label when no account wrote it - Polar, an app,
+            // a webhook - while the message is still there to say.
+            authorName: authorNameOf({ ...row.message, authorId: row.authorId }, named),
             excerpt: row.excerpt,
             files: files.get(row.id) ?? [],
             links: card?.ok && card.view ? [card] : [],
