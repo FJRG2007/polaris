@@ -137,6 +137,23 @@ describe("the phone's notices", () => {
             ["call", "components.calls.calling(Ana)"],
             ["call-ended", ""]
         ]);
+        expect(frames[0]).toMatchObject({ meetingId: "x", caller: "Ana" });
+        expect(frames[1]).not.toHaveProperty("meetingId");
+        await stream.close();
+    });
+
+    it("stops the ring when this person declines it on another device", async () => {
+        const stream = await open();
+        listener!({ channelId: "c1", kind: "call", actorId: "u2", actorName: "Ana", audience: ["me"], call: { meetingId: "m1", state: "ringing", count: 1 } });
+        // Somebody else's decline, and one for a call that never rang here, are not this phone's.
+        listener!({ kind: "call-settled", actorId: "u3", audience: ["u3"], meetingId: "m1" });
+        listener!({ kind: "call-settled", actorId: "me", audience: ["me"], meetingId: "other" });
+        listener!({ kind: "call-settled", actorId: "me", audience: ["me"], meetingId: "m1" });
+        const frames = await stream.frames(200);
+        expect(frames.map((frame) => [frame.kind, frame.tag])).toEqual([
+            ["call", "call:c1"],
+            ["call-ended", "call:c1"]
+        ]);
         await stream.close();
     });
 });

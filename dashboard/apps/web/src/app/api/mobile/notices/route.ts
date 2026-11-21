@@ -44,6 +44,10 @@ export interface MobileNotice {
     /** A sign-in asking this phone: the request to answer, and when it stops counting (epoch ms). */
     readonly approvalId?: string;
     readonly expiresAt?: number;
+    /** A ringing call: the call to decline from the phone, and who is calling,
+     *  which the phone's incoming-call screen names on its own. */
+    readonly meetingId?: string;
+    readonly caller?: string;
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -58,6 +62,9 @@ export async function GET(request: Request): Promise<Response> {
     const encoder = new TextEncoder();
     const scope = holdStreamScope(actor);
     const waiting = new Map<string, ReturnType<typeof setTimeout>>();
+    /** The conversation each call rang in on this connection, so a decline on
+     *  another device (which names only the call) stops this phone ringing. */
+    const rang = new Map<string, string>();
     let heartbeat: ReturnType<typeof setInterval> | null = null;
     let unsubscribe: (() => void) | null = null;
     let unsubscribeApprovals: (() => void) | null = null;
@@ -150,7 +157,17 @@ export async function GET(request: Request): Promise<Response> {
             if (closed) return;
 
             if (chatAllowed) unsubscribe = subscribeChatChanges((change) => {
-                if (closed || !change.channelId || change.actorId === actor.id) return;
+                if (closed) return;
+                // Declined on another of this person's devices: their own act, so
+                // it is read before the rule that skips one's own changes.
+                if (change.kind === "call-settled") {
+                    const channelId = change.meetingId ? rang.get(change.meetingId) : undefined;
+                    if (!channelId || !change.audience?.includes(actor.id)) return;
+                    rang.delete(change.meetingId!);
+                    send({ kind: "call-ended", channelId, tag: `call:${channelId}`, title: "", body: "", path: `/chat/c/${channelId}` });
+                    return;
+                }
+                if (!change.channelId || change.actorId === actor.id) return;
                 // An ephemeral answer is never a phone notice, not even for its
                 // audience: it is seen where it was asked for.
                 if (change.kind === "posted" && change.audience) return;
@@ -165,6 +182,9 @@ export async function GET(request: Request): Promise<Response> {
                         // A ring names who hears it, and leaves out whoever blocked
                         // the caller: the phone rings for exactly the same people.
                         if (ringing && change.audience && !change.audience.includes(actor.id)) return;
+                        const meetingId = change.call.meetingId;
+                        if (ringing) rang.set(meetingId, channelId);
+                        else rang.delete(meetingId);
                         send({
                             kind: ringing ? "call" : "call-ended",
                             channelId,
@@ -175,7 +195,8 @@ export async function GET(request: Request): Promise<Response> {
                                     : chat("callStage.incomingCall")
                                 : "",
                             body: "",
-                            path: `/chat/c/${channelId}`
+                            path: `/chat/c/${channelId}`,
+                            ...(ringing ? { meetingId, caller: change.actorName ?? chat("callStage.incomingCall") } : {})
                         });
                     }
                 };
