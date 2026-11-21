@@ -1,6 +1,6 @@
 # Propuesta v2: cifrado de extremo a extremo (E2EE) en Polaris Chat
 
-Fecha: 2026-11-21. Estado: propuesta, sin código. Sustituye a la v1 (`docs/chat-e2ee-proposal.md`, rama `docs/e2ee-proposal`). Las afirmaciones sobre otros productos llevan la fuente entre corchetes `[n]`; las fuentes 1-57 son las de la v1 y se mantienen con el mismo número, las nuevas van de la 58 en adelante. Lo que es deducción o estimación propia aparece marcado como tal.
+Fecha: 2026-11-21. Estado: propuesta; la fase 0 está hecha ([chat-e2ee-phase0.md](chat-e2ee-phase0.md)). Sustituye a la v1 de este mismo archivo (historial de git). Las afirmaciones sobre otros productos llevan la fuente entre corchetes `[n]`; las fuentes 1-57 son las de la v1 y se mantienen con el mismo número, las nuevas van de la 58 en adelante. Lo que es deducción o estimación propia aparece marcado como tal.
 
 Requisitos del propietario que fija esta versión:
 
@@ -364,10 +364,10 @@ La web siempre llega actualizada (la sirve la propia instancia). El desfase est�
 | Dimensión | Diseño | Coste |
 | --- | --- | --- |
 | Primer pintado | Sin cambios: el armazón y lo que el dispositivo ya tenía (la rama del almacén offline ya abre conversaciones desde lo guardado antes de que conteste la red) se pintan antes de cargar nada criptográfico | Ninguno |
-| Biblioteca MLS (WASM) | Carga diferida en un Worker al abrir el chat; el descifrado de mensajes con `HK` usa WebCrypto (AES-GCM nativo) y no necesita el WASM, así que leer no espera a MLS | Peso y arranque a medir en fase 0 |
+| Biblioteca MLS (WASM) | **OpenMLS 0.9.2**, elegida en la fase 0: única candidata con auditoría externa publicada, Rust con memoria segura, mismo núcleo nativo en Android e iOS [P0]. Carga diferida en un Worker al abrir el chat o en reposo tras el primer pintado, con nombre con hash, `immutable` y precarga en el Service Worker; el descifrado de mensajes con `HK` usa WebCrypto y no necesita el WASM, así que leer no espera a MLS | 371 KB con brotli; `init()` 16 ms en Chromium y 70 ms con CPU x4 más lenta [P0] |
 | Descifrado de una conversación | Por lotes, solo la ventana visible, en el Worker | Despreciable por mensaje |
 | Envío | Un AES-GCM y una firma por mensaje | Despreciable |
-| Canal de 10.000 miembros con 3 dispositivos | 30.000 hojas; commit con unos `log2(30.000)` ~ 15 cifrados de ruta [21]; altas y bajas agrupadas en commits periódicos; el servidor propone bajas como remitente externo; los miembros entran al grupo MLS del canal **al abrirlo por primera vez** (external commit), no al unirse al espacio | Árbol de ratchet del orden de MB en canales enormes: se descarga una vez y se actualiza por deltas (estimación) |
+| Canal de 10.000 miembros con 3 dispositivos | En teoría `log2(N)` cifrados de ruta por commit [21]. **La fase 0 midió otra cosa** con un árbol recién creado por altas masivas: los nodos intermedios quedan vacíos y un commit de alta o baja crece **lineal**, unos 82 B por miembro (~410 KB a 5.000) [P0]. Por eso los miembros entran al grupo MLS del canal **al abrirlo por primera vez** (external commit), no al unirse al espacio ni en bloque al migrar; cada dispositivo emite un commit de actualización propio al entrar (rellena su ruta); altas y bajas se agrupan en commits periódicos; el servidor propone bajas como remitente externo. El estado estacionario con el árbol lleno está **sin medir** y es lo primero de la fase 4 | Estado por dispositivo ~1 MB a 1.000 miembros y ~5 MB a 5.000 [P0]; crear o migrar un grupo de 5.000 cuesta ~8 s, siempre en un Worker y por tandas [P0] |
 | Dispositivos inactivos | Bajas automáticas tras N días sin conexión (protege la seguridad tras compromiso y reduce el árbol); al volver entran con external commit | Decisión 7 |
 | Mensaje en canal grande | Una escritura y un reparto; nada por destinatario | Igual que hoy |
 | Almacenamiento | Ficheros sin duplicar (10.1); unos 92 B por mensaje (v1) + segmentos de índice + envoltorios (32 B + cabecera por clave, unos 1.100 B con ML-KEM) por periodo y miembro | Moderado; los periodos rotan poco |
@@ -397,6 +397,53 @@ Hoy un reenvío no copia nada: el mensaje nuevo apunta al original (`replyToId` 
 **Migración.** El migrador (8.2) convierte cada adjunto existente en un blob cifrado una sola vez aunque lo referencien varios mensajes (los reenvíos actuales apuntan al original, así que no hay duplicados que reconciliar). Las copias que `saved-media.ts` hizo en el pasado se quedan como blobs independientes: son ficheros distintos con historias de borrado distintas.
 
 ---
+
+## 10b. Almacenamiento: deduplicación y destinos sin fugas
+
+### 10b.1 Lo que existe hoy (auditado en el código)
+
+| Pieza | Comportamiento actual | Evidencia |
+| --- | --- | --- |
+| Destino de los archivos del chat | Ajuste `CHAT_TARGET_KEY`: una conexión (NAS u otra), `local` o `auto` (NAS si la instancia tiene, si no este servidor) | `dashboard/apps/web/src/lib/chat/attachments.ts:149-166` (`chatStorageSettings`, `chatTarget` -> `resolveStorageTarget`) |
+| Escritura | Un archivo nuevo por subida en `polaris/chat/<channelId>/<uuid aleatorio>`, escrito, comprobado y movido a local si el destino no lo guarda (`placeFile`) | `attachments.ts:43` (`ATTACHMENT_ROOT`), `attachments.ts:248-302` (`storeAttachment`) |
+| Miniaturas y posters | **Ya las genera el navegador del emisor** y se escriben al lado como `<path>.poster.jpg` | `attachments.ts:254-260`, `attachments.ts:293`, `attachments.ts:331-346` (`placePoster`) |
+| Reenviar | No copia bytes: crea un mensaje nuevo que cita al original (`forwarded: true`, relación `ChatQuote` por `replyToId`) | `lib/chat/messages.ts:1308-1325` |
+| Reenviar, efecto secundario | La cita usa `onDelete: SetNull`: si se borra el original, lo reenviado deja de verse | `packages/db/prisma/schema.prisma`, modelo `ChatMessage`, relación `replyTo` |
+| Volver a enviar un medio guardado | **Copia los bytes**: lee el archivo y llama otra vez a `storeAttachment`. El comentario lo justifica: dos filas apuntando al mismo archivo harían que borrar un mensaje lo quitara de los dos | `lib/chat/saved-media.ts:108-147` (`readAttachment` y `storeAttachment` en la línea 139) |
+| Medios remotos (GIF y similares) | Se descargan y se guardan como archivo nuevo en cada envío | `app/(app)/chat/actions.ts:436-437` (`fetchRemoteMedia` y `storeAttachment`) |
+| Borrado | `removeStoredFiles` agrupa por destino y borra; lo comparten los programados | `attachments.ts:607` |
+| Limpieza | `tidyChatStorage` quita carpetas de conversaciones que ya no existen o vacías, **nunca** por "nadie apunta a este archivo", para que un fallo en las filas no borre fotos | `attachments.ts:700-716` |
+| Hash de contenido o deduplicación | **No existe** en el chat ni en Drive. El único SHA-256 relacionado es el nombre de caché de miniaturas de Drive, que hashea conexión, ruta, fecha y tamaño, no el contenido | `lib/drive-thumbnail.ts:80-81` |
+| "Guardar en Drive" desde el chat | No existe hoy (sin coincidencias en `lib/chat` ni en `app/(app)/chat`) | búsqueda en el código |
+| Backfill de medios | No se encontró ningún módulo `media-backfill` | búsqueda en el código |
+
+Conclusión: hoy no hay deduplicación que perder. Hay dos fuentes de copias evitables (medios guardados y medios remotos vueltos a enviar) y un fallo de diseño en los reenvíos (borrar el original los vacía).
+
+### 10b.2 Diseño con E2EE
+
+| Mecanismo | Cómo | Qué ve el servidor | Ganancia |
+| --- | --- | --- | --- |
+| **Blob cifrado con clave por archivo** | Cada archivo se cifra una vez con una clave aleatoria de 256 bits, en bloques de 64 KiB (v1 4.2); la clave y el SHA-256 del claro van dentro del mensaje cifrado | Un blob opaco y su tamaño | - |
+| **Reenviar y volver a enviar = nueva referencia** | El mensaje nuevo lleva la misma clave del archivo y el id del blob; el servidor suma una referencia en una tabla `ChatBlob(id, target, path, size, refs)`. No se sube nada | Que dos mensajes apuntan al mismo blob, cosa que ya sabe hoy con las citas | N envíos de un archivo de S bytes pasan de N x S a S |
+| **Recuento de referencias** | El blob se borra cuando su recuento llega a 0, en la misma transacción que borra la última fila; `tidyChatStorage` sigue sin borrar por huérfanos y solo informa | - | Resuelve el motivo del comentario de `saved-media.ts`: borrar un mensaje ya no quita el archivo de otro. También el reenvío que se vacía al borrar el original, porque el mensaje reenviado guarda su propia referencia y su propia clave |
+| **Deduplicación dentro de lo que ya ve quien tiene la clave** | El cliente calcula `HMAC(K_dedup_usuario, SHA-256(claro))` con una clave derivada de su `AK` y lo manda al subir; si coincide con un blob suyo, se reutiliza | Que **ese usuario** sube dos veces el mismo archivo; nada entre usuarios | Medios remotos repetidos y archivos repetidos de la misma persona |
+| **Sin deduplicación entre usuarios** | Se descarta el cifrado convergente (clave derivada del contenido): permite confirmar si alguien tiene un archivo concreto y, con archivos de formato predecible, aprender el resto ("learn-the-remaining-information", Tahoe-LAFS) [94]; el problema está formalizado como cifrado bloqueado por el mensaje [95] | - | Se renuncia a ahorrar entre personas distintas; con datos de gobierno no se negocia |
+| **Miniaturas** | Siguen generándose en el emisor, como hoy; se cifran con su propia clave dentro del mensaje | Un blob opaco más pequeño | Sin regresión |
+| **Destinos (NAS, conexiones, local)** | Igual que hoy: `chatTarget()` decide dónde va el blob y `placeFile` lo escribe. El destino solo guarda blobs cifrados | Lo mismo que el servidor | Mejora: un NAS compartido o una conexión externa dejan de tener fotos en claro |
+| **Guardar en Drive** (cuando se añada) | El cliente descifra y sube a Drive como un archivo normal, con los permisos de Drive. Drive no es E2EE y el botón lo dice. No se reutiliza el blob del chat: Drive necesita el claro para sus visores, miniaturas y compartición | Lo que Drive ve de cualquier archivo | - |
+| **Sobrecarga del cifrado** | 16 B de etiqueta por bloque de 64 KiB (0,024%) más una cabecera fija | - | Despreciable |
+
+No se encontró una fuente primaria que confirme que WhatsApp reutiliza el mismo blob cifrado al reenviar medios, así que no se afirma nada sobre WhatsApp; el diseño se sostiene por sí mismo.
+
+### 10b.3 La migración como ahorro de espacio
+
+| Paso | Detalle |
+| --- | --- |
+| Informe previo | Antes de M2, el migrador calcula el SHA-256 de cada archivo en claro y muestra en Administración cuánto se recuperaría (bytes duplicados por conversación y por autor). Solo informa |
+| Fusión | En M2, los archivos idénticos **dentro de la misma conversación** o **del mismo autor** se cifran una sola vez y pasan a un único blob con recuento de referencias; desaparecen las copias que crearon los medios guardados y los GIF vueltos a enviar |
+| Entre conversaciones distintas | No se fusionan por defecto: el servidor conservaría para siempre el dato "este archivo está en A y en B". Decisión 10 |
+| Verificación | El SHA-256 del claro de cada referencia se comprueba contra el blob fusionado antes de borrar ninguna copia (M3) |
+| Cuánto | La cifra depende de cada instalación y la da el informe previo; el tope es la suma de todas las copias menos una por archivo |
 
 ## 11. Aseguramiento interno (sustituye a la auditoría externa)
 
@@ -496,14 +543,18 @@ Una auditoría externa es opcional y se puede añadir en cualquier momento; no b
 | 6 | Poscuántico desde el primer día en lo almacenado | Sí, HPKE híbrido con ML-KEM-768 para envoltorios | Protege contra "guardar ahora, descifrar después" a cambio de unos 1.100 B por envoltorio |
 | 7 | Baja automática de dispositivos inactivos | 90 días | Más corto mejora la seguridad tras compromiso; más largo evita reentradas |
 | 8 | Modo "solo apps verificadas" para la web | Disponible por organización, apagado por defecto | Cierra la vía del JS modificado a cambio de exigir extensión o app |
+| 9 | Cómo entran los canales grandes al MLS tras migrar (fase 0: commits lineales con árbol recién creado) | Grupo creado vacío; cada dispositivo entra al abrir el canal con external commit y commit de actualización | Commits pequeños y sin picos, a cambio de que la primera apertura de un canal grande tarde algo más (en un Worker, fuera del primer pintado) |
+| 10 | Deduplicación de archivos al migrar | Fusionar solo dentro de la misma conversación o del mismo autor | Algo menos de ahorro que fusionarlo todo, a cambio de no dejar para siempre en el servidor qué archivo se compartió en qué conversaciones |
 
 ---
 
 ## 14. Plan por fases actualizado
 
+Resultado de la fase 0 (biblioteca elegida, medidas y riesgos): [chat-e2ee-phase0.md](chat-e2ee-phase0.md).
+
 | Fase | Contenido | Tamaño | Depende de |
 | --- | --- | --- | --- |
-| 0 | Modelo de amenazas; prueba técnica de OpenMLS y mls-rs en WASM (navegador, Electron, WebViews) y nativo; medir peso, arranque, coste de commits en grupos de 30.000 hojas, ritmo del migrador y tamaño de segmentos de índice | M | - |
+| 0 | **Hecha** para la biblioteca: OpenMLS 0.9.2 elegida; peso, arranque y coste por tamaño de grupo medidos; hallazgo de commits lineales tras altas masivas [P0]. Queda: Android e iOS reales (solo se aproximaron), estado estacionario del árbol, ritmo del migrador, tamaño de los segmentos de índice e informe de duplicados | M | - |
 | 1 | Clave de cuenta, cierres (dispositivo, contraseña con derivación en el cliente, passkey PRF, QR), cambio del flujo de contraseña de `better-auth` sin romper cuentas existentes (se adopta en el siguiente inicio de sesión), almacenes nativos | L | 0 |
 | 2 | `ORK` con Shamir, custodios, delegación opcional, integración con `account-recovery-service` y registro de auditoría | L | 1 |
 | 3 | Transparencia de claves y verificación del paquete web por extensión y escritorio | L | 1 |
@@ -525,7 +576,7 @@ No hay entrega parcial visible: el usuario no debe ver una versión con funcione
 
 ## Fuentes
 
-Fuentes 1-57: las de la v1, con los mismos números y URL (ver `docs/chat-e2ee-proposal.md`, sección "Fuentes"). Se usan aquí: 1, 2, 8, 10, 12, 13, 14, 21, 27, 30, 31, 34, 35, 36, 37, 47, 49, 52, 53, 57.
+Fuentes 1-57: las de la v1, con los mismos números y URL (ver la v1 de este archivo en el historial de git, commit `5e5d7b5809`, sección "Fuentes"). Se usan aquí: 1, 2, 8, 10, 12, 13, 14, 21, 27, 30, 31, 34, 35, 36, 37, 47, 49, 52, 53, 57.
 
 58. RFC 9750, The Messaging Layer Security (MLS) Architecture (abril de 2025) - https://www.rfc-editor.org/rfc/rfc9750.html
 59. Albrecht, Celi, Dowling, Jones, "Practically-exploitable Cryptographic Vulnerabilities in Matrix" (ePrint 2023/485) - https://eprint.iacr.org/2023/485.pdf ; resumen de CVE-2022-39250 y CVE-2022-39251 - https://portswigger.net/daily-swig/matrix-address-flaws-that-break-message-encryption-assurances
@@ -562,6 +613,9 @@ Fuentes 1-57: las de la v1, con los mismos números y URL (ver `docs/chat-e2ee-p
 90. Matrix.org, "libolm deprecation" (CVE-2024-45192, CVE-2024-45193) - https://matrix.org/blog/2024/08/libolm-deprecation/
 91. NVD, CVE-2024-40640 (vodozemac, base64 sin tiempo constante) - https://nvd.nist.gov/vuln/detail/CVE-2024-40640
 92. MLS WG, vectores de prueba de interoperabilidad - https://github.com/mlswg/mls-implementations/blob/main/test-vectors.md
+94. Tahoe-LAFS, ataque de Drew Perttula y Brian Warner (confirmación de archivo y learn-the-remaining-information con cifrado convergente) - https://tahoe-lafs.org/hacktahoelafs/drew_perttula.html
+95. Bellare, Keelveedhi, Ristenpart, "Message-Locked Encryption and Secure Deduplication" (EUROCRYPT 2013, ePrint 2012/631) - https://eprint.iacr.org/2012/631
+P0. Fase 0 de Polaris: elección de la biblioteca MLS y medidas - [chat-e2ee-phase0.md](chat-e2ee-phase0.md)
 93. MDN, cuotas de almacenamiento y criterios de desalojo (ventanas privadas, `persist()`, desalojo de Safari a 7 días) - https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria
 
 ### Lo que no se pudo verificar
