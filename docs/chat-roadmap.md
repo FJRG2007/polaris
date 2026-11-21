@@ -105,7 +105,8 @@ when a deploy finishes".
 
 ## 4. End-to-end encryption
 
-**Status: ⬜ · Priority P1 · Size XL.** Asked for directly. It deserves its own
+**Status: ⬜ · Priority P1 · Size XL.** The full design proposal (protocol, feature by
+feature, recovery, phases) is in [chat-e2ee-proposal.md](chat-e2ee-proposal.md). Asked for directly. It deserves its own
 section because it is not a feature so much as a different set of rules for
 everything else.
 
