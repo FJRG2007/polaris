@@ -29,6 +29,7 @@ import { deviceAuthorization, twoFactor } from "better-auth/plugins";
 import { emailLinkPlugin, MAGIC_LINK_VERIFY_PATH } from "./email-link.js";
 import { noteSecondFactor, noteSentCodeAnswered, noteSignIn } from "./sign-in-record.js";
 import { connectionSignInPlugin, CONNECTION_SIGN_IN_PATH } from "./connection-sign-in.js";
+import { opaqueSignInPlugin, OPAQUE_SIGN_IN_PATH } from "./opaque-sign-in.js";
 import {
     ASSERTION_PATHS,
     refuseSessionForEnforcedDomain,
@@ -469,7 +470,11 @@ export { MAGIC_LINK_VERIFY_PATH };
  * path is challenged on the same hook but decides per sign-in (see
  * challengedSignIn), because the account it defers to has gates of its own.
  */
-const CHALLENGED_SIGN_IN_PATHS: ReadonlySet<string> = new Set([MAGIC_LINK_VERIFY_PATH]);
+// The OPAQUE password sign-in is challenged exactly like `/sign-in/email`.
+const CHALLENGED_SIGN_IN_PATHS: ReadonlySet<string> = new Set([
+    MAGIC_LINK_VERIFY_PATH,
+    OPAQUE_SIGN_IN_PATH
+]);
 
 /**
  * Make those sign-ins raise the second-factor challenge too.
@@ -517,6 +522,7 @@ function gateOtherSignIns(plugin: BetterAuthPlugin): BetterAuthPlugin {
  *  about the person who reached it. */
 const SIGN_IN_METHOD_BY_PATH: ReadonlyMap<string, SignInMethod> = new Map([
     ["/sign-in/email", "password"],
+    [OPAQUE_SIGN_IN_PATH, "password"],
     [MAGIC_LINK_VERIFY_PATH, "email-link"],
     ["/passkey/verify-authentication", "passkey"],
     [DEVICE_TOKEN_PATH, "qr-code"],
@@ -615,6 +621,7 @@ function buildPlugins(options: AuthOptions, address: string): BetterAuthPlugin[]
         twoFactorPlugin(options),
         deviceAuthorizationPlugin(),
         connectionSignInPlugin(),
+        opaqueSignInPlugin(),
         samlSsoPlugin()
     ];
     const webauthn = passkeyPlugin(address, options.appOrigins?.() ?? []);

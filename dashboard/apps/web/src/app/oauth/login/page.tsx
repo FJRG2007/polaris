@@ -7,6 +7,7 @@ import { CONNECTION_PROVIDERS } from "@polaris/core";
 import { MAX_DEVICE_ACCOUNTS, deviceAccountRoom, listDeviceAccounts } from "@polaris/auth";
 import { safeRedirect } from "./post-login-target";
 import { LoginForm, type SignInProvider } from "./login-form";
+import { chatE2eeEnabled } from "@/lib/chat/e2ee/flag";
 import { connectionSignInOffered } from "@/lib/connections/oauth";
 import { pendingTwoFactorUserId } from "@/lib/two-factor-challenge";
 
@@ -99,6 +100,7 @@ export default async function LoginPage({
             providers={providers}
             add={add}
             chooser={chooser}
+            opaqueSignIn={chatE2eeEnabled()}
         />
     );
 }

@@ -26,12 +26,16 @@ Tests (`packages/chat-crypto/test`, 31): round trips for every lock, own known-a
 | `@hpke/hybridkem-x-wing` | 0.7.1 | X-Wing (draft-connolly-cfrg-xwing-kem-06) for `@hpke/core`; pulls `mlkem` 2.7.1 (same maintainer). Pre-1.0 and tracking a draft: the KEM id is in every envelope header, so a final-RFC change becomes a new suite entry, never a silent reinterpretation |
 | `fake-indexeddb` (dev) | 6.2.8 | Exercises the real IndexedDB store code in Node |
 
-## What remains of phase 1
+## Server side (in place, behind the flag)
 
-1. **Server storage.** Prisma models (additive, rerunnable migration per `test/updates/migrations-rerunnable.test.ts`): `ChatAccountKey` (userId, akVersion, signPublicKey, hpkePublicKey), `ChatAccountKeyLock` (userId, kind, lockId, akVersion, envelope; unique on userId+kind+lockId), `ChatOpaqueRecord` (userId, record), `ChatOpaqueLogin` (id, userId, state, expiresAt; deleted on finish, swept on expiry), and the OPAQUE `serverSetup` stored encrypted with `encryptSecret(..., POLARIS_MASTER_KEY)` so a database-only theft does not carry it. Generated on first use, so no `.env` key is needed.
-2. **Routes** (Zod discriminated union, `backgroundUser()`, 404 while the flag is off, `rateLimit` per user on login start): register start/finish (record and envelope written in one transaction), login start/finish, put/delete passkey envelope, read public keys. The password envelope is released **only** after `finishLogin` succeeds, so a stolen session cookie does not yield material for offline guessing. Re-registering the password lock should require the existing step-up grant.
-3. **Native key stores** (Keychain, Keystore, DPAPI/safeStorage) for desktop, Android, iOS.
-4. **QR approval lock** (below) and the **sign-in migration** (below).
+| Piece | Where |
+| --- | --- |
+| Tables `ChatAccountKey`, `ChatAccountKeyLock`, `OpaqueRecord`, `OpaqueLogin`, `OpaqueServerSetup` | `packages/db/prisma/migrations/20271207000000_chat_e2ee_account_key` (additive, rerunnable) |
+| Server setup sealed with `encryptSecret(..., POLARIS_MASTER_KEY)`, made on first use; a replaced master key drops every record and the accounts fall back to their password hash | `apps/web/src/lib/chat/e2ee/opaque-service.ts` |
+| `/api/e2ee/sign-in` (no session: OPAQUE sign-in, adoption) and `/api/e2ee/keys` (session: public keys, passkey envelopes, OPAQUE unlock of the password envelope). Zod discriminated unions, JSON content type required (no simple cross-site posts), rate limits per address and per account, one refusal body for every cause, 404 while `POLARIS_INTERNAL_CHAT_E2EE` is not `1` | `apps/web/src/lib/chat/e2ee/handlers.ts`, `schemas.ts` |
+| Sealed better-auth endpoint `/polaris/opaque-sign-in`: 404 off the wire, challenged by the second factor like `/sign-in/email`, recorded as a password sign-in, refused for an enforced identity-provider domain | `packages/auth/src/opaque-sign-in.ts` |
+
+The password envelope is released only by a successful OPAQUE finish **and** a full session: never to a sign-in still owing its second factor, never by the adoption's verify step, never by a plain read. It is written only by the session's unlock, alongside the proof.
 
 ## Sign-in migration to OPAQUE (owner decision: mandatory for every password account)
 
@@ -48,7 +52,16 @@ Design:
 
 Required tests before this ships: existing account signs in before and after migration; migration interrupted after registration and before verification (still signs in, retries); concurrent sign-ins; password reset on migrated and unmigrated accounts; 2FA and passkey accounts byte-for-byte unchanged.
 
-**Not implemented in this deliverable.** It changes the production sign-in path for every account and cannot be done safely before item 1-2 above exist and the better-auth session path is wired and tested. It is the next step of phase 1.
+**Implemented behind the internal flag.** The sign-in form (`oauth/login`) is rendered with `opaqueSignIn={chatE2eeEnabled()}`; while it is false the form runs exactly the code it ran before and never loads the OPAQUE chunk. With it on: OPAQUE first, the better-auth password sign-in whenever OPAQUE does not end in a session, and the adoption (`adoptOpaque`) right after a password sign-in succeeds, before the page moves on - so accounts with a second factor adopt too. In this round the better-auth hash is never deleted; dropping it is a separate, later step once the stack is on and every client speaks OPAQUE. Covered by `apps/web/test/chat/e2ee/opaque-sign-in.test.ts` (before/after, interrupted, concurrent, password reset, password changed mid-login, 2FA, accounts without a password, replaced master key, replay, unknown addresses, cross-account envelope) and `packages/auth/test/sign-in/opaque-endpoint.test.ts`.
+
+Known residuals: a known address costs two more indexed reads than an unknown one at sign-in start (the same order of difference `/sign-in/email` has); `OpaqueLogin` rows are bounded by the per-address limit and swept on every start, not by a global cap.
+
+## What remains of phase 1
+
+1. QR approval carrying `AK` (below).
+2. Native key stores (Keychain, Keystore, DPAPI/safeStorage) for desktop, Android, iOS.
+3. Wiring the passkey PRF lock into the passkey sign-in ceremony, creating `AK` for an account that has none, and re-sealing the password lock after a reset - all on top of the routes above.
+4. Retiring the better-auth hash for adopted accounts (only when the stack is switched on).
 
 ## QR approval carries `AK`
 

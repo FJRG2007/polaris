@@ -62,17 +62,18 @@ export async function startPasswordRegistration(
 }
 
 /**
- * Finish registering and seal the account key under the new password lock.
- * Returns what goes to the server: the OPAQUE record and the envelope.
+ * Finish registering. Returns the OPAQUE record (for the server) and the lock
+ * key (which stays here); with an account key given, also its envelope sealed
+ * under the new password lock.
  */
 export async function finishPasswordRegistration(input: {
     readonly state: string;
     readonly registrationResponse: string;
     readonly password: string;
     readonly userId: string;
-    readonly accountKey: Uint8Array;
-    readonly akVersion: number;
-}): Promise<{ registrationRecord: string; envelope: Uint8Array }> {
+    readonly accountKey?: Uint8Array;
+    readonly akVersion?: number;
+}): Promise<{ registrationRecord: string; lockKey: CryptoKey; envelope: Uint8Array | null }> {
     await opaque.ready;
     const finished = opaque.client.finishRegistration({
         clientRegistrationState: input.state,
@@ -81,13 +82,22 @@ export async function finishPasswordRegistration(input: {
         identifiers: identifiersFor(input.userId),
         keyStretching: PASSWORD_KSF_V1
     });
-    const key = await lockKeyFrom(finished.exportKey);
-    const envelope = await sealAccountKey(
-        input.accountKey,
-        key,
-        bindingFor(input.userId, input.akVersion)
-    );
-    return { registrationRecord: finished.registrationRecord, envelope };
+    const lockKey = await lockKeyFrom(finished.exportKey);
+    const envelope =
+        input.accountKey && input.akVersion !== undefined
+            ? await sealWithPassword(input.accountKey, lockKey, input.userId, input.akVersion)
+            : null;
+    return { registrationRecord: finished.registrationRecord, lockKey, envelope };
+}
+
+/** The account key sealed under a password lock key from a finished exchange. */
+export async function sealWithPassword(
+    accountKey: Uint8Array,
+    lockKey: CryptoKey,
+    userId: string,
+    akVersion: number
+): Promise<Uint8Array> {
+    return sealAccountKey(accountKey, lockKey, bindingFor(userId, akVersion));
 }
 
 export async function startPasswordLogin(

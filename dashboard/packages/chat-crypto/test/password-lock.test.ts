@@ -46,7 +46,7 @@ describe("password lock over OPAQUE", { timeout: 120_000 }, () => {
         const { registrationRecord, envelope } = await register(setup, ALICE, "correct horse");
         const done = await login(setup, ALICE, registrationRecord, "correct horse");
         expect(done.accepted).toBe(true);
-        const opened = await client.openWithPassword(envelope, done.lockKey, ALICE, 1);
+        const opened = await client.openWithPassword(envelope!, done.lockKey, ALICE, 1);
         expect(Array.from(opened)).toEqual(Array.from(AK));
         expect(done.lockKey.extractable).toBe(false);
     });
@@ -94,10 +94,10 @@ describe("password lock over OPAQUE", { timeout: 120_000 }, () => {
         const alice = await register(setup, ALICE, "same password");
         const bob = await register(setup, BOB, "same password", 2);
         const done = await login(setup, ALICE, alice.registrationRecord, "same password");
-        await expect(client.openWithPassword(bob.envelope, done.lockKey, ALICE, 1)).rejects.toBeInstanceOf(
+        await expect(client.openWithPassword(bob.envelope!, done.lockKey, ALICE, 1)).rejects.toBeInstanceOf(
             LockOpenError
         );
-        await expect(client.openWithPassword(alice.envelope, done.lockKey, ALICE, 2)).rejects.toBeInstanceOf(
+        await expect(client.openWithPassword(alice.envelope!, done.lockKey, ALICE, 2)).rejects.toBeInstanceOf(
             LockOpenError
         );
     });

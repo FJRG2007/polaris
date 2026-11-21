@@ -104,9 +104,15 @@ export function LoginForm({
     awaitingSetup,
     providers,
     add = null,
-    chooser = []
+    chooser = [],
+    opaqueSignIn = false
 }: {
     awaitingSetup: boolean;
+    /** Chat end-to-end encryption's internal flag: prove the password over
+     *  OPAQUE, and move an account onto it after a password sign-in. False
+     *  everywhere until the whole stack is switched on, and then the sign-in
+     *  below runs exactly as it always has. */
+    opaqueSignIn?: boolean;
     /** The services offered as a way in. Empty on a deployment whose operator
      *  has connected none or allows none. */
     providers: SignInProvider[];
@@ -325,10 +331,16 @@ export function LoginForm({
             setError(t("login.invalid"));
             return;
         }
-        const { data, error: signInError } = await signIn.email({
-            email,
-            password: parsed.password
-        });
+        // Behind the internal flag only: the OPAQUE sign-in first, and the
+        // password sign-in below whenever it does not end in a session.
+        const e2ee = opaqueSignIn ? await import("@/lib/chat/e2ee/sign-in-client") : null;
+        const viaOpaque = e2ee ? await e2ee.signInWithOpaque(email, parsed.password) : null;
+        const { data, error: signInError } = viaOpaque
+            ? { data: { twoFactorRedirect: viaOpaque.challenged } as unknown, error: null }
+            : await signIn.email({
+                  email,
+                  password: parsed.password
+              });
         setPending(false);
         if (signInError) {
             // A domain that must use its identity provider is told so, and
@@ -340,6 +352,12 @@ export function LoginForm({
             }
             setError(await refusalMessage(signInRefusal(signInError) ?? "credentials", t));
             return;
+        }
+        // The password was just accepted the old way: move the account onto
+        // OPAQUE while this page still holds it. Never fails the sign-in.
+        if (e2ee && !viaOpaque) {
+            setPending(true);
+            await e2ee.adoptOpaque(email, parsed.password);
         }
         window.localStorage.setItem(LAST_IDENTIFIER_KEY, parsed.identifier);
         // With a second factor armed, the password alone issues no session: the

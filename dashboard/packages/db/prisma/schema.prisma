@@ -430,6 +430,9 @@ model User {
     gameTime            UserGameTime[]
     mobileDeviceKeys    MobileDeviceKey[]
     mobileVoipTokens    MobileVoipToken[]
+    chatAccountKey      ChatAccountKey?
+    chatAccountKeyLocks ChatAccountKeyLock[]
+    opaqueRecord        OpaqueRecord?
     signInApprovals     SignInApproval[]
     chatAttachmentOpens ChatAttachmentOpen[]
     badgesSeen          UserBadgeSeen[]
@@ -18827,4 +18830,82 @@ model BlockedDevice {
     createdAt DateTime @default(now())
 
     @@unique([userId, deviceKey])
+}
+
+// Chat end-to-end encryption, phase 1 (docs/chat-e2ee-phase1.md). Behind the
+// internal rollout flag: nothing reads these until the whole stack is switched on.
+//
+// The account key's two public halves. The key itself never reaches the server.
+model ChatAccountKey {
+    userId        String   @id @db.Uuid
+    akVersion     Int
+    // Ed25519, 32 bytes.
+    signPublicKey Bytes
+    // X-Wing (X25519 + ML-KEM-768), 1216 bytes.
+    hpkePublicKey Bytes
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// The account key sealed under one lock (password, a passkey's PRF output).
+// Opaque to the server: it holds no key that opens any of these.
+model ChatAccountKeyLock {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    // "password" | "passkey-prf". The device lock never leaves the browser.
+    kind      String
+    // "password", or the passkey's credential id.
+    lockId    String
+    akVersion Int
+    envelope  Bytes
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, kind, lockId])
+}
+
+// An account's OPAQUE (RFC 9807) registration record. Used to sign in only once
+// verifiedAt is set and passwordTag still matches the account's current password
+// hash, so any password change - reset, admin reset, recovery - retires the
+// record without a hook on every one of those paths.
+model OpaqueRecord {
+    userId      String    @id @db.Uuid
+    record      String
+    // Keyed fingerprint of the credential hash the record was made against.
+    passwordTag String
+    verifiedAt  DateTime?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// The server half of an OPAQUE login between its two steps. Single use: taken
+// (deleted) by the finish, and swept once expired.
+model OpaqueLogin {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    // Null for an address with no account: the exchange still runs, so the reply
+    // says nothing about which addresses are registered.
+    userId    String?  @db.Uuid
+    // "sign-in" | "verify" | "unlock"
+    purpose   String
+    state     String
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+
+    @@index([expiresAt])
+}
+
+// The instance's OPAQUE server setup (OPRF seed and key pair), sealed under
+// POLARIS_MASTER_KEY like every other stored secret. One row, made on first use.
+model OpaqueServerSetup {
+    id         String   @id
+    ciphertext Bytes
+    nonce      Bytes
+    keyId      String
+    createdAt  DateTime @default(now())
 }
