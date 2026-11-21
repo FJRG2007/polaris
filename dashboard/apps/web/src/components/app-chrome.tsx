@@ -107,6 +107,7 @@ import { OpenInApp } from "@/components/open-in-app";
 import { SnapshotBuild } from "@/components/snapshot-build";
 import { NotificationsProvider } from "@/components/notifications/notifications-provider";
 import { shelfKey } from "@/lib/shelf";
+import { deliverEverywhere } from "@/lib/chat/delivered";
 import {
     chatWaitingOnShelf,
     mailWaitingOnShelf,
@@ -143,6 +144,10 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
             ? chatWaitingOnShelf(user.id).catch(() => NO_CHAT_WAITING)
             : NO_CHAT_WAITING
     );
+    // Polaris is open on a device of theirs, so what is waiting in their
+    // conversations has reached it: the second tick under each sender's message.
+    // Not awaited - nothing on this page depends on it, and it never throws.
+    void nav.then((apps) => (apps.ids.includes("chat") ? deliverEverywhere(user.id) : undefined));
     // The same, for mail. A person who spends the day in Deploy is told a
     // message arrived by the same badge that tells them about a chat.
     const mailWaiting = nav.then((apps) =>

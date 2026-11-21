@@ -1430,11 +1430,12 @@
         "theTimeWasNotRecorded": "No se registró la hora.",
         "notYet": "Todavía no.",
         "notOnTheirDevice": "Aún no está en su dispositivo.",
+        "readHidden": "Confirmaciones de lectura desactivadas.",
         "notOpened": "Aún no lo ha abierto.",
         "readBy": "Leído por {count} de {total}",
         "readByEveryone": "Leído por todos",
         "waiting": "Aún sin leer",
-        "unknown": "Oculto",
+        "unknown": "Entregado, lectura oculta",
         "readers": "Miembros"
     },
     "savedDrafts": {

@@ -1431,10 +1431,11 @@
         "notYet": "Not yet.",
         "notOnTheirDevice": "Not on their device yet.",
         "notOpened": "Not opened yet.",
+        "readHidden": "Read receipts are off.",
         "readBy": "Read by {count} of {total}",
         "readByEveryone": "Read by everyone",
         "waiting": "Not yet read",
-        "unknown": "Hidden",
+        "unknown": "Delivered, read hidden",
         "readers": "Members"
     },
     "savedDrafts": {

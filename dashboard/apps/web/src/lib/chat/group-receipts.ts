@@ -26,7 +26,9 @@ export interface MemberMark {
     readonly readAt: Date | null;
     readonly deliveredAt: Date | null;
     /** False when either side's read-receipt setting withholds them. Such a
-     *  member is unknown: never counted as having read anything. */
+     *  member is never counted as having read anything - but whether their
+     *  device has the message is still shown, as WhatsApp shows it: the setting
+     *  is about reading, and the second tick is about the message arriving. */
     readonly allowed: boolean;
 }
 
@@ -48,20 +50,30 @@ export function seenAt(member: {
     return seen > read ? seen : read;
 }
 
-/** One member's standing with one message. */
+/**
+ * One member's standing with one message.
+ *
+ * "unknown" is a member whose ticks are withheld and whose device has the
+ * message: it reached them, and whether they read it is theirs to keep. One
+ * whose device does not have it yet is plainly "sent" - that is not a fact the
+ * setting covers.
+ */
 export function memberReceiptAt(mark: MemberMark, createdAt: Date): MemberReceipt {
-    if (!mark.allowed) return "unknown";
-    if (mark.readAt && mark.readAt >= createdAt) return "read";
-    if (mark.deliveredAt && mark.deliveredAt >= createdAt) return "delivered";
-    return "sent";
+    // Having read it means a device had it, whatever the delivery mark says: a
+    // conversation caught up from the list, or a row from before the mark
+    // existed, has a read mark and no delivery one.
+    const read = mark.readAt !== null && mark.readAt >= createdAt;
+    const delivered = read || (mark.deliveredAt !== null && mark.deliveredAt >= createdAt);
+    if (!mark.allowed) return delivered ? "unknown" : "sent";
+    if (read) return "read";
+    return delivered ? "delivered" : "sent";
 }
 
 /**
  * The tick under a message: the least any other member has got to. Read only
  * once every one of them has read it, delivered once every one has it. A member
- * whose ticks are withheld holds it at delivered, because "everyone has read
- * this" would otherwise be a claim about somebody who chose not to say - and
- * holding it lower would say the message never reached the others.
+ * whose ticks are withheld holds it at delivered at most, because "everyone has
+ * read this" would otherwise be a claim about somebody who chose not to say.
  */
 export function receiptAmong(marks: readonly MemberMark[], createdAt: Date): core.MessageReceipt {
     let least: core.MessageReceipt = "read";
@@ -75,12 +87,13 @@ export function receiptAmong(marks: readonly MemberMark[], createdAt: Date): cor
 
 /**
  * Whether a conversation with this many other members gets ticks, and with
- * them the per-member list. None when nobody's ticks are visible: a reader who
- * turned their own off sees nobody's, the same reciprocity a one-to-one has.
+ * them the per-member list. Whatever the read-receipt settings say: a reader who
+ * turned their own off sees nobody's *read*, the same reciprocity a one-to-one
+ * has, but still sees their messages arrive - one tick, then two, never the
+ * colour - as WhatsApp does.
  */
 export function ticksShown(marks: readonly MemberMark[]): boolean {
-    if (marks.length === 0 || marks.length > GROUP_RECEIPT_MAX_MEMBERS - 1) return false;
-    return marks.some((mark) => mark.allowed);
+    return marks.length > 0 && marks.length <= GROUP_RECEIPT_MAX_MEMBERS - 1;
 }
 
 /** One member as the who-has-read list shows them. */

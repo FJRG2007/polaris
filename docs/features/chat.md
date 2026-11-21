@@ -69,7 +69,9 @@ unless the rules below turn that off.
   <img src="../assets/media/chat-direct-dark-en-desktop.webp" alt="A direct message with read ticks and the other person's profile">
 </picture>
 
-One-to-one and group conversations, with read and delivered ticks. The profile
+One-to-one and group conversations, with ticks under each of your messages: one
+when it is sent, two in grey once a device of the other person has it, two in
+colour once they read it. The profile
 panel shows the person's bio, pronouns, the friends and spaces you share, and
 their decoration and banner.
 
@@ -114,5 +116,7 @@ kept.
 
 Each person decides who can ask to be their friend, send them files and call
 them, who sees when they were last here and what they are playing, whether
-others see that they read a message, and who may forward what they write. A
+others see that they read a message, and who may forward what they write. Turning
+read receipts off hides when a message was read, both ways, but not that it
+arrived: the grey ticks still show. A
 list names a group of people once, for any of these settings.

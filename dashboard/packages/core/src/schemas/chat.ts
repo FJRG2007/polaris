@@ -791,6 +791,20 @@ export const chatMarkChannelsReadSchema = z.object({
 
 export type ChatMarkChannelsReadInput = z.infer<typeof chatMarkChannelsReadSchema>;
 
+/** The most conversations one delivery acknowledgement may name. */
+export const MAX_CHAT_DELIVERED = 100;
+
+/**
+ * A device saying it now holds what arrived in these conversations: the second
+ * tick. Names conversations, never messages - the mark is how far the device has
+ * got, so "everything up to now" is the whole claim.
+ */
+export const chatDeliveredSchema = z.object({
+    channelIds: z.array(z.string().uuid()).min(1).max(MAX_CHAT_DELIVERED)
+});
+
+export type ChatDeliveredInput = z.infer<typeof chatDeliveredSchema>;
+
 /**
  * Putting a conversation back to unread.
  *

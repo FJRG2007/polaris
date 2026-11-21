@@ -543,11 +543,6 @@ export function MessageList({
                                 message={message}
                                 liveTranslation={liveTranslation}
                                 grouped={grouped}
-                                // The ticks go under the last message of a block and
-                                // nowhere else. Somebody who has read the newest of
-                                // five messages in a row has read the other four,
-                                // and five ticks say that five times.
-                                lastOfBlock={!sharesBlock(message, messages[index + 1])}
                                 mine={message.authorId === viewerId}
                                 viewerId={viewerId}
                                 onMention={onMention}
@@ -793,7 +788,6 @@ function useMessageKeys({
 function Message({
     message,
     grouped,
-    lastOfBlock,
     mine,
     canPost,
     canModerate,
@@ -830,8 +824,6 @@ function Message({
     /** What this message was drawn as while it went, when it was sent from here. */
     landed?: Landed;
     grouped: boolean;
-    /** Whether the next message starts a new block, which is where the ticks go. */
-    lastOfBlock: boolean;
     mine: boolean;
     canPost: boolean;
     canModerate: boolean;
@@ -1223,10 +1215,11 @@ function Message({
                                         flaggedLinks={message.flaggedLinks}
                                     />
                                 </TranslatableText>
-                                {/* Under the last message of a block only. Five ticks
-                            down a run of five messages say the same thing five
-                            times, and seeing the newest is seeing the rest. */}
-                                {message.receipt && lastOfBlock && (
+                                {/* Under every message of the reader's own, as WhatsApp
+                            draws them: a run of five can be at different stages -
+                            the first read, the last still on its way - and the
+                            tick under the newest says nothing about the others. */}
+                                {message.receipt && (
                                     <Ticks
                                         receipt={message.receipt}
                                         onOpen={() => onExplain(message)}

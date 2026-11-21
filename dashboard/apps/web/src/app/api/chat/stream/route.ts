@@ -301,6 +301,19 @@ export async function GET(request: Request): Promise<Response> {
                     return;
                 }
 
+                // Somebody's device picked up what arrived: the second tick
+                // under the messages of the people they were sent by. Addressed
+                // to those people by the publisher; never to the person's own
+                // screens, and never to anybody who no longer reaches the
+                // conversation. Not coalesced, for the reason `read` is not.
+                if (change.kind === "delivered") {
+                    if (!change.channelId || change.actorId === actor.id) return;
+                    if (!change.audience?.includes(actor.id)) return;
+                    if (!scope.reachable().has(change.channelId)) return;
+                    send({ kind: "delivered", channelId: change.channelId, userId: change.actorId });
+                    return;
+                }
+
                 // Their own typing and their own call are theirs already. What
                 // they posted is not: only the tab that sent a message settled
                 // it, and a line the server wrote in their name - "you started a

@@ -950,7 +950,14 @@ export async function listChannels(
             allowed: ruleOf(channelId) === "on" || allowed.has(member.userId)
         }));
         if (kind === "dm") {
+            // Withheld read receipts still show the message arriving, never
+            // being read: the stamp on the message, capped at delivered.
             if (marks[0]!.allowed) receipts.set(channelId, true);
+            else {
+                // Read implies it arrived, even where only the read was stamped.
+                const message = last.get(channelId)!;
+                receipts.set(channelId, message.delivered || message.read ? "delivered" : "sent");
+            }
         } else if (groupReceipts.ticksShown(marks)) {
             const at = new Date(last.get(channelId)!.at);
             receipts.set(channelId, groupReceipts.receiptAmong(marks, at));

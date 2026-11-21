@@ -48,6 +48,9 @@ export interface ChatChange {
      *      their own other devices, which have an unread count to take down, and
      *      the person they were reading, whose ticks have just moved. Addressed
      *      through `audience`, because who may know is a setting.
+     *  delivered - a device of somebody here now holds what arrived. For the
+     *      other members alone (`audience`), whose ticks go from one to two;
+     *      the person's own screens have nothing to move.
      *  pins - a message was pinned or unpinned here; the bar above the
      *      conversation reads its pins again.
      *  emoji - a space's own emoji were added, renamed or removed. Carries the
@@ -69,6 +72,7 @@ export interface ChatChange {
         | "call"
         | "appearance"
         | "read"
+        | "delivered"
         | "activity"
         | "pins"
         | "emoji"

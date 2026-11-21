@@ -110,7 +110,11 @@ export function MessageInfoDialog({
                             icon={<CheckCheck className="size-4" />}
                             iso={delivery.readAt}
                             reached={delivery.state === "read"}
-                            waiting={t("messageInfo.notOpened")}
+                            waiting={
+                                delivery.readHidden
+                                    ? t("messageInfo.readHidden")
+                                    : t("messageInfo.notOpened")
+                            }
                         />
                     </ol>
                 )}

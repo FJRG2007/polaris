@@ -237,9 +237,16 @@ describe("the ticks, asked for on their own", () => {
         expect(marks).toEqual({ m2: "read" });
     });
 
-    it("answers nothing where there are no ticks to show", async () => {
+    it("shows delivered at most where read receipts are withheld", async () => {
         receiptsAllowed = false;
-        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({});
+        // Read, but the setting keeps that back: only the arrival shows.
+        others = [
+            { userId: "grace", lastReadAt: messages[2]!.createdAt, lastDeliveredAt: messages[2]!.createdAt }
+        ];
+        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({ m2: "delivered" });
+        // Not on their device yet: one tick.
+        others = [{ userId: "grace", lastReadAt: null, lastDeliveredAt: null }];
+        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({ m2: "sent" });
     });
 
     it("asks nothing at all for an empty list", async () => {
@@ -260,7 +267,23 @@ describe("the three moments", () => {
             deliveredAt: delivered.toISOString(),
             readAt: read.toISOString(),
             state: "read",
-            readers: null
+            readers: null,
+            readHidden: false
+        });
+    });
+
+    it("keep the read moment back where read receipts are withheld", async () => {
+        receiptsAllowed = false;
+        const delivered = new Date("2026-08-17T10:05:00Z");
+        messages[1] = { ...messages[1]!, deliveredAt: delivered, readAt: new Date("2026-08-17T10:06:00Z") };
+        others = [
+            { userId: "grace", lastReadAt: messages[1]!.createdAt, lastDeliveredAt: delivered }
+        ];
+        expect(await deliveryOf(ada, "m2")).toMatchObject({
+            deliveredAt: delivered.toISOString(),
+            readAt: null,
+            state: "delivered",
+            readHidden: true
         });
     });
 
@@ -315,10 +338,16 @@ describe("in a group", () => {
         expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({ m2: "read" });
     });
 
-    it("shows nothing to a reader who withholds their own", async () => {
+    it("shows a reader who withholds their own the arrivals and no reads", async () => {
         receiptsAllowed = false;
-        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({});
-        expect(await deliveryOf(ada, "m2")).toBeNull();
+        others[0]!.lastReadAt = at(2);
+        others[0]!.lastDeliveredAt = at(2);
+        others[1]!.lastReadAt = at(2);
+        others[1]!.lastDeliveredAt = at(2);
+        expect(await receiptsFor(ada, "c1", ["m2"])).toEqual({ m2: "delivered" });
+        const delivery = await deliveryOf(ada, "m2");
+        expect(delivery?.state).toBe("delivered");
+        expect(delivery?.readers?.map((reader) => reader.state)).toEqual(["unknown", "unknown"]);
     });
 
     it("lists who has read it, read first", async () => {

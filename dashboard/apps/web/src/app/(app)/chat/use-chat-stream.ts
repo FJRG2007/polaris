@@ -56,6 +56,9 @@ const frameSchema = z.discriminatedUnion("kind", [
         // open across a deploy, and absent means the ordinary catch-up.
         unread: z.literal(true).optional()
     }),
+    // A device of somebody here now holds what arrived: the ticks under this
+    // reader's own messages go from one to two. Unknown to a server before it.
+    z.object({ kind: z.literal("delivered"), channelId: z.string(), userId: z.string() }),
     // Polar's answer to a mention as far as it has written it: the whole text
     // so far, never a piece. Empty takes it back; `messageId` is the answer
     // posted, which the draft stands in for until it is on screen.

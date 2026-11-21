@@ -1298,8 +1298,10 @@ export function ChannelView({
                 // Somebody caught up in here. Their own screens take a count
                 // down; this one moves the ticks under its own messages, which
                 // used to sit on "sent" until the conversation was reopened.
+                // A device of theirs picking the messages up moves them too,
+                // from one tick to two.
                 if (
-                    frame.kind === "read" &&
+                    (frame.kind === "read" || frame.kind === "delivered") &&
                     frame.channelId === channelId &&
                     frame.userId !== viewerId
                 ) {

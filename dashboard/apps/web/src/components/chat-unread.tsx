@@ -43,6 +43,28 @@ export function useChatUnread(): ChatUnread {
 
 const STREAM_PATH = "/api/chat/stream";
 const UNREAD_PATH = "/api/chat/unread";
+const DELIVERED_PATH = "/api/chat/delivered";
+
+/** The most conversations one acknowledgement names - `MAX_CHAT_DELIVERED`,
+ *  which is not imported to keep the core schemas out of every page's bundle. */
+const MOST_DELIVERED = 100;
+
+/**
+ * The conversations a `posted` frame says a message landed in, as against only
+ * changing in place. Absent `arrived` is a server from before it, where every
+ * conversation named is read as an arrival. Pure.
+ */
+export function arrivedIn(frame: unknown): string[] {
+    if (!frame || typeof frame !== "object") return [];
+    const { kind, arrived, channels } = frame as {
+        kind?: unknown;
+        arrived?: unknown;
+        channels?: unknown;
+    };
+    if (kind !== "posted") return [];
+    const named = Array.isArray(arrived) ? arrived : Array.isArray(channels) ? channels : [];
+    return named.filter((id): id is string => typeof id === "string");
+}
 
 const unreadSchema = z.object({ messages: z.number(), conversations: z.number() });
 
@@ -73,6 +95,24 @@ export function ChatUnreadProvider({
     // The open shelf's count, taken again from the server's seed on a switch.
     const [unread, setUnread] = useShelfSeed(initial);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Conversations a message landed in since the last acknowledgement, said
+    // with the recount below: one request a burst, not one a message.
+    const landed = useRef(new Set<string>());
+
+    const acknowledge = useCallback(() => {
+        const channelIds = [...landed.current].slice(0, MOST_DELIVERED);
+        landed.current.clear();
+        if (channelIds.length === 0) return;
+        void fetch(DELIVERED_PATH, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ channelIds }),
+            keepalive: true
+        }).catch(() => {
+            // Nothing to do: the next page load says it for every conversation
+            // at once (`deliverEverywhere`), and opening this one says it too.
+        });
+    }, []);
 
     const recount = useCallback(() => {
         void fetch(UNREAD_PATH, { cache: "no-store" })
@@ -90,7 +130,7 @@ export function ChatUnreadProvider({
 
     useEffect(() => {
         if (!enabled) return;
-        const stop = subscribeSharedStream(STREAM_PATH, scope, ({ data }) => {
+        const stop = subscribeSharedStream(STREAM_PATH, scope, ({ data, owner }) => {
             let kind: unknown;
             let frame: { kind?: unknown; actorId?: unknown };
             try {
@@ -116,15 +156,24 @@ export function ChatUnreadProvider({
                 return;
             }
             if (typeof kind !== "string" || !COUNTED.has(kind)) return;
+            // The message is on this device now, which is the second tick under
+            // it. Said by the tab holding the wire alone - the device's, not each
+            // tab's - and only for conversations where it landed; the server
+            // ignores the sender's own messages and anything already marked.
+            if (owner) for (const id of arrivedIn(frame)) landed.current.add(id);
             if (timer.current) clearTimeout(timer.current);
-            timer.current = setTimeout(recount, SETTLE_MS);
+            timer.current = setTimeout(() => {
+                recount();
+                acknowledge();
+            }, SETTLE_MS);
         });
         return () => {
             if (timer.current) clearTimeout(timer.current);
             timer.current = null;
+            acknowledge();
             stop();
         };
-    }, [enabled, scope, recount]);
+    }, [enabled, scope, recount, acknowledge]);
 
     return <UnreadContext.Provider value={unread}>{children}</UnreadContext.Provider>;
 }

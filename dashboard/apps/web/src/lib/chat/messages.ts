@@ -49,6 +49,7 @@ import { announceRoomMention, refuseRoomMention } from "./room-mentions";
 import { requireNotSpam, requireRoomMentionAllowed } from "./spam-guard";
 import { allowedBy, maySee, receiptsAmong } from "@/lib/privacy-service";
 import * as groupReceipts from "./group-receipts";
+import * as delivered from "./delivered";
 import { channelMentions, isBlankMarkdown } from "@/components/rich-text/markdown";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
 import { confineCustomEmoji, reactionEmoji } from "./custom-emoji";
@@ -1385,45 +1386,20 @@ export async function react(actor: ChatActor, input: core.ChatReactInput): Promi
  * Say that this browser now has the messages.
  *
  * The second tick, and a different claim to the third: this is the device
- * holding them, and reading is the person. Written on every fetch rather than on
- * a signal of its own, because fetching them *is* the event - a client that has
- * the messages has had them delivered, whatever it does next.
+ * holding them, and reading is the person. Fetching them *is* the event - a
+ * client that has the messages has had them delivered, whatever it does next -
+ * though it is no longer the only one: a screen told over the live channel that
+ * something arrived says so too (`delivered.ts`), which is what lets the sender
+ * see the grey pair before the colour.
  *
- * Only where there is somebody to tell. A membership row is what carries the
- * mark, and somebody reading a public channel through the space has none.
+ * Only in a conversation of people, where there are ticks to move, and only for
+ * a member: a membership row is what carries the mark, and somebody reading a
+ * public channel through the space has none.
  */
 async function markDelivered(actor: ChatActor, channel: ChannelAccess): Promise<void> {
-    const now = new Date();
-    const channelId = channel.channelId;
-
-    // The moment itself, on the messages themselves, and only in a one-to-one
-    // conversation - which is the only place there is a "the other person" to
-    // draw an information panel about. The mark below says how far this reader
-    // has got now; it can never say when they got to a particular message.
-    if (channel.kind === "dm" && channel.member) {
-        const mark = await prisma.chatChannelMember.findUnique({
-            where: { channelId_userId: { channelId, userId: actor.id } },
-            select: { lastDeliveredAt: true }
-        });
-        await prisma.chatMessage.updateMany({
-            where: {
-                channelId,
-                authorId: { not: actor.id },
-                deliveredAt: null,
-                // From where the last pick-up left off. Everything older than
-                // that arrived long ago - possibly before Polaris recorded the
-                // moment at all - and stamping it now would put today's time on
-                // a message from March.
-                ...(mark?.lastDeliveredAt ? { createdAt: { gte: mark.lastDeliveredAt } } : {})
-            },
-            data: { deliveredAt: now }
-        });
-    }
-
-    await prisma.chatChannelMember.updateMany({
-        where: { channelId, userId: actor.id },
-        data: { lastDeliveredAt: now }
-    });
+    if (!channel.member || channel.spaceId) return;
+    if (channel.kind !== "dm" && channel.kind !== "group") return;
+    await delivered.markDelivered(actor.id, [channel.channelId]);
 }
 
 /**
@@ -1847,6 +1823,10 @@ export interface MessageDelivery {
      * shown as such, never as having read it.
      */
     readonly readers: readonly MessageReader[] | null;
+    /** True in a one-to-one where either side's read-receipt setting withholds
+     *  the read: the panel says so instead of "not opened yet", which would be a
+     *  claim about something it does not know. */
+    readonly readHidden: boolean;
 }
 
 /** One member of a group, and how far one message has got with them. */
@@ -1882,13 +1862,17 @@ export async function deliveryOf(
 
     const state = await receiptStateIn(actor, row.channelId);
     if (!state) return null;
+    // When the other person read it is exactly what a withheld receipt keeps
+    // back, even though the moment is stamped on the message.
+    const readShown = state.group || state.marks[0]!.allowed;
 
     return {
         sentAt: row.createdAt.toISOString(),
         deliveredAt: row.deliveredAt?.toISOString() ?? null,
-        readAt: row.readAt?.toISOString() ?? null,
+        readAt: readShown ? (row.readAt?.toISOString() ?? null) : null,
         state: receiptAt(state, row.createdAt),
-        readers: state.group ? await readersOf(actor, state, row.createdAt) : null
+        readers: state.group ? await readersOf(actor, state, row.createdAt) : null,
+        readHidden: !readShown
     };
 }
 
@@ -2648,9 +2632,9 @@ async function receiptStateIn(actor: ChatActor, channelId: string): Promise<Rece
         deliveredAt: other.lastDeliveredAt,
         allowed: allowed.has(other.userId)
     }));
-    // A one-to-one shows nothing rather than an unknown: there is only the one
-    // person, and an unknown tick there is the setting announcing itself.
-    if (channel.kind === "dm" && !marks[0]!.allowed) return null;
+    // Withheld read receipts still draw one tick and then two, never the colour
+    // (see `ticksShown`): a one-to-one where either side turned them off reads
+    // as delivered at most, which is what WhatsApp shows in the same case.
     return groupReceipts.ticksShown(marks) ? { group: channel.kind === "group", marks } : null;
 }
 

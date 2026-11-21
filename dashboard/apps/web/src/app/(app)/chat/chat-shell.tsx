@@ -56,6 +56,14 @@ export function tickMayMove(channels: readonly ChatChannelView[], channelId: str
     return Boolean(row.last?.receipts && !row.last.read);
 }
 
+/** The same question for the second tick: a row whose own last message is still
+ *  short of delivered. Pure. */
+export function deliveryMayMove(channels: readonly ChatChannelView[], channelId: string): boolean {
+    const row = channels.find((channel) => channel.id === channelId);
+    if (!row) return true;
+    return Boolean(row.last?.receipts && !row.last.delivered && !row.last.read);
+}
+
 /**
  * Whether this address is a conversation, which on a phone takes the whole
  * screen. Opening one with somebody counts: that page either becomes the
@@ -195,6 +203,10 @@ function ChatColumns({ children }: { children: ReactNode }) {
                     if (frame.userId === viewerId) refreshChannels();
                     else if (tickMayMove(rows.current, frame.channelId)) refreshChannels();
                 }
+                // Somebody's device picked a message up: only a row whose tick
+                // is still a single one has anything to change.
+                if (frame.kind === "delivered" && deliveryMayMove(rows.current, frame.channelId))
+                    refreshChannels();
             },
             [refresh, refreshChannels, viewerId]
         )

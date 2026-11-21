@@ -1,9 +1,10 @@
 /**
  * The tick under a group message, worked out from its members' read marks.
  *
- * Read only when every other member has read it; a member whose ticks are
- * withheld is unknown, never counted as having read anything, and holds the
- * tick at delivered rather than sent; and past the cap there are no ticks at all.
+ * Read only when every other member has read it; a member whose read receipts
+ * are withheld is never counted as having read anything, but whether their
+ * device has the message is still shown, as WhatsApp shows it; and past the cap
+ * there are no ticks at all.
  */
 
 import { describe, expect, it } from "vitest";
@@ -47,13 +48,20 @@ describe("receiptAmong", () => {
         expect(memberReceiptAt(mark("b", AFTER, AFTER, false), SENT)).toBe("unknown");
     });
 
-    it("holds a withheld member at delivered, not sent, once the others have it", () => {
-        expect(receiptAmong([mark("a", null, AFTER), mark("b", null, null, false)], SENT)).toBe(
+    it("shows whether a withheld member's device has it, and never more", () => {
+        // Their device has it: delivered, and "unknown" in the list - it reached
+        // them, and whether they read it is theirs to keep.
+        expect(receiptAmong([mark("a", null, AFTER), mark("b", null, AFTER, false)], SENT)).toBe(
             "delivered"
         );
-        expect(receiptAmong([mark("a", null, BEFORE), mark("b", null, null, false)], SENT)).toBe(
+        expect(memberReceiptAt(mark("b", null, AFTER, false), SENT)).toBe("unknown");
+        // It does not: plainly sent, which is not a fact the setting covers.
+        expect(receiptAmong([mark("a", null, AFTER), mark("b", null, null, false)], SENT)).toBe(
             "sent"
         );
+        expect(memberReceiptAt(mark("b", BEFORE, BEFORE, false), SENT)).toBe("sent");
+        // Having read it means a device had it, even with no delivery mark.
+        expect(memberReceiptAt(mark("b", AFTER, null, false), SENT)).toBe("unknown");
     });
 
     it("is sent for nobody at all", () => {
@@ -80,9 +88,9 @@ describe("ticksShown", () => {
         expect(ticksShown(many(GROUP_RECEIPT_MAX_MEMBERS))).toBe(false);
     });
 
-    it("is off when nobody's ticks are visible", () => {
+    it("stays on when nobody's read receipts are visible, for the delivered tick", () => {
         expect(ticksShown([mark("a", null, null, false), mark("b", null, null, false)])).toBe(
-            false
+            true
         );
         expect(ticksShown([mark("a", null, null, false), mark("b", null, null)])).toBe(true);
         expect(ticksShown([])).toBe(false);
@@ -93,7 +101,7 @@ describe("readersAt", () => {
     it("lists read first and withheld last, by name within each", () => {
         const list = readersAt(
             [
-                { ...mark("z", null, null, false), name: "Zed" },
+                { ...mark("z", null, AFTER, false), name: "Zed" },
                 { ...mark("b", null, AFTER), name: "Bea" },
                 { ...mark("c", AFTER, AFTER), name: "Cy" },
                 { ...mark("a", AFTER, AFTER), name: "Al" },
