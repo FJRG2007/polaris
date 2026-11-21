@@ -525,6 +525,18 @@ html:has(.page-bleed) {
     outline-offset: 2px;
 }
 
+/* After a tap, no ring at all. A phone moves focus by script whenever a sheet
+   or dialog closes, and browsers count that as focus-visible, so the button that
+   opened it (the chat's "+", every round icon button) kept a ring around it
+   until the next tap. `data-input` is written by the document's input-modality
+   script; a key press brings the ring back. Tailwind's `focus-visible:ring-*`
+   is a box shadow, cleared through the variables it is built from. */
+html[data-input="touch"] :is(a, button, [role="button"], [role="tab"], [role="menuitem"], summary, [tabindex]):focus-visible {
+    outline: none;
+    --tw-ring-offset-shadow: 0 0 #0000;
+    --tw-ring-shadow: 0 0 #0000;
+}
+
 /* A field you type in shows focus on a mouse click too, so a ring drawn outside
    it reads as a second box around the field, and a toolbar or card that clips
    its overflow cuts that box in half. Fields draw the ring on their own edge. */

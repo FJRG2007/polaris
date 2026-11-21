@@ -9,6 +9,7 @@ import { DropGuard } from "@/components/drop-guard";
 import { localeDirection, themeClass } from "@polaris/core";
 import { resolveSession } from "@/lib/session";
 import { CHUNK_RECOVERY_SCRIPT } from "@/lib/stale-build";
+import { INPUT_MODALITY_SCRIPT } from "@/lib/input-modality";
 import { getClient, getLocale, getTranslations } from "@/lib/i18n/request";
 import { pickMessages } from "@/lib/i18n/translate";
 import { seasonPreviewFor } from "@/lib/seasonal-preview";
@@ -91,6 +92,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 {/* First in the document, so it is listening before any chunk can
                     fail - see recoverMissingChunks. */}
                 <script dangerouslySetInnerHTML={{ __html: CHUNK_RECOVERY_SCRIPT }} />
+                {/* A tap from a key, so a focus ring follows only the keyboard - see input-modality.ts. */}
+                <script dangerouslySetInnerHTML={{ __html: INPUT_MODALITY_SCRIPT }} />
             </head>
             <body>
                 {/* What the desktop app's window is dragged by on a page with no
