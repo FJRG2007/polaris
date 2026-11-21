@@ -330,7 +330,10 @@
         "add": "Add a passkey",
         "confirmTitle": "Confirm your password",
         "confirmDescription": "Adding a passkey adds a way into your account, so it asks for your password first. Your device will prompt you next.",
-        "naming": "Naming it \"{name}\"."
+        "naming": "Naming it \"{name}\".",
+        "originUnknown": "Not recorded yet",
+        "firstSeen": "First seen on use",
+        "firstSeenHint": "Nothing was recorded when this passkey was added. This is the browser, system and address of its first sign-in after that."
     },
     "emailLink": {
         "title": "Sign in with an emailed link",

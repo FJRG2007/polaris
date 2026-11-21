@@ -330,7 +330,10 @@
         "add": "Añadir passkey",
         "confirmTitle": "Confirma tu contraseña",
         "confirmDescription": "Añadir una llave de acceso añade una forma de entrar en tu cuenta, así que primero pide tu contraseña. Después te preguntará tu dispositivo.",
-        "naming": "Se llamará \"{name}\"."
+        "naming": "Se llamará \"{name}\".",
+        "originUnknown": "Aún sin registrar",
+        "firstSeen": "Visto al usarla",
+        "firstSeenHint": "No se registró nada al añadir esta llave. Es el navegador, sistema y dirección de su primer inicio de sesión después."
     },
     "emailLink": {
         "title": "Entrar con un enlace por correo",

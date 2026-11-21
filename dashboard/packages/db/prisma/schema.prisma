@@ -315,6 +315,7 @@ model User {
     securityQuestions   SecurityQuestion[]
     accountRecoveries   AccountRecovery[]
     accessGroups        AccessGroup[]
+    accessRules         AccountAccessRule[]
     accessGroupBindings UserAccessGroup[]
     vpnPeers            VpnPeer[]
     vpnAccess           VpnAccess?
@@ -1190,11 +1191,36 @@ model Passkey {
     // once, and on rows that predate the column - a passkey nobody can date is
     // the one worth looking at, so it is shown as unused rather than hidden.
     lastUsedAt   DateTime?
+    // Set when the browser, system and address above were not recorded when the
+    // passkey was added and were filled in on its first sign-in after that. The
+    // screen then says "first seen" rather than claiming that is where it was added.
+    originSeenAt DateTime?
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId])
     @@index([credentialID])
+}
+
+// One of an account's own access rules, written like a firewall custom rule: the
+// conditions (a JSON tree validated by accountRuleSchema in @polaris/core) and what
+// happens when they all hold. Tried in `position` order, first match wins.
+model AccountAccessRule {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    userId     String   @db.Uuid
+    position   Int
+    name       String
+    enabled    Boolean  @default(true)
+    // block | challenge | allow
+    action     String
+    conditions Json
+    timeZone   String   @default("UTC")
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId, position])
 }
 
 model Role {
@@ -1464,6 +1490,10 @@ model UserSecurity {
     allowedCidrs         String    @default("[]")
     allowedCountries     String    @default("[]")
     allowedContinents    String    @default("[]")
+    // When the inline allowlist above (and the groups bound to the account) were
+    // carried into AccountAccessRule. Null until then; set once, so the move runs
+    // exactly once per account and the columns above stop being enforced after it.
+    accessRulesMigratedAt DateTime?
     // Restrictions an administrator imposed on the account. Held apart from the
     // account's own rules above because the two are judged independently: a
     // sign-in must satisfy both, so nothing the user does under Account >

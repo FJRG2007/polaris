@@ -121,8 +121,8 @@ function passkeyPlugin(address: string, appOrigins: readonly string[] = []): Bet
             }
         },
         authentication: {
-            afterVerification: async ({ clientData }) => {
-                await stampPasskeyUse(clientData.id);
+            afterVerification: async ({ ctx, clientData }) => {
+                await stampPasskeyUse(clientData.id, requestOrigin(ctx?.headers));
             }
         }
     }) as BetterAuthPlugin;
@@ -171,10 +171,38 @@ async function assertPasskeyNameFree(userId: string, supplied: unknown): Promise
  * Never fails the sign-in. Somebody is being let in on a credential that
  * verified; a date that could not be written is not a reason to refuse them.
  */
-async function stampPasskeyUse(credentialId: string): Promise<void> {
+async function stampPasskeyUse(credentialId: string, origin: DeviceOrigin): Promise<void> {
+    const now = new Date();
     await prisma.passkey
-        .updateMany({ where: { credentialID: credentialId }, data: { lastUsedAt: new Date() } })
+        .updateMany({ where: { credentialID: credentialId }, data: { lastUsedAt: now } })
         .catch((error: unknown) => console.error("passkey use not recorded:", error));
+    await backfillPasskeyOrigin(credentialId, origin, now).catch((error: unknown) =>
+        console.error("passkey origin not recorded:", error)
+    );
+}
+
+/**
+ * Fill in where a passkey was used from, on a row that never recorded where it was
+ * added. Only rows with no browser on record are touched - the condition is in the
+ * update itself, so two sign-ins racing write once and a recorded origin is never
+ * overwritten - and `originSeenAt` marks the facts as first seen on use, so the
+ * screen does not pass them off as the registration.
+ */
+export async function backfillPasskeyOrigin(credentialId: string, origin: DeviceOrigin, at: Date): Promise<void> {
+    if (!origin.userAgent) return;
+    const { count } = await prisma.passkey.updateMany({
+        where: { credentialID: credentialId, userAgent: null },
+        data: {
+            userAgent: origin.userAgent,
+            userAgentBrands: origin.userAgentBrands ?? null,
+            userAgentPlatform: origin.userAgentPlatform ?? null,
+            originSeenAt: at
+        }
+    });
+    // An address recorded at registration is kept; only a missing one is filled.
+    if (count > 0 && origin.ip) {
+        await prisma.passkey.updateMany({ where: { credentialID: credentialId, ip: null }, data: { ip: origin.ip } });
+    }
 }
 
 /**

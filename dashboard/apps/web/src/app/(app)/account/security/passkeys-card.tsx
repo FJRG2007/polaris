@@ -32,7 +32,8 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import type { PasskeyView } from "@/lib/passkey-directory";
 import { Feedback, type SettingLock } from "./setting-card";
-import { KeyRound, Trash2, Laptop, ShieldCheck } from "lucide-react";
+import { KeyRound, Trash2, ShieldCheck } from "lucide-react";
+import { BrowserMark, SystemMark } from "@/components/client-marks";
 import { useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import { PASSKEY_NAME_MAX, passkeyNameKey, passkeyRelyingPartyId } from "@polaris/core";
 import { confirmPasswordForPasskeyAction, notePasskeyAddedAction, removePasskeyAction } from "./passkey-actions";
@@ -203,10 +204,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                                             </div>
                                         </td>
                                         <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
-                                            <span className="flex items-center gap-1.5">
-                                                <Laptop className="size-3.5 shrink-0" />
-                                                {t("passkeys.browserOn", { browser: passkey.browser, os: passkey.os })}
-                                            </span>
+                                            <PasskeyOrigin passkey={passkey} />
                                         </td>
                                         <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground 2xl:table-cell">
                                             {passkey.ip ? (
@@ -321,5 +319,36 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
                 </DialogContent>
             </Dialog>
         </Card>
+    );
+}
+
+/**
+ * Where a passkey came from, with the browser and system marks the sessions table
+ * draws. A row whose origin was filled in on a later sign-in says so, rather than
+ * passing that sign-in off as where the passkey was added.
+ */
+function PasskeyOrigin({ passkey }: { passkey: PasskeyView }) {
+    const t = useTranslations("accountSecurity");
+    if (passkey.browser === "Unknown browser" && passkey.os === "Unknown OS") {
+        return <span>{t("passkeys.originUnknown")}</span>;
+    }
+    return (
+        <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="flex items-center gap-2">
+                <span className="flex min-w-0 items-center gap-1.5">
+                    <BrowserMark browser={passkey.browser} />
+                    <span className="truncate" title={passkey.browser}>{passkey.browser}</span>
+                </span>
+                <span className="flex min-w-0 items-center gap-1.5">
+                    <SystemMark os={passkey.os} />
+                    <span className="truncate" title={passkey.os}>{passkey.os}</span>
+                </span>
+            </span>
+            {passkey.originSeenAt ? (
+                <span className="text-[11px] text-muted-foreground" title={t("passkeys.firstSeenHint")}>
+                    {t("passkeys.firstSeen")} <RelativeTime iso={passkey.originSeenAt} />
+                </span>
+            ) : null}
+        </span>
     );
 }

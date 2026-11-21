@@ -29,6 +29,10 @@ export interface PasskeyView {
     os: string;
     /** Where the registration came from. Null on rows that predate the column. */
     ip: string | null;
+    /** When the browser, system and address were filled in on a later sign-in
+     *  because nothing was recorded when the passkey was added. Null when they
+     *  are the registration's own (or still unknown). */
+    originSeenAt: string | null;
     /** ISO timestamps; the caller renders them in the reader's locale. */
     addedAt: string;
     /** When it last proved a sign-in, or null if it never has. */
@@ -56,6 +60,7 @@ export async function listUserPasskeys(userId: string, userAgent?: string): Prom
             userAgent: true,
             userAgentBrands: true,
             userAgentPlatform: true,
+            originSeenAt: true,
             createdAt: true,
             lastUsedAt: true
         }
@@ -70,6 +75,7 @@ export async function listUserPasskeys(userId: string, userAgent?: string): Prom
             browser: client.browser,
             os: client.os,
             ip: row.ip,
+            originSeenAt: row.originSeenAt?.toISOString() ?? null,
             addedAt: row.createdAt.toISOString(),
             lastUsedAt: row.lastUsedAt?.toISOString() ?? null
         };
