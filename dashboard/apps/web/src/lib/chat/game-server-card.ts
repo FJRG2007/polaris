@@ -155,6 +155,8 @@ export type GameInviteCardView =
           readonly player: string;
           readonly joinFrom: GamePlayerJoinFrom | null;
           readonly canOpen: boolean;
+          /** This reader holds the invited player: the card speaks to them. */
+          readonly forPlayer: boolean;
       });
 
 /** Where the server's page is. */

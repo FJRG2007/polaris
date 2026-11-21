@@ -79,6 +79,9 @@ describe("reading a game invite card", () => {
             state: "ready",
             player: "demo",
             canOpen: true,
+            // Somebody who may read the server but is not the player: the card
+            // speaks about the player, not to them.
+            forPlayer: false,
             joinFrom: { kind: "signIns" },
             address: "192.0.2.4:30120"
         });
@@ -89,6 +92,7 @@ describe("reading a game invite card", () => {
         expect(await readGameInviteCard(SERVER, "demo")).toMatchObject({
             state: "ready",
             canOpen: false,
+            forPlayer: true,
             address: "192.0.2.4:30120"
         });
         expect(linkAsked[0]).toMatchObject({
@@ -97,6 +101,16 @@ describe("reading a game invite card", () => {
                 userId: "reader",
                 player: { equals: "demo", mode: "insensitive" }
             }
+        });
+    });
+
+    it("speaks to the player who also may read the server", async () => {
+        access = { ownerId: "owner" };
+        link = { id: "link" };
+        expect(await readGameInviteCard(SERVER, "demo")).toMatchObject({
+            state: "ready",
+            canOpen: true,
+            forPlayer: true
         });
     });
 

@@ -1149,7 +1149,11 @@ function Message({
                                 {t("messageList.thisMessageWasDeleted")}
                             </p>
                         ) : notice ? null : invite ? (
-                            <GameInviteCard invite={invite} message={message} />
+                            <GameInviteCard
+                                invite={invite}
+                                message={message}
+                                mine={message.authorId === viewerId}
+                            />
                         ) : (
                             <div className="text-sm">
                                 <TranslatableText id={message.id} body={message.body} live={live}>

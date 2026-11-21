@@ -51,6 +51,7 @@ async function linkedOwner(userId: string, installedAppId: string, player: strin
  * it with a way to its page; the player it invites sees it without one, because
  * being let onto a server is not being let into its page. Anybody else - the
  * player once unlinked, a forwarded copy - is told only that it is not theirs.
+ * Whether this reader is the invited player decides who the card speaks to.
  */
 export async function readGameInviteCard(
     installedAppId: unknown,
@@ -60,8 +61,11 @@ export async function readGameInviteCard(
     if (!parsed.success) return null;
     const { installedAppId: id, player: name } = parsed.data;
     const user = await requireUser();
-    const access = await gameServerAccess(user, id, "games.read").catch(() => null);
-    const ownerId = access?.ownerId ?? (await linkedOwner(user.id, id, name));
+    const [access, linked] = await Promise.all([
+        gameServerAccess(user, id, "games.read").catch(() => null),
+        linkedOwner(user.id, id, name)
+    ]);
+    const ownerId = access?.ownerId ?? linked;
     if (!ownerId) return { state: "denied" };
     const [facts, joinFrom] = await Promise.all([
         gameServerCardFacts(ownerId, id),
@@ -70,5 +74,5 @@ export async function readGameInviteCard(
     if (!facts) return { state: "denied" };
     const view = card.cardView(facts);
     if (view.state !== "ready") return { state: "denied" };
-    return { ...view, player: name, joinFrom, canOpen: Boolean(access) };
+    return { ...view, player: name, joinFrom, canOpen: Boolean(access), forPlayer: linked !== null };
 }

@@ -2444,6 +2444,10 @@
         "notification": "{name} added you to {server}",
         "invite": {
             "joinAs": "Join as {player}",
+            "inviteFor": "Invite for {player}",
+            "fromSignInsThem": "From wherever they are signed in to Polaris",
+            "fromAskYou": "They will ask you which address to join from",
+            "fromAskThem": "They will ask {name} which address to join from",
             "running": "Running",
             "fromSignIns": "From wherever you are signed in to Polaris",
             "fromAnywhere": "From any address",
@@ -2455,6 +2459,7 @@
         },
         "guide": {
             "minecraftJava": "1. Open Minecraft Java Edition {version}.\n2. Multiplayer > Add Server.\n3. Paste {address} as the address and press Done.\n4. Pick the server and Join Server.",
+            "minecraftJavaAny": "1. Open Minecraft Java Edition.\n2. Multiplayer > Add Server.\n3. Paste {address} as the address and press Done.\n4. Pick the server and Join Server.",
             "minecraftBedrock": "1. Open Minecraft (Bedrock).\n2. Play > Servers > Add Server.\n3. Address {host}, port {port}.\n4. Save, then pick the server to join.",
             "ark": "1. Open ARK and choose Join Game.\n2. Turn on Show Player Servers.\n3. Search for {name} and join.",
             "fivem": "1. Install FiveM and press Join here.\n2. Or open FiveM, press F8 and type: connect {address}",

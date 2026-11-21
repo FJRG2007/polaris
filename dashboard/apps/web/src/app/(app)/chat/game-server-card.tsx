@@ -75,10 +75,13 @@ export function GameServerCard({
 /** The invite a player got from whoever added them, drawn in that person's row. */
 export function GameInviteCard({
     invite,
-    message
+    message,
+    mine = false
 }: {
     invite: GameInvite;
     message: ChatMessageView;
+    /** The reader sent this invite. */
+    mine?: boolean;
 }) {
     const t = useTranslations("chat");
     const view = useCardView<GameInviteCardView>(
@@ -96,7 +99,15 @@ export function GameInviteCard({
                 view={view}
                 message={null}
                 canOpen={ready?.canOpen ?? false}
-                invite={ready ? { player: ready.player, joinFrom: ready.joinFrom } : undefined}
+                invite={
+                    ready
+                        ? {
+                              player: ready.player,
+                              joinFrom: ready.joinFrom,
+                              reader: ready.forPlayer ? "player" : mine ? "sender" : "other"
+                          }
+                        : undefined
+                }
                 sender={message.authorName}
             />
         </div>
@@ -114,7 +125,7 @@ function ServerPanel({
     /** The message to time the card by, when the row around it does not. */
     message: ChatMessageView | null;
     canOpen: boolean;
-    invite?: { player: string; joinFrom: GamePlayerJoinFrom | null };
+    invite?: { player: string; joinFrom: GamePlayerJoinFrom | null; reader: InviteReader };
     sender?: string | null;
 }) {
     const t = useTranslations("chat");
@@ -197,11 +208,13 @@ function ServerPanel({
                     {invite && (
                         <div className="min-w-0 text-xs">
                             <p className="break-words font-medium">
-                                {t("gameServerCard.invite.joinAs", { player: invite.player })}
+                                {invite.reader === "player"
+                                    ? t("gameServerCard.invite.joinAs", { player: invite.player })
+                                    : t("gameServerCard.invite.inviteFor", { player: invite.player })}
                             </p>
                             {invite.joinFrom && (
                                 <p className="break-words text-muted-foreground">
-                                    {joinFromText(invite.joinFrom, sender ?? "", t)}
+                                    {joinFromText(invite.joinFrom, invite.reader, sender ?? "", t)}
                                 </p>
                             )}
                         </div>
@@ -211,7 +224,7 @@ function ServerPanel({
                             {t("gameServerCard.howToJoin")}
                         </summary>
                         <p className="mt-1.5 whitespace-pre-line break-words leading-relaxed">
-                            {t(`gameServerCard.guide.${ready.guide}`, {
+                            {t(guideKey(ready), {
                                 address: ready.address ?? "-",
                                 host: parts?.host ?? "-",
                                 port: parts?.port ?? "-",
@@ -234,19 +247,36 @@ function ServerPanel({
     );
 }
 
+/** Who is reading an invite: the player it lets in, whoever sent it, or
+ *  somebody else who may read the server. Each is spoken to differently. */
+type InviteReader = "player" | "sender" | "other";
+
+/** The guide, without a release in it when the server does not report one. */
+function guideKey(ready: ReadyView) {
+    return ready.guide === "minecraftJava" && !ready.release
+        ? "gameServerCard.guide.minecraftJavaAny"
+        : (`gameServerCard.guide.${ready.guide}` as const);
+}
+
 function joinFromText(
     from: GamePlayerJoinFrom,
+    reader: InviteReader,
     sender: string,
     t: NamespaceTranslator<"chat">
 ): string {
     switch (from.kind) {
         case "signIns":
-            return t("gameServerCard.invite.fromSignIns");
+            return reader === "player"
+                ? t("gameServerCard.invite.fromSignIns")
+                : t("gameServerCard.invite.fromSignInsThem");
         case "anywhere":
             return t("gameServerCard.invite.fromAnywhere");
         case "addresses":
             return t("gameServerCard.invite.fromAddresses", { addresses: from.addresses.join(", ") });
         case "ask":
-            return t("gameServerCard.invite.fromAsk", { name: sender });
+            if (reader === "sender") return t("gameServerCard.invite.fromAskYou");
+            return reader === "player"
+                ? t("gameServerCard.invite.fromAsk", { name: sender })
+                : t("gameServerCard.invite.fromAskThem", { name: sender });
     }
 }
