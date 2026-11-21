@@ -12,6 +12,7 @@
 import { z } from "zod";
 import { gameWords, issueText, messageText } from "../game-words";
 import { prisma } from "@polaris/db";
+import { installReleaseById } from "../../lib/minecraft/server-release";
 import { host } from "@polaris/app-host";
 import { linkedChannels, readChatLink } from "../../lib/minecraft/chat-link";
 import { readPinned } from "../../lib/minecraft/pinned";
@@ -59,7 +60,7 @@ async function stateOf(installedAppId: string): Promise<LiveDisplayState> {
     });
     const config = readInstallConfig(row?.config);
     const pinned = readPinned(config);
-    const release = typeof config.mcRelease === "string" ? config.mcRelease : null;
+    const release = await installReleaseById(installedAppId);
     return {
         pinned: pinned ? { announcement: pinned.announcement, endsAt: pinned.endsAt } : null,
         sidebar: readSidebar(config),

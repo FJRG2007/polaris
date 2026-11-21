@@ -16,6 +16,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { installRelease } from "./server-release";
 import { host } from "@polaris/app-host";
 import { fresh } from "../fresh";
 import { liveContext } from "./live-values";
@@ -166,11 +167,11 @@ async function settingsOf(installedAppId: string): Promise<{
 } | null> {
     const row = await prisma.installedApp.findUnique({
         where: { id: installedAppId },
-        select: { config: true, catalogId: true, status: true }
+        select: { config: true, catalogId: true, status: true, applicationId: true, ownerId: true }
     });
     if (!row || row.status === "removed") return null;
     const config = readInstallConfig(row.config);
-    const release = typeof config.mcRelease === "string" ? config.mcRelease : null;
+    const release = await installRelease({ config, applicationId: row.applicationId, ownerId: row.ownerId });
     return {
         config,
         release,

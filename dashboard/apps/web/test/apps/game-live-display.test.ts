@@ -36,6 +36,7 @@ import {
     sidebarSupported
 } from "@polaris-app/game-servers/src/lib/minecraft/sidebar";
 import { english } from "../setup/game-english";
+import { concreteRelease } from "@polaris-app/game-servers/src/lib/minecraft/server-release";
 
 const draft = (over: Partial<Announcement>): Announcement => ({ ...BLANK_ANNOUNCEMENT, ...over });
 const NOW = Date.parse("2026-09-25T20:00:00Z");
@@ -278,6 +279,19 @@ describe("the side panel", () => {
         expect(sidebarSupported("java", "1.21.4")).toBe(true);
         expect(sidebarSupported("java", null)).toBe(true);
         expect(sidebarSupported("bedrock", "1.21.4")).toBe(false);
+    });
+
+    it("takes a release that is not a number as recent, not as too old", () => {
+        // A modpack server recorded as LATEST was told the panel needs 1.16.
+        expect(sidebarSupported("java", "LATEST")).toBe(true);
+        expect(sidebarSupported("java", "26.3")).toBe(true);
+    });
+
+    it("reads the real release over a recorded LATEST", () => {
+        expect(concreteRelease("LATEST", "1.20.1")).toBe("1.20.1");
+        expect(concreteRelease("1.21.4", "1.20.1")).toBe("1.21.4");
+        expect(concreteRelease("", " latest ", null)).toBeNull();
+        expect(sidebarLegacy(concreteRelease("LATEST", "1.20.1"))).toBe(true);
     });
 
     it("refuses anything of one player's, since everybody sees the same panel", () => {

@@ -14,6 +14,7 @@ import { type GameId, gameOfServer, softwareLabel } from "@polaris/core";
 import { Prisma, prisma } from "@polaris/db";
 import { freemem, totalmem } from "node:os";
 import { RELEASE_KEY } from "./games-create";
+import { concreteRelease } from "./minecraft/server-release";
 import type { CrashLoop } from "./crash-loop";
 import { readServerUptime } from "./games-uptime";
 import { gameServerCatalogIds } from "./game-catalog";
@@ -21,7 +22,6 @@ import { hasCrossplay } from "./minecraft/blueprints";
 import { drainQueue } from "./minecraft/queue-service";
 import { adoptRoutedAddress, gameServerAddress } from "./minecraft/address";
 import { sweepArkTimeouts } from "./ark/timeout-service";
-import { wantsLatest } from "./minecraft/blueprint-version";
 import { primaryIdentifier } from "./fivem/players";
 import {
     applyFivemAccess,
@@ -455,11 +455,8 @@ export async function listGameServerFacts(
  * worth printing as one.
  */
 function releaseOf(config: InstallConfig, setting: string | undefined): string | null {
-    const recorded =
-        typeof config[RELEASE_KEY] === "string" ? (config[RELEASE_KEY] as string).trim() : "";
-    const declared = (setting ?? "").trim();
-    const release = recorded || declared;
-    return release.length > 0 && !wantsLatest(release) ? release : null;
+    const recorded = typeof config[RELEASE_KEY] === "string" ? (config[RELEASE_KEY] as string) : null;
+    return concreteRelease(recorded, setting);
 }
 
 /** The port the install pinned for this application, when it pinned one. An

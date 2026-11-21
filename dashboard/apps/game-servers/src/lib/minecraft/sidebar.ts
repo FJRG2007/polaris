@@ -173,7 +173,10 @@ export function sidebarTexts(sidebar: SidebarConfig): string[] {
  *  has no release recorded, and is. */
 function atLeast(release: string | null, minor: number, patch: number): boolean {
     if (!release) return true;
-    const [major = 0, has = 0, fix = 0] = release.split(".").map((part) => Number(part) || 0);
+    // `LATEST`, a snapshot name: not a number, and recent rather than old - the
+    // same reading `versionAtLeast` gives it.
+    if (!/^\d+\.\d+/.test(release.trim())) return true;
+    const [major = 0, has = 0, fix = 0] = release.trim().split(".").map((part) => Number(part) || 0);
     if (major !== 1) return major > 1;
     if (has !== minor) return has > minor;
     return fix >= patch;
