@@ -17,7 +17,7 @@ import { restPose } from "./motion/avatar-engine";
 import { canvasRatio } from "./motion/motion-runtime";
 import { drawAvatar, OVERSCAN, RISE } from "./motion/avatar-draw";
 import { usePolarAllowed } from "./polar-allowed";
-import { useDecorationSeason } from "@/components/seasonal/seasonal-frame";
+import { useDecorationSeason } from "@/components/seasonal/season-context";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Popover, PopoverContent, PopoverTrigger, cn } from "@polaris/ui";
 

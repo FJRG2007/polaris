@@ -23,7 +23,6 @@ vi.mock("@/lib/favicon", () => ({
     currentFavicon: () => null,
     drawFavicon: () => null
 }));
-vi.mock("@/components/seasonal/seasonal-frame", () => ({ useDecorationSeason: () => null }));
 vi.mock("@/components/presence-store", () => ({ usePresence: () => mine }));
 vi.mock("@/components/session-scope", () => ({ useSessionScope: () => "ada" }));
 

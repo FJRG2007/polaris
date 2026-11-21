@@ -15,7 +15,7 @@ import { cn } from "@polaris/ui";
 import { drawAvatar, OVERSCAN, RISE } from "./avatar-draw";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useDecorationSeason } from "@/components/seasonal/seasonal-frame";
+import { useDecorationSeason } from "@/components/seasonal/season-context";
 import { Sim, restPose, type AvatarState } from "./avatar-engine";
 import { reachability, subscribeReachability } from "@/lib/reachability";
 import {

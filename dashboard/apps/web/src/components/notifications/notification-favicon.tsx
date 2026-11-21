@@ -38,7 +38,7 @@ import {
     seasonalFavicon,
     type FaviconLink
 } from "@/lib/favicon";
-import { useDecorationSeason } from "@/components/seasonal/seasonal-frame";
+import { useDecorationSeason } from "@/components/seasonal/season-context";
 import { useDesktopBridge } from "@/components/desktop-app";
 import { useClient } from "@/components/i18n/i18n-provider";
 import {
@@ -93,7 +93,12 @@ export function NotificationFavicon() {
     useEffect(() => {
         const setAppIcon = desktop?.setAppIcon;
         if (!setAppIcon) return;
-        const png = season ? drawFavicon(null, 256, season) : null;
+        let png: string | null = null;
+        try {
+            png = season ? drawFavicon(null, 256, season) : null;
+        } catch {
+            // The plain icon, rather than none.
+        }
         void setAppIcon({ png }).catch(() => undefined);
         return () => void setAppIcon({ png: null }).catch(() => undefined);
     }, [desktop, season]);
