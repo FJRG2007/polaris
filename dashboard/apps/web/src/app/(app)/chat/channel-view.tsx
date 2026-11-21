@@ -419,11 +419,16 @@ export function ChannelView({
     // of, which id to ask from next - and a state value read inside an awaited
     // function is the one from before the await.
     const held = useRef<readonly ChatMessageView[]>([]);
-    // Set just before a page is added above the window, so the layout effect
-    // below can put the reader back where they were reading: prepending changes
-    // the height of everything above them, and without this the conversation
-    // jumps by exactly one page every time it loads one.
-    const anchor = useRef<number | null>(null);
+    // Set just before a page is added to the window or let go of, so the layout
+    // effect below can put the reader back on the line they were reading:
+    // prepending changes the height of everything above them, and without this
+    // the conversation jumps by exactly one page every time it loads one.
+    //
+    // A line rather than the list's height. A fetch that adds a page at one end
+    // trims the other, and a height difference counts both: putting the reader
+    // back by it moved them by exactly the part that was let go of, which is
+    // the conversation scrolling up into older messages on its own.
+    const anchor = useRef<ReadingPosition | null>(null);
     // One fetch at a time in each direction. A trackpad fires scroll events far
     // faster than a round trip.
     const fetching = useRef(false);
@@ -729,7 +734,7 @@ export function ChannelView({
         // where they were reading: prepending a page changes the height of
         // everything above, and without this the conversation jumps by exactly
         // one page every time it loads one.
-        anchor.current = scroller.current?.scrollHeight ?? null;
+        anchor.current = scroller.current ? readingPosition(scroller.current) : null;
 
         const window = [...result.page.messages, ...held.current];
         if (window.length > MAX_WINDOW && !following.current) {
@@ -764,7 +769,7 @@ export function ChannelView({
 
         const window = [...held.current, ...result.page.messages];
         if (window.length > MAX_WINDOW) {
-            anchor.current = scroller.current?.scrollHeight ?? null;
+            anchor.current = scroller.current ? readingPosition(scroller.current) : null;
             const kept = window.slice(window.length - MAX_WINDOW);
             olderThanRef.current = kept[0]?.id ?? null;
             setOlderThan(olderThanRef.current);
@@ -1423,11 +1428,13 @@ export function ChannelView({
         const element = scroller.current;
         if (!element) return;
         if (anchor.current !== null) {
-            element.scrollTop += element.scrollHeight - anchor.current;
+            keepReading(element, anchor.current);
             anchor.current = null;
-            readingAt.current = readingPosition(element);
-        } else if (following.current) stick();
-        else readingAt.current = keepReading(element, readingAt.current);
+            readingAt.current = following.current ? null : readingPosition(element);
+        } else if (following.current) {
+            stick();
+            readingAt.current = null;
+        } else readingAt.current = keepReading(element, readingAt.current);
         setAway(readingOlder(element));
     }, [shown, stick]);
 
@@ -2230,6 +2237,11 @@ export function ChannelView({
                     // somebody deciding to read further up.
                     if (below < AT_BOTTOM_SLACK) {
                         following.current = true;
+                        // Nobody is reading a line while following the end. A
+                        // line remembered from before - the list has grown and
+                        // been trimmed under it since - would be put back the
+                        // moment they scroll, and jump them up by the difference.
+                        readingAt.current = null;
                         // Back at the live end, so nothing is waiting below
                         // and everything on screen has now been seen.
                         setUnseen(0);

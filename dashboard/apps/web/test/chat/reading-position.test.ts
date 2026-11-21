@@ -64,6 +64,23 @@ describe("the line a reader is on", () => {
         expect(scroller.scrollTop).toBe(510);
     });
 
+    it("stays put when a page arrives above and as much is let go of below", () => {
+        // The window is full, so loading older messages trims the newest: the
+        // list ends up the same height. Putting the reader back by the change in
+        // height moved them nowhere, and the line they were on slid 400px down -
+        // the conversation scrolling up into older messages by itself.
+        const scroller = list({ b: 50, c: 100, y: 900, z: 950 }, 110);
+        const was = readingPosition(scroller);
+        for (const row of Array.from(scroller.children)) {
+            const element = row as HTMLElement;
+            if (element.id === "message-y" || element.id === "message-z") element.remove();
+            else element.dataset.top = String(Number(element.dataset.top) + 400);
+        }
+        keepReading(scroller, was);
+        expect(scroller.scrollTop).toBe(510);
+        expect(readingPosition(scroller)?.id).toBe("message-c");
+    });
+
     it("does not change while the reader scrolls", () => {
         const scroller = list({ b: 50, c: 100 }, 110);
         const was = readingPosition(scroller);
