@@ -22,7 +22,8 @@ import { voiceActionSchema, voiceStateSchema } from "@/shared/voice-widget";
 import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys";
 import { closeNotice, showNotice } from "./notices";
 import { appBadgeSchema, applyAppBadge } from "./app-badge";
-import { isServerUrl, serverPath } from "./navigation";
+import { isSafeExternalUrl, isServerUrl, serverPath } from "./navigation";
+import { openExternal } from "./open-external";
 import { FolderRefusal, zipFolder } from "./folder-zip";
 import { cancelApiKey, keyFormState, submitApiKey } from "./key-flow";
 import { kindOf, openPolarisWindow, type WindowKind } from "./windows";
@@ -508,6 +509,15 @@ export function registerIpc(host: IpcHost): void {
         const window = BrowserWindow.fromWebContents(event.sender);
         if (!fromPolaris(event) || !request.success || !window) return { ok: false, reason: "refused" };
         return installTool(window, request.data);
+    });
+
+    // A plain click on a link to another site, taken by the preload before the
+    // page starts to leave (`preload/outside-links`). Refused for anything but
+    // the Polaris itself, and the preload then follows the link as before.
+    ipcMain.handle(CHANNELS.openOutside, (event, raw: unknown): boolean => {
+        if (!fromPolaris(event) || typeof raw !== "string" || !isSafeExternalUrl(raw)) return false;
+        openExternal(raw);
+        return true;
     });
 
     ipcMain.handle(CHANNELS.defaultBrowser, (event): string | null => {

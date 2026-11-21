@@ -579,6 +579,7 @@ export const CHANNELS = {
     computerEvent: "desktop:computer-event",
     defaultBrowser: "desktop:default-browser",
     systemIdle: "desktop:system-idle",
+    openOutside: "desktop:open-outside",
     windowShown: "desktop:window-shown",
     callHotkeys: "desktop:call-hotkeys",
     callHotkey: "desktop:call-hotkey",

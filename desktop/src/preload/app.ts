@@ -10,6 +10,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import { followTitleBarColors } from "@/shared/title-bar";
 import { reportTextSize } from "./text-size";
+import { holdOutsideLinks } from "./outside-links";
 import { readUpdateReady } from "@/shared/update-ready";
 import { readUpdateCheck } from "@/shared/update-check";
 import type { CallHotkey } from "@/shared/call-hotkeys";
@@ -157,3 +158,4 @@ contextBridge.exposeInMainWorld("polarisDesktop", bridge);
 
 followTitleBarColors((colors) => void ipcRenderer.invoke(CHANNELS.titleBarColors, colors));
 reportTextSize((raw) => void ipcRenderer.invoke(CHANNELS.textSizeSeen, raw));
+holdOutsideLinks((url) => ipcRenderer.invoke(CHANNELS.openOutside, url));
