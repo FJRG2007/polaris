@@ -47,6 +47,12 @@ vi.mock("@/lib/avatar-service", () => ({ discardAvatars: async () => undefined }
 vi.mock("@/lib/access/grants", () => ({ dropGrantsFor: async () => undefined }));
 
 vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds: async () => [] }));
+// Who may be added, by each person's own setting, has its own tests
+// (`group-friends.test.ts`); here everybody may.
+vi.mock("@/lib/chat/group-reach", async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    groupRefusals: async () => []
+}));
 
 vi.mock("@polaris/auth", () => ({
     can: async () => true
