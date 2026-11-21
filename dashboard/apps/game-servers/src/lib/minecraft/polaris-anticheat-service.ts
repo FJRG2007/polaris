@@ -43,7 +43,7 @@ export interface AnticheatState {
     readonly supported: boolean;
     /** What carries it here: the plugin, or the Polaris mod, with the engine nested
      *  in it and its own anti-xray. */
-    readonly kind: "plugin" | "mod" | null;
+    readonly kind: "plugin" | "engine" | "mod" | null;
     /** Whether this Polaris has an address the server can download it from. */
     readonly reachable: boolean;
 }
