@@ -14,11 +14,13 @@ name: Dashboard CI
 # beside each other, and the run costs the longer of the two instead of the sum.
 # Both still run: nothing is skipped to make this faster.
 #
-# The web app's suite runs in its own jobs, split four ways. It is nine tenths of
-# the test time - about fifteen minutes of 1,500-odd files on one runner, after
-# the typecheck - and it was what every publish waited on, well after the image
-# itself was built. Each shard runs a fixed quarter of the files, so every test
-# still runs on every commit; they simply run on four machines at once.
+# The web app's suite runs in its own jobs, split eight ways. It is nine tenths of
+# the test time - about an hour of 3,000-odd files on one runner - and at four
+# shards each still took 11-15 minutes after a 4-minute setup (measured
+# 2026-11-21), so a red commit was only known 19 minutes in. Each shard runs a
+# fixed eighth of the files, so every test still runs on every commit; they simply
+# run on eight machines at once. Standard runners cost nothing on this public
+# repository, so the extra setup costs no money, only runner slots.
 #
 # Not on main, and that is the point. The publish workflow calls this one, and both
 # instances share the concurrency group below; with cancellation off on main the
@@ -207,14 +209,14 @@ jobs:
           npm run test:scripts
 
   web-tests:
-    name: web tests (${{ matrix.shard }}/4)
+    name: web tests (${{ matrix.shard }}/8)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
-      # One failing quarter should not hide what the other three would report.
+      # One failing eighth should not hide what the others would report.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     steps:
       - uses: actions/checkout@v7
 
@@ -227,7 +229,7 @@ jobs:
       - run: npm ci --prefer-offline || npm ci --prefer-offline || npm ci --prefer-offline
       - run: npm run db:generate
       - uses: ./.github/actions/workspace-packages
-      - run: npm run test -w @polaris/web -- --shard=${{ matrix.shard }}/4
+      - run: npm run test -w @polaris/web -- --shard=${{ matrix.shard }}/8
 
   # Proof that the app compiles, for branches and pull requests. The publish workflow
   # builds the very same app inside the image it ships, so it asks for this to be
