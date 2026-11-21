@@ -51,7 +51,7 @@ export async function setSuccessorAction(input: unknown): Promise<ActionResult> 
             targetType: "user",
             targetId: successor.userId
         });
-        revalidatePath("/account/security");
+        revalidatePath("/account/security", "layout");
         return {};
     } catch (caught) {
         if (caught instanceof SuccessorError) return localized({ error: caught.message });
@@ -73,6 +73,6 @@ export async function clearSuccessorAction(proof: unknown): Promise<ActionResult
 
     await clearSuccessor(user.id);
     await recordAudit({ actorId: user.id, action: "account.successor.cleared" });
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }

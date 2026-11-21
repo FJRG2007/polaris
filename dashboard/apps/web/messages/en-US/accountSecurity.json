@@ -1,7 +1,21 @@
 {
     "page": {
-        "title": "Security",
+        "title": "Password & sign-in",
         "intro": "How you prove it is you, and how long a session stays open."
+    },
+    "pages": {
+        "twoFactor": {
+            "title": "Two-factor authentication",
+            "intro": "The second step after your password, and where its codes are sent."
+        },
+        "passkeys": {
+            "title": "Passkeys & security keys",
+            "intro": "Sign in with your fingerprint, face, screen lock or a hardware key."
+        },
+        "recovery": {
+            "title": "Account recovery",
+            "intro": "How you get back in if you lose your password or your devices."
+        }
     },
     "newDevice": {
         "unrecognized": "{surface, select, app {This app did not say what it is, so it counts as new. Security settings stay locked from here.} other {This browser did not say what it is, so it counts as new. Security settings stay locked from here.}}",

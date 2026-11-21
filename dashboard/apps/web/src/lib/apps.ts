@@ -93,6 +93,9 @@ import {
     Share2,
     ShieldBan,
     ShieldCheck,
+    Fingerprint,
+    LifeBuoy,
+    Smartphone,
     SlidersHorizontal,
     ToggleRight,
     Sparkles,
@@ -2612,16 +2615,38 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             keywords: ["org", "orgs", "teams", "company", "members", "roster", "group"]
         },
         // Everything that decides who reaches this account is one subject, and it
-        // is half the rail: five screens people go looking for together.
+        // is half the rail: how you sign in, the second step, passkeys, the ways
+        // back in, then what is signed in now and who may sign in from where.
         {
-            label: "Password & 2FA", // i18n-ignore
+            label: "Password & sign-in", // i18n-ignore
             href: "/account/security",
             icon: ShieldCheck,
-            keywords: ["password", "2fa", "two-factor", "passkey", "security"],
+            keywords: ["password", "pin", "security", "session limits", "lockdown", "sign in"],
             group: "Security"
         },
         {
-            label: "Sessions", // i18n-ignore
+            label: "Two-factor", // i18n-ignore
+            href: "/account/security/two-factor",
+            icon: Smartphone,
+            keywords: ["2fa", "two-factor", "authenticator", "totp", "codes", "telegram", "approval"],
+            group: "Security"
+        },
+        {
+            label: "Passkeys & keys", // i18n-ignore
+            href: "/account/security/passkeys",
+            icon: Fingerprint,
+            keywords: ["passkey", "security key", "yubikey", "webauthn", "fingerprint"],
+            group: "Security"
+        },
+        {
+            label: "Recovery", // i18n-ignore
+            href: "/account/security/recovery",
+            icon: LifeBuoy,
+            keywords: ["backup codes", "recovery questions", "successor", "lost password"],
+            group: "Security"
+        },
+        {
+            label: "Sessions & devices", // i18n-ignore
             href: "/account/sessions",
             icon: MonitorSmartphone,
             keywords: ["devices", "sign out", "remembered devices", "trusted devices"],

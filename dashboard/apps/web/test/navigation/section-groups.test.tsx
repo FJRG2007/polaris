@@ -30,7 +30,11 @@ const { AppSidebar } = await import("@/components/app-sidebar");
 
 const SECURITY_SCREENS = [
     "/account/security",
+    "/account/security/two-factor",
+    "/account/security/passkeys",
+    "/account/security/recovery",
     "/account/sessions",
+    "/account/activity",
     "/account/scan",
     "/account/access"
 ];

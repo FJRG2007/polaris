@@ -1,7 +1,21 @@
 {
     "page": {
-        "title": "Seguridad",
+        "title": "Contraseña y acceso",
         "intro": "Cómo demuestras que eres tú y cuánto tiempo sigue abierta una sesión."
+    },
+    "pages": {
+        "twoFactor": {
+            "title": "Verificación en dos pasos",
+            "intro": "El segundo paso tras tu contraseña y adónde llegan sus códigos."
+        },
+        "passkeys": {
+            "title": "Passkeys y llaves de seguridad",
+            "intro": "Entra con tu huella, tu cara, el bloqueo de pantalla o una llave física."
+        },
+        "recovery": {
+            "title": "Recuperar la cuenta",
+            "intro": "Cómo vuelves a entrar si pierdes la contraseña o tus dispositivos."
+        }
     },
     "newDevice": {
         "unrecognized": "{surface, select, app {Esta app no ha dicho qué es, así que cuenta como nueva. Los ajustes de seguridad siguen bloqueados desde aquí.} other {Este navegador no ha dicho qué es, así que cuenta como nuevo. Los ajustes de seguridad siguen bloqueados desde aquí.}}",

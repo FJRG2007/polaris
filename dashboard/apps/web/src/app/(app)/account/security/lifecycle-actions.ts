@@ -55,7 +55,7 @@ export async function raiseLockdownAction(input: unknown): Promise<ActionResult>
     if (proved.error) return localized(proved);
 
     await raiseLockdown(user.id, parsed.data.note);
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }
 
@@ -74,7 +74,7 @@ export async function liftLockdownAction(input: unknown): Promise<ActionResult> 
     if (proved.error) return localized(proved);
 
     await liftLockdown(user.id);
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }
 

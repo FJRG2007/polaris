@@ -67,6 +67,7 @@ export const accountSecurity = defineScene({
                     </p>
                 </div>
                 <SecurityView
+                    part="sign-in"
                     account={VIEWER.email}
                     newDeviceGraceDays={3}
                     hasPin

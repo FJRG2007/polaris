@@ -153,8 +153,8 @@ export function CheckupView({
                             <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-md border border-border">
                                 {(
                                     [
-                                        ["twoFactor", ShieldCheck, "/account/security"],
-                                        ["passkeys", KeyRound, "/account/security"],
+                                        ["twoFactor", ShieldCheck, "/account/security/two-factor"],
+                                        ["passkeys", KeyRound, "/account/security/passkeys"],
                                         ["sessions", MonitorSmartphone, "/account/sessions"]
                                     ] as const
                                 ).map(([key, Icon, href]) => (

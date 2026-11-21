@@ -199,7 +199,7 @@ describe("the passkeys card in settings", () => {
         render(<VaultPasskeys />, { wrapper: MessagesWrapper });
         await screen.findByTestId("passkey-none");
         const link = screen.getByRole("link", { name: /security/i });
-        expect(link.getAttribute("href")).toBe("/account/security");
+        expect(link.getAttribute("href")).toBe("/account/security/passkeys");
         expect(screen.queryByRole("switch")).toBeNull();
     });
 

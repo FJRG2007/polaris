@@ -102,7 +102,7 @@ export async function setConnectionSignInAction(connectionId: string, enabled: b
 
     const updated = await setConnectionSignIn(user.id, parsed.data, enabled === true);
     if (!updated) return refuse("errors.noLongerConnected");
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }
 
@@ -128,7 +128,7 @@ export async function setConnectionSignInChallengeAction(challenge: boolean): Pr
         action: "account.connection-sign-in.challenge",
         metadata: { challenge: challenge === true }
     });
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }
 
@@ -162,7 +162,7 @@ export async function setUsernameSignInAction(enabled: boolean): Promise<ActionR
         action: "account.username-sign-in",
         metadata: { enabled: enabled === true }
     });
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }
 
@@ -181,7 +181,7 @@ export async function setAutoPasskeyAction(enabled: boolean): Promise<ActionResu
         action: "account.auto-passkey",
         metadata: { enabled: enabled === true }
     });
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }
 
@@ -196,7 +196,7 @@ export async function setEmailLinkSignInAction(enabled: boolean): Promise<Action
         action: "account.email-link-sign-in",
         metadata: { enabled: enabled === true }
     });
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }
 
@@ -281,7 +281,7 @@ export async function setPinAction(input: unknown): Promise<ActionResult> {
     const result = await setQuickPin(auth, user.id, parsed.data.pin, parsed.data.password);
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.pin.set" });
-        revalidatePath("/account/security");
+        revalidatePath("/account/security", "layout");
     }
     return localized(result);
 }
@@ -298,7 +298,7 @@ export async function clearPinAction(password: string): Promise<ActionResult> {
     const result = await clearQuickPin(auth, user.id, String(password));
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.pin.cleared" });
-        revalidatePath("/account/security");
+        revalidatePath("/account/security", "layout");
     }
     return localized(result);
 }
@@ -324,7 +324,7 @@ export async function setNewDeviceGraceAction(days: unknown): Promise<ActionResu
         action: "account.new-device-grace.updated",
         metadata: { days: parsed.data }
     });
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }
 
@@ -349,7 +349,7 @@ export async function updateSessionBindingAction(input: unknown): Promise<Action
         action: "account.session-binding.updated",
         metadata: parsed.data
     });
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }
 
@@ -361,7 +361,7 @@ export async function updateSessionLimitsAction(input: unknown): Promise<ActionR
     if (!parsed.success) return firstIssue(parsed.error.issues, "errors.checkForm");
     await updateSessionLimits(user.id, parsed.data);
     await recordAudit({ actorId: user.id, action: "account.session-limits.updated", metadata: parsed.data });
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }
 
@@ -396,7 +396,7 @@ export async function setLoginApprovalAction(required: boolean, password: string
         actorId: user.id,
         action: required ? "account.login-approval.enabled" : "account.login-approval.disabled"
     });
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }
 
@@ -409,7 +409,7 @@ export async function setSecurityQuestionsAction(password: string, input: unknow
     const result = await setSecurityQuestions(auth, user.id, String(password), parsed.data.answers);
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.security-questions.set" });
-        revalidatePath("/account/security");
+        revalidatePath("/account/security", "layout");
     }
     return localized(result);
 }
@@ -421,7 +421,7 @@ export async function clearSecurityQuestionsAction(password: string): Promise<Ac
     const result = await clearSecurityQuestions(auth, user.id, String(password));
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.security-questions.cleared" });
-        revalidatePath("/account/security");
+        revalidatePath("/account/security", "layout");
     }
     return localized(result);
 }

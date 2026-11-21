@@ -30,6 +30,9 @@ interface SecurityChange {
 }
 
 const SECURITY = "/account/security";
+const TWO_FACTOR = "/account/security/two-factor";
+const PASSKEYS = "/account/security/passkeys";
+const RECOVERY = "/account/security/recovery";
 const SESSIONS = "/account/sessions";
 const VAULT_SETTINGS = "/vault/settings";
 
@@ -46,19 +49,19 @@ const SECURITY_CHANGES: Readonly<Record<string, SecurityChange>> = {
     "account.pin.cleared": { key: "security.account_pin_cleared", href: SECURITY },
     "account.security-questions.set": {
         key: "security.account_security_questions_set",
-        href: SECURITY
+        href: RECOVERY
     },
     "account.security-questions.cleared": {
         key: "security.account_security_questions_cleared",
-        href: SECURITY
+        href: RECOVERY
     },
     "account.phone.set": { key: "security.account_phone_set", href: SECURITY },
     "account.phone.verified": { key: "security.account_phone_verified", href: SECURITY },
     "account.phone.removed": { key: "security.account_phone_removed", href: SECURITY },
-    "account.2fa.methods-updated": { key: "security.account_2fa_methods_updated", href: SECURITY },
+    "account.2fa.methods-updated": { key: "security.account_2fa_methods_updated", href: TWO_FACTOR },
     "account.2fa.backup-codes-issued": {
         key: "security.account_2fa_backup_codes_issued",
-        href: SECURITY
+        href: RECOVERY
     },
     "account.2fa.trusted-device-revoked": {
         key: "security.account_2fa_trusted_device_revoked",
@@ -68,18 +71,18 @@ const SECURITY_CHANGES: Readonly<Record<string, SecurityChange>> = {
         key: "security.account_2fa_trusted_devices_revoked",
         href: SESSIONS
     },
-    "account.passkey.removed": { key: "security.account_passkey_removed", href: SECURITY },
-    "account.passkey.added": { key: "security.account_passkey_added", href: SECURITY },
+    "account.passkey.removed": { key: "security.account_passkey_removed", href: PASSKEYS },
+    "account.passkey.added": { key: "security.account_passkey_added", href: PASSKEYS },
     "vault.passkey.added": { key: "security.vault_passkey_added", href: VAULT_SETTINGS },
     "vault.passkey.removed": { key: "security.vault_passkey_removed", href: VAULT_SETTINGS },
     "vault.passkeys.reset": { key: "security.vault_passkeys_reset", href: VAULT_SETTINGS },
     "account.login-approval.enabled": {
         key: "security.account_login_approval_enabled",
-        href: SECURITY
+        href: TWO_FACTOR
     },
     "account.login-approval.disabled": {
         key: "security.account_login_approval_disabled",
-        href: SECURITY
+        href: TWO_FACTOR
     },
     "account.new-device-grace.updated": {
         key: "security.account_new_device_grace_updated",
@@ -98,8 +101,8 @@ const SECURITY_CHANGES: Readonly<Record<string, SecurityChange>> = {
     // notifications/session-breach.
     "account.session.pinned": { key: "security.account_session_pinned", href: SESSIONS },
     "account.extension.pinned": { key: "security.account_extension_pinned", href: SESSIONS },
-    "account.successor.set": { key: "security.account_successor_set", href: SECURITY },
-    "account.successor.cleared": { key: "security.account_successor_cleared", href: SECURITY },
+    "account.successor.set": { key: "security.account_successor_set", href: RECOVERY },
+    "account.successor.cleared": { key: "security.account_successor_cleared", href: RECOVERY },
     "connection.signin.allowed": { key: "security.connection_signin_allowed", href: SECURITY },
     "connection.signin.refused": { key: "security.connection_signin_refused", href: SECURITY },
     "account.signin-rules.updated": {

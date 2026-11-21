@@ -68,7 +68,7 @@ export async function setPhoneAction(input: unknown): Promise<ActionResult> {
     const result = await setUserPhone(auth, user.id, parsed.data.phone, parsed.data.password);
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.phone.set" });
-        revalidatePath("/account/security");
+        revalidatePath("/account/security", "layout");
     }
     return localized(result);
 }
@@ -80,7 +80,7 @@ export async function removePhoneAction(password: unknown): Promise<ActionResult
     const result = await removeUserPhone(auth, user.id, String(password ?? ""));
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.phone.removed" });
-        revalidatePath("/account/security");
+        revalidatePath("/account/security", "layout");
     }
     return localized(result);
 }
@@ -149,7 +149,7 @@ export async function checkTelegramLinkAction(): Promise<{ linked: boolean; erro
     const result = await checkTelegramLink(user.id);
     if (result.linked) {
         await recordAudit({ actorId: user.id, action: "account.telegram.linked" });
-        revalidatePath("/account/security");
+        revalidatePath("/account/security", "layout");
     }
     return result.error ? { linked: false, ...(await localized({ error: result.error })) } : result;
 }
@@ -160,7 +160,7 @@ export async function unlinkTelegramAction(): Promise<ActionResult> {
     if (blocked) return localized({ error: blocked });
     await unlinkTelegram(user.id);
     await recordAudit({ actorId: user.id, action: "account.telegram.unlinked" });
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }
 
@@ -178,7 +178,7 @@ export async function verifyPhoneAction(code: unknown): Promise<ActionResult> {
     const result = await verifyPhoneCode(auth, user.id, parsed.data);
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.phone.verified" });
-        revalidatePath("/account/security");
+        revalidatePath("/account/security", "layout");
     }
     return localized(result);
 }
@@ -225,7 +225,7 @@ export async function regenerateBackupCodesAction(
             action: "account.2fa.backup-codes-issued",
             metadata: { count: result.codes.length }
         });
-        revalidatePath("/account/security");
+        revalidatePath("/account/security", "layout");
     }
     return localized(result);
 }
@@ -274,7 +274,7 @@ export async function saveTwoFactorPreferencesAction(input: unknown): Promise<Ac
                 preferred: parsed.data.preferences.preferred
             }
         });
-        revalidatePath("/account/security");
+        revalidatePath("/account/security", "layout");
     }
     return localized(result);
 }
@@ -328,6 +328,6 @@ export async function saveTwoFactorPolicyAction(input: unknown): Promise<ActionR
             stricter: isStricter(previous, next)
         }
     });
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }

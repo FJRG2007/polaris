@@ -126,7 +126,7 @@ export async function saveConnectionSignInAction(
         metadata: { signIn: allowed === true }
     });
     revalidatePath("/admin/integrations");
-    revalidatePath("/account/security");
+    revalidatePath("/account/security", "layout");
     return {};
 }
 

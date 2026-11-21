@@ -1,15 +1,15 @@
 "use client";
 
 /**
- * The Security page's composition: one card per control, each opening its own
+ * The Security pages' composition: one card per control, each opening its own
  * dialog. Only the two session limits are edited inline - they are a pair of
  * dropdowns, and burying them in a dialog would cost a click for nothing.
  *
- * The cards sit in two columns once the viewport can carry them, split by what
- * they answer: the left column is how a sign-in is proved, the right is the ways
- * back in when that fails and what a session is allowed afterwards. Passkeys run
- * the full width underneath, because that card is a table with a row per device
- * and columns that had nowhere to go inside a half-width card.
+ * One component draws all four pages (`part`), so the dialogs and the lock that
+ * every card reads stay in one place: sign-in (password, PIN, the other ways in,
+ * and what a session is allowed afterwards, in two columns), two-factor, passkeys
+ * (a table with a row per device, full width), and recovery (backup codes,
+ * questions, the successor).
  *
  * Nothing here decides anything; the server actions re-verify every change.
  */
@@ -51,6 +51,9 @@ import {
 } from "@polaris/core";
 
 type Translate = NamespaceTranslator<"accountSecurity">;
+
+/** The Security pages: /account/security and its three neighbours under it. */
+export type SecurityPart = "sign-in" | "two-factor" | "passkeys" | "recovery";
 
 /** Human label for a minute count used by both limit dropdowns. */
 function describeMinutes(t: Translate, minutes: number, zeroLabel: string): string {
@@ -96,8 +99,11 @@ export function SecurityView({
     connections,
     connectionChallenge,
     otherSessions,
-    successor
+    successor,
+    part
 }: {
+    /** Which of the Security pages this is; each draws only its own cards. */
+    part: SecurityPart;
     /** Set while this browser is too new on the account to change any of this.
      *  Every control below reads it; the server refuses them regardless. */
     lock?: SettingLock;
@@ -188,6 +194,10 @@ export function SecurityView({
 
     const hasQuestions = questions.length === SECURITY_QUESTION_COUNT;
     const locked = Boolean(lock);
+    // Only the sign-in page has enough cards for two columns; on the others a
+    // column is dissolved into the single one rather than left half empty.
+    const signIn = part === "sign-in";
+    const column = signIn ? "flex flex-col gap-4" : "contents";
 
     return (
         <div className="flex flex-col gap-4">
@@ -204,8 +214,10 @@ export function SecurityView({
                 </Card>
             ) : null}
 
-            <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-start">
-                <div className="flex flex-col gap-4">
+            {part === "passkeys" ? null : (
+            <div className={signIn ? "grid grid-cols-1 gap-4 xl:grid-cols-2 xl:items-start" : "flex flex-col gap-4"}>
+                <div className={column}>
+                    {signIn ? (
                     <SettingCard
                         title={t("view.password.title")}
                         description={t("view.password.description")}
@@ -217,7 +229,10 @@ export function SecurityView({
                             {t("view.change")}
                         </Button>
                     </SettingCard>
+                    ) : null}
 
+                    {part === "two-factor" ? (
+                    <>
                     <SettingCard
                         title={t("view.authenticator.title")}
                         description={t("view.authenticator.description")}
@@ -254,9 +269,13 @@ export function SecurityView({
                         status={twoFactorMethods.find((status) => status.method === "telegram")}
                         locked={locked}
                     />
+                    </>
+                    ) : null}
 
                     {/* Ways in, next to the ones they stand beside: a link to the
                         address, and the outside accounts that were connected. */}
+                    {signIn ? (
+                    <>
                     <UsernameSignInCard
                         enabled={usernameSignIn}
                         username={username}
@@ -270,16 +289,21 @@ export function SecurityView({
                         twoFactorEnabled={twoFactorEnabled}
                         lock={lock}
                     />
+                    </>
+                    ) : null}
                 </div>
 
-                <div className="flex flex-col gap-4">
+                <div className={column}>
+                    {part === "recovery" ? (
                     <BackupCodesCard
                         lock={lock}
                         account={account}
                         twoFactorEnabled={twoFactorEnabled}
                         remaining={backupCodesRemaining}
                     />
+                    ) : null}
 
+                    {signIn ? (
                     <SettingCard
                         title={t("view.pin.title")}
                         // Not conditional on the approval gate any more: the PIN also
@@ -304,7 +328,9 @@ export function SecurityView({
                             {hasPin ? t("view.change") : t("view.pin.set")}
                         </Button>
                     </SettingCard>
+                    ) : null}
 
+                    {part === "recovery" ? (
                     <SettingCard
                         title={t("view.questions.title")}
                         description={t("view.questions.description")}
@@ -326,7 +352,10 @@ export function SecurityView({
                             {hasQuestions ? t("view.update") : t("view.setUp")}
                         </Button>
                     </SettingCard>
+                    ) : null}
 
+                    {signIn ? (
+                    <>
                     <Card>
                         <CardBody className="flex flex-col gap-3">
                             <div>
@@ -409,15 +438,22 @@ export function SecurityView({
                         pinSessionsToAddress={pinSessionsToAddress}
                         lock={lock}
                     />
+                    </>
+                    ) : null}
                 </div>
             </div>
+            )}
 
-            <PasskeysCard passkeys={passkeys} lock={lock} />
-            <AutoPasskeyCard enabled={autoPasskey} lock={lock} />
-            <SuccessorCard successor={successor} lock={lock} />
+            {part === "passkeys" ? (
+                <>
+                    <PasskeysCard passkeys={passkeys} lock={lock} />
+                    <AutoPasskeyCard enabled={autoPasskey} lock={lock} />
+                </>
+            ) : null}
+            {part === "recovery" ? <SuccessorCard successor={successor} lock={lock} /> : null}
             {/* Last, because it is the end of the page: the emergency switch and
                 the two ways out, with nothing under them. */}
-            <LockdownCard standing={standing} lock={lock} />
+            {signIn ? <LockdownCard standing={standing} lock={lock} /> : null}
 
             <ChangePasswordDialog open={dialog === "password"} onOpenChange={(open) => !open && close()} />
             <RecoverPasswordDialog

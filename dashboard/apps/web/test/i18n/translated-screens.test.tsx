@@ -129,16 +129,18 @@ describe("the rail", () => {
         const markup = renderToStaticMarkup(withMessages(<AppSidebar />));
         expect(markup).toContain("My account</p>");
         expect(markup).toContain("Security</p>");
-        expect(markup).toContain(">Sessions<");
-        expect(markup).toContain(">Password &amp; 2FA<");
+        expect(markup).toContain(">Sessions &amp; devices<");
+        expect(markup).toContain(">Password &amp; sign-in<");
+        expect(markup).toContain(">Recovery<");
     });
 
     it("reads in Spanish for a Spanish reader", () => {
         const markup = renderToStaticMarkup(withMessages(<AppSidebar />, "es-ES"));
         expect(markup).toContain("Mi cuenta</p>");
         expect(markup).toContain("Seguridad</p>");
-        expect(markup).toContain(">Sesiones<");
-        expect(markup).not.toContain(">Sessions<");
+        expect(markup).toContain(">Sesiones y dispositivos<");
+        expect(markup).toContain(">Recuperar<");
+        expect(markup).not.toContain(">Sessions &amp; devices<");
     });
 });
 

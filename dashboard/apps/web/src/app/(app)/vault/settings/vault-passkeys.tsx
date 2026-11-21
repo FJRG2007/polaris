@@ -34,7 +34,7 @@ import {
 /** The step-up purpose these switches are proved under. */
 const PURPOSE = "vault-passkeys";
 
-const SECURITY_PATH = "/account/security";
+const SECURITY_PATH = "/account/security/passkeys";
 
 export function VaultPasskeys() {
     const t = useTranslations("vault");
