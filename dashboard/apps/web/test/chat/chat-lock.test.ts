@@ -213,6 +213,7 @@ describe("forgotten code", () => {
         expect(await lock.lockState("ada")).toEqual({
             hasCode: false,
             hideLocked: false,
+            hideEntry: false,
             unlockMinutes: -1,
             codeLength: null
         });
