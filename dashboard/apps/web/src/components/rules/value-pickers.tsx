@@ -81,7 +81,7 @@ export function ChoiceChips({
             {unknown.map((value) => (
                 <span
                     key={value}
-                    className="inline-flex max-w-full items-center gap-1 rounded-full border border-danger/40 bg-danger-soft px-2.5 py-1 text-xs text-danger-ink"
+                    className="inline-flex max-w-full items-center gap-1 rounded-full border border-danger-edge bg-danger-soft px-2.5 py-1 text-xs text-danger-ink"
                 >
                     <span className="min-w-0 truncate">{unknownLabel ? unknownLabel(value) : value}</span>
                     <button
