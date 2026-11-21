@@ -163,6 +163,10 @@
         "groupAdds": {
             "label": "Quién puede añadirte a grupos",
             "note": "Quién puede meterte en una conversación de grupo. Por defecto, tus amigos y la gente de tus organizaciones; a los demás se les dice que no se te puede añadir."
+        },
+        "messages": {
+            "label": "Quién puede escribirte",
+            "note": "Quién puede empezar una conversación contigo. El resto llega a Solicitudes, sin aviso ni leído hasta que aceptes o bloquees. No afecta a las conversaciones que ya tienes."
         }
     },
     "who": {

@@ -146,6 +146,7 @@ const AUDIENCE_COLUMNS = {
     fileTransfers: true,
     calls: true,
     groupAdds: true,
+    messages: true,
     discoverable: true,
     findByEmail: true,
     findByPhone: true,

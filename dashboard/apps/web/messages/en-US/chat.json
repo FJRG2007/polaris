@@ -266,7 +266,9 @@
         "placesBusy": "Too many searches. Try again in a minute.",
         "placesUnavailable": "Place search is unavailable right now",
         "muteMentionsInvalid": "That mute could not be changed",
-        "groupInviteGone": "That invitation is no longer open."
+        "groupInviteGone": "That invitation is no longer open.",
+        "messageRequestGone": "That request is no longer waiting.",
+        "messageRequestBlockFailed": "Could not block them. Try again from their profile."
     },
     "media": {
         "refused": {
@@ -2767,5 +2769,20 @@
         "decline": "Decline",
         "join": "Join",
         "sent": "{count, plural, one {One person was invited instead of added.} other {# people were invited instead of added.}}"
+    },
+    "messageRequests": {
+        "title": "Message requests",
+        "back": "Back to Chat",
+        "empty": "No message requests",
+        "emptyHint": "Conversations from people outside Who can message you wait here.",
+        "loadFailed": "Requests could not be loaded.",
+        "retry": "Try again",
+        "waiting": "{count, plural, one {# message} other {# messages}}",
+        "noPreview": "Nothing to preview",
+        "accept": "Accept",
+        "delete": "Delete",
+        "block": "Block",
+        "blocked": "{name} is blocked.",
+        "failed": "That did not go through. Try again."
     }
 }

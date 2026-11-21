@@ -163,6 +163,10 @@
         "groupAdds": {
             "label": "Who can add you to groups",
             "note": "Who may put you in a group conversation. Friends and people in your organizations by default; anybody else is told you cannot be added."
+        },
+        "messages": {
+            "label": "Who can message you",
+            "note": "Who may start a conversation with you. Anybody else lands in Message requests, silent and unread until you accept or block them. Existing conversations are not affected."
         }
     },
     "who": {

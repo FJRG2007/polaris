@@ -27,6 +27,7 @@ vi.mock("@/app/(app)/chat/lock-actions", () => ({
 }));
 vi.mock("@/components/step-up-dialog", () => ({ StepUpDialog: () => null }));
 vi.mock("@/app/(app)/chat/actions", () => ({
+    messageRequestCountAction: async () => ({ count: 0 }),
     voicePresenceAction: async () => ({ inRoom: {} }),
     searchPeopleAction: async () => ({ people: [] }),
     listInvitesAction: async () => ({ invites: [] })

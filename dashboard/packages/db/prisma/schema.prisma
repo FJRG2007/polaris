@@ -10807,6 +10807,10 @@ model ChatChannelMember {
     // claim to having read them: one is the device, the other is the person.
     // What the second tick means.
     lastDeliveredAt   DateTime?
+    // Set while this one-to-one is a message request to this member: somebody
+    // their "who can message me" does not let in opened it (ledger row 17). It
+    // stays off their list, silent and unread until they accept it.
+    requestedAt       DateTime?
     // How much of this conversation is worth being interrupted for: all,
     // mentions, none - or `inherit`, which is the space's answer. A different
     // question from the mute below it: a mute is a silence with an end and
@@ -10849,6 +10853,7 @@ model ChatChannelMember {
 
     @@unique([channelId, userId])
     @@index([userId])
+    @@index([userId, requestedAt])
 }
 
 // One person's chat lock: the code that opens their locked conversations, and
@@ -11890,6 +11895,7 @@ model UserPrivacy {
     // is "never chose" and resolves to friends, colleagues counted as friends -
     // the fixed rule every account had before this column existed.
     groupAdds      String?
+    messages       String?
     // Who may send something this account wrote into another conversation. Open
     // by default, like the rest: a messenger where nothing can be passed on is
     // not what anybody expects, and a default that removed a button would read

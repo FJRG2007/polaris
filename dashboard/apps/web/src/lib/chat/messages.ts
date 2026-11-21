@@ -714,6 +714,12 @@ async function sendUnguarded(
         }
         // A hidden conversation comes back with a new message, unless muted.
         await unhideOnMessage(tx, input.channelId, actor.id, message.createdAt);
+        // Answering a message request is accepting it (row 17): it joins the
+        // rail and rings like any other conversation from here on.
+        await tx.chatChannelMember.updateMany({
+            where: { channelId: input.channelId, userId: actor.id, requestedAt: { not: null } },
+            data: { requestedAt: null, muted: false }
+        });
         // Posting is reading: the sender is caught up by definition, and without
         // this their own message would light their own badge.
         await tx.chatChannelMember.upsert({
@@ -1446,13 +1452,15 @@ export async function markChannelsRead(
             ) AS m`,
         prisma.chatChannelMember.findMany({
             where: { userId: actor.id, channelId: { in: ids } },
-            select: { channelId: true, lastReadAt: true }
+            select: { channelId: true, lastReadAt: true, requestedAt: true }
         })
     ]);
     const held = new Map(marks.map((row) => [row.channelId, row]));
-    // Never backwards, as `markRead`: only where the mark is behind.
+    // Never backwards, as `markRead`: only where the mark is behind. And never
+    // on a message request, which sends no read receipt until accepted.
     const moves = newest.flatMap((row) => {
         const current = held.get(row.channelId);
+        if (current?.requestedAt) return [];
         if (current?.lastReadAt && current.lastReadAt >= row.createdAt) return [];
         return [{ ...row, before: current?.lastReadAt ?? null, exists: Boolean(current) }];
     });
@@ -1542,8 +1550,10 @@ export async function markRead(actor: ChatActor, input: core.ChatMarkReadInput):
 
     const current = await prisma.chatChannelMember.findUnique({
         where: { channelId_userId: { channelId: input.channelId, userId: actor.id } },
-        select: { lastReadAt: true, lastSeenAt: true }
+        select: { lastReadAt: true, lastSeenAt: true, requestedAt: true }
     });
+    // A message request sends no read receipt until it is accepted (row 17).
+    if (current?.requestedAt) return;
     if (current?.lastReadAt && current.lastReadAt >= message.createdAt) return;
 
     const seen = current?.lastSeenAt;

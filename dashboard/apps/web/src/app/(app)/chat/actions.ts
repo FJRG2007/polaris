@@ -49,6 +49,7 @@ import { allowedBy } from "@/lib/privacy-service";
 import { FriendError, requestFriend } from "@/lib/friends-service";
 import { groupAddable, groupStandings, mayJoinGroup } from "@/lib/chat/group-reach";
 import * as groupInvites from "@/lib/chat/group-invites";
+import * as messageRequests from "@/lib/chat/message-requests";
 import type { GroupInviteView } from "@/lib/chat/group-invites";
 import { MAX_NICKNAME, setNickname } from "@/lib/contact-names";
 import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
@@ -1421,6 +1422,47 @@ export async function declineGroupInviteAction(inviteId: unknown): Promise<{ err
     if (!parsed.success) return { error: (await getTranslations("chat"))("errors.groupInviteGone") };
     const result = await guard(() => groupInvites.declineGroupInvite(me, parsed.data));
     return result.error ? { error: result.error } : {};
+}
+
+/** The message requests waiting on the caller (/chat/requests). */
+export async function listMessageRequestsAction(): Promise<{
+    requests: messageRequests.MessageRequestView[];
+}> {
+    const me = await actor();
+    return { requests: await messageRequests.pendingMessageRequests(me) };
+}
+
+/** How many message requests wait, for the link on the rail. */
+export async function messageRequestCountAction(): Promise<{ count: number }> {
+    const me = await actor();
+    return { count: await messageRequests.messageRequestCount(me) };
+}
+
+const messageRequestAnswerSchema = z.object({
+    channelId: z.string().uuid(),
+    answer: z.enum(["accept", "delete", "block"])
+});
+
+/** Accept, delete or block a message request; accepting answers with the
+ *  conversation to open. */
+export async function answerMessageRequestAction(
+    input: unknown
+): Promise<{ error?: string; channelId?: string }> {
+    const me = await actor();
+    const parsed = messageRequestAnswerSchema.safeParse(input);
+    if (!parsed.success)
+        return { error: (await getTranslations("chat"))("errors.messageRequestGone") };
+    const { channelId, answer } = parsed.data;
+    const result = await guard(() =>
+        answer === "accept"
+            ? messageRequests.acceptMessageRequest(me, channelId)
+            : messageRequests
+                  .declineMessageRequest(me, channelId, answer === "block")
+                  .then(() => undefined)
+    );
+    if (result.error) return { error: result.error };
+    revalidatePath(CHAT_PATH);
+    return result.value ? { channelId: result.value } : {};
 }
 
 /** Name a group, or take the name off again. Anybody in it may. */

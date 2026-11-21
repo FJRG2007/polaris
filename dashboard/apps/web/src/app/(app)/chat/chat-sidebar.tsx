@@ -105,6 +105,7 @@ import {
     Settings2,
     ShieldOff,
     Smile,
+    Inbox,
     NotebookPen,
     Star,
     Trash2,
@@ -269,6 +270,15 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
     const open = params.channelId ?? null;
     const spacePage = params.spaceId ?? null;
     const here = usePathname();
+    // How many message requests wait, read once the rail is up and again on
+    // returning from the requests page - the link says so before it is opened.
+    const [requests, setRequests] = useState(0);
+    useEffect(() => {
+        actions.messageRequestCountAction().then(
+            (result) => setRequests(result.count),
+            () => setRequests(0)
+        );
+    }, [here]);
     const saved = here === "/chat/saved";
     const meetings = here.startsWith("/chat/meetings");
 
@@ -673,6 +683,24 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                 >
                     <Users className="size-3.5 shrink-0" />
                     <span className="min-w-0 truncate">{t("groupInvites.title")}</span>
+                </Link>
+                {/* Conversations from people outside "who can message me". */}
+                <Link
+                    href="/chat/requests"
+                    className={cn(
+                        "flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
+                        here === "/chat/requests"
+                            ? "bg-card-hover text-foreground"
+                            : "text-muted-foreground"
+                    )}
+                >
+                    <Inbox className="size-3.5 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">{t("messageRequests.title")}</span>
+                    {requests > 0 ? (
+                        <span className="shrink-0 tabular-nums text-[0.6875rem] text-foreground-subtle">
+                            {requests}
+                        </span>
+                    ) : null}
                 </Link>
 
                 <LockShelfEntries

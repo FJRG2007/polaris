@@ -147,6 +147,7 @@ export const PRIVACY_FIELD_LABELS = {
     fileTransfers: "Who can send you files",
     calls: "Who can call you",
     groupAdds: "Who can add you to groups",
+    messages: "Who can message you",
     forwarding: "Passing your messages on"
 } as const;
 
@@ -187,6 +188,8 @@ export const PRIVACY_FIELD_NOTES = {
     calls: "Who may ring you. A call takes over the screen of whatever you were doing and makes a noise in the room you are in, which is why this starts at your friends rather than at everybody. Joining a voice channel is not this: that is a room somebody walked into, and who may be in it is the room's own question. Anybody who cannot call you is simply not offered the button.",
     groupAdds:
         "Who may put you in a group conversation. Friends and people in your organizations by default; anybody else who tries is told you cannot be added.",
+    messages:
+        "Who may start a conversation with you. Anybody else can still write, but their first messages wait under Message requests - no notification, no read receipt - until you accept them or block the sender. Conversations you already have are not affected.",
     fileTransfers:
         "Who may offer you a file or a folder. Nothing ever lands without you accepting it, so this is about who may ask - anybody who cannot is simply not offered the button. People you share an organization with count as friends here; set to nobody, nobody can, including them."
 } as const;
@@ -208,6 +211,7 @@ export const PRIVACY_FIELDS = [
     "fileTransfers",
     "calls",
     "groupAdds",
+    "messages",
     "lastSeen",
     "lastActive",
     "activity",
@@ -250,7 +254,7 @@ export const PRIVACY_SECTIONS = [
     {
         id: "reaching",
         label: "Reaching you",
-        fields: ["friendRequests", "fileTransfers", "calls", "groupAdds"]
+        fields: ["friendRequests", "messages", "fileTransfers", "calls", "groupAdds"]
     },
     {
         id: "presence",
@@ -513,6 +517,13 @@ export const privacySettingsSchema = z.object({
     calls: known,
     groupAdds: known,
     /**
+     * Who may start a direct conversation with this account (ledger row 17).
+     * Open by default, which is what every account had before the field
+     * existed. Anybody outside it is not refused: the conversation is opened as
+     * a message request the recipient accepts or blocks.
+     */
+    messages: open,
+    /**
      * Who is shown the address the account signs in with.
      *
      * Closed by default, and the only reason it is not open like the rest: an
@@ -575,6 +586,7 @@ export const RECOMMENDED_PRIVACY: Record<PrivacyField, PrivacyAudience> = {
     fileTransfers: "friends",
     calls: "friends",
     groupAdds: "friends",
+    messages: "friends",
     lastSeen: "friends",
     lastActive: "friends",
     activity: "friends",

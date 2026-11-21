@@ -266,7 +266,9 @@
         "placesBusy": "Demasiadas búsquedas. Prueba en un minuto.",
         "placesUnavailable": "La búsqueda de lugares no está disponible",
         "muteMentionsInvalid": "No se pudo cambiar el silencio",
-        "groupInviteGone": "Esa invitación ya no está abierta."
+        "groupInviteGone": "Esa invitación ya no está abierta.",
+        "messageRequestGone": "Esa solicitud ya no está pendiente.",
+        "messageRequestBlockFailed": "No se pudo bloquear. Prueba desde su perfil."
     },
     "media": {
         "refused": {
@@ -2767,5 +2769,20 @@
         "decline": "Rechazar",
         "join": "Unirme",
         "sent": "{count, plural, one {Se ha invitado a una persona en lugar de añadirla.} other {Se ha invitado a # personas en lugar de añadirlas.}}"
+    },
+    "messageRequests": {
+        "title": "Solicitudes",
+        "back": "Volver al chat",
+        "empty": "Sin solicitudes",
+        "emptyHint": "Aquí esperan las conversaciones de quien no está en Quién puede escribirte.",
+        "loadFailed": "No se pudieron cargar.",
+        "retry": "Reintentar",
+        "waiting": "{count, plural, one {# mensaje} other {# mensajes}}",
+        "noPreview": "Sin vista previa",
+        "accept": "Aceptar",
+        "delete": "Borrar",
+        "block": "Bloquear",
+        "blocked": "{name} está bloqueado.",
+        "failed": "No se pudo hacer. Inténtalo de nuevo."
     }
 }

@@ -23,6 +23,7 @@ vi.mock("@/app/(app)/account/privacy/actions", () => ({
     unblockPersonAction: async () => ({})
 }));
 vi.mock("@/app/(app)/chat/actions", () => ({
+    messageRequestCountAction: async () => ({ count: 0 }),
     voicePresenceAction: async () => ({ inRoom: {} }),
     searchPeopleAction: async () => ({ people: [] })
 }));

@@ -24,6 +24,7 @@ import { discardAvatars } from "@/lib/avatar-service";
 import { readsOrgWhere } from "@/lib/orgs/org-service";
 import { postNotice, postSpaceNotice } from "./notices";
 import { groupRefusals, refuseGroupStrangers } from "./group-reach";
+import { landsInRequests } from "./message-requests";
 import { inviteToGroup } from "./group-invites";
 import { blockedBetween, blockedBy } from "@/lib/blocks";
 import { discardSpaceEmoji } from "./custom-emoji";
@@ -761,7 +762,9 @@ export async function listChannels(
     const [spaces, memberships, administered, granted] = await Promise.all([
         reachableSpaceIds(actor),
         prisma.chatChannelMember.findMany({
-            where: { userId: actor.id },
+            // A message request waiting on this person is not on their rail
+            // until they accept it: it lives under Message requests (row 17).
+            where: { userId: actor.id, requestedAt: null },
             select: {
                 channelId: true,
                 lastReadAt: true,
@@ -2113,6 +2116,13 @@ export async function openDirect(
         });
         if (existing) return existing.id;
 
+        // Somebody whose "who can message me" leaves the actor out is not
+        // refused: the conversation opens as a request on their side, silent
+        // and off their list until they accept it (ledger row 17). Only a new
+        // conversation - one that already exists stays exactly as it was.
+        const held = others.length === 1 && (await landsInRequests(actor.id, others[0]!));
+        const requestedAt = held ? new Date() : null;
+
         try {
             const channel = await prisma.chatChannel.create({
                 data: {
@@ -2134,7 +2144,17 @@ export async function openDirect(
                     // it must not reorder somebody's list.
                     lastMessageAt: new Date(),
                     createdById: actor.id,
-                    members: { createMany: { data: everyone.map((userId) => ({ userId })) } }
+                    members: {
+                        createMany: {
+                            data: everyone.map((userId) =>
+                                // Muted as well, so nothing about the request
+                                // rings, badges or pushes before it is accepted.
+                                requestedAt && userId !== actor.id
+                                    ? { userId, requestedAt, muted: true }
+                                    : { userId }
+                            )
+                        }
+                    }
                 },
                 select: { id: true }
             });
@@ -2378,7 +2398,7 @@ export interface ChatElsewhere {
 export async function conversationsElsewhere(actor: ChatActor): Promise<ChatElsewhere[]> {
     const scopes = await readableChatScopes(actor.id);
     const rows = await prisma.chatChannelMember.findMany({
-        where: { userId: actor.id },
+        where: { userId: actor.id, requestedAt: null },
         select: {
             channelId: true,
             lastReadAt: true,
@@ -2460,7 +2480,7 @@ export interface ChatUnreadConversation {
 export async function unreadConversations(actor: ChatActor): Promise<ChatUnreadConversation[]> {
     const [memberships, cleared] = await Promise.all([
         prisma.chatChannelMember.findMany({
-            where: { userId: actor.id },
+            where: { userId: actor.id, requestedAt: null },
             select: {
                 channelId: true,
                 lastReadAt: true,

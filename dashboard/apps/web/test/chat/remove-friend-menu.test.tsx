@@ -31,6 +31,7 @@ vi.mock("@/app/(app)/account/privacy/actions", () => ({
     removeFriendAction
 }));
 vi.mock("@/app/(app)/chat/actions", () => ({
+    messageRequestCountAction: async () => ({ count: 0 }),
     voicePresenceAction: async () => ({ inRoom: {} }),
     markChannelsReadAction: async () => ({}),
     markUnreadAction: async () => ({}),
