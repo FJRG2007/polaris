@@ -147,7 +147,8 @@
         "qrSignIn": {
             "tooManyCodes": "Too many codes from here. Sign in with your password.",
             "codeInvalid": "That code is no longer valid. Ask for a new one on the sign-in screen.",
-            "pinFirst": "Set a quick unlock PIN in Account > Security before allowing a sign-in this way."
+            "pinFirst": "Set a quick unlock PIN in Account > Security before allowing a sign-in this way.",
+            "restricted": "Many people blocked or reported you, so you cannot link a device for {hours, plural, one {1 more hour} other {# more hours}}. Sign in there with your password."
         },
         "roles": {
             "nameTaken": "A role with that name already exists.",

@@ -10,11 +10,16 @@
  */
 
 import { useState } from "react";
-import { Input, Switch } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
+import { Input, Select, Switch } from "@polaris/ui";
 import { setModerationPolicyAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { restrictionSchema, type ModerationPolicy, type RestrictionPolicy } from "@/lib/chat/moderation-policy-rules";
+import {
+    AUTO_DOWNLOAD_CHOICES,
+    restrictionSchema,
+    type ModerationPolicy,
+    type RestrictionPolicy
+} from "@/lib/chat/moderation-policy-rules";
 
 const LIMITS = {
     threshold: restrictionSchema.shape.threshold,
@@ -100,6 +105,24 @@ export function ModerationPolicyView({ initial }: { initial: ModerationPolicy })
             {number("threshold")}
             {number("windowDays")}
             {number("hours")}
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-sm font-medium">{t("chat.moderation.autoDownload")}</span>
+                    <span className="text-xs text-muted-foreground">{t("chat.moderation.autoDownloadHint")}</span>
+                </span>
+                <Select
+                    className="h-8 w-full shrink-0 text-xs sm:w-48"
+                    aria-label={t("chat.moderation.autoDownload")}
+                    value={shown.autoDownload}
+                    options={AUTO_DOWNLOAD_CHOICES.map((choice) => ({
+                        value: choice,
+                        label: t(`chat.moderation.autoDownloadChoice.${choice}`)
+                    }))}
+                    onValueChange={(next) =>
+                        void save({ ...shown, autoDownload: next as ModerationPolicy["autoDownload"] })
+                    }
+                />
+            </div>
             {error ? <p className="text-sm text-danger">{error}</p> : null}
         </section>
     );

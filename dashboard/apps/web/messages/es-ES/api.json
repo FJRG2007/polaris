@@ -147,7 +147,8 @@
         "qrSignIn": {
             "tooManyCodes": "Demasiados códigos desde aquí. Inicia sesión con tu contraseña.",
             "codeInvalid": "Ese código ya no es válido. Pide uno nuevo en la pantalla de inicio de sesión.",
-            "pinFirst": "Configura un PIN de desbloqueo rápido en Cuenta > Seguridad antes de permitir un inicio de sesión así."
+            "pinFirst": "Configura un PIN de desbloqueo rápido en Cuenta > Seguridad antes de permitir un inicio de sesión así.",
+            "restricted": "Mucha gente te bloqueó o denunció: no puedes vincular un dispositivo durante {hours, plural, one {1 hora más} other {# horas más}}. Entra allí con tu contraseña."
         },
         "roles": {
             "nameTaken": "Ya existe un rol con ese nombre.",

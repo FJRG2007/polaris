@@ -101,22 +101,84 @@ export async function spamRestrictionFor(userId: string, now: Date = new Date())
     return restrictionFrom(signals, policy, now);
 }
 
+/** Whole hours until it lifts, at least one, for the sentence that says so. */
+export function restrictionHoursLeft(restriction: SpamRestriction, now: number = Date.now()): number {
+    return Math.max(1, Math.ceil((restriction.until.getTime() - now) / (60 * 60 * 1000)));
+}
+
+/** Where the action reaches: the organization it happens in, and who it adds. */
+export interface Reach {
+    readonly orgId: string | null;
+    readonly targets: readonly string[];
+}
+
+/** What is known about the actor and the people reached inside `orgId`. */
+export interface OrgStanding {
+    /** The actor owns the organization or holds its admin role: a grant the
+     *  organization made on purpose. */
+    readonly actorAdmin: boolean;
+    /** The actor is an unrestricted member (or the owner). */
+    readonly actorMember: boolean;
+    /** Which targets are unrestricted members (or the owner). */
+    readonly members: ReadonlySet<string>;
+}
+
+/**
+ * Pure: whether a restricted account may still do this. Only inside an
+ * organization: its owner and administrators, granted that by the
+ * organization, keep running its conversations, and a member adding only
+ * fellow members reaches nobody new - the organization already put them
+ * together. Anywhere else, or with one outsider among the targets, no.
+ */
+export function exemptFromRestriction(reach: Reach, standing: OrgStanding | null): boolean {
+    if (!reach.orgId || !standing) return false;
+    if (standing.actorAdmin) return true;
+    return standing.actorMember && reach.targets.length > 0 && reach.targets.every((id) => standing.members.has(id));
+}
+
+async function orgStanding(actorId: string, reach: Reach): Promise<OrgStanding | null> {
+    if (!reach.orgId) return null;
+    const ids = [...new Set([actorId, ...reach.targets])];
+    const [org, rows] = await Promise.all([
+        prisma.organization.findUnique({ where: { id: reach.orgId }, select: { ownerId: true } }),
+        prisma.organizationMember.findMany({
+            where: { orgId: reach.orgId, userId: { in: ids }, restricted: false },
+            select: { userId: true, role: true }
+        })
+    ]);
+    if (!org) return null;
+    const members = new Set(rows.map((row) => row.userId));
+    members.add(org.ownerId);
+    const actorRole = rows.find((row) => row.userId === actorId)?.role;
+    return {
+        actorAdmin: org.ownerId === actorId || actorRole === "owner" || actorRole === "admin",
+        actorMember: members.has(actorId),
+        members
+    };
+}
+
 /**
  * Refuse something that reaches new people while the account is restricted.
+ * `reach` names where it happens, for the organization exemptions above; it
+ * is only asked once the account turns out to be restricted, so the common
+ * path costs nothing extra.
  *
  * A lookup that fails lets the action through and is logged: this guards
  * against spam, and an outage in it must never stop somebody starting a
  * conversation they are entitled to.
  */
-export async function requireUnrestricted(userId: string): Promise<void> {
+export async function requireUnrestricted(userId: string, reach?: () => Promise<Reach>): Promise<void> {
     let restriction: SpamRestriction | null;
     try {
         restriction = await spamRestrictionFor(userId);
+        if (restriction && reach) {
+            const where = await reach();
+            if (exemptFromRestriction(where, await orgStanding(userId, where))) return;
+        }
     } catch (error) {
         console.error("[chat] could not check the spam restriction:", error);
         return;
     }
     if (!restriction) return;
-    const hours = Math.max(1, Math.ceil((restriction.until.getTime() - Date.now()) / (60 * 60 * 1000)));
-    throw new ChatRuleError({ key: "errors.spamRestricted", params: { hours } });
+    throw new ChatRuleError({ key: "errors.spamRestricted", params: { hours: restrictionHoursLeft(restriction) } });
 }

@@ -21,6 +21,7 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { isVanishDuration } from "@/lib/chat/vanish-rules";
+import { AUTO_DOWNLOAD_CHOICES } from "@/lib/chat/moderation-policy-rules";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
@@ -343,6 +344,24 @@ export async function saveLinkPreviewsAction(on: unknown): Promise<{ error?: str
         where: { userId: user.id },
         create: { userId: user.id, linkPreviews: parsed.data },
         update: { linkPreviews: parsed.data },
+        select: { userId: true }
+    });
+    revalidatePath(PRIVACY_PATH);
+    return {};
+}
+
+/** Which pictures load on their own in Chat (ledger row 5); null goes back to
+ *  the instance's choice. */
+export async function saveAutoDownloadAction(choice: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = z.enum(AUTO_DOWNLOAD_CHOICES).nullable().safeParse(choice);
+    if (!parsed.success) {
+        return { error: (await getTranslations("accountPrivacy"))("errors.notSaved") };
+    }
+    await prisma.userPrivacy.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, chatAutoDownload: parsed.data },
+        update: { chatAutoDownload: parsed.data },
         select: { userId: true }
     });
     revalidatePath(PRIVACY_PATH);

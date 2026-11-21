@@ -11958,6 +11958,10 @@ model UserPrivacy {
     // is "never chose" and resolves to friends, colleagues counted as friends -
     // the fixed rule every account had before this column existed.
     groupAdds      String?
+    // Which pictures load on their own in Chat (ledger row 5): "all",
+    // "contacts" (friends, colleagues and yourself) or "none". Null is "never
+    // chose" and resolves to the instance's choice in Chat's moderation policy.
+    chatAutoDownload String?
     messages       String?
     // Who may send something this account wrote into another conversation. Open
     // by default, like the rest: a messenger where nothing can be passed on is

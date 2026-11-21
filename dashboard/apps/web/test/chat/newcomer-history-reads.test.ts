@@ -168,6 +168,7 @@ vi.mock("@/lib/privacy-service", () => ({
     allowedBy: async (_viewer: unknown, _field: string, ids: readonly string[]) => new Set(ids)
 }));
 vi.mock("@/lib/chat/live", () => ({ publishChatChange: () => undefined }));
+vi.mock("@/lib/chat/auto-download", () => ({ autoLoadAuthors: async () => "all" }));
 vi.mock("@/lib/chat/rules", () => ({ rulesForChannel: async () => ({ keepEditHistory: false }) }));
 vi.mock("@/lib/chat/room-mentions", () => ({
     announceRoomMention: async () => undefined,

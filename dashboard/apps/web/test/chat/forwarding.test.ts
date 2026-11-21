@@ -33,6 +33,8 @@ vi.mock("@/lib/privacy-service", () => ({
         new Set(ids.filter((id) => !refusing.includes(id)))
 }));
 
+vi.mock("@/lib/chat/auto-download", () => ({ autoLoadAuthors: async () => "all" }));
+
 /** The conversations the reader can open, for a forward's quote. */
 let reachable: string[] = [];
 

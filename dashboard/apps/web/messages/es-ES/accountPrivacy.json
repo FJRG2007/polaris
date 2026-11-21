@@ -347,5 +347,15 @@
                 "hint": "Cierra la sesión donde ya no la uses."
             }
         }
+    },
+    "autoDownload": {
+        "label": "Imágenes que se cargan solas en Chat",
+        "hint": "Las demás esperan tras un botón con su tamaño. Vídeos, audios y archivos ya esperan.",
+        "default": "Predeterminado ({choice})",
+        "choice": {
+            "all": "De todos",
+            "contacts": "De amigos y colegas",
+            "none": "De nadie"
+        }
     }
 }

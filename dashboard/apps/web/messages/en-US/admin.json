@@ -392,7 +392,14 @@
             "restrictionHint": "They cannot start chats, create groups or add people for a while. Existing chats keep working.",
             "threshold": "Different people",
             "windowDays": "Within days",
-            "hours": "Restricted for hours"
+            "hours": "Restricted for hours",
+            "autoDownload": "Pictures that load on their own",
+            "autoDownloadHint": "For anybody who has not chosen. Others wait behind a button.",
+            "autoDownloadChoice": {
+                "all": "From everyone",
+                "contacts": "From friends and colleagues",
+                "none": "From nobody"
+            }
         }
     },
     "consumption": {

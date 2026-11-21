@@ -392,7 +392,14 @@
             "restrictionHint": "No pueden iniciar chats, crear grupos ni añadir gente un tiempo. Sus chats siguen igual.",
             "threshold": "Personas distintas",
             "windowDays": "En días",
-            "hours": "Horas restringida"
+            "hours": "Horas restringida",
+            "autoDownload": "Imágenes que se cargan solas",
+            "autoDownloadHint": "Para quien no lo haya elegido. Las demás esperan tras un botón.",
+            "autoDownloadChoice": {
+                "all": "De todos",
+                "contacts": "De amigos y colegas",
+                "none": "De nadie"
+            }
         }
     },
     "consumption": {

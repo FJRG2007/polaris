@@ -1399,6 +1399,7 @@ function Message({
                                                     state={state}
                                                 />
                                             ) : file.inline ? (
+                                                <HeldPictureIf held={message.autoLoad === false && !local} file={file}>
                                                 <KeepableImage
                                                     href={attachmentImageUrl(file.id)}
                                                     shape={file}
@@ -1419,6 +1420,7 @@ function Message({
                                                         })
                                                     }
                                                 />
+                                                </HeldPictureIf>
                                             ) : sending && pendingUrl && isPlayable(file.contentType) ? (
                                                 <span className="flex min-w-0 max-w-full items-center gap-2">
                                                     <VoiceNote
@@ -1487,8 +1489,11 @@ function Message({
                                                     // kilobytes, and the difference
                                                     // between a list of black rectangles
                                                     // and a list somebody can read.
+                                                    // Not even the still for a reader who
+                                                    // chose not to have media load on its
+                                                    // own (`auto-download`): play is the ask.
                                                     poster={
-                                                        file.hasPoster
+                                                        file.hasPoster && message.autoLoad !== false
                                                             ? `/api/chat/attachments/${file.id}?poster=1`
                                                             : undefined
                                                     }
@@ -1772,6 +1777,84 @@ function Marks({ pinned, starred }: { pinned: boolean; starred: boolean }) {
  */
 /** The largest a picture is drawn inside a message, before it is opened. */
 const PICTURE_BOX = { width: 320, height: 288 } as const;
+
+/** Pictures this tab was asked to load, so one stays loaded when its row is
+ *  drawn again after scrolling away. */
+const loadedHere = new Set<string>();
+
+/**
+ * A picture this reader chose not to have load on its own (ledger row 5,
+ * `lib/chat/auto-download`): its blur at its own size and a button naming its
+ * type and size. Pressing it draws `children`, the picture itself; nothing of
+ * it is fetched before that.
+ */
+function HeldPicture({
+    file,
+    children
+}: {
+    file: {
+        readonly id: string;
+        readonly name: string;
+        readonly size: number;
+        readonly contentType: string;
+        readonly width: number | null;
+        readonly height: number | null;
+        readonly thumbhash: string | null;
+    };
+    children: ReactNode;
+}) {
+    const t = useTranslations("chat");
+    const [loaded, setLoaded] = useState(() => loadedHere.has(file.id));
+    if (loaded) return <>{children}</>;
+    const fitted = fittedSize(file.width, file.height, PICTURE_BOX);
+    const blur = placeholderUrl(file.thumbhash);
+    const kind = (file.contentType.split("/")[1] ?? "").split(/[+;]/)[0]?.toUpperCase() || "";
+    return (
+        <span
+            className={cn(
+                "relative grid max-w-full place-items-center overflow-hidden rounded-md bg-muted",
+                !fitted && "h-40 w-56"
+            )}
+            style={
+                fitted
+                    ? {
+                          width: fitted.width,
+                          aspectRatio: `${file.width} / ${file.height}`,
+                          ...(blur ? { backgroundImage: `url(${blur})`, backgroundSize: "cover" } : {})
+                      }
+                    : undefined
+            }
+        >
+            <button
+                type="button"
+                onClick={() => {
+                    loadedHere.add(file.id);
+                    setLoaded(true);
+                }}
+                aria-label={t("messageList.loadPictureNamed", { name: file.name })}
+                className="flex min-w-0 max-w-[90%] items-center gap-1.5 rounded-full bg-background/85 px-3 py-1 text-xs shadow-sm backdrop-blur hover:bg-background"
+            >
+                <Download className="size-3.5 shrink-0" />
+                <span className="truncate">
+                    {t("messageList.loadPicture", { size: readableSize(file.size), kind })}
+                </span>
+            </button>
+        </span>
+    );
+}
+
+/** `HeldPicture` when `held`, the picture as it is otherwise. */
+function HeldPictureIf({
+    held,
+    file,
+    children
+}: {
+    held: boolean;
+    file: Parameters<typeof HeldPicture>[0]["file"];
+    children: ReactNode;
+}) {
+    return held ? <HeldPicture file={file}>{children}</HeldPicture> : <>{children}</>;
+}
 
 function KeepableImage({
     href,
@@ -2502,4 +2585,3 @@ function readableSize(bytes: number): string {
     if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
-

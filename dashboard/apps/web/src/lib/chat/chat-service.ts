@@ -447,7 +447,11 @@ export async function addSpaceMembers(
     userIds: readonly string[]
 ): Promise<void> {
     await requireSpace(actor, spaceId, "admin");
-    await requireUnrestricted(actor.id);
+    await requireUnrestricted(actor.id, async () => ({
+        orgId:
+            (await prisma.chatSpace.findUnique({ where: { id: spaceId }, select: { orgId: true } }))?.orgId ?? null,
+        targets: userIds
+    }));
     const space = await prisma.chatSpace.findUnique({
         where: { id: spaceId },
         select: { ownerId: true }
@@ -1658,7 +1662,13 @@ export async function addChannelMembers(
     userIds: readonly string[]
 ): Promise<{ invited: string[] } | void> {
     const access = await requireChannel(actor, channelId);
-    await requireUnrestricted(actor.id);
+    await requireUnrestricted(actor.id, async () => {
+        const channel = await prisma.chatChannel.findUnique({
+            where: { id: channelId },
+            select: { orgId: true, space: { select: { orgId: true } } }
+        });
+        return { orgId: channel?.orgId ?? channel?.space?.orgId ?? null, targets: userIds };
+    });
     const group = access.kind === "group";
     /** Whoever was asked rather than added, for the caller to say so. */
     let invited: string[] = [];
@@ -2154,7 +2164,7 @@ export async function openDirect(
         if (existing) return existing.id;
         // A new conversation reaches somebody new: refused while the account
         // is restricted for spam. The existing one above was not.
-        await requireUnrestricted(actor.id);
+        await requireUnrestricted(actor.id, async () => ({ orgId, targets: others }));
 
         // Somebody whose "who can message me" leaves the actor out is not
         // refused: the conversation opens as a request on their side, silent
@@ -2220,7 +2230,7 @@ export async function openDirect(
     }
 
     // A new group reaches new people: refused while restricted for spam.
-    await requireUnrestricted(actor.id);
+    await requireUnrestricted(actor.id, async () => ({ orgId, targets: others }));
 
     return createGroup(actor, others, orgId, name);
 }

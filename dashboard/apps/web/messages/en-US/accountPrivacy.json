@@ -347,5 +347,15 @@
                 "hint": "Sign out anywhere you no longer use."
             }
         }
+    },
+    "autoDownload": {
+        "label": "Pictures that load on their own in Chat",
+        "hint": "Others wait behind a button with their size. Videos, voice and files already wait for you.",
+        "default": "Default ({choice})",
+        "choice": {
+            "all": "From everyone",
+            "contacts": "From friends and colleagues",
+            "none": "From nobody"
+        }
     }
 }

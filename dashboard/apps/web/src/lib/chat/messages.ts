@@ -82,6 +82,7 @@ import { webhookFace } from "./webhook-face";
 import { chatPrivacyIn, chatPrivacyOf, expiryForChannel } from "./vanish";
 import { hasDirectRules } from "./vanish-rules";
 import { isShielded, shieldedAmong } from "./advanced-privacy";
+import { autoLoadAuthors } from "./auto-download";
 import { keepStates } from "./keep";
 import { concealedFor, requireUnlocked, unhideOnMessage } from "./chat-lock";
 
@@ -211,6 +212,9 @@ export interface ChatMessageView {
      *  never offered as downloads. The attachment route refuses them by the
      *  same stored value. Absent is off. */
     readonly shielded?: boolean;
+    /** False when this reader chose not to have its pictures load on their own
+     *  (`auto-download.ts`): they wait behind a button. Absent is true. */
+    readonly autoLoad?: boolean;
     /** The first web address in it, whatever came of looking it up. The list
      *  needs it even when nothing did: a video Polaris knows how to play still
      *  plays when the site refused to describe itself. */
@@ -2376,6 +2380,9 @@ export async function decorateMessages(
     const mayForward = await allowedBy({ id: actor.id, isAdmin: false }, "forwarding", authorIds);
     // Conversations with advanced chat privacy on, whose messages go nowhere.
     const shielded = await shieldedAmong(rows.map((row) => row.channelId));
+    // Whose pictures load on their own for this reader (ledger row 5).
+    // A lookup that fails draws pictures as before rather than failing the page.
+    const autoLoads = await autoLoadAuthors(actor.id, authorIds).catch((): "all" => "all");
     // Disappearing messages somebody keeps, and whether this reader may.
     const keeps = await keepStates(actor, rows.map((row) => ({ ...row, expiresAt: row.expiresAt ?? null, audience: row.audience ?? [] })));
     // One query for the page, the same shape as the nicknames above: a block is
@@ -2575,6 +2582,9 @@ export async function decorateMessages(
             // Nor one carrying a file meant to be seen once: a forward would be a
             // second copy of exactly what was not to be kept.
             shielded: shielded.has(row.channelId),
+            ...(autoLoads === "all" || (row.authorId !== null && autoLoads.has(row.authorId))
+                ? {}
+                : { autoLoad: false }),
             forwardable:
                 row.deletedAt === null &&
                 !shielded.has(row.channelId) &&

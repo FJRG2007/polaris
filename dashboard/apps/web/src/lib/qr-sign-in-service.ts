@@ -33,6 +33,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { appBaseUrl } from "@/lib/domain-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { sessionDeviceLabels } from "@/lib/session-device";
+import { restrictionHoursLeft, spamRestrictionFor } from "@/lib/chat/spam-restriction";
 import { describeDevice, QR_SIGN_IN_PATH, type QrSignInDecision } from "@polaris/core";
 import {
     clientHost,
@@ -323,6 +324,17 @@ export async function decideSignInCode(
             return { error: (await readerWords("api"))("refusals.qrSignIn.pinFirst") };
         }
         if (!(await verifyQuickPin(auth, userId, decision.pin))) return { error: (await readerWords("accountSecurity"))("known.wrongPin") };
+        // Linking a device is reaching further, so an account restricted for
+        // spam waits (ledger row 24). Signing in on the device itself with the
+        // password is untouched: nobody is locked out of their own account.
+        const restriction = await spamRestrictionFor(userId).catch(() => null);
+        if (restriction) {
+            return {
+                error: (await readerWords("api"))("refusals.qrSignIn.restricted", {
+                    hours: restrictionHoursLeft(restriction)
+                })
+            };
+        }
     }
 
     const store = await headers();
