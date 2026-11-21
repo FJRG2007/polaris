@@ -11,7 +11,7 @@
 
 import { useMemo } from "react";
 import * as core from "@polaris/core";
-import { ChipList, validAddress } from "./chip-list";
+import { ChipList, validAddress } from "@/components/rules/chip-list";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     RuleConditionBuilder,

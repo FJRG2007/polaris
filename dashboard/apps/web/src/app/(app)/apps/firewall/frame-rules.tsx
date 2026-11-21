@@ -16,10 +16,10 @@
 
 import { useState } from "react";
 import * as core from "@polaris/core";
-import { ChipList } from "./chip-list";
+import { ChipList } from "@/components/rules/chip-list";
 import { anyEmpty } from "./rule-editor";
 import { ruleDescription } from "./rule-language";
-import { PageHeader, Section } from "./page-parts";
+import { PageHeader, Section } from "@/components/rules/page-parts";
 import { ConditionBuilder } from "./condition-builder";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";

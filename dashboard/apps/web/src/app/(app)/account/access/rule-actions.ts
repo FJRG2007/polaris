@@ -14,48 +14,17 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
+import { accountRulesSchema } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { localized } from "../security/action-messages";
 import { revokeSessionsRefusedByRules } from "@/lib/session-guard";
-import { accountRulesSchema, evaluateAccountRules, type AccountRule } from "@polaris/core";
-import { listAccountRules, resolveAccountRuleFacts, saveAccountRules } from "@/lib/account-rules";
-import { clientIp, clientUserAgent, clientUserAgentBrands, clientUserAgentPlatform } from "@/lib/request-context";
+import { listAccountRules, saveAccountRules } from "@/lib/account-rules";
+import { judgeCurrentSession, type RulePreview } from "./current-session";
 
-export interface RulePreview {
-    action: AccountRule["action"];
-    ruleName: string | null;
-    ip: string | null;
-    country: string | null;
-    browser: string | null;
-    os: string | null;
-}
+export type { RulePreview } from "./current-session";
 
-type Result<T = object> = ({ error?: undefined } & T) | { error: string };
-
-/** What the rules would do to the session asking. */
-async function judgeCurrent(userId: string, rules: readonly AccountRule[]): Promise<RulePreview> {
-    const [ip, userAgent, brands, platform] = await Promise.all([
-        clientIp(),
-        clientUserAgent(),
-        clientUserAgentBrands(),
-        clientUserAgentPlatform()
-    ]);
-    const facts = await resolveAccountRuleFacts(userId, rules, ip ?? null, {
-        userAgent: userAgent ?? null,
-        brands: brands ?? null,
-        platform: platform ?? null
-    });
-    const verdict = evaluateAccountRules(rules, facts);
-    return {
-        action: verdict.action,
-        ruleName: verdict.rule?.name ?? null,
-        ip: facts.ip,
-        country: facts.country,
-        browser: facts.browser,
-        os: facts.os
-    };
-}
+type Result<T = object> = ({ error?: undefined } & T) | { error: string; lockout?: RulePreview };
 
 export async function previewAccountRulesAction(input: unknown): Promise<Result<{ preview: RulePreview }>> {
     const user = await requireUser();
@@ -63,7 +32,7 @@ export async function previewAccountRulesAction(input: unknown): Promise<Result<
     if (!parsed.success) {
         return { error: parsed.error.issues[0]?.message ?? (await getTranslations("account"))("access.errors.checkRules") };
     }
-    return { preview: await judgeCurrent(user.id, parsed.data) };
+    return { preview: await judgeCurrentSession(user.id, parsed.data) };
 }
 
 export async function saveAccountRulesAction(input: unknown): Promise<Result> {
@@ -74,9 +43,12 @@ export async function saveAccountRulesAction(input: unknown): Promise<Result> {
     if (!parsed.success) {
         return { error: parsed.error.issues[0]?.message ?? (await getTranslations("account"))("access.errors.checkRules") };
     }
-    const preview = await judgeCurrent(user.id, parsed.data);
+    const preview = await judgeCurrentSession(user.id, parsed.data);
     if (preview.action === "block") {
-        return { error: (await getTranslations("account"))("access.rules.lockout", { rule: preview.ruleName ?? "" }) };
+        return {
+            error: (await getTranslations("account"))("access.rules.lockout", { rule: preview.ruleName ?? "" }),
+            lockout: preview
+        };
     }
 
     const before = await listAccountRules(user.id);

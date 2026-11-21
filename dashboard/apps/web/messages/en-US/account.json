@@ -139,7 +139,6 @@
             "intro": "Restrict where your account and your API keys may be used from."
         },
         "summary": {
-            "groups": "{count, plural, one {# group} other {# groups}}",
             "addresses": "{count, plural, one {# address rule} other {# address rules}}",
             "locations": "{count, plural, one {# location} other {# locations}}",
             "none": "No restriction - reachable from anywhere"
@@ -147,11 +146,6 @@
         "deleteTitle": "Delete \"{name}\"?",
         "deleteInUse": "It is in use; the rules it contributes will stop applying.",
         "deleteFinal": "This cannot be undone.",
-        "signIn": {
-            "title": "Sign-in restrictions",
-            "description": "Leave everything empty to allow sign-in from anywhere. Otherwise a sign-in must match your address rules and your allowed locations.",
-            "none": "No restriction: your account can be signed in from any address."
-        },
         "connectingFrom": "You are connecting from <ip>{address}</ip>",
         "enforced": "An administrator also limits this account to {rules}.",
         "groups": {
@@ -170,12 +164,107 @@
             "create": "Create group"
         },
         "errors": {
-            "lockout": "That would block the address you are using right now. Add it to the rules first, or leave them empty.",
             "checkRules": "Check the rules.",
             "checkGroup": "Check the group."
         },
         "rules": {
-            "lockout": "Not saved: the rule \"{rule}\" would block the session you are using right now. Change it, or put an allow rule for this session above it."
+            "lockout": "Not saved: the rule \"{rule}\" would block the session you are using right now. Change it, or put an allow rule for this session above it.",
+            "title": "Your rules",
+            "empty": "No rules yet. Your account can be signed in from anywhere, on any device.",
+            "orderHint": "Rules are tried in order and the first one that matches decides. Put an allow rule above a block rule to make an exception.",
+            "deleteBody": "Sign-ins it was refusing are let through again, unless another rule below it matches.",
+            "describe": "{field} {operator} {values}",
+            "and": " and ",
+            "or": " or ",
+            "values": "Values",
+            "deletedList": "Deleted list",
+            "noLists": "You have no saved address lists yet. Create one below, then pick it here.",
+            "addressPlaceholder": "203.0.113.0/24",
+            "invalidAddress": "Enter an IP address or a range such as 203.0.113.0/24.",
+            "reputationOff": "Polaris cannot tell what kind of network an address is on yet, so this condition never matches. An administrator can turn on address reputation under Management, Integrations.",
+            "actions": {
+                "block": "Block",
+                "challenge": "Verify",
+                "allow": "Allow"
+            },
+            "effects": {
+                "block": "The sign-in is refused, and a session it matches is signed out.",
+                "challenge": "The session is locked until you prove it is you again.",
+                "allow": "Let through, and no rule below it is tried."
+            },
+            "fields": {
+                "ip": "Address",
+                "country": "Country",
+                "continent": "Continent",
+                "os": "Operating system",
+                "browser": "Browser",
+                "device_type": "Device type",
+                "network": "Network",
+                "weekday": "Weekday",
+                "time": "Time of day",
+                "access_group": "Saved address list"
+            },
+            "operators": {
+                "equals": "is one of",
+                "not_equals": "is not one of"
+            },
+            "deviceTypes": {
+                "mobile": "Phone or tablet",
+                "computer": "Computer"
+            },
+            "networks": {
+                "vpn": "VPN",
+                "proxy": "Proxy",
+                "tor": "Tor",
+                "fraud": "Known fraud",
+                "high_risk": "High risk"
+            },
+            "weekdays": {
+                "mon": "Monday",
+                "tue": "Tuesday",
+                "wed": "Wednesday",
+                "thu": "Thursday",
+                "fri": "Friday",
+                "sat": "Saturday",
+                "sun": "Sunday"
+            },
+            "time": {
+                "from": "From",
+                "to": "To",
+                "add": "Add window",
+                "overnight": "This window ends the next day."
+            },
+            "examples": {
+                "title": "Start from an example:",
+                "blockApple": "Block iPhone and Mac",
+                "onlyCountry": "Only from my country",
+                "blockAnonymous": "Block VPN, proxy and Tor"
+            },
+            "editor": {
+                "createTitle": "New access rule",
+                "editTitle": "Edit access rule",
+                "name": "Name",
+                "when": "When",
+                "whenHint": "The rule applies when every condition holds.",
+                "then": "Then",
+                "timeZone": "Time zone",
+                "timeZoneHint": "Weekdays and times are read in this zone.",
+                "needsName": "Name the rule.",
+                "needsValues": "Give every condition at least one value."
+            },
+            "preview": {
+                "title": "Test against my current session",
+                "hint": "See what the rules, with this one as it stands, would do to the session you are using now. Nothing is saved.",
+                "listHint": "See what your saved rules would do to the session you are using now.",
+                "test": "Run test",
+                "testing": "Testing...",
+                "block": "This session would be blocked by \"{rule}\".",
+                "challenge": "This session would be asked to verify by \"{rule}\".",
+                "allow": "This session would be allowed by \"{rule}\".",
+                "noMatch": "No rule matches, so this session is allowed.",
+                "client": "{browser} on {os}",
+                "unknown": "Unknown"
+            }
         }
     },
     "activity": {

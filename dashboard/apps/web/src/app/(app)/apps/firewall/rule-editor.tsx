@@ -17,7 +17,7 @@
 import { useState } from "react";
 import * as core from "@polaris/core";
 import { TriangleAlert } from "lucide-react";
-import { PageHeader, Section } from "./page-parts";
+import { PageHeader, Section } from "@/components/rules/page-parts";
 import { ConditionBuilder } from "./condition-builder";
 import { Button, Checkbox, Input, Select, isDirty } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";

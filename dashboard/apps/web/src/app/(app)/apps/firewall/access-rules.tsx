@@ -13,8 +13,8 @@
 
 import Link from "next/link";
 import { Button, Switch } from "@polaris/ui";
-import { PageHeader, Section } from "./page-parts";
-import { ChipList, validAddress } from "./chip-list";
+import { PageHeader, Section } from "@/components/rules/page-parts";
+import { ChipList, validAddress } from "@/components/rules/chip-list";
 import type { WafPrincipalGrant } from "@polaris/core";
 import type { WafLoginBelowView } from "@/lib/waf-service";
 import { Ban, ShieldCheck, TriangleAlert } from "lucide-react";

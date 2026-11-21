@@ -30,9 +30,9 @@
 import { RestoreHistoryButton } from "@/components/restore-history";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { RuleList } from "./rule-list";
-import { Section } from "./page-parts";
+import { Section } from "@/components/rules/page-parts";
 import { ruleDescription } from "./rule-language";
-import { ChipList } from "./chip-list";
+import { ChipList } from "@/components/rules/chip-list";
 import { Frame, Loader2, Mail, Search } from "lucide-react";
 import { ManagedRulePage } from "./managed-rule-page";
 import { useCallback, useEffect, useRef, useState } from "react";

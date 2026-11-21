@@ -17,7 +17,7 @@
 
 import Link from "next/link";
 import { grouped } from "./grouped";
-import { ChipList, validAddress } from "./chip-list";
+import { ChipList, validAddress } from "@/components/rules/chip-list";
 import { AddressAccounts } from "./address-accounts";
 import { localizeJail } from "./waf-words";
 import { scopeKindLabel } from "./scope-kinds";

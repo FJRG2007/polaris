@@ -23,7 +23,7 @@ import { grouped } from "./grouped";
 import { ruleDescription } from "./rule-language";
 import { Badge, Button, Switch } from "@polaris/ui";
 import { CopyButton } from "@/components/copy-button";
-import { PageHeader, Section } from "./page-parts";
+import { PageHeader, Section } from "@/components/rules/page-parts";
 import { useDisplayFormat } from "@/components/display-format";
 import { CircleOff, Plus, ShieldCheck, TriangleAlert } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";

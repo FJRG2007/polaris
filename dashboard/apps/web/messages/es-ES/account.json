@@ -139,7 +139,6 @@
             "intro": "Limita desde dónde se pueden usar tu cuenta y tus claves de API."
         },
         "summary": {
-            "groups": "{count, plural, one {# grupo} other {# grupos}}",
             "addresses": "{count, plural, one {# regla de dirección} other {# reglas de dirección}}",
             "locations": "{count, plural, one {# ubicación} other {# ubicaciones}}",
             "none": "Sin restricción: accesible desde cualquier sitio"
@@ -147,11 +146,6 @@
         "deleteTitle": "¿Eliminar «{name}»?",
         "deleteInUse": "Está en uso; las reglas que aporta dejarán de aplicarse.",
         "deleteFinal": "Esto no se puede deshacer.",
-        "signIn": {
-            "title": "Límites de acceso",
-            "description": "Déjalo todo vacío para permitir iniciar sesión desde cualquier sitio. Si no, un inicio de sesión tiene que cumplir tus reglas de dirección y tus ubicaciones permitidas.",
-            "none": "Sin restricción: se puede iniciar sesión en tu cuenta desde cualquier dirección."
-        },
         "connectingFrom": "Te estás conectando desde <ip>{address}</ip>",
         "enforced": "Un administrador también limita esta cuenta a {rules}.",
         "groups": {
@@ -170,12 +164,107 @@
             "create": "Crear grupo"
         },
         "errors": {
-            "lockout": "Eso bloquearía la dirección que estás usando ahora mismo. Añádela primero a las reglas, o déjalas vacías.",
             "checkRules": "Revisa las reglas.",
             "checkGroup": "Revisa el grupo."
         },
         "rules": {
-            "lockout": "No se guardó: la regla \"{rule}\" bloquearía la sesión que estás usando ahora. Cámbiala o pon encima una regla que permita esta sesión."
+            "lockout": "No se guardó: la regla \"{rule}\" bloquearía la sesión que estás usando ahora. Cámbiala o pon encima una regla que permita esta sesión.",
+            "title": "Tus reglas",
+            "empty": "Todavía no hay reglas. Tu cuenta puede iniciar sesión desde cualquier sitio y dispositivo.",
+            "orderHint": "Las reglas se prueban en orden y decide la primera que coincide. Pon una regla de permitir encima de una de bloquear para hacer una excepción.",
+            "deleteBody": "Los inicios de sesión que rechazaba vuelven a entrar, salvo que coincida otra regla de debajo.",
+            "describe": "{field} {operator} {values}",
+            "and": " y ",
+            "or": " o ",
+            "values": "Valores",
+            "deletedList": "Lista eliminada",
+            "noLists": "Todavía no tienes listas de direcciones. Crea una abajo y elígela aquí.",
+            "addressPlaceholder": "203.0.113.0/24",
+            "invalidAddress": "Escribe una dirección IP o un rango como 203.0.113.0/24.",
+            "reputationOff": "Polaris aún no puede saber qué tipo de red usa una dirección, así que esta condición nunca coincide. Un administrador puede activar la reputación de direcciones en Gestión, Integraciones.",
+            "actions": {
+                "block": "Bloquear",
+                "challenge": "Verificar",
+                "allow": "Permitir"
+            },
+            "effects": {
+                "block": "Se rechaza el inicio de sesión y se cierra la sesión que coincida.",
+                "challenge": "La sesión se bloquea hasta que demuestres de nuevo que eres tú.",
+                "allow": "Se deja pasar y no se prueba ninguna regla de debajo."
+            },
+            "fields": {
+                "ip": "Dirección",
+                "country": "País",
+                "continent": "Continente",
+                "os": "Sistema operativo",
+                "browser": "Navegador",
+                "device_type": "Dispositivo",
+                "network": "Red",
+                "weekday": "Día",
+                "time": "Hora del día",
+                "access_group": "Lista de direcciones"
+            },
+            "operators": {
+                "equals": "es uno de",
+                "not_equals": "no es uno de"
+            },
+            "deviceTypes": {
+                "mobile": "Móvil o tableta",
+                "computer": "Ordenador"
+            },
+            "networks": {
+                "vpn": "VPN",
+                "proxy": "Proxy",
+                "tor": "Tor",
+                "fraud": "Fraude",
+                "high_risk": "Alto riesgo"
+            },
+            "weekdays": {
+                "mon": "Lunes",
+                "tue": "Martes",
+                "wed": "Miércoles",
+                "thu": "Jueves",
+                "fri": "Viernes",
+                "sat": "Sábado",
+                "sun": "Domingo"
+            },
+            "time": {
+                "from": "Desde",
+                "to": "Hasta",
+                "add": "Añadir franja",
+                "overnight": "Esta franja termina al día siguiente."
+            },
+            "examples": {
+                "title": "Empieza con un ejemplo:",
+                "blockApple": "Bloquear iPhone y Mac",
+                "onlyCountry": "Solo desde mi país",
+                "blockAnonymous": "Bloquear VPN, proxy y Tor"
+            },
+            "editor": {
+                "createTitle": "Nueva regla",
+                "editTitle": "Editar regla",
+                "name": "Nombre",
+                "when": "Cuando",
+                "whenHint": "La regla se aplica cuando se cumplen todas las condiciones.",
+                "then": "Acción",
+                "timeZone": "Zona horaria",
+                "timeZoneHint": "Los días y las horas se leen en esta zona.",
+                "needsName": "Ponle nombre a la regla.",
+                "needsValues": "Da al menos un valor a cada condición."
+            },
+            "preview": {
+                "title": "Probar con mi sesión actual",
+                "hint": "Mira qué harían las reglas, con esta tal como está, a la sesión que usas ahora. No se guarda nada.",
+                "listHint": "Mira qué harían tus reglas guardadas a la sesión que usas ahora.",
+                "test": "Probar",
+                "testing": "Probando...",
+                "block": "Esta sesión quedaría bloqueada por «{rule}».",
+                "challenge": "Esta sesión tendría que verificarse por «{rule}».",
+                "allow": "Esta sesión quedaría permitida por «{rule}».",
+                "noMatch": "Ninguna regla coincide, así que esta sesión está permitida.",
+                "client": "{browser} en {os}",
+                "unknown": "Sin datos"
+            }
         }
     },
     "activity": {
