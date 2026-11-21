@@ -2530,8 +2530,8 @@
         "withdraw": "Retirar",
         "accept": "Aceptar",
         "decline": "Rechazar",
-        "previewsOff": "Desactivar vistas previas de enlaces",
-        "previewsOn": "Activar vistas previas de enlaces"
+        "previewsOff": "Quitar vistas previas",
+        "previewsOn": "Ver vistas previas"
     },
     "streamQuality": {
         "custom": "Personal",

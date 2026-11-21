@@ -314,7 +314,7 @@
         "forbidden": "Tu administrador ha desactivado las vistas previas de enlaces para todos."
     },
     "checkup": {
-        "title": "Revisión de privacidad",
+        "title": "Revisar privacidad",
         "summary": "Revisa paso a paso quién puede encontrarte, verte y contactarte.",
         "start": "Empezar",
         "back": "Volver a privacidad",
@@ -322,12 +322,12 @@
         "recommended": "Recomendado: {audience}",
         "useRecommended": "Usar lo recomendado",
         "previous": "Atrás",
-        "continue": "Siguiente",
+        "continue": "Seguir",
         "saveAndContinue": "Guardar y seguir",
         "finish": "Hecho",
         "saved": "Guardado.",
         "security": {
-            "title": "Seguridad de la cuenta",
+            "title": "Seguridad",
             "intro": "La privacidad solo se mantiene si nadie más puede entrar como tú.",
             "open": "Abrir",
             "twoFactor": {
@@ -335,11 +335,11 @@
                 "hint": "Un código o llave además de tu contraseña."
             },
             "passkeys": {
-                "label": "Llaves de acceso",
+                "label": "Passkeys",
                 "hint": "Entra con tu dispositivo en vez de con contraseña."
             },
             "sessions": {
-                "label": "Dispositivos con sesión",
+                "label": "Tus sesiones",
                 "hint": "Cierra la sesión donde ya no la uses."
             }
         }

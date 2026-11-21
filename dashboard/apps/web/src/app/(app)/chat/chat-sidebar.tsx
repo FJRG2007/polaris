@@ -653,7 +653,7 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                                 })
                         )
                     }
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-muted-foreground transition-colors hover:bg-card-hover"
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-start text-sm text-muted-foreground transition-colors hover:bg-card-hover"
                 >
                     <NotebookPen className="size-3.5 shrink-0" />
                     <span className="min-w-0 truncate">{t("sidebar.messageYourself")}</span>
