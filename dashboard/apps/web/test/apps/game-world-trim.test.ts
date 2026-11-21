@@ -54,6 +54,21 @@ describe("the settings a server carries", () => {
         expect(readWorldTrim({ [WORLD_TRIM_KEY]: { everyDays: 10_000 } }).everyDays).toBe(365);
     });
 
+    it("tells a run from before 2026-11-21 from one somebody asked for", () => {
+        const old = readWorldTrimRun({ [WORLD_TRIM_RUN_KEY]: { at: "2026-11-21T05:05:00.000Z", removed: 20678 } });
+        expect(old).toMatchObject({ trigger: null, backup: null, acknowledged: false });
+        const asked = readWorldTrimRun({
+            [WORLD_TRIM_RUN_KEY]: {
+                at: "2026-11-22T10:00:00.000Z",
+                removed: 3,
+                trigger: "button",
+                backup: "2026-11-22T10-00-00-000.tar.gz",
+                acknowledged: true
+            }
+        });
+        expect(asked).toMatchObject({ trigger: "button", backup: "2026-11-22T10-00-00-000.tar.gz", acknowledged: true });
+    });
+
     it("says nothing about a server that has never run one", () => {
         expect(readWorldTrimRun({})).toBeNull();
         expect(readWorldTrimRun({ [WORLD_TRIM_RUN_KEY]: { removed: 4 } })).toBeNull();
@@ -135,6 +150,25 @@ describe("what the container printed", () => {
         expect(readTrimReport('{"ok":true}')).toBeNull();
     });
 
+    it("reads a refusal, and says nothing was removed", () => {
+        const refused = readTrimReport(
+            JSON.stringify({ removed: 20678, freedBytes: 1, refused: { reason: "share", share: 0.8347, limit: 0.5 } })
+        );
+        expect(refused?.refused).toEqual({ reason: "share", share: 0.8347, limit: 0.5 });
+        expect(refused && english(describeTrim(refused))).toContain("83%");
+        // A reason this side has never heard of is still a refusal.
+        const unknown = readTrimReport(JSON.stringify({ removed: 4, refused: { reason: "something-new" } }));
+        expect(unknown?.refused?.reason).toBe("backup");
+    });
+
+    it("reads the backup the run took", () => {
+        const report = readTrimReport(
+            JSON.stringify({ removed: 4, backup: { name: "2026-11-22T10-00-00-000.tar.gz", sizeBytes: 900, files: 3 } })
+        );
+        expect(report?.backup).toEqual({ name: "2026-11-22T10-00-00-000.tar.gz", sizeBytes: 900 });
+        expect(readTrimReport(JSON.stringify({ removed: 0 }))?.backup).toBeNull();
+    });
+
     it("says what happened in one sentence", () => {
         const report = readTrimReport(line);
         expect(report && english(describeTrim(report))).toContain("55,790 chunks");
@@ -152,7 +186,19 @@ describe("the script that goes into the container", () => {
 
     it("needs nothing that is not already in the image", () => {
         const imports = [...WORLD_TRIM_SCRIPT.matchAll(/^import (\w+)/gm)].map((match) => match[1]);
-        expect(imports.sort()).toEqual(["argparse", "gzip", "json", "os", "struct", "sys", "zlib"]);
+        expect(imports.sort()).toEqual([
+            "argparse",
+            "datetime",
+            "gzip",
+            "json",
+            "os",
+            "shutil",
+            "stat",
+            "struct",
+            "sys",
+            "tarfile",
+            "zlib"
+        ]);
     });
 
     it("never writes over a world file in place", () => {

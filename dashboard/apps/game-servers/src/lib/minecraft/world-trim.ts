@@ -73,6 +73,15 @@ export interface WorldTrimRun {
     readonly freedBytes: number;
     /** Why it did not work, in words for the screen. Empty when it did. */
     readonly detail: string;
+    /**
+     * Who asked for it. Only written since 2026-11-21: a run without it is one
+     * from before, which may have been automatic and taken no backup.
+     */
+    readonly trigger: "button" | "automatic" | null;
+    /** The backup taken right before it, by archive name, when there was one. */
+    readonly backup: string | null;
+    /** The operator said the world is fine after it, so the screen stops asking. */
+    readonly acknowledged: boolean;
 }
 
 /** The settings out of a stored config blob, with anything malformed falling back
@@ -107,7 +116,10 @@ export function readWorldTrimRun(config: Record<string, unknown>): WorldTrimRun 
         ok: value.ok !== false,
         removed: typeof value.removed === "number" ? value.removed : 0,
         freedBytes: typeof value.freedBytes === "number" ? value.freedBytes : 0,
-        detail: typeof value.detail === "string" ? value.detail : ""
+        detail: typeof value.detail === "string" ? value.detail : "",
+        trigger: value.trigger === "button" || value.trigger === "automatic" ? value.trigger : null,
+        backup: typeof value.backup === "string" ? value.backup : null,
+        acknowledged: value.acknowledged === true
     };
 }
 
@@ -132,9 +144,10 @@ export function trimDue(
     // stopped server takes no backup, and "never stood in" is not "never used":
     // on 2026-11-21 one deleted 443 chunks holding chests, beds and signs, all
     // with an InhabitedTime of 0, and left the rewritten region files owned by
-    // root so the server could not save over them. Until the optimizer keeps
-    // every chunk that holds anything placed and preserves file ownership, only
-    // the button (which backs up first) may run it.
+    // root so the server could not save over them (BUG-0009). The script now
+    // keeps anything holding something, refuses worlds where inhabited time is
+    // not evidence, backs up first and keeps owners - and still only a person
+    // pressing the button, who is shown the result and its backup, may run it.
     if (AUTOMATIC_TRIM_DISABLED) return false;
     if (!settings.enabled) return false;
     // Bedrock keeps its world in a key-value store rather than in region files.
@@ -161,6 +174,38 @@ export interface WorldTrimReport {
     /** Region files it would not touch, with the reason. Empty is the ordinary
      *  case; anything here is a file left exactly as it was. */
     readonly skipped: readonly { file: string; why: string }[];
+    /** The copy the script took and read back before it rewrote anything. */
+    readonly backup: { readonly name: string; readonly sizeBytes: number } | null;
+    /** Why the script would not go ahead, when it would not. Nothing was written. */
+    readonly refused: WorldTrimRefusal | null;
+}
+
+/**
+ * The reasons the script stops a whole run before it writes anything: more than
+ * half of a dimension's finished chunks would go, the world does not count
+ * inhabited time, or the backup could not be made, or made whole.
+ */
+export type WorldTrimRefusal =
+    | { readonly reason: "share"; readonly share: number; readonly limit: number }
+    | { readonly reason: "untracked" }
+    | { readonly reason: "room"; readonly free: number; readonly size: number }
+    | { readonly reason: "backup"; readonly detail: string };
+
+function readRefusal(value: unknown): WorldTrimRefusal | null {
+    if (typeof value !== "object" || value === null) return null;
+    const row = value as Record<string, unknown>;
+    switch (row.reason) {
+        case "share":
+            return { reason: "share", share: numberOf(row.share), limit: numberOf(row.limit) };
+        case "untracked":
+            return { reason: "untracked" };
+        case "room":
+            return { reason: "room", free: numberOf(row.free), size: numberOf(row.size) };
+        default:
+            // Any refusal this side does not know the name of is still a refusal:
+            // the script wrote nothing, and saying otherwise would be the lie.
+            return { reason: "backup", detail: typeof row.detail === "string" ? row.detail : "" };
+    }
 }
 
 /**
@@ -199,7 +244,17 @@ export function readTrimReport(output: string): WorldTrimReport | null {
                           ? [{ file: skip.file, why: typeof skip.why === "string" ? skip.why : "" }]
                           : [];
                   })
-                : []
+                : [],
+            backup:
+                typeof row.backup === "object" &&
+                row.backup !== null &&
+                typeof (row.backup as Record<string, unknown>).name === "string"
+                    ? {
+                          name: (row.backup as Record<string, unknown>).name as string,
+                          sizeBytes: numberOf((row.backup as Record<string, unknown>).sizeBytes)
+                      }
+                    : null,
+            refused: row.refused === undefined || row.refused === null ? null : readRefusal(row.refused)
         };
     }
     return null;
@@ -211,9 +266,42 @@ function numberOf(value: unknown): number {
 
 /** What a run did, in one sentence, for the screen and for the activity trail. */
 export function describeTrim(report: WorldTrimReport): string {
+    if (report.refused) return describeRefusal(report.refused);
     if (report.removed === 0) return gameMessage("games", "lib.trim.nothing");
     const size = formatBytes(report.freedBytes);
     return report.dryRun
         ? gameMessage("games", "lib.trim.wouldFree", { count: report.removed, size })
         : gameMessage("games", "lib.trim.freed", { count: report.removed, size });
+}
+
+/** Why nothing was done, in words for whoever pressed the button. */
+export function describeRefusal(refused: WorldTrimRefusal): string {
+    switch (refused.reason) {
+        case "share":
+            return gameMessage("games", "lib.trim.refusedShare", {
+                share: Math.round(refused.share * 100)
+            });
+        case "untracked":
+            return gameMessage("games", "lib.trim.refusedUntracked");
+        case "room":
+            return gameMessage("games", "lib.trim.refusedRoom", {
+                free: formatBytes(refused.free),
+                size: formatBytes(refused.size)
+            });
+        case "backup":
+            return gameMessage("games", "lib.trim.refusedBackup");
+    }
+}
+
+/**
+ * A past run the World screen should still ask about, or null.
+ *
+ * Any run that removed something and was not started from the button since
+ * 2026-11-21 - which covers every automatic run, none of which took a backup -
+ * until the operator says the world is fine (BUG-0009).
+ */
+export function pastTrimToReview(run: WorldTrimRun | null): WorldTrimRun | null {
+    if (!run || !run.ok || run.removed <= 0) return null;
+    if (run.trigger === "button" || run.acknowledged) return null;
+    return run;
 }

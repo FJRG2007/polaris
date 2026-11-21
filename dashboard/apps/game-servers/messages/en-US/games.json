@@ -942,9 +942,13 @@
             "stopFirst": "The server has to be stopped before its world can be optimized",
             "failed": "The world could not be optimized",
             "needsNewer": "This machine needs a newer Polaris before it can optimize a world",
-            "nothing": "Nothing to take out - every chunk has been visited.",
-            "wouldFree": "{count, plural, one {1 chunk has} other {{count, number} chunks have}} never been visited. Removing them would free {size}.",
-            "freed": "Removed {count, plural, one {1 chunk} other {{count, number} chunks}} nobody had been in, freeing {size}."
+            "nothing": "Nothing to take out - every chunk holds something or somebody has been in it.",
+            "wouldFree": "{count, plural, one {1 chunk is} other {{count, number} chunks are}} untouched generated land. Removing them would free {size}.",
+            "freed": "Removed {count, plural, one {1 chunk} other {{count, number} chunks}} of untouched generated land, freeing {size}.",
+            "refusedShare": "Not optimized: it would remove {share}% of this world, which is more than any world people play in can lose safely. Some mods and pre-generated worlds look untouched when they are not, so nothing was changed.",
+            "refusedUntracked": "Not optimized: this world does not record where players have been, so Polaris cannot tell builds from untouched land. Nothing was changed.",
+            "refusedRoom": "Not optimized: a backup is taken first and there is not enough free space for it ({free} free, {size} needed). Nothing was changed.",
+            "refusedBackup": "Not optimized: the backup taken first could not be made or checked, and nothing is removed without one. Nothing was changed."
         },
         "noAnswerInTime": "The server did not answer in time",
         "fivemStarting": "The server is starting. It loads its resources first, which takes a moment.",

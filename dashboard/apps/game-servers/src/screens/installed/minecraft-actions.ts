@@ -1663,7 +1663,14 @@ export async function backUpWorldAction(
  */
 export async function previewWorldTrimAction(
     installedAppId: string
-): Promise<{ summary?: string; removed?: number; freedBytes?: number; error?: string }> {
+): Promise<{
+    summary?: string;
+    removed?: number;
+    freedBytes?: number;
+    /** The script would not go ahead on this world; `summary` says why. */
+    refused?: boolean;
+    error?: string;
+}> {
     const { access } = await requireGameServer("games.manage", installedAppId);
     const { previewWorldTrim } = await import("../../lib/minecraft/world-trim-service");
     const { describeTrim } = await import("../../lib/minecraft/world-trim");
@@ -1676,19 +1683,22 @@ export async function previewWorldTrimAction(
     return {
         summary: describeTrim(outcome.report),
         removed: outcome.report.removed,
-        freedBytes: outcome.report.freedBytes
+        freedBytes: outcome.report.freedBytes,
+        refused: outcome.report.refused !== null
     };
 }
 
-/** Do it, stopping the server for it and putting it back as it was. */
+/**
+ * Do it, stopping the server for it and putting it back as it was. Always backed
+ * up first - the backup's name comes back so the screen can offer to restore it.
+ */
 export async function optimizeWorldAction(
-    installedAppId: string,
-    options: { backup?: boolean } = {}
-): Promise<{ summary?: string; error?: string }> {
+    installedAppId: string
+): Promise<{ summary?: string; backup?: string | null; refused?: boolean; error?: string }> {
     const { user, access } = await requireGameServer("games.manage", installedAppId);
     const { optimizeWorldNow } = await import("../../lib/minecraft/world-trim-service");
     const { describeTrim } = await import("../../lib/minecraft/world-trim");
-    const outcome = await optimizeWorldNow(access.ownerId, installedAppId, options);
+    const outcome = await optimizeWorldNow(access.ownerId, installedAppId);
     if (!outcome.report)
         return {
             error:
@@ -1699,9 +1709,34 @@ export async function optimizeWorldAction(
         action: "games.world-optimize",
         targetType: "installedApp",
         targetId: installedAppId,
-        metadata: { removed: outcome.report.removed, freedBytes: outcome.report.freedBytes }
+        metadata: {
+            removed: outcome.report.removed,
+            freedBytes: outcome.report.freedBytes,
+            backup: outcome.report.backup?.name ?? null,
+            refused: outcome.report.refused?.reason ?? null
+        }
     });
-    return { summary: describeTrim(outcome.report) };
+    return {
+        summary: describeTrim(outcome.report),
+        backup: outcome.report.backup?.name ?? null,
+        refused: outcome.report.refused !== null
+    };
+}
+
+/** The operator checked the world after a past optimization and it is fine. */
+export async function acknowledgeWorldTrimAction(installedAppId: string): Promise<{ error?: string }> {
+    const { access } = await requireGameServer("games.manage", installedAppId);
+    const { WORLD_TRIM_RUN_KEY } = await import("../../lib/minecraft/world-trim");
+    const install = await prisma.installedApp.findFirst({
+        where: { id: installedAppId, ownerId: access.ownerId },
+        select: { config: true }
+    });
+    const stored = readInstallConfig(install?.config)[WORLD_TRIM_RUN_KEY];
+    if (typeof stored !== "object" || stored === null || Array.isArray(stored)) return {};
+    await patchInstallConfig(installedAppId, {
+        [WORLD_TRIM_RUN_KEY]: { ...(stored as Record<string, unknown>), acknowledged: true }
+    });
+    return {};
 }
 
 const worldTrimSchema = z.object({

@@ -10,10 +10,11 @@
  * remembers where each chunk sits inside it, so a file rewritten underneath it is
  * one the server then writes back through a table that no longer describes it.
  *
- * A backup is taken first, and it is taken while the server is still up, because
- * that is the only time the archive can be made - it is the container's own `tar`.
- * So the order is: back up, stop, optimize, start. An automatic run that cannot
- * take a backup does not run at all.
+ * A backup is taken first, every time, by the script itself once the server is
+ * down: it copies the world beside itself, reads the copy back in full, and
+ * refuses to rewrite anything unless the copy holds every file about to change.
+ * Its name comes back in the report, recorded with the run, so the screen can
+ * offer to put it back. There is no way to ask for a run without one.
  *
  * And the server goes back to whatever it was. A server that was running is
  * running again at the end, including when the optimizer failed; a server that
@@ -28,7 +29,6 @@ import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { DATA_DIR, levelParent } from "./world";
 import { withServerContainer } from "./service";
-import { createWorldBackup } from "./world-service";
 import { WORLD_TRIM_SCRIPT } from "./world-trim-script";
 import {
     describeTrim,
@@ -86,7 +86,7 @@ export async function previewWorldTrim(
     ownerId: string,
     installedAppId: string
 ): Promise<WorldTrimOutcome> {
-    return runTrim(ownerId, installedAppId, { dryRun: true, backup: false, restart: false });
+    return runTrim(ownerId, installedAppId, { dryRun: true, restart: false, trigger: "button" });
 }
 
 /**
@@ -97,14 +97,11 @@ export async function previewWorldTrim(
  */
 export async function optimizeWorldNow(
     ownerId: string,
-    installedAppId: string,
-    options: { backup?: boolean } = {}
+    installedAppId: string
 ): Promise<WorldTrimOutcome> {
-    return runTrim(ownerId, installedAppId, {
-        dryRun: false,
-        backup: options.backup !== false,
-        restart: true
-    });
+    // No option to skip the backup: the script itself copies the world, reads
+    // the copy back and refuses to rewrite anything without it (BUG-0009).
+    return runTrim(ownerId, installedAppId, { dryRun: false, restart: true, trigger: "button" });
 }
 
 /**
@@ -136,14 +133,13 @@ export async function sweepWorldTrim(
         })
     )
         return false;
-    // No backup: the archive is made by the container's own tar, which needs the
-    // server up, and starting it to back it up would be the sweep stopping and
-    // starting a server nobody asked it to touch. A stopped server's world is
-    // already covered by whatever backup plan it has.
+    // Unreachable while AUTOMATIC_TRIM_DISABLED holds (see `trimDue`). Were it
+    // ever reached, the script still backs up and refuses exactly as it does for
+    // the button.
     const outcome = await runTrim(ownerId, installedAppId, {
         dryRun: false,
-        backup: false,
-        restart: false
+        restart: false,
+        trigger: "automatic"
     });
     return outcome.failure === null;
 }
@@ -151,7 +147,7 @@ export async function sweepWorldTrim(
 async function runTrim(
     ownerId: string,
     installedAppId: string,
-    how: { dryRun: boolean; backup: boolean; restart: boolean }
+    how: { dryRun: boolean; restart: boolean; trigger: "button" | "automatic" }
 ): Promise<WorldTrimOutcome> {
     const install = await prisma.installedApp.findFirst({
         where: { id: installedAppId, ownerId, status: { not: "removed" } },
@@ -174,21 +170,18 @@ async function runTrim(
     const held = [install.applicationId];
     await holdStorage(held);
     try {
-        if (how.backup) {
-            // Before the stop, because the archive is the container's own tar.
-            await createWorldBackup(ownerId, installedAppId);
-        }
         if (wasRunning) {
             await setApplicationRunning(install.applicationId, ownerId, false);
             restarted = true;
         }
         const outcome = await execute(ownerId, installedAppId, world, settings, how.dryRun);
-        if (!how.dryRun) await record(installedAppId, outcome);
+        if (!how.dryRun) await record(installedAppId, outcome, how.trigger);
         return { ...outcome, restarted };
     } catch (caught) {
         const why =
             caught instanceof Error ? caught.message : gameMessage("games", "lib.trim.failed");
-        if (!how.dryRun) await record(installedAppId, { report: null, failure: why, restarted });
+        if (!how.dryRun)
+            await record(installedAppId, { report: null, failure: why, restarted }, how.trigger);
         return { report: null, failure: why, restarted };
     } finally {
         // Always, including after a failure: a server that was up when somebody
@@ -217,6 +210,10 @@ async function execute(
             dryRun
         });
         const report = readTrimReport(result.output);
+        // A rewrite with no backup in the report is not something this script
+        // does; anything that claims one is not to be reported as a success.
+        if (report && !dryRun && !report.refused && report.removed > 0 && !report.backup)
+            return fail(gameMessage("games", "lib.trim.failed"), false);
         if (result.code !== 0 || !report) {
             // The container's own words, when it said anything worth repeating.
             // "python3: not found" is the whole answer for an image that has none,
@@ -236,14 +233,21 @@ async function execute(
 /** Write down what happened, so the screen can say it and the sweep knows this
  *  world has been done. A failure is recorded too: a run that keeps failing is
  *  worth seeing, and it stops the sweep trying again every minute. */
-async function record(installedAppId: string, outcome: WorldTrimOutcome): Promise<void> {
+async function record(
+    installedAppId: string,
+    outcome: WorldTrimOutcome,
+    trigger: "button" | "automatic"
+): Promise<void> {
+    const refused = outcome.report?.refused ?? null;
     await patchInstallConfig(installedAppId, {
         [WORLD_TRIM_RUN_KEY]: {
             at: new Date().toISOString(),
-            ok: outcome.failure === null,
-            removed: outcome.report?.removed ?? 0,
-            freedBytes: outcome.report?.freedBytes ?? 0,
-            detail: outcome.failure ?? (outcome.report ? describeTrim(outcome.report) : "")
+            ok: outcome.failure === null && refused === null,
+            removed: refused ? 0 : (outcome.report?.removed ?? 0),
+            freedBytes: refused ? 0 : (outcome.report?.freedBytes ?? 0),
+            detail: outcome.failure ?? (outcome.report ? describeTrim(outcome.report) : ""),
+            trigger,
+            backup: outcome.report?.backup?.name ?? null
         }
     }).catch(() => undefined);
 }

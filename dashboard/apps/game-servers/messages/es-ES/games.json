@@ -942,9 +942,13 @@
             "stopFirst": "El servidor tiene que estar parado para poder optimizar su mundo",
             "failed": "No se pudo optimizar el mundo",
             "needsNewer": "Esta máquina necesita un Polaris más nuevo para poder optimizar un mundo",
-            "nothing": "Nada que quitar - se ha visitado cada chunk.",
-            "wouldFree": "{count, plural, one {1 chunk no se ha visitado nunca} other {{count, number} chunks no se han visitado nunca}}. Quitarlos liberaría {size}.",
-            "freed": "{count, plural, one {Se quitó 1 chunk} other {Se quitaron {count, number} chunks}} en los que nadie había estado, liberando {size}."
+            "nothing": "Nada que quitar - cada chunk tiene algo o alguien ha estado en él.",
+            "wouldFree": "{count, plural, one {1 chunk es} other {{count, number} chunks son}} terreno generado sin tocar. Quitarlos liberaría {size}.",
+            "freed": "{count, plural, one {Se quitó 1 chunk} other {Se quitaron {count, number} chunks}} de terreno generado sin tocar, liberando {size}.",
+            "refusedShare": "No se optimizó: quitaría el {share}% de este mundo, más de lo que puede perder sin riesgo un mundo en el que se juega. Algunos mods y mundos pregenerados parecen sin tocar cuando no lo están, así que no se cambió nada.",
+            "refusedUntracked": "No se optimizó: este mundo no registra por dónde han pasado los jugadores, así que Polaris no distingue construcciones de terreno sin tocar. No se cambió nada.",
+            "refusedRoom": "No se optimizó: antes se hace una copia y no hay espacio libre para ella ({free} libres, {size} necesarios). No se cambió nada.",
+            "refusedBackup": "No se optimizó: la copia previa no se pudo hacer o comprobar, y sin ella no se quita nada. No se cambió nada."
         },
         "noAnswerInTime": "El servidor no respondió a tiempo",
         "fivemStarting": "El servidor está arrancando. Primero carga sus recursos, lo que lleva un momento.",
