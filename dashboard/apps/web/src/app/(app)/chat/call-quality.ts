@@ -127,10 +127,11 @@ export const CAMERA_LADDER: QualityLadder = {
  * one. So the rungs climb in framerate first and the encoder is told which of
  * the two it is looking at - see `screenIsMotion`.
  *
- * The top rung sends the display at its own resolution, uncapped, with an
- * allowance to match - a 4K monitor full of small text is the one thing in a
- * call that can genuinely use ten megabits, and giving it less is how a shared
- * terminal comes out unreadable.
+ * The top rung is the source: the display at its own resolution and up to
+ * sixty frames a second, uncapped, with an allowance to match - a 4K monitor
+ * full of small text, or a game, is the one thing in a call that can genuinely
+ * use that much, and giving it less is how a shared terminal comes out
+ * unreadable and a game comes out choppy. It is what auto opens at and stays at.
  */
 export const SCREEN_LADDER: QualityLadder = {
     rungs: {
@@ -159,10 +160,10 @@ export const SCREEN_LADDER: QualityLadder = {
             detail: "1080p, 30 fps"
         },
         max: {
-            frameRate: 30,
-            maxBitrate: 10_000_000,
+            frameRate: 60,
+            maxBitrate: 12_000_000,
             label: "callQuality.highest",
-            detail: "Full size, 30 fps",
+            detail: "Source, 60 fps",
             detailKey: "callQuality.fullSize"
         }
     },
@@ -237,6 +238,8 @@ export interface AutoState {
      * rung down, which is where it was actually found.
      */
     readonly blocked?: CallLevel;
+    /** How much trouble has piled up at this rung - see `TROUBLE_TO_DROP`. */
+    readonly troubled?: number;
 }
 
 /**
@@ -371,6 +374,19 @@ export const HEALTHY_TO_CLIMB = 4;
  *  times as long: it has been wrong there before. */
 export const HEALTHY_TO_RETRY = 12;
 
+/**
+ * How much trouble it takes to bring the picture down a rung.
+ *
+ * A reading that struggles adds two and one that does not takes one away, so
+ * three bad readings in a row drop a rung and a line that is bad about half the
+ * time still gets there, a little later - while a single bad moment on a good
+ * line never does. One bad reading used to be enough, and a single wobble, or
+ * the first seconds of any call while the line is still being measured, took a
+ * shared screen from the source down to 720p at five frames a second.
+ */
+export const TROUBLE_TO_DROP = 6;
+const TROUBLE_PER_BAD = 2;
+
 /** Below this share of the frames a rung asked for, the picture is stuttering
  *  whatever anything else claims. Half is deliberately far down - a camera in a
  *  dim room legitimately drops to two thirds on its own. */
@@ -417,7 +433,16 @@ export const SAVER_CLIMB_SHARE = 0.6;
 
 /** Whether something is actually going wrong, as opposed to merely not being
  *  perfect. Only these bring the picture down; the data saver adds one more,
- *  a line that has started to queue. */
+ *  a line that has started to queue.
+ *
+ *  The encoder saying it is short of bandwidth is not one of them. It says so
+ *  for the first seconds of every call, while the estimate is still climbing
+ *  to what the line can really carry, and on a full line it is already
+ *  answering it itself by spending fewer bits on the same rung - which is what
+ *  every other call app relies on. Read as trouble, it walked every shared
+ *  screen to the bottom of the ladder before the line had been measured. What
+ *  the call actually suffers from - lost packets, a machine that cannot keep up,
+ *  frames that stop - still counts. */
 function struggling(
     health: CallHealth,
     ladder: QualityLadder,
@@ -426,9 +451,8 @@ function struggling(
 ): boolean {
     if (health.connection === "poor" || health.connection === "lost") return true;
     if (saver && health.rtt !== undefined && health.rtt >= SAVER_QUEUED_RTT_S) return true;
-    // The encoder naming what is holding it back. Both answers mean the rung is
-    // beyond this machine or this line right now, which is exactly the question.
-    if (health.limitation === "bandwidth" || health.limitation === "cpu") return true;
+    // The machine cannot encode this rung: no amount of bandwidth fixes that.
+    if (health.limitation === "cpu") return true;
     if (health.fps === undefined) return false;
     return health.fps < ladder.rungs[level].frameRate * STALLING_BELOW;
 }
@@ -458,10 +482,11 @@ function lower(one: CallLevel | undefined, two: CallLevel): CallLevel {
 /**
  * What auto should do next, given how the picture is doing right now.
  *
- * Down immediately, up slowly, and that asymmetry is the whole design. Dropping
- * a rung costs a slightly softer picture and buys back the call; climbing one
- * costs the call again if the guess was wrong, so it waits until things have
- * been convincingly fine.
+ * Down once the trouble is real, up slowly, and that asymmetry is the whole
+ * design. Dropping a rung costs a softer picture and buys back the call, so it
+ * waits only for the trouble to be sustained - see `TROUBLE_TO_DROP`; climbing
+ * one costs the call again if the guess was wrong, so it waits until things
+ * have been convincingly fine.
  *
  * The point of reading the encoder rather than only the connection is that it
  * lets the default be greedy. Asking for the top rung and watching for a
@@ -476,18 +501,23 @@ export function driftAuto(
     saver = hostDataSaver()
 ): AutoState {
     if (struggling(health, ladder, state.level, saver)) {
+        const troubled = (state.troubled ?? 0) + TROUBLE_PER_BAD;
+        if (troubled < TROUBLE_TO_DROP) return { ...state, healthy: 0, troubled };
         const down = shift(ladder, state.level, -1);
         return {
             level: down,
             healthy: 0,
+            troubled: 0,
             // Remembered only where there was somewhere to fall from. At the
             // floor the rung is not what is wrong, and blaming it would make
             // every climb out of a bad patch take three minutes.
             blocked: down === state.level ? state.blocked : lower(state.blocked, state.level)
         };
     }
+    const troubled = Math.max(0, (state.troubled ?? 0) - 1);
     const next = shift(ladder, state.level, 1);
-    if (!comfortable(health, ladder.rungs[next], saver)) return { ...state, healthy: 0 };
+    if (!comfortable(health, ladder.rungs[next], saver))
+        return { ...state, healthy: 0, troubled };
     const healthy = state.healthy + 1;
     // At or above the rung that failed, not merely equal to it. Equality alone
     // damped exactly one rung, and the one under it went back to the ordinary
@@ -495,8 +525,8 @@ export function driftAuto(
     // second every minute, failed, and came back down.
     const slow = state.blocked !== undefined && index(next) >= index(state.blocked);
     const needed = slow ? HEALTHY_TO_RETRY : HEALTHY_TO_CLIMB;
-    if (healthy < needed) return { ...state, healthy };
-    return { level: next, healthy: 0, blocked: state.blocked };
+    if (healthy < needed) return { ...state, healthy, troubled };
+    return { level: next, healthy: 0, troubled: 0, blocked: state.blocked };
 }
 
 /** Where auto begins a call: the best rung there is. A line is presumed fine

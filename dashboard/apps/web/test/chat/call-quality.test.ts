@@ -41,6 +41,7 @@ const {
     HEALTHY_TO_RETRY,
     LEVELS,
     SCREEN_LADDER,
+    TROUBLE_TO_DROP,
     cameraConstraints,
     cameraQuality,
     driftAuto,
@@ -137,7 +138,7 @@ describe("what a screen is asked for", () => {
         const want = screenConstraints("max");
         expect(want.width).toBeUndefined();
         expect(want.height).toBeUndefined();
-        expect(want.frameRate).toEqual({ ideal: 30 });
+        expect(want.frameRate).toEqual({ ideal: 60 });
     });
 
     it("caps the size on every rung below it", () => {
@@ -231,9 +232,16 @@ describe("the automatic walk on a backup line (data saver)", () => {
 
     it("comes down when the line starts to queue, and only then", () => {
         const queued = { ...calm, rtt: quality.SAVER_QUEUED_RTT_S };
-        expect(driftAuto(screen(), queued, SCREEN_LADDER, true).level).toBe("high");
+        // Sustained, as any trouble has to be before it costs a rung.
+        const walk = (saver: boolean) => {
+            let state = screen();
+            for (let reading = 0; reading < TROUBLE_TO_DROP / 2; reading += 1)
+                state = driftAuto(state, queued, SCREEN_LADDER, saver);
+            return state.level;
+        };
+        expect(walk(true)).toBe("high");
         // The same round trip without the saver is a far line, not a full one.
-        expect(driftAuto(screen(), queued, SCREEN_LADDER, false).level).toBe("max");
+        expect(walk(false)).toBe("max");
     });
 
     it("climbs back only once the estimate says the bigger rung fits", () => {
@@ -318,6 +326,17 @@ describe("the automatic walk", () => {
     const camera = () => startAuto(CAMERA_LADDER);
     /** A reading with nothing wrong in it. */
     const clean = { connection: "excellent", limitation: "none", fps: 30 };
+    /** The same reading, as many times in a row as it takes to drop a rung. */
+    const sustained = (
+        state: ReturnType<typeof startAuto>,
+        health: Parameters<typeof driftAuto>[1],
+        ladder = CAMERA_LADDER
+    ) => {
+        let after = state;
+        for (let reading = 0; reading < TROUBLE_TO_DROP / 2; reading += 1)
+            after = driftAuto(after, health, ladder);
+        return after;
+    };
 
     it("starts at the very top", () => {
         // Greedy on purpose. A line is presumed fine until it says otherwise -
@@ -326,43 +345,41 @@ describe("the automatic walk", () => {
         expect(camera().level).toBe("max");
     });
 
-    it("drops a rung on the first poor reading", () => {
-        expect(driftAuto(camera(), { connection: "poor" }, CAMERA_LADDER).level).toBe("high");
+    it("stays at the top through one bad reading, and drops once it is sustained", () => {
+        // A single wobble is not a call that lags. Three bad readings in a row
+        // are.
+        const once = driftAuto(camera(), { connection: "poor" }, CAMERA_LADDER);
+        expect(once.level).toBe("max");
+        expect(sustained(camera(), { connection: "poor" }).level).toBe("high");
     });
 
     it("treats a lost connection the same way", () => {
-        expect(driftAuto(camera(), { connection: "lost" }, CAMERA_LADDER).level).toBe("high");
+        expect(sustained(camera(), { connection: "lost" }).level).toBe("high");
     });
 
-    it("drops when the encoder says the line cannot carry it", () => {
-        // The reading that makes greed safe: the encoder naming what is holding
-        // it back, while it is happening, rather than packets going missing
-        // afterwards.
-        const after = driftAuto(
-            camera(),
-            { connection: "excellent", limitation: "bandwidth", fps: 30 },
-            CAMERA_LADDER
-        );
-        expect(after.level).toBe("high");
+    it("keeps a shared screen at the source while the line is still being measured", () => {
+        // The encoder says it is short of bandwidth for the first seconds of
+        // every call. Read as trouble, it walked every shared screen down to
+        // 720p at five frames a second before the line had been measured.
+        let state = startAuto(SCREEN_LADDER);
+        for (let reading = 0; reading < 8; reading += 1)
+            state = driftAuto(
+                state,
+                { connection: "excellent", limitation: "bandwidth" },
+                SCREEN_LADDER
+            );
+        expect(state.level).toBe("max");
     });
 
     it("drops when the encoder says the machine cannot encode it", () => {
-        const after = driftAuto(
-            camera(),
-            { connection: "excellent", limitation: "cpu", fps: 30 },
-            CAMERA_LADDER
-        );
+        const after = sustained(camera(), { connection: "excellent", limitation: "cpu", fps: 30 });
         expect(after.level).toBe("high");
     });
 
     it("drops when the frames stop arriving, whatever anything else claims", () => {
         // The freeze somebody actually notices. Half of what the rung asked for
         // is far enough down that a camera in a dim room does not trip it.
-        const after = driftAuto(
-            camera(),
-            { connection: "excellent", limitation: "none", fps: 8 },
-            CAMERA_LADDER
-        );
+        const after = sustained(camera(), { connection: "excellent", limitation: "none", fps: 8 });
         expect(after.level).toBe("high");
     });
 
@@ -389,11 +406,7 @@ describe("the automatic walk", () => {
     it("blames nothing when it is already at the floor", () => {
         // Otherwise the bottom rung is marked as the one that failed, and
         // climbing out of a bad patch takes three times as long as it should.
-        const after = driftAuto(
-            { level: CAMERA_LADDER.floor, healthy: 0 },
-            { connection: "poor" },
-            CAMERA_LADDER
-        );
+        const after = sustained({ level: CAMERA_LADDER.floor, healthy: 0 }, { connection: "poor" });
         expect(after.blocked).toBeUndefined();
     });
 
@@ -443,11 +456,7 @@ describe("the automatic walk", () => {
         // Without this the greedy default is a metronome: a machine that cannot
         // encode 1080p cannot encode it a minute later either, and the call
         // rediscovers that every minute for as long as it lasts.
-        let state = driftAuto(
-            camera(),
-            { connection: "excellent", limitation: "cpu" },
-            CAMERA_LADDER
-        );
+        let state = sustained(camera(), { connection: "excellent", limitation: "cpu" });
         expect(state.level).toBe("high");
         expect(state.blocked).toBe("max");
         for (let reading = 1; reading < HEALTHY_TO_RETRY; reading += 1) {
@@ -472,12 +481,8 @@ describe("the automatic walk", () => {
         // fails, 720p fails, and then 720p is ordinary ground again - so the
         // call climbed into it every minute, failed, and came back, for as long
         // as it lasted. What is remembered is the lowest rung that failed.
-        let state = driftAuto(
-            camera(),
-            { connection: "excellent", limitation: "cpu" },
-            CAMERA_LADDER
-        );
-        state = driftAuto(state, { connection: "excellent", limitation: "cpu" }, CAMERA_LADDER);
+        let state = sustained(camera(), { connection: "excellent", limitation: "cpu" });
+        state = sustained(state, { connection: "excellent", limitation: "cpu" });
         expect(state.level).toBe("medium");
         expect(state.blocked).toBe("high");
         for (let reading = 1; reading < HEALTHY_TO_RETRY; reading += 1) {
@@ -504,12 +509,13 @@ describe("the automatic walk", () => {
         expect(state.level).toBe("max");
     });
 
-    it("does not oscillate between two rungs on an alternating line", () => {
-        // One bad reading costs a rung; one good one buys nothing. A line that
-        // flickers therefore settles at the bottom rather than changing the
-        // picture every fifteen seconds, which is the thing people notice.
+    it("comes down on a line that is bad half the time, and never climbs on it", () => {
+        // A bad reading weighs two and a good one takes one away, so a line
+        // that flickers still drops - later than a plainly bad one - and the
+        // good readings between never add up to a climb. The picture moves
+        // rarely, which is the thing people notice.
         let state = camera();
-        for (let round = 0; round < 8; round += 1) {
+        for (let round = 0; round < 24; round += 1) {
             state = driftAuto(state, { connection: "poor" }, CAMERA_LADDER);
             state = driftAuto(state, clean, CAMERA_LADDER);
         }

@@ -1840,7 +1840,7 @@
         "medium": "Medium",
         "high": "High",
         "highest": "Highest",
-        "fullSize": "Full size, 30 fps"
+        "fullSize": "Source, up to 60 fps"
     },
     "devices": {
         "cameraN": "Camera {n}",
