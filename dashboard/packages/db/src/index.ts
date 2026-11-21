@@ -206,6 +206,59 @@ export function accessWriteOf(model: string, operation: string, args: unknown): 
     return { model, userIds: namedUser(model, args) };
 }
 
+/** One write to a watched table, as it was asked: the model, the operation and
+ *  its arguments - never the rows it touched. */
+export interface ModelWrite {
+    readonly model: string;
+    readonly operation: string;
+    readonly args: unknown;
+}
+
+type ModelWriteListener = (write: ModelWrite) => void;
+const MODEL_WRITES = Symbol.for("polaris.db.model-writes");
+
+function modelWriteListeners(): Map<string, Set<ModelWriteListener>> {
+    const holder = globalThis as { [MODEL_WRITES]?: Map<string, Set<ModelWriteListener>> };
+    holder[MODEL_WRITES] ??= new Map();
+    return holder[MODEL_WRITES];
+}
+
+/**
+ * Hear about every write that lands on one of these models, whichever screen,
+ * job or service made it - the same hook the live access channel uses, for a
+ * table written from too many places for each to remember to say so (a
+ * deployment's status is). Called after the write succeeded, synchronously, so
+ * a listener must be cheap and must not throw; one that does is logged and
+ * never the write's failure.
+ */
+export function onModelWrite(models: readonly string[], listener: ModelWriteListener): () => void {
+    const byModel = modelWriteListeners();
+    for (const model of models) {
+        const set = byModel.get(model) ?? new Set();
+        set.add(listener);
+        byModel.set(model, set);
+    }
+    return () => {
+        for (const model of models) {
+            const set = byModel.get(model);
+            set?.delete(listener);
+            if (set?.size === 0) byModel.delete(model);
+        }
+    };
+}
+
+function announceModelWrite(model: string, operation: string, args: unknown): void {
+    const listeners = modelWriteListeners().get(model);
+    if (!listeners || !WRITES.has(operation)) return;
+    for (const listener of listeners) {
+        try {
+            listener({ model, operation, args });
+        } catch (caught) {
+            console.error(caught);
+        }
+    }
+}
+
 /** Tell the listeners after a write lands. A listener that throws is one dead
  *  connection and never the write's failure. */
 export function announcingAccessWrites(base: PrismaClient): PrismaClient {
@@ -214,6 +267,7 @@ export function announcingAccessWrites(base: PrismaClient): PrismaClient {
             $allModels: {
                 async $allOperations({ model, operation, args, query }) {
                     const result = await query(args);
+                    announceModelWrite(model, operation, args);
                     const listeners = accessWriteListeners();
                     if (listeners.size === 0) return result;
                     const write = accessWriteOf(model, operation, args);

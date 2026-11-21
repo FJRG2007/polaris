@@ -25,6 +25,9 @@ import {
     type ProjectSummary
 } from "./deploy-view";
 
+/** Raised on the window when the server says a service in the open project changed. */
+export const DEPLOY_PROJECT_CHANGED = "polaris:deploy-project-changed";
+
 export function ProjectDetail({
     project,
     canManage,
@@ -72,6 +75,64 @@ export function ProjectDetail({
             environment.applications.some((app) => isInFlightStatus(app.deployStatus)) ||
             environment.databases.some((database) => isInFlightStatus(database.status))
     );
+    // A service changed anywhere else - a deck key, the assistant, a build
+    // finishing, another tab - is pushed by the server and the board redraws
+    // within a moment; the polls above stay as the fallback. One connection per
+    // tab, let go while the tab is hidden and read once when it is seen again.
+    useEffect(() => {
+        let source: EventSource | null = null;
+        let last = 0;
+        let trailing: ReturnType<typeof setTimeout> | null = null;
+        const wake = () => {
+            window.dispatchEvent(new CustomEvent(DEPLOY_PROJECT_CHANGED));
+            const wait = last + 1000 - Date.now();
+            if (wait <= 0) {
+                last = Date.now();
+                router.refresh();
+            } else if (!trailing) {
+                trailing = setTimeout(() => {
+                    trailing = null;
+                    last = Date.now();
+                    router.refresh();
+                }, wait);
+            }
+        };
+        const open = () => {
+            if (source || document.visibilityState === "hidden" || typeof EventSource === "undefined")
+                return;
+            const next = new EventSource(
+                `/api/deploy/projects/stream?projectId=${encodeURIComponent(project.id)}`
+            );
+            let opened = false;
+            next.onopen = () => {
+                if (opened) wake();
+                opened = true;
+            };
+            next.onmessage = wake;
+            next.onerror = () => {
+                if (next.readyState === EventSource.CLOSED && source === next) source = null;
+            };
+            source = next;
+        };
+        const onVisibility = () => {
+            if (document.visibilityState === "hidden") {
+                source?.close();
+                source = null;
+            } else if (!source) {
+                open();
+                wake();
+            }
+        };
+        open();
+        document.addEventListener("visibilitychange", onVisibility);
+        return () => {
+            document.removeEventListener("visibilitychange", onVisibility);
+            if (trailing) clearTimeout(trailing);
+            source?.close();
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [project.id]);
+
     useEffect(() => {
         if (!settling) return;
         return pollWhileVisible(refresh, 3000);

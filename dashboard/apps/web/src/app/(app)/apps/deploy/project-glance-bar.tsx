@@ -61,11 +61,13 @@ export function useProjectGlance(
         }
         const timer = setInterval(refresh, moving ? MOVING_MS : IDLE_MS);
         document.addEventListener("visibilitychange", refresh);
+        window.addEventListener("polaris:deploy-project-changed", refresh);
         return () => {
             active = false;
             controller.abort();
             clearInterval(timer);
             document.removeEventListener("visibilitychange", refresh);
+            window.removeEventListener("polaris:deploy-project-changed", refresh);
         };
     }, [projectId, moving]);
     return glance;

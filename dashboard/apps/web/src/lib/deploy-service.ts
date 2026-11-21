@@ -6,6 +6,7 @@
  * in-memory queue - no external broker - so two deploys of one app never race.
  */
 
+import { deployServicesChanged } from "@/lib/deploy/live";
 import { canDeployAnyway, checkReleaseImage, parseStoredWarning } from "@/lib/security/deploy-gate";
 import { queueDependencyScan } from "@/lib/security/lockfiles";
 import {
@@ -2554,6 +2555,7 @@ export async function restartApplication(applicationId: string, ownerId: string)
     const ports = await getPorts(target, ownerId);
     try {
         await ports.container(container, "restart");
+        deployServicesChanged([applicationId]);
     } finally {
         await ports.dispose();
     }
