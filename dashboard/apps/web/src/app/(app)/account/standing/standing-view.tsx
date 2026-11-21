@@ -27,7 +27,7 @@ import {
 /** Something in force, as the page is handed it - moments as strings, since it
  *  crosses from a server component. */
 interface Restriction {
-    readonly kind: "timeout" | "ban";
+    readonly kind: "timeout" | "ban" | "spam";
     readonly where: string;
     readonly until: string | null;
 }
@@ -185,7 +185,9 @@ export function StandingView({
                                     className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/30 px-3 py-2 text-sm"
                                 >
                                     <span className="min-w-0 truncate">
-                                        {t.rich(restriction.kind === "ban" ? "standing.inForce.banned" : "standing.inForce.timedOut", {
+                                        {restriction.kind === "spam"
+                                            ? t("standing.inForce.spamRestricted", { people: Number(restriction.where) })
+                                            : t.rich(restriction.kind === "ban" ? "standing.inForce.banned" : "standing.inForce.timedOut", {
                                             where: (chunks) => (
                                                 <span key="where" className="font-medium">
                                                     {chunks}

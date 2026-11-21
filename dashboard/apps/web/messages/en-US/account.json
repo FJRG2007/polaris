@@ -1152,7 +1152,8 @@
             "banned": "Banned from <where>{place}</where>",
             "timedOut": "Timed out in <where>{place}</where>",
             "until": "until {time}",
-            "untilLifted": "until it is lifted"
+            "untilLifted": "until it is lifted",
+            "spamRestricted": "Cannot start new chats, create groups or add people ({people} people blocked or reported you)"
         },
         "games": {
             "title": "Game server sanctions",

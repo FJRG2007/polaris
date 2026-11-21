@@ -276,7 +276,8 @@
         "messageRequestBlockFailed": "Could not block them. Try again from their profile.",
         "keepNotDisappearing": "Only disappearing messages can be kept",
         "keepNotAllowed": "This message cannot be kept",
-        "keepAdminsOnly": "Only the group owner can keep messages here"
+        "keepAdminsOnly": "Only the group owner can keep messages here",
+        "spamRestricted": "Many people blocked or reported you, so you cannot reach new people for {hours, plural, one {1 more hour} other {# more hours}}. Your existing chats still work."
     },
     "media": {
         "refused": {

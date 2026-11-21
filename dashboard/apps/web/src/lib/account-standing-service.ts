@@ -16,6 +16,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { spamRestrictionFor } from "@/lib/chat/spam-restriction";
 import {
     accountStanding,
     ACCOUNT_STANDING_WINDOW_DAYS,
@@ -24,8 +25,10 @@ import {
 
 /** Something in force against an account, as its owner is shown it. */
 export interface AccountRestriction {
-    /** `timeout` ends by itself; `ban` does not. */
-    readonly kind: "timeout" | "ban";
+    /** `timeout` and `spam` end by themselves; `ban` does not. `spam` is the
+     *  automatic restriction on reaching new people (`chat/spam-restriction`),
+     *  and its `where` is how many people blocked or reported the account. */
+    readonly kind: "timeout" | "ban" | "spam";
     /** The conversation or space it applies in, named the way its owner sees it. */
     readonly where: string;
     /** When it lifts, or null for one that does not lift on its own. */
@@ -47,7 +50,7 @@ export async function accountStandingFor(userId: string): Promise<AccountStandin
     const now = new Date();
     const since = new Date(now.getTime() - ACCOUNT_STANDING_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-    const [user, upheld, spaceTimeouts, channelTimeouts, bans] = await Promise.all([
+    const [user, upheld, spaceTimeouts, channelTimeouts, bans, spam] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { bannedAt: true } }),
         // Upheld rather than reported: anybody can report anything, and a
         // standing that moved on accusations is a standing anybody can push
@@ -66,7 +69,9 @@ export async function accountStandingFor(userId: string): Promise<AccountStandin
         prisma.chatSpaceBan.findMany({
             where: { userId },
             select: { space: { select: { name: true } } }
-        })
+        }),
+        // Never fails the page: the standing stands without it.
+        spamRestrictionFor(userId, now).catch(() => null)
     ]);
 
     const restrictions: AccountRestriction[] = [
@@ -81,7 +86,8 @@ export async function accountStandingFor(userId: string): Promise<AccountStandin
             where: row.channel.name || "a conversation",
             until: row.timeoutUntil
         })),
-        ...bans.map((row) => ({ kind: "ban" as const, where: row.space.name, until: null }))
+        ...bans.map((row) => ({ kind: "ban" as const, where: row.space.name, until: null })),
+        ...(spam ? [{ kind: "spam" as const, where: String(spam.people), until: spam.until }] : [])
     ];
 
     return {

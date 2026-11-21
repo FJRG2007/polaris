@@ -276,7 +276,8 @@
         "messageRequestBlockFailed": "No se pudo bloquear. Prueba desde su perfil.",
         "keepNotDisappearing": "Solo se guardan mensajes temporales",
         "keepNotAllowed": "Este mensaje no se puede guardar",
-        "keepAdminsOnly": "Solo el dueño del grupo guarda mensajes"
+        "keepAdminsOnly": "Solo el dueño del grupo guarda mensajes",
+        "spamRestricted": "Mucha gente te bloqueó o denunció: no puedes contactar con gente nueva durante {hours, plural, one {1 hora más} other {# horas más}}. Tus chats siguen igual."
     },
     "media": {
         "refused": {

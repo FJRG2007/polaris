@@ -1152,7 +1152,8 @@
             "banned": "Vetado en <where>{place}</where>",
             "timedOut": "Expulsado temporalmente de <where>{place}</where>",
             "until": "hasta el {time}",
-            "untilLifted": "hasta que se levante"
+            "untilLifted": "hasta que se levante",
+            "spamRestricted": "No puedes iniciar chats, crear grupos ni añadir gente ({people} personas te bloquearon o denunciaron)"
         },
         "games": {
             "title": "Sanciones en juegos",

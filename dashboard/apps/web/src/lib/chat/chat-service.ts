@@ -8,6 +8,7 @@
  * volume changes by two orders of magnitude.
  */
 
+import { requireUnrestricted } from "./spam-restriction";
 import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
 import type { ChatGameLinkView } from "./game-links";
@@ -446,6 +447,7 @@ export async function addSpaceMembers(
     userIds: readonly string[]
 ): Promise<void> {
     await requireSpace(actor, spaceId, "admin");
+    await requireUnrestricted(actor.id);
     const space = await prisma.chatSpace.findUnique({
         where: { id: spaceId },
         select: { ownerId: true }
@@ -1656,6 +1658,7 @@ export async function addChannelMembers(
     userIds: readonly string[]
 ): Promise<{ invited: string[] } | void> {
     const access = await requireChannel(actor, channelId);
+    await requireUnrestricted(actor.id);
     const group = access.kind === "group";
     /** Whoever was asked rather than added, for the caller to say so. */
     let invited: string[] = [];
@@ -2149,6 +2152,9 @@ export async function openDirect(
             select: { id: true }
         });
         if (existing) return existing.id;
+        // A new conversation reaches somebody new: refused while the account
+        // is restricted for spam. The existing one above was not.
+        await requireUnrestricted(actor.id);
 
         // Somebody whose "who can message me" leaves the actor out is not
         // refused: the conversation opens as a request on their side, silent
@@ -2212,6 +2218,9 @@ export async function openDirect(
             return raced.id;
         }
     }
+
+    // A new group reaches new people: refused while restricted for spam.
+    await requireUnrestricted(actor.id);
 
     return createGroup(actor, others, orgId, name);
 }
