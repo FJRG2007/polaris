@@ -48,6 +48,8 @@ import type { ChatRosterMember } from "@/lib/chat/roster-groups";
 import { allowedBy } from "@/lib/privacy-service";
 import { FriendError, requestFriend } from "@/lib/friends-service";
 import { groupAddable, groupStandings, mayJoinGroup } from "@/lib/chat/group-reach";
+import * as groupInvites from "@/lib/chat/group-invites";
+import type { GroupInviteView } from "@/lib/chat/group-invites";
 import { MAX_NICKNAME, setNickname } from "@/lib/contact-names";
 import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
 import { chatProfile, type ChatProfile } from "@/lib/chat/profiles";
@@ -240,7 +242,10 @@ export interface GroupCandidate {
  */
 export async function searchGroupPeopleAction(
     query: string,
-    meetingId?: string
+    meetingId?: string,
+    // Adding to a group that already exists: anybody whose own setting refuses
+    // the add is asked instead (ledger row 16), so they can be picked.
+    invitesInstead?: boolean
 ): Promise<{ results?: GroupCandidate[]; withheld?: number; error?: string }> {
     const me = await actor();
     const call = z.string().uuid().optional().safeParse(meetingId);
@@ -274,6 +279,7 @@ export async function searchGroupPeopleAction(
     const results: GroupCandidate[] = found.people.map((person) => {
         const standing = standings.get(person.id) ?? "stranger";
         if (inside.has(person.id) || addable.has(person.id)) return person;
+        if (invitesInstead === true && standing !== "blocked") return person;
         return {
             ...person,
             // A friend or colleague who shut their group adds reads as
@@ -1359,7 +1365,9 @@ export async function leaveSpaceAction(
     return result;
 }
 
-export async function addChannelMembersAction(input: unknown): Promise<{ error?: string }> {
+export async function addChannelMembersAction(
+    input: unknown
+): Promise<{ error?: string; invited?: number }> {
     const me = await actor();
     const parsed = core.chatMembersSchema.safeParse(input);
     if (!parsed.success)
@@ -1372,8 +1380,38 @@ export async function addChannelMembersAction(input: unknown): Promise<{ error?:
     const result = await guard(() =>
         chat.addChannelMembers(me, parsed.data.id, parsed.data.userIds)
     );
-    if (!result.error) revalidatePath(CHAT_PATH);
-    return result;
+    if (result.error) return { error: result.error };
+    revalidatePath(CHAT_PATH);
+    // How many were asked rather than added, so the screen can say so.
+    return { invited: result.value?.invited.length ?? 0 };
+}
+
+/** The group invitations waiting on the caller (/chat/invites). */
+export async function listGroupInvitesAction(): Promise<{ invites: GroupInviteView[] }> {
+    const me = await actor();
+    return { invites: await groupInvites.pendingGroupInvites(me) };
+}
+
+/** Accept a group invitation; answers with the conversation to open. */
+export async function acceptGroupInviteAction(
+    inviteId: unknown
+): Promise<{ error?: string; channelId?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(inviteId);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.groupInviteGone") };
+    const result = await guard(() => groupInvites.acceptGroupInvite(me, parsed.data));
+    if (result.error) return { error: result.error };
+    revalidatePath(CHAT_PATH);
+    return { channelId: result.value };
+}
+
+/** Decline a group invitation. */
+export async function declineGroupInviteAction(inviteId: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(inviteId);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.groupInviteGone") };
+    const result = await guard(() => groupInvites.declineGroupInvite(me, parsed.data));
+    return result.error ? { error: result.error } : {};
 }
 
 /** Name a group, or take the name off again. Anybody in it may. */

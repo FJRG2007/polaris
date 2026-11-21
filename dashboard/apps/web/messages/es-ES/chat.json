@@ -107,7 +107,7 @@
         "groupFull": "Un grupo admite {count} personas. Crea un canal en su lugar.",
         "chatOff": "Alguien de ahí no tiene el chat activado",
         "cannotStartConversation": "No puedes iniciar esa conversación",
-        "groupNotFriends": "{others, plural, =0 {Aún no tienes amistad con {name}.} one {Aún no tienes amistad con {name} ni con otra persona.} other {Aún no tienes amistad con {name} ni con # personas más.}} Solo puedes añadir a un grupo a tus amigos y a gente de tu organización. Envía antes una solicitud de amistad.",
+        "groupNotFriends": "{others, plural, =0 {No puedes meter a {name} en un grupo nuevo.} one {No puedes meter a {name} ni a otra persona en un grupo nuevo.} other {No puedes meter a {name} ni a # personas más en un grupo nuevo.}} Crea el grupo con los demás y añádelos después: recibirán una invitación.",
         "meetingSignInFirst": "Esta reunión solo está abierta a quien haya iniciado sesión en Polaris",
         "voiceChannelFull": "Este canal de voz está lleno. Admite {count, plural, one {# persona} other {# personas}} a la vez.",
         "blockedRecipient": "Has bloqueado a {name}. Desbloquéalo para enviarle un mensaje.",
@@ -2744,5 +2744,21 @@
         "notSent": "No enviado: {excerpt}",
         "retry": "Reenviar",
         "discard": "Borrar"
+    },
+    "groupInvites": {
+        "notification": "{name} te ha invitado a un grupo",
+        "gone": "Esa invitación ya no está abierta.",
+        "failed": "No se ha podido completar. Inténtalo de nuevo.",
+        "back": "Volver al chat",
+        "title": "Invitaciones a grupos",
+        "loadFailed": "No se han podido cargar las invitaciones.",
+        "retry": "Reintentar",
+        "empty": "Sin invitaciones",
+        "emptyHint": "Cuando alguien que no puede añadirte a un grupo te invite, aparecerá aquí.",
+        "unnamed": "Grupo sin nombre",
+        "from": "De {name}",
+        "decline": "Rechazar",
+        "join": "Unirme",
+        "sent": "{count, plural, one {Se ha invitado a una persona en lugar de añadirla.} other {Se ha invitado a # personas en lugar de añadirlas.}}"
     }
 }

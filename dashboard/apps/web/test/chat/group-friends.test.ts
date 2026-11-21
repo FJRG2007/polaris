@@ -28,7 +28,15 @@ let removed: string[] = [];
 /** Each account's own "who can add me to groups"; absent is never chosen. */
 let groupAdds = new Map<string, string>();
 
+/** Who was asked to join instead of being added, by the last add. */
+let invitedNow: string[] = [];
+
 vi.mock("@polaris/auth", () => ({ can: async () => true }));
+vi.mock("@/lib/chat/group-invites", () => ({
+    inviteToGroup: async (_actor: unknown, _channelId: string, ids: readonly string[]) => {
+        invitedNow = [...ids];
+    }
+}));
 vi.mock("@/lib/setting-store", () => ({
     getSetting: async () => null,
     getSettings: async () => new Map(),
@@ -206,15 +214,33 @@ beforeEach(() => {
     added = null;
     removed = [];
     groupAdds = new Map();
+    invitedNow = [];
 });
 
 /** Every way a group gains a member, run against the same cases. */
 const paths = {
     "starting a group": (people: string[]) => chat.openDirect(ada, ["grace", ...people]),
-    "adding to a group": (people: string[]) => chat.addChannelMembers(ada, "group-1", people)
+    // Adding to a group that exists asks whoever refuses instead of failing
+    // (ledger row 16); for the table below that is "not added", said as a throw.
+    "adding to a group": async (people: string[]) => {
+        const result = await chat.addChannelMembers(ada, "group-1", people);
+        if (result && result.invited.length > 0) throw new InvitedInstead(result.invited);
+    }
 } as const;
 
-describe.each(Object.entries(paths))("%s", (_path, run) => {
+/** Whoever an add to an existing group asked rather than added. */
+class InvitedInstead extends Error {
+    constructor(readonly people: string[]) {
+        super("invited instead");
+    }
+}
+
+/** What "refused" looks like on each path: a refusal, or an invitation. */
+function refusalOn(path: string) {
+    return path === "starting a group" ? reach.GroupStrangerError : InvitedInstead;
+}
+
+describe.each(Object.entries(paths))("%s", (path, run) => {
     beforeEach(() => friends("grace"));
 
     it("takes a stranger whose own group adds are open to everybody", async () => {
@@ -225,13 +251,13 @@ describe.each(Object.entries(paths))("%s", (_path, run) => {
     it("refuses a friend who shut their group adds to nobody", async () => {
         friends("alan");
         groupAdds.set("alan", "nobody");
-        await expect(run(["alan"])).rejects.toBeInstanceOf(reach.GroupStrangerError);
+        await expect(run(["alan"])).rejects.toBeInstanceOf(refusalOn(path));
     });
 
     it("refuses a colleague who shut their group adds, and a blocked person even when open", async () => {
         colleagues = ["alan"];
         groupAdds.set("alan", "nobody");
-        await expect(run(["alan"])).rejects.toBeInstanceOf(reach.GroupStrangerError);
+        await expect(run(["alan"])).rejects.toBeInstanceOf(refusalOn(path));
         groupAdds.set("hopper", "everyone");
         blocks = [{ blockerId: "hopper", blockedId: "ada" }];
         await expect(run(["hopper"])).rejects.toBeInstanceOf(ChatAccessError);
@@ -245,37 +271,44 @@ describe.each(Object.entries(paths))("%s", (_path, run) => {
 
     it("refuses somebody whose request is still waiting, in either direction", async () => {
         friends("alan", "pending");
-        await expect(run(["alan"])).rejects.toBeInstanceOf(reach.GroupStrangerError);
+        await expect(run(["alan"])).rejects.toBeInstanceOf(refusalOn(path));
         friendships = [{ requesterId: "grace", addresseeId: "ada", status: "accepted" }];
         friends("alan", "pending", "alan");
-        await expect(run(["alan"])).rejects.toBeInstanceOf(reach.GroupStrangerError);
+        await expect(run(["alan"])).rejects.toBeInstanceOf(refusalOn(path));
         expect(created).toBeNull();
         expect(added).toBeNull();
     });
 
     it("refuses a stranger, and names them so the screen can say who", async () => {
         const refusal = await run(["alan"]).catch((caught: unknown) => caught);
-        expect(refusal).toBeInstanceOf(reach.GroupStrangerError);
-        expect((refusal as InstanceType<typeof ChatAccessError>).text).toEqual({
-            key: "errors.groupNotFriends",
-            params: { name: "Alan", others: 0 }
-        });
+        expect(refusal).toBeInstanceOf(refusalOn(path));
+        if (refusal instanceof InvitedInstead) expect(refusal.people).toEqual(["alan"]);
+        else
+            expect((refusal as InstanceType<typeof ChatAccessError>).text).toEqual({
+                key: "errors.groupNotFriends",
+                params: { name: "Alan", others: 0 }
+            });
         expect(created).toBeNull();
         expect(added).toBeNull();
     });
 
     it("counts the rest when several are refused at once", async () => {
         const refusal = await run(["alan", "hopper", "turing"]).catch((caught: unknown) => caught);
-        expect((refusal as InstanceType<typeof ChatAccessError>).text.params).toMatchObject({
-            others: 2
-        });
+        if (refusal instanceof InvitedInstead) expect(refusal.people).toHaveLength(3);
+        else
+            expect((refusal as InstanceType<typeof ChatAccessError>).text.params).toMatchObject({
+                others: 2
+            });
     });
 
     it("refuses the whole request when one of several is a stranger", async () => {
         friends("alan");
-        await expect(run(["alan", "hopper"])).rejects.toBeInstanceOf(reach.GroupStrangerError);
+        await expect(run(["alan", "hopper"])).rejects.toBeInstanceOf(refusalOn(path));
         expect(created).toBeNull();
-        expect(added).toBeNull();
+        // Starting a group refuses all of it; adding takes the friend and asks
+        // the stranger.
+        if (path === "starting a group") expect(added).toBeNull();
+        else expect([added, invitedNow]).toEqual([["alan"], ["hopper"]]);
     });
 
     it("refuses a friend the actor has blocked, with the sentence every block gives", async () => {
@@ -309,7 +342,7 @@ describe.each(Object.entries(paths))("%s", (_path, run) => {
         friendships = friendships.filter((row) => row.addresseeId !== "alan");
         created = null;
         added = null;
-        await expect(run(["alan"])).rejects.toBeInstanceOf(reach.GroupStrangerError);
+        await expect(run(["alan"])).rejects.toBeInstanceOf(refusalOn(path));
     });
 });
 
@@ -333,9 +366,11 @@ describe("adding to a group that already exists", () => {
 
     it("applies to a group somebody else started, exactly as to one's own", async () => {
         members = ["grace", "ada"];
-        await expect(chat.addChannelMembers(ada, "group-1", ["alan"])).rejects.toBeInstanceOf(
-            reach.GroupStrangerError
-        );
+        await expect(chat.addChannelMembers(ada, "group-1", ["alan"])).resolves.toEqual({
+            invited: ["alan"]
+        });
+        expect(invitedNow).toEqual(["alan"]);
+        expect(added).toBeNull();
     });
 
     it("keeps a group filed under an organization to its roster, friend or not", async () => {
@@ -410,16 +445,16 @@ describe("the refusal, as the person who pressed the button reads it", () => {
     it("names the person and says what to do, in American English and in Spanish", () => {
         const one = new reach.GroupStrangerError("Alan", 0);
         expect(one.textIn("en-US")).toBe(
-            "Alan is not your friend yet. Only friends and people in your organization can be added to a group. Send a friend request first."
+            "Alan cannot be put in a new group by you. Start the group with the others, then add them: they get an invitation instead."
         );
         expect(one.textIn("es-ES")).toBe(
-            "Aún no tienes amistad con Alan. Solo puedes añadir a un grupo a tus amigos y a gente de tu organización. Envía antes una solicitud de amistad."
+            "No puedes meter a Alan en un grupo nuevo. Crea el grupo con los demás y añádelos después: recibirán una invitación."
         );
         expect(new reach.GroupStrangerError("Alan", 2).textIn("en-US")).toMatch(
-            /^Alan and 2 others are not your friends yet\./
+            /^Alan and 2 others cannot be put in a new group by you\./
         );
         expect(new reach.GroupStrangerError("Alan", 1).textIn("es-ES")).toMatch(
-            /^Aún no tienes amistad con Alan ni con otra persona\./
+            /^No puedes meter a Alan ni a otra persona en un grupo nuevo\./
         );
     });
 });

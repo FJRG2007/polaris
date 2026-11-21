@@ -167,7 +167,9 @@ export async function inviteToCallAction(
             { id: user.id, name: user.name },
             parsed.data.meetingId,
             parsed.data.userIds,
-            (channelId, userIds) => chat.addChannelMembers({ id: user.id }, channelId, userIds),
+            async (channelId, userIds) => {
+                await chat.addChannelMembers({ id: user.id }, channelId, userIds);
+            },
             (userIds, kept) => chat.openDirect({ id: user.id }, userIds, "", kept)
         )
     );

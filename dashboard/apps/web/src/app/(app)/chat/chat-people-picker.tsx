@@ -22,7 +22,8 @@ export function ChatPeoplePicker({
     onChange,
     exclude,
     label,
-    meetingId
+    meetingId,
+    invitesInstead = false
 }: {
     /** Whether the people picked end up in a group. */
     forGroup: boolean;
@@ -33,10 +34,13 @@ export function ChatPeoplePicker({
     /** The call the people are being brought into, whose conversation's own
      *  members may be picked whatever their standing - nobody adds them. */
     meetingId?: string;
+    /** Adding to an existing group: people who refuse adds are asked instead,
+     *  so they stay pickable. */
+    invitesInstead?: boolean;
 }) {
     const searchGroup = useCallback(
-        (query: string) => searchGroupPeopleAction(query, meetingId),
-        [meetingId]
+        (query: string) => searchGroupPeopleAction(query, meetingId, invitesInstead),
+        [meetingId, invitesInstead]
     );
     if (!forGroup) {
         return (

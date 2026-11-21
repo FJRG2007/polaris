@@ -543,6 +543,17 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "chat.groupInvite",
+        group: "people",
+        label: "Group invitations",
+        description: "Somebody asked you to join a group they could not add you to.",
+        // Somebody's own "who can add me to groups" turned an add into a
+        // question, and a question nobody hears about is a refusal by another
+        // name - so it reaches the bell, quietly.
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "chat.reminder",
         group: "people",
         label: "Message reminders",

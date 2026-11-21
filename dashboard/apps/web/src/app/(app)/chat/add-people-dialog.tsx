@@ -29,7 +29,8 @@ import {
     DialogDescription,
     DialogFooter,
     DialogHeader,
-    DialogTitle
+    DialogTitle,
+    useToast
 } from "@polaris/ui";
 import * as polls from "./chat-reads";
 
@@ -45,6 +46,7 @@ export function AddPeopleDialog({
     onAdded: () => void;
 }) {
     const t = useTranslations("chat");
+    const toast = useToast();
     const router = useRouter();
     const direct = channel.kind === "dm";
     const [already, setAlready] = useState<readonly string[]>([]);
@@ -105,7 +107,14 @@ export function AddPeopleDialog({
             setError
         );
         setBusy(false);
-        if (result?.error) return;
+        if (!result || result.error) return;
+        // Whoever refuses group adds was asked instead, and the adder is told.
+        if (result.invited) {
+            toast.show({
+                key: `group-invited-${channel.id}`,
+                title: t("groupInvites.sent", { count: result.invited })
+            });
+        }
         setPicked([]);
         onOpenChange(false);
         onAdded();
@@ -129,6 +138,7 @@ export function AddPeopleDialog({
 
                 <ChatPeoplePicker
                     forGroup={direct || channel.kind === "group"}
+                    invitesInstead={!direct && channel.kind === "group"}
                     picked={picked}
                     onChange={setPicked}
                     exclude={already}

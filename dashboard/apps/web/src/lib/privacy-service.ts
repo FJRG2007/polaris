@@ -82,7 +82,9 @@ export function isLockValue(value: string | null | undefined): boolean {
 /** Every field an administrator locked, in one read. */
 export async function privacyLocks(): Promise<Set<core.PrivacyField>> {
     const stored = await getSettings(core.PRIVACY_FIELDS.map(privacyLockKey));
-    return new Set(core.PRIVACY_FIELDS.filter((field) => isLockValue(stored.get(privacyLockKey(field)))));
+    return new Set(
+        core.PRIVACY_FIELDS.filter((field) => isLockValue(stored.get(privacyLockKey(field))))
+    );
 }
 
 /** Whether one field is locked. */

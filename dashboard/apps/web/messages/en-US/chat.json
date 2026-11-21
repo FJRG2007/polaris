@@ -107,7 +107,7 @@
         "groupFull": "A group holds {count} people. Make a channel instead.",
         "chatOff": "Somebody there does not have the chat turned on",
         "cannotStartConversation": "You cannot start that conversation",
-        "groupNotFriends": "{others, plural, =0 {{name} is not your friend yet.} one {{name} and one other person are not your friends yet.} other {{name} and # others are not your friends yet.}} Only friends and people in your organization can be added to a group. Send a friend request first.",
+        "groupNotFriends": "{others, plural, =0 {{name} cannot be put in a new group by you.} one {{name} and one other person cannot be put in a new group by you.} other {{name} and # others cannot be put in a new group by you.}} Start the group with the others, then add them: they get an invitation instead.",
         "meetingSignInFirst": "This meeting is only open to people signed in to Polaris",
         "voiceChannelFull": "This voice channel is full. It holds {count, plural, one {# person} other {# people}} at a time.",
         "blockedRecipient": "You blocked {name}. Unblock them to send a message.",
@@ -2744,5 +2744,21 @@
         "notSent": "Not sent: {excerpt}",
         "retry": "Send again",
         "discard": "Delete"
+    },
+    "groupInvites": {
+        "notification": "{name} invited you to a group",
+        "gone": "That invitation is no longer open.",
+        "failed": "That did not go through. Try again.",
+        "back": "Back to Chat",
+        "title": "Group invitations",
+        "loadFailed": "Invitations could not be loaded.",
+        "retry": "Try again",
+        "empty": "No invitations",
+        "emptyHint": "When someone who cannot add you to a group asks you to join, it shows up here.",
+        "unnamed": "Unnamed group",
+        "from": "From {name}",
+        "decline": "Decline",
+        "join": "Join",
+        "sent": "{count, plural, one {One person was invited instead of added.} other {# people were invited instead of added.}}"
     }
 }

@@ -33,6 +33,8 @@ datasource db {
 
 model User {
     pushSubscriptions PushSubscription[]
+    chatGroupInvitesSent     ChatGroupInvite[] @relation("ChatGroupInviter")
+    chatGroupInvitesReceived ChatGroupInvite[] @relation("ChatGroupInvitee")
     polarThreads      PolarThread[]
     polarProjects     PolarProject[]
     polarCommands     PolarCommand[]
@@ -10573,6 +10575,7 @@ model ChatSpaceBan {
 // where the uniqueness does not apply.
 model ChatChannel {
     id            String    @id @default(uuid(7)) @db.Uuid
+    groupInvites  ChatGroupInvite[]
     spaceId       String?   @db.Uuid
     // The heading it sits under inside its space, or null for the channels above
     // the first one. ON DELETE SET NULL: removing a heading must not remove the
@@ -18655,4 +18658,26 @@ model AgentSessionArtifactVersion {
     createdAt    DateTime             @default(now())
 
     @@unique([artifactId, version])
+}
+// An invitation to a group conversation, sent instead of adding somebody whose
+// "who can add me to groups" (`UserPrivacy.groupAdds`) refused the person
+// adding them. Nobody is put in front of a room they did not choose: they are
+// asked, and join only by accepting. One per person per group - asking again
+// refreshes the same row rather than piling up.
+model ChatGroupInvite {
+    id         String    @id @default(uuid(7)) @db.Uuid
+    channelId  String    @db.Uuid
+    inviterId  String    @db.Uuid
+    inviteeId  String    @db.Uuid
+    createdAt  DateTime  @default(now())
+    // Set when answered; a row with either set is history, not a pending ask.
+    acceptedAt DateTime?
+    declinedAt DateTime?
+
+    channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+    inviter User        @relation("ChatGroupInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+    invitee User        @relation("ChatGroupInvitee", fields: [inviteeId], references: [id], onDelete: Cascade)
+
+    @@unique([channelId, inviteeId])
+    @@index([inviteeId, createdAt])
 }

@@ -34,7 +34,9 @@ export async function readPrivacy(): Promise<PrivacyData> {
                 core.resolvedAudience(field, null, stored.get(privacyDefaultKey(field)) ?? null)
             ])
         ) as Record<core.PrivacyField, core.PrivacyAudience>,
-        locks: core.PRIVACY_FIELDS.filter((field) => isLockValue(stored.get(privacyLockKey(field)))),
+        locks: core.PRIVACY_FIELDS.filter((field) =>
+            isLockValue(stored.get(privacyLockKey(field)))
+        ),
         discovery: readDiscoveryPolicy(stored.get(DISCOVERY_POLICY_KEY) ?? null)
     };
 }

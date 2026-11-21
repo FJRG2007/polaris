@@ -670,6 +670,10 @@
         "analyticsDigest": {
             "label": "Analytics summary",
             "description": "A site's visitors and views for the week or month you chose."
+        },
+        "chatGroupInvite": {
+            "label": "Group invitations",
+            "description": "Someone asked you to join a group they could not add you to."
         }
     },
     "groups": {

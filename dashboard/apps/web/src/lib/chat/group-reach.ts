@@ -121,6 +121,23 @@ export async function groupAddable(
 }
 
 /**
+ * Who among these the actor may not put in a group, by their own setting. A
+ * block throws instead, with the sentence every block gives, since a blocked
+ * person is neither added nor asked.
+ */
+export async function groupRefusals(
+    actor: ChatActor,
+    candidateIds: readonly string[]
+): Promise<string[]> {
+    const standings = await groupStandings(actor.id, candidateIds);
+    if ([...standings.values()].includes("blocked")) {
+        throw new ChatAccessError({ key: "errors.cannotStartConversation" });
+    }
+    const addable = await groupAddable(actor.id, standings);
+    return [...standings.keys()].filter((id) => !addable.has(id));
+}
+
+/**
  * Refuse unless every one of these people may be put in a group by the actor.
  *
  * A block refuses with the sentence every block gives and names nobody. Anybody
@@ -131,17 +148,11 @@ export async function refuseGroupStrangers(
     actor: ChatActor,
     candidateIds: readonly string[]
 ): Promise<void> {
-    const standings = await groupStandings(actor.id, candidateIds);
-    const addable = await groupAddable(actor.id, standings);
-    const refused = [...standings].filter(([id]) => !addable.has(id));
+    const refused = await groupRefusals(actor, candidateIds);
     if (refused.length === 0) return;
 
-    if (refused.some(([, standing]) => standing === "blocked")) {
-        throw new ChatAccessError({ key: "errors.cannotStartConversation" });
-    }
-
     const first = await prisma.user.findUnique({
-        where: { id: refused[0]![0] },
+        where: { id: refused[0]! },
         select: { name: true, username: true }
     });
     const name = first?.name || (first?.username ? `@${first.username}` : "");

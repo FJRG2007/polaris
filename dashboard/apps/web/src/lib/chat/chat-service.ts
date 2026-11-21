@@ -23,7 +23,8 @@ import { discardChannelFiles } from "./attachments";
 import { discardAvatars } from "@/lib/avatar-service";
 import { readsOrgWhere } from "@/lib/orgs/org-service";
 import { postNotice, postSpaceNotice } from "./notices";
-import { refuseGroupStrangers } from "./group-reach";
+import { groupRefusals, refuseGroupStrangers } from "./group-reach";
+import { inviteToGroup } from "./group-invites";
 import { blockedBetween, blockedBy } from "@/lib/blocks";
 import { discardSpaceEmoji } from "./custom-emoji";
 import { currentChatOrgId, orgChatPeople, readableChatScopes } from "./isolation";
@@ -1603,9 +1604,11 @@ export async function addChannelMembers(
     actor: ChatActor,
     channelId: string,
     userIds: readonly string[]
-): Promise<void> {
+): Promise<{ invited: string[] } | void> {
     const access = await requireChannel(actor, channelId);
     const group = access.kind === "group";
+    /** Whoever was asked rather than added, for the caller to say so. */
+    let invited: string[] = [];
     if (!access.mayAdminister && !group) {
         throw new ChatAccessError({ key: "errors.channelAddNotAllowed" });
     }
@@ -1685,11 +1688,19 @@ export async function addChannelMembers(
             if (newcomers.some((userId) => !roster.has(userId)))
                 throw new ChatAccessError({ key: "errors.notInOrganization" });
         }
-        // Only the actor's friends and colleagues - see `group-reach.ts`. Only
-        // the newcomers: whoever is already in the group stays, whatever their
-        // standing with the person adding the next one.
-        await refuseGroupStrangers(actor, newcomers);
+        // Each newcomer's own "who can add me to groups" - see `group-reach.ts`.
+        // Only the newcomers: whoever is already in the group stays, whatever
+        // their standing with the person adding the next one. Anybody it
+        // refuses is asked instead of added (ledger row 16): an invitation they
+        // accept or ignore, never a room they were put in front of.
+        invited = await groupRefusals(actor, newcomers);
+        if (invited.length > 0) {
+            await inviteToGroup(actor, channelId, invited);
+            const asked = new Set(invited);
+            wanted.splice(0, wanted.length, ...wanted.filter((userId) => !asked.has(userId)));
+        }
     }
+    if (wanted.length === 0) return { invited };
 
     await prisma.chatChannelMember.createMany({
         data: wanted.map((userId) => ({ channelId, userId })),
@@ -1705,6 +1716,7 @@ export async function addChannelMembers(
         }
     }
     publishChatChange({ channelId, kind: "channels", actorId: actor.id, audience: wanted });
+    return { invited };
 }
 
 /**
