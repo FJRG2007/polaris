@@ -62,6 +62,9 @@
             polarisTimerHint:
                 "Press to start or pause, double press for +1 min or the next phase, hold to reset.",
             noTimers: "This Polaris has no Calendar timers for this deck.",
+            reconnect: "Reconnect",
+            reconnectHint: "Approve the code in the browser that opens; the deck stays signed in meanwhile.",
+            loading: "Reading the deck's connection...",
             gestures: "More presses",
             gesturesHint:
                 "Optional. A press runs the action above at once unless a double press is set here.",
@@ -143,6 +146,9 @@
             polarisTimerHint:
                 "Pulsa: iniciar o pausar; doble: +1 min o fase siguiente; mantén: reiniciar.",
             noTimers: "Polaris no tiene temporizadores de Calendario aquí.",
+            reconnect: "Reconectar",
+            reconnectHint: "Aprueba el código en el navegador que se abre; la deck sigue conectada mientras.",
+            loading: "Leyendo la conexión de la deck...",
             gestures: "Más pulsaciones",
             gesturesHint:
                 "Opcional. Una pulsación ejecuta la acción de arriba al momento, salvo con doble pulsación.",

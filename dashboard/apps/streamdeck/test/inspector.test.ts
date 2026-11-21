@@ -248,6 +248,59 @@ describe("the settings screen", () => {
         expect(document.querySelector('input[type="text"]')).toBeNull();
     });
 
+    it("says it is reading the connection instead of drawing nothing before the plugin answers", () => {
+        const { dom } = openScreen("timer");
+        const document = dom.window.document;
+        const source = document.querySelector("select") as InstanceType<typeof dom.window.HTMLSelectElement>;
+        source.value = "polaris";
+        source.dispatchEvent(new dom.window.Event("change"));
+        expect(document.getElementById("root")!.textContent).toContain("Reading the deck's connection");
+    });
+
+    it("offers Reconnect where a timer needs the deck connected again, and reconnects to the same address", () => {
+        const { dom, sent, listeners } = openScreen("timer");
+        const status = (connecting: Record<string, unknown>) =>
+            listeners.get("message")?.({
+                data: JSON.stringify({
+                    event: "sendToPropertyInspector",
+                    payload: {
+                        type: "status",
+                        link: "online",
+                        address: "https://polaris.example.com",
+                        account: "Ana",
+                        connecting,
+                        update: null,
+                        catalogue: [],
+                        locked: [
+                            {
+                                id: "calendar.timer",
+                                label: "Calendar timer",
+                                message: "Reconnect this deck to allow: See upcoming calendar events."
+                            }
+                        ]
+                    }
+                })
+            });
+        status({ phase: "idle" });
+        const document = dom.window.document;
+        const source = document.querySelector("select") as InstanceType<typeof dom.window.HTMLSelectElement>;
+        source.value = "polaris";
+        source.dispatchEvent(new dom.window.Event("change"));
+        expect(document.getElementById("root")!.textContent).toContain("See upcoming calendar events");
+
+        const button = [...document.querySelectorAll("button")].find((b) => b.textContent === "Reconnect");
+        expect(button).toBeDefined();
+        button!.click();
+        expect(sent.find((message) => message.payload?.type === "connect")?.payload).toEqual({
+            type: "connect",
+            address: "https://polaris.example.com"
+        });
+
+        // While it waits for approval the timer screen shows the code, not the old notice.
+        status({ phase: "waiting", userCode: "ABCD-EFGH", url: "https://polaris.example.com/deck/approve" });
+        expect(document.getElementById("root")!.textContent).toContain("ABCD-EFGH");
+    });
+
     it("draws more presses for a key and saves a double press with its window", () => {
         const { dom, sent, listeners } = openScreen("key");
         const fan = (id: string, label: string, kind = "run") => ({

@@ -110,9 +110,30 @@
         ];
     }
 
+    /** A notice that the deck must be connected again, with the button that does it:
+     *  the same approval as connecting, against the address it already uses. */
+    function reconnectBlock(message, tone) {
+        const nodes = [el("p", { class: tone ?? "notice", text: message })];
+        if (status?.address)
+            nodes.push(
+                el("div", { class: "buttons" }, [
+                    el("button", {
+                        type: "button",
+                        text: words.reconnect,
+                        on: { click: () => toPlugin({ type: "connect", address: status.address }) }
+                    })
+                ]),
+                el("p", { class: "hint", text: words.reconnectHint })
+            );
+        return nodes;
+    }
+
     function connectionSection() {
         const box = el("section", {}, [el("h2", { text: words.connection })]);
-        if (!status) return box;
+        if (!status) {
+            box.append(el("p", { class: "hint", text: words.loading }));
+            return box;
+        }
         const connecting = status.connecting ?? { phase: "idle" };
 
         if (connecting.phase === "waiting") {
@@ -234,12 +255,13 @@
         // What connecting the deck again would allow, in Polaris's words.
         const locked = status?.locked ?? [];
         const blocked = locked.find((item) => item.id === settings.action);
-        const reconnect = () =>
-            blocked
-                ? [el("p", { class: "notice", text: blocked.message })]
-                : [...new Set(locked.map((item) => item.message))]
-                      .slice(0, 3)
-                      .map((message) => el("p", { class: "hint", text: message }));
+        const reconnect = () => {
+            if (blocked) return reconnectBlock(blocked.message);
+            const messages = [...new Set(locked.map((item) => item.message))].slice(0, 3);
+            if (messages.length === 0) return [];
+            const [last, ...rest] = messages.reverse();
+            return [...rest.reverse().map((message) => el("p", { class: "hint", text: message })), ...reconnectBlock(last, "hint")];
+        };
         if (catalogue.length === 0) {
             box.append(el("p", { class: "hint", text: words.noActions }), ...reconnect());
             return box;
@@ -397,14 +419,16 @@
     /** One of the account's Calendar timers, a new one, or the focus cycle. */
     function polarisTimerSection() {
         const box = el("section", {}, [sourceRow()]);
-        if (status?.link !== "online") {
+        // Not connected, or connecting again: the connection screen, code and all.
+        if (status?.link !== "online" || (status.connecting && status.connecting.phase !== "idle")) {
             box.append(connectionSection());
             return box;
         }
         const entry = (status.catalogue ?? []).find((item) => item.id === "calendar.timer");
         const locked = (status.locked ?? []).find((item) => item.id === "calendar.timer");
         if (!entry) {
-            box.append(el("p", { class: "notice", text: locked?.message ?? words.noTimers }));
+            if (locked) box.append(...reconnectBlock(locked.message));
+            else box.append(el("p", { class: "notice", text: words.noTimers }));
             return box;
         }
         const field = (entry.options ?? []).find((option) => option.name === "timer");

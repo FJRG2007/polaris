@@ -399,6 +399,9 @@ class Hub {
                 const claimed = await this.client.claim(address, opened.deviceCode);
                 if (claimed.status === "pending") continue;
                 if (claimed.status === "approved") {
+                    // Connecting again replaces the key this deck held; the old one
+                    // is revoked once the new one is safely kept, never before.
+                    const replaced = this.credentials;
                     this.credentials = {
                         address,
                         token: claimed.token,
@@ -409,6 +412,11 @@ class Hub {
                             .then((instance) => (instance ? { instance } : {})))
                     };
                     await this.#keep(this.credentials);
+                    if (replaced && replaced.keyId !== claimed.keyId) {
+                        await this.client.end(replaced).catch((caught: unknown) => {
+                            streamDeck.logger.warn(`Polaris did not revoke the replaced key: ${String(caught)}`);
+                        });
+                    }
                     this.connecting = { phase: "idle" };
                     this.#failures = 0;
                     await this.refreshCatalogue(true);
