@@ -1736,7 +1736,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 },
                 // The devices are opened by this hook, filtered, and handed over -
                 // so nothing here should go looking for one of its own.
-                stopLocalTrackOnUnpublish: false
+                stopLocalTrackOnUnpublish: false,
+                // The client's own page-leave hook hangs up on `beforeunload`,
+                // which fires before a navigation is even decided. In the
+                // desktop app a link to another site is cancelled and opened in
+                // the system browser, so the page never leaves - but the call
+                // had already been dropped. `pagehide` below is the page
+                // actually going away.
+                disconnectOnPageLeave: false
             });
             room.current = joined;
             const noteShareDrop = () => {
@@ -2301,9 +2308,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         }
 
         void start();
+        const pageGone = () => void room.current?.disconnect().catch(() => undefined);
+        window.addEventListener("pagehide", pageGone);
 
         return () => {
             stopped = true;
+            window.removeEventListener("pagehide", pageGone);
             rejoin.current = null;
             if (rejoinTimer) clearTimeout(rejoinTimer);
             if (beat) clearInterval(beat);
