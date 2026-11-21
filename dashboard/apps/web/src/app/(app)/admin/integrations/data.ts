@@ -30,6 +30,7 @@ import {
     connectionSignInAllowed
 } from "@/lib/connections/store";
 import { integrationWords } from "@/lib/integrations/registry-words";
+import { IMAGERY_INTEGRATION, customImageryTemplate, readImageryFailure } from "@/lib/map-imagery";
 
 /** Whether each service people can link an account of may also sign them in,
  *  keyed by slug. Read together so the cards can be built without awaiting. */
@@ -81,7 +82,8 @@ export async function loadIntegrationsAction() {
         oauthLimits,
         signIn,
         proven,
-        emailTrust
+        emailTrust,
+        imageryFailure
     ] = await Promise.all([
         listIntegrationStates(),
         getGithubStatus(),
@@ -111,7 +113,9 @@ export async function loadIntegrationsAction() {
         provenApplications(),
         // And whether each one's word confirms the address it hands over. Same
         // reason: resolved up front so the mapping below stays synchronous.
-        emailTrustAllowances()
+        emailTrustAllowances(),
+        // The last time the chosen satellite imagery provider refused its key.
+        readImageryFailure()
     ]);
     const accountLimits = new Map(oauthLimits);
     // What a step can ask the operator to paste in: the public pages a review desk
@@ -208,6 +212,19 @@ export async function loadIntegrationsAction() {
                                   ? state.config.bundleId
                                   : DEFAULT_IOS_BUNDLE,
                           sandbox: state?.config.sandbox === true
+                      }
+                    : undefined,
+            // The imagery provider is config, not a secret; the key beside it is.
+            imagery:
+                entry.slug === IMAGERY_INTEGRATION
+                    ? {
+                          provider:
+                              state?.enabled &&
+                              (state.config.provider === "maptiler" || state.config.provider === "esri")
+                                  ? state.config.provider
+                                  : "default",
+                          envOverride: customImageryTemplate() !== null,
+                          failure: imageryFailure
                       }
                     : undefined,
             accountLimit:

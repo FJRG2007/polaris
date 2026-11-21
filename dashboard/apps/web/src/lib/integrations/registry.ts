@@ -710,6 +710,35 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyHelp: "The API key from your Giphy app, not the SDK key from a client-side example."
     },
     {
+        // Configured by its own dialog (provider, key, test tile) and read by
+        // lib/map-imagery.ts; the providers and their terms are in lib/map-layers.ts.
+        slug: "satellite-imagery",
+        name: "Satellite imagery",
+        category: "Chat",
+        summary: "Sharper satellite and hybrid maps for shared locations.",
+        description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+            "Shared locations use free Sentinel-2 imagery, which turns soft at street level. With a MapTiler or Esri key the satellite and hybrid maps stay sharp much closer in. Tiles still come through Polaris, so the provider never sees who is looking or where, and the key never reaches a browser.",
+        docsUrl: "https://docs.maptiler.com/cloud/api/tiles/",
+        setupLinks: [
+            {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+                label: "Create a MapTiler key",
+                url: "https://cloud.maptiler.com/account/keys/",
+                help: "The free plan is enough for a small team, and asks for the MapTiler logo beside the map. Leave the key without allowed origins: tiles are requested by this server, not by a browser."
+            },
+            {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+                label: "Or create an ArcGIS API key",
+                url: "https://developers.arcgis.com/documentation/security-and-authentication/api-key-authentication/tutorials/create-an-api-key/",
+                help: "An ArcGIS Location Platform account, and an API key with the basemaps privilege. The first 2 million tiles a month are free."
+            }
+        ],
+        requiresApiKey: true,
+        apiKeyLabel: "API key",
+        apiKeyHelp: "Checked with a test tile before it is saved. Stored encrypted."
+    },
+    {
         slug: "cloudflare",
         name: "Cloudflare",
         category: "Networking",

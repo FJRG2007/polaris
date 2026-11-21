@@ -2465,6 +2465,22 @@
                         "help": "Shown under Membership details in your Apple Developer account."
                     }
                 }
+            },
+            "satelliteImagery": {
+                "summary": "Sharper satellite and hybrid maps for shared locations.",
+                "description": "Shared locations use free Sentinel-2 imagery, which turns soft at street level. With a MapTiler or Esri key the satellite and hybrid maps stay sharp much closer in. Tiles still come through Polaris, so the provider never sees who is looking or where, and the key never reaches a browser.",
+                "apiKeyLabel": "API key",
+                "apiKeyHelp": "Checked with a test tile before it is saved. Stored encrypted.",
+                "links": {
+                    "0": {
+                        "label": "Create a MapTiler key",
+                        "help": "The free plan is enough for a small team, and asks for the MapTiler logo beside the map. Leave the key without allowed origins: tiles are requested by this server, not by a browser."
+                    },
+                    "1": {
+                        "label": "Or create an ArcGIS API key",
+                        "help": "An ArcGIS Location Platform account, and an API key with the basemaps privilege. The first 2 million tiles a month are free."
+                    }
+                }
             }
         },
         "applePush": {
@@ -2478,6 +2494,30 @@
             "sandboxHint": "On for an app run from Xcode; off for TestFlight and the App Store.",
             "use": "Ring iPhones",
             "useHint": "Off keeps the key and stops the pushes; iPhones then ring only while the app is open."
+        },
+        "satelliteImagery": {
+            "provider": "Imagery",
+            "default": "Free (Sentinel-2)",
+            "hint": {
+                "default": "No key needed. Clear down to neighbourhoods, soft at street level.",
+                "maptiler": "Sharp to street level. Needs a MapTiler key.",
+                "esri": "Sharp to street level in most places. Needs an ArcGIS key."
+            },
+            "badKey": "That does not look like an API key. Paste it without spaces.",
+            "envOverride": "This server sets its own imagery address, which takes the place of the choice below until it is removed.",
+            "failure": {
+                "refused": "{provider} refused this key. Check it was copied whole and allows map tiles.",
+                "limit": "{provider} accepted the key but its quota is used up. Nothing was changed.",
+                "unreachable": "{provider} did not answer. Nothing was changed; try again in a moment."
+            },
+            "fellBack": {
+                "refused": "Maps are showing the free imagery: {provider} refused the key",
+                "limit": "Maps are showing the free imagery: the {provider} quota ran out",
+                "unreachable": "Maps are showing the free imagery: {provider} did not answer"
+            },
+            "works": "{provider} drew a test tile. Maps use it from now on.",
+            "testAndSave": "Test and save",
+            "done": "Done"
         }
     },
     "organizations": {

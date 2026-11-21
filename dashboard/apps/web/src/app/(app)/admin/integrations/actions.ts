@@ -21,6 +21,14 @@ import { APPLE_PUSH_PROVIDER, applePushConfigSchema, validApnsKey } from "@/lib/
 import { connectionFailure, markConnectionFailureSeen } from "@/lib/connections/attention";
 import { dismissAdminWaiting } from "@/lib/admin-waiting";
 import { verifyKey } from "@/lib/integrations/virustotal";
+import { IMAGERY } from "@/lib/map-layers";
+import { imageryChoiceSchema } from "@/lib/map-imagery-schema";
+import {
+    IMAGERY_INTEGRATION,
+    clearImageryFailure,
+    forgetImagery,
+    testImageryKey
+} from "@/lib/map-imagery";
 import { CRIMINALIP_RULES } from "@/lib/integrations/criminalip-rules";
 import type { GoogleApiHealth } from "@/lib/connections/google-api-health";
 import type { CfAccount } from "@/lib/integrations/cloudflare-api";
@@ -482,6 +490,70 @@ export async function saveTenorAction(input: {
 
     revalidatePath("/admin/integrations");
     return {};
+}
+
+/**
+ * Choose the satellite imagery shared locations are drawn with. A keyed provider
+ * is asked for one test tile with the key before anything is kept - a key that
+ * does not draw a tile is refused here, in words, instead of leaving every map
+ * blurry for a reason nobody can see. The key is tri-state like the others:
+ * blank keeps the stored one (and is then tested again), which is also how a
+ * provider is switched without retyping.
+ */
+export async function saveSatelliteImageryAction(
+    input: unknown
+): Promise<{ error?: string; tested?: boolean }> {
+    const user = await requireAdmin();
+    const t = await getTranslations("admin");
+    const parsed = imageryChoiceSchema.safeParse(input);
+    if (!parsed.success) return { error: t("integrations.satelliteImagery.badKey") };
+    const choice = parsed.data;
+    try {
+        if (choice.provider === "default") {
+            // The key stays on file so switching back needs no retyping.
+            const existing = await getIntegrationState(IMAGERY_INTEGRATION);
+            await upsertIntegration(IMAGERY_INTEGRATION, {
+                enabled: false,
+                config: { ...(existing?.config ?? {}), provider: "default" },
+                installedById: user.id
+            });
+        } else {
+            const typed = choice.apiKey?.trim() || undefined;
+            const existing = await getIntegrationState(IMAGERY_INTEGRATION);
+            const key = typed ?? (existing?.hasSecret ? await getIntegrationSecret(IMAGERY_INTEGRATION) : null);
+            if (!key) return { error: t("integrations.errors.apiKeyFirst") };
+            const check = await testImageryKey(choice.provider, key);
+            if (!check.ok) {
+                return {
+                    error: t(`integrations.satelliteImagery.failure.${check.reason}`, {
+                        provider: IMAGERY[choice.provider].name
+                    })
+                };
+            }
+            await upsertIntegration(IMAGERY_INTEGRATION, {
+                enabled: true,
+                config: { provider: choice.provider },
+                secret: typed,
+                installedById: user.id
+            });
+        }
+        await clearImageryFailure();
+        forgetImagery();
+        await recordAudit({
+            actorId: user.id,
+            action: "integration.configure",
+            targetType: "integration",
+            targetId: IMAGERY_INTEGRATION,
+            metadata: { provider: choice.provider }
+        });
+    } catch (caught) {
+        return {
+            error: caught instanceof Error ? caught.message : t("integrations.errors.notSaved")
+        };
+    }
+
+    revalidatePath("/admin/integrations");
+    return { tested: choice.provider !== "default" };
 }
 
 /**

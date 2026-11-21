@@ -2465,6 +2465,22 @@
                         "help": "Aparece en Membership details en tu cuenta de Apple Developer."
                     }
                 }
+            },
+            "satelliteImagery": {
+                "summary": "Mapas satélite e híbridos más nítidos en las ubicaciones compartidas.",
+                "description": "Las ubicaciones compartidas usan imágenes gratuitas de Sentinel-2, que se ven borrosas a nivel de calle. Con una clave de MapTiler o Esri, los mapas satélite e híbridos siguen nítidos mucho más cerca. Las teselas siguen pasando por Polaris, así que el proveedor nunca ve quién mira ni dónde, y la clave nunca llega al navegador.",
+                "apiKeyLabel": "Clave de API",
+                "apiKeyHelp": "Se prueba con una tesela antes de guardarla. Se guarda cifrada.",
+                "links": {
+                    "0": {
+                        "label": "Crear una clave de MapTiler",
+                        "help": "El plan gratuito basta para un equipo pequeño y pide el logo de MapTiler junto al mapa. Deja la clave sin orígenes permitidos: las teselas las pide este servidor, no un navegador."
+                    },
+                    "1": {
+                        "label": "O crear una clave de API de ArcGIS",
+                        "help": "Una cuenta de ArcGIS Location Platform y una clave de API con el privilegio de mapas base. Los primeros 2 millones de teselas al mes son gratis."
+                    }
+                }
             }
         },
         "applePush": {
@@ -2478,6 +2494,30 @@
             "sandboxHint": "Actívalo para una app lanzada desde Xcode; desactívalo para TestFlight y la App Store.",
             "use": "Sonar en iPhone",
             "useHint": "Desactivado guarda la clave y deja de enviar avisos; los iPhone suenan solo con la app abierta."
+        },
+        "satelliteImagery": {
+            "provider": "Imágenes",
+            "default": "Gratis (Sentinel-2)",
+            "hint": {
+                "default": "Sin clave. Nítidas hasta el barrio, borrosas a nivel de calle.",
+                "maptiler": "Nítidas a nivel de calle. Necesita una clave de MapTiler.",
+                "esri": "Nítidas a nivel de calle en casi todo el mundo. Necesita una clave de ArcGIS."
+            },
+            "badKey": "Eso no parece una clave de API. Pégala sin espacios.",
+            "envOverride": "Este servidor fija su propia dirección de imágenes, que sustituye a la opción de abajo mientras exista.",
+            "failure": {
+                "refused": "{provider} rechazó esta clave. Comprueba que se copió entera y que permite teselas de mapa.",
+                "limit": "{provider} aceptó la clave, pero su cuota está agotada. No se ha cambiado nada.",
+                "unreachable": "{provider} no respondió. No se ha cambiado nada; inténtalo de nuevo en un momento."
+            },
+            "fellBack": {
+                "refused": "Los mapas muestran las imágenes gratuitas: {provider} rechazó la clave",
+                "limit": "Los mapas muestran las imágenes gratuitas: se agotó la cuota de {provider}",
+                "unreachable": "Los mapas muestran las imágenes gratuitas: {provider} no respondió"
+            },
+            "works": "{provider} dibujó una tesela de prueba. Los mapas la usan desde ahora.",
+            "testAndSave": "Probar y guardar",
+            "done": "Hecho"
         }
     },
     "organizations": {

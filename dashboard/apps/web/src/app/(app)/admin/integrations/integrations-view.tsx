@@ -80,6 +80,9 @@ import {
     isDirty
 } from "@polaris/ui";
 import { categoryWords, dymoRule } from "@/lib/integrations/registry-words";
+import { RelativeTime } from "@/components/relative-time";
+import { imageryKeySchema } from "@/lib/map-imagery-schema";
+import { IMAGERY, type ImageryProvider, type KeyedImageryProvider } from "@/lib/map-layers";
 
 /** What every configure dialog takes: the card it is for, and how to close it. */
 export interface IntegrationDialogProps {
@@ -152,6 +155,17 @@ export interface IntegrationCard {
     /** Whether this service's word confirms the address it hands over. Undefined
      *  for a service that hands over none, which is most of them. */
     emailTrusted?: boolean;
+    /** Satellite imagery: the provider in use, whether the instance's own address
+     *  overrides it, and the last time the provider refused its key. */
+    imagery?: {
+        provider: ImageryProvider;
+        envOverride: boolean;
+        failure: {
+            provider: KeyedImageryProvider;
+            reason: "refused" | "limit" | "unreachable";
+            at: string;
+        } | null;
+    };
 }
 
 /** What a card's button opens. Every card in the catalog has to resolve to
@@ -172,6 +186,7 @@ export function dialogFor(card: IntegrationCard): ComponentType<IntegrationDialo
     if (["tenor", "giphy", "lastfm", "tailscale", "deepl", "google-translate"].includes(card.slug))
         return TenorDialog;
     if (card.slug === "krisp") return LicensedFilterDialog;
+    if (card.slug === "satellite-imagery") return SatelliteImageryDialog;
     if (card.slug === "apple-push") return ApplePushDialog;
     if (OAUTH_APPS[card.slug]) return OAuthAppDialog;
     return null;
@@ -1539,6 +1554,154 @@ function TenorDialog({ card, onClose }: { card: IntegrationCard; onClose: () => 
                         <Button type="button" onClick={onSave} disabled={saving || unchanged}>
                             {saving ? (
                                 <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                tc("actions.save")
+                            )}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/**
+ * The satellite imagery shared locations are drawn with: the free default, or a
+ * provider with the operator's key. Saving a key asks the provider for a test
+ * tile first and says on screen whether it drew one; a refusal recorded later,
+ * when the maps fell back to the default, is shown here too.
+ */
+function SatelliteImageryDialog({ card, onClose }: IntegrationDialogProps) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
+    const current = card.imagery?.provider ?? "default";
+    const [provider, setProvider] = useState<ImageryProvider>(current);
+    const [apiKey, setApiKey] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const [works, setWorks] = useState(false);
+    const values = { provider, apiKey };
+    const [loaded] = useState(() => values);
+    const unchanged = !isDirty(loaded, values);
+    const [saving, startSave] = useTransition();
+    const keyed = provider !== "default";
+    // The same rule the server applies, checked as it is typed; blank keeps the stored key.
+    const keyInvalid = keyed && apiKey.trim() !== "" && !imageryKeySchema.safeParse(apiKey).success;
+    const failure = card.imagery?.failure;
+
+    function onSave() {
+        setError(null);
+        setWorks(false);
+        startSave(async () => {
+            const result = await runAction(
+                () => integrationActions.saveSatelliteImageryAction({ provider, apiKey }),
+                setError
+            );
+            if (!result) return;
+            if (result.error) setError(result.error);
+            else if (result.tested) setWorks(true);
+            else onClose();
+        });
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <IntegrationLogo slug={card.slug} className="size-5" />
+                        {card.name}
+                    </DialogTitle>
+                    <DialogDescription>{card.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col gap-4">
+                    {card.imagery?.envOverride ? (
+                        <p className="flex items-start gap-2 rounded-md border border-border p-3 text-sm">
+                            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+                            <span className="min-w-0">{t("integrations.satelliteImagery.envOverride")}</span>
+                        </p>
+                    ) : null}
+
+                    <div className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">{t("integrations.satelliteImagery.provider")}</span>
+                        <SegmentedControl
+                            aria-label={t("integrations.satelliteImagery.provider")}
+                            className="flex w-full"
+                            value={provider}
+                            onValueChange={(next) => {
+                                setProvider(next as ImageryProvider);
+                                setWorks(false);
+                                setError(null);
+                            }}
+                            options={[
+                                { value: "default", label: t("integrations.satelliteImagery.default") },
+                                { value: "maptiler", label: IMAGERY.maptiler.name },
+                                { value: "esri", label: IMAGERY.esri.name }
+                            ]}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                            {t(`integrations.satelliteImagery.hint.${provider}`)}
+                        </span>
+                    </div>
+
+                    {keyed ? (
+                        <>
+                            <SetupSteps links={card.setupLinks} values={card.setupValues} />
+                            <label className="flex flex-col gap-1 text-sm">
+                                <span className="font-medium">
+                                    {card.apiKeyLabel ?? t("integrations.dialog.apiKey")}
+                                </span>
+                                <Input
+                                    type="password"
+                                    autoComplete="off"
+                                    value={apiKey}
+                                    aria-invalid={keyInvalid || undefined}
+                                    onChange={(event) => {
+                                        setApiKey(event.target.value);
+                                        setWorks(false);
+                                    }}
+                                    placeholder={
+                                        card.hasSecret
+                                            ? t("integrations.dialog.savedKey")
+                                            : t("integrations.dialog.pasteKey")
+                                    }
+                                />
+                                <span className={cn("text-xs", keyInvalid ? "text-danger" : "text-muted-foreground")}>
+                                    {keyInvalid ? t("integrations.satelliteImagery.badKey") : card.apiKeyHelp}
+                                </span>
+                            </label>
+                        </>
+                    ) : null}
+
+                    {failure && current !== "default" && !works ? (
+                        <p className="flex items-start gap-2 rounded-md border border-border p-3 text-sm">
+                            <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+                            <span className="min-w-0">
+                                {t(`integrations.satelliteImagery.fellBack.${failure.reason}`, {
+                                    provider: IMAGERY[failure.provider].name
+                                })}{" "}
+                                <RelativeTime iso={failure.at} className="text-muted-foreground" />
+                            </span>
+                        </p>
+                    ) : null}
+
+                    {works ? (
+                        <p className="flex items-center gap-2 text-sm text-success">
+                            <CheckCircle2 className="size-4 shrink-0" />
+                            {t("integrations.satelliteImagery.works", { provider: IMAGERY[provider].name })}
+                        </p>
+                    ) : null}
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={onClose}>
+                            {works ? t("integrations.satelliteImagery.done") : tc("actions.cancel")}
+                        </Button>
+                        <Button type="button" onClick={onSave} disabled={saving || keyInvalid || (unchanged && !keyed)}>
+                            {saving ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : keyed ? (
+                                t("integrations.satelliteImagery.testAndSave")
                             ) : (
                                 tc("actions.save")
                             )}
