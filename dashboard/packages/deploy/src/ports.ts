@@ -227,6 +227,13 @@ export interface RuntimePorts {
      */
     readFile(container: string, path: string): Promise<ReadableStream<Uint8Array>>;
     /**
+     * A read-only command's output (`ls stat cat tar find test du`), streamed
+     * rather than collected - so a listing longer than `runIn` reports arrives
+     * whole. The local daemon answers for a stopped container too. Optional: a
+     * caller without it falls back to `runIn`.
+     */
+    readCommand?(container: string, argv: readonly string[]): Promise<ReadableStream<Uint8Array>>;
+    /**
      * Stream bytes into a file inside a container - the reverse of `readFile`.
      *
      * A restore puts a dump back, and a dump is exactly the artifact that must

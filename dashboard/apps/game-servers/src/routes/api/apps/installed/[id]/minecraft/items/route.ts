@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { serverModItems } from "../../../../../../../lib/minecraft/mod-items-service";
 import { host } from "@polaris/app-host";
+import { readerLocale } from "../../../../../../../lib/owner-words";
 
 const { requireGameServer } = host.appsInstallAccess;
 
@@ -27,7 +28,7 @@ export async function GET(
 ): Promise<Response> {
     const { id } = await params;
     const { access } = await requireGameServer("games.read", id);
-    const read = await serverModItems(access.ownerId, id).catch(() => null);
+    const read = await serverModItems(access.ownerId, id, await readerLocale()).catch(() => null);
     // `complete` is false when the budget ran out with mods still to read, and the
     // panel needs it: what it does with an answer is keep it for a few minutes,
     // and keeping a half-read one that long is the rest of the list not appearing

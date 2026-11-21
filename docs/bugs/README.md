@@ -18,6 +18,6 @@ Security findings are not kept here; they live in
 | BUG-0005 | Polaris desktop seems not to open on its first start, and again after a host is added | Desktop | Fixed, watching | desktop/src/main/window-front.ts | 2026-11-21 |
 | BUG-0006 | Opening a link to another site in Polaris desktop ends the call | Calls | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/use-sfu-call.ts | 2026-11-21 |
 | BUG-0007 | Polar's side panel opens on the old chat, then on an empty one when opened again | Polar | Fixed, watching | dashboard/apps/web/src/components/polar/polar-panel.tsx | 2026-11-21 |
-| BUG-0008 | Items from a modpack's mods are missing from the Minecraft item picker | Game servers | Open | dashboard/apps/game-servers/src/lib/minecraft/mod-items-service.ts | 2026-11-21 |
+| BUG-0008 | Items from a modpack's mods are missing from the Minecraft item picker | Game servers | Fixed, watching | dashboard/apps/game-servers/src/lib/minecraft/mod-items-service.ts | 2026-11-21 |
 | BUG-0009 | The world optimizer removed chests, beds and signs, and left the world unsaveable | Game servers | Fixed, watching | dashboard/apps/game-servers/src/lib/minecraft/world-trim-script.ts | 2026-11-21 |
 | BUG-0010 | The side panel says it needs Minecraft 1.16 on a 1.20.1 server | Game servers | Fixed, watching | dashboard/apps/game-servers/src/lib/minecraft/server-release.ts | 2026-11-21 |

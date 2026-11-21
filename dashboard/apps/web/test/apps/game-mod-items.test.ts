@@ -402,7 +402,7 @@ describe("what the panel does with them", () => {
             "Not searching late: only the first mods on a long list are read. They can still be typed as ids."
         );
         expect(noteFor({ complete: false }, 0)).toBe(
-            "Some mods are still being read. Open the picker again to see their items."
+            "Some mods are still being read. Their items appear here as they are."
         );
     });
 

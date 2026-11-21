@@ -628,7 +628,7 @@
             "found": "Also searching {count} items this server's mods add. Type a mod's name for just those.",
             "unread": "Could not read the items {names} adds. They can still be typed as ids.",
             "skipped": "Not searching {names}: only the first mods on a long list are read. They can still be typed as ids.",
-            "incomplete": "Some mods are still being read. Open the picker again to see their items.",
+            "incomplete": "Some mods are still being read. Their items appear here as they are.",
             "andMore": "{names} and {count} more"
         }
     },

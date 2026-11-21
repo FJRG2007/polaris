@@ -703,7 +703,28 @@ export class SshPorts implements RuntimePorts {
      * truncated file that looks like a complete backup.
      */
     public async readFile(container: string, path: string): Promise<ReadableStream<Uint8Array>> {
-        const command = `docker exec ${quoteArg(container)} cat -- ${quoteArg(path)}`;
+        return this.streamOut(container, ["cat", "--", path], path);
+    }
+
+    /**
+     * A read-only command's output, streamed - the same channel as `readFile`.
+     * Inside a running container only: the engine over SSH has no way into a
+     * stopped one's files short of starting another container, which this does
+     * not do.
+     */
+    public async readCommand(
+        container: string,
+        argv: readonly string[]
+    ): Promise<ReadableStream<Uint8Array>> {
+        return this.streamOut(container, argv, argv[0] ?? "a command");
+    }
+
+    private async streamOut(
+        container: string,
+        argv: readonly string[],
+        what: string
+    ): Promise<ReadableStream<Uint8Array>> {
+        const command = `docker exec ${quoteArg(container)} ${argv.map(quoteArg).join(" ")}`;
         const client = await this.connect();
         return new Promise<ReadableStream<Uint8Array>>((resolve, reject) => {
             client.exec(command, (error, channel) => {
@@ -728,7 +749,7 @@ export class SshPorts implements RuntimePorts {
                             }
                             controller.error(
                                 new Error(
-                                    `reading ${path} exited with code ${code}${stderr ? `: ${stderr.trim()}` : ""}`
+                                    `reading ${what} exited with code ${code}${stderr ? `: ${stderr.trim()}` : ""}`
                                 )
                             );
                         });

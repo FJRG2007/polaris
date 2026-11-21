@@ -208,7 +208,10 @@ function readableLabel(raw: unknown, path: string): string {
  * the game behaves - reads as no items rather than as a failure. Three of the six
  * mods on the server this was built for are exactly that.
  */
-export async function readJarItems(jar: JarFiles): Promise<JarItems> {
+export async function readJarItems(
+    jar: JarFiles,
+    languages: readonly string[] = []
+): Promise<JarItems> {
     const paths = new Set(jar.paths);
     const texts = new Map<string, unknown>();
 
@@ -252,6 +255,14 @@ export async function readJarItems(jar: JarFiles): Promise<JarItems> {
         const lang = await json(`assets/${namespace}/lang/en_us.json`);
         const words =
             lang !== null && typeof lang === "object" ? (lang as Record<string, unknown>) : {};
+        const translations: [string, Record<string, unknown>][] = [];
+        for (const code of languages) {
+            if (!/^[a-z]{2,3}_[a-z]{2,4}$/.test(code)) continue;
+            const other = await json(`assets/${namespace}/lang/${code}.json`);
+            if (other !== null && typeof other === "object") {
+                translations.push([code, other as Record<string, unknown>]);
+            }
+        }
 
         for (const path of itemPathsIn(paths, namespace, words)) {
             if (items.length >= MAX_ITEMS) break;
@@ -264,10 +275,18 @@ export async function readJarItems(jar: JarFiles): Promise<JarItems> {
                 words[`item.${namespace}.${key}`] ?? words[`block.${namespace}.${key}`],
                 path
             );
+            const names: Record<string, string> = {};
+            for (const [code, other] of translations) {
+                const text = other[`item.${namespace}.${key}`] ?? other[`block.${namespace}.${key}`];
+                if (typeof text !== "string") continue;
+                const name = readableLabel(text, path);
+                if (name !== label) names[code] = name;
+            }
             items.push({
                 id,
                 label,
-                icon: await iconFor(namespace, path, { json, facesOf, paths, jar, icons })
+                icon: await iconFor(namespace, path, { json, facesOf, paths, jar, icons }),
+                ...(Object.keys(names).length > 0 ? { names } : {})
             });
         }
     }

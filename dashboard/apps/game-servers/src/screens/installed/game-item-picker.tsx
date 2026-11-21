@@ -29,6 +29,12 @@ import type { SearchableItem } from "@polaris/core/catalog-search";
  *  nobody finds anything in, and a search of two more letters is faster. */
 const SHOWN = 120;
 
+/** How many more times an unfinished catalogue is asked for while the picker is
+ *  open, and how long apart. Each answer already spends up to the server's read
+ *  budget, so this covers a few hundred jars read for the first time. */
+const MORE_ROUNDS = 12;
+const MORE_PAUSE_MS = 1500;
+
 export interface ItemPickerSource<T extends SearchableItem> {
     /** The catalogue, fetched once and shared by every picker in the tab. The
      *  caller owns the caching, because it also owns the failure. */
@@ -41,7 +47,7 @@ export interface ItemPickerSource<T extends SearchableItem> {
      * for. So it is appended when it arrives and the grid is drawn from the first
      * batch meanwhile. Absent for a game whose catalogue is one file.
      */
-    readonly more?: () => Promise<{ items: T[]; note: string | null }>;
+    readonly more?: () => Promise<{ items: T[]; note: string | null; pending?: boolean }>;
     readonly search: (items: readonly T[], query: string, limit: number) => T[];
     /** One item's picture at whatever size the slot draws it. */
     readonly Icon: ComponentType<{ id: string; className?: string }>;
@@ -102,16 +108,30 @@ export function GameItemPicker<T extends SearchableItem>({
         let live = true;
         // Never a reason to fail the picker: what this adds is extra, and what it
         // could not add it says in a line under the grid.
-        more().then(
-            (second) => {
-                if (!live) return;
-                setExtra(second.items);
-                setNote(second.note);
-            },
-            () => undefined
-        );
+        //
+        // A large pack is read across several answers, each continuing where the
+        // last stopped, so the picker asks again while it stays open and the items
+        // fill in without anybody reopening it. Spaced and bounded, so a server
+        // that never finishes is a few requests rather than a loop.
+        let rounds = 0;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const ask = (): void => {
+            more().then(
+                (second) => {
+                    if (!live) return;
+                    setExtra(second.items);
+                    setNote(second.note);
+                    if (second.pending && ++rounds < MORE_ROUNDS) {
+                        timer = setTimeout(ask, MORE_PAUSE_MS);
+                    }
+                },
+                () => undefined
+            );
+        };
+        ask();
         return () => {
             live = false;
+            clearTimeout(timer);
         };
     }, [more]);
 

@@ -65,6 +65,9 @@ export interface ModItemsLoad {
     readonly items: CatalogItem[];
     /** A sentence for the picker, or null when there is nothing to say. */
     readonly note: string | null;
+    /** The server ran out of time with jars still to read; asking again
+     *  continues from where it stopped. */
+    readonly pending: boolean;
 }
 
 /**
@@ -107,7 +110,7 @@ export function loadModItems(
         // this one. It still resolves - a picker with no modded items is where
         // this started, and not something to fail a grid over.
         loads.delete(installedAppId);
-        return { items: [], note: null };
+        return { items: [], note: null, pending: false };
     });
     loads.set(installedAppId, { at: Date.now(), load });
     return load;
@@ -137,11 +140,10 @@ async function fetchModItems(installedAppId: string, t: ModItemsText): Promise<M
     // A half-read answer is kept only until the next open: the server reads what
     // it did not reach then, and a five-minute cache would be the rest of the
     // server's mods missing until somebody reloaded the tab.
-    if ((payload as { complete?: unknown } | null)?.complete === false) {
-        loads.delete(installedAppId);
-    }
+    const pending = (payload as { complete?: unknown } | null)?.complete === false;
+    if (pending) loads.delete(installedAppId);
 
-    return { items: modCatalogItems(items), note: noteFor(payload, items.length, t) };
+    return { items: modCatalogItems(items), note: noteFor(payload, items.length, t), pending };
 }
 
 /**

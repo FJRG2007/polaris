@@ -654,6 +654,13 @@ export interface ServerContainer {
      */
     readFile(path: string): Promise<ReadableStream<Uint8Array>>;
     /**
+     * A read-only command's whole output (`ls stat cat tar find test du`),
+     * streamed, which `run` cuts at 16 KiB. On the local host it answers while
+     * the server is stopped as well. Absent where the machine has no such
+     * route; callers fall back to `run`.
+     */
+    readOut?(argv: readonly string[]): Promise<ReadableStream<Uint8Array>>;
+    /**
      * Run the world optimizer against this server's files, with the server down.
      *
      * Not a use of `run`: that is a command inside a container that is up, and the
@@ -707,6 +714,9 @@ function containerOn(install: MinecraftInstall, ports: RuntimePorts): ServerCont
         sayAll: (lines) => sendGameLines(ports, install, lines),
         sayEach: (commands) => sendGameCommands(ports, install, commands),
         readFile: (path) => ports.readFile(install.container, path),
+        ...(ports.readCommand
+            ? { readOut: (argv: readonly string[]) => ports.readCommand!(install.container, argv) }
+            : {}),
         trimWorld: ports.trimWorld
             ? (script, options) => ports.trimWorld!(install.container, script, options)
             : null

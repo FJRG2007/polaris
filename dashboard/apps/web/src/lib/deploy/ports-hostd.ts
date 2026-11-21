@@ -338,6 +338,16 @@ export class HostdPorts implements RuntimePorts {
         return Readable.toWeb(response) as ReadableStream<Uint8Array>;
     }
 
+    /** The daemon's read route, which answers for a stopped container as well by
+     *  borrowing its volumes - and holds `argv[0]` to its own read-only list. */
+    public async readCommand(
+        container: string,
+        argv: readonly string[]
+    ): Promise<ReadableStream<Uint8Array>> {
+        const response = await this.client.fsRead(container, [...argv]);
+        return Readable.toWeb(response) as ReadableStream<Uint8Array>;
+    }
+
     /** Streamed through the daemon's write route. The daemon streams back what
      *  the write printed; that is drained so a refusal surfaces as an error. */
     public async writeFile(

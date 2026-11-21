@@ -143,7 +143,10 @@ export const modItemSchema = z.object({
     id: z.string().max(160),
     /** What the game calls it, in the language the panel is in. */
     label: z.string().max(120),
-    icon: modItemIconSchema.nullable()
+    icon: modItemIconSchema.nullable(),
+    /** The label in the other languages the panel speaks, by the game's own
+     *  language code (`es_es`), where the jar carries a translation. */
+    names: z.record(z.string().regex(/^[a-z]{2,3}_[a-z]{2,4}$/), z.string().max(120)).optional()
 });
 
 export type ModItem = z.infer<typeof modItemSchema>;
@@ -161,6 +164,9 @@ export interface ModItemView extends ModItem {
     readonly mod: string;
     /** The build its picture is kept under. */
     readonly build: string;
+    /** The English label, when `label` is a translation of it - searched too, so
+     *  the name a guide or a friend uses still finds the item. */
+    readonly english?: string;
 }
 
 /** A picture and how to draw it. Mod textures are not always square - an animated
@@ -214,7 +220,10 @@ export function readModItems(payload: unknown): ModItemView[] {
                     : itemLabel(id),
             mod: typeof entry.mod === "string" ? entry.mod : "",
             build: typeof entry.build === "string" && isBuildKey(entry.build) ? entry.build : "",
-            icon: readModIcon(entry.icon)
+            icon: readModIcon(entry.icon),
+            ...(typeof entry.english === "string" && entry.english.length > 0
+                ? { english: entry.english.slice(0, 120) }
+                : {})
         });
     }
     return items;
@@ -236,7 +245,7 @@ export function modCatalogItems(items: readonly ModItemView[]): CatalogItem[] {
         // SecurityCraft is `security-craft` on the mod list and `securitycraft` in
         // every id it registers, and a search box that answers only to the first
         // is one the obvious query misses.
-        search: `${item.label.toLowerCase()} ${itemName(item.id)} ${modNamespace(item.id)} ${item.mod.toLowerCase()}`
+        search: `${item.label.toLowerCase()} ${(item.english ?? "").toLowerCase()} ${itemName(item.id)} ${modNamespace(item.id)} ${item.mod.toLowerCase()}`
             .replace(/\s+/g, " ")
             .trim(),
         // Behind the vanilla entry of the same name, so a search for "stone"

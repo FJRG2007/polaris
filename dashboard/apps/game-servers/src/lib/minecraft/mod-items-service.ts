@@ -8,6 +8,12 @@
  * all and reaches nobody, which is what keeps this off every deployment that was
  * running happily before it existed.
  *
+ * Two places the jars come from. The server's mods folder first - whatever is
+ * actually installed, from a modpack, a hand upload or the list - read through
+ * the machine's own file access, which answers on the local host while the
+ * server is stopped too. Then the Modrinth list, for a mod added there that the
+ * server has not booted with yet (and a server never started at all).
+ *
  * Kept per build rather than per server, under the jar's own SHA-1. A build that
  * has not changed is never downloaded twice - not on the next visit, not on the
  * next restart, and not for the second server running the same mod. A list that
@@ -41,6 +47,9 @@ import {
     projectSlug
 } from "./modrinth";
 import { host } from "@polaris/app-host";
+import { LOCALES, findSoftware, type Locale } from "@polaris/core";
+import { mayBeCut } from "../container-files";
+import { withServerContainer, type ServerContainer } from "./service";
 
 const { listEnvVars } = host.envVarService;
 
@@ -48,9 +57,37 @@ const { listEnvVars } = host.envVarService;
  *  not something to resolve one jar at a time while somebody waits. */
 const MAX_PROJECTS = 24;
 
-/** What the whole picker is allowed to carry. Rechiseled alone is 3739 items, so
- *  this is a few of those rather than a number anybody normal reaches. */
-const MAX_ITEMS = 12000;
+/** What the whole picker is allowed to carry. A large modpack is around twenty
+ *  thousand items; this is twice that, so a real one is never cut short and a
+ *  pathological one still answers with a bounded list. */
+const MAX_ITEMS = 40000;
+
+/** What one kept catalogue may hold. Rechiseled alone is 3739 items. */
+const MAX_CATALOG_ITEMS = 12000;
+
+/**
+ * What a kept catalogue's shape is. 2 carries the labels in the panel's other
+ * languages; a catalogue without it is read again when its jar is at hand, and
+ * still answered from when it is not.
+ */
+const CATALOG_VERSION = 2;
+
+/** The panel's languages other than English, as the game spells them (`es_es`). */
+const LANGUAGES: readonly string[] = LOCALES.filter((locale) => locale !== "en-US").map(
+    gameLanguage
+);
+
+function gameLanguage(locale: string): string {
+    return locale.toLowerCase().replace("-", "_");
+}
+
+/** Where every loader that reads mods - Forge, NeoForge, Fabric, Quilt and the
+ *  hybrids - looks for them in the image's data directory. */
+export const MODS_DIR = "/data/mods";
+
+/** Jars read at once from the folder: enough to hide the round trip to the
+ *  machine, few enough that the worst case held in memory stays a few jars. */
+const FOLDER_READS = 4;
 
 /** A jar bigger than this is not read. Nothing that adds items comes close - the
  *  largest on the server this was built for is 12 MB. */
@@ -93,6 +130,8 @@ export interface ServerModItem extends modItems.ModItem {
     readonly mod: string;
     /** The build its picture is kept under, so the panel can address it. */
     readonly build: string;
+    /** The English label, when `label` is in the reader's language instead. */
+    readonly english?: string;
 }
 
 export interface ServerModItems {
@@ -115,47 +154,119 @@ export interface ServerModItems {
     readonly skipped: readonly string[];
 }
 
-const EMPTY: ServerModItems = { items: [], unread: [], skipped: [], complete: true };
-
 /**
- * Everything the mods on one server add.
+ * Everything the mods on one server add, labelled in `locale`.
  *
- * Reads the list off the install itself rather than taking it from the caller:
- * this downloads files, and what it downloads should be decided by what the
- * server is actually configured to install.
+ * Reads what to look at off the install itself rather than taking it from the
+ * caller: this reads files and downloads others, and which should be decided by
+ * what the server is actually configured to run.
  */
 export async function serverModItems(
     ownerId: string,
-    installedAppId: string
+    installedAppId: string,
+    locale: Locale = "en-US"
 ): Promise<ServerModItems> {
     const settings = await readSettings(ownerId, installedAppId);
     const loader = loaderForType(settings.software);
-    // A plugin server loads no client assets, so there is nothing of this kind to
-    // read and no reason to fetch anything.
-    if (loader === null || isPluginLoader(loader)) return EMPTY;
+    const until = Date.now() + READ_BUDGET_MS;
+    const gathered = new Gathered();
 
+    if (readsModFolder(settings.software)) {
+        const local = await withServerContainer(ownerId, installedAppId, async (server) =>
+            server.edition === "java"
+                ? sharedFolderRead(installedAppId, () =>
+                      readModFolder(containerFolder(server), installedAppId, until)
+                  )
+                : null
+        ).catch(() => null);
+        if (local !== null) {
+            for (const catalog of local.catalogs) gathered.add(catalog);
+            gathered.unread.push(...local.unread);
+            if (!local.complete) gathered.complete = false;
+        }
+    }
+
+    // A plugin server loads no client assets, so there is nothing on its list of
+    // this kind to read and no reason to fetch anything.
+    if (loader !== null && !isPluginLoader(loader) && !gathered.full()) {
+        await readModrinthList(settings, loader, until, gathered);
+    }
+    return gathered.answer(gameLanguage(locale));
+}
+
+/**
+ * Whether a server's software loads jars from a mods folder.
+ *
+ * The mod loaders and the hybrids do, and so may a modpack or a custom jar. A
+ * `TYPE` this catalogue does not know (`AUTO_CURSEFORGE`, say) is looked at too:
+ * one listing is cheaper than a picker missing a whole pack. Vanilla, the
+ * plugin servers and an unset `TYPE` - which the image runs as vanilla - are
+ * left alone, so they do no work at all.
+ */
+export function readsModFolder(software: string): boolean {
+    if (software.trim() === "") return false;
+    const known = findSoftware(software);
+    return known === null || known.weight === "mods" || known.id === "CUSTOM";
+}
+
+/** The items of every catalogue read, once each, up to `MAX_ITEMS`. */
+class Gathered {
+    readonly items: ServerModItem[] = [];
+    readonly unread: string[] = [];
+    readonly skipped: string[] = [];
+    complete = true;
+    private readonly taken = new Set<string>();
+
+    full(): boolean {
+        return this.items.length >= MAX_ITEMS;
+    }
+
+    add(catalog: BuildCatalog): void {
+        for (const item of catalog.items) {
+            if (this.full()) return;
+            if (this.taken.has(item.id)) continue;
+            this.taken.add(item.id);
+            this.items.push({ ...item, mod: catalog.title, build: catalog.build });
+        }
+    }
+
+    /** The answer, each label in `language` where the jar translated it. The
+     *  English one rides along so a search in English still finds it. */
+    answer(language: string): ServerModItems {
+        const items = this.items.map(({ names, ...item }) => {
+            const translated = names?.[language];
+            return translated && translated !== item.label
+                ? { ...item, label: translated, english: item.label }
+                : item;
+        });
+        return { items, unread: this.unread, skipped: this.skipped, complete: this.complete };
+    }
+}
+
+/** The server's Modrinth list, as it was read before the folder was. */
+async function readModrinthList(
+    settings: { version: string | null; projects: string; },
+    loader: string,
+    until: number,
+    gathered: Gathered
+): Promise<void> {
     // Entries with no Modrinth slug are files placed by hand, which have nothing
     // to download, so they are left out before the cap rather than spending it.
     const listed = parseProjectList(settings.projects).flatMap((entry) => {
         const slug = projectSlug(entry);
         return slug === null ? [] : [{ entry, slug }];
     });
-    if (listed.length === 0) return EMPTY;
+    if (listed.length === 0) return;
     const entries = listed.slice(0, MAX_PROJECTS);
-    const skipped = listed.slice(MAX_PROJECTS).map((item) => item.slug);
+    gathered.skipped.push(...listed.slice(MAX_PROJECTS).map((item) => item.slug));
 
-    const items: ServerModItem[] = [];
-    const taken = new Set<string>();
-    const unread: string[] = [];
-    const until = Date.now() + READ_BUDGET_MS;
-    let complete = true;
     for (const { entry, slug } of entries) {
         // Out of time is not the same as unreadable, and is not reported as it:
         // what is left is read on the next open, from a cache that is by then one
         // mod shorter.
         if (Date.now() >= until) {
-            complete = false;
-            break;
+            gathered.complete = false;
+            return;
         }
         const read = await catalogFor(entry, slug, loader, settings.version, until).catch(
             (caught: unknown) => (caught instanceof OutOfTime ? "out of time" : null)
@@ -163,26 +274,302 @@ export async function serverModItems(
         // A read the clock cut short is not a mod whose jar cannot be read, so it
         // is left for the next open rather than reported as broken.
         if (read === "out of time") {
-            complete = false;
-            break;
+            gathered.complete = false;
+            return;
         }
         if (read === null) {
-            unread.push(slug);
+            gathered.unread.push(slug);
             continue;
         }
-        for (const item of read.items) {
-            if (items.length >= MAX_ITEMS) break;
-            if (taken.has(item.id)) continue;
-            taken.add(item.id);
-            items.push({ ...item, mod: read.title, build: read.build });
-        }
+        gathered.add(read);
         // Past the cap the rest of the list is jars downloaded and read for items
         // that are then dropped, so the walk stops here and not just the copy.
-        if (items.length >= MAX_ITEMS) break;
+        if (gathered.full()) return;
     }
-    return { items, unread, skipped, complete };
 }
 
+/** One jar in the mods folder, as listed. `size` is -1 when the listing could
+ *  not say, which is a jar that is read again rather than trusted unchanged. */
+export interface FolderJar {
+    readonly name: string;
+    readonly size: number;
+    readonly modified: string;
+}
+
+/**
+ * A server's mods folder, as much of one as this needs - an interface rather
+ * than the container, so the whole walk can be asserted against jars assembled
+ * in a test.
+ */
+export interface ModFolder {
+    /** The jars in it, and whether that is all of them. Null when the folder
+     *  could not be listed at all - a machine that is unreachable, say. */
+    list(): Promise<{ jars: readonly FolderJar[]; whole: boolean; } | null>;
+    /** One jar's bytes, or null when it is not there or is longer than `limit`. */
+    read(name: string, limit: number): Promise<Uint8Array | null>;
+}
+
+export interface FolderRead {
+    readonly catalogs: readonly BuildCatalog[];
+    /** Jars that could not be read, by file name. */
+    readonly unread: readonly string[];
+    readonly complete: boolean;
+}
+
+/** One reading of a server's folder at a time: two tabs opening the picker at
+ *  once share it rather than reading every jar twice. */
+const folderReads = new Map<string, Promise<FolderRead | null>>();
+
+function sharedFolderRead(
+    key: string,
+    work: () => Promise<FolderRead | null>
+): Promise<FolderRead | null> {
+    const held = folderReads.get(key);
+    if (held) return held;
+    const read = work().finally(() => {
+        if (folderReads.get(key) === read) folderReads.delete(key);
+    });
+    folderReads.set(key, read);
+    return read;
+}
+
+/**
+ * What the jars in a server's mods folder add.
+ *
+ * A jar listed with the size and modification time it had last time is answered
+ * from what was kept under its hash, without reading it again - a 300-jar pack
+ * reopened costs one listing. Anything new or changed is read whole, hashed, and
+ * looked up by that hash before it is unpacked, so the same build on a second
+ * server is never unpacked twice. What the budget does not reach is left for the
+ * next open, which starts from everything this one kept.
+ */
+export async function readModFolder(
+    folder: ModFolder,
+    key: string,
+    until: number
+): Promise<FolderRead | null> {
+    const listed = await folder.list();
+    if (listed === null) return null;
+    const jars = [...listed.jars].sort((left, right) => left.name.localeCompare(right.name));
+    const index = await readIndex(key);
+    const next: Record<string, IndexEntry> = {};
+    const found: (BuildCatalog | null | "late")[] = Array.from({ length: jars.length }, () => null);
+    const pending: number[] = [];
+
+    for (const [at, jar] of jars.entries()) {
+        const known = index[jar.name];
+        if (known && jar.size >= 0 && known.size === jar.size && known.modified === jar.modified) {
+            const kept = await readCatalog(known.sha1);
+            if (kept !== null && kept.v === CATALOG_VERSION) {
+                found[at] = { build: known.sha1, title: kept.title, items: kept.items };
+                next[jar.name] = known;
+                continue;
+            }
+        }
+        pending.push(at);
+    }
+
+    let cursor = 0;
+    const worker = async (): Promise<void> => {
+        while (cursor < pending.length) {
+            const at = pending[cursor++]!;
+            const jar = jars[at]!;
+            if (Date.now() >= until) {
+                found[at] = "late";
+                continue;
+            }
+            const read = await readFolderJar(folder, jar, until);
+            if (read === "late" || read === null) {
+                found[at] = read;
+                continue;
+            }
+            found[at] = read;
+            next[jar.name] = { size: jar.size, modified: jar.modified, sha1: read.build };
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(FOLDER_READS, pending.length) }, worker));
+
+    if (pending.length > 0 || Object.keys(index).length !== Object.keys(next).length) {
+        await writeIndex(key, next);
+    }
+    const catalogs: BuildCatalog[] = [];
+    const unread: string[] = [];
+    let complete = listed.whole;
+    for (const [at, read] of found.entries()) {
+        if (read === "late") complete = false;
+        else if (read === null) unread.push(jars[at]!.name);
+        else catalogs.push(read);
+    }
+    return { catalogs, unread, complete };
+}
+
+/** One jar from the folder, from the cache by its hash or read from its bytes.
+ *  Null when it cannot be read, "late" when the clock ran out first. */
+async function readFolderJar(
+    folder: ModFolder,
+    jar: FolderJar,
+    until: number
+): Promise<BuildCatalog | null | "late"> {
+    if (jar.size > MAX_JAR_BYTES) return null;
+    let bytes: Uint8Array | null;
+    try {
+        bytes = await beforeDeadline(folder.read(jar.name, MAX_JAR_BYTES), until);
+    } catch (caught) {
+        return caught instanceof OutOfTime ? "late" : null;
+    }
+    if (bytes === null || bytes.byteLength === 0) return null;
+    const sha1 = createHash("sha1").update(bytes).digest("hex");
+    const kept = await readCatalog(sha1);
+    if (kept !== null && kept.v === CATALOG_VERSION) {
+        return { build: sha1, title: kept.title, items: kept.items };
+    }
+    const read = await catalogFromBytes(sha1, bytes, jarTitle(jar.name), until);
+    if (read === null) return Date.now() >= until ? "late" : null;
+    return read;
+}
+
+/**
+ * What a jar's file name says the mod is called: the name without its version
+ * and loader. `cure-2.0.2-forge-1.20.1.jar` is "cure". Only ever shown beside
+ * an item and searched, so a name that keeps a stray suffix costs nothing.
+ */
+export function jarTitle(file: string): string {
+    const bare = file.replace(/\.jar$/i, "");
+    const cut = bare.search(/[-_+ ](?:v?\d|mc\d|forge|neoforge|fabric|quilt)/i);
+    const title = (cut > 0 ? bare.slice(0, cut) : bare).trim();
+    return (title.length > 0 ? title : bare).slice(0, 120);
+}
+
+/** A file name the folder's listing gave that can be read as one: one path
+ *  segment, no control characters. It is passed as an argument, never to a
+ *  shell, so this is all it has to be. */
+function isJarName(name: string): boolean {
+    return (
+        /\.jar$/i.test(name) &&
+        name.length <= 255 &&
+        !name.includes("/") &&
+        !/[\u0000-\u001f\u007f]/.test(name)
+    );
+}
+
+/**
+ * The folder inside the server's container.
+ *
+ * Listed with one `find`, streamed where the machine allows so a long pack is
+ * not cut at the 16 KiB a `run` reports. GNU find's `-printf` gives the size and
+ * time the index compares; an image whose find has no `-printf` falls back to a
+ * bare `ls`, whose jars are then simply read every time.
+ */
+function containerFolder(server: ServerContainer): ModFolder {
+    const output = async (argv: readonly string[]): Promise<{ text: string; whole: boolean; }> => {
+        if (server.readOut) {
+            return { text: (await collect(await server.readOut(argv))).toString("utf8"), whole: true };
+        }
+        const result = await server.run(argv);
+        return { text: result.output, whole: !mayBeCut(result.output) };
+    };
+    return {
+        list: async () => {
+            try {
+                const found = await output([
+                    "find",
+                    MODS_DIR,
+                    "-maxdepth",
+                    "1",
+                    "-type",
+                    "f",
+                    "-name",
+                    "*.jar",
+                    "-printf",
+                    "%s\\t%T@\\t%f\\n"
+                ]);
+                const jars = parseFolderListing(found.text);
+                if (jars.length > 0) return { jars, whole: found.whole };
+                const named = await output(["ls", "-1A", "--", MODS_DIR]);
+                return {
+                    jars: named.text
+                        .split("\n")
+                        .map((line) => line.trim())
+                        .filter(isJarName)
+                        .map((name) => ({ name, size: -1, modified: "" })),
+                    whole: named.whole
+                };
+            } catch {
+                return null;
+            }
+        },
+        read: async (name, limit) => {
+            if (!isJarName(name)) return null;
+            try {
+                return await bounded(await server.readFile(`${MODS_DIR}/${name}`), limit);
+            } catch {
+                return null;
+            }
+        }
+    };
+}
+
+/** `find -printf "%s\t%T@\t%f\n"` as jars, skipping any line that is not one. */
+export function parseFolderListing(text: string): FolderJar[] {
+    const jars: FolderJar[] = [];
+    for (const line of text.split("\n")) {
+        const [size, modified, ...rest] = line.split("\t");
+        const name = rest.join("\t").replace(/\r$/, "");
+        if (!size || !/^\d+$/.test(size) || !modified || !isJarName(name)) continue;
+        jars.push({ name, size: Number(size), modified: modified.slice(0, 40) });
+    }
+    return jars;
+}
+
+async function collect(stream: ReadableStream<Uint8Array>): Promise<Buffer> {
+    const parts: Buffer[] = [];
+    const reader = stream.getReader();
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        parts.push(Buffer.from(value));
+    }
+    return Buffer.concat(parts);
+}
+
+const indexEntrySchema = z.object({
+    size: z.number().int().min(0),
+    modified: z.string().max(40),
+    sha1: z.string().refine(isBuildKey)
+});
+
+type IndexEntry = z.infer<typeof indexEntrySchema>;
+
+const indexSchema = z.record(z.string().max(255), indexEntrySchema);
+
+/** What a server key may be to name its index file: an install id. */
+function indexPath(key: string): string | null {
+    return /^[A-Za-z0-9_-]{1,64}$/.test(key)
+        ? join(loadEnv().POLARIS_DATA_DIR, "mod-items", "servers", `${key}.json`)
+        : null;
+}
+
+/** Which build each jar in a server's folder was, by its name, size and time. */
+async function readIndex(key: string): Promise<Record<string, IndexEntry>> {
+    const path = indexPath(key);
+    if (path === null) return {};
+    try {
+        const parsed = indexSchema.safeParse(JSON.parse(await readFile(path, "utf8")));
+        return parsed.success ? parsed.data : {};
+    } catch {
+        return {};
+    }
+}
+
+async function writeIndex(key: string, index: Record<string, IndexEntry>): Promise<void> {
+    const path = indexPath(key);
+    if (path === null) return;
+    try {
+        await place(path, Buffer.from(JSON.stringify(index)));
+    } catch {
+        // Unwritten is every jar hashed again on the next open, not a failure.
+    }
+}
 /** One kept picture, or null when nothing was ever kept under that name. */
 export async function modItemIcon(build: string, name: string): Promise<Buffer | null> {
     if (!isBuildKey(build) || !isIconName(name)) return null;
@@ -214,8 +601,9 @@ async function readSettings(
 }
 
 const catalogSchema = z.object({
+    v: z.number().int().optional(),
     title: z.string().max(120),
-    items: z.array(modItemSchema).max(MAX_ITEMS)
+    items: z.array(modItemSchema).max(MAX_CATALOG_ITEMS)
 });
 
 interface BuildCatalog {
@@ -260,9 +648,16 @@ async function catalogFor(
     if (build === null) throw new Error(`No build of ${slug} to read`);
 
     const kept = await readCatalog(build.sha1);
-    if (kept !== null) return { build: build.sha1, title: kept.title, items: kept.items };
+    if (kept !== null && kept.v === CATALOG_VERSION) {
+        return { build: build.sha1, title: kept.title, items: kept.items };
+    }
 
     const read = await sharedRead(build.sha1, build.url, slug, until);
+    // A catalogue kept before the current shape still answers when the jar
+    // cannot be fetched again: English labels beat no items.
+    if (read === null && kept !== null) {
+        return { build: build.sha1, title: kept.title, items: kept.items };
+    }
     if (read === null) {
         if (Date.now() >= until) throw new OutOfTime(`Out of time reading ${build.filename}`);
         throw new Error(`Could not read ${build.filename}`);
@@ -294,7 +689,7 @@ async function sharedRead(
 /** The catalogue kept for one build, or null when there is not one. */
 async function readCatalog(
     build: string
-): Promise<{ title: string; items: modItems.ModItem[] } | null> {
+): Promise<{ v?: number | undefined; title: string; items: modItems.ModItem[] } | null> {
     try {
         const raw = await readFile(join(buildFolder(build), "catalog.json"), "utf8");
         const parsed = catalogSchema.safeParse(JSON.parse(raw));
@@ -340,7 +735,19 @@ async function readBuild(
         return null;
     }
     if (createHash("sha1").update(bytes).digest("hex") !== sha1) return null;
+    return catalogFromBytes(sha1, bytes, slug, until);
+}
 
+/**
+ * Unpack one jar whose hash is `sha1` and keep what it adds under that hash.
+ * Null when it is not a jar this can open.
+ */
+async function catalogFromBytes(
+    sha1: string,
+    bytes: Uint8Array,
+    title: string,
+    until: number
+): Promise<BuildCatalog | null> {
     let read: modItems.JarItems;
     try {
         const zip = await JSZip.loadAsync(bytes);
@@ -356,7 +763,7 @@ async function readBuild(
                 spent += body.byteLength;
                 return body;
             }
-        });
+        }, LANGUAGES);
     } catch {
         // Not a jar, or one this cannot open. One mod without a picture list.
         return null;
@@ -366,12 +773,19 @@ async function readBuild(
     // dropped rather than kept: one over-long texture or namespace in a file that
     // is parsed on the way in would make the whole kept catalogue unreadable, and
     // an unreadable one is the jar downloaded again on every single open.
-    const catalog = catalogSchema.safeParse({ title: slug, items: read.items });
+    const catalog = catalogSchema.safeParse({
+        v: CATALOG_VERSION,
+        title,
+        items: read.items
+    });
     const kept = catalog.success
         ? catalog.data
         : {
-              title: slug,
-              items: read.items.filter((item) => modItemSchema.safeParse(item).success)
+              v: CATALOG_VERSION,
+              title,
+              items: read.items
+                  .filter((item) => modItemSchema.safeParse(item).success)
+                  .slice(0, MAX_CATALOG_ITEMS)
           };
     await keep(sha1, kept, read.icons);
     return { build: sha1, title: kept.title, items: kept.items };
@@ -489,7 +903,7 @@ function concat(chunks: readonly Uint8Array[], size: number): Uint8Array {
  */
 async function keep(
     build: string,
-    catalog: { title: string; items: readonly modItems.ModItem[] },
+    catalog: { v?: number | undefined; title: string; items: readonly modItems.ModItem[] },
     icons: ReadonlyMap<string, Uint8Array>
 ): Promise<void> {
     try {

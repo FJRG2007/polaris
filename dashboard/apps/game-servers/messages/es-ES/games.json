@@ -628,7 +628,7 @@
             "found": "También se buscan {count} objetos que añaden los mods de este servidor. Escribe el nombre de un mod para ver solo esos.",
             "unread": "No se pudieron leer los objetos que añade {names}. Aún se pueden escribir como ids.",
             "skipped": "No se busca en {names}: solo se leen los primeros mods de una lista larga. Aún se pueden escribir como ids.",
-            "incomplete": "Aún se están leyendo algunos mods. Vuelve a abrir el selector para ver sus objetos.",
+            "incomplete": "Aún se están leyendo algunos mods. Sus objetos aparecen aquí a medida que se leen.",
             "andMore": "{names} y {count} más"
         }
     },
