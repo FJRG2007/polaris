@@ -2341,6 +2341,8 @@
         "newCode": "Código nuevo",
         "currentCode": "Código actual",
         "codeHint": "Solo números",
+        "hideEntry": "Ocultar también el acceso a Bloqueados",
+        "hideEntryHint": "Escribe tu código en la búsqueda de Chat",
         "hideLocked": "Ocultar chats bloqueados de la lista",
         "newMessage": "Mensaje nuevo",
         "noneHidden": "Ninguno oculto",

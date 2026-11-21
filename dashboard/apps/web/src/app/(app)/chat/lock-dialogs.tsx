@@ -49,6 +49,7 @@ export function codeReady(code: string, length: number | null = null): boolean {
 const NO_LOCK: ChatLockState = {
     hasCode: false,
     hideLocked: false,
+    hideEntry: false,
     unlockMinutes: timing.DEFAULT_UNLOCK_MINUTES,
     codeLength: null
 };
@@ -292,6 +293,16 @@ export function LockSettingsDialog({
         onOpenChange(false);
     }
 
+    async function chooseHideEntry(hide: boolean): Promise<void> {
+        const before = state;
+        onChanged({ ...state, hideEntry: hide });
+        const result = await runAction(() => lockActions.setHideEntryAction({ hide }), setError);
+        if (!result || result.error) {
+            onChanged(before);
+            if (result?.error) setError(result.error);
+        }
+    }
+
     async function chooseHide(hide: boolean): Promise<void> {
         const before = state;
         // Drawn at once, put back on a refusal.
@@ -422,6 +433,23 @@ export function LockSettingsDialog({
                             onChange={(checked) => void chooseHide(checked)}
                         />
                     </label>
+                    {/* Only with the chats hidden, and only for a code whose length is
+                    known: that length is how search tells the code from a query. */}
+                    {state.hideLocked && state.codeLength !== null ? (
+                        <label className="flex items-center justify-between gap-3 text-sm">
+                            <span className="flex min-w-0 flex-col">
+                                <span>{t("lock.hideEntry")}</span>
+                                <span className="text-xs text-foreground-subtle">
+                                    {t("lock.hideEntryHint")}
+                                </span>
+                            </span>
+                            <Switch
+                                checked={state.hideEntry === true}
+                                aria-label={t("lock.hideEntry")}
+                                onChange={(checked) => void chooseHideEntry(checked)}
+                            />
+                        </label>
+                    ) : null}
                     <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
                         <span className="flex min-w-0 flex-col">
                             <span>{t("lock.unlockFor")}</span>
@@ -603,23 +631,28 @@ export function LockShelfEntries({
             </div>
         );
 
+    // Hidden entirely: the list opens by typing the code into Chat search.
+    const secret = state.hasCode && state.hideLocked && state.hideEntry === true;
+
     return (
         <>
-            <button
-                type="button"
-                className={`${entry} text-muted-foreground`}
-                onClick={() => (state.hasCode ? setAsking(true) : openSettings())}
-            >
-                <Lock className="size-3.5 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">
-                    {state.hasCode ? t("lock.lockedChats") : t("lock.settings")}
-                </span>
-                {state.hasCode && lockedCount > 0 ? (
-                    <span className="shrink-0 text-xs tabular-nums text-foreground-subtle">
-                        {lockedCount}
+            {secret ? null : (
+                <button
+                    type="button"
+                    className={`${entry} text-muted-foreground`}
+                    onClick={() => (state.hasCode ? setAsking(true) : openSettings())}
+                >
+                    <Lock className="size-3.5 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">
+                        {state.hasCode ? t("lock.lockedChats") : t("lock.settings")}
                     </span>
-                ) : null}
-            </button>
+                    {state.hasCode && lockedCount > 0 ? (
+                        <span className="shrink-0 text-xs tabular-nums text-foreground-subtle">
+                            {lockedCount}
+                        </span>
+                    ) : null}
+                </button>
+            )}
             {hiddenCount > 0 ? (
                 <button
                     type="button"

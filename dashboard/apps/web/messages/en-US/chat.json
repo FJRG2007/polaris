@@ -2341,6 +2341,8 @@
         "newCode": "New code",
         "currentCode": "Current code",
         "codeHint": "Numbers only",
+        "hideEntry": "Hide the Locked chats entry too",
+        "hideEntryHint": "Type your code in Chat search to open them",
         "hideLocked": "Hide locked chats from the list",
         "newMessage": "New message",
         "noneHidden": "No hidden chats",

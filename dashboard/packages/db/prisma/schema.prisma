@@ -10864,6 +10864,9 @@ model ChatLock {
     // How many digits the code has (4, 6 or 8), so the box submits on the last
     // one. Not secret. Null for a code set before it was recorded.
     codeLength Int?
+    // With hideLocked: the "Locked chats" entry is gone too, and the list opens
+    // only by typing the code into Chat search. Off keeps the entry.
+    hideEntry  Boolean  @default(false)
     updatedAt  DateTime @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)

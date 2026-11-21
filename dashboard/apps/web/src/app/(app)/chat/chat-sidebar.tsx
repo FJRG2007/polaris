@@ -67,6 +67,7 @@ import { reordered, useRailDrag, type Dragging, type DropTarget } from "./use-ra
 import * as move from "./channel-move";
 import { joinMenuGroups } from "./menu-groups";
 import { onShelf, type LockShelf } from "./lock-shelf";
+import { listenForReveal } from "./lock-reveal";
 import * as lockActions from "./lock-actions";
 import { LockCodeDialog, LockShelfEntries, useChatLock } from "./lock-dialogs";
 import {
@@ -275,6 +276,8 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
     // Every chat, or one of the "Locked chats" / "Hidden chats" shelves.
     const [shelf, setShelf] = useState<LockShelf>("all");
     const { hideLocked } = useChatLock().state;
+    // Chat search opened "Locked chats" with the code (the entry may be hidden).
+    useEffect(() => listenForReveal(() => setShelf("locked")), []);
     const [listView, chooseListView] = useChatListView();
     // Whether "auto" draws the detailed rows, decided by the width the rows
     // actually have. Kept as the decision rather than the width, so it moves

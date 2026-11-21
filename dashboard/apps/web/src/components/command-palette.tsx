@@ -82,6 +82,9 @@ import {
     recordSearchAction
 } from "@/app/(app)/search-actions";
 import * as polls from "./shared-polls";
+import { keepUnlockProofs } from "@/app/(app)/chat/lock-session";
+import { openLockedChatsAction, searchLockAction } from "@/app/(app)/chat/lock-actions";
+import { maybeLockCode, revealLockedChats } from "@/app/(app)/chat/lock-reveal";
 
 /** How long a fetched resource index is reused before it is asked for again. */
 const INDEX_TTL_MS = 60_000;
@@ -180,6 +183,10 @@ export function CommandPalette({
     const [loading, setLoading] = useState(false);
     const [hits, setHits] = useState<SearchHit[]>([]);
     const [searching, setSearching] = useState(false);
+    /** The chat lock code's length when the reader hid the "Locked chats" entry
+     *  (the list then opens by typing the code here); null when they did not,
+     *  undefined until asked. */
+    const [secretCode, setSecretCode] = useState<number | null | undefined>(undefined);
     const [failure, setFailure] = useState<string | null>(null);
     const [recent, setRecent] = useState<core.RecentSearch[]>([]);
     // The key in force, as this keyboard prints it - corrected after mount, since
@@ -295,9 +302,18 @@ export function CommandPalette({
      * implementation can see.
      */
     function onOpenChange(next: boolean): void {
-        if (!next && scope && trimmed.length > 1 && !openedRef.current && answers > 0) {
+        if (
+            !next &&
+            scope &&
+            trimmed.length > 1 &&
+            !openedRef.current &&
+            answers > 0 &&
+            !codeShaped
+        ) {
             remember({ kind: "query", scope: scope.id, term: trimmed, label: trimmed, href: null });
         }
+        // Asked again next time: the reader may change the setting in between.
+        if (!next) setSecretCode(undefined);
         setOpen(next);
     }
 
@@ -324,10 +340,62 @@ export function CommandPalette({
         fieldRef.current?.focus();
     }
 
+    const chatScope = scope !== null && core.isChatSearchScope(scope.id);
+    // Asked once per page, the first time a Chat search is open: whether the
+    // reader hid the "Locked chats" entry, so a code typed here opens them.
+    useEffect(() => {
+        if (!open || !chatScope || secretCode !== undefined) return;
+        let live = true;
+        searchLockAction()
+            .then((length) => live && setSecretCode(typeof length === "number" ? length : null))
+            // A server without the setting, or an account without Chat: no code.
+            .catch(() => live && setSecretCode(null));
+        return () => {
+            live = false;
+        };
+    }, [open, chatScope, secretCode]);
+
+    // A number that could be the code (or the start of it) is never sent as a
+    // search, where it would sit in an address and the server's logs; until the
+    // answer above is in, every number waits.
+    const codeShaped =
+        chatScope &&
+        /^\d+$/.test(trimmed) &&
+        (secretCode === undefined ||
+            (typeof secretCode === "number" && maybeLockCode(trimmed, secretCode)));
+
+    // The whole code: tried once against the server, which counts the guess. A
+    // wrong one shows nothing, the same as a number nobody searched for.
+    useEffect(() => {
+        if (!open || !codeShaped || typeof secretCode !== "number") return;
+        if (trimmed.length !== secretCode) return;
+        let live = true;
+        const code = trimmed;
+        openLockedChatsAction({ code })
+            .then((result) => {
+                if (!live || result.error || !result.proofs) return;
+                keepUnlockProofs(result.proofs);
+                setQuery("");
+                setOpen(false);
+                revealLockedChats();
+                if (!pathname.startsWith("/chat")) router.push("/chat");
+            })
+            .catch(() => undefined);
+        return () => {
+            live = false;
+        };
+    }, [open, codeShaped, secretCode, trimmed, pathname, router]);
+
     // One scoped search per pause, dropped if the field moves on before it lands.
     useEffect(() => {
         if (!open || !scope || scope.resourceKind) return;
         const term = trimmed;
+        if (codeShaped) {
+            setHits([]);
+            setFailure(null);
+            setSearching(false);
+            return;
+        }
         const key = `${scope.id}:${term.toLowerCase()}`;
         const cached = lookupCache.get(key);
         if (cached && Date.now() - cached.at < LOOKUP_TTL_MS) {
@@ -379,7 +447,7 @@ export function CommandPalette({
             // nothing.
             setSearching(false);
         };
-    }, [open, scope, trimmed]);
+    }, [open, scope, trimmed, codeShaped]);
 
     // Keyed on the joined ids: the array is rebuilt on every render of the layout
     // above, so identity alone would rebuild the index for nothing.

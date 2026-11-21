@@ -12,7 +12,7 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import * as lock from "@/lib/chat/chat-lock";
 import { guardChat } from "@/lib/chat/chat-guard";
-import { requirePermission } from "@/lib/session";
+import { guardedUser, requirePermission, sessionCan } from "@/lib/session";
 import { stepUpGranted } from "@/lib/step-up-grant";
 import { getTranslations } from "@/lib/i18n/request";
 
@@ -33,12 +33,25 @@ async function invalid(
 }
 
 const hideLockedSchema = z.object({ hide: z.boolean() });
+const hideEntrySchema = z.object({ hide: z.boolean() });
 const lockChannelSchema = lock.channelFlagSchema.extend({ code: lock.lockCodeSchema.optional() });
 const openLockedSchema = z.object({ code: lock.lockCodeSchema });
 
 export async function lockStateAction(): Promise<lock.ChatLockState> {
     const me = await actor();
     return lock.lockState(me.id);
+}
+
+/**
+ * The code's length when the reader hid the "Locked chats" entry, for Chat
+ * search to recognise a code; null otherwise. Asked from the search panel on
+ * any page, so it answers null instead of redirecting a reader without Chat.
+ */
+export async function searchLockAction(): Promise<number | null> {
+    const user = await guardedUser({ touch: false });
+    if (!user || !(await sessionCan(user, "chat.use"))) return null;
+    const state = await lock.lockState(user.id);
+    return state.hasCode && state.hideLocked && state.hideEntry ? state.codeLength : null;
 }
 
 /** Set the code, or change it with the current one. */
@@ -68,6 +81,16 @@ export async function setHideLockedAction(input: unknown): Promise<{ error?: str
     const parsed = hideLockedSchema.safeParse(input);
     if (!parsed.success) return invalid();
     const result = await guardChat(() => lock.setHideLocked(me, parsed.data.hide));
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result.error ? { error: result.error } : {};
+}
+
+/** Hide the "Locked chats" entry too: the list then opens from Chat search. */
+export async function setHideEntryAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = hideEntrySchema.safeParse(input);
+    if (!parsed.success) return invalid();
+    const result = await guardChat(() => lock.setHideEntry(me, parsed.data.hide));
     if (!result.error) revalidatePath(CHAT_PATH);
     return result.error ? { error: result.error } : {};
 }

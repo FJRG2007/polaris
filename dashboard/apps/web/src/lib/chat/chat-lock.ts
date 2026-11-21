@@ -83,6 +83,9 @@ export const unlockMinutesSchema = z.object({
 export interface ChatLockState {
     readonly hasCode: boolean;
     readonly hideLocked: boolean;
+    /** With `hideLocked`: no "Locked chats" entry either, and the list opens by
+     *  typing the code into Chat search. Needs a code of known length. */
+    readonly hideEntry: boolean;
     /** How long locked chats stay open after the code - see `lock-timing`. */
     readonly unlockMinutes: number;
     /** Digits in the code, or null when the box has to wait for a button. */
@@ -92,11 +95,12 @@ export interface ChatLockState {
 export async function lockState(userId: string): Promise<ChatLockState> {
     const row = await prisma.chatLock.findUnique({
         where: { userId },
-        select: { hideLocked: true, unlockMinutes: true, codeLength: true }
+        select: { hideLocked: true, hideEntry: true, unlockMinutes: true, codeLength: true }
     });
     return {
         hasCode: row !== null,
         hideLocked: row?.hideLocked ?? false,
+        hideEntry: (row?.hideEntry ?? false) && timing.knownCodeLength(row?.codeLength) !== null,
         unlockMinutes: timing.unlockMinutesOf(row?.unlockMinutes),
         codeLength: timing.knownCodeLength(row?.codeLength)
     };
@@ -172,6 +176,20 @@ export async function setHideLocked(actor: ChatActor, hide: boolean): Promise<vo
     const updated = await prisma.chatLock.updateMany({
         where: { userId: actor.id },
         data: { hideLocked: hide }
+    });
+    if (updated.count === 0) throw new ChatAccessError({ key: "errors.lockNoCode" });
+    publishChatChange({ kind: "channels", actorId: actor.id, audience: [actor.id] });
+}
+
+/**
+ * Hide the "Locked chats" entry as well, so the list is reached only by typing
+ * the code into Chat search. The search tells a code from a query by its length,
+ * so a code set before its length was recorded cannot be hidden this way.
+ */
+export async function setHideEntry(actor: ChatActor, hide: boolean): Promise<void> {
+    const updated = await prisma.chatLock.updateMany({
+        where: hide ? { userId: actor.id, codeLength: { not: null } } : { userId: actor.id },
+        data: { hideEntry: hide }
     });
     if (updated.count === 0) throw new ChatAccessError({ key: "errors.lockNoCode" });
     publishChatChange({ kind: "channels", actorId: actor.id, audience: [actor.id] });
