@@ -1,26 +1,23 @@
 "use client";
 
 /**
- * The rule's conditions, as rows you build or as text you write.
+ * The firewall's conditions: the shared rule builder with the firewall's vocabulary
+ * - the request's own facts and the signature checks - and its expression language.
  *
- * The rows are the good way to write a first rule and the wrong way to write the
- * twentieth, so both are here and they are the same rule: switching to the expression
- * renders what the rows say, and switching back parses what was typed. Neither is a
- * draft of the other - the parse is refused rather than approximated, because a
- * condition quietly dropped from a firewall rule is the failure nobody sees.
- *
- * `And` and `Or` sit on each row rather than on the list, because that is the question
- * being asked at that moment: "and what else?" against this row. A row in an `and`
- * list that is given an `Or` becomes a group of its own holding the two - which is
- * what the brackets in the expression then say, and what the engine then does.
+ * The expression is parsed as well as rendered, and the parse is refused rather
+ * than approximated, because a condition quietly dropped from a firewall rule is the
+ * failure nobody sees.
  */
 
-import { useState } from "react";
+import { useMemo } from "react";
 import * as core from "@polaris/core";
-import { Button, Select } from "@polaris/ui";
 import { ChipList, validAddress } from "./chip-list";
-import { Plus, TriangleAlert, X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import {
+    RuleConditionBuilder,
+    type ConditionVocabulary,
+    type RuleCondition
+} from "@/components/rules/condition-builder";
 import {
     emptyCondition,
     fieldOptions,
@@ -32,12 +29,11 @@ import {
 } from "./rule-language";
 
 type WafCondition = core.WafCondition;
-type WafConditionGroup = core.WafConditionGroup;
 type WafLeafCondition = core.WafLeafCondition;
 type WafSignalCondition = core.WafSignalCondition;
+type WafTest = WafLeafCondition | WafSignalCondition;
 
-/** How deep a group may sit before the schema stops accepting one. The editor stops
- *  offering the join that would go deeper rather than letting a save fail on it. */
+/** How deep a group may sit before the schema stops accepting one. */
 const GROUP_DEPTH_MAX = 2;
 
 export function ConditionBuilder({
@@ -48,356 +44,63 @@ export function ConditionBuilder({
     onChange: (next: WafCondition[]) => void;
 }) {
     const t = useTranslations("firewall");
-    // The expression while it is being written. Null means the rows are in charge, so
-    // the text is never a stale copy of a rule the rows have since changed.
-    const [draft, setDraft] = useState<string | null>(null);
-    const [problem, setProblem] = useState<string | null>(null);
-
-    const expression = core.renderWafExpression(conditions);
-
-    /** Take what was typed, or say why it cannot be taken. */
-    function applyDraft(text: string): boolean {
-        const parsed = core.parseWafExpression(text);
-        if (!parsed.ok) {
-            setProblem(parsed.error);
-            return false;
-        }
-        onChange(core.foldWafValues(parsed.conditions));
-        setProblem(null);
-        return true;
-    }
-
-    if (draft !== null) {
-        return (
-            <div className="flex flex-col gap-2">
-                <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-xs font-medium text-muted-foreground">{t("conditions.expression")}</span>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            if (applyDraft(draft)) setDraft(null);
-                        }}
-                        className="text-xs text-primary underline-offset-2 hover:underline"
-                    >
-                        {t("conditions.useBuilder")}
-                    </button>
-                </div>
-                <textarea
-                    value={draft}
-                    rows={4}
-                    spellCheck={false}
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    aria-label={t("conditions.expressionLabel")}
-                    aria-invalid={problem !== null}
-                    maxLength={core.WAF_EXPRESSION_MAX}
-                    onChange={(event) => {
-                        setDraft(event.target.value);
-                        setProblem(null);
-                    }}
-                    onBlur={() => applyDraft(draft)}
-                    className="w-full rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs text-foreground "
-                />
-                <div className="flex items-baseline justify-between gap-2">
-                    {problem ? (
-                        <p className="flex items-start gap-1.5 text-xs text-danger">
-                            <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
-                            {problem}
-                        </p>
-                    ) : (
-                        <p className="text-xs text-muted-foreground">
-                            {t("conditions.expressionHint")}
-                        </p>
-                    )}
-                    <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("conditions.characters", { used: draft.length, max: core.WAF_EXPRESSION_MAX })}>
-                        {t("conditions.characters", { used: draft.length, max: core.WAF_EXPRESSION_MAX })}
-                    </span>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="flex flex-col gap-3">
-            <ConditionList conditions={conditions} match="all" depth={0} onChange={onChange} />
-
-            <div className="flex flex-col gap-1.5">
-                <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-xs font-medium text-muted-foreground">{t("conditions.preview")}</span>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setProblem(null);
-                            setDraft(expression);
-                        }}
-                        className="text-xs text-primary underline-offset-2 hover:underline"
-                    >
-                        {t("conditions.edit")}
-                    </button>
-                </div>
-                <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs text-foreground">
-                    {expression || t("conditions.previewEmpty")}
-                </pre>
-                <span className="self-end text-xs text-muted-foreground">
-                    {t("conditions.characters", { used: expression.length, max: core.WAF_EXPRESSION_MAX })}
-                </span>
-            </div>
-        </div>
-    );
-}
-
-/**
- * One level of the condition tree: the rule's own list, or a group's members.
- *
- * The joiner between rows is drawn here rather than by each row, because it is a fact
- * about the list they are in - "and" at the top, whichever word the group matches on
- * inside one.
- */
-function ConditionList({
-    conditions,
-    match,
-    depth,
-    onChange
-}: {
-    conditions: readonly WafCondition[];
-    match: "all" | "any";
-    depth: number;
-    onChange: (next: WafCondition[]) => void;
-}) {
-    const t = useTranslations("firewall");
-    const joiner = match === "any" ? t("conditions.or") : t("conditions.and");
-
-    const replace = (at: number, next: WafCondition): void =>
-        onChange(conditions.map((entry, index) => (index === at ? next : entry)));
-
-    /**
-     * Add a condition next to the one at `at`, joined by `how`.
-     *
-     * Joining the way the list already reads is an append. Joining the other way turns
-     * that one row into a group holding both, which is what the brackets in the
-     * expression are about - and it is refused rather than done badly when the group
-     * would sit deeper than a rule may go.
-     */
-    const join = (at: number, how: "all" | "any"): void => {
-        if (how === match) {
-            const next = [...conditions];
-            next.splice(at + 1, 0, emptyCondition());
-            onChange(next);
-            return;
-        }
-        const here = conditions[at];
-        if (!here) return;
-        replace(at, { match: how, conditions: [here, emptyCondition()] } as WafConditionGroup);
-    };
-
-    return (
-        <div className="flex flex-col gap-2">
-            {conditions.map((condition, at) => {
-                const canWrap = depth < GROUP_DEPTH_MAX && !core.isWafConditionGroup(condition);
-                return (
-                    <div key={at} className="flex flex-col gap-2">
-                        {at === 0 ? null : <span className="text-xs font-medium text-muted-foreground">{joiner}</span>}
-                        {core.isWafConditionGroup(condition) ? (
-                            <ConditionGroupBlock
-                                group={condition}
-                                depth={depth + 1}
-                                removable={conditions.length > 1}
-                                onChange={(next) => replace(at, next)}
-                                onRemove={() => onChange(conditions.filter((_, index) => index !== at))}
-                            />
-                        ) : (
-                            <ConditionRow
-                                condition={condition}
-                                removable={conditions.length > 1}
-                                canWrap={canWrap}
-                                onChange={(next) => replace(at, next)}
-                                onJoin={(how) => join(at, how)}
-                                onRemove={() => onChange(conditions.filter((_, index) => index !== at))}
-                            />
-                        )}
+    const vocabulary = useMemo<ConditionVocabulary<WafTest>>(
+        () => ({
+            fieldOptions: fieldOptions(t),
+            fieldValue,
+            fieldChanged,
+            operatorOptions: (test) =>
+                core.isWafSignalCondition(test) ? signalOperators(t) : operatorOptions(test.field, t),
+            operatorValue: (test) =>
+                core.isWafSignalCondition(test) ? (test.negate ? "not_matches" : "matches") : test.operator,
+            operatorChanged: (test, value) =>
+                core.isWafSignalCondition(test)
+                    ? { ...test, negate: value === "not_matches" }
+                    : { ...test, operator: value as core.WafRuleOperator },
+            emptyCondition,
+            maxDepth: GROUP_DEPTH_MAX,
+            valueEditor: (test, change) =>
+                core.isWafSignalCondition(test) ? (
+                    <p className="text-xs text-muted-foreground">{t("conditions.signalHint")}</p>
+                ) : (
+                    <div className="flex flex-col gap-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">{t("conditions.value")}</span>
+                        <ChipList
+                            entries={test.values}
+                            onChange={(values) => change({ ...test, values })}
+                            placeholder={valuePlaceholder(t, test.field)}
+                            validate={test.field === "ip" ? validAddress : undefined}
+                            invalidMessage={test.field === "ip" ? t("rules.invalidAddress") : undefined}
+                        />
                     </div>
-                );
-            })}
-
-            {conditions.length === 0 ? (
-                <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="w-fit"
-                    onClick={() => onChange([emptyCondition()])}
-                >
-                    <Plus className="size-3.5 shrink-0" aria-hidden="true" />
-                    {t("conditions.add")}
-                </Button>
-            ) : null}
-        </div>
+                ),
+            expression: {
+                render: (list) => core.renderWafExpression(list as WafCondition[]),
+                parse: (text) => {
+                    const parsed = core.parseWafExpression(text);
+                    return parsed.ok
+                        ? { ok: true, conditions: core.foldWafValues(parsed.conditions) as RuleCondition<WafTest>[] }
+                        : { ok: false, error: parsed.error };
+                },
+                max: core.WAF_EXPRESSION_MAX
+            }
+        }),
+        [t]
     );
-}
-
-/** A group, drawn as an indented surface so the bracket in the expression has
- *  something on screen that corresponds to it. */
-function ConditionGroupBlock({
-    group,
-    depth,
-    removable,
-    onChange,
-    onRemove
-}: {
-    group: WafConditionGroup;
-    depth: number;
-    removable: boolean;
-    onChange: (next: WafConditionGroup) => void;
-    onRemove: () => void;
-}) {
-    const t = useTranslations("firewall");
     return (
-        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/20 px-3 py-3">
-            <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-muted-foreground">{t("conditions.matches")}</span>
-                <Select
-                    value={group.match}
-                    aria-label={t("conditions.matchLabel")}
-                    className="w-36"
-                    options={[
-                        { value: "any", label: t("conditions.any") },
-                        { value: "all", label: t("conditions.all") }
-                    ]}
-                    onValueChange={(value) => onChange({ ...group, match: value as WafConditionGroup["match"] })}
-                />
-                {removable ? (
-                    <button
-                        type="button"
-                        onClick={onRemove}
-                        aria-label={t("conditions.removeGroup")}
-                        title={t("conditions.removeGroupTitle")}
-                        className="ms-auto inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-danger "
-                    >
-                        <X className="size-3.5 shrink-0" aria-hidden="true" />
-                    </button>
-                ) : null}
-            </div>
-            <ConditionList
-                conditions={group.conditions}
-                match={group.match}
-                depth={depth}
-                // The schema types the innermost group as holding tests only, which is
-                // the depth limit expressed in the type. The list above cannot produce
-                // one deeper - it stops offering the join at GROUP_DEPTH_MAX - so this
-                // narrows back to what was already true rather than asserting it.
-                onChange={(conditions) => onChange({ ...group, conditions } as WafConditionGroup)}
-            />
-        </div>
-    );
-}
-
-function ConditionRow({
-    condition,
-    removable,
-    canWrap,
-    onChange,
-    onJoin,
-    onRemove
-}: {
-    condition: WafLeafCondition | WafSignalCondition;
-    removable: boolean;
-    /** Whether the join that would open a group is still within the nesting limit. */
-    canWrap: boolean;
-    onChange: (next: WafCondition) => void;
-    onJoin: (how: "all" | "any") => void;
-    onRemove: () => void;
-}) {
-    // Split rather than narrowed in place: both halves of this row read one or the
-    // other, and a check at every use would say the same thing eight times.
-    const t = useTranslations("firewall");
-    const signal = core.isWafSignalCondition(condition) ? condition : null;
-    const leaf = signal ? null : (condition as WafLeafCondition);
-
-    return (
-        <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-end gap-2">
-                <label className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
-                    {t("conditions.field")}
-                    <Select
-                        value={fieldValue(condition)}
-                        aria-label={t("conditions.field")}
-                        className="w-52"
-                        options={fieldOptions(t)}
-                        onValueChange={(value) => onChange(fieldChanged(condition, value))}
-                    />
-                </label>
-                <label className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
-                    {t("conditions.operator")}
-                    {signal || !leaf ? (
-                        <Select
-                            value={signal?.negate ? "not_matches" : "matches"}
-                            aria-label={t("conditions.operator")}
-                            className="w-56"
-                            options={signalOperators(t)}
-                            onValueChange={(value) =>
-                                signal && onChange({ ...signal, negate: value === "not_matches" })
-                            }
-                        />
-                    ) : (
-                        <Select
-                            value={leaf.operator}
-                            aria-label={t("conditions.operator")}
-                            className="w-48"
-                            options={operatorOptions(leaf.field, t)}
-                            onValueChange={(value) => onChange({ ...leaf, operator: value as core.WafRuleOperator })}
-                        />
-                    )}
-                </label>
-
-                <div className="mb-1 ms-auto flex shrink-0 items-center gap-1">
-                    <JoinButton
-                        label={t("conditions.andButton")}
-                        title={t("conditions.joinAnd")}
-                        disabled={!canWrap}
-                        onClick={() => onJoin("all")}
-                    />
-                    <JoinButton
-                        label={t("conditions.orButton")}
-                        title={t("conditions.joinOr")}
-                        disabled={!canWrap}
-                        onClick={() => onJoin("any")}
-                    />
-                    {removable ? (
-                        <button
-                            type="button"
-                            onClick={onRemove}
-                            aria-label={t("conditions.removeCondition")}
-                            title={t("conditions.remove")}
-                            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-danger "
-                        >
-                            <X className="size-3.5 shrink-0" aria-hidden="true" />
-                        </button>
-                    ) : null}
-                </div>
-            </div>
-
-            {leaf ? (
-                <div className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">{t("conditions.value")}</span>
-                    <ChipList
-                        entries={leaf.values}
-                        onChange={(values) => onChange({ ...leaf, values })}
-                        placeholder={valuePlaceholder(t, leaf.field)}
-                        validate={leaf.field === "ip" ? validAddress : undefined}
-                        invalidMessage={leaf.field === "ip" ? t("rules.invalidAddress") : undefined}
-                    />
-                </div>
-            ) : (
-                <p className="text-xs text-muted-foreground">
-                    {t("conditions.signalHint")}
-                </p>
-            )}
-        </div>
+        <RuleConditionBuilder<WafTest>
+            conditions={conditions as readonly RuleCondition<WafTest>[]}
+            vocabulary={vocabulary}
+            // The schema types the innermost group as holding tests only, which is
+            // the depth limit expressed in the type; the builder stops offering the
+            // join at GROUP_DEPTH_MAX, so this narrows back to what was already true.
+            onChange={(next) => onChange(next as WafCondition[])}
+        />
     );
 }
 
 /** The condition a change of field leaves behind. */
-function fieldChanged(condition: WafLeafCondition | WafSignalCondition, value: string): WafCondition {
+function fieldChanged(condition: WafTest, value: string): WafTest {
     if (value.startsWith("signal:")) {
         return { signal: value.slice("signal:".length) as core.WafRuleSignal, negate: false };
     }
@@ -413,30 +116,4 @@ function fieldChanged(condition: WafLeafCondition | WafSignalCondition, value: s
         operator: keepsOperator ? condition.operator : "equals",
         values: changedKind ? [] : condition.values
     };
-}
-
-/** One of the two words a row can be joined to the next by. */
-function JoinButton({
-    label,
-    title,
-    disabled,
-    onClick
-}: {
-    label: string;
-    title: string;
-    disabled: boolean;
-    onClick: () => void;
-}) {
-    const t = useTranslations("firewall");
-    return (
-        <button
-            type="button"
-            disabled={disabled}
-            onClick={onClick}
-            title={disabled ? t("conditions.tooDeep") : title}
-            className="inline-flex h-8 items-center rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40 "
-        >
-            {label}
-        </button>
-    );
 }

@@ -173,6 +173,9 @@
             "lockout": "That would block the address you are using right now. Add it to the rules first, or leave them empty.",
             "checkRules": "Check the rules.",
             "checkGroup": "Check the group."
+        },
+        "rules": {
+            "lockout": "Not saved: the rule \"{rule}\" would block the session you are using right now. Change it, or put an allow rule for this session above it."
         }
     },
     "activity": {

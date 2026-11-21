@@ -127,6 +127,7 @@ export * from "./enigma.js";
 export * from "./review.js";
 export * from "./trackers.js";
 export * from "./waf-rules.js";
+export * from "./account-access-rules.js";
 export * from "./waf-email.js";
 export * from "./waf-integrity.js";
 export * from "./waf-injection.js";

@@ -27,7 +27,7 @@
 import { ipAllowed } from "./cidr.js";
 import { injectionFailure } from "./waf-injection.js";
 import { browserIntegrityFailure } from "./waf-integrity.js";
-import { isWafConditionGroup, isWafSignalCondition } from "./schemas/deploy.js";
+import { isWafSignalCondition } from "./schemas/deploy.js";
 import type {
     WafCondition,
     WafCustomRule,
@@ -160,11 +160,35 @@ function signalHolds(condition: WafSignalCondition, facts: WafRequestFacts): boo
  * not what it could look at.
  */
 export function conditionHolds(condition: WafCondition, facts: WafRequestFacts): boolean {
-    if (isWafSignalCondition(condition)) return signalHolds(condition, facts);
-    if (!isWafConditionGroup(condition)) return leafHolds(condition, facts);
+    return treeHolds<Exclude<WafCondition, { match: unknown }>>(condition, (leaf) =>
+        isWafSignalCondition(leaf) ? signalHolds(leaf, facts) : leafHolds(leaf, facts)
+    );
+}
+
+/** A condition tree of any vocabulary: a test, or a group of them read as `all`/`any`.
+ *  The firewall's rules and an account's own access rules are both this shape and
+ *  differ only in what a single test reads. */
+export interface ConditionTreeGroup<L> {
+    readonly match: "all" | "any";
+    readonly conditions: readonly (L | ConditionTreeGroup<L>)[];
+}
+
+function isTreeGroup<L>(condition: L | ConditionTreeGroup<L>): condition is ConditionTreeGroup<L> {
+    return (
+        typeof condition === "object" &&
+        condition !== null &&
+        "match" in condition &&
+        Array.isArray((condition as { conditions?: unknown }).conditions)
+    );
+}
+
+/** Whether a condition tree holds, given how one test is judged. Short-circuits the
+ *  way the operators read. */
+export function treeHolds<L>(condition: L | ConditionTreeGroup<L>, leafHolds: (leaf: L) => boolean): boolean {
+    if (!isTreeGroup(condition)) return leafHolds(condition);
     return condition.match === "any"
-        ? condition.conditions.some((entry) => conditionHolds(entry, facts))
-        : condition.conditions.every((entry) => conditionHolds(entry, facts));
+        ? condition.conditions.some((entry) => treeHolds(entry, leafHolds))
+        : condition.conditions.every((entry) => treeHolds(entry, leafHolds));
 }
 
 /** Whether every one of a rule's conditions holds. */

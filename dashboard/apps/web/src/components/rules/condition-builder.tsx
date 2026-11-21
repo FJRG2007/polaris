@@ -1,0 +1,423 @@
+"use client";
+
+/**
+ * A rule's conditions, as rows you build or as text you write - shared by every
+ * screen that writes rules the way the firewall does: the firewall's custom and
+ * frame rules, and an account's own access rules.
+ *
+ * What a single test can look at (its fields, operators and values) is the
+ * vocabulary, passed in; the tree around the tests - `And` and `Or` on each row, a
+ * row given the other joiner becoming a group of its own, the depth limit, and the
+ * expression view when the vocabulary has one - is the same everywhere, so the
+ * screens cannot drift apart in how a rule is put together.
+ *
+ * `And` and `Or` sit on each row rather than on the list, because that is the
+ * question being asked at that moment: "and what else?" against this row.
+ */
+
+import { useState, type ReactNode } from "react";
+import { Button, Select } from "@polaris/ui";
+import { Plus, TriangleAlert, X } from "lucide-react";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+
+/** One test. Its shape belongs to the vocabulary. */
+export type RuleTest = object;
+
+/** A group of tests read as `all` or `any`. */
+export interface RuleGroup<T extends RuleTest = RuleTest> {
+    match: "all" | "any";
+    conditions: RuleCondition<T>[];
+}
+
+export type RuleCondition<T extends RuleTest = RuleTest> = T | RuleGroup<T>;
+
+interface Option {
+    value: string;
+    label: string;
+}
+
+/** What one test can say, and how the expression view reads and writes it. */
+export interface ConditionVocabulary<T extends RuleTest> {
+    fieldOptions: Option[];
+    fieldValue: (test: T) => string;
+    fieldChanged: (test: T, value: string) => T;
+    operatorOptions: (test: T) => Option[];
+    operatorValue: (test: T) => string;
+    operatorChanged: (test: T, value: string) => T;
+    emptyCondition: () => T;
+    /** What goes under the row: the value editor, or a hint where a test takes none. */
+    valueEditor: (test: T, onChange: (next: T) => void) => ReactNode;
+    /** How deep a group may sit. The builder stops offering the join that would go deeper. */
+    maxDepth: number;
+    /** The rule as text, when the vocabulary has a language for it. */
+    expression?: {
+        render: (conditions: readonly RuleCondition<T>[]) => string;
+        parse: (text: string) => { ok: true; conditions: RuleCondition<T>[] } | { ok: false; error: string };
+        max: number;
+    };
+}
+
+export function isRuleGroup<T extends RuleTest>(condition: RuleCondition<T>): condition is RuleGroup<T> {
+    return "match" in condition && Array.isArray((condition as { conditions?: unknown }).conditions);
+}
+
+export function RuleConditionBuilder<T extends RuleTest>({
+    conditions,
+    vocabulary,
+    onChange
+}: {
+    conditions: readonly RuleCondition<T>[];
+    vocabulary: ConditionVocabulary<T>;
+    onChange: (next: RuleCondition<T>[]) => void;
+}) {
+    const t = useTranslations("firewall");
+    // The expression while it is being written. Null means the rows are in charge, so
+    // the text is never a stale copy of a rule the rows have since changed.
+    const [draft, setDraft] = useState<string | null>(null);
+    const [problem, setProblem] = useState<string | null>(null);
+
+    const language = vocabulary.expression;
+    const expression = language ? language.render(conditions) : "";
+
+    /** Take what was typed, or say why it cannot be taken. */
+    function applyDraft(text: string): boolean {
+        if (!language) return true;
+        const parsed = language.parse(text);
+        if (!parsed.ok) {
+            setProblem(parsed.error);
+            return false;
+        }
+        onChange(parsed.conditions);
+        setProblem(null);
+        return true;
+    }
+
+    if (draft !== null && language) {
+        return (
+            <div className="flex flex-col gap-2">
+                <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">{t("conditions.expression")}</span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (applyDraft(draft)) setDraft(null);
+                        }}
+                        className="text-xs text-primary underline-offset-2 hover:underline"
+                    >
+                        {t("conditions.useBuilder")}
+                    </button>
+                </div>
+                <textarea
+                    value={draft}
+                    rows={4}
+                    spellCheck={false}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    aria-label={t("conditions.expressionLabel")}
+                    aria-invalid={problem !== null}
+                    maxLength={language.max}
+                    onChange={(event) => {
+                        setDraft(event.target.value);
+                        setProblem(null);
+                    }}
+                    onBlur={() => applyDraft(draft)}
+                    className="w-full rounded-md border border-border bg-muted px-3 py-2 font-mono text-xs text-foreground "
+                />
+                <div className="flex items-baseline justify-between gap-2">
+                    {problem ? (
+                        <p className="flex items-start gap-1.5 text-xs text-danger">
+                            <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
+                            {problem}
+                        </p>
+                    ) : (
+                        <p className="text-xs text-muted-foreground">
+                            {t("conditions.expressionHint")}
+                        </p>
+                    )}
+                    <span className="min-w-0 max-w-full shrink-0 truncate text-xs text-muted-foreground" title={t("conditions.characters", { used: draft.length, max: language.max })}>
+                        {t("conditions.characters", { used: draft.length, max: language.max })}
+                    </span>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex flex-col gap-3">
+            <ConditionList conditions={conditions} vocabulary={vocabulary} match="all" depth={0} onChange={onChange} />
+
+            {language ? (
+            <div className="flex flex-col gap-1.5">
+                <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-xs font-medium text-muted-foreground">{t("conditions.preview")}</span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setProblem(null);
+                            setDraft(expression);
+                        }}
+                        className="text-xs text-primary underline-offset-2 hover:underline"
+                    >
+                        {t("conditions.edit")}
+                    </button>
+                </div>
+                <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 font-mono text-xs text-foreground">
+                    {expression || t("conditions.previewEmpty")}
+                </pre>
+                <span className="self-end text-xs text-muted-foreground">
+                    {t("conditions.characters", { used: expression.length, max: language.max })}
+                </span>
+            </div>
+            ) : null}
+        </div>
+    );
+}
+
+/**
+ * One level of the condition tree: the rule's own list, or a group's members.
+ *
+ * The joiner between rows is drawn here rather than by each row, because it is a fact
+ * about the list they are in - "and" at the top, whichever word the group matches on
+ * inside one.
+ */
+function ConditionList<T extends RuleTest>({
+    conditions,
+    vocabulary,
+    match,
+    depth,
+    onChange
+}: {
+    conditions: readonly RuleCondition<T>[];
+    vocabulary: ConditionVocabulary<T>;
+    match: "all" | "any";
+    depth: number;
+    onChange: (next: RuleCondition<T>[]) => void;
+}) {
+    const t = useTranslations("firewall");
+    const joiner = match === "any" ? t("conditions.or") : t("conditions.and");
+
+    const replace = (at: number, next: RuleCondition<T>): void =>
+        onChange(conditions.map((entry, index) => (index === at ? next : entry)));
+
+    /**
+     * Add a condition next to the one at `at`, joined by `how`.
+     *
+     * Joining the way the list already reads is an append. Joining the other way turns
+     * that one row into a group holding both, which is what the brackets in the
+     * expression are about - and it is refused rather than done badly when the group
+     * would sit deeper than a rule may go.
+     */
+    const join = (at: number, how: "all" | "any"): void => {
+        if (how === match) {
+            const next = [...conditions];
+            next.splice(at + 1, 0, vocabulary.emptyCondition());
+            onChange(next);
+            return;
+        }
+        const here = conditions[at];
+        if (!here) return;
+        replace(at, { match: how, conditions: [here, vocabulary.emptyCondition()] });
+    };
+
+    return (
+        <div className="flex flex-col gap-2">
+            {conditions.map((condition, at) => {
+                const canWrap = depth < vocabulary.maxDepth && !isRuleGroup(condition);
+                return (
+                    <div key={at} className="flex flex-col gap-2">
+                        {at === 0 ? null : <span className="text-xs font-medium text-muted-foreground">{joiner}</span>}
+                        {isRuleGroup(condition) ? (
+                            <ConditionGroupBlock
+                                group={condition}
+                                vocabulary={vocabulary}
+                                depth={depth + 1}
+                                removable={conditions.length > 1}
+                                onChange={(next) => replace(at, next)}
+                                onRemove={() => onChange(conditions.filter((_, index) => index !== at))}
+                            />
+                        ) : (
+                            <ConditionRow
+                                condition={condition}
+                                vocabulary={vocabulary}
+                                removable={conditions.length > 1}
+                                canWrap={canWrap}
+                                onChange={(next) => replace(at, next)}
+                                onJoin={(how) => join(at, how)}
+                                onRemove={() => onChange(conditions.filter((_, index) => index !== at))}
+                            />
+                        )}
+                    </div>
+                );
+            })}
+
+            {conditions.length === 0 ? (
+                <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="w-fit"
+                    onClick={() => onChange([vocabulary.emptyCondition()])}
+                >
+                    <Plus className="size-3.5 shrink-0" aria-hidden="true" />
+                    {t("conditions.add")}
+                </Button>
+            ) : null}
+        </div>
+    );
+}
+
+/** A group, drawn as an indented surface so the bracket in the expression has
+ *  something on screen that corresponds to it. */
+function ConditionGroupBlock<T extends RuleTest>({
+    group,
+    vocabulary,
+    depth,
+    removable,
+    onChange,
+    onRemove
+}: {
+    group: RuleGroup<T>;
+    vocabulary: ConditionVocabulary<T>;
+    depth: number;
+    removable: boolean;
+    onChange: (next: RuleGroup<T>) => void;
+    onRemove: () => void;
+}) {
+    const t = useTranslations("firewall");
+    return (
+        <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/20 px-3 py-3">
+            <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground">{t("conditions.matches")}</span>
+                <Select
+                    value={group.match}
+                    aria-label={t("conditions.matchLabel")}
+                    className="w-36"
+                    options={[
+                        { value: "any", label: t("conditions.any") },
+                        { value: "all", label: t("conditions.all") }
+                    ]}
+                    onValueChange={(value) => onChange({ ...group, match: value as RuleGroup<T>["match"] })}
+                />
+                {removable ? (
+                    <button
+                        type="button"
+                        onClick={onRemove}
+                        aria-label={t("conditions.removeGroup")}
+                        title={t("conditions.removeGroupTitle")}
+                        className="ms-auto inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-danger "
+                    >
+                        <X className="size-3.5 shrink-0" aria-hidden="true" />
+                    </button>
+                ) : null}
+            </div>
+            <ConditionList
+                conditions={group.conditions}
+                vocabulary={vocabulary}
+                match={group.match}
+                depth={depth}
+                onChange={(conditions) => onChange({ ...group, conditions })}
+            />
+        </div>
+    );
+}
+
+function ConditionRow<T extends RuleTest>({
+    condition,
+    vocabulary,
+    removable,
+    canWrap,
+    onChange,
+    onJoin,
+    onRemove
+}: {
+    condition: T;
+    vocabulary: ConditionVocabulary<T>;
+    removable: boolean;
+    /** Whether the join that would open a group is still within the nesting limit. */
+    canWrap: boolean;
+    onChange: (next: T) => void;
+    onJoin: (how: "all" | "any") => void;
+    onRemove: () => void;
+}) {
+    const t = useTranslations("firewall");
+    return (
+        <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-end gap-2">
+                <label className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
+                    {t("conditions.field")}
+                    <Select
+                        value={vocabulary.fieldValue(condition)}
+                        aria-label={t("conditions.field")}
+                        className="w-52"
+                        options={vocabulary.fieldOptions}
+                        onValueChange={(value) => onChange(vocabulary.fieldChanged(condition, value))}
+                    />
+                </label>
+                <label className="flex min-w-0 flex-col gap-1.5 text-xs font-medium text-muted-foreground">
+                    {t("conditions.operator")}
+                    <Select
+                        value={vocabulary.operatorValue(condition)}
+                        aria-label={t("conditions.operator")}
+                        className="w-52"
+                        options={vocabulary.operatorOptions(condition)}
+                        onValueChange={(value) => onChange(vocabulary.operatorChanged(condition, value))}
+                    />
+                </label>
+
+                <div className="mb-1 ms-auto flex shrink-0 items-center gap-1">
+                    <JoinButton
+                        label={t("conditions.andButton")}
+                        title={t("conditions.joinAnd")}
+                        disabled={!canWrap}
+                        onClick={() => onJoin("all")}
+                    />
+                    <JoinButton
+                        label={t("conditions.orButton")}
+                        title={t("conditions.joinOr")}
+                        disabled={!canWrap}
+                        onClick={() => onJoin("any")}
+                    />
+                    {removable ? (
+                        <button
+                            type="button"
+                            onClick={onRemove}
+                            aria-label={t("conditions.removeCondition")}
+                            title={t("conditions.remove")}
+                            className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-danger "
+                        >
+                            <X className="size-3.5 shrink-0" aria-hidden="true" />
+                        </button>
+                    ) : null}
+                </div>
+            </div>
+
+            {vocabulary.valueEditor(condition, onChange)}
+        </div>
+    );
+}
+
+/** One of the two words a row can be joined to the next by. */
+function JoinButton({
+    label,
+    title,
+    disabled,
+    onClick
+}: {
+    label: string;
+    title: string;
+    disabled: boolean;
+    onClick: () => void;
+}) {
+    const t = useTranslations("firewall");
+    return (
+        <button
+            type="button"
+            disabled={disabled}
+            onClick={onClick}
+            title={disabled ? t("conditions.tooDeep") : title}
+            className="inline-flex h-8 items-center rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-40 "
+        >
+            {label}
+        </button>
+    );
+}

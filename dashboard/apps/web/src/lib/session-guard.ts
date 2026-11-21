@@ -36,14 +36,13 @@ import { notify } from "@/lib/notifications/dispatch";
 import type { ViewAsRow } from "@/lib/view-as-service";
 import { describeOrigin } from "@/lib/session-directory";
 import { wordsFor } from "@/lib/notifications/notice-words";
-import { evaluateAccountAccess } from "@/lib/network-rules";
+import { evaluateAccountRequest, listAccountRules } from "@/lib/account-rules";
 import { getInstanceSecurity } from "@/lib/instance-security";
 import { beginSignInStepUp, STEP_UP_PATH } from "@/lib/two-factor-policy-service";
 import { notifySessionOpened, notifySessionsClosed } from "@/lib/notifications/session-events";
 import {
     consumeSessionRotation,
     rememberAccountDevice,
-    resolveSignInRules,
     takeSignInRecord
 } from "@polaris/auth";
 import {
@@ -144,21 +143,45 @@ export async function noteActivity(sessionId: string | undefined | null): Promis
 export async function revokeSessionsRefusedByRules(userId: string): Promise<number> {
     const states = await prisma.sessionState.findMany({
         where: { userId, session: { expiresAt: { gt: new Date() } } },
-        select: { sessionId: true, ip: true }
+        select: {
+            sessionId: true,
+            ip: true,
+            userAgent: true,
+            userAgentBrands: true,
+            userAgentPlatform: true,
+            lockedAt: true
+        }
     });
     if (states.length === 0) return 0;
 
-    const ownRules = await resolveSignInRules(userId);
-    const verdicts = new Map<string | null, boolean>();
+    // Each session is judged on what it recorded about itself: its address and
+    // the browser it said it was. Sessions that share both share one verdict.
+    const ownRules = await listAccountRules(userId);
+    const verdicts = new Map<string, Awaited<ReturnType<typeof evaluateAccountRequest>>["action"]>();
     const refused: string[] = [];
+    const challenged: string[] = [];
     for (const state of states) {
-        let allowed = verdicts.get(state.ip);
-        if (allowed === undefined) {
-            allowed = (await evaluateAccountAccess(userId, state.ip ?? undefined, ownRules))
-                .allowed;
-            verdicts.set(state.ip, allowed);
+        const key = `${state.ip}|${state.userAgent}|${state.userAgentBrands}|${state.userAgentPlatform}`;
+        let action = verdicts.get(key);
+        if (action === undefined) {
+            action = (
+                await evaluateAccountRequest(
+                    userId,
+                    state.ip,
+                    { userAgent: state.userAgent, brands: state.userAgentBrands, platform: state.userAgentPlatform },
+                    ownRules
+                )
+            ).action;
+            verdicts.set(key, action);
         }
-        if (!allowed) refused.push(state.sessionId);
+        if (action === "block") refused.push(state.sessionId);
+        else if (action === "challenge" && !state.lockedAt) challenged.push(state.sessionId);
+    }
+    if (challenged.length > 0) {
+        await prisma.sessionState.updateMany({
+            where: { userId, sessionId: { in: challenged } },
+            data: { lockedAt: new Date() }
+        });
     }
     if (refused.length === 0) return 0;
 
@@ -339,20 +362,38 @@ export async function guardSession({
         await followClientVersion(sessionId, state, asked);
     }
 
-    // 3. First sight of this session, or a move to a new address: re-run the
-    //    account's network rules rather than trusting an old verdict forever.
-    if (!state || state.ip !== (ip ?? null)) {
-        const decision = await evaluateAccountAccess(userId, ip, await resolveSignInRules(userId));
-        if (!decision.allowed) {
+    // 3. First sight of this session, a move to a new address, or the periodic
+    //    re-check: re-run the account's access rules rather than trusting an old
+    //    verdict forever. The periodic pass rides on the activity stamp's own
+    //    interval, so a rule about the time of day or the device reaches a session
+    //    already open without a lookup on every request.
+    const recheck = touch && state !== null && now - state.lastSeenAt.getTime() >= ACTIVITY_WRITE_INTERVAL_MS;
+    if (!state || state.ip !== (ip ?? null) || recheck) {
+        const decision = await evaluateAccountRequest(userId, ip ?? null, await requestClient());
+        if (decision.action === "block") {
             await revokeSession(sessionId);
             await recordAudit({
                 actorId: userId,
                 action: "account.signin.blocked",
                 targetType: "session",
                 targetId: sessionId,
-                metadata: { reason: decision.reason }
+                metadata: { reason: decision.source === "enforced" ? "enforced" : "rule", rule: decision.ruleName }
             });
             return { ok: false, redirect: "/oauth/login?blocked=1" };
+        }
+        // A rule asking the person to prove it is them again locks the session:
+        // the lock screen asks for the factor, and the session carries on after.
+        //    Only on first sight or a move: the periodic pass would otherwise lock
+        //    the same session again a minute after its owner unlocked it.
+        const challenge = decision.action === "challenge" && !(state && state.ip === (ip ?? null));
+        if (challenge) {
+            await recordAudit({
+                actorId: userId,
+                action: "account.signin.challenged",
+                targetType: "session",
+                targetId: sessionId,
+                metadata: { rule: decision.ruleName }
+            });
         }
         if (!state) {
             const created = await createSessionState({
@@ -368,6 +409,10 @@ export async function guardSession({
             // The sign-in owes more factors than the one it answered: held until
             // it pays them, exactly like a session waiting for approval.
             if (created.stepUp) return { ok: false, redirect: STEP_UP_PATH };
+            if (challenge) {
+                await prisma.sessionState.update({ where: { sessionId }, data: { lockedAt: new Date() } });
+                return { ok: false, redirect: "/oauth/lock" };
+            }
             // The session is real from here, so it faces the same demand every
             // later request faces. Returning early without asking would let one
             // request through per sign-in, which is one more than none.
@@ -375,8 +420,9 @@ export async function guardSession({
         }
         await prisma.sessionState.update({
             where: { sessionId },
-            data: { ip: ip ?? null, country: decision.country }
+            data: { ip: ip ?? null, country: decision.country, ...(challenge ? { lockedAt: new Date() } : {}) }
         });
+        if (challenge) return { ok: false, redirect: "/oauth/lock" };
     }
 
     // 4. An explicit decision from another session wins over everything below.

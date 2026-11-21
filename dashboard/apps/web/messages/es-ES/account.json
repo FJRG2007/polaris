@@ -173,6 +173,9 @@
             "lockout": "Eso bloquearía la dirección que estás usando ahora mismo. Añádela primero a las reglas, o déjalas vacías.",
             "checkRules": "Revisa las reglas.",
             "checkGroup": "Revisa el grupo."
+        },
+        "rules": {
+            "lockout": "No se guardó: la regla \"{rule}\" bloquearía la sesión que estás usando ahora. Cámbiala o pon encima una regla que permita esta sesión."
         }
     },
     "activity": {
