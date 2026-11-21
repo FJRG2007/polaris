@@ -228,9 +228,12 @@ export interface SentBody {
 export async function follow(
     start: URL,
     accept = "text/html,application/xhtml+xml",
-    sent?: SentBody
+    sent?: SentBody,
+    /** For a download rather than a page: the whole answer, body included, has
+     *  this long. A page keeps the short default. */
+    timeoutMs: number = FETCH_TIMEOUT_MS
 ): Promise<GuardedResponse | null> {
-    return (await walk(start, accept, sent, null))?.response ?? null;
+    return (await walk(start, accept, sent, null, timeoutMs))?.response ?? null;
 }
 
 /**
@@ -260,7 +263,8 @@ async function walk(
     start: URL,
     accept: string,
     sent: SentBody | undefined,
-    arrived: ((url: URL) => boolean) | null
+    arrived: ((url: URL) => boolean) | null,
+    timeoutMs: number = FETCH_TIMEOUT_MS
 ): Promise<{ response: GuardedResponse | null; url: URL } | null> {
     let url = start;
     /** Dropped on the redirects that mean "go and GET this instead". A 301, 302
@@ -277,7 +281,7 @@ async function walk(
             // underneath the fetch.
             const init = {
                 redirect: "manual" as const,
-                signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+                signal: AbortSignal.timeout(timeoutMs),
                 dispatcher,
                 headers: {
                     // Named honestly, in the form crawlers are conventionally

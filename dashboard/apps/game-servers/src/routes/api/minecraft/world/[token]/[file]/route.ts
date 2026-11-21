@@ -1,27 +1,30 @@
 /**
- * A map's world, for a Minecraft server's container to download while it is
- * being created - behind the key its `WORLD` address carries (`mod-token`).
+ * A map's world - or a pack or world somebody uploaded - for a Minecraft
+ * server's container to download while it is being created - behind the key its `WORLD` address carries (`mod-token`).
  *
  * A wrong key is the same answer as a missing file, so this does not say which
  * worlds exist to somebody who cannot have them.
  */
 
 import { modTokenMatches } from "../../../../../../lib/minecraft/mod-token";
-import { worldGet, worldHead } from "../../../../../../lib/minecraft/world-download";
+import { archiveGet, worldGet, worldHead } from "../../../../../../lib/minecraft/world-download";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ token: string; file: string }> };
 
-export async function HEAD(_request: Request, { params }: Params): Promise<Response> {
+export async function HEAD(request: Request, { params }: Params): Promise<Response> {
     const { token, file } = await params;
     if (!modTokenMatches(token)) return new Response(null, { status: 404 });
+    if (file.startsWith("polaris-")) return archiveGet(request, file, true);
     return worldHead(file);
 }
 
-export async function GET(_request: Request, { params }: Params): Promise<Response> {
+export async function GET(request: Request, { params }: Params): Promise<Response> {
     const { token, file } = await params;
     if (!modTokenMatches(token)) return new Response("Not found", { status: 404 });
+    // A pack or world somebody brought themselves (`archives/store.ts`).
+    if (file.startsWith("polaris-")) return archiveGet(request, file);
     return worldGet(file);
 }

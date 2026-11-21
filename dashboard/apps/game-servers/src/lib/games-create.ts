@@ -110,6 +110,8 @@ import {
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
 import { modToken } from "./minecraft/mod-token";
+import { loaderSpecOf } from "./minecraft/loader-pin";
+import { archiveUrl, readArchive, type ArchiveInfo } from "./minecraft/archives/store";
 
 const { availableHostPort } = host.appsPortRegistry;
 const { promptedEnvVars, findApp } = host.appsCatalog;
@@ -163,7 +165,7 @@ export const RELEASE_KEY = "mcRelease";
  * there is no map, or a server reset from a map to an ordinary world would fetch
  * the map again on its next restart.
  */
-const WORLD_KEY = "WORLD";
+export const WORLD_KEY = "WORLD";
 
 /** What decides the game a Minecraft server plays and the map it plays it on.
  *  The same answers whether the server is being created or being reset to them. */
@@ -187,6 +189,28 @@ export interface MinecraftShape {
     readonly concurrentPlayers: number;
     /** Whether Bedrock clients are meant to be able to join a Java server. */
     readonly crossplay: boolean;
+    /** A server pack somebody uploaded (`archives/store.ts`): it brings the
+     *  loader, the release and the mods. Java only. */
+    readonly packArchive?: string;
+    /** A world somebody uploaded, played instead of a map or a generated one. */
+    readonly worldArchive?: string;
+}
+
+/** An uploaded archive a shape names, refusing one that is gone or the wrong
+ *  kind - a day unused and it is swept, and the form has to send it again. */
+async function shapeArchive(id: string | undefined, kind: "pack" | "world"): Promise<ArchiveInfo | null> {
+    if (!id) return null;
+    const archive = await readArchive(id);
+    if (!archive || archive.kind !== kind)
+        throw new Error(gameMessage("games", kind === "pack" ? "lib.packGone" : "lib.worldGone"));
+    return archive;
+}
+
+/** What a pack's mods cost on top of the loader. Polaris's own estimate counts
+ *  projects on the list; a pack's jars are not on it. */
+export function packHeapMb(heapMb: number, pack: ArchiveInfo | null): number {
+    if (!pack || pack.mods === 0) return heapMb;
+    return Math.max(heapMb, 3072 + pack.mods * 20);
 }
 
 /**
@@ -220,13 +244,30 @@ export async function minecraftShapeEnv(
     addresses?: MapAddresses
 ): Promise<Map<string, string>> {
     const env = new Map(current);
-    const map = mapFor(blueprint, shape.mapId);
-    const served = map ? (addresses ?? (await mapAddresses())) : undefined;
-    const versions = await blueprintVersions(blueprint, shape.crossplay, shape.software, map).catch(
-        () => []
-    );
+    const pack = await shapeArchive(shape.packArchive, "pack");
+    const ownWorld = await shapeArchive(shape.worldArchive, "world");
+    if ((pack || ownWorld) && edition !== "java")
+        throw new Error(gameMessage("games", "lib.archiveJavaOnly"));
+    // A pack is a whole game of its own: a blueprint that installs plugins or
+    // insists on Paper would be a second one, on the wrong loader.
+    if (pack && (blueprint.software || blueprint.projects.length > 0))
+        throw new Error(gameMessage("games", "lib.packNeedsPlainBlueprint", { name: blueprint.name }));
+    // Geyser is a plugin, and a pack server runs mods.
+    if (pack && shape.crossplay) throw new Error(gameMessage("games", "lib.packNoCrossplay"));
+    const packSoftware = pack?.loader?.type ?? shape.software;
+    if (pack && !loaderSpecOf(packSoftware))
+        throw new Error(gameMessage("games", "lib.packNeedsLoader"));
+    // A world somebody brought replaces the map: there is one world to arrive.
+    const map = ownWorld ? undefined : mapFor(blueprint, shape.mapId);
+    const served =
+        map || pack || ownWorld ? (addresses ?? (await mapAddresses())) : undefined;
+    // A pack says which release it is for, and no blueprint plugin list has a
+    // say in it: there is none on a pack server.
+    const versions = pack
+        ? []
+        : await blueprintVersions(blueprint, shape.crossplay, shape.software, map).catch(() => []);
     const pinned = releaseFor(blueprint, map);
-    const asked = (shape.version ?? "").trim();
+    const asked = (pack?.loader?.minecraft ?? shape.version ?? "").trim();
     // A map pinned to a release is not a preference that a picker can override:
     // its datapack declares the release it was written for and its command blocks
     // are that release's syntax, so the alternative to refusing here is a server
@@ -255,8 +296,16 @@ export async function minecraftShapeEnv(
 
     // The world the container fetches for itself, and the folder it lands in.
     // Blank for a generated world, so a server reset off a map stops fetching it.
-    env.set(WORLD_KEY, map && served ? worldUrl(served.world, map, served.key) : "");
+    env.set(
+        WORLD_KEY,
+        ownWorld && served
+            ? archiveUrl(served, "world", ownWorld.id)
+            : map && served
+              ? worldUrl(served.world, map, served.key)
+              : ""
+    );
     if (map) env.set(levelEnvKey(edition), map.id);
+    if (ownWorld) env.set(levelEnvKey(edition), ownWorld.levelName ?? "world");
 
     // The seed and the shape of the world only ever apply to one that does not
     // exist yet, which is what a caller with no map is about to generate. Both are
@@ -281,7 +330,7 @@ export async function minecraftShapeEnv(
     // to every image: somewhere between unset, empty and zero, and zero is a
     // valid seed that generates the same world every time. Which is exactly what
     // people saw - every new server, the same map.
-    const generated = map === undefined;
+    const generated = map === undefined && ownWorld === null;
     const chosen = shape.seed?.trim() ?? "";
     env.set(seedEnvKey(edition), generated ? chosen || randomSeed() : "");
     for (const [key, value] of Object.entries(
@@ -305,12 +354,32 @@ export async function minecraftShapeEnv(
 
     // Only the Java image runs a JVM to give a heap to.
     if (edition === "java") {
-        javaSoftwareEnv(env, blueprint, shape, map);
+        javaSoftwareEnv(
+            env,
+            blueprint,
+            { ...shape, ...(packSoftware ? { software: packSoftware } : {}) },
+            map
+        );
+        // The pack itself, which the image unpacks over the data folder on the
+        // boot that first sees it, and the loader build it was made on. A loader
+        // version the pack does not name is left to the image, which takes the
+        // newest for that release - and the sweep holds it there after.
+        if (pack && served) {
+            env.set(GENERIC_PACK_KEY, archiveUrl(served, "pack", pack.id));
+            const spec = loaderSpecOf(packSoftware);
+            if (spec) {
+                env.set(spec.key, pack.loader?.version ?? "");
+                for (const key of spec.legacyKeys) env.set(key, "");
+            }
+        }
         // The heap last, because it is decided by the line above it: a mod
         // loader costs about a gigabyte before a single mod is installed on it,
         // and each mod on the list costs again. A server sized as if it were
         // vanilla is one that runs out of memory while generating the world.
-        env.set("MEMORY", formatMemory(shapeHeapMb(env, blueprint, shape.concurrentPlayers)));
+        env.set(
+            "MEMORY",
+            formatMemory(packHeapMb(shapeHeapMb(env, blueprint, shape.concurrentPlayers), pack))
+        );
     }
     for (const [key, value] of Object.entries(blueprint.env ?? {})) env.set(key, value);
     // Last, over the blueprint's own: where the two disagree the map is the one
@@ -358,8 +427,13 @@ function resourcePackEnv(
 const SOFTWARE_EXTRA_KEYS: Readonly<Record<string, string>> = {
     BUILD_FROM_SOURCE: "",
     MODRINTH_MODPACK: "",
-    CUSTOM_SERVER: ""
+    CUSTOM_SERVER: "",
+    // An uploaded server pack, which only a shape that names one puts back.
+    GENERIC_PACK: ""
 };
+
+/** Where the image is told which server pack to unpack. */
+export const GENERIC_PACK_KEY = "GENERIC_PACK";
 
 /** The software a Java server runs and the projects its list carries, written
  *  onto `env`. Shared by building a server and quoting its heap, so the two agree
@@ -504,6 +578,8 @@ export async function expectedMinecraftHeapMb(
         readonly serverId?: string;
         /** The server being reset, whose list the new one starts from. */
         readonly installedAppId?: string;
+        /** An uploaded server pack, whose mods are not on the list. */
+        readonly packArchive?: string;
     }
 ): Promise<number | null> {
     if (input.edition !== "java") return null;
@@ -538,7 +614,8 @@ export async function expectedMinecraftHeapMb(
         },
         mapFor(blueprint, input.mapId)
     );
-    const heapMb = shapeHeapMb(env, blueprint, input.concurrentPlayers);
+    const pack = input.packArchive ? await readArchive(input.packArchive).catch(() => null) : null;
+    const heapMb = packHeapMb(shapeHeapMb(env, blueprint, input.concurrentPlayers), pack);
     if (!input.installedAppId) return heapForMachine(ownerId, input.serverId ?? "local", heapMb);
     const { resetHeapMb } = await import("./games-memory");
     return resetHeapMb(ownerId, input.installedAppId, heapMb);
@@ -591,7 +668,9 @@ async function createMinecraftServer(
             ...(input.levelType ? { levelType: input.levelType } : {}),
             ...(input.biome ? { biome: input.biome } : {}),
             concurrentPlayers: input.concurrentPlayers,
-            crossplay: input.crossplay
+            crossplay: input.crossplay,
+            ...(input.packArchive ? { packArchive: input.packArchive } : {}),
+            ...(input.worldArchive ? { worldArchive: input.worldArchive } : {})
         },
         new Map(base.env.map((entry) => [entry.key, entry.value]))
     );
@@ -601,7 +680,10 @@ async function createMinecraftServer(
     if (map) warmMap(map);
     env.set("MAX_PLAYERS", String(input.maxPlayers));
     if (input.edition === "java") {
-        const heapMb = shapeHeapMb(env, blueprint, input.concurrentPlayers);
+        const heapMb = packHeapMb(
+            shapeHeapMb(env, blueprint, input.concurrentPlayers),
+            await shapeArchive(input.packArchive, "pack")
+        );
         env.set("MEMORY", formatMemory(await heapForMachine(ownerId, input.serverId, heapMb)));
     }
 

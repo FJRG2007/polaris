@@ -204,7 +204,7 @@ function ResetDialog({
     // players again, including onto a plain generated world - which is neither
     // what was meant nor anything the reader could work out from the sentence
     // underneath the box.
-    const carriesPlayers = edition === "java" && !shape.mapId;
+    const carriesPlayers = edition === "java" && !shape.mapId && !shape.world;
 
     async function submit(): Promise<void> {
         setPending(true);
@@ -220,6 +220,8 @@ function ResetDialog({
             ...(shape.mapId ? { mapId: shape.mapId } : {}),
             ...(edition === "java" ? { software: shape.software } : {}),
             ...(edition === "java" && shape.source ? { softwareSource: shape.source } : {}),
+            ...(edition === "java" && shape.pack ? { packArchive: shape.pack.id } : {}),
+            ...(edition === "java" && shape.world ? { worldArchive: shape.world.id } : {}),
             version: shape.version.trim() || LATEST,
             ...(shape.seed.trim() ? { seed: shape.seed.trim() } : {}),
             ...(edition === "java" ? { levelType: shape.levelType, biome: shape.biome } : {}),

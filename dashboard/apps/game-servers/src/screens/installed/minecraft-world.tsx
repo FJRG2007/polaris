@@ -15,6 +15,8 @@
  * place for it to be wrong.
  */
 
+import { ArchiveIntake } from "../../components/archive-intake";
+import type { ArchiveInfo } from "../../lib/minecraft/archives/store";
 import { formatBytes } from "@polaris/core";
 import { useGameText, useSchemaText } from "../game-text";
 import * as world from "../../lib/minecraft/world";
@@ -36,6 +38,7 @@ import {
     Play,
     RotateCcw,
     Sprout,
+    Upload,
     Trash2,
     TriangleAlert
 } from "lucide-react";
@@ -44,6 +47,7 @@ import {
     deleteWorldAction,
     deleteWorldBackupAction,
     newWorldAction,
+    importWorldAction,
     restoreWorldBackupAction,
     saveBackupPolicyAction,
     switchWorldAction
@@ -165,7 +169,9 @@ function WorldsCard({
     onChanged: () => Promise<void>;
 }) {
     const t = useGameText("minecraft");
+    const g = useGameText("games");
     const [creating, setCreating] = useState(false);
+    const [importing, setImporting] = useState(false);
     const [busy, setBusy] = useState<string | null>(null);
     const [failed, setFailed] = useState<string | null>(null);
     const [deleting, setDeleting] = useState<string | null>(null);
@@ -202,14 +208,27 @@ function WorldsCard({
                         <Sprout className="size-4 text-primary" />
                         {t("world.world")}
                     </CardTitle>
-                    <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => setCreating(true)}
-                        disabled={view === null}
-                    >
-                        {t("world.newWorld")}
-                    </Button>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        {view?.edition !== "bedrock" && (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setImporting(true)}
+                                disabled={view === null}
+                            >
+                                <Upload className="size-4 shrink-0" />
+                                {g("archive.importWorld")}
+                            </Button>
+                        )}
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => setCreating(true)}
+                            disabled={view === null}
+                        >
+                            {t("world.newWorld")}
+                        </Button>
+                    </div>
                 </div>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
@@ -317,6 +336,13 @@ function WorldsCard({
                 )}
             </CardBody>
 
+            {importing && (
+                <ImportWorldDialog
+                    installedAppId={installedAppId}
+                    onClose={() => setImporting(false)}
+                    onDone={onChanged}
+                />
+            )}
             {creating && (
                 <NewWorldDialog
                     installedAppId={installedAppId}
@@ -336,6 +362,69 @@ function WorldsCard({
                 onConfirm={() => deleting && void remove(deleting)}
             />
         </Card>
+    );
+}
+
+/**
+ * A world somebody brings - a map from a website, or one of their own saves -
+ * played instead of the current one, which stays on the disk and in the list.
+ */
+function ImportWorldDialog({
+    installedAppId,
+    onClose,
+    onDone
+}: {
+    installedAppId: string;
+    onClose: () => void;
+    onDone: () => Promise<void>;
+}) {
+    const t = useGameText("minecraft");
+    const g = useGameText("games");
+    const [archive, setArchive] = useState<ArchiveInfo | null>(null);
+    const [pending, setPending] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    async function submit(): Promise<void> {
+        if (!archive) return;
+        setPending(true);
+        setError(null);
+        const result = await importWorldAction({ installedAppId, archiveId: archive.id });
+        setPending(false);
+        if (result.error) {
+            setError(result.error);
+            return;
+        }
+        await onDone();
+        onClose();
+    }
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && !pending && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Upload className="size-4 shrink-0" /> {g("archive.importWorld")}
+                    </DialogTitle>
+                </DialogHeader>
+                <div className="flex flex-col gap-4">
+                    <ArchiveIntake kind="world" value={archive} onChange={setArchive} disabled={pending} />
+                    <p className="flex items-start gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs">
+                        <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+                        <span className="text-muted-foreground">{g("archive.importWorldNote")}</span>
+                    </p>
+                    {error && <p className="text-sm text-danger">{error}</p>}
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={onClose} disabled={pending}>
+                            {t("world.cancel")}
+                        </Button>
+                        <Button onClick={() => void submit()} disabled={pending || !archive}>
+                            {pending && <Loader2 className="size-4 animate-spin" />}
+                            {g("archive.playThisWorld")}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
     );
 }
 

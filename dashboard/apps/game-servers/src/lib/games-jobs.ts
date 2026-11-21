@@ -372,6 +372,16 @@ export function gameJobTable(): readonly AppJob[] {
             run: runWorldTrims
         },
         {
+            key: "game-uploaded-archives",
+            // Hourly: what it removes is a day old before it is removed at all.
+            everyMs: Number(process.env.POLARIS_GAME_ARCHIVE_SWEEP_MS) || 60 * MINUTE,
+            // Leased: two runners deleting the same file is harmless, but one of
+            // them reading the list while the other renames a new archive in is
+            // not worth having.
+            leaseMs: 10 * MINUTE,
+            run: async () => (await import("./minecraft/archives/store")).sweepArchives()
+        },
+        {
             key: "game-reach",
             // Two minutes, because it is only ever answering a question the operator
             // has already been told the answer arrives on its own: a port opened while

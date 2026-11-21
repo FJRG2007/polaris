@@ -178,6 +178,8 @@ async function installedGameIds(ownerId: string): Promise<GameId[]> {
 }
 
 const expectedMemorySchema = z.object({
+    /** An uploaded server pack, whose mods cost memory the list does not show. */
+    packArchive: z.string().regex(/^[a-f0-9]{64}$/).optional(),
     edition: z.enum(["java", "bedrock"]),
     blueprintId: z.string().trim().min(1).max(64),
     software: z.string().trim().min(1).max(32).optional(),

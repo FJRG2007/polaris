@@ -40,6 +40,8 @@ import { SoftwareLogo } from "./software-logo";
 import { blueprintsFor, releaseFor } from "../lib/minecraft/blueprints";
 import { mapsFor } from "../lib/minecraft/maps";
 import { blueprintVersionsAction, type BlueprintVersions } from "../screens/actions";
+import { ArchiveIntake } from "./archive-intake";
+import type { ArchiveInfo } from "../lib/minecraft/archives/store";
 
 /**
  * What each blueprint answered last time it was asked, for this tab.
@@ -79,6 +81,11 @@ export interface BlueprintShape {
     readonly seed: string;
     readonly levelType: string;
     readonly biome: string;
+    /** A server pack somebody uploaded: it brings the loader, the release and
+     *  the mods. Java only. */
+    readonly pack: ArchiveInfo | null;
+    /** A world somebody uploaded, played instead of a map or a generated one. */
+    readonly world: ArchiveInfo | null;
 }
 
 /** The version that means "whatever the blueprint can newest run on", rather than
@@ -126,8 +133,22 @@ export const DEFAULT_SHAPE: BlueprintShape = {
     version: LATEST,
     seed: "",
     levelType: world.DEFAULT_LEVEL_TYPE,
-    biome: world.DEFAULT_BIOME
+    biome: world.DEFAULT_BIOME,
+    pack: null,
+    world: null
 };
+
+/** The release an uploaded pack names, when it names one exactly. */
+function packRelease(pack: ArchiveInfo | null): string | null {
+    return pack?.loader?.minecraft ?? null;
+}
+
+/** The loaders a pack can run on, for a pack that does not say which. */
+const PACK_LOADERS = ["FORGE", "NEOFORGE", "FABRIC", "QUILT"].map((id) => ({
+    value: id,
+    // The loader's own name, as the software list spells it.
+    label: findSoftware(id)?.name ?? id
+}));
 
 export function BlueprintFields({
     edition,
@@ -147,6 +168,11 @@ export function BlueprintFields({
     const schemaText = useSchemaText();
     const t = useGameText("games");
     const [advanced, setAdvanced] = useState(false);
+    /** Whether the world comes from a file somebody brings, which is open before
+     *  the file has arrived. */
+    const [ownWorld, setOwnWorld] = useState(value.world !== null);
+    /** Whether the software comes from a server pack, likewise. */
+    const [usePack, setUsePack] = useState(value.pack !== null);
     /** Null until the releases are known, which is a wait worth showing rather
      *  than a list that silently starts as one entry and grows. */
     const [offered, setOffered] = useState<BlueprintVersions | null>(null);
@@ -160,7 +186,7 @@ export function BlueprintFields({
     // Read off this blueprint's own list rather than by id alone, so a map left
     // over from the blueprint before it is not treated as the current choice.
     const map = maps.find((entry) => entry.id === value.mapId);
-    const pinned = releaseFor(blueprint, map);
+    const pinned = packRelease(value.pack) ?? releaseFor(blueprint, map);
     const seedError = shapeError(value);
 
     function set(patch: Partial<BlueprintShape>): void {
@@ -302,6 +328,119 @@ export function BlueprintFields({
                 </p>
             </div>
 
+            {/* Out in the open rather than under Advanced: Vanilla, Paper, Forge,
+                NeoForge or Fabric is the decision a modded server is made of, and
+                somebody looking for it should not have to know where it hides. */}
+            {edition === "java" && (
+                <div className="flex flex-col gap-2">
+                    {!usePack && (
+                        <SoftwarePicker
+                            value={blueprint?.software ?? value.software}
+                            source={value.source}
+                            onChange={(software, source) => set({ software, source })}
+                            pinnedBy={
+                                blueprint?.software ? (schemaText(blueprint.name) ?? null) : null
+                            }
+                        />
+                    )}
+                    {usePack ? (
+                        <div className="flex flex-col gap-2 text-sm">
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="font-medium">{t("archive.serverPack")}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setUsePack(false);
+                                        set({ pack: null, version: LATEST });
+                                    }}
+                                    className="text-xs text-muted-foreground transition-colors hover:text-foreground"
+                                >
+                                    {t("archive.chooseSoftwareInstead")}
+                                </button>
+                            </div>
+                            <ArchiveIntake
+                                kind="pack"
+                                value={value.pack}
+                                onChange={(pack) =>
+                                    set(
+                                        pack
+                                            ? {
+                                                  pack,
+                                                  // A pack is a whole game: the
+                                                  // blueprint with nothing of its
+                                                  // own, and the loader and the
+                                                  // release the pack says.
+                                                  blueprintId: "survival",
+                                                  mapId: "",
+                                                  software: pack.loader?.type ?? "FORGE",
+                                                  source: "",
+                                                  version: pack.loader?.minecraft ?? LATEST
+                                              }
+                                            : { pack: null, version: LATEST }
+                                    )
+                                }
+                            />
+                            {value.pack && !value.pack.loader && (
+                                <label className="flex flex-col gap-1">
+                                    <span className="font-medium">{t("archive.whichLoader")}</span>
+                                    <Select
+                                        value={
+                                            PACK_LOADERS.some((entry) => entry.value === value.software)
+                                                ? value.software
+                                                : "FORGE"
+                                        }
+                                        onValueChange={(software) => set({ software })}
+                                        options={PACK_LOADERS}
+                                        aria-label={t("archive.whichLoader")}
+                                    />
+                                </label>
+                            )}
+                        </div>
+                    ) : (
+                        !blueprint?.software &&
+                        (blueprint?.projects.length ?? 0) === 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setUsePack(true)}
+                                className="self-start text-xs text-primary hover:underline"
+                            >
+                                {t("archive.useAServerPack")}
+                            </button>
+                        )
+                    )}
+                </div>
+            )}
+
+            {edition === "java" && maps.length === 0 && (
+                <div className="flex flex-col gap-2">
+                    <span className="text-sm font-medium">{t("blueprint.map")}</span>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <Choice
+                            selected={!ownWorld}
+                            onSelect={() => {
+                                setOwnWorld(false);
+                                set({ world: null });
+                            }}
+                            title={t("blueprint.generateAWorld")}
+                            detail={t("blueprint.newWorldEmpty")}
+                        />
+                        <Choice
+                            selected={ownWorld}
+                            onSelect={() => setOwnWorld(true)}
+                            title={t("archive.ownWorld")}
+                            detail={t("archive.ownWorldDetail")}
+                        />
+                    </div>
+                    {ownWorld && (
+                        <ArchiveIntake
+                            kind="world"
+                            value={value.world}
+                            onChange={(own) => set({ world: own, mapId: "", seed: "" })}
+                        />
+                    )}
+                </div>
+            )}
+
             {maps.length > 0 && (
                 <div className="flex flex-col gap-2">
                     <span className="text-sm font-medium">{t("blueprint.map")}</span>
@@ -315,7 +454,10 @@ export function BlueprintFields({
                                 // The seed goes with it: it generates nothing now,
                                 // and one left in a field nobody can see is a
                                 // submit refused for a reason nobody can read.
-                                onSelect={() => set({ mapId: entry.id, version: LATEST, seed: "" })}
+                                onSelect={() => {
+                                    setOwnWorld(false);
+                                    set({ mapId: entry.id, version: LATEST, seed: "", world: null });
+                                }}
                                 title={schemaText(entry.name) ?? ""}
                                 detail={schemaText(entry.summary) ?? ""}
                                 note={
@@ -333,8 +475,11 @@ export function BlueprintFields({
                             />
                         ))}
                         <Choice
-                            selected={value.mapId.length === 0}
-                            onSelect={() => set({ mapId: "", version: LATEST })}
+                            selected={value.mapId.length === 0 && !ownWorld}
+                            onSelect={() => {
+                                setOwnWorld(false);
+                                set({ mapId: "", version: LATEST, world: null });
+                            }}
                             title={t("blueprint.generateAWorld")}
                             detail={
                                 blueprint?.projects.length
@@ -343,10 +488,30 @@ export function BlueprintFields({
                             }
                         />
                     </div>
+                    {edition === "java" && (
+                        <Choice
+                            selected={ownWorld}
+                            onSelect={() => {
+                                setOwnWorld(true);
+                                set({ mapId: "", version: LATEST });
+                            }}
+                            title={t("archive.ownWorld")}
+                            detail={t("archive.ownWorldDetail")}
+                        />
+                    )}
+                    {ownWorld && (
+                        <ArchiveIntake
+                            kind="world"
+                            value={value.world}
+                            onChange={(own) => set({ world: own, mapId: "", seed: "" })}
+                        />
+                    )}
                     <p className="text-xs text-muted-foreground">
                         {map
                             ? t("blueprint.mapDownloaded", { author: map.author })
-                            : t("blueprint.theServerGeneratesItsOwn")}
+                            : ownWorld
+                              ? t("archive.ownWorldPlayed")
+                              : t("blueprint.theServerGeneratesItsOwn")}
                     </p>
                 </div>
             )}
@@ -367,18 +532,6 @@ export function BlueprintFields({
                 {advanced && (
                     <div className="flex flex-col gap-3 border-s border-border ps-3">
                         <div className="grid grid-cols-1 gap-3">
-                            {edition === "java" && (
-                                <SoftwarePicker
-                                    value={blueprint?.software ?? value.software}
-                                    source={value.source}
-                                    onChange={(software, source) => set({ software, source })}
-                                    pinnedBy={
-                                        blueprint?.software
-                                            ? (schemaText(blueprint.name) ?? null)
-                                            : null
-                                    }
-                                />
-                            )}
                             <label className="flex flex-col gap-1 text-sm">
                                 <span className="font-medium">
                                     {t("blueprint.minecraftVersion")}
@@ -447,7 +600,7 @@ export function BlueprintFields({
 
                         {/* A map brings its own terrain, so the questions about
                             generating one have no answer that changes anything. */}
-                        {!map && (
+                        {!map && !ownWorld && (
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <label className="flex flex-col gap-1 text-sm">
                                     <span className="font-medium">{t("blueprint.worldSeed")}</span>
@@ -492,7 +645,7 @@ export function BlueprintFields({
                             </div>
                         )}
 
-                        {!map && edition === "java" && world.usesBiome(value.levelType) && (
+                        {!map && !ownWorld && edition === "java" && world.usesBiome(value.levelType) && (
                             <label className="flex flex-col gap-1 text-sm">
                                 <span className="font-medium">{t("blueprint.biome")}</span>
                                 <Select

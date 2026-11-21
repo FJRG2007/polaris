@@ -272,7 +272,8 @@
         "itemIdRule": "An item looks like minecraft:stone",
         "iconSize": "A server icon has to be {size}",
         "couldNotReadSymbiote": "Could not read Symbiote",
-        "couldNotChangeSymbiote": "Could not change Symbiote"
+        "couldNotChangeSymbiote": "Could not change Symbiote",
+        "couldNotImportWorld": "The world could not be imported. Try again."
     },
     "status": {
         "failed": "Failed",
@@ -1145,7 +1146,13 @@
         "you": "You",
         "symbioteUnsupported": "Symbiote runs on NeoForge 1.21.4 only. This server cannot load it.",
         "symbioteNeedsAddress": "Symbiote needs this Polaris to have a public address: the server downloads it from there when it starts.",
-        "noSymbiote": "This Polaris was built without Symbiote. Update Polaris from Settings to get it."
+        "noSymbiote": "This Polaris was built without Symbiote. Update Polaris from Settings to get it.",
+        "packGone": "The uploaded server pack is no longer here. Upload it again.",
+        "worldGone": "The uploaded world is no longer here. Upload it again.",
+        "archiveJavaOnly": "Server packs and uploaded worlds are for Java servers.",
+        "packNeedsPlainBlueprint": "{name} installs a game of its own. Choose Survival to use a server pack.",
+        "packNeedsLoader": "Choose the loader this server pack runs on.",
+        "packNoCrossplay": "Bedrock crossplay is a plugin, and a server pack runs mods. Turn crossplay off to use one."
     },
     "notify": {
         "playerAddedTitle": "{actor} added you to {server}",
@@ -1517,5 +1524,55 @@
         "corrupt": "The downloaded map was damaged and was discarded. Try again.",
         "noSpace": "There is not enough disk space for this map. Free some space, then try again.",
         "failed": "The map could not be prepared. Try again."
+    },
+    "archive": {
+        "serverPack": "Server pack",
+        "serverPackIntro": "The server files of a modpack from CurseForge, Modrinth, FTB or any other site. Polaris reads the loader and the release from it.",
+        "useAServerPack": "Or use a server pack (.zip) from any site",
+        "chooseSoftwareInstead": "Choose software instead",
+        "whichLoader": "Loader this pack runs on",
+        "ownWorld": "Your own world",
+        "ownWorldDetail": "A map from a website or one of your saves, as a .zip.",
+        "ownWorldPlayed": "The server starts in the world you upload.",
+        "importWorld": "Import a world",
+        "importWorldNote": "The server restarts into this world. The current one stays on the disk and in the list, so you can switch back.",
+        "playThisWorld": "Play this world",
+        "dropOrChoose": "Drop a .zip here",
+        "chooseFile": "Choose file",
+        "orLink": "Or paste a link to the .zip",
+        "linkPlaceholder": "https://.../pack.zip",
+        "download": "Download",
+        "packHint": "The zip a modpack site calls server files or server pack.",
+        "worldHint": "A world folder zipped: the one with level.dat inside.",
+        "sending": "Sending {done} of {total}",
+        "downloading": "Downloading {done}",
+        "downloadingOf": "Downloading {done} of {total}",
+        "processing": "Reading the archive",
+        "cancel": "Cancel",
+        "remove": "Remove",
+        "minecraft": "Minecraft {version}",
+        "mods": "{count, plural, one {# mod} other {# mods}}",
+        "plugins": "{count, plural, one {# plugin} other {# plugins}}",
+        "datapacks": "{count, plural, one {# datapack} other {# datapacks}}",
+        "loaderUnknown": "The pack does not say which loader it is for. Choose one below.",
+        "leftOut": "Left out (Polaris sets these itself): {names}",
+        "failures": {
+            "tooLarge": "That file is larger than 3 GB.",
+            "noSpace": "There is not enough free disk space on this machine for it.",
+            "unreachable": "That link could not be downloaded. Use the link of the .zip itself, not the page it is on.",
+            "notFound": "This upload is no longer here. Send the file again.",
+            "notZip": "That is not a .zip file, or it is damaged.",
+            "encrypted": "The zip is password protected. Zip it again without a password.",
+            "method": "The zip uses a compression Minecraft packs do not. Zip it again with your system's own zip.",
+            "tooMany": "The zip has too many files to be a server pack.",
+            "unsafePath": "The zip has paths that point outside its own folder, so it was refused.",
+            "empty": "The zip is empty.",
+            "noContent": "No mods, config or plugins folder in it, so it is not a server pack.",
+            "isWorld": "This is a world, not a server pack. Add it under World.",
+            "isPack": "This is a server pack, not a world. Add it under Server software.",
+            "ambiguous": "The zip holds more than one pack side by side. Upload one at a time.",
+            "busy": "You already have three uploads going. Wait for one to finish.",
+            "failed": "The archive could not be read. Try again."
+        }
     }
 }

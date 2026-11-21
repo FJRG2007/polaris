@@ -131,7 +131,9 @@ export async function resetMinecraftServer(
             levelType,
             ...(input.biome ? { biome: input.biome } : {}),
             concurrentPlayers: input.concurrentPlayers,
-            crossplay
+            crossplay,
+            ...(input.packArchive ? { packArchive: input.packArchive } : {}),
+            ...(input.worldArchive ? { worldArchive: input.worldArchive } : {})
         },
         current
     );
@@ -246,7 +248,7 @@ export async function resetMinecraftServer(
             levelType,
             ...(input.biome ? { biome: input.biome } : {}),
             keepPlayers: input.keepPlayers,
-            fromMap: Boolean(input.mapId),
+            fromMap: Boolean(input.mapId) || Boolean(input.worldArchive),
             ...(mapped?.generator ? { mapGenerator: mapped.generator } : {})
         },
         actorId

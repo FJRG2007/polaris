@@ -24,6 +24,9 @@ import { isJoinPassword, isSteamId, JOIN_PASSWORD_HINT } from "./ark/access";
 
 /** What every server is asked, whatever it plays: what it is called, where it
  *  runs, how big it is and what it answers to. */
+/** An uploaded pack or world, by the sha256 it is kept under. */
+const archiveIdSchema = z.string().trim().regex(/^[a-f0-9]{64}$/);
+
 const commonFields = {
     name: z.string().trim().min(1, gameMessage("games", "schema.nameServer")).max(48),
     /** "local" or a connected server's id. */
@@ -63,6 +66,10 @@ const minecraftServerSchema = z.object({
     /** The one value the chosen software needs: the modpack for a modpack server,
      *  the URL of the jar for a custom one. Ignored by everything else. */
     softwareSource: z.string().trim().max(500).optional(),
+    /** A server pack uploaded beforehand (`archives/store.ts`), by its id. */
+    packArchive: archiveIdSchema.optional(),
+    /** A world uploaded beforehand, played instead of a map. */
+    worldArchive: archiveIdSchema.optional(),
     version: z.string().trim().max(32).default("LATEST"),
     /** The world to generate. Any text: a number is used as itself, anything
      *  else is hashed. Blank is a random world. */
@@ -270,6 +277,8 @@ export const resetMinecraftServerSchema = z
             .refine(isServerSoftware, gameMessage("games", "schema.notSoftware"))
             .optional(),
         softwareSource: z.string().trim().max(500).optional(),
+        packArchive: archiveIdSchema.optional(),
+        worldArchive: archiveIdSchema.optional(),
         version: z.string().trim().max(32).default("LATEST"),
         seed: z.string().trim().max(64).optional(),
         levelType: z.string().trim().max(64).refine(isLevelType, gameMessage("games", "schema.notLevelType")).optional(),

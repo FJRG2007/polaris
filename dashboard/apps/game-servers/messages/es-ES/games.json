@@ -272,7 +272,8 @@
         "itemIdRule": "Un objeto es como minecraft:stone",
         "iconSize": "El icono del servidor tiene que ser de {size}",
         "couldNotReadSymbiote": "No se pudo leer Symbiote",
-        "couldNotChangeSymbiote": "No se pudo cambiar Symbiote"
+        "couldNotChangeSymbiote": "No se pudo cambiar Symbiote",
+        "couldNotImportWorld": "No se pudo importar el mundo. Inténtalo de nuevo."
     },
     "status": {
         "failed": "Falló",
@@ -1145,7 +1146,13 @@
         "you": "Tú",
         "symbioteUnsupported": "Symbiote solo funciona en NeoForge 1.21.4. Este servidor no puede cargarlo.",
         "symbioteNeedsAddress": "Symbiote necesita que este Polaris tenga una dirección pública: el servidor lo descarga de ella al arrancar.",
-        "noSymbiote": "Este Polaris se construyó sin Symbiote. Actualiza Polaris desde Ajustes para tenerlo."
+        "noSymbiote": "Este Polaris se construyó sin Symbiote. Actualiza Polaris desde Ajustes para tenerlo.",
+        "packGone": "El server pack subido ya no está. Vuelve a subirlo.",
+        "worldGone": "El mundo subido ya no está. Vuelve a subirlo.",
+        "archiveJavaOnly": "Los server packs y mundos subidos son para servidores Java.",
+        "packNeedsPlainBlueprint": "{name} instala un juego propio. Elige Survival para usar un server pack.",
+        "packNeedsLoader": "Elige el loader de este server pack.",
+        "packNoCrossplay": "El crossplay con Bedrock es un plugin y un server pack usa mods. Desactívalo para usar uno."
     },
     "notify": {
         "playerAddedTitle": "{actor} te añadió a {server}",
@@ -1517,5 +1524,55 @@
         "corrupt": "El mapa descargado estaba dañado y se ha descartado. Inténtalo de nuevo.",
         "noSpace": "No hay espacio en disco suficiente para este mapa. Libera espacio e inténtalo de nuevo.",
         "failed": "No se pudo preparar el mapa. Inténtalo de nuevo."
+    },
+    "archive": {
+        "serverPack": "Server pack",
+        "serverPackIntro": "Los archivos de servidor de un modpack de CurseForge, Modrinth, FTB o cualquier web. Polaris lee de ahí el loader y la versión.",
+        "useAServerPack": "O usa un server pack (.zip) de cualquier web",
+        "chooseSoftwareInstead": "Elegir software",
+        "whichLoader": "Loader del pack",
+        "ownWorld": "Tu propio mundo",
+        "ownWorldDetail": "Un mapa de una web o una partida tuya, en .zip.",
+        "ownWorldPlayed": "El servidor arranca en el mundo que subas.",
+        "importWorld": "Importar mundo",
+        "importWorldNote": "El servidor se reinicia en este mundo. El actual sigue en el disco y en la lista, así que puedes volver a él.",
+        "playThisWorld": "Jugar este mundo",
+        "dropOrChoose": "Suelta aquí un .zip",
+        "chooseFile": "Elegir archivo",
+        "orLink": "O pega el enlace del .zip",
+        "linkPlaceholder": "https://.../pack.zip",
+        "download": "Descargar",
+        "packHint": "El zip que la web del modpack llama server files o server pack.",
+        "worldHint": "La carpeta de un mundo comprimida: la que tiene level.dat.",
+        "sending": "Enviando {done} de {total}",
+        "downloading": "Descargando {done}",
+        "downloadingOf": "Descargando {done} de {total}",
+        "processing": "Leyendo el archivo",
+        "cancel": "Cancelar",
+        "remove": "Quitar",
+        "minecraft": "Minecraft {version}",
+        "mods": "{count, plural, one {# mod} other {# mods}}",
+        "plugins": "{count, plural, one {# plugin} other {# plugins}}",
+        "datapacks": "{count, plural, one {# datapack} other {# datapacks}}",
+        "loaderUnknown": "El pack no dice para qué loader es. Elige uno abajo.",
+        "leftOut": "Omitido (Polaris lo pone él): {names}",
+        "failures": {
+            "tooLarge": "El archivo pasa de 3 GB.",
+            "noSpace": "No hay espacio libre suficiente en esta máquina.",
+            "unreachable": "No se pudo descargar ese enlace. Usa el enlace del .zip en sí, no el de la página.",
+            "notFound": "Esta subida ya no está. Vuelve a enviar el archivo.",
+            "notZip": "No es un .zip, o está dañado.",
+            "encrypted": "El zip tiene contraseña. Comprímelo de nuevo sin ella.",
+            "method": "El zip usa una compresión que los packs no usan. Comprímelo con el zip de tu sistema.",
+            "tooMany": "El zip tiene demasiados archivos para ser un server pack.",
+            "unsafePath": "El zip tiene rutas que salen de su carpeta, así que se rechazó.",
+            "empty": "El zip está vacío.",
+            "noContent": "No tiene carpeta mods, config ni plugins: no es un server pack.",
+            "isWorld": "Esto es un mundo, no un server pack. Añádelo en Mundo.",
+            "isPack": "Esto es un server pack, no un mundo. Añádelo en Software del servidor.",
+            "ambiguous": "El zip trae varios packs a la vez. Sube uno cada vez.",
+            "busy": "Ya tienes tres subidas en marcha. Espera a que acabe una.",
+            "failed": "No se pudo leer el archivo. Inténtalo de nuevo."
+        }
     }
 }

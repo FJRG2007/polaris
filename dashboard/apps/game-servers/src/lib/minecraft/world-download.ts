@@ -119,3 +119,45 @@ export const worldHead = (file: string) => head(file, worldFor);
 export const worldGet = (file: string) => get(file, WORLD_FILES, worldFor, WORLD_LIMIT);
 export const packHead = (file: string) => head(file, packFor);
 export const packGet = (file: string) => get(file, MAP_PACK_FILES, packFor, PACK_LIMIT);
+
+/** A server's container fetching the pack or world somebody brought: a few
+ *  boots per address, like a world. */
+export const ARCHIVE_LIMIT: DownloadLimit = {
+    bucket: "mc-archive-get",
+    perAddress: 10,
+    overall: 60,
+    windowMs: 10 * 60_000
+};
+
+/**
+ * A pack or world somebody uploaded, for the container of the server that runs
+ * it (`archives/store.ts`). Named by its hash, so it never changes under a name:
+ * the image asks with the date of the copy it already has, and is told it still
+ * has it instead of downloading hundreds of megabytes again on every boot.
+ */
+export async function archiveGet(request: Request, file: string, headOnly = false): Promise<Response> {
+    const { archiveOfFile, archivePath } = await import("./archives/store");
+    const named = archiveOfFile(file);
+    if (!named) return new Response(headOnly ? null : "Not found", { status: 404 });
+    const location = archivePath(named.id);
+    const info = await stat(location).catch(() => null);
+    if (!info?.isFile()) return new Response(headOnly ? null : "Not found", { status: 404 });
+    const modified = new Date(Math.floor(info.mtimeMs / 1000) * 1000);
+    const headers = {
+        ...headersFor(file, info.size),
+        "cache-control": "private, max-age=0, must-revalidate",
+        "last-modified": modified.toUTCString()
+    };
+    const since = Date.parse(request.headers.get("if-modified-since") ?? "");
+    if (Number.isFinite(since) && since >= modified.getTime())
+        return new Response(null, { status: 304, headers: { "last-modified": headers["last-modified"] } });
+    if (headOnly) return new Response(null, { headers });
+    if (!(await withinLimit(ARCHIVE_LIMIT))) {
+        console.warn(`[minecraft-world] ${file}: download refused, over the ${ARCHIVE_LIMIT.bucket} limit`);
+        return new Response("Too many requests", {
+            status: 429,
+            headers: { "retry-after": String(Math.ceil(ARCHIVE_LIMIT.windowMs / 1000)) }
+        });
+    }
+    return new Response(Readable.toWeb(createReadStream(location)) as ReadableStream, { headers });
+}

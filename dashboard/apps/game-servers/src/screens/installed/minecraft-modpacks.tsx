@@ -19,20 +19,78 @@ import { useEffect, useState, useTransition } from "react";
 import { useGameText } from "../game-text";
 import { Boxes, ExternalLink, Loader2, Search } from "lucide-react";
 import type { ModrinthProject } from "../../lib/minecraft/modrinth";
-import { searchModpacksAction, setModpackAction } from "./minecraft-actions";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Skeleton } from "@polaris/ui";
+import {
+    applyServerPackAction,
+    searchModpacksAction,
+    serverPackInfoAction,
+    setModpackAction
+} from "./minecraft-actions";
+import { ArchiveIntake, ArchiveSummary } from "../../components/archive-intake";
+import type { ArchiveInfo } from "../../lib/minecraft/archives/store";
+import {
+    Badge,
+    Button,
+    Card,
+    CardBody,
+    CardHeader,
+    CardTitle,
+    Input,
+    Select,
+    Skeleton
+} from "@polaris/ui";
 
 export function ModpacksCard({
     installedAppId,
     /** What the server runs now: the pack, or blank for a server that runs none. */
     modpack,
+    /** The uploaded server pack it runs (`GENERIC_PACK`), blank for none. */
+    serverPack = "",
     onSaved
 }: {
     installedAppId: string;
     modpack: string;
+    serverPack?: string;
     onSaved: () => void;
 }) {
     const t = useGameText("minecraft");
+    const g = useGameText("games");
+    const [uploaded, setUploaded] = useState<ArchiveInfo | null>(null);
+    const [running, setRunning] = useState<ArchiveInfo | null>(null);
+    const [packLoader, setPackLoader] = useState("FORGE");
+    const [packConfirm, setPackConfirm] = useState(false);
+
+    // What the uploaded pack it runs is, by the id its address carries. Asked
+    // every time rather than only when the settings name one: the variable is
+    // not among the ones every screen is handed.
+    useEffect(() => {
+        let active = true;
+        void serverPackInfoAction(installedAppId).then((info) => {
+            if (active) setRunning(info);
+        });
+        return () => {
+            active = false;
+        };
+    }, [installedAppId, serverPack, uploaded]);
+
+    function applyPack(pack: ArchiveInfo): void {
+        setError(null);
+        startTransition(async () => {
+            const result = await applyServerPackAction({
+                installedAppId,
+                archiveId: pack.id,
+                ...(pack.loader
+                    ? {}
+                    : { software: packLoader as "FORGE" | "NEOFORGE" | "FABRIC" | "QUILT" })
+            });
+            if (result.error) {
+                setError(result.error);
+                return;
+            }
+            setPackConfirm(false);
+            setUploaded(null);
+            onSaved();
+        });
+    }
     const [query, setQuery] = useState("");
     const [packs, setPacks] = useState<ModrinthProject[] | null>(null);
     const [chosen, setChosen] = useState<ModrinthProject | null>(null);
@@ -183,6 +241,75 @@ export function ModpacksCard({
                         </div>
                     </div>
                 )}
+
+                <div className="flex flex-col gap-2 border-t border-border pt-3">
+                    <span className="text-sm font-medium">{g("archive.serverPack")}</span>
+                    <p className="text-xs text-muted-foreground">{g("archive.serverPackIntro")}</p>
+                    {running && !uploaded && (
+                        <div className="flex flex-col gap-1">
+                            <span className="text-xs text-muted-foreground">
+                                {t("modpacks.running")}
+                            </span>
+                            <ArchiveSummary archive={running} onRemove={null} />
+                        </div>
+                    )}
+                    <ArchiveIntake
+                        kind="pack"
+                        value={uploaded}
+                        onChange={(pack) => {
+                            setUploaded(pack);
+                            setPackConfirm(false);
+                        }}
+                        disabled={pending}
+                    />
+                    {uploaded && !uploaded.loader && (
+                        <label className="flex flex-col gap-1 text-sm">
+                            <span className="font-medium">{g("archive.whichLoader")}</span>
+                            <Select
+                                value={packLoader}
+                                onValueChange={setPackLoader}
+                                options={[
+                                    // i18n-ignore: product names
+                                    { value: "FORGE", label: "Forge" },
+                                    // i18n-ignore: product names
+                                    { value: "NEOFORGE", label: "NeoForge" },
+                                    // i18n-ignore: product names
+                                    { value: "FABRIC", label: "Fabric" },
+                                    // i18n-ignore: product names
+                                    { value: "QUILT", label: "Quilt" }
+                                ]}
+                                aria-label={g("archive.whichLoader")}
+                            />
+                        </label>
+                    )}
+                    {uploaded && !packConfirm && (
+                        <Button
+                            size="sm"
+                            className="self-start"
+                            disabled={pending}
+                            onClick={() => setPackConfirm(true)}
+                        >
+                            {t("modpacks.install")}
+                        </Button>
+                    )}
+                    {uploaded && packConfirm && (
+                        <div className="flex flex-col gap-2 rounded-md border border-warning-edge bg-warning-soft px-3 py-2">
+                            <p className="text-sm font-medium">
+                                {t("modpacks.installTitle", { name: uploaded.name })}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{t("modpacks.installBody")}</p>
+                            <div className="flex items-center gap-2">
+                                <Button size="sm" disabled={pending} onClick={() => applyPack(uploaded)}>
+                                    {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+                                    {t("modpacks.installIt")}
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => setPackConfirm(false)}>
+                                    {t("modpacks.cancel")}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
 
                 {error && <p className="text-xs text-danger">{error}</p>}
             </CardBody>

@@ -3514,3 +3514,103 @@ export async function cancelQueuedActionAction(
         };
     }
 }
+
+const serverPackSchema = z.object({
+    installedAppId: z.string().uuid(),
+    archiveId: z.string().regex(/^[a-f0-9]{64}$/),
+    /** What to run when the pack does not say; ignored when it does. */
+    software: z.enum(["FORGE", "NEOFORGE", "FABRIC", "QUILT"]).optional()
+});
+
+/**
+ * Put a server pack somebody uploaded on this server, and restart onto it. The
+ * world stays; what the server runs is the pack's.
+ */
+export async function applyServerPackAction(
+    input: z.infer<typeof serverPackSchema>
+): Promise<{ error?: string }> {
+    const parsed = serverPackSchema.safeParse(input);
+    if (!parsed.success) return { error: (await gameWords("minecraft"))("errors.couldNotChangeTheModpack") };
+    try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { applyServerPack } = await import("../../lib/minecraft/archives/apply");
+        const pack = await applyServerPack(access.ownerId, parsed.data.installedAppId, user.id, {
+            archiveId: parsed.data.archiveId,
+            ...(parsed.data.software ? { software: parsed.data.software } : {})
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "games.serverPack",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { archive: pack.id, name: pack.name, loader: pack.loader?.type ?? null }
+        });
+        return {};
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("minecraft"))("errors.couldNotChangeTheModpack")
+        };
+    }
+}
+
+const importWorldSchema = z.object({
+    installedAppId: z.string().uuid(),
+    archiveId: z.string().regex(/^[a-f0-9]{64}$/)
+});
+
+/** Play a world somebody uploaded on this server. The current one is kept. */
+export async function importWorldAction(
+    input: z.infer<typeof importWorldSchema>
+): Promise<{ error?: string; level?: string }> {
+    const parsed = importWorldSchema.safeParse(input);
+    if (!parsed.success) return { error: (await gameWords("games"))("errors.couldNotImportWorld") };
+    try {
+        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { importWorld } = await import("../../lib/minecraft/archives/apply");
+        const { level } = await importWorld(
+            access.ownerId,
+            parsed.data.installedAppId,
+            user.id,
+            parsed.data.archiveId
+        );
+        await recordAudit({
+            actorId: user.id,
+            action: "games.worldImport",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { archive: parsed.data.archiveId, level }
+        });
+        return { level };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("games"))("errors.couldNotImportWorld")
+        };
+    }
+}
+
+/** The uploaded server pack this server runs, or null for none. */
+export async function serverPackInfoAction(
+    installedAppId: string
+): Promise<import("../../lib/minecraft/archives/store").ArchiveInfo | null> {
+    if (!z.string().uuid().safeParse(installedAppId).success) return null;
+    try {
+        const { access } = await requireGameServer("games.read", installedAppId);
+        const install = await prisma.installedApp.findFirst({
+            where: { id: installedAppId, ownerId: access.ownerId },
+            select: { applicationId: true }
+        });
+        if (!install?.applicationId) return null;
+        const vars = await listEnvVars("application", install.applicationId, access.ownerId);
+        const { archiveOfUrl, readArchive } = await import("../../lib/minecraft/archives/store");
+        const named = archiveOfUrl(vars.find((entry) => entry.key === "GENERIC_PACK")?.value);
+        return named ? await readArchive(named.id) : null;
+    } catch {
+        return null;
+    }
+}

@@ -219,6 +219,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                 software: edition === "java" && shape.software ? shape.software : undefined,
                 softwareSource: edition === "java" && shape.source ? shape.source : undefined,
                 mapId: shape.mapId || undefined,
+                packArchive: edition === "java" ? shape.pack?.id : undefined,
                 crossplay,
                 concurrentPlayers,
                 serverId
@@ -236,6 +237,7 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
         shape.blueprintId,
         shape.software,
         shape.mapId,
+        shape.pack?.id,
         crossplay,
         concurrentPlayers,
         serverId
@@ -354,6 +356,8 @@ export function NewServerDialog({ onClose }: { onClose: () => void }) {
                           software: edition === "java" ? shape.software : undefined,
                           softwareSource:
                               edition === "java" ? shape.source || undefined : undefined,
+                          packArchive: edition === "java" ? shape.pack?.id : undefined,
+                          worldArchive: edition === "java" ? shape.world?.id : undefined,
                           version: shape.version.trim() || LATEST,
                           seed: shape.seed.trim() || undefined,
                           levelType: edition === "java" ? shape.levelType : undefined,

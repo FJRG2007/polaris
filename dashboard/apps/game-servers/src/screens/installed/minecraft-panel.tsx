@@ -784,6 +784,10 @@ export function MinecraftPanel({
                                     settings.find((entry) => entry.key === "MODRINTH_MODPACK")
                                         ?.value ?? ""
                                 }
+                                serverPack={
+                                    settings.find((entry) => entry.key === "GENERIC_PACK")
+                                        ?.value ?? ""
+                                }
                                 onSaved={reloadSettings}
                             />
                         )}
