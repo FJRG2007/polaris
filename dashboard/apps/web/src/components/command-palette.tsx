@@ -376,6 +376,7 @@ export function CommandPalette({
                 if (!live || result.error || !result.proofs) return;
                 keepUnlockProofs(result.proofs);
                 setQuery("");
+                setSecretCode(undefined);
                 setOpen(false);
                 revealLockedChats();
                 if (!pathname.startsWith("/chat")) router.push("/chat");
