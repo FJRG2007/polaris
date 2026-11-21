@@ -32,6 +32,11 @@ vi.mock("@/app/(app)/search-actions", () => ({
     recordSearchAction: vi.fn(async () => ({}))
 }));
 
+// The hidden "Locked chats" lookup is a server action; no reader here hid it.
+vi.mock("@/app/(app)/chat/lock-actions", () => ({
+    searchLockAction: async () => null,
+    openLockedChatsAction: async () => ({ error: "wrong" })
+}));
 vi.mock("@/app/(app)/tour-actions", () => ({
     markOverviewAction: vi.fn(async () => undefined),
     shouldOfferOverviewAction: vi.fn(async () => false)
