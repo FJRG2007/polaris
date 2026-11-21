@@ -29,25 +29,15 @@ import { setSoundSeason } from "@/lib/sound-season";
 import { useRouter } from "next/navigation";
 import { Button } from "@polaris/ui";
 import * as core from "@polaris/core";
-import { createContext, useContext, useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Eye, Ghost, PartyPopper, Snowflake, Sparkles, type LucideIcon } from "lucide-react";
 import { stopSeasonPreviewAction } from "@/app/(app)/account/preferences/seasonal-actions";
-import { SeasonContext, useDecorationSeason } from "./season-context";
+import { PreviewContext, SeasonContext, useDecorationSeason, usePreviewSeason } from "./season-context";
 
 /** How often the date is looked at again, for a tab left open across midnight. */
 const RECHECK_MS = 30 * 60_000;
 
-/** The season this session is previewing, as the frame drew it. `undefined`
- *  outside a frame, so a reader can tell "no frame" from "no preview". */
-const PreviewContext = createContext<core.Season | null | undefined>(undefined);
-
-export { useDecorationSeason };
-
-/** The season this session is previewing, from the frame: what a control that
- *  starts or stops a preview reads, so it follows a stop made elsewhere. */
-export function usePreviewSeason(): core.Season | null | undefined {
-    return useContext(PreviewContext);
-}
+export { useDecorationSeason, usePreviewSeason };
 
 /** The season on the reader's calendar today, and the run of the sound pack it
  *  plays (see `packOn`), followed across midnight. Both null until the page is

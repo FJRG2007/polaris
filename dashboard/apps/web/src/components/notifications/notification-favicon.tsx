@@ -21,7 +21,8 @@
  * In a season the icon also wears the season's accessory - the season the frame
  * decorates with, so the operator's switch and the reader's own calendar decide
  * it exactly as they decide the rest of the decoration. The desktop app gets the
- * same dressed mark for its window, taskbar, tray and Dock icon.
+ * same dressed mark for its window, taskbar, tray and Dock icon, and the phone
+ * app is told the season for its launcher icon.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -38,7 +39,8 @@ import {
     seasonalFavicon,
     type FaviconLink
 } from "@/lib/favicon";
-import { useDecorationSeason } from "@/components/seasonal/season-context";
+import { useDecorationSeason, usePreviewSeason } from "@/components/seasonal/season-context";
+import { phoneSeasonIcon } from "@/lib/mobile-bridge";
 import { useDesktopBridge } from "@/components/desktop-app";
 import { useClient } from "@/components/i18n/i18n-provider";
 import {
@@ -49,6 +51,9 @@ import {
     titleWithBadge,
     type FaviconStyle
 } from "@/lib/favicon-style";
+
+/** How long the season has to stay put before the phone app is told it. */
+const PHONE_ICON_SETTLE_MS = 2000;
 
 export function NotificationFavicon() {
     const { items } = useNotificationFeed();
@@ -71,6 +76,7 @@ export function NotificationFavicon() {
     const desktop = useDesktopBridge();
     const client = useClient();
     const season = useDecorationSeason();
+    const preview = usePreviewSeason();
 
     useEffect(() => {
         const read = () => setStyle(faviconStyle());
@@ -102,6 +108,16 @@ export function NotificationFavicon() {
         void setAppIcon({ png }).catch(() => undefined);
         return () => void setAppIcon({ png: null }).catch(() => undefined);
     }, [desktop, season]);
+
+    // The phone app's launcher icon wears the season too, and keeps it after
+    // the page goes. Not an admin's preview, which is this session's alone;
+    // and only once the season has settled, since the frame reads the calendar
+    // a moment after the first paint and iOS shows an alert on every change.
+    useEffect(() => {
+        if (preview) return;
+        const timer = window.setTimeout(() => phoneSeasonIcon(season), PHONE_ICON_SETTLE_MS);
+        return () => window.clearTimeout(timer);
+    }, [season, preview]);
 
     // The desktop app has no tab: the same choice goes on its icon in the
     // taskbar or the Dock instead, and comes off when the page goes.

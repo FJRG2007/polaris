@@ -41,6 +41,24 @@ interface PolarisMobileBridge {
      *  moment (epoch ms), so it keeps moving with the page closed. */
     startLiveLocation?(untilMs: number): void;
     stopLiveLocation?(): void;
+    /** The season the page decorates with ("" for none): the app's launcher
+     *  icon wears it. Absent from an app older than the feature. */
+    setSeasonIcon?(season: string): void;
+}
+
+/**
+ * Name the season the page decorates with to the phone app, which dresses its
+ * launcher icon in it; null asks for the plain icon. Does nothing in a browser
+ * or in an app too old to, which keeps its plain icon.
+ */
+export function phoneSeasonIcon(season: string | null): void {
+    const app = bridge();
+    if (typeof app?.setSeasonIcon !== "function") return;
+    try {
+        app.setSeasonIcon(season ?? "");
+    } catch {
+        // The app keeps the icon it has.
+    }
 }
 
 /**
