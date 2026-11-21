@@ -115,20 +115,25 @@ function SentFile({
     file,
     at,
     onOpen,
-    pending = false
+    pending = false,
+    shielded = false
 }: {
     file: ChatMessageView["attachments"][number];
     at: string;
     onOpen: (file: ViewedFile) => void;
     /** Still on its way: the same chip, with nothing to open or save yet. */
     pending?: boolean;
+    /** Advanced chat privacy is on: it may be opened, never saved. The route
+     *  refuses the download too; this only stops offering it. */
+    shielded?: boolean;
 }) {
     const t = useTranslations("chat");
     const readable = previewableAs(file.name, file.contentType);
     const chip =
         "inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-1 text-start text-xs transition-colors hover:bg-card-hover";
 
-    if (pending) {
+    // Nothing to open and saving is refused: a label rather than a link.
+    if (pending || (shielded && !readable)) {
         return (
             <span className={cn(chip, "hover:bg-card")}>
                 {file.borrowed ? (
@@ -187,15 +192,17 @@ function SentFile({
                 <span className="shrink-0 text-muted-foreground">{readableSize(file.size)}</span>
                 {file.borrowed && <DriveMark />}
             </button>
-            <a
-                href={`/api/chat/attachments/${file.id}?download=1`}
-                download={file.name}
-                aria-label={t("messageList.downloadNamed", { name: file.name })}
-                title={t("messageList.download")}
-                className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
-            >
-                <Download className="size-3.5 shrink-0" />
-            </a>
+            {!shielded && (
+                <a
+                    href={`/api/chat/attachments/${file.id}?download=1`}
+                    download={file.name}
+                    aria-label={t("messageList.downloadNamed", { name: file.name })}
+                    title={t("messageList.download")}
+                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
+                >
+                    <Download className="size-3.5 shrink-0" />
+                </a>
+            )}
         </span>
     );
 }
@@ -1494,13 +1501,18 @@ function Message({
                                                             ? file.width / file.height
                                                             : undefined
                                                     }
-                                                    download={`/api/chat/attachments/${file.id}?download=1`}
+                                                    download={
+                                                        message.shielded
+                                                            ? undefined
+                                                            : `/api/chat/attachments/${file.id}?download=1`
+                                                    }
                                                 />
                                             ) : (
                                                 <SentFile
                                                     file={file}
                                                     at={message.createdAt}
                                                     onOpen={onOpenFile}
+                                                    shielded={message.shielded}
                                                 />
                                             )}
                                         </Spoiler>

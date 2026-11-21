@@ -54,6 +54,7 @@ vi.mock("@polaris/db", () => {
     return {
         prisma: {
             $transaction: async (run: (client: typeof tx) => unknown) => run(tx),
+            chatChannel: { findMany: async () => [] },
             polarChatCall: {
                 create: async ({ data }: any) => {
                     held.push(data);
