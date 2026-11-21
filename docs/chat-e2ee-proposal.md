@@ -109,6 +109,16 @@ Lección: **nadie** que ofrece E2EE real mantiene una recuperación sin factor d
 
 Soporte de PRF: Chromium lo envió (intención de lanzamiento en blink-dev) [82]; hay informes de que el flujo entre dispositivos de Safari no devolvía PRF [83] y de fallos en Firefox para macOS [84]. **No se puede depender solo de PRF**: es un cierre más cuando el autenticador lo da, y su ausencia no cambia nada para el usuario.
 
+**Objetivo del propietario (2026-11-21): un hackeo del servidor nunca entrega mensajes.** Lo que eso fija en esta sección:
+
+| Lo que roba o controla el atacante | Qué obtiene | Qué lo cierra |
+| --- | --- | --- |
+| La base de datos, el disco, el NAS o las copias de seguridad | Texto cifrado, envoltorios y metadatos mínimos; ningún mensaje | El servidor nunca tiene `AK` ni `HK` en claro. Las partes del quórum (`ORK`) están envueltas para los **dispositivos** de los custodios, no guardadas en claro en el servidor |
+| Lo anterior + fuerza bruta contra el envoltorio por contraseña | Solo las cuentas con contraseñas débiles | **OPAQUE (RFC 9807) por defecto**, no una derivación simple: el servidor no ve la contraseña ni en el registro y no puede precalcular. Argon2id con parámetros altos (128 MiB) y la política de contraseñas existente (Have I Been Pwned). Ajuste de organización e instancia **"sin cierre por contraseña"** (apagado por defecto): la contraseña solo autentica y `AK` exige dispositivo, passkey PRF o quórum |
+| El servidor en marcha, modificado | Podría servir JavaScript alterado o añadir un dispositivo falso | Modo "solo apps verificadas" (decisión 8), transparencia de claves (4.6) y aviso en todos los dispositivos de la cuenta cuando se añade uno nuevo o se desbloquea `AK` solo con contraseña |
+| La cuenta de un administrador | Nada por sí sola | La recuperación exige el quórum y cada uso se registra y se notifica al afectado. Con un solo administrador en la instancia, el riesgo es ese administrador: la pantalla de seguridad lo dice y recomienda un segundo custodio |
+| El propio dispositivo del usuario (malware, sistema comprometido) | Lo que ese dispositivo ve | Fuera del modelo, como en Signal, WhatsApp o Threema. La baja de inactivos (decisión 7) y el borrado remoto limitan el daño |
+
 ### 3.3 Recorridos por tipo de usuario
 
 | Situación | Qué pasa | ¿Nota algo? |
