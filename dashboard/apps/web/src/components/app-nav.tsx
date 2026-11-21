@@ -56,7 +56,7 @@ const CATEGORY_LABEL = new Map<string, string>(
 
 /** An option under the launcher's grid, drawn as an icon button. */
 const FOOTER_ICON =
-    "size-8 justify-center p-0 text-muted-foreground hover:text-foreground focus:text-foreground";
+    "size-8 justify-center p-0 text-muted-foreground hover:text-foreground focus-visible:text-foreground";
 
 export function AppNav({
     appIds,

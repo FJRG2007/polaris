@@ -657,7 +657,7 @@ function AppTile({
                         event.preventDefault();
                         action.onSelect();
                     }}
-                    className="absolute start-0.5 top-0.5 size-6 justify-center rounded-full bg-elevated p-0 text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:text-foreground focus:text-foreground focus:opacity-100 group-hover/tile:opacity-100 [@media(hover:none)]:opacity-100 [&_svg]:!size-3.5"
+                    className="absolute start-0.5 top-0.5 size-6 justify-center rounded-full bg-elevated p-0 text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition-opacity hover:text-foreground focus-visible:text-foreground focus-visible:opacity-100 group-hover/tile:opacity-100 [@media(hover:none)]:opacity-100 [&_svg]:!size-3.5"
                 >
                     {action.icon}
                 </DropdownMenuItem>

@@ -1762,7 +1762,7 @@ export function Composer({
                             aria-expanded={attaching}
                             aria-label={t("attachSheet.title")}
                             title={t("attachSheet.title")}
-                            className="me-1 grid size-8 shrink-0 place-items-center rounded-full bg-muted text-foreground transition-colors active:bg-muted/70 disabled:opacity-50 [-webkit-tap-highlight-color:transparent]"
+                            className="me-1 grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors active:bg-muted active:text-foreground aria-expanded:text-foreground disabled:opacity-50 [-webkit-tap-highlight-color:transparent]"
                         >
                             <Plus className="size-5" />
                         </button>
