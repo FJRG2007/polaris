@@ -27,12 +27,14 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 import { getUserSecurity, twoFactorEnabled } from "@polaris/auth";
 import {
     INSTANCE_SECURITY_DEFAULTS,
+    INSTANCE_SECURITY_SETTING_KEY,
     instanceSecuritySchema,
+    phishingResistantApplies,
     type InstanceSecurityPolicy,
     type SecondFactorEnrollment
 } from "@polaris/core";
 
-const POLICY_KEY = "security.second-factor";
+const POLICY_KEY = INSTANCE_SECURITY_SETTING_KEY;
 
 /**
  * What this instance asks for. Anything unreadable reads as the defaults rather
@@ -118,6 +120,42 @@ export async function owesSecondFactor(userId: string): Promise<boolean> {
  * whatever this returns, so the answer only ever matters for the accounts that
  * have one.
  */
+/**
+ * Whether this session still owes a passkey or security-key sign-in under the
+ * instance's policy: the policy covers the account, and the session was opened
+ * some other way. A session whose sign-in was never recorded (opened before
+ * Polaris noted how, or its note lost) owes it too - an unknown sign-in is not
+ * treated as a phishing-resistant one.
+ *
+ * Costs nothing while the requirement is off, which is every instance until an
+ * administrator turns it on.
+ */
+export async function owesPhishingResistantSignIn(
+    userId: string,
+    sessionId: string,
+    isAdmin?: boolean
+): Promise<boolean> {
+    const { requirePhishingResistant: scope } = await getInstanceSecurity();
+    if (scope === "off") return false;
+    const admin =
+        isAdmin ??
+        (await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } }))?.isAdmin === true;
+    if (!phishingResistantApplies(scope, admin)) return false;
+    const state = await prisma.sessionState.findUnique({
+        where: { sessionId },
+        select: { signInMethod: true }
+    });
+    return state?.signInMethod !== "passkey";
+}
+
+/** Whether the policy asks this account for passkey sign-ins at all. */
+export async function phishingResistantRequiredFor(userId: string): Promise<boolean> {
+    const { requirePhishingResistant: scope } = await getInstanceSecurity();
+    if (scope === "off") return false;
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
+    return phishingResistantApplies(scope, user?.isAdmin === true);
+}
+
 export async function connectionSignInChallenged(userId: string): Promise<boolean> {
     const policy = await getInstanceSecurity();
     if (policy.challengeConnectionSignIn) return true;

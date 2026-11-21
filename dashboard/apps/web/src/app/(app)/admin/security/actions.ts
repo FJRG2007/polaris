@@ -9,6 +9,7 @@
  */
 
 import { revalidatePath } from "next/cache";
+import { prisma } from "@polaris/db";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { recordAudit } from "@/lib/audit-service";
@@ -23,6 +24,15 @@ export async function saveInstanceSecurityAction(
     const parsed = instanceSecuritySchema.safeParse(input);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("admin"))("security.errors.checkForm") };
 
+    // Requiring keys from an administrator who holds none would hold their own
+    // next request on a step they may not be able to finish, and on an address
+    // where passkeys do not work it would hold everybody's. Holding one proves
+    // both that they can sign in and that keys work here.
+    if (parsed.data.requirePhishingResistant !== "off") {
+        const own = await prisma.passkey.count({ where: { userId: admin.id } });
+        if (own === 0) return { error: (await getTranslations("admin"))("security.phishing.needOwnKey") };
+    }
+
     await setInstanceSecurity(parsed.data);
     await recordAudit({
         actorId: admin.id,
@@ -31,7 +41,8 @@ export async function saveInstanceSecurityAction(
             requireSecondFactor: parsed.data.requireSecondFactor,
             acceptedFactors: parsed.data.acceptedFactors,
             challengeConnectionSignIn: parsed.data.challengeConnectionSignIn,
-            requireLoginApproval: parsed.data.requireLoginApproval
+            requireLoginApproval: parsed.data.requireLoginApproval,
+            requirePhishingResistant: parsed.data.requirePhishingResistant
         }
     });
     revalidatePath("/admin/security");

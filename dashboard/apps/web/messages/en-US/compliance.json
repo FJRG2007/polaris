@@ -161,7 +161,11 @@
         "strictPreset": "Services on the strict preset",
         "recommendedPreset": "Services on the recommended preset",
         "noPreset": "Services with no preset",
-        "ownHeaders": "Services sending headers of their own"
+        "ownHeaders": "Services sending headers of their own",
+        "keySignIn": "Passkey or security-key sign-in",
+        "keySignIn_off": "Not required",
+        "keySignIn_admins": "Required of administrators",
+        "keySignIn_everyone": "Required of every account"
     },
     "notes": {
         "noEmailChannel": "Email codes are accepted, but no email channel is set, so only the authenticator can be armed.",

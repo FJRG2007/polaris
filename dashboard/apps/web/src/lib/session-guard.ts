@@ -38,8 +38,8 @@ import type { ViewAsRow } from "@/lib/view-as-service";
 import { describeOrigin } from "@/lib/session-directory";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { evaluateAccountRequest, listAccountRules } from "@/lib/account-rules";
-import { getInstanceSecurity } from "@/lib/instance-security";
 import { approvalDemanded } from "@/lib/login-approval";
+import { getInstanceSecurity, owesPhishingResistantSignIn } from "@/lib/instance-security";
 import { beginSignInStepUp, STEP_UP_PATH } from "@/lib/two-factor-policy-service";
 import { notifySessionOpened, notifySessionsClosed } from "@/lib/notifications/session-events";
 import {
@@ -222,6 +222,25 @@ async function secondFactorVerdict(hasFactor: boolean): Promise<SessionVerdict |
     return requireSecondFactor ? { ok: false, redirect: ENROLL_PATH } : null;
 }
 
+/** Where a session the instance wants opened with a passkey or security key is sent. */
+export const SECURITY_KEY_PATH = "/oauth/security-key";
+
+/**
+ * The instance's demand for a phishing-resistant sign-in, as a verdict. Retroactive
+ * the same way the second-factor demand is: a session opened with a password before
+ * an administrator turned it on meets it at its next request. Read only while the
+ * requirement is on.
+ */
+async function phishingResistantVerdict(
+    userId: string,
+    sessionId: string,
+    isAdmin: boolean
+): Promise<SessionVerdict | null> {
+    return (await owesPhishingResistantSignIn(userId, sessionId, isAdmin))
+        ? { ok: false, redirect: SECURITY_KEY_PATH }
+        : null;
+}
+
 /**
  * Decide whether a session may serve this request, creating its Polaris-side
  * state on first sight. Callers redirect on a refusal; the pages that handle a
@@ -246,6 +265,9 @@ export async function guardSession({
                 // The other way a sign-in proves itself. The approval gate stands
                 // in for a second factor rather than stacking on top of one.
                 twoFactorEnabled: true,
+                // Who the instance's passkey requirement covers when it is set
+                // to administrators only.
+                isAdmin: true,
                 // A temporary password an administrator handed out, still unreplaced.
                 passwordChangeRequired: true,
                 security: {
@@ -460,7 +482,11 @@ export async function guardSession({
             // The session is real from here, so it faces the same demand every
             // later request faces. Returning early without asking would let one
             // request through per sign-in, which is one more than none.
-            return (await secondFactorVerdict(record.twoFactorEnabled === true)) ?? ALLOWED;
+            return (
+                (await secondFactorVerdict(record.twoFactorEnabled === true)) ??
+                (await phishingResistantVerdict(userId, sessionId, record.isAdmin === true)) ??
+                ALLOWED
+            );
         }
         await prisma.sessionState.update({
             where: { sessionId },
@@ -492,6 +518,12 @@ export async function guardSession({
     //    them to arm a factor through it would be asking the wrong question first.
     const owed = await secondFactorVerdict(record.twoFactorEnabled === true);
     if (owed) return owed;
+
+    // 6a. The instance's demand that this session was opened with a passkey or a
+    //     security key. After the second factor, so an account that has neither
+    //     arms the factor first and is not asked two things at once.
+    const keyOwed = await phishingResistantVerdict(userId, sessionId, record.isAdmin === true);
+    if (keyOwed) return keyOwed;
 
     // 6b. A temporary password from an administrator. Nothing else is served
     //     until the account replaces it with one only its owner knows.

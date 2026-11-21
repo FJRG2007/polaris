@@ -21,6 +21,8 @@ import { getTranslations } from "@/lib/i18n/request";
 import { localized } from "./action-messages";
 import { confirmAccountPassword } from "@polaris/auth";
 import { listUserPasskeys, type PasskeyView } from "@/lib/passkey-directory";
+import { announceNewPasskey } from "@/lib/passkey-announce";
+import { phishingResistantRequiredFor } from "@/lib/instance-security";
 
 /**
  * The signed-in user's passkeys, oldest first. Resolves the session rather than
@@ -51,45 +53,10 @@ export async function confirmPasswordForPasskeyAction(
     return {};
 }
 
-/** How recently a credential must have been written for this to be the call that
- *  announces it. Long enough for a slow ceremony, short enough that it cannot be
- *  used to re-announce a passkey registered last week. */
-const REGISTRATION_WINDOW_MS = 5 * 60 * 1000;
-
-/**
- * Record that a passkey was registered, once the browser's ceremony has
- * finished.
- *
- * A permanent way into the account is being created, so the owner is told - but
- * the credential itself is written by better-auth from the client, which leaves
- * nothing on the server to hang that on. So the client says it is done and the
- * server checks: it announces the newest passkey on the account, only while it
- * is newly written, and only if it has not been announced already. A caller that
- * says this without registering anything therefore gets nothing, and a caller
- * that says it twice gets one alert.
- */
+/** Log and announce the passkey just registered, once (see `announceNewPasskey`). */
 export async function notePasskeyAddedAction(): Promise<void> {
     const user = await requireUser();
-    const newest = await prisma.passkey.findFirst({
-        where: { userId: user.id },
-        orderBy: { createdAt: "desc" },
-        select: { id: true, name: true, createdAt: true }
-    });
-    if (!newest || Date.now() - newest.createdAt.getTime() > REGISTRATION_WINDOW_MS) return;
-
-    const announced = await prisma.auditLog.findFirst({
-        where: { actorId: user.id, action: "account.passkey.added", targetId: newest.id },
-        select: { id: true }
-    });
-    if (announced) return;
-
-    await recordAudit({
-        actorId: user.id,
-        action: "account.passkey.added",
-        targetType: "passkey",
-        targetId: newest.id,
-        metadata: newest.name ? { name: newest.name } : undefined
-    });
+    await announceNewPasskey(user.id);
 }
 
 export async function removePasskeyAction(passkeyId: unknown): Promise<{ error?: string }> {
@@ -103,14 +70,40 @@ export async function removePasskeyAction(passkeyId: unknown): Promise<{ error?:
         where: { id: passkeyId, userId: user.id },
         select: { credentialID: true }
     });
-    const [removed] = await prisma.$transaction([
-        prisma.passkey.deleteMany({ where: { id: passkeyId, userId: user.id } }),
-        prisma.vaultPasskey.deleteMany({
-            where: passkey
-                ? { userId: user.id, credentialId: passkey.credentialID }
-                : { id: { in: [] } }
-        })
-    ]);
+    let removed: { count: number };
+    if (passkey && (await phishingResistantRequiredFor(user.id))) {
+        // The instance requires this account to sign in with a passkey or a
+        // security key, so its last one cannot go: without it the next sign-in
+        // could not meet the requirement. Serializable, so two removals racing
+        // over the last two cannot both see one left.
+        const kept = await prisma
+            .$transaction(
+                async (tx) => {
+                    const count = await tx.passkey.count({ where: { userId: user.id } });
+                    if (count <= 1) return null;
+                    const result = await tx.passkey.deleteMany({ where: { id: passkeyId, userId: user.id } });
+                    await tx.vaultPasskey.deleteMany({
+                        where: { userId: user.id, credentialId: passkey.credentialID }
+                    });
+                    return result;
+                },
+                { isolationLevel: "Serializable" }
+            )
+            .catch(() => undefined);
+        const t = await getTranslations("accountSecurity");
+        if (kept === null) return { error: t("errors.lastRequiredPasskey") };
+        if (kept === undefined) return { error: t("errors.passkeyRetry") };
+        removed = kept;
+    } else {
+        [removed] = await prisma.$transaction([
+            prisma.passkey.deleteMany({ where: { id: passkeyId, userId: user.id } }),
+            prisma.vaultPasskey.deleteMany({
+                where: passkey
+                    ? { userId: user.id, credentialId: passkey.credentialID }
+                    : { id: { in: [] } }
+            })
+        ]);
+    }
     if (removed.count === 0)
         return { error: (await getTranslations("accountSecurity"))("errors.passkeyGone") };
     await recordAudit({

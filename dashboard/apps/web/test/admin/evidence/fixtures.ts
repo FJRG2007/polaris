@@ -12,7 +12,12 @@ export function readings(overrides: Partial<EvidenceReadings> = {}): EvidenceRea
         now: NOW,
         instance: { url: "https://polaris.example.com", build: "abc123def456" },
         authentication: {
-            policy: { requireSecondFactor: true, acceptedFactors: ["totp", "email"], challengeConnectionSignIn: false },
+            policy: {
+                requireSecondFactor: true,
+                acceptedFactors: ["totp", "email"],
+                challengeConnectionSignIn: false,
+                requirePhishingResistant: "off"
+            },
             mailReady: true,
             accounts: 12,
             withSecondFactor: 12,

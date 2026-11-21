@@ -102,7 +102,9 @@
         "keepOneMethod": "Keep at least one method accepted.",
         "policyWrongPassword": "Current password is incorrect.",
         "blockOwnDevice": "You are using this device, so it cannot be blocked from here.",
-        "unknownDevice": "That device is no longer listed. Reload the page."
+        "unknownDevice": "That device is no longer listed. Reload the page.",
+        "lastRequiredPasskey": "This is your last passkey, and this Polaris requires signing in with one. Add another before removing it.",
+        "passkeyRetry": "The passkey was not removed. Try again."
     },
     "phone": {
         "confirmationMessage": "{code} is your Polaris confirmation code. It expires in {minutes} minutes."

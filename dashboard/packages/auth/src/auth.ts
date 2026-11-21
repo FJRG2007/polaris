@@ -52,6 +52,10 @@ import {
     TWO_FACTOR_CODE_TTL_MINUTES,
     TWO_FACTOR_METHOD_HEADER,
     findConnectionProvider,
+    INSTANCE_SECURITY_SETTING_KEY,
+    instanceSecuritySchema,
+    phishingResistantApplies,
+    type PhishingResistantScope,
     type SecondFactor,
     type SignInMethod
 } from "@polaris/core";
@@ -1022,6 +1026,35 @@ async function sessionHeldBack(
 }
 
 /**
+ * Whether the instance requires this account to sign in with a passkey or a
+ * security key and this session was opened some other way. Mirrors
+ * `owesPhishingResistantSignIn` in the app, which this package cannot import;
+ * a policy that cannot be read is the stored defaults, which require nothing.
+ */
+async function owesKeySignIn(userId: string, sessionId: string): Promise<boolean> {
+    const row = await prisma.setting.findUnique({
+        where: { key: INSTANCE_SECURITY_SETTING_KEY },
+        select: { value: true }
+    });
+    if (!row) return false;
+    let scope: PhishingResistantScope = "off";
+    try {
+        const parsed = instanceSecuritySchema.safeParse(JSON.parse(row.value));
+        if (parsed.success) scope = parsed.data.requirePhishingResistant;
+    } catch {
+        return false;
+    }
+    if (scope === "off") return false;
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { isAdmin: true } });
+    if (!phishingResistantApplies(scope, user?.isAdmin === true)) return false;
+    const state = await prisma.sessionState.findUnique({
+        where: { sessionId },
+        select: { signInMethod: true }
+    });
+    return state?.signInMethod !== "passkey";
+}
+
+/**
  * Whether a session that was just stored is still short of what the sign-in asks:
  * the first-factor session the two-factor hook takes back before the second step,
  * or one held for another device's approval. Neither is a sign-in yet, so neither is
@@ -1094,6 +1127,23 @@ export async function refuseProtectedEndpoint(
             "This sign-in has not been let in yet. Open Polaris to finish signing in first.",
             "SESSION_NOT_CLEARED"
         );
+    }
+    // The instance requires this account to sign in with a passkey or a security
+    // key, and this session was opened some other way: the dashboard holds it on
+    // the security-key screen, and these doors are held the same, or a phished
+    // password could remove the keys, disarm the second factor or end the real
+    // sessions from behind the screen. The one thing such a session may do is
+    // register the account's first key, which is what that screen offers.
+    if (await owesKeySignIn(session.user.id, session.session.id)) {
+        const firstKey =
+            NEEDS_PASSWORD.has(endpoint) &&
+            (await prisma.passkey.count({ where: { userId: session.user.id } })) === 0;
+        if (!firstKey) {
+            return refused(
+                "This Polaris requires signing in with a passkey or security key. Sign in with one first.",
+                "KEY_SIGN_IN_REQUIRED"
+            );
+        }
     }
     if (!PROTECTED_ENDPOINTS.has(endpoint)) return null;
 

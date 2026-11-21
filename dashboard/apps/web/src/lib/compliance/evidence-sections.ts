@@ -123,6 +123,12 @@ function authentication(readings: EvidenceReadings, { t }: EvidenceWords): Secti
                 text: policy.challengeConnectionSignIn ? t("facts.askedToo") : t("facts.standsForBoth")
             },
             {
+                id: "second-factor.phishing-resistant",
+                label: t("facts.keySignIn"),
+                value: policy.requirePhishingResistant,
+                text: t(`facts.keySignIn_${policy.requirePhishingResistant}`)
+            },
+            {
                 id: "accounts.second-factor",
                 label: t("facts.withSecondFactor"),
                 value: withSecondFactor,

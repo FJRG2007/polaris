@@ -19,15 +19,12 @@ const userSecurity = { findUnique: vi.fn(), upsert: vi.fn() };
 const accountDevice = { findFirst: vi.fn(), findMany: vi.fn() };
 const session = { findFirst: vi.fn() };
 const sessionState = { findUnique: vi.fn(), findFirst: vi.fn() };
+const setting = { findUnique: vi.fn() };
+const user = { findUnique: vi.fn() };
+const passkey = { update: vi.fn(), findMany: vi.fn(), count: vi.fn() };
 
 vi.mock("@polaris/db", () => ({
-    prisma: {
-        userSecurity,
-        accountDevice,
-        session,
-        sessionState,
-        passkey: { update: vi.fn(), findMany: vi.fn() }
-    }
+    prisma: { userSecurity, accountDevice, session, sessionState, setting, user, passkey }
 }));
 
 const { refuseProtectedEndpoint } = await import("../../src/auth.js");
@@ -60,6 +57,56 @@ beforeEach(() => {
     // that is not about the approval gate.
     sessionState.findUnique.mockResolvedValue({ approval: "approved", lockedAt: null, stepUp: null });
     sessionState.findFirst.mockResolvedValue(null);
+    // No instance policy stored: nobody is required to sign in with a key.
+    setting.findUnique.mockResolvedValue(null);
+    user.findUnique.mockResolvedValue({ isAdmin: false });
+    passkey.count.mockResolvedValue(0);
+});
+
+describe("an instance that requires passkeys or security keys", () => {
+    function requireKeys(scope: "admins" | "everyone") {
+        setting.findUnique.mockResolvedValue({
+            value: JSON.stringify({ requireSecondFactor: true, acceptedFactors: ["totp"], requirePhishingResistant: scope })
+        });
+    }
+
+    it("refuses every protected door to a session opened with a password", async () => {
+        requireKeys("everyone");
+        sessionState.findUnique.mockResolvedValue({ approval: "approved", lockedAt: null, stepUp: null, signInMethod: "password" });
+        passkey.count.mockResolvedValue(2);
+        for (const path of ["/passkey/delete-passkey", "/two-factor/disable", "/revoke-sessions", "/change-password", "/passkey/generate-register-options"]) {
+            const refusal = await refuseProtectedEndpoint(authFor(SIGNED_IN), post(path));
+            expect(refusal?.status, path).toBe(403);
+            expect(await refusal?.json()).toMatchObject({ code: "KEY_SIGN_IN_REQUIRED" });
+        }
+    });
+
+    it("lets that session register the account's first key, and nothing else", async () => {
+        requireKeys("everyone");
+        readyToRegister();
+        sessionState.findUnique.mockResolvedValue({ approval: "approved", lockedAt: null, stepUp: null, signInMethod: "password" });
+        expect(await refuseProtectedEndpoint(authFor(SIGNED_IN), post("/passkey/generate-register-options"))).toBeNull();
+        const refusal = await refuseProtectedEndpoint(authFor(SIGNED_IN), post("/two-factor/disable"));
+        expect(await refusal?.json()).toMatchObject({ code: "KEY_SIGN_IN_REQUIRED" });
+    });
+
+    it("leaves a session opened with a key alone", async () => {
+        requireKeys("everyone");
+        readyToRegister();
+        sessionState.findUnique.mockResolvedValue({ approval: "approved", lockedAt: null, stepUp: null, signInMethod: "passkey" });
+        passkey.count.mockResolvedValue(1);
+        expect(await refuseProtectedEndpoint(authFor(SIGNED_IN), post("/passkey/generate-register-options"))).toBeNull();
+    });
+
+    it("covers only administrators when it is set to administrators", async () => {
+        requireKeys("admins");
+        sessionState.findUnique.mockResolvedValue({ approval: "approved", lockedAt: null, stepUp: null, signInMethod: "password" });
+        passkey.count.mockResolvedValue(1);
+        expect(await refuseProtectedEndpoint(authFor(SIGNED_IN), post("/revoke-sessions"))).toBeNull();
+        user.findUnique.mockResolvedValue({ isAdmin: true });
+        const refusal = await refuseProtectedEndpoint(authFor(SIGNED_IN), post("/revoke-sessions"));
+        expect(refusal?.status).toBe(403);
+    });
 });
 
 describe("refuseProtectedEndpoint", () => {

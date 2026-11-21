@@ -12,7 +12,8 @@
 import { describe, expect, it } from "vitest";
 import {
     INSTANCE_SECURITY_DEFAULTS,
-    instanceSecuritySchema
+    instanceSecuritySchema,
+    phishingResistantApplies
 } from "../src/schemas/instance-security.js";
 
 describe("the instance security policy", () => {
@@ -44,6 +45,29 @@ describe("the instance security policy", () => {
             instanceSecuritySchema.parse({ requireSecondFactor: true, acceptedFactors: [], requireLoginApproval: true })
                 .requireLoginApproval
         ).toBe(true);
+    });
+
+    it("requires keys from nobody unless an administrator says so", () => {
+        expect(INSTANCE_SECURITY_DEFAULTS.requirePhishingResistant).toBe("off");
+        // A policy stored before the setting existed parses as it did.
+        expect(
+            instanceSecuritySchema.parse({ requireSecondFactor: true, acceptedFactors: ["totp"] })
+                .requirePhishingResistant
+        ).toBe("off");
+        expect(
+            instanceSecuritySchema.safeParse({
+                requireSecondFactor: true,
+                acceptedFactors: [],
+                requirePhishingResistant: "some"
+            }).success
+        ).toBe(false);
+    });
+
+    it("covers administrators or everybody, as chosen", () => {
+        expect(phishingResistantApplies("off", true)).toBe(false);
+        expect(phishingResistantApplies("admins", true)).toBe(true);
+        expect(phishingResistantApplies("admins", false)).toBe(false);
+        expect(phishingResistantApplies("everyone", false)).toBe(true);
     });
 
     it("keeps the authenticator accepted whatever was stored", () => {

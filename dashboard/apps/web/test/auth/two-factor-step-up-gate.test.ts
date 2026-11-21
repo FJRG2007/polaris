@@ -32,7 +32,11 @@ vi.mock("@/lib/account-rules", () => ({
     listAccountRules: vi.fn(async () => []),
     evaluateAccountRequest: vi.fn(async () => ({ action: "allow", source: null, ruleName: null, country: null }))
 }));
-vi.mock("@/lib/instance-security", () => ({ getInstanceSecurity: vi.fn(async () => ({ requireSecondFactor: false })) }));
+const keys = vi.hoisted(() => ({ owesPhishingResistantSignIn: vi.fn(async () => false) }));
+vi.mock("@/lib/instance-security", () => ({
+    getInstanceSecurity: vi.fn(async () => ({ requireSecondFactor: false })),
+    ...keys
+}));
 vi.mock("@/lib/notifications/session-events", () => ({ notifySessionOpened: vi.fn(), notifySessionsClosed: vi.fn() }));
 vi.mock("@/lib/two-factor-policy-service", () => ({ ...policy, STEP_UP_PATH: "/oauth/step-up" }));
 vi.mock("@polaris/auth", () => ({
@@ -170,5 +174,36 @@ describe("a session that still owes factors", () => {
         policy.beginSignInStepUp.mockResolvedValue({ stepUp: '{"need":2}', country: "US" });
         expect(await guardSession(input)).toEqual({ ok: false, redirect: "/oauth/step-up" });
         expect(policy.beginSignInStepUp.mock.calls[0]![0].factor).toBe("code");
+    });
+});
+
+describe("an instance that requires passkeys or security keys", () => {
+    it("holds a session the requirement covers until it signs in with a key", async () => {
+        db.sessionState.findUnique.mockResolvedValue(existingState());
+        keys.owesPhishingResistantSignIn.mockResolvedValueOnce(true);
+        expect(await guardSession(input)).toEqual({ ok: false, redirect: "/oauth/security-key" });
+        expect(keys.owesPhishingResistantSignIn).toHaveBeenCalledWith("user-1", "session-1", false);
+    });
+
+    it("asks with the account's admin flag, for a requirement on administrators only", async () => {
+        db.user.findUnique.mockResolvedValue({
+            bannedAt: null,
+            disabledAt: null,
+            deletionRequestedAt: null,
+            twoFactorEnabled: true,
+            isAdmin: true,
+            passwordChangeRequired: false,
+            security: {
+                idleLockMinutes: 0,
+                sessionMaxMinutes: 0,
+                requireLoginApproval: false,
+                bindSessionsToClient: false,
+                pinSessionsToAddress: "off",
+                lockdownAt: null
+            }
+        });
+        db.sessionState.findUnique.mockResolvedValue(existingState());
+        expect((await guardSession(input)).ok).toBe(true);
+        expect(keys.owesPhishingResistantSignIn).toHaveBeenCalledWith("user-1", "session-1", true);
     });
 });

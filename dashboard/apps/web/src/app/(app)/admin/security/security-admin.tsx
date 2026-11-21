@@ -13,11 +13,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveInstanceSecurityAction } from "./actions";
-import { Button, Card, CardBody, Switch } from "@polaris/ui";
+import { Button, Card, CardBody, Select, Switch } from "@polaris/ui";
 import { Feedback } from "@/app/(app)/account/security/setting-card";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
+    PHISHING_RESISTANT_SCOPES,
     SECOND_FACTOR_ENROLLMENTS,
+    type PhishingResistantScope,
     type InstanceSecurityPolicy,
     type SecondFactorEnrollment
 } from "@polaris/core";
@@ -30,6 +32,7 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
     const [accepted, setAccepted] = useState<SecondFactorEnrollment[]>(policy.acceptedFactors);
     const [connectionChallenge, setConnectionChallenge] = useState(policy.challengeConnectionSignIn);
     const [approval, setApproval] = useState(policy.requireLoginApproval);
+    const [phishing, setPhishing] = useState<PhishingResistantScope>(policy.requirePhishingResistant);
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState<{ error?: string; ok?: string } | null>(null);
 
@@ -40,7 +43,8 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
         required !== policy.requireSecondFactor ||
         !sameList ||
         connectionChallenge !== policy.challengeConnectionSignIn ||
-        approval !== policy.requireLoginApproval;
+        approval !== policy.requireLoginApproval ||
+        phishing !== policy.requirePhishingResistant;
 
     function toggle(factor: SecondFactorEnrollment, on: boolean) {
         setResult(null);
@@ -56,7 +60,8 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
             requireSecondFactor: required,
             acceptedFactors: accepted,
             challengeConnectionSignIn: connectionChallenge,
-            requireLoginApproval: approval
+            requireLoginApproval: approval,
+            requirePhishingResistant: phishing
         });
         setBusy(false);
         setResult(response);
@@ -157,6 +162,30 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
                                 setApproval(next);
                             }}
                             aria-label={t("security.approval.title")}
+                        />
+                    </div>
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardBody className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                        <div className="min-w-0">
+                            <h2 className="text-sm font-medium">{t("security.phishing.title")}</h2>
+                            <p className="text-xs text-muted-foreground">{t("security.phishing.hint")}</p>
+                        </div>
+                        <Select
+                            className="sm:w-40 sm:shrink-0"
+                            value={phishing}
+                            onValueChange={(next) => {
+                                setResult(null);
+                                setPhishing(next as PhishingResistantScope);
+                            }}
+                            aria-label={t("security.phishing.title")}
+                            options={PHISHING_RESISTANT_SCOPES.map((scope) => ({
+                                value: scope,
+                                label: t(`security.phishing.${scope}`)
+                            }))}
                         />
                     </div>
                 </CardBody>

@@ -102,7 +102,9 @@
         "keepOneMethod": "Deja al menos un método aceptado.",
         "policyWrongPassword": "La contraseña actual no es correcta.",
         "blockOwnDevice": "Estás usando este dispositivo, así que no se puede bloquear desde aquí.",
-        "unknownDevice": "Ese dispositivo ya no aparece. Recarga la página."
+        "unknownDevice": "Ese dispositivo ya no aparece. Recarga la página.",
+        "lastRequiredPasskey": "Es tu última llave de acceso y este Polaris exige iniciar sesión con una. Añade otra antes de quitarla.",
+        "passkeyRetry": "No se ha quitado la llave de acceso. Inténtalo de nuevo."
     },
     "phone": {
         "confirmationMessage": "{code} es tu código de confirmación de Polaris. Caduca en {minutes} minutos."

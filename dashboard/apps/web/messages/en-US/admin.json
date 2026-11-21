@@ -3208,6 +3208,14 @@
             "checkForm": "Check the form.",
             "onOrOff": "Choose on or off.",
             "saveFailed": "Could not save that. Try again."
+        },
+        "phishing": {
+            "title": "Require passkeys or security keys",
+            "hint": "The covered accounts must sign in with a passkey or a security key, which a look-alike site cannot replay. Sessions opened with a password are held until the person signs in again with a key.",
+            "off": "Nobody",
+            "admins": "Administrators",
+            "everyone": "Everyone",
+            "needOwnKey": "Add a passkey or security key to your own account before requiring them, so you can still sign in."
         }
     },
     "uploads": {

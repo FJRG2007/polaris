@@ -135,7 +135,8 @@ vi.mock("@/lib/instance-security", () => ({
     getInstanceSecurity: async () => ({
         requireSecondFactor: true,
         acceptedFactors: ["totp", "email"],
-        challengeConnectionSignIn: false
+        challengeConnectionSignIn: false,
+        requirePhishingResistant: "off"
     })
 }));
 vi.mock("@/lib/retention-service", () => ({

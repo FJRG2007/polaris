@@ -54,6 +54,14 @@ export const SECOND_FACTOR_ENROLLMENT_INFO: Record<
     }
 };
 
+/** The setting row the policy is stored under, read by the dashboard and the auth layer alike. */
+export const INSTANCE_SECURITY_SETTING_KEY = "security.second-factor";
+
+/** Who has to sign in with a passkey or a security key: nobody, administrators, everybody. */
+export const PHISHING_RESISTANT_SCOPES = ["off", "admins", "everyone"] as const;
+
+export type PhishingResistantScope = (typeof PHISHING_RESISTANT_SCOPES)[number];
+
 export const instanceSecuritySchema = z.object({
     /** Every account carries a second factor before it can use Polaris. */
     requireSecondFactor: z.boolean(),
@@ -78,8 +86,20 @@ export const instanceSecuritySchema = z.object({
      * it, whatever the account chose for itself, and even with an authenticator
      * armed. Defaulted for the same reason as the line above.
      */
-    requireLoginApproval: z.boolean().default(false)
+    requireLoginApproval: z.boolean().default(false),
+    /**
+     * Whose sessions must have been opened with a passkey or a security key -
+     * the sign-ins a look-alike site cannot replay, since the key answers only
+     * for this address. Defaulted to nobody, so a policy stored before this
+     * existed parses exactly as it did.
+     */
+    requirePhishingResistant: z.enum(PHISHING_RESISTANT_SCOPES).default("off")
 });
+
+/** Whether `scope` asks an account with this admin flag for a passkey sign-in. */
+export function phishingResistantApplies(scope: PhishingResistantScope, isAdmin: boolean): boolean {
+    return scope === "everyone" || (scope === "admins" && isAdmin);
+}
 
 export type InstanceSecurityPolicy = z.infer<typeof instanceSecuritySchema>;
 
@@ -101,5 +121,6 @@ export const INSTANCE_SECURITY_DEFAULTS: InstanceSecurityPolicy = {
     requireSecondFactor: true,
     acceptedFactors: ["totp", "email"],
     challengeConnectionSignIn: false,
-    requireLoginApproval: false
+    requireLoginApproval: false,
+    requirePhishingResistant: "off"
 };

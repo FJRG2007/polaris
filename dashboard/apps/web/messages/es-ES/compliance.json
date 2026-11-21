@@ -161,7 +161,11 @@
         "strictPreset": "Servicios con el preajuste estricto",
         "recommendedPreset": "Servicios con el preajuste recomendado",
         "noPreset": "Servicios sin preajuste",
-        "ownHeaders": "Servicios que envían cabeceras propias"
+        "ownHeaders": "Servicios que envían cabeceras propias",
+        "keySignIn": "Entrar con llave de acceso",
+        "keySignIn_off": "No se exige",
+        "keySignIn_admins": "Se exige a los administradores",
+        "keySignIn_everyone": "Se exige a todas las cuentas"
     },
     "notes": {
         "noEmailChannel": "Se aceptan códigos por correo, pero no hay ningún canal de correo configurado, así que solo se puede activar la app de autenticación.",

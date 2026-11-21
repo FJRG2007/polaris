@@ -3208,6 +3208,14 @@
             "checkForm": "Revisa el formulario.",
             "onOrOff": "Elige activado o desactivado.",
             "saveFailed": "No se ha podido guardar. Inténtalo de nuevo."
+        },
+        "phishing": {
+            "title": "Exigir llaves de acceso o de seguridad",
+            "hint": "Las cuentas afectadas deben iniciar sesión con una llave de acceso o de seguridad, que un sitio que imite a este no puede reutilizar. Las sesiones abiertas con contraseña quedan retenidas hasta que la persona vuelva a entrar con una llave.",
+            "off": "Nadie",
+            "admins": "Administradores",
+            "everyone": "Todos",
+            "needOwnKey": "Añade una llave de acceso o de seguridad a tu propia cuenta antes de exigirlas, para poder seguir entrando."
         }
     },
     "uploads": {
