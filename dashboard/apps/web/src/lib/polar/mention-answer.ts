@@ -135,7 +135,14 @@ export async function answerMentionWithReason(turn: MentionTurn): Promise<Mentio
     const allowed = await rateLimit(`polar-chat:${userId}`, 30, 60_000);
     if (!allowed.ok) return fail("tooFast", words("polar.tooFast"));
 
-    const [{ answeredBy }, { automaticChoice }, { PLAIN_TURN, noteModelEchoed }, usage, { echoesPrompt }, plan] =
+    const [
+        { answeredBy },
+        { automaticChoice },
+        { PLAIN_TURN, noteModelEchoed, noteToolMarkup, toolMarkupIn },
+        usage,
+        { echoesPrompt },
+        plan
+    ] =
         await Promise.all([
             import("@/lib/polar/models"),
             import("@/lib/polar/shared"),
@@ -237,8 +244,17 @@ export async function answerMentionWithReason(turn: MentionTurn): Promise<Mentio
             } catch (error) {
                 console.error(`polar: could not record the usage of ${turn.where}:`, error);
             }
-            const said = withoutPseudoToolCalls(text).trim();
             const who = `${answered.option.provider}/${answered.option.model}`;
+            // A tool call written out as text - `<invoke name=...>`, a model's
+            // own chat-template markup - is nothing anybody should read, and
+            // nothing ran. Kept off turns with tools for a while, as the panel
+            // does, and the next model is asked.
+            if (toolMarkupIn(text)) {
+                console.warn(`polar: ${who} wrote its tool calls as text for ${turn.where}; asking the next model`);
+                noteToolMarkup(userId, answered.option.provider, answered.option.model);
+                continue;
+            }
+            const said = withoutPseudoToolCalls(text).trim();
             const pending = kit?.pending() ?? null;
             if (pending) {
                 console.info(`polar: ${turn.where} answered by ${who} (${payer}), asking to run ${pending.tool}`);

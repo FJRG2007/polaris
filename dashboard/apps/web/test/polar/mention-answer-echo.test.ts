@@ -19,9 +19,17 @@ vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true 
 vi.mock("@/lib/polar/access", () => ({
     polarAccessFor: async () => ({ use: true, spend: true, web: true, connectors: true })
 }));
-vi.mock("@/lib/polar/automatic", () => ({
+const garbled = new Set<string>();
+vi.mock("@/lib/polar/automatic", async (original) => ({
     PLAIN_TURN: {},
-    noteModelEchoed: (_user: string, provider: string, model: string) => echoed.add(`${provider}/${model}`)
+    noteModelEchoed: (_user: string, provider: string, model: string) => echoed.add(`${provider}/${model}`),
+    // Automatic leaves a model that wrote its calls as text off a turn with
+    // tools; here that is the same set the resolver below skips.
+    noteToolMarkup: (_user: string, provider: string, model: string) => {
+        garbled.add(`${provider}/${model}`);
+        echoed.add(`${provider}/${model}`);
+    },
+    toolMarkupIn: (await original<typeof import("@/lib/polar/automatic")>()).toolMarkupIn
 }));
 // Automatic leaves out what was noted, as `unusableModels` makes it do.
 // The turn is planned as the panel plans it (`turn-plan.ts`); here it is the
@@ -76,6 +84,7 @@ const turn = {
 
 beforeEach(() => {
     echoed.clear();
+    garbled.clear();
     asked.length = 0;
     info.mockClear();
 });
@@ -99,5 +108,27 @@ describe("a mention answered with an echo", () => {
         const answer = await answerMentionWithReason(turn);
         expect(answer).toEqual({ text: "polar.failed", problem: "failed" });
         expect(asked.length).toBeLessThanOrEqual(3);
+    });
+});
+
+describe("a mention answered with a tool call written out as text", () => {
+    it("never posts the markup, and asks the next model", async () => {
+        // What a model whose chat template the API does not parse sends back:
+        // the call it meant to make, as words.
+        answers = {
+            "rekaai/reka-edge":
+                'ernie:tool_call <invoke name="polaris_tools"><parameter name="intent">game servers list</parameter></invoke>',
+            "qwen/qwen3.8-27b": "Ahora mismo no hay nadie conectado en cursed."
+        };
+        const answer = await answerMentionWithReason(turn);
+        expect(answer).toEqual({ text: "Ahora mismo no hay nadie conectado en cursed.", problem: null });
+        expect(garbled.has("openrouter/rekaai/reka-edge")).toBe(true);
+    });
+
+    it("says it could not answer rather than posting markup from every model", async () => {
+        answers = Object.fromEntries(MODELS.map((id) => [id, '<invoke name="polaris_tools"></invoke>']));
+        const answer = await answerMentionWithReason(turn);
+        expect(answer.text).not.toContain("<invoke");
+        expect(answer.problem).toBe("failed");
     });
 });

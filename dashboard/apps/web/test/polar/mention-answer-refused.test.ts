@@ -18,7 +18,12 @@ vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true 
 vi.mock("@/lib/polar/access", () => ({
     polarAccessFor: async () => ({ use: true, spend: true, web: true, connectors: true })
 }));
-vi.mock("@/lib/polar/automatic", () => ({ PLAIN_TURN: {}, noteModelEchoed: () => undefined }));
+vi.mock("@/lib/polar/automatic", () => ({
+    PLAIN_TURN: {},
+    noteModelEchoed: () => undefined,
+    noteToolMarkup: () => undefined,
+    toolMarkupIn: () => false
+}));
 // The turn is planned as the panel plans it (`turn-plan.ts`); here it is the
 // mocked resolver's answer, on Automatic.
 vi.mock("@/lib/polar/turn-plan", async () => {
