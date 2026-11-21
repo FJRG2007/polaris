@@ -508,20 +508,19 @@ Una auditoría externa es opcional y se puede añadir en cualquier momento; no b
 
 ---
 
-## 13. Decisiones que solo puede tomar el propietario
+## 13. Decisiones del propietario (tomadas el 2026-11-21)
 
-| # | Decisión | Recomendación | Trade-off en una línea |
-| --- | --- | --- | --- |
-| 1 | Modelo de recuperación por defecto (3.4) | **A: recuperación de la organización con quórum**, sin delegación automática por defecto | Sin ceremonia y sin pérdida para casi todos, a cambio de que la organización por quórum pueda leer; B es lo máximo en privacidad pero pierde historial al perder factores |
-| 2 | Cuentas sin organización (personales en una instancia) | Quórum de administradores de la instancia, con la misma notificación | Las personales quedan protegidas igual; la alternativa (solo factores propios) pierde historial al restablecer |
-| 3 | Archivo de cumplimiento (miembro visible, estilo Wire) | Disponible y apagado por defecto | Sirve a regulados sin tocar a los demás; activado por defecto rompería "no notar nada" |
-| 4 | Purga de copias anteriores con texto en claro | Instantánea de vuelta atrás 30 días y luego ofrecer purgar backups anteriores con un botón | Más días = vuelta atrás más segura y más tiempo con texto en claro |
-| 5 | Plazo de transición para clientes antiguos | Corte por conversación cuando todos los dispositivos activos lo soportan, máximo 30 días | Plazo corto = protección antes; largo = menos avisos de "actualiza" |
-| 6 | Poscuántico desde el primer día en lo almacenado | Sí, HPKE híbrido con ML-KEM-768 para envoltorios | Protege contra "guardar ahora, descifrar después" a cambio de unos 1.100 B por envoltorio |
-| 7 | Baja automática de dispositivos inactivos | 90 días | Más corto mejora la seguridad tras compromiso; más largo evita reentradas |
-| 8 | Modo "solo apps verificadas" para la web | Disponible por organización, apagado por defecto | Cierra la vía del JS modificado a cambio de exigir extensión o app |
-| 9 | Cómo entran los canales grandes al MLS tras migrar (fase 0: commits lineales con árbol recién creado) | Grupo creado vacío; cada dispositivo entra al abrir el canal con external commit y commit de actualización | Commits pequeños y sin picos, a cambio de que la primera apertura de un canal grande tarde algo más (en un Worker, fuera del primer pintado) |
-| 10 | Deduplicación de archivos al migrar | Fusionar solo dentro de la misma conversación o del mismo autor | Algo menos de ahorro que fusionarlo todo, a cambio de no dejar para siempre en el servidor qué archivo se compartió en qué conversaciones |
+| # | Decisión | Resultado |
+| --- | --- | --- |
+| 1-2 | Recuperación | **El historial no se pierde nunca, en ninguna cuenta.** Cambiar de móvil, de Android a iOS o perder un dispositivo solo pide la contraseña o la passkey: la clave de cuenta se desbloquea con ellas. Si además se olvida la contraseña y se pierden todos los dispositivos, recupera un quórum: administradores de la organización para sus miembros, administradores de la instancia para cuentas personales (con un solo administrador, ese administrador). Cada recuperación queda registrada y se avisa al usuario. Sin opción de salirse. Se descarta que otros miembros reenvíen el historial: la identidad del dispositivo nuevo la avalaría el servidor, que es el adversario. |
+| 3 | Retención legal (miembro archivador visible) | Disponible por organización, apagada por defecto; se activa para personas concretas y todos ven el aviso en esas conversaciones. |
+| 4 | Vuelta atrás | Instantánea en claro 30 días para revertir si el cifrado falla; después se purga el texto en claro (incluidas las copias anteriores) y queda solo cifrado de extremo a extremo, sin opción de volver. |
+| 5 | Clientes antiguos | Sin copia en claro de transición. La activación (fase 14) espera a que las versiones con soporte estén publicadas y verificadas en escritorio, Android, iOS (aprobada en la App Store) y la extensión; desde ese momento una app sin actualizar muestra "Actualiza para ver este chat". Es una puerta de lanzamiento más. |
+| 6 | Poscuántico | Desde el inicio: HPKE híbrido con ML-KEM-768 para lo almacenado. |
+| 7 | Dispositivos inactivos | Baja tras **30 días** sin conexión por defecto (WhatsApp desconecta enlazados a los 30 días, Signal a los 45); ajustable por el administrador de la instancia o por la organización entre 7 y 90. La reincorporación es automática y no pierde historial. |
+| 8 | Solo apps verificadas | Ajuste de instancia (lo fija el administrador de Polaris) y de organización, apagado por defecto; una organización puede endurecer lo que impone la instancia, nunca relajarlo. Referente: Code Verify de Meta para WhatsApp Web; Signal no tiene cliente web por este motivo. Un navegador o sistema comprometido queda fuera del modelo, como en cualquier mensajero. |
+| 9 | Canales grandes tras migrar | Grupo creado vacío; cada dispositivo entra al abrir el canal por primera vez y envía su propia actualización. |
+| 10 | Fusión de duplicados en la migración | Solo dentro de la misma conversación o del mismo autor. |
 
 ---
 
