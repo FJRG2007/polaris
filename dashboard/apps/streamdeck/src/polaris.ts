@@ -20,6 +20,7 @@ import {
 } from "../../../packages/core/src/instance-fallback";
 import os from "node:os";
 import { SseReader } from "./sse";
+import { deviceIdentity } from "../../../packages/core/src/device-identity-node";
 
 /** One entry of the catalogue, as `GET /api/deck/actions` hands it out. */
 export interface DeckAction {
@@ -320,12 +321,19 @@ export class PolarisClient {
 
     /** Ask to connect this computer's deck. */
     async open(address: string): Promise<OpenedRequest> {
+        // The computer's hashed machine id, so Account > Sessions shows the deck
+        // under the same device as the desktop app and the command line. A
+        // Polaris from before it existed ignores the field.
+        const device = await deviceIdentity();
         const response = await this.fetcher(`${address}/api/deck/authorize`, {
             method: "POST",
             headers: this.#headers(),
             body: JSON.stringify({
                 deviceName: os.hostname().slice(0, 80) || "Stream Deck",
-                clientVersion: this.version
+                clientVersion: this.version,
+                ...(device.id
+                ? { device: { id: device.id, ...(device.osVersion ? { osVersion: device.osVersion } : {}) } }
+                : {})
             })
         });
         return this.#json<OpenedRequest>(response);

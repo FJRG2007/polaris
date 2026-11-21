@@ -20,7 +20,7 @@ export default {
     },
     plugins: [
         typescript({
-            include: ["src/**/*.ts", "../../packages/core/src/instance-fallback.ts"],
+            include: ["src/**/*.ts", "../../packages/core/src/instance-fallback.ts", "../../packages/core/src/device-identity.ts", "../../packages/core/src/device-identity-node.ts"],
             noEmitOnError: true
         }),
         nodeResolve({ browser: false, exportConditions: ["node"], preferBuiltins: true }),

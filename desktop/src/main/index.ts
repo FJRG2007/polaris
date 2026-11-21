@@ -59,6 +59,7 @@ import { addressWords, failoverFor, instanceRecordFor } from "./polaris-api";
 import { AUTHORITY_INVALID, USE_CHROMIUM, pinScope, verifyDecision } from "./local-ca-pin";
 import { activeOrigin, backStep, failedLoadStep, samePlaceOn, titleWith } from "./window-failover";
 import { openExternal } from "./open-external";
+import { installDeviceHeaders } from "./device-headers";
 import { DEFAULT_HOLD_MS, UNTRUSTED_WORDS } from "../../../dashboard/packages/core/src/instance-fallback";
 import { createServerCheck, describeVerdict, probeServer, type ServerVerdict } from "@/shared/server-identity";
 
@@ -810,6 +811,10 @@ function start(): void {
                 (contents !== null && allowLocalPermission(permission, kindOf(contents), undefined)) ||
                 allowPermission(permission, requestingOrigin, server())
         );
+
+        // Which computer this is, to the active server only, so its sessions
+        // list can group this app with the other Polaris apps on the machine.
+        installDeviceHeaders(session.defaultSession, server);
 
         registerIpc({
             server,

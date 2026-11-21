@@ -8,6 +8,7 @@
  */
 
 import { learnInstance } from "../../../core/src/instance-fallback.js";
+import { deviceIdentity } from "../../../core/src/device-identity-node.js";
 import { CLI_VERSION } from "../version.js";
 import { CliError, usage } from "../errors.js";
 import { line, printJson } from "../output.js";
@@ -134,12 +135,19 @@ export async function login(context: Context, flags: Flags): Promise<void> {
     }
 
     const anonymous: Connection = { url, token: null };
+    // The computer's hashed machine id, so Account > Sessions shows this sign-in
+    // under the same device as the desktop app and the Stream Deck beside it. A
+    // Polaris from before it existed ignores the field.
+    const device = await deviceIdentity();
     const opened = await call(anonymous, "POST", "/api/cli/authorize", authorizeSchema, {
         fetch: context.fetch,
         body: {
             deviceName: (context.machineName() || "Unknown computer").slice(0, 80),
             clientVersion: CLI_VERSION,
-            scopes: LOGIN_SCOPES
+            scopes: LOGIN_SCOPES,
+            ...(device.id
+                ? { device: { id: device.id, ...(device.osVersion ? { osVersion: device.osVersion } : {}) } }
+                : {})
         }
     });
 
