@@ -8,6 +8,11 @@
  * updated separately; the native app in `desktop/` is the download for what a
  * browser window cannot do.
  *
+ * The icons stay the plain mark in every season. The season is decided on the
+ * reader's own calendar, and this file is built on the server and cached by the
+ * browser and the system; an installed app's icon is not refreshed when it
+ * changes. The tab, the desktop app and Polar wear the season instead.
+ *
  * The colours are the dark theme's background (`--background` in the design
  * tokens), the one a window opens on before the page has painted.
  */

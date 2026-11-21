@@ -293,6 +293,10 @@ export interface PolarisDesktop {
         readonly count: number;
         readonly overlay: string | null;
     }): Promise<boolean>;
+    /** The app's window, taskbar, tray and Dock icon in the season's dress: a
+     *  PNG data URL, or null for the plain icon the app ships with. Missing on
+     *  a desktop app older than it, which keeps its plain icon. */
+    setAppIcon?(input: { readonly png: string | null }): Promise<boolean>;
     /** The screens and windows to share, each with a small picture, for the
      *  picker this page draws. Null where the system's own picker is the one to
      *  use (macOS). Absent from an app older than the picker, which then shows

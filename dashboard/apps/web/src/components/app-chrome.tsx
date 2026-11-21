@@ -317,7 +317,6 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                     "chat"
                                                                                 )}
                                                                             >
-                                                                                <NotificationFavicon />
                                                                                 <SoundVolumeSeed
                                                                                     volume={
                                                                                         soundVolume
@@ -430,6 +429,8 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                         seasonPreview
                                                                                     }
                                                                                 >
+                                                                                    {/* Inside the frame: the tab icon wears the season's accessory. */}
+                                                                                    <NotificationFavicon />
                                                                                     <PhoneTabsProvider>
                                                                                         <AppShell
                                                                                             mark={

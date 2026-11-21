@@ -15,6 +15,7 @@ import { cn } from "@polaris/ui";
 import { drawAvatar, OVERSCAN, RISE } from "./avatar-draw";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useDecorationSeason } from "@/components/seasonal/seasonal-frame";
 import { Sim, restPose, type AvatarState } from "./avatar-engine";
 import { reachability, subscribeReachability } from "@/lib/reachability";
 import {
@@ -91,6 +92,7 @@ export function PolarAvatar({
     const ref = useRef<HTMLCanvasElement | null>(null);
     const sim = useRef<Sim | null>(null);
     const reduced = useReducedMotion();
+    const season = useDecorationSeason();
 
     useEffect(() => {
         const canvas = ref.current;
@@ -112,7 +114,7 @@ export function PolarAvatar({
         };
         fit();
         const still = reduced || prefersReducedMotion();
-        const paintStill = () => drawAvatar(ctx, box, ratio, restPose(state), 0);
+        const paintStill = () => drawAvatar(ctx, box, ratio, restPose(state), 0, season);
         const resize =
             typeof ResizeObserver === "undefined"
                 ? null
@@ -142,13 +144,13 @@ export function PolarAvatar({
                 rig.setPointer(dx / Math.max(1, d), dy / Math.max(1, d), strength);
             }
             rig.update(dt);
-            drawAvatar(ctx, box, ratio, rig.pose, seconds);
+            drawAvatar(ctx, box, ratio, rig.pose, seconds, season);
         });
         return () => {
             stop();
             resize?.disconnect();
         };
-    }, [state, size, reduced]);
+    }, [state, size, reduced, season]);
 
     const side = (OVERSCAN - 1) / 2;
     return (

@@ -17,21 +17,15 @@
  * script is only reliably picked up as a raster image across browsers.
  *
  * The mark below is the same geometry as the static app/icon.svg, which is what
- * the tab shows before any of this runs. A test holds the two together.
+ * the tab shows before any of this runs. A test holds the two together. In a
+ * season it also wears that season's accessory (`season-mark` in core).
  */
 
-/** The unit box the mark is drawn in. */
-export const MARK_SIZE = 32;
+import * as core from "@polaris/core";
 
-/** Violet, matching the interface's primary. */
-export const MARK_BACKGROUND = "#7632EC";
-
-export const MARK_CORNER = 7;
-
-/** A four-point star - Polaris is the one that does not move. */
-export const MARK_STAR = "M16 3Q17.6 12.6 29 16Q17.6 19.4 16 29Q14.4 19.4 3 16Q14.4 12.6 16 3Z";
-
-export const MARK_FOREGROUND = "#FFFFFF";
+// The mark's geometry lives with the seasonal accessories it can wear, so the
+// tab, the generated PNGs and the native apps draw one and the same thing.
+export const { MARK_SIZE, MARK_BACKGROUND, MARK_CORNER, MARK_STAR, MARK_FOREGROUND } = core;
 
 /** Red, matching the interface's danger. */
 const BADGE_BACKGROUND = "#E1474C";
@@ -60,7 +54,11 @@ export type FaviconBadge = { kind: "count"; label: string } | { kind: "dot" };
  * when the browser gives us no canvas to draw on, which leaves the icon already
  * in the document alone rather than blanking it.
  */
-export function drawFavicon(badge: FaviconBadge | null, size = RENDER_SIZE): string | null {
+export function drawFavicon(
+    badge: FaviconBadge | null,
+    size = RENDER_SIZE,
+    season: core.Season | null = null
+): string | null {
     const canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
@@ -80,6 +78,12 @@ export function drawFavicon(badge: FaviconBadge | null, size = RENDER_SIZE): str
     }
     context.fillStyle = MARK_FOREGROUND;
     context.fill(new Path2D(MARK_STAR));
+    if (season) {
+        for (const shape of core.SEASON_MARK_ACCESSORIES[season]) {
+            context.fillStyle = shape.fill;
+            context.fill(new Path2D(shape.d));
+        }
+    }
     context.restore();
     if (!badge) return canvas.toDataURL("image/png");
 
@@ -133,6 +137,15 @@ export function drawBadgeOverlay(badge: FaviconBadge, size = 32): string | null 
         context.fillText(badge.label, radius, radius);
     }
     return canvas.toDataURL("image/png");
+}
+
+/** The plain mark wearing `season`'s accessory, as the vector the tab can show
+ *  crisp at every size. */
+export function seasonalFavicon(season: core.Season): FaviconLink {
+    return {
+        href: `data:image/svg+xml,${encodeURIComponent(core.seasonMarkSvg(season))}`,
+        type: "image/svg+xml"
+    };
 }
 
 /** What the tab is showing now, so the badge can be taken back off later. */

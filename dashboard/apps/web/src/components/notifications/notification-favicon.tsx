@@ -17,6 +17,11 @@
  * changing it in Settings redraws the tab there and then. The tab's title
  * carries the same thing in front of it, because a row of pinned or crowded tabs
  * shows the title where the icon is too small to read.
+ *
+ * In a season the icon also wears the season's accessory - the season the frame
+ * decorates with, so the operator's switch and the reader's own calendar decide
+ * it exactly as they decide the rest of the decoration. The desktop app gets the
+ * same dressed mark for its window, taskbar, tray and Dock icon.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -30,8 +35,10 @@ import {
     currentFavicon,
     drawBadgeOverlay,
     drawFavicon,
+    seasonalFavicon,
     type FaviconLink
 } from "@/lib/favicon";
+import { useDecorationSeason } from "@/components/seasonal/seasonal-frame";
 import { useDesktopBridge } from "@/components/desktop-app";
 import { useClient } from "@/components/i18n/i18n-provider";
 import {
@@ -63,6 +70,7 @@ export function NotificationFavicon() {
     const quiet = useDoNotDisturb();
     const desktop = useDesktopBridge();
     const client = useClient();
+    const season = useDecorationSeason();
 
     useEffect(() => {
         const read = () => setStyle(faviconStyle());
@@ -74,12 +82,21 @@ export function NotificationFavicon() {
         plain.current ??= currentFavicon();
         const badge = faviconBadge(style, waiting);
         if (!badge) {
-            applyFavicon(plain.current);
+            applyFavicon(season ? seasonalFavicon(season) : plain.current);
             return;
         }
-        const badged = drawFavicon(badge);
+        const badged = drawFavicon(badge, undefined, season);
         if (badged) applyFavicon({ href: badged, type: "image/png" });
-    }, [style, waiting]);
+    }, [style, waiting, season]);
+
+    // The desktop app's own icon, dressed for the season and put back after.
+    useEffect(() => {
+        const setAppIcon = desktop?.setAppIcon;
+        if (!setAppIcon) return;
+        const png = season ? drawFavicon(null, 256, season) : null;
+        void setAppIcon({ png }).catch(() => undefined);
+        return () => void setAppIcon({ png: null }).catch(() => undefined);
+    }, [desktop, season]);
 
     // The desktop app has no tab: the same choice goes on its icon in the
     // taskbar or the Dock instead, and comes off when the page goes.

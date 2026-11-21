@@ -17,6 +17,7 @@ import { restPose } from "./motion/avatar-engine";
 import { canvasRatio } from "./motion/motion-runtime";
 import { drawAvatar, OVERSCAN, RISE } from "./motion/avatar-draw";
 import { usePolarAllowed } from "./polar-allowed";
+import { useDecorationSeason } from "@/components/seasonal/seasonal-frame";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Popover, PopoverContent, PopoverTrigger, cn } from "@polaris/ui";
 
@@ -30,14 +31,15 @@ export const POLAR_NAME = "Polar";
 export function PolarFace({ size = 28, className }: { size?: number; className?: string }) {
     const ref = useRef<HTMLCanvasElement | null>(null);
     const box = Math.round(size * 0.8);
+    const season = useDecorationSeason();
     useEffect(() => {
         const canvas = ref.current;
         const ctx = canvas?.getContext("2d");
         if (!canvas || !ctx) return;
         const ratio = canvasRatio();
         canvas.width = canvas.height = Math.round(box * OVERSCAN * ratio);
-        drawAvatar(ctx, box, ratio, restPose("idle"), 0);
-    }, [box]);
+        drawAvatar(ctx, box, ratio, restPose("idle"), 0, season);
+    }, [box, season]);
     const side = (OVERSCAN - 1) / 2;
     return (
         <span

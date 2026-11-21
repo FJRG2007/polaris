@@ -13,6 +13,8 @@
  * Every path and colour is made once; a frame allocates nothing it keeps.
  */
 
+import type { Season } from "@polaris/core";
+import { drawAccessory } from "./avatar-accessories";
 import type { AvatarPose } from "./avatar-engine";
 
 /* The canvas is drawn larger than the avatar's layout box, so a hop can
@@ -212,14 +214,16 @@ const easeInOut = (p: number) => (p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p 
 /**
  * Draw one frame. `box` is the avatar's layout size in CSS px; the canvas is
  * `box * OVERSCAN` square at `dpr`, with the body's centre `RISE * box` below
- * its middle. `seconds` drives only the star.
+ * its middle. `seconds` drives only the star. `accessory` is the season's hat,
+ * worn on the head and moving with it.
  */
 export function drawAvatar(
     ctx: CanvasRenderingContext2D,
     box: number,
     dpr: number,
     pose: AvatarPose,
-    seconds: number
+    seconds: number,
+    accessory: Season | null = null
 ): void {
     const full = box * OVERSCAN;
     const S = box / 100;
@@ -327,14 +331,13 @@ export function drawAvatar(
     const fm3 = cpf * sf;
     const fe = zf * sy * HALF_DEPTH - 50 * fm0;
     const ffo = -zf * cyf * sp * HALF_DEPTH - 50 * fm1 - 50 * fm3;
-    ctx.setTransform(
-        ba * fm0 + bc * fm1,
-        bb * fm0 + bd * fm1,
-        bc * fm3,
-        bd * fm3,
-        ba * fe + bc * ffo + be,
-        bb * fe + bd * ffo + bf
-    );
+    const capA = ba * fm0 + bc * fm1;
+    const capB = bb * fm0 + bd * fm1;
+    const capC = bc * fm3;
+    const capD = bd * fm3;
+    const capE = ba * fe + bc * ffo + be;
+    const capF = bb * fe + bd * ffo + bf;
+    ctx.setTransform(capA, capB, capC, capD, capE, capF);
     ctx.globalAlpha = 0.14;
     ctx.strokeStyle = INK;
     ctx.lineWidth = 1.4;
@@ -354,6 +357,12 @@ export function drawAvatar(
         drawFace(ctx, pose);
     }
     ctx.restore();
+    if (accessory) {
+        ctx.save();
+        ctx.setTransform(capA, capB, capC, capD, capE, capF);
+        drawAccessory(ctx, accessory);
+        ctx.restore();
+    }
 }
 
 /* place a feature on the sphere: skipped once it has gone round the side */
