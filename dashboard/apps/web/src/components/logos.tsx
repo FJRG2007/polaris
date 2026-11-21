@@ -7,7 +7,7 @@
 import { MESSAGING_MARKS } from "@/components/messaging-logos";
 import { cn } from "@polaris/ui";
 import { initialsInk, tintFor } from "@polaris/core";
-import { Blocks, Mails, Server } from "lucide-react";
+import { Blocks, Mails, Satellite, Server } from "lucide-react";
 import { DymoMark } from "./dymo-mark";
 import * as brand from "./brand-icons";
 import { AppleMark } from "@polaris/ui/account-downloads/client-marks";
@@ -154,6 +154,8 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     ikea: brand.IkeaMark,
     homeassistant: brand.HomeAssistantMark,
     mqtt: brand.MqttMark,
+    // Not a brand: the imagery may come from several providers, so a plain satellite.
+    "satellite-imagery": Satellite,
     petkit: PetkitMark,
     vercel: brand.VercelMark,
     railway: brand.RailwayMark,
