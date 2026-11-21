@@ -27,7 +27,7 @@ import { useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEve
 import {
     formatPhoneAsTyped,
     isPhoneCountry,
-    PHONE_COUNTRIES,
+    phoneCountries,
     phoneCallingCode,
     phoneCountryFromLocales,
     splitPhone,
@@ -65,7 +65,7 @@ export function phoneCountryOptions(locale: string): SearchableSelectOption[] {
     if (known) return known;
     const local = displayNames(locale);
     const english = displayNames("en");
-    const rows = PHONE_COUNTRIES.map((code) => {
+    const rows = phoneCountries().map((code) => {
         const name = regionName(local, code);
         const calling = phoneCallingCode(code);
         const names = [name, regionName(english, code)];

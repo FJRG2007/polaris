@@ -19,14 +19,21 @@ import {
 
 export type PhoneCountry = CountryCode;
 
-/** Every country and territory a number can belong to, by ISO 3166-1 code. */
-export const PHONE_COUNTRIES: readonly PhoneCountry[] = getCountries();
+let known: ReadonlySet<string> | null = null;
 
-const KNOWN = new Set<string>(PHONE_COUNTRIES);
+/**
+ * Every country and territory a number can belong to, by ISO 3166-1 code.
+ * A function rather than a constant read at import, so a bundle that takes
+ * something else from this package does not carry the phone metadata.
+ */
+export function phoneCountries(): readonly PhoneCountry[] {
+    return getCountries();
+}
 
 /** Whether `code` (upper case, `ES`) is a country a phone number can belong to. */
 export function isPhoneCountry(code: string | null | undefined): code is PhoneCountry {
-    return typeof code === "string" && KNOWN.has(code);
+    known ??= new Set<string>(getCountries());
+    return typeof code === "string" && known.has(code);
 }
 
 /** The calling code dialled before a country's numbers, without the plus: `34`. */

@@ -4,7 +4,7 @@ import {
     formatPhoneAsTyped,
     formatPhoneInternational,
     isPhoneCountry,
-    PHONE_COUNTRIES,
+    phoneCountries,
     phoneCallingCode,
     phoneCountryFromLocales,
     phoneCountryOf,
@@ -55,7 +55,7 @@ describe("formatting", () => {
 
 describe("countries", () => {
     it("knows every country's calling code", () => {
-        expect(PHONE_COUNTRIES.length).toBeGreaterThan(200);
+        expect(phoneCountries().length).toBeGreaterThan(200);
         expect(phoneCallingCode("ES")).toBe("34");
         expect(isPhoneCountry("ES")).toBe(true);
         expect(isPhoneCountry("XX")).toBe(false);
