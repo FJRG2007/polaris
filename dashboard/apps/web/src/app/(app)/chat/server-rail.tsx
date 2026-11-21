@@ -37,7 +37,7 @@ import * as core from "@polaris/core";
 import { leaveSpaceAction, setSpaceNotifyAction } from "./actions";
 import { BansDialog } from "./bans-dialog";
 import { InviteDialog } from "./invite-dialog";
-import { chatAvatarUrl } from "@/lib/avatar-url";
+import { SpacePicture, spaceColor, spaceInitials } from "./space-face";
 import { NewSpaceDialog } from "./new-space-dialog";
 import { ChatPictureDialog } from "./picture-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
@@ -79,17 +79,6 @@ const CONTEXT_PARTS: MenuParts = {
     SubTrigger: ContextMenuSubTrigger,
     SubContent: ContextMenuSubContent
 };
-
-/** A stored colour as `#rrggbb`, or null when it is not one this can draw with.
- *  The column is a free string, so a space could hold anything at all. */
-function hex(color: string | undefined): string | null {
-    if (!color) return null;
-    const trimmed = color.trim();
-    const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(trimmed);
-    if (short)
-        return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`.toLowerCase();
-    return /^#[0-9a-f]{6}$/i.test(trimmed) ? trimmed.toLowerCase() : null;
-}
 
 export function ServerRail({
     browse = false
@@ -228,10 +217,10 @@ export function ServerRail({
                             label={space.name}
                             active={activeSpaceId === space.id}
                             unread={waiting.get(space.id) ?? 0}
-                            color={hex(space.color)}
+                            color={spaceColor(space.color)}
                             onClick={() => openSpace(space.id)}
                         >
-                            {initials(space)}
+                            {spaceInitials(space)}
                             <SpacePicture spaceId={space.id} />
                         </Pill>
                     </SpaceMenu>
@@ -311,7 +300,7 @@ export function ServerRail({
                     kind="space"
                     id={picturing.id}
                     name={picturing.name}
-                    color={hex(picturing.color)}
+                    color={spaceColor(picturing.color)}
                     // The tile is drawn from one URL that nothing on screen will
                     // ask for again by itself. The new bytes are already in the
                     // browser, so this is a redraw rather than a round trip.
@@ -319,28 +308,6 @@ export function ServerRail({
                 />
             )}
         </div>
-    );
-}
-
-/**
- * The picture whoever runs the space put on it, over its initials.
- *
- * Nothing here knows whether there is one: the route answers a transparent pixel
- * when there is not, and the letters underneath show straight through it. So the
- * common case draws no request-shaped hole and needs no query to decide what to
- * render.
- */
-function SpacePicture({ spaceId }: { spaceId: string }) {
-    const [failed, setFailed] = useState(false);
-    if (failed) return null;
-    return (
-        // eslint-disable-next-line @next/next/no-img-element -- one small image per space, no loader wanted
-        <img
-            src={chatAvatarUrl("space", spaceId)}
-            alt=""
-            onError={() => setFailed(true)}
-            className="absolute inset-0 size-full object-cover"
-        />
     );
 }
 
@@ -547,12 +514,4 @@ function SpaceMenu({
             </ContextMenuContent>
         </ContextMenu>
     );
-}
-
-/** Up to two letters, taken from the words of the name. */
-function initials(space: ChatSpaceView): string {
-    const words = space.name.trim().split(/\s+/).filter(Boolean);
-    if (words.length === 0) return "?";
-    if (words.length === 1) return words[0]!.slice(0, 2).toUpperCase();
-    return `${words[0]![0]}${words[1]![0]}`.toUpperCase();
 }

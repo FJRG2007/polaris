@@ -41,6 +41,7 @@ import { useTextTranslator } from "@/components/text-translation/provider";
 import { languageLabel } from "@/components/text-translation/language-select";
 import { translateMarkdown } from "@/components/rich-text/translate-markdown";
 import { Avatar, AvatarStack } from "@/components/avatar";
+import { SpaceFace } from "./space-face";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { listedTargets, type Target } from "./forward-targets";
 import { PersonName, PersonRow } from "@/components/person-name";
@@ -51,7 +52,6 @@ import {
     Hash,
     Languages,
     Loader2,
-    Server,
     Volume2
 } from "lucide-react";
 import {
@@ -360,7 +360,7 @@ export function ForwardDialog({
                                             onClick={() => setInside(space.id)}
                                             className="flex w-full items-center gap-2 px-3 py-2 text-start text-sm transition-colors hover:bg-muted"
                                         >
-                                            <Server className="size-3.5 shrink-0 text-muted-foreground" />
+                                            <SpaceFace space={space} />
                                             <span
                                                 className="min-w-0 flex-1 truncate"
                                                 title={space.name}

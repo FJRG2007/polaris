@@ -40,7 +40,6 @@ import { messageTarget, NOTHING, type MessageTarget } from "./message-target";
 import type { ChatAttachmentView, ChatMessageView } from "@/lib/chat/messages";
 import type { DeleteMessage } from "./delete-message";
 import { useHideMessage } from "./vanish-controls";
-import { forwardBlock } from "@/lib/chat/private-invitation";
 import { AUDIO_FORMATS, extensionOf, saveRecording, type AudioFormat } from "./audio-download";
 import {
     AlarmClock,
@@ -247,8 +246,6 @@ export function MessageMenu({
      * taking it down is not offered rather than offered and refused.
      */
     const notice = message.kind === "system";
-    /** Why Forward is shown disabled (`forwardBlock`), or null when nothing forbids it. */
-    const blocked = message.deleted || notice ? null : forwardBlock(message);
     const reactable = canPost && !message.deleted && actions.onReact;
     const remindable = !message.deleted && message.kind !== "system";
     const speakable = !message.deleted && Boolean(message.body.trim()) && browserCanSpeak();
@@ -523,27 +520,15 @@ export function MessageMenu({
                                     {t("messageMenu.replyPrivately")}
                                 </ContextMenuItem>
                             )}
-                            {/* Absent rather than refused when whoever wrote it does
-                                not allow it. A menu that offers something and then
-                                says no is worse than one that offers less. */}
+                            {/* Absent rather than refused whenever it cannot travel -
+                                the author does not allow it, or it is one of the
+                                exceptions (`forwardBlock`, folded into `forwardable` on
+                                the server). A menu that offers something and then says
+                                no is worse than one that offers less. */}
                             {message.forwardable && actions.onForward && !notice && (
                                 <ContextMenuItem onSelect={() => actions.onForward?.(message)}>
                                     <Forward className="size-3.5" />
                                     {t("messageMenu.forward")}
-                                </ContextMenuItem>
-                            )}
-                            {/* The exceptions (`forwardBlock`) look like any message to
-                                forward, so the menu says why they are not. A line
-                                Polaris wrote itself has no Forward at all. */}
-                            {actions.onForward && blocked !== null && (
-                                <ContextMenuItem disabled className="items-start">
-                                    <Forward className="mt-0.5 size-3.5" />
-                                    <span className="flex min-w-0 flex-col">
-                                        {t("messageMenu.forward")}
-                                        <span className="text-xs text-muted-foreground">
-                                            {t(`messageMenu.${blocked}NotForwarded`)}
-                                        </span>
-                                    </span>
                                 </ContextMenuItem>
                             )}
                             {actions.onOpenThread && !notice && (
