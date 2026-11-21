@@ -19,11 +19,23 @@ import { linkDenialMessage } from "@/lib/link-denial";
 import { LinkPasswordForm } from "@/components/link-password-form";
 import { countPolarShareView, gatePolarShare } from "@/lib/polar/share-access";
 import { unlockPolarShareAction } from "./actions";
+import { linkPreviewMetadata } from "@/lib/link-preview/metadata";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { robots: { index: false, follow: false } };
+/** What a chat app shows under a pasted link: the kind, and the name only when
+ *  anybody holding the link could open it (see `lib/link-preview`). */
+export async function generateMetadata({
+    params
+}: {
+    params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+    return {
+        robots: { index: false, follow: false },
+        ...(await linkPreviewMetadata("chat", (await params).token))
+    };
+}
 
 export default async function SharedPolarChatPage({
     params

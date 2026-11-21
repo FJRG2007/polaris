@@ -177,6 +177,9 @@ const nextConfig = {
         // `/cli/[file]` and imported by nothing - so named, or the image ships
         // without them and the install line downloads a 503.
         "/cli/**": ["../../packages/cli/dist/**", "../../packages/cli/scripts/**"],
+        // The link-preview pictures read their faces from disk (the renderer
+        // cannot take WOFF2, so these are WOFF copies nothing imports).
+        "/api/og/**": ["./src/fonts/og/**"],
         // The Code step's engine is loaded by a worker thread from a path, so
         // nothing imports it and tracing would leave it out of the image.
         "/**": [

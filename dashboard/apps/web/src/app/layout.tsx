@@ -16,6 +16,7 @@ import { seasonPreviewFor } from "@/lib/seasonal-preview";
 import { I18nProvider, LocaleSync } from "@/components/i18n/i18n-provider";
 import { ConnectionBanner } from "@/components/connection-banner";
 import { resolveTextSize, resolveTheme } from "@/lib/display-prefs-service";
+import { defaultPreviewMetadata } from "@/lib/link-preview/metadata";
 
 /**
  * The page is laid out to the very edges of the screen, under a notch, a
@@ -32,13 +33,16 @@ export const viewport: Viewport = {
 };
 
 /** The document's title and description, the description in the reader's
- *  language, and the rule that keeps every page out of search engines. The
- *  title is the product's name, which is not translated. */
+ *  language, the rule that keeps every page out of search engines, and the
+ *  branded picture a pasted link is previewed with (a public link page swaps in
+ *  its own - see `lib/link-preview`). The title is the product's name, which is
+ *  not translated. */
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("common");
     return {
         title: "Polaris", // i18n-ignore
         description: t("meta.description"),
+        ...(await defaultPreviewMetadata(t("meta.description"))),
         // Every page, public or not, stays out of search engines and their
         // caches; next.config's X-Robots-Tag says the same on every response.
         robots: {

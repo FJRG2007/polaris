@@ -30,9 +30,21 @@ import { LinkPasswordForm } from "@/components/link-password-form";
 import { Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { LinkUnavailable, PublicShell } from "@/components/public-shell";
 import { gateNoteShareRequest, noteDenialMessage } from "@/lib/notes/share-access";
+import type { Metadata } from "next";
+import { linkPreviewMetadata } from "@/lib/link-preview/metadata";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** What a chat app shows under a pasted link: the kind, and the name only when
+ *  anybody holding the link could open it (see `lib/link-preview`). */
+export async function generateMetadata({
+    params
+}: {
+    params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+    return linkPreviewMetadata("note", (await params).token);
+}
 
 export default async function PublicNotePage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;

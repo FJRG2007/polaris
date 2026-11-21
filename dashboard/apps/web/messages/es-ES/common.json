@@ -10,6 +10,49 @@
     "meta": {
         "description": "Panel de control para tu home lab: archivos, conexiones y más."
     },
+    "linkPreview": {
+        "files": "{count} archivos",
+        "kinds": {
+            "share": "Compartido de Drive",
+            "transfer": "Envío de archivos",
+            "snippet": "Fragmento",
+            "fileRequest": "Pedir archivos",
+            "textRequest": "Pedir texto",
+            "note": "Nota",
+            "task": "Tarea",
+            "document": "Documento",
+            "form": "Formulario",
+            "meeting": "Invitación a llamar",
+            "chat": "Conversación",
+            "analytics": "Analíticas",
+            "send": "Envío seguro",
+            "places": "Acceso compartido",
+            "profile": "Perfil",
+            "org": "Organización",
+            "calendar": "Calendario",
+            "status": "Estado en vivo"
+        },
+        "descriptions": {
+            "share": "Abre el enlace para ver lo compartido.",
+            "transfer": "Archivos enviados para descargar.",
+            "snippet": "Texto compartido contigo.",
+            "fileRequest": "Sube tus archivos con este enlace.",
+            "textRequest": "Envía tu texto con este enlace.",
+            "note": "Una nota compartida contigo.",
+            "task": "Una tarea compartida contigo.",
+            "document": "Un documento compartido contigo.",
+            "form": "Rellena el formulario con este enlace.",
+            "meeting": "Únete a la llamada con este enlace.",
+            "chat": "Una conversación compartida contigo.",
+            "analytics": "Estadísticas del sitio compartidas.",
+            "send": "Cifrado - solo el enlace puede abrirlo.",
+            "places": "Acceso compartido contigo.",
+            "profile": "Un perfil en Polaris.",
+            "org": "Una organización en Polaris.",
+            "calendar": "Elige una hora con este enlace.",
+            "status": "Estado actual del servicio."
+        }
+    },
     "pages": {
         "error": {
             "updatedTitle": "Polaris se ha actualizado mientras esta página estaba abierta",

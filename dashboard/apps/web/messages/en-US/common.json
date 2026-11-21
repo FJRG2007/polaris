@@ -10,6 +10,49 @@
     "meta": {
         "description": "Home-lab control plane - drive, connections, and more."
     },
+    "linkPreview": {
+        "files": "{count} files",
+        "kinds": {
+            "share": "Shared from Drive",
+            "transfer": "File transfer",
+            "snippet": "Snippet",
+            "fileRequest": "File request",
+            "textRequest": "Text request",
+            "note": "Note",
+            "task": "Task",
+            "document": "Document",
+            "form": "Shared form",
+            "meeting": "Call invitation",
+            "chat": "Shared chat",
+            "analytics": "Analytics",
+            "send": "Secure send",
+            "places": "Shared access",
+            "profile": "Profile",
+            "org": "Organization",
+            "calendar": "Calendar",
+            "status": "Status page"
+        },
+        "descriptions": {
+            "share": "Open the link to see what was shared.",
+            "transfer": "Files sent to you for download.",
+            "snippet": "Text shared with you.",
+            "fileRequest": "Upload your files with this link.",
+            "textRequest": "Send your text with this link.",
+            "note": "A note shared with you.",
+            "task": "A task shared with you.",
+            "document": "A document shared with you.",
+            "form": "Fill in the form with this link.",
+            "meeting": "Join the call with this link.",
+            "chat": "A conversation shared with you.",
+            "analytics": "Site statistics shared with you.",
+            "send": "Encrypted - only the link can open it.",
+            "places": "Access shared with you.",
+            "profile": "A profile on Polaris.",
+            "org": "An organization on Polaris.",
+            "calendar": "Pick a time with this link.",
+            "status": "Current service status."
+        }
+    },
     "pages": {
         "error": {
             "updatedTitle": "Polaris was updated while this page was open",

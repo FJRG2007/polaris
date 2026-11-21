@@ -17,14 +17,22 @@ import { guardedUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { ProfileFrame } from "@/components/profile-frame";
 import { OrgBody } from "./org-body";
+import { linkPreviewMetadata } from "@/lib/link-preview/metadata";
 
 export const dynamic = "force-dynamic";
 
 /** The same title whether or not the organization exists: a page that named it
  *  in the tab before saying whether it would show it answers "does this handle
  *  exist" to anybody who asks. */
-export async function generateMetadata(): Promise<Metadata> {
-    return { title: (await getTranslations("publicPages"))("org.metaTitle") };
+export async function generateMetadata({
+    params
+}: {
+    params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+    return {
+        title: (await getTranslations("publicPages"))("org.metaTitle"),
+        ...(await linkPreviewMetadata("org", (await params).slug))
+    };
 }
 
 export default async function OrganizationPage({ params }: { params: Promise<{ slug: string }> }) {

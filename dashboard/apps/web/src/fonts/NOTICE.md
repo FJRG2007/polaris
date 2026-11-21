@@ -51,3 +51,7 @@ interface faces above, and **Small caps** is a typographic variation of Default.
 Unlike the interface faces these are declared but **not preloaded**, so a browser
 only fetches one the first time a name on the page is actually set in it. A
 deployment where nobody has chosen a face downloads none of them.
+
+`og/` holds WOFF copies of Plex Sans Regular and SemiBold, converted from the
+`woff2` files above. They are for the link-preview pictures (`lib/link-preview`),
+whose renderer cannot read WOFF2 and must never fetch a font over the network.

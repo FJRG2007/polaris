@@ -17,11 +17,24 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { clientIp, hashForLog } from "@/lib/request-context";
 import { openTransfer } from "@/lib/disposable-transfer-service";
 import { LinkUnavailable, PublicShell } from "@/components/public-shell";
+import type { Metadata } from "next";
+import { linkPreviewMetadata } from "@/lib/link-preview/metadata";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export const metadata = { robots: { index: false, follow: false } };
+/** What a chat app shows under a pasted link: the kind, and the name only when
+ *  anybody holding the link could open it (see `lib/link-preview`). */
+export async function generateMetadata({
+    params
+}: {
+    params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+    return {
+        robots: { index: false, follow: false },
+        ...(await linkPreviewMetadata("transfer", (await params).token))
+    };
+}
 
 export default async function QuickSendPage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;

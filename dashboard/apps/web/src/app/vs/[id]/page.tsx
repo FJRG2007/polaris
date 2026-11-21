@@ -9,9 +9,16 @@
 
 import { SendReader } from "./send-reader";
 import { Messages } from "@/components/i18n/messages";
+import type { Metadata } from "next";
+import { linkPreviewMetadata } from "@/lib/link-preview/metadata";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** The Send is end-to-end encrypted: its preview never names anything. */
+export async function generateMetadata(): Promise<Metadata> {
+    return linkPreviewMetadata("send", "");
+}
 
 export default async function PublicSendPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;

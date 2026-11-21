@@ -22,9 +22,21 @@ import { linkDenialMessage } from "@/lib/link-denial";
 import { gateMeetingLink } from "@/lib/chat/meeting-link-access";
 import { LinkPasswordForm } from "@/components/link-password-form";
 import { unlockMeetingLinkAction } from "./actions";
+import type { Metadata } from "next";
+import { linkPreviewMetadata } from "@/lib/link-preview/metadata";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** What a chat app shows under a pasted link: the kind, and the name only when
+ *  anybody holding the link could open it (see `lib/link-preview`). */
+export async function generateMetadata({
+    params
+}: {
+    params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+    return linkPreviewMetadata("meeting", (await params).token);
+}
 
 export default async function GuestMeetingPage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;

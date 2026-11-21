@@ -19,14 +19,22 @@ import { guardedUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { ProfileFrame } from "@/components/profile-frame";
 import { ProfileBody } from "./profile-body";
+import { linkPreviewMetadata } from "@/lib/link-preview/metadata";
 
 export const dynamic = "force-dynamic";
 
 /** Deliberately the same title whether or not the person exists: a page that
  *  named them in the tab before saying whether it would show them is a page that
  *  answers "does this username exist" to anybody who asks. */
-export async function generateMetadata(): Promise<Metadata> {
-    return { title: (await getTranslations("publicPages"))("profile.metaTitle") };
+export async function generateMetadata({
+    params
+}: {
+    params: Promise<{ username: string }>;
+}): Promise<Metadata> {
+    return {
+        title: (await getTranslations("publicPages"))("profile.metaTitle"),
+        ...(await linkPreviewMetadata("profile", (await params).username))
+    };
 }
 
 export default async function ProfilePage({ params }: { params: Promise<{ username: string }> }) {

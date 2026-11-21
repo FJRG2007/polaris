@@ -3,12 +3,20 @@
 import type { Metadata } from "next";
 import { SharedAnalytics } from "../shared-analytics";
 import { getTranslations } from "@/lib/i18n/request";
+import { linkPreviewMetadata } from "@/lib/link-preview/metadata";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata(): Promise<Metadata> {
-    return { title: (await getTranslations("analytics"))("report.title") };
+export async function generateMetadata({
+    params
+}: {
+    params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+    return {
+        title: (await getTranslations("analytics"))("report.title"),
+        ...(await linkPreviewMetadata("analytics", (await params).token))
+    };
 }
 
 export default async function SharedAnalyticsPage({

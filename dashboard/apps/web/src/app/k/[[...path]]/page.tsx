@@ -28,11 +28,18 @@ import { LinkUnavailable, PublicShell } from "@/components/public-shell";
 import { renderAppPage, type AppPageProps } from "@/lib/app-bundles/serve-page";
 import { artifactDetail } from "@/lib/agents/session-artifacts";
 import { SharedArtifact } from "./artifact-guest";
+import { linkPreviewMetadata } from "@/lib/link-preview/metadata";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { robots: { index: false, follow: false } };
+/** A lent link opens a door, a camera or a device: its preview never names which. */
+export async function generateMetadata(): Promise<Metadata> {
+    return {
+        robots: { index: false, follow: false },
+        ...(await linkPreviewMetadata("places", ""))
+    };
+}
 
 export default async function GuestLinkPage(props: AppPageProps) {
     const { path = [] } = await props.params;

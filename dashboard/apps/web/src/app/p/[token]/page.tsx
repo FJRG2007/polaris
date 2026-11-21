@@ -19,9 +19,21 @@ import { LinkPasswordForm } from "@/components/link-password-form";
 import { gateSnippetRequest, snippetDenialMessage } from "@/lib/snippet-access";
 import { unlockSnippetAction } from "@/app/(app)/drive/snippets/snippet-actions";
 import { logSnippetAccess, readSnippetFiles, registerSnippetView } from "@/lib/snippet-service";
+import type { Metadata } from "next";
+import { linkPreviewMetadata } from "@/lib/link-preview/metadata";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** What a chat app shows under a pasted link: the kind, and the name only when
+ *  anybody holding the link could open it (see `lib/link-preview`). */
+export async function generateMetadata({
+    params
+}: {
+    params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+    return linkPreviewMetadata("snippet", (await params).token);
+}
 
 export default async function PublicSnippetPage({
     params

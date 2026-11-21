@@ -35,9 +35,21 @@ import {
     shareUnlockCookie,
     verifyShareUnlock
 } from "@/lib/share-service";
+import type { Metadata } from "next";
+import { linkPreviewMetadata } from "@/lib/link-preview/metadata";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** What a chat app shows under a pasted link: the kind, and the name only when
+ *  anybody holding the link could open it (see `lib/link-preview`). */
+export async function generateMetadata({
+    params
+}: {
+    params: Promise<{ token: string }>;
+}): Promise<Metadata> {
+    return linkPreviewMetadata("share", (await params).token);
+}
 
 export default async function SharePage({
     params,
