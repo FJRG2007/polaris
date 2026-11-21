@@ -23,6 +23,10 @@
  * `polaris-neoforge`), so the same switch turns both on and off: a server there
  * counts as protected, and gets it by default, like a plugin server.
  *
+ * On Forge the engine is a mod of its own (the `forge` module, one jar per Forge
+ * era, `FORGE_BUILDS`): it goes on the server's `MODS` list like the plugin, under
+ * the same switch, and comes off it when switched off. It has no anti-xray.
+ *
  * What it catches it hands back to Polaris over HTTP, at the plugin's own alert
  * thresholds, so the Anti-cheat tab lists it: for that it carries the same
  * address, server id and token the login plugin uses (one token per server,
@@ -138,8 +142,26 @@ export function moddedServer(env: ReadonlyMap<string, string>): boolean {
 /** The file the dashboard serves the plugin as. */
 export const ANTICHEAT_FILE = "polaris-anticheat-bukkit.jar";
 
+/**
+ * The engine's Forge builds: one jar per Forge era, and the releases each loads
+ * on. Forge runs each release under its own names, so a jar never loads on a
+ * release it does not list (its mods.toml says the same).
+ */
+export const FORGE_BUILDS: readonly { readonly file: string; readonly releases: readonly string[] }[] = [
+    { file: "polaris-anticheat-forge-1.20.1.jar", releases: ["1.20.1"] }
+];
+
+/** The engine's Forge jar for this release, or null when there is none. */
+export function forgeAnticheatFileFor(version: string): string | null {
+    const release = version.trim();
+    return FORGE_BUILDS.find((build) => build.releases.includes(release))?.file ?? null;
+}
+
 /** Every file of it the dashboard serves, for the route. */
-export const ANTICHEAT_FILES: readonly string[] = [ANTICHEAT_FILE];
+export const ANTICHEAT_FILES: readonly string[] = [
+    ANTICHEAT_FILE,
+    ...FORGE_BUILDS.map((build) => build.file)
+];
 
 /** Modrinth's loader names it runs on, as `loaderForType` gives them. */
 const LOADERS: readonly string[] = ["paper", "folia", "spigot"];
@@ -152,15 +174,22 @@ export function anticheatRunsOn(software: string): boolean {
 
 /**
  * What protects a server on this software and release: the plugin, the Polaris
- * mod's anti-xray, or nothing.
+ * mod that carries the engine (NeoForge), the engine's own Forge mod, or nothing.
+ * `engine` is on the list and switched like the plugin, but carries nothing else
+ * the plugin does (chat moderation, sounds).
  */
 export type AnticheatBuild =
     | { readonly kind: "plugin"; readonly file: string }
-    | { readonly kind: "mod"; readonly file: string };
+    | { readonly kind: "mod"; readonly file: string }
+    | { readonly kind: "engine"; readonly file: string };
 
 export function anticheatBuildFor(software: string, version: string): AnticheatBuild | null {
     if (anticheatRunsOn(software)) {
         return pluginLoadsOn(version) ? { kind: "plugin", file: ANTICHEAT_FILE } : null;
+    }
+    if (loaderForType(software) === "forge") {
+        const engine = forgeAnticheatFileFor(version);
+        return engine ? { kind: "engine", file: engine } : null;
     }
     if (loaderForType(software) !== "neoforge") return null;
     const file = modFileFor(software, version);
@@ -233,7 +262,7 @@ export function anticheatOn(env: ReadonlyMap<string, string>): boolean {
 export function anticheatActive(env: ReadonlyMap<string, string>): boolean {
     const build = anticheatBuildFor(env.get("TYPE") ?? "", env.get("VERSION") ?? "");
     if (!build) return false;
-    if (build.kind === "plugin") return anticheatOn(env);
+    if (build.kind !== "mod") return anticheatOn(env);
     const off = (key: string) => env.get(key)?.trim().toLowerCase() === "off";
     return carries(env, build.file) && !off(ANTICHEAT_KEY) && !off(ANTIXRAY_KEY);
 }

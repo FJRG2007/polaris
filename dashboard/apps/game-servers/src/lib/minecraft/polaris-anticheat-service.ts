@@ -95,7 +95,7 @@ export async function setAnticheat(
         }
         if (!(await anticheatBundled(build.file))) {
             throw new Error(
-                build.kind === "plugin"
+                build.kind !== "mod"
                     ? gameMessage("games", "lib.noAnticheatPlugin")
                     : gameMessage("games", "lib.noModBuild")
             );

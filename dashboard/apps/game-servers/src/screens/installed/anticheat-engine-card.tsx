@@ -98,6 +98,10 @@ export function AnticheatEngineCard({
                             <p className="text-xs text-muted-foreground">
                                 {t("engine.onThisNeoforgeServerPolaris")}
                             </p>
+                        ) : state?.kind === "engine" ? (
+                            <p className="text-xs text-muted-foreground">
+                                {t("engine.onThisForgeServerPolaris")}
+                            </p>
                         ) : (
                             <p className="text-xs text-muted-foreground">{t("engine.about")}</p>
                         )}

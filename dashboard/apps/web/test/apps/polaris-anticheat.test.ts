@@ -303,6 +303,65 @@ describe("on a NeoForge server, through the Polaris mod", () => {
     });
 });
 
+describe("on a Forge server, through the engine's own mod", () => {
+    const ENGINE = `${BASE}/api/minecraft/mod/key/polaris-anticheat-forge-1.20.1.jar`;
+    const forge = (extra: [string, string][] = []) =>
+        new Map<string, string>([["TYPE", "FORGE"], ["VERSION", "1.20.1"], ...extra]);
+    const input = { baseUrl: BASE, modKey: "key", installedAppId: SERVER, token: "t" };
+
+    it("has a build for 1.20.1 alone, and is wanted by default there", () => {
+        expect(anticheat.anticheatBuildFor("FORGE", "1.20.1")).toEqual({
+            kind: "engine",
+            file: "polaris-anticheat-forge-1.20.1.jar"
+        });
+        expect(anticheat.anticheatBuildFor("FORGE", "1.21.1")).toBeNull();
+        expect(anticheat.anticheatBuildFor("FORGE", "")).toBeNull();
+        expect(anticheat.wantsDefaultAnticheat(forge())).toBe(true);
+        expect(anticheat.wantsDefaultAnticheat(forge([["POLARIS_ANTICHEAT", "off"]]))).toBe(false);
+        expect(anticheat.ANTICHEAT_FILES).toContain("polaris-anticheat-forge-1.20.1.jar");
+    });
+
+    it("goes on the list like the plugin, and comes off it when switched off", () => {
+        const other = "https://elsewhere.example/other.jar";
+        const on = anticheat.anticheatEnableEnv(forge([["MODS", other]]), input);
+        expect(on.get("MODS")).toBe(`${other},${ENGINE}`);
+        expect(on.get("POLARIS_ANTICHEAT")).toBe("on");
+        // It has no anti-xray of its own to switch.
+        expect(on.has("POLARIS_ANTIXRAY")).toBe(false);
+        const env = new Map([...forge(), ...on]);
+        expect(anticheat.anticheatOn(env)).toBe(true);
+        expect(anticheat.anticheatActive(env)).toBe(true);
+        expect(anticheat.anticheatHoldsMod(env)).toBe(false);
+        const off = anticheat.anticheatDisableEnv(env);
+        expect(off.get("MODS")).toBe(other);
+        expect(off.get("POLARIS_ANTICHEAT")).toBe("off");
+        expect(anticheat.anticheatActive(new Map([...env, ...off]))).toBe(false);
+    });
+
+    it("is not on with the switch alone, nor with the jar alone", () => {
+        expect(anticheat.anticheatActive(forge([["POLARIS_ANTICHEAT", "on"]]))).toBe(false);
+        expect(anticheat.anticheatActive(forge([["MODS", ENGINE]]))).toBe(false);
+    });
+
+    it("comes off a release or software its jar does not load on", async () => {
+        const guarded = forge([
+            ["MODS", ENGINE],
+            ["POLARIS_ANTICHEAT", "on"]
+        ]);
+        expect(anticheat.anticheatMovedTo(guarded, "FORGE", "1.21.1")?.get("MODS")).toBe("");
+        expect(anticheat.anticheatMovedTo(guarded, "FORGE", "1.20.1")).toBeNull();
+        const writes = new Map(
+            (
+                await guardForSave([{ key: "TYPE", value: "PAPER" }], async () => guarded)
+            ).map((one) => [one.key, one.value])
+        );
+        expect(writes.get("MODS")).toBe("");
+        expect(writes.get("POLARIS_ANTICHEAT")).toBe("");
+        expect(anticheat.withoutAnticheatBuild(guarded)).toBe("");
+        expect(guardAsTemplate(guarded).get("MODS")).toBe("");
+    });
+});
+
 describe("the plugin on an old Java", () => {
     const plugin = "https://polaris.example.com/api/minecraft/mods/polaris-anticheat-bukkit.jar";
 
