@@ -10,9 +10,9 @@
  * decision about their Polaris account.
  */
 
-import { Gamepad2 } from "lucide-react";
 import { Badge, Skeleton } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
+import { PolarisAppIcon } from "@/components/polaris-app-icon";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** One sanction as the page is handed it - moments as strings, since it crosses
@@ -41,7 +41,7 @@ export function GameSanctionsHeading() {
     return (
         <div>
             <h2 className="flex items-center gap-2 text-sm font-medium">
-                <Gamepad2 className="size-4 shrink-0 text-muted-foreground" />
+                <PolarisAppIcon appId="games" />
                 {t("standing.games.title")}
             </h2>
             <p className="text-xs text-muted-foreground">{t("standing.games.description")}</p>
