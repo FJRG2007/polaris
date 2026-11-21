@@ -40,7 +40,9 @@ vi.mock("@polaris/db", () => ({
                     : []
         },
         follow: { findMany: async () => [] },
-        friendship: { findMany: async () => [] }
+        friendship: { findMany: async () => [] },
+        // No administrator default and no lock: every field is the account's.
+        setting: { findUnique: async () => null, findMany: async () => [] }
     }
 }));
 

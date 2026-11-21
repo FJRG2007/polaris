@@ -4218,7 +4218,9 @@
         },
         "defaults": {
             "title": "Defaults",
-            "description": "What each setting starts on for accounts that never changed it, existing ones included. A setting someone changed keeps their choice."
+            "description": "What each setting starts on for accounts that never changed it, existing ones included. A setting someone changed keeps their choice.",
+            "lock": "Lock",
+            "lockLabel": "Lock {field} to this default for everybody"
         },
         "discovery": {
             "title": "Finding people",

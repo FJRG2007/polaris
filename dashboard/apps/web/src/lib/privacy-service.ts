@@ -64,6 +64,37 @@ export async function privacyDefaults(): Promise<Map<core.PrivacyField, string>>
     return answer;
 }
 
+/**
+ * Where the administrator's lock on one field is kept: "true" holds every
+ * account to the default above, whatever it chose. Absent - which is every
+ * instance until an administrator says otherwise - leaves the choice with the
+ * person, exactly as before locks existed.
+ */
+export function privacyLockKey(field: core.PrivacyField): string {
+    return `privacy.locks.${field}`;
+}
+
+/** Whether a stored lock value means locked. Anything but "true" is not. */
+export function isLockValue(value: string | null | undefined): boolean {
+    return value === "true";
+}
+
+/** Every field an administrator locked, in one read. */
+export async function privacyLocks(): Promise<Set<core.PrivacyField>> {
+    const stored = await getSettings(core.PRIVACY_FIELDS.map(privacyLockKey));
+    return new Set(core.PRIVACY_FIELDS.filter((field) => isLockValue(stored.get(privacyLockKey(field)))));
+}
+
+/** Whether one field is locked. */
+export async function privacyLocked(field: core.PrivacyField): Promise<boolean> {
+    return isLockValue(await getSetting(privacyLockKey(field)));
+}
+
+/** Lock a field to its default, or hand it back to each account. */
+export async function setPrivacyLock(field: core.PrivacyField, locked: boolean): Promise<void> {
+    await setSetting(privacyLockKey(field), locked ? "true" : null);
+}
+
 /** What one field resolves to for an account that never chose it. */
 export async function defaultAudience(field: core.PrivacyField): Promise<core.PrivacyAudience> {
     return core.resolvedAudience(field, null, await getSetting(privacyDefaultKey(field)));
@@ -112,6 +143,7 @@ const AUDIENCE_COLUMNS = {
     forwarding: true,
     fileTransfers: true,
     calls: true,
+    groupAdds: true,
     discoverable: true,
     findByEmail: true,
     findByPhone: true,
@@ -121,7 +153,7 @@ const AUDIENCE_COLUMNS = {
 } as const;
 
 export async function privacyFor(userId: string): Promise<core.PrivacySettings> {
-    const [row, links, defaults] = await Promise.all([
+    const [row, links, defaults, locks] = await Promise.all([
         prisma.userPrivacy.findUnique({ where: { userId }, select: AUDIENCE_COLUMNS }),
         prisma.privacyFieldList.findMany({
             where: { userId },
@@ -131,7 +163,8 @@ export async function privacyFor(userId: string): Promise<core.PrivacySettings> 
                 list: { select: { name: true, members: { select: { userId: true } } } }
             }
         }),
-        privacyDefaults()
+        privacyDefaults(),
+        privacyLocks()
     ]);
 
     // A named list comes back as the id it is; a setting's own unnamed one comes
@@ -152,8 +185,15 @@ export async function privacyFor(userId: string): Promise<core.PrivacySettings> 
                 {
                     // A `null` column and a missing row both mean nobody has
                     // chosen, and both resolve to what the operator set.
-                    audience: core.resolvedAudience(field, row?.[field], defaults.get(field)),
-                    ...(linked.get(field) ?? {})
+                    // A locked field is the administrator's default and never a
+                    // list, so the person's own list does not come along.
+                    audience: core.resolvedAudience(
+                        field,
+                        row?.[field],
+                        defaults.get(field),
+                        locks.has(field)
+                    ),
+                    ...(locks.has(field) ? {} : (linked.get(field) ?? {}))
                 }
             ])
         )
@@ -260,17 +300,21 @@ export async function allowedBy(
         select: { userId: true, ...AUDIENCE_COLUMNS }
     });
     const stored = new Map(rows.map((row) => [row.userId, row[field] ?? null]));
+    // A locked field is the administrator's default for everybody, whatever
+    // they stored - asked every time, since it overrides even a chosen value.
+    const locked = await privacyLocked(field);
     // Anybody who never chose - no row, or a null column - falls to the
     // operator's default for the field, and to the code's where there is none:
     // for an address and a number that is nobody. Asked once, and only when
     // somebody here actually needs it.
-    const unset = wanted.some((userId) => (stored.get(userId) ?? null) === null)
-        ? await getSetting(privacyDefaultKey(field))
-        : null;
+    const unset =
+        locked || wanted.some((userId) => (stored.get(userId) ?? null) === null)
+            ? await getSetting(privacyDefaultKey(field))
+            : null;
     const audiences = new Map(
         wanted.map((userId) => [
             userId,
-            core.resolvedAudience(field, stored.get(userId) ?? null, unset)
+            core.resolvedAudience(field, stored.get(userId) ?? null, unset, locked)
         ])
     );
     // Only what an audience in play actually asks for. A page of results whose
@@ -578,8 +622,13 @@ export async function discoverableBy(
  * changes again.
  */
 export async function setPrivacy(userId: string, settings: core.PrivacySettings): Promise<void> {
-    const naming = core.PRIVACY_FIELDS.filter((field) =>
-        core.audienceNeedsList(settings[field].audience)
+    // A field the administrator locked is not this person's to change: whatever
+    // the form sent for it is ignored, and the column and list they had stay as
+    // they were, ready for the day the lock is lifted. Enforced here rather than
+    // in the form, which only greys the row out.
+    const locks = await privacyLocks();
+    const naming = core.PRIVACY_FIELDS.filter(
+        (field) => !locks.has(field) && core.audienceNeedsList(settings[field].audience)
     );
     const saved = naming
         .map((field) => ({ field, listId: settings[field].listId }))
@@ -611,6 +660,7 @@ export async function setPrivacy(userId: string, settings: core.PrivacySettings)
     ]);
     const audiences = Object.fromEntries(
         core.PRIVACY_FIELDS.map((field) => {
+            if (locks.has(field)) return [field, current?.[field] ?? null];
             const audience = settings[field].audience;
             const chosen =
                 (current?.[field] ?? null) !== null ||
@@ -627,7 +677,10 @@ export async function setPrivacy(userId: string, settings: core.PrivacySettings)
             update: audiences
         }),
         prisma.privacyFieldList.deleteMany({
-            where: { userId, field: { notIn: named.map((entry) => entry.field) } }
+            where: {
+                userId,
+                field: { notIn: [...named.map((entry) => entry.field), ...locks] }
+            }
         }),
         ...named.map((entry) =>
             prisma.privacyFieldList.upsert({
@@ -766,10 +819,12 @@ export async function reciprocalAmong(
     const candidates = wanted.filter((id) => theirs.has(id));
     if (candidates.length === 0) return new Set();
     const own = row?.[field] ?? null;
+    const locked = await privacyLocked(field);
     const audience = core.resolvedAudience(
         field,
         own,
-        own === null ? await getSetting(privacyDefaultKey(field)) : null
+        own === null || locked ? await getSetting(privacyDefaultKey(field)) : null,
+        locked
     );
     if (audience === "nobody") return new Set();
     if (audience === "everyone") return new Set(candidates);

@@ -7,13 +7,15 @@
 import * as core from "@polaris/core";
 import { getSettings } from "@/lib/setting-store";
 import { PUBLIC_KEY } from "@/lib/profile-service";
-import { privacyDefaultKey } from "@/lib/privacy-service";
+import { isLockValue, privacyDefaultKey, privacyLockKey } from "@/lib/privacy-service";
 import { DISCOVERY_POLICY_KEY, readDiscoveryPolicy, type DiscoveryPolicy } from "@/lib/discovery-policy";
 
 export interface PrivacyData {
     publicProfiles: boolean;
     /** What each field resolves to for an account that never chose it. */
     defaults: Record<core.PrivacyField, core.PrivacyAudience>;
+    /** The fields held to their default for every account. */
+    locks: core.PrivacyField[];
     discovery: DiscoveryPolicy;
 }
 
@@ -21,7 +23,8 @@ export async function readPrivacy(): Promise<PrivacyData> {
     const stored = await getSettings([
         PUBLIC_KEY,
         DISCOVERY_POLICY_KEY,
-        ...core.PRIVACY_FIELDS.map(privacyDefaultKey)
+        ...core.PRIVACY_FIELDS.map(privacyDefaultKey),
+        ...core.PRIVACY_FIELDS.map(privacyLockKey)
     ]);
     return {
         publicProfiles: stored.get(PUBLIC_KEY) === "true",
@@ -31,6 +34,7 @@ export async function readPrivacy(): Promise<PrivacyData> {
                 core.resolvedAudience(field, null, stored.get(privacyDefaultKey(field)) ?? null)
             ])
         ) as Record<core.PrivacyField, core.PrivacyAudience>,
+        locks: core.PRIVACY_FIELDS.filter((field) => isLockValue(stored.get(privacyLockKey(field)))),
         discovery: readDiscoveryPolicy(stored.get(DISCOVERY_POLICY_KEY) ?? null)
     };
 }

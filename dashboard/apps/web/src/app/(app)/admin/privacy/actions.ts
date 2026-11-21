@@ -15,7 +15,12 @@ import { setDiscoveryPolicy } from "@/lib/people-search";
 import { setProfilesPublic } from "@/lib/profile-service";
 import { DISCOVERY_POLICY_KEY, discoveryPolicySchema } from "@/lib/discovery-policy";
 import * as core from "@polaris/core";
-import { privacyDefaultKey, setDefaultAudience } from "@/lib/privacy-service";
+import {
+    privacyDefaultKey,
+    privacyLockKey,
+    setDefaultAudience,
+    setPrivacyLock
+} from "@/lib/privacy-service";
 
 /**
  * Whether somebody's page may be read without signing in.
@@ -68,6 +73,34 @@ export async function setPrivacyDefaultAction(
         targetType: "setting",
         targetId: privacyDefaultKey(parsedField.data),
         metadata: { field: parsedField.data, audience: parsedAudience.data }
+    });
+    revalidatePath("/admin/privacy");
+    return {};
+}
+
+/**
+ * Hold one privacy field to its default for every account, or hand it back.
+ * While locked, each account's own choice is kept but not read, and the account
+ * screen greys the row out; the lock is enforced where the field is resolved,
+ * so no client can save its way past it.
+ */
+export async function setPrivacyLockAction(
+    field: unknown,
+    locked: unknown
+): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsedField = z.enum(core.PRIVACY_FIELDS).safeParse(field);
+    const parsedLocked = z.boolean().safeParse(locked);
+    if (!parsedField.success || !parsedLocked.success) {
+        return { error: (await getTranslations("admin"))("privacy.errors.checkSettings") };
+    }
+    await setPrivacyLock(parsedField.data, parsedLocked.data);
+    await recordAudit({
+        actorId: admin.id,
+        action: "settings.privacy-lock",
+        targetType: "setting",
+        targetId: privacyLockKey(parsedField.data),
+        metadata: { field: parsedField.data, locked: parsedLocked.data }
     });
     revalidatePath("/admin/privacy");
     return {};

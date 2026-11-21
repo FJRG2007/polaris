@@ -77,7 +77,8 @@ vi.mock("@/lib/privacy-service", () => ({
         asked.push(viewer);
         return false;
     },
-    privacyDefaults: async () => new Map([["followers", "nobody"]])
+    privacyDefaults: async () => new Map([["followers", "nobody"]]),
+    privacyLocks: async () => new Set()
 }));
 
 vi.mock("@/lib/blocks", () => ({

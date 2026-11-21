@@ -37,9 +37,13 @@ export interface NamedPerson {
 export function PrivacyView({
     settings,
     lists,
-    people
+    people,
+    locked = []
 }: {
     settings: core.PrivacySettings;
+    /** Fields the administrator holds to their default. Greyed out here; the
+     *  server ignores whatever is sent for them, so this is only the picture. */
+    locked?: readonly core.PrivacyField[];
     /** The lists this account saved under a name, which any rule may use. */
     lists: readonly PrivacyListView[];
     /** Names for everybody the rules already name, so the rows can draw them. */
@@ -119,13 +123,19 @@ export function PrivacyView({
                                             <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
                                                 {t(`fields.${field}.note` as const)}
                                             </span>
+                                            {locked.includes(field) && (
+                                                <span className="block text-[0.6875rem] leading-snug text-muted-foreground">
+                                                    {t("lockedByAdmin")}
+                                                </span>
+                                            )}
                                         </span>
                                         <Select
                                             className="h-8 w-full shrink-0 text-xs sm:w-64"
                                             aria-label={t(`fields.${field}.label` as const)}
                                             value={draft[field].audience}
                                             disabled={
-                                                field === "profile" && (savingProfile || saving)
+                                                locked.includes(field) ||
+                                                (field === "profile" && (savingProfile || saving))
                                             }
                                             options={(field === "profile"
                                                 ? core.PROFILE_AUDIENCES

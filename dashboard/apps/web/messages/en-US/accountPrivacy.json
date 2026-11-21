@@ -159,6 +159,10 @@
         "forwarding": {
             "label": "Passing your messages on",
             "note": "Who may forward something you wrote into another conversation. Anybody who cannot is not offered it, and they can still copy the text - this is a rule about the button, not a lock on your words."
+        },
+        "groupAdds": {
+            "label": "Who can add you to groups",
+            "note": "Who may put you in a group conversation. Friends and people in your organizations by default; anybody else is told you cannot be added."
         }
     },
     "who": {
@@ -302,5 +306,6 @@
         "confirmBody": "Without it, a photo of the screen taken from another device no longer shows who it was shown to, so it is easier to share. Applies to what you send from now on.",
         "keep": "Keep it on",
         "turnOff": "Turn off"
-    }
+    },
+    "lockedByAdmin": "Set by your administrator for everybody here."
 }

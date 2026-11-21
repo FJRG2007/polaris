@@ -146,6 +146,7 @@ export const PRIVACY_FIELD_LABELS = {
     friendRequests: "Who can ask to be your friend",
     fileTransfers: "Who can send you files",
     calls: "Who can call you",
+    groupAdds: "Who can add you to groups",
     forwarding: "Passing your messages on"
 } as const;
 
@@ -184,6 +185,8 @@ export const PRIVACY_FIELD_NOTES = {
     forwarding:
         "Who may forward something you wrote into another conversation. Anybody who cannot is not offered it, and they can still copy the text - this is a rule about the button, not a lock on your words.",
     calls: "Who may ring you. A call takes over the screen of whatever you were doing and makes a noise in the room you are in, which is why this starts at your friends rather than at everybody. Joining a voice channel is not this: that is a room somebody walked into, and who may be in it is the room's own question. Anybody who cannot call you is simply not offered the button.",
+    groupAdds:
+        "Who may put you in a group conversation. Friends and people in your organizations by default; anybody else who tries is told you cannot be added.",
     fileTransfers:
         "Who may offer you a file or a folder. Nothing ever lands without you accepting it, so this is about who may ask - anybody who cannot is simply not offered the button. People you share an organization with count as friends here; set to nobody, nobody can, including them."
 } as const;
@@ -204,6 +207,7 @@ export const PRIVACY_FIELDS = [
     "friendRequests",
     "fileTransfers",
     "calls",
+    "groupAdds",
     "lastSeen",
     "lastActive",
     "activity",
@@ -246,7 +250,7 @@ export const PRIVACY_SECTIONS = [
     {
         id: "reaching",
         label: "Reaching you",
-        fields: ["friendRequests", "fileTransfers", "calls"]
+        fields: ["friendRequests", "fileTransfers", "calls", "groupAdds"]
     },
     {
         id: "presence",
@@ -507,6 +511,7 @@ export const privacySettingsSchema = z.object({
      * the same shape every other refusal here takes.
      */
     calls: known,
+    groupAdds: known,
     /**
      * Who is shown the address the account signs in with.
      *
@@ -584,13 +589,19 @@ export function defaultAudiencesFor(field: PrivacyField): readonly PrivacyAudien
  * code's own default only where the administrator never set one. An operator
  * default that names a list, or that the field does not offer, is ignored
  * rather than trusted.
+ *
+ * `locked` is the administrator holding the field to their default: then the
+ * person's own choice is not consulted at all. It stays stored, so lifting the
+ * lock gives it back, but nothing reads it while the lock stands. Off unless an
+ * administrator set it, so every existing account resolves as it did.
  */
 export function resolvedAudience(
     field: PrivacyField,
     stored: unknown,
-    operatorDefault: unknown
+    operatorDefault: unknown,
+    locked = false
 ): PrivacyAudience {
-    const own = z.enum(PRIVACY_AUDIENCES).safeParse(stored);
+    const own = z.enum(PRIVACY_AUDIENCES).safeParse(locked ? null : stored);
     if (own.success) return own.data;
     const operator = z.enum(PRIVACY_AUDIENCES).safeParse(operatorDefault);
     if (operator.success && defaultAudiencesFor(field).includes(operator.data)) {

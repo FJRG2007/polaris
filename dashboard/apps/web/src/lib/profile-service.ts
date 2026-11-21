@@ -41,6 +41,7 @@ import { followCounts, followsPerson } from "@/lib/people-follow";
 import {
     allowedBy,
     privacyDefaults,
+    privacyLocks,
     maySee,
     type PrivacyViewer
 } from "@/lib/privacy-service";
@@ -502,9 +503,10 @@ async function visible(
     // `resolvedAudience` is the one way to read one off a row: a column holds a
     // string written years ago, or null for "never chosen", which is the
     // operator's default for the field.
-    const defaults = await privacyDefaults();
+    const [defaults, locks] = await Promise.all([privacyDefaults(), privacyLocks()]);
     const open = (field: keyof Fields) =>
-        core.resolvedAudience(field, row?.[field], defaults.get(field)) === "everyone";
+        core.resolvedAudience(field, row?.[field], defaults.get(field), locks.has(field)) ===
+        "everyone";
     return {
         discoverable: open("discoverable"),
         profile: open("profile"),

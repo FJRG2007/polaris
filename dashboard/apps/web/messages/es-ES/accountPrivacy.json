@@ -159,6 +159,10 @@
         "forwarding": {
             "label": "Reenviar tus mensajes",
             "note": "Quién puede reenviar algo que escribiste a otra conversación. A quien no pueda no se le ofrece, y aun así puede copiar el texto: es una regla sobre el botón, no un candado para tus palabras."
+        },
+        "groupAdds": {
+            "label": "Quién puede añadirte a grupos",
+            "note": "Quién puede meterte en una conversación de grupo. Por defecto, tus amigos y la gente de tus organizaciones; a los demás se les dice que no se te puede añadir."
         }
     },
     "who": {
@@ -302,5 +306,6 @@
         "confirmBody": "Sin ella, una foto de la pantalla hecha desde otro dispositivo ya no muestra a quién se le enseñó, así que es más fácil compartirla. Se aplica a lo que envíes a partir de ahora.",
         "keep": "Mantenerla",
         "turnOff": "Quitarla"
-    }
+    },
+    "lockedByAdmin": "Fijado por tu administrador para todos aquí."
 }

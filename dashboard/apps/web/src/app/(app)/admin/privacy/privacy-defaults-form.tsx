@@ -11,16 +11,49 @@
 
 import * as core from "@polaris/core";
 import { useState, useTransition } from "react";
-import { setPrivacyDefaultAction } from "./actions";
-import { Card, CardBody, Select } from "@polaris/ui";
+import { Card, CardBody, Select, Switch } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { setPrivacyDefaultAction, setPrivacyLockAction } from "./actions";
 
 type Defaults = Record<core.PrivacyField, core.PrivacyAudience>;
 
-export function PrivacyDefaultsForm({ defaults }: { defaults: Defaults }) {
+export function PrivacyDefaultsForm({
+    defaults,
+    locks = []
+}: {
+    defaults: Defaults;
+    /** Fields held to their default for every account. */
+    locks?: readonly core.PrivacyField[];
+}) {
     const t = useTranslations("admin");
     const tp = useTranslations("accountPrivacy");
     const [values, setValues] = useState<Defaults>(defaults);
+    const [locked, setLocked] = useState<ReadonlySet<core.PrivacyField>>(() => new Set(locks));
+
+    // The same optimistic flip as an audience: shown at once, put back on refusal.
+    const flipLock = (field: core.PrivacyField) => {
+        const before = locked.has(field);
+        const apply = (on: boolean) =>
+            setLocked((current) => {
+                const next = new Set(current);
+                if (on) next.add(field);
+                else next.delete(field);
+                return next;
+            });
+        apply(!before);
+        setError(null);
+        setBusy(field);
+        startTransition(async () => {
+            const result = await setPrivacyLockAction(field, !before).catch(() => ({
+                error: t("privacy.errors.checkSettings")
+            }));
+            if (result.error) {
+                apply(before);
+                setError(result.error);
+            }
+            setBusy(null);
+        });
+    };
     const [busy, setBusy] = useState<core.PrivacyField | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [, startTransition] = useTransition();
@@ -74,6 +107,17 @@ export function PrivacyDefaultsForm({ defaults }: { defaults: Defaults }) {
                                             choose(field, value as core.PrivacyAudience)
                                         }
                                     />
+                                    <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+                                        <Switch
+                                            checked={locked.has(field)}
+                                            disabled={busy === field}
+                                            aria-label={t("privacy.defaults.lockLabel", {
+                                                field: tp(`fields.${field}.label` as const)
+                                            })}
+                                            onChange={() => flipLock(field)}
+                                        />
+                                        {t("privacy.defaults.lock")}
+                                    </label>
                                 </li>
                             ))}
                         </ul>

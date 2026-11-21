@@ -34,8 +34,8 @@
 
 import { prisma } from "@polaris/db";
 import { blockedBetween } from "@/lib/blocks";
-import { colleaguesAmong } from "@/lib/privacy-service";
 import { ChatAccessError, type ChatActor } from "./access";
+import { allowedBy, colleaguesAmong } from "@/lib/privacy-service";
 
 /**
  * Where one person stands, as far as being added to a group goes.
@@ -100,6 +100,27 @@ export async function groupStandings(
 }
 
 /**
+ * Who among these the actor may put in a group, by each person's own
+ * "who can add me to groups" (`groupAdds`, ledger row 16).
+ *
+ * The rule above is that field's default: "friends", with a colleague counted
+ * as a friend the way `mayRing` counts one, so an account that never chose
+ * resolves exactly as every account did before the field existed. Somebody can
+ * open it to everybody or shut it to nobody - friends and colleagues included.
+ * A block refuses whatever the field says, and the viewer is never treated as
+ * an administrator: there is no door in this rule, as the header says.
+ */
+export async function groupAddable(
+    actorId: string,
+    standings: ReadonlyMap<string, GroupStanding>
+): Promise<Set<string>> {
+    const open = [...standings].filter(([, standing]) => standing !== "blocked").map(([id]) => id);
+    if (open.length === 0) return new Set();
+    const colleagues = new Set(open.filter((id) => standings.get(id) === "colleague"));
+    return allowedBy({ id: actorId, isAdmin: false }, "groupAdds", open, colleagues);
+}
+
+/**
  * Refuse unless every one of these people may be put in a group by the actor.
  *
  * A block refuses with the sentence every block gives and names nobody. Anybody
@@ -111,7 +132,8 @@ export async function refuseGroupStrangers(
     candidateIds: readonly string[]
 ): Promise<void> {
     const standings = await groupStandings(actor.id, candidateIds);
-    const refused = [...standings].filter(([, standing]) => !mayJoinGroup(standing));
+    const addable = await groupAddable(actor.id, standings);
+    const refused = [...standings].filter(([id]) => !addable.has(id));
     if (refused.length === 0) return;
 
     if (refused.some(([, standing]) => standing === "blocked")) {

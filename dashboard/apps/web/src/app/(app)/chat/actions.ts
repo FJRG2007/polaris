@@ -47,7 +47,7 @@ import { listChannelRoster } from "@/lib/chat/roster";
 import type { ChatRosterMember } from "@/lib/chat/roster-groups";
 import { allowedBy } from "@/lib/privacy-service";
 import { FriendError, requestFriend } from "@/lib/friends-service";
-import { groupStandings, mayJoinGroup } from "@/lib/chat/group-reach";
+import { groupAddable, groupStandings, mayJoinGroup } from "@/lib/chat/group-reach";
 import { MAX_NICKNAME, setNickname } from "@/lib/contact-names";
 import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
 import { chatProfile, type ChatProfile } from "@/lib/chat/profiles";
@@ -256,10 +256,14 @@ export async function searchGroupPeopleAction(
         ids.filter((id) => !inside.has(id))
     );
     const strangers = ids.filter((id) => standings.get(id) === "stranger");
-    const askable =
+    // Each person's own "who can add me to groups" decides, the same check the
+    // add itself runs - so the picker never offers somebody the server refuses.
+    const [askable, addable] = await Promise.all([
         strangers.length > 0
-            ? await allowedBy({ id: me.id, isAdmin: false }, "friendRequests", strangers)
-            : new Set<string>();
+            ? allowedBy({ id: me.id, isAdmin: false }, "friendRequests", strangers)
+            : new Set<string>(),
+        groupAddable(me.id, standings)
+    ]);
     const t = await getTranslations("chat");
     const reason = {
         pending: t("groupPicker.pending"),
@@ -269,10 +273,14 @@ export async function searchGroupPeopleAction(
 
     const results: GroupCandidate[] = found.people.map((person) => {
         const standing = standings.get(person.id) ?? "stranger";
-        if (inside.has(person.id) || mayJoinGroup(standing)) return person;
+        if (inside.has(person.id) || addable.has(person.id)) return person;
         return {
             ...person,
-            unavailable: reason[standing as keyof typeof reason],
+            // A friend or colleague who shut their group adds reads as
+            // somebody who cannot be added, never as which setting it was.
+            unavailable: mayJoinGroup(standing)
+                ? t("groupPicker.closed")
+                : reason[standing as keyof typeof reason],
             requestable: standing === "stranger" && askable.has(person.id)
         };
     });

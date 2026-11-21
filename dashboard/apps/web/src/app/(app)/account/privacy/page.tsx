@@ -14,21 +14,22 @@ import { prisma } from "@polaris/db";
 import { ChatTimerCard } from "./chat-timer-card";
 import { ViewOnceWatermarkCard } from "./view-once-watermark-card";
 import { BlockedCard } from "./blocked-card";
-import { listsFor, namePeople, privacyFor } from "@/lib/privacy-service";
+import { listsFor, namePeople, privacyFor, privacyLocks } from "@/lib/privacy-service";
 
 export const dynamic = "force-dynamic";
 
 export default async function PrivacyPage() {
     const session = await requireUser();
     const t = await getTranslations("accountPrivacy");
-    const [settings, lists, blocked, chatPrivacy] = await Promise.all([
+    const [settings, lists, blocked, chatPrivacy, locks] = await Promise.all([
         privacyFor(session.id),
         listsFor(session.id),
         listBlocked(session.id),
         prisma.userPrivacy.findUnique({
             where: { userId: session.id },
             select: { chatVanishAfter: true, viewOnceWatermark: true }
-        })
+        }),
+        privacyLocks()
     ]);
     // Every name any rule needs, in one read: a row draws the people it names,
     // and it holds their ids.
@@ -40,7 +41,7 @@ export default async function PrivacyPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("page.title")}</h1>
                 <p className="text-sm text-muted-foreground">{t("page.intro")}</p>
             </div>
-            <PrivacyView settings={settings} lists={lists} people={people} />
+            <PrivacyView settings={settings} lists={lists} people={people} locked={[...locks]} />
             <ChatTimerCard seconds={chatPrivacy?.chatVanishAfter ?? 0} />
             <ViewOnceWatermarkCard on={chatPrivacy?.viewOnceWatermark ?? true} />
             {/* What is shared beside your name has its own page: sources,

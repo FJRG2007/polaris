@@ -25,7 +25,27 @@ let created: { kind: string; members: string[] } | null = null;
 let added: string[] | null = null;
 let removed: string[] = [];
 
+/** Each account's own "who can add me to groups"; absent is never chosen. */
+let groupAdds = new Map<string, string>();
+
 vi.mock("@polaris/auth", () => ({ can: async () => true }));
+vi.mock("@/lib/setting-store", () => ({
+    getSetting: async () => null,
+    getSettings: async () => new Map(),
+    setSetting: async () => undefined
+}));
+vi.mock("@/lib/friends-service", () => ({
+    friendIds: async (userId: string) =>
+        new Set(
+            friendships
+                .filter(
+                    (row) =>
+                        row.status === "accepted" &&
+                        (row.requesterId === userId || row.addresseeId === userId)
+                )
+                .map((row) => (row.requesterId === userId ? row.addresseeId : row.requesterId))
+        )
+}));
 vi.mock("@/lib/orgs/org-service", () => ({
     memberOrgIds: async (userId: string) =>
         userId === "ada" && colleagues.length ? ["org-1"] : [],
@@ -62,6 +82,15 @@ const NAMES: Record<string, string> = {
 vi.mock("@polaris/db", () => ({
     VISIBLE_USER: {},
     prisma: {
+        userPrivacy: {
+            findMany: async ({ where }: { where: { userId: { in: string[] } } }) =>
+                where.userId.in
+                    .filter((userId) => groupAdds.has(userId))
+                    .map((userId) => ({ userId, groupAdds: groupAdds.get(userId) }))
+        },
+        privacyFieldList: { findMany: async () => [] },
+        privacyListMember: { findMany: async () => [] },
+        follow: { findMany: async () => [] },
         userBlock: {
             findMany: async ({
                 where
@@ -176,6 +205,7 @@ beforeEach(() => {
     created = null;
     added = null;
     removed = [];
+    groupAdds = new Map();
 });
 
 /** Every way a group gains a member, run against the same cases. */
@@ -186,6 +216,26 @@ const paths = {
 
 describe.each(Object.entries(paths))("%s", (_path, run) => {
     beforeEach(() => friends("grace"));
+
+    it("takes a stranger whose own group adds are open to everybody", async () => {
+        groupAdds.set("alan", "everyone");
+        await expect(run(["alan"])).resolves.not.toThrow();
+    });
+
+    it("refuses a friend who shut their group adds to nobody", async () => {
+        friends("alan");
+        groupAdds.set("alan", "nobody");
+        await expect(run(["alan"])).rejects.toBeInstanceOf(reach.GroupStrangerError);
+    });
+
+    it("refuses a colleague who shut their group adds, and a blocked person even when open", async () => {
+        colleagues = ["alan"];
+        groupAdds.set("alan", "nobody");
+        await expect(run(["alan"])).rejects.toBeInstanceOf(reach.GroupStrangerError);
+        groupAdds.set("hopper", "everyone");
+        blocks = [{ blockerId: "hopper", blockedId: "ada" }];
+        await expect(run(["hopper"])).rejects.toBeInstanceOf(ChatAccessError);
+    });
 
     it("takes a friend, whichever of the two asked", async () => {
         friends("alan", "accepted", "alan");

@@ -11827,6 +11827,10 @@ model UserPrivacy {
     // question and is not this: that is a room somebody walked into, not a
     // person being rung.
     calls          String?
+    // Who may put this account in a group conversation (ledger row 16). Null
+    // is "never chose" and resolves to friends, colleagues counted as friends -
+    // the fixed rule every account had before this column existed.
+    groupAdds      String?
     // Who may send something this account wrote into another conversation. Open
     // by default, like the rest: a messenger where nothing can be passed on is
     // not what anybody expects, and a default that removed a button would read

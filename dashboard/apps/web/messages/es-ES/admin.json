@@ -4218,7 +4218,9 @@
         },
         "defaults": {
             "title": "Por defecto",
-            "description": "Con qué empieza cada ajuste en las cuentas que nunca lo cambiaron, también las existentes. Quien lo cambió conserva su elección."
+            "description": "Con qué empieza cada ajuste en las cuentas que nunca lo cambiaron, también las existentes. Quien lo cambió conserva su elección.",
+            "lock": "Fijar",
+            "lockLabel": "Fijar {field} en este valor para todos"
         },
         "discovery": {
             "title": "Encontrar personas",

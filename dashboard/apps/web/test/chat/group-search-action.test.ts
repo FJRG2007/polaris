@@ -44,7 +44,14 @@ vi.mock("@/lib/chat/group-reach", () => ({
             ["linus", "stranger"],
             ["turing", "colleague"]
         ]),
-    mayJoinGroup: (standing: string) => standing === "friend" || standing === "colleague"
+    mayJoinGroup: (standing: string) => standing === "friend" || standing === "colleague",
+    // Nobody here chose a group-adds setting, so it is the old rule.
+    groupAddable: async (_actorId: string, standings: Map<string, string>) =>
+        new Set(
+            [...standings]
+                .filter(([, standing]) => standing === "friend" || standing === "colleague")
+                .map(([id]) => id)
+        )
 }));
 vi.mock("@/lib/privacy-service", () => ({
     allowedBy: async (_viewer: unknown, field: string, ids: string[]) => {

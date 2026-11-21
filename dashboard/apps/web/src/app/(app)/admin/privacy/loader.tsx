@@ -37,7 +37,7 @@ export function PrivacyLoader({
                     profiles={
                         <PublicProfilesForm enabled={data.publicProfiles} />
                     }
-                    defaults={<PrivacyDefaultsForm defaults={data.defaults} />}
+                    defaults={<PrivacyDefaultsForm defaults={data.defaults} locks={data.locks} />}
                     discovery={<PeopleDiscoveryForm policy={data.discovery} />}
                 />
             )}

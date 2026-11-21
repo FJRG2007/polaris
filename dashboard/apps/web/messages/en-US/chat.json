@@ -1657,7 +1657,8 @@
         "sendRequestTo": "Send {name} a friend request",
         "requestSent": "Friend request sent",
         "cannotAsk": "You cannot send that request",
-        "requestFailed": "The request could not be sent. Try again."
+        "requestFailed": "The request could not be sent. Try again.",
+        "closed": "Does not accept group adds"
     },
     "addPeople": {
         "addPeople": "Add people",
