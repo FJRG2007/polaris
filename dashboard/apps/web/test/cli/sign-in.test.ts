@@ -135,6 +135,32 @@ beforeEach(() => {
 describe("a TV's request", () => {
     const TV = { ...REQUEST, deviceName: "Sample TV", scopes: [], kind: "tv" as const };
 
+    it("names Companion for a deck sign-in Companion made, so Sessions lists it as such", async () => {
+        const made: Record<string, unknown>[] = [];
+        for (const agent of [
+            "polaris-companion/1.2.0 (linux; x64; node 22.11.0)",
+            "polaris-streamdeck/0.9.0 (win32; x64; node 24.0.0)"
+        ]) {
+            const opened = await openCliSignIn(
+                { ...REQUEST, deviceName: "DRAGON", requestUserAgent: agent, kind: "streamdeck" },
+                (size) => crypto.getRandomValues(new Uint8Array(size))
+            );
+            await answerCliSignIn({
+                userId: ADA,
+                userCode: opened!.userCode,
+                approve: true,
+                kind: "streamdeck"
+            });
+            expect(await claimCliSignIn(opened!.deviceCode)).toMatchObject({ status: "approved" });
+            made.push(minted.at(-1)!.input);
+        }
+        expect(made.map((input) => [input["name"], input["description"]])).toEqual([
+            ["Companion - DRAGON", "Connected from the Companion module."],
+            ["Stream Deck - DRAGON", "Connected from the Stream Deck plugin."]
+        ]);
+        expect(minted.map((key) => key.kind)).toEqual(["streamdeck", "streamdeck"]);
+    });
+
     it("mints a key of its own kind that carries no scope", async () => {
         const opened = await openCliSignIn(TV, fixedRandom);
         await answerCliSignIn({

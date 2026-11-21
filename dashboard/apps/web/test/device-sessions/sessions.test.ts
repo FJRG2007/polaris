@@ -64,7 +64,9 @@ vi.mock("@/lib/notifications/session-events", () => ({
     notifySessionsClosed: async (entry: Row) => void notices.push(entry)
 }));
 
-const { DEVICE_KINDS } = await import("@/lib/device-sessions/kinds");
+const { COMPANION_KEY_DESCRIPTION, DEVICE_KINDS, deviceSessionLabel } = await import(
+    "@/lib/device-sessions/kinds"
+);
 const {
     deviceAddressAllows,
     listDeviceSessions,
@@ -109,6 +111,7 @@ describe("listing", () => {
         expect(row).toEqual({
             id: "key-1",
             kind: "cli",
+            client: null,
             name: "ada-laptop",
             hostname: "ada-laptop",
             os: "macOS",
@@ -150,6 +153,25 @@ describe("listing", () => {
             ["cli", "DRAGON", "DRAGON"]
         ]);
         expect(rows.map((row) => row.kind).sort()).toEqual([...DEVICE_KINDS].sort());
+    });
+
+    it("names Companion for the deck sign-in it made, and a Stream Deck for every other", async () => {
+        keys.push(
+            cliKey({
+                kind: "streamdeck",
+                name: "Companion - DRAGON",
+                clientName: "DRAGON",
+                description: COMPANION_KEY_DESCRIPTION
+            }),
+            // A deck connected before the client was recorded keeps working and
+            // reads as the Stream Deck it was listed as.
+            cliKey({ kind: "streamdeck", clientName: "DRAGON", description: null })
+        );
+        const rows = await listDeviceSessions(ADA, NOW);
+        expect(rows.map((row) => [row.kind, row.client, deviceSessionLabel(row)])).toEqual([
+            ["streamdeck", "companion", "sessionsTable.appSignIn.kinds.companion"],
+            ["streamdeck", null, "sessionsTable.appSignIn.kinds.streamdeck"]
+        ]);
     });
 
     it("says when the account's rule locks it", async () => {

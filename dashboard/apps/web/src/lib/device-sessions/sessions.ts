@@ -24,6 +24,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
 import { addressPinned, isHandheld, type AddressPinScope } from "@polaris/core";
 import {
+    COMPANION_KEY_DESCRIPTION,
     DEVICE_KINDS,
     DEVICE_SESSION_KINDS,
     type DeviceSessionKind
@@ -35,6 +36,9 @@ export interface DeviceSessionView {
     readonly id: string;
     /** Which app signed in. */
     readonly kind: DeviceSessionKind;
+    /** Which client made a sign-in its kind shares: Companion for a deck
+     *  sign-in the Companion module made, null otherwise. */
+    readonly client: "companion" | null;
     /** The device's name, as the app reported it at sign-in. */
     readonly name: string;
     /** The computer's hostname, for a kind whose reported name is one, so the
@@ -110,6 +114,7 @@ export async function listDeviceSessions(
                 kind: true,
                 name: true,
                 clientName: true,
+                description: true,
                 clientOs: true,
                 clientVersion: true,
                 clientOsVersion: true,
@@ -127,6 +132,7 @@ export async function listDeviceSessions(
     return rows.map((row) => ({
         id: row.id,
         kind: row.kind as DeviceSessionKind,
+        client: row.description === COMPANION_KEY_DESCRIPTION ? "companion" : null,
         // A sign-in made before the computer was recorded still has the key's
         // own name, which carries it ("CLI - laptop").
         name: row.clientName ?? row.name,

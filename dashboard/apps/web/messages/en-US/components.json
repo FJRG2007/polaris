@@ -1045,6 +1045,7 @@
             "kinds": {
                 "cli": "Command line",
                 "streamdeck": "Stream Deck",
+                "companion": "Companion",
                 "tv": "Polaris TV"
             },
             "lockedHint": "This sign-in only works from the address it was last used at",

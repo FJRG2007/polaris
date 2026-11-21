@@ -22,7 +22,7 @@ import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { VaultClientRow } from "@/lib/vault/devices";
 import type { DeviceSessionView } from "@/lib/device-sessions/sessions";
-import { DEVICE_SESSION_KINDS } from "@/lib/device-sessions/kinds";
+import { deviceSessionLabel } from "@/lib/device-sessions/kinds";
 import type { ExtensionSessionView } from "@/lib/extension/sessions";
 import { TrustedDevicesCard } from "./trusted-devices-card";
 import { BlockedDevicesCard } from "./blocked-devices-card";
@@ -153,7 +153,7 @@ export function SessionsView({
     /** Sign a device's app out. Its key is revoked, so the app's next request
      *  says it was signed out and asks to be connected again. */
     async function signOutDevice(session: DeviceSessionView) {
-        const named = { app: words(DEVICE_SESSION_KINDS[session.kind].label), name: session.name };
+        const named = { app: words(deviceSessionLabel(session)), name: session.name };
         const ok = await confirm({
             title: t("sessions.app.title", named),
             description: t("sessions.app.description"),

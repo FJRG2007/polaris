@@ -28,6 +28,7 @@ import { TV_TOKEN_DAYS } from "@/lib/tv/scopes";
 import { DECK_TOKEN_DAYS, isDeckScope, type DeckScope } from "@/lib/deck/scopes";
 import { createApiKey, scopesAvailableTo } from "@polaris/auth";
 import { revokeDeviceSession } from "@/lib/device-sessions/sessions";
+import { COMPANION_KEY_DESCRIPTION } from "@/lib/device-sessions/kinds";
 import { AUTHORIZATION_POLL_MS, AUTHORIZATION_TTL_MS, newUserCode } from "@/lib/device-code";
 import { createApiKeySchema, describeClient, parseStringList, stringifyList } from "@polaris/core";
 
@@ -282,6 +283,10 @@ export async function claimCliSignIn(
 
     const held = new Set<string>(await scopesAvailableTo(account.id, account.isAdmin));
     const kind = storedKind(row.kind);
+    // Companion signs in through the deck's flow; its user-agent is the one
+    // thing that tells the two apart, and the sessions screen names it from this.
+    const companion =
+        kind === "streamdeck" && /^polaris-companion\//.test(row.requestUserAgent ?? "");
     const scopes = storedScopes(row.scopes, kind).filter((scope) => held.has(scope));
     // A TV's key carries no scope at all: it reaches /api/tv and nothing else.
     if (scopes.length === 0 && kind !== "tv") return { status: "denied" };
@@ -299,7 +304,7 @@ export async function claimCliSignIn(
                       `TV - ${row.deviceName}`.slice(0, 60)
                     : kind === "streamdeck"
                       ? // i18n-ignore the name of a key, in the list its owner reads
-                        `Stream Deck - ${row.deviceName}`.slice(0, 60)
+                        `${companion ? "Companion" : "Stream Deck"} - ${row.deviceName}`.slice(0, 60)
                       : // i18n-ignore the name of a key, in the list its owner reads
                         `CLI - ${row.deviceName}`.slice(0, 60),
             description:
@@ -307,8 +312,10 @@ export async function claimCliSignIn(
                     ? // i18n-ignore stored with the key; the list shows it as written
                       "Connected from Polaris TV."
                     : kind === "streamdeck"
-                      ? // i18n-ignore stored with the key; the list shows it as written
-                        "Connected from the Stream Deck plugin."
+                      ? companion
+                          ? COMPANION_KEY_DESCRIPTION
+                          : // i18n-ignore stored with the key; the list shows it as written
+                            "Connected from the Stream Deck plugin."
                       : // i18n-ignore stored with the key; the list shows it as written
                         "Signed in with plr login.",
             environment: kind === "cli" ? "development" : "production",

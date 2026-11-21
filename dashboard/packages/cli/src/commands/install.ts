@@ -237,7 +237,7 @@ export async function uninstall(
             }).catch(() =>
                 line(
                     context.io,
-                    `Could not reach ${profile.url} to revoke profile ${name}'s key; revoke it under API keys there.`
+                    `Could not reach ${profile.url} to revoke profile ${name}'s key; sign it out under Sessions there (or revoke it under API keys if it was a key you made).`
                 )
             );
         }

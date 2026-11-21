@@ -19,7 +19,7 @@ import { SystemMark } from "@/components/client-marks";
 import { DeviceAddress } from "@/components/device-address";
 import { ActivityLink, HostName, MachineBadge, PinButton } from "@/components/sessions-table";
 import type { Machine } from "@/lib/device-sessions/machines";
-import { DEVICE_SESSION_KINDS } from "@/lib/device-sessions/kinds";
+import { DEVICE_SESSION_KINDS, deviceSessionLabel } from "@/lib/device-sessions/kinds";
 import type { DeviceSessionView } from "@/lib/device-sessions/sessions";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -56,7 +56,8 @@ export function DeviceSessionRows({
                 const address = session.lastUsedIp ?? session.signedInIp;
                 const locked = session.pinToAddress ?? session.pinnedByRule;
                 const lastUsedAt = session.lastUsedAt;
-                const { icon: Mark, label } = DEVICE_SESSION_KINDS[session.kind];
+                const { icon: Mark } = DEVICE_SESSION_KINDS[session.kind];
+                const label = deviceSessionLabel(session);
                 const app = t(label);
                 const named = t("sessionsTable.appSignIn.named", { app, name: session.name });
                 return (

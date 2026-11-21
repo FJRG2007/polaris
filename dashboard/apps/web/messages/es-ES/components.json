@@ -1045,6 +1045,7 @@
             "kinds": {
                 "cli": "Terminal",
                 "streamdeck": "Stream Deck",
+                "companion": "Companion",
                 "tv": "Polaris TV"
             },
             "lockedHint": "Esta sesión solo funciona desde la última dirección en que se usó",

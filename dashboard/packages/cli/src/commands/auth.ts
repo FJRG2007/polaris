@@ -300,12 +300,12 @@ export async function logout(context: Context, flags: Flags): Promise<void> {
     } else if (outcome === "missing") {
         line(
             context.io,
-            `Removed profile ${name} from this computer. Its token was no longer here to revoke; revoke the key under API keys on ${profile.url}.`
+            `Removed profile ${name} from this computer. Its token was no longer here to revoke; sign it out under Sessions on ${profile.url} (or revoke it under API keys if it was a key you made).`
         );
     } else {
         line(
             context.io,
-            `Removed profile ${name} from this computer, but ${profile.url} could not be reached to revoke its key. It keeps working until you revoke it under API keys.`
+            `Removed profile ${name} from this computer, but ${profile.url} could not be reached to revoke its key. It keeps working until you sign it out under Sessions (or revoke it under API keys if it was a key you made).`
         );
     }
     if (current && current !== name) report(context, ui, `Now using profile ${current}.`);

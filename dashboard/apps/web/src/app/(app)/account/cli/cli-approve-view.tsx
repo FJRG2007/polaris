@@ -109,7 +109,7 @@ export function CliApproveView({ account, kind = "cli" }: { account?: string; ki
                     answered === "in"
                         ? t.rich(`${words}.signedInHint`, {
                               link: (chunks) => (
-                                  <Link key="link" className="underline" href="/account/api-keys">
+                                  <Link key="link" className="underline" href="/account/sessions">
                                       {chunks}
                                   </Link>
                               )

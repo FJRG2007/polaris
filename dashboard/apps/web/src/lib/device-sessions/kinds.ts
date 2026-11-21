@@ -45,3 +45,26 @@ export const DEVICE_KINDS = Object.keys(DEVICE_SESSION_KINDS) as DeviceSessionKi
 export function isDeviceSessionKind(kind: string): kind is DeviceSessionKind {
     return Object.hasOwn(DEVICE_SESSION_KINDS, kind);
 }
+
+/**
+ * What the Companion module's sign-in is stored with. Companion connects
+ * through the Stream Deck's own flow and holds a key of the same kind - the
+ * deck routes take nothing else - so this description is what tells the
+ * sessions screen which of the two it is. A sign-in from before it was written
+ * reads as a Stream Deck, which is what it was listed as then.
+ */
+// i18n-ignore stored with the key; never shown
+export const COMPANION_KEY_DESCRIPTION = "Connected from the Companion module.";
+
+/** The app a device sign-in names on the sessions screen: its kind's, or
+ *  Companion's for the deck sign-in Companion made. */
+export function deviceSessionLabel(session: {
+    readonly kind: DeviceSessionKind;
+    readonly client?: "companion" | null;
+}):
+    | (typeof DEVICE_SESSION_KINDS)[DeviceSessionKind]["label"]
+    | "sessionsTable.appSignIn.kinds.companion" {
+    return session.kind === "streamdeck" && session.client === "companion"
+        ? "sessionsTable.appSignIn.kinds.companion"
+        : DEVICE_SESSION_KINDS[session.kind].label;
+}
