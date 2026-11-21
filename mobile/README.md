@@ -29,6 +29,17 @@ Until the app is on TestFlight, a Mac with Xcode installs it on your own iPhone 
 A free Apple ID signs the app for 7 days; press Run again to renew it. A paid Apple Developer account removes that
 limit and allows TestFlight.
 
+## Calls with the app closed
+
+On Android a call rings like a phone call with nothing to set up: the ringtone, the answer screen over the lock
+screen, and Answer and Decline on the notification.
+
+On iPhone, iOS wakes a closed app only for a push sent through Apple, which needs a paid Apple Developer account.
+Create a key with **Apple Push Notifications service (APNs)** ticked under Certificates, Identifiers & Profiles >
+Keys, then open **Admin > Integrations > Apple push** in Polaris and paste the .p8 file with its Key ID and your Team
+ID. From then on a call rings the iPhone with the system's own call screen. Without it, an iPhone rings only while the
+app is open.
+
 ## VPN
 
 On Android the app runs the Polaris VPN itself: pick a location on the VPN page and press **Connect**, and accept

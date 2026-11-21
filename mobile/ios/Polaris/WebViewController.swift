@@ -192,6 +192,8 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
         retry = nil
         retries = 0
         failure.isHidden = true
+        // Signed in by now, or still: the Polaris learns which phone to ring for this account.
+        IncomingCalls.shared.register(with: host)
     }
 
     private func scheduleRetry() {

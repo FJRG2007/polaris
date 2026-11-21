@@ -21,6 +21,9 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         GENERATE_INFOPLIST_FILE: NO
+        # Push (for calls that ring with the app closed). Read only by a signed build; the simulator build in CI
+        # does not sign.
+        CODE_SIGN_ENTITLEMENTS: Polaris/Polaris.entitlements
     info:
       path: Polaris/Info.plist
       properties:
@@ -46,6 +49,9 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         UIUserInterfaceStyle: Dark
+        # A call that rings with the app closed: iOS wakes the app for a VoIP push and it shows the call screen.
+        UIBackgroundModes:
+          - voip
         UIAppFonts:
           - IBMPlexSans-Regular.ttf
           - IBMPlexSans-Medium.ttf

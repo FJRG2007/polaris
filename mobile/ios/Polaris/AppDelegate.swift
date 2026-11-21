@@ -4,6 +4,15 @@ import UIKit
 final class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
+    ) -> Bool {
+        // First thing: a call that woke the app is handed over as soon as this registers.
+        IncomingCalls.shared.start()
+        return true
+    }
+
+    func application(
+        _ application: UIApplication,
         configurationForConnecting session: UISceneSession,
         options: UIScene.ConnectionOptions
     ) -> UISceneConfiguration {
