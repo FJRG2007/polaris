@@ -1,0 +1,50 @@
+{
+    "name": "@polaris/chat-crypto",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Chat end-to-end encryption, client side: the account key, the locks that wrap it, and the hybrid post-quantum envelope for stored keys.",
+    "exports": {
+        "./account-key": {
+            "types": "./dist/account-key.d.ts",
+            "import": "./dist/account-key.js"
+        },
+        "./locks": {
+            "types": "./dist/locks.d.ts",
+            "import": "./dist/locks.js"
+        },
+        "./device-lock": {
+            "types": "./dist/device-lock.d.ts",
+            "import": "./dist/device-lock.js"
+        },
+        "./password-lock": {
+            "types": "./dist/password-lock.d.ts",
+            "import": "./dist/password-lock.js"
+        },
+        "./passkey-lock": {
+            "types": "./dist/passkey-lock.d.ts",
+            "import": "./dist/passkey-lock.js"
+        },
+        "./hybrid-envelope": {
+            "types": "./dist/hybrid-envelope.d.ts",
+            "import": "./dist/hybrid-envelope.js"
+        },
+        "./opaque-server": {
+            "types": "./dist/opaque-server.d.ts",
+            "import": "./dist/opaque-server.js"
+        }
+    },
+    "scripts": {
+        "build": "tsup src/account-key.ts src/locks.ts src/device-lock.ts src/password-lock.ts src/passkey-lock.ts src/hybrid-envelope.ts src/opaque-server.ts --format esm --dts --clean",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run --passWithNoTests"
+    },
+    "dependencies": {
+        "@hpke/core": "1.10.1",
+        "@hpke/hybridkem-x-wing": "0.7.1",
+        "@serenity-kit/opaque": "1.1.0"
+    },
+    "devDependencies": {
+        "fake-indexeddb": "6.2.8"
+    }
+}
