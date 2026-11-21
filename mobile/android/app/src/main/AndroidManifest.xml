@@ -189,6 +189,11 @@
             </intent-filter>
         </receiver>
 
+        <!-- The system installer's answer to a self-update; only ever sent by this app's own PendingIntent. -->
+        <receiver
+            android:name=".UpdateResult"
+            android:exported="false" />
+
         <!-- Where the camera writes what is taken from the file picker; never exported, granted per capture. -->
         <provider
             android:name=".CaptureProvider"

@@ -11,7 +11,10 @@ to other sites opening in the browser, and a check for newer builds of itself.
 2. Open the file. Android asks once to allow installs from the browser you downloaded with.
 3. Type the address you open Polaris at. The app checks that it is a Polaris before it keeps it.
 
-Later versions install over this one; the app offers them itself, at most twice a day. Hold the app icon and pick
+Later versions install over this one by themselves: allow Polaris to install apps when it asks, and from then on it
+downloads each new version, checks it against the release's SHA256SUMS, and installs it when you leave the app
+(Android 12 and later, with no prompt; older versions ask with one tap). Without that permission it offers the
+download instead. The Google Play and F-Droid builds never update themselves: their store does. Hold the app icon and pick
 **Use another Polaris** to point it somewhere else.
 
 ## Install on iPhone from a Mac

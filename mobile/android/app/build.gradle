@@ -2,6 +2,10 @@ plugins {
     id 'com.android.application'
 }
 
+// The APK published on GitHub installs its own updates; the Google Play bundle and the F-Droid build (both built
+// without this property) do not, and do not declare the permission, because both stores forbid it.
+def selfUpdate = (project.findProperty('polaris.selfUpdate') ?: 'false') == 'true'
+
 android {
     namespace 'app.polaris.mobile'
     compileSdk 36
@@ -12,6 +16,14 @@ android {
         targetSdk 36
         versionCode 12
         versionName '0.1.11'
+        buildConfigField 'boolean', 'SELF_UPDATE', selfUpdate.toString()
+    }
+
+    sourceSets {
+        if (selfUpdate) {
+            release.manifest.srcFile 'src/selfUpdate/AndroidManifest.xml'
+            debug.manifest.srcFile 'src/selfUpdate/AndroidManifest.xml'
+        }
     }
 
     signingConfigs {

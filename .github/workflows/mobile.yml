@@ -29,7 +29,10 @@ jobs:
         working-directory: mobile/android
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon testReleaseUnitTest lintRelease assembleRelease bundleRelease
+          # The store build first (no self-update permission), then the GitHub APK that updates itself, so both are
+          # tested and linted the way they ship.
+          ./gradlew --no-daemon testReleaseUnitTest lintRelease bundleRelease
+          ./gradlew --no-daemon -Ppolaris.selfUpdate=true testReleaseUnitTest lintRelease assembleRelease
           cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/polaris-android.apk"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -102,7 +105,9 @@ jobs:
         run: |
           export MOBILE_KEYSTORE_PATH="$RUNNER_TEMP/mobile.keystore"
           printf '%s' "$MOBILE_KEYSTORE_BASE64" | base64 -d > "$MOBILE_KEYSTORE_PATH"
-          (cd mobile/android && chmod +x gradlew && ./gradlew --no-daemon assembleRelease bundleRelease)
+          # The Google Play bundle has no self-update permission (Play forbids it); the GitHub APK installs its own.
+          (cd mobile/android && chmod +x gradlew && ./gradlew --no-daemon bundleRelease \
+            && ./gradlew --no-daemon -Ppolaris.selfUpdate=true assembleRelease)
           rm -f "$MOBILE_KEYSTORE_PATH"
           mkdir out
           cp mobile/android/app/build/outputs/apk/release/app-release.apk out/polaris-android.apk
@@ -111,7 +116,7 @@ jobs:
           (cd out && sha256sum polaris-android.apk polaris-android.aab > SHA256SUMS)
           gh release create "${{ steps.decide.outputs.tag }}" out/* \
             --title "Polaris for Android ${{ steps.decide.outputs.tag }}" \
-            --notes "Install polaris-android.apk on the phone. Later versions install over it, and the app offers them itself. polaris-android.aab is the bundle for Google Play." \
+            --notes "Install polaris-android.apk on the phone. Later versions download and install themselves once Polaris is allowed to install apps. polaris-android.aab is the bundle for Google Play." \
             --latest=false
       # Play reads "what's new" as one whatsnew-<locale> file per language: the same text F-Droid reads from
       # fastlane/metadata/android/<locale>/changelogs/<versionCode>.txt.

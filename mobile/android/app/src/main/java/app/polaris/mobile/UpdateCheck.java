@@ -136,7 +136,8 @@ final class UpdateCheck {
                     return;
                 }
                 status.setText(activity.getString(R.string.update_title, found[0]));
-                offer(activity, found[0], found[1]);
+                if (SelfUpdate.supported(activity)) SelfUpdate.found(activity, found[0], found[1], true, status);
+                else offerBrowser(activity, found[0], found[1]);
             });
         }, "update-check-now").start();
     }
@@ -167,27 +168,33 @@ final class UpdateCheck {
                 }
                 prefs.edit().putLong("checkedAt", System.currentTimeMillis()).remove("failedAt").apply();
                 if (found == null) return;
-                activity.runOnUiThread(() -> offer(activity, found[0], found[1]));
+                activity.runOnUiThread(() -> {
+                    if (SelfUpdate.supported(activity)) SelfUpdate.found(activity, found[0], found[1], false, null);
+                    else offerBrowser(activity, found[0], found[1]);
+                });
             } finally {
                 RUNNING.set(false);
             }
         }, "update-check").start();
     }
 
-    private static void offer(Activity activity, String version, String url) {
+    /** The newer version offered as a download in the browser, for a build or a phone that cannot install it itself. */
+    static void offerBrowser(Activity activity, String version, String url) {
         if (activity.isFinishing() || activity.isDestroyed()) return;
         new AlertDialog.Builder(activity)
                 .setTitle(activity.getString(R.string.update_title, version))
                 .setMessage(R.string.update_message)
-                .setPositiveButton(R.string.update_download, (dialog, which) -> {
-                    try {
-                        activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-                    } catch (ActivityNotFoundException none) {
-                        // No browser to download with: nothing to do but leave it.
-                    }
-                })
+                .setPositiveButton(R.string.update_download, (dialog, which) -> openDownload(activity, url))
                 .setNegativeButton(R.string.update_later, null)
                 .show();
+    }
+
+    static void openDownload(Activity activity, String url) {
+        try {
+            activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+        } catch (ActivityNotFoundException none) {
+            // No browser to download with: nothing to do but leave it.
+        }
     }
 
     private static String fetch() throws Exception {

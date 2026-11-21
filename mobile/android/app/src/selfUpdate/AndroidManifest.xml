@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Merged only into the build published on GitHub (-Ppolaris.selfUpdate=true), the one that installs its own
+     updates (SelfUpdate.java). Google Play and F-Droid builds never declare these. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+</manifest>

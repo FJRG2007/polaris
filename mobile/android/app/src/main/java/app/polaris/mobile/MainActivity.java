@@ -575,6 +575,13 @@ public final class MainActivity extends Activity {
     }
 
     @Override
+    protected void onStop() {
+        super.onStop();
+        // Leaving the app is when a downloaded update installs itself, so it never closes what the person is doing.
+        if (!isChangingConfigurations()) SelfUpdate.installWhenLeaving(this);
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         NoticeService.pageVisible = true;
@@ -584,6 +591,7 @@ public final class MainActivity extends Activity {
         if (web != null) hostChanged();
         // On every return to the app, not only a cold start: Android keeps an app alive for days.
         UpdateCheck.maybeRun(this);
+        SelfUpdate.offerPending(this);
     }
 
     @Override

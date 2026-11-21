@@ -22,6 +22,13 @@
     <string name="update_message">Download it and open the file to install it over this version.</string>
     <string name="update_download">Download</string>
     <string name="update_later">Later</string>
+    <string name="update_allow_message">Let Polaris install its own updates and it will keep itself up to date, with no download to open. Allow it on the next screen, then come back.</string>
+    <string name="update_allow">Allow</string>
+    <string name="update_install_message">It is downloaded and checked. Polaris closes to install it; open it again after.</string>
+    <string name="update_install">Install</string>
+    <string name="update_downloading">Downloading Polaris %1$s...</string>
+    <string name="update_download_failed">The download didn't go through. Try again later.</string>
+    <string name="update_ready">Polaris %1$s installs when you leave the app.</string>
     <string name="view_once_audio">Playing audio</string>
     <string name="view_once_close">Close</string>
     <string name="view_once_camera">Taken with the camera</string>
