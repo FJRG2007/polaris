@@ -127,10 +127,10 @@ export function withoutReplacedAnticheats(projects: string): string {
  */
 export function wantsDefaultAnticheat(env: ReadonlyMap<string, string>): boolean {
     const decided = (env.get(ANTICHEAT_KEY) ?? "").trim().toLowerCase();
-    return (
-        decided === "" &&
-        anticheatBuildFor(env.get("TYPE") ?? "", env.get("VERSION") ?? "") !== null
-    );
+    const build = anticheatBuildFor(env.get("TYPE") ?? "", env.get("VERSION") ?? "");
+    // The Forge engine is offered, not adopted: it has not yet run on a real
+    // server with a full mod list, so it goes on only when the owner switches it.
+    return decided === "" && build !== null && build.kind !== "engine";
 }
 
 /** Whether the server runs mods: the engine's movement and block checks only

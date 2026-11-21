@@ -66,7 +66,11 @@ dependencies {
         isTransitive = false // messes with guava otherwise
     }
 
-    compileOnly(libs.floodgate.api)
+    compileOnly(libs.floodgate.api) {
+        // Its parent snapshot is gone from the repository, and nothing here uses it:
+        // only FloodgateApi is read, at runtime, from Floodgate itself.
+        exclude(group = "org.geysermc", module = "common")
+    }
     compileOnly(libs.viaversion)
     compileOnly(libs.viabackwards)
     compileOnly(libs.netty)

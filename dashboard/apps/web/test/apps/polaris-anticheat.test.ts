@@ -309,14 +309,14 @@ describe("on a Forge server, through the engine's own mod", () => {
         new Map<string, string>([["TYPE", "FORGE"], ["VERSION", "1.20.1"], ...extra]);
     const input = { baseUrl: BASE, modKey: "key", installedAppId: SERVER, token: "t" };
 
-    it("has a build for 1.20.1 alone, and is wanted by default there", () => {
+    it("has a build for 1.20.1 alone, offered but never switched on by itself", () => {
         expect(anticheat.anticheatBuildFor("FORGE", "1.20.1")).toEqual({
             kind: "engine",
             file: "polaris-anticheat-forge-1.20.1.jar"
         });
         expect(anticheat.anticheatBuildFor("FORGE", "1.21.1")).toBeNull();
         expect(anticheat.anticheatBuildFor("FORGE", "")).toBeNull();
-        expect(anticheat.wantsDefaultAnticheat(forge())).toBe(true);
+        expect(anticheat.wantsDefaultAnticheat(forge())).toBe(false);
         expect(anticheat.wantsDefaultAnticheat(forge([["POLARIS_ANTICHEAT", "off"]]))).toBe(false);
         expect(anticheat.ANTICHEAT_FILES).toContain("polaris-anticheat-forge-1.20.1.jar");
     });
