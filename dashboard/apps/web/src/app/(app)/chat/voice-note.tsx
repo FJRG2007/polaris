@@ -219,7 +219,7 @@ export function VoiceNote({
     const done = length > 0 ? Math.min(1, at / length) : 0;
 
     return (
-        <span className="inline-flex max-w-full flex-col gap-1 rounded-md border border-border bg-card px-2 py-1.5">
+        <span className="inline-flex min-w-0 max-w-full flex-col gap-1 rounded-md border border-border bg-card px-2 py-1.5">
             {!recorded && (
                 <span
                     className="max-w-[16rem] truncate text-[0.6875rem] text-muted-foreground"
@@ -233,7 +233,9 @@ export function VoiceNote({
                 and "the NAS is not answering" looks exactly like a broken
                 player from here. */}
             {broken && <span className="text-[0.6875rem] text-danger">{broken}</span>}
-            <span className="flex items-center gap-2">
+            {/* On a phone the row is narrower than its parts: the waveform gives
+                way, so the time, the speed and the volume always stay inside. */}
+            <span className="flex min-w-0 items-center gap-1.5 sm:gap-2">
                 <button
                     type="button"
                     onClick={toggle}
@@ -285,7 +287,7 @@ export function VoiceNote({
                         // Nothing selects and nothing scrolls under the finger:
                         // a drag along a waveform on a phone is a drag along a
                         // waveform, not a scroll of the conversation.
-                        className="flex h-7 w-44 max-w-[45vw] shrink-0 touch-none select-none items-center gap-px"
+                        className="flex h-7 w-44 min-w-12 shrink touch-none select-none items-center gap-px"
                     >
                         {bars.map((level, index) => (
                             <span
@@ -310,7 +312,7 @@ export function VoiceNote({
                         onChange={(event) => seekTo(Number(event.target.value) / (length || 1))}
                         style={{ backgroundSize: `${done * 100}% 100%` }}
                         className={cn(
-                            "h-1 w-40 max-w-[45vw] cursor-pointer appearance-none rounded-full bg-muted",
+                            "h-1 w-40 min-w-12 shrink cursor-pointer appearance-none rounded-full bg-muted",
                             "bg-gradient-to-r from-primary to-primary bg-no-repeat",
                             "[&::-webkit-slider-thumb]:size-2.5 [&::-webkit-slider-thumb]:appearance-none",
                             "[&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary",

@@ -1420,7 +1420,7 @@ function Message({
                                                     }
                                                 />
                                             ) : sending && pendingUrl && isPlayable(file.contentType) ? (
-                                                <span className="flex items-center gap-2">
+                                                <span className="flex min-w-0 max-w-full items-center gap-2">
                                                     <VoiceNote
                                                         href={pendingUrl}
                                                         name={file.name}
