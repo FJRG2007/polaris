@@ -206,6 +206,9 @@ describe("the work Polaris runs on a schedule", () => {
             // the same container, onto the same disk - and the copy that is worth
             // having is the one the server was not busy competing with.
             "game-world-backups",
+            // Two passes would each run the same server's ownership repair; harmless,
+            // but one throwaway container per stopped server is the whole point.
+            "game-world-owners",
             // Two runners would rewrite the same region files at once, which is
             // the one thing the optimizer cannot defend against: it is safe
             // against being interrupted, not against a second copy of itself.

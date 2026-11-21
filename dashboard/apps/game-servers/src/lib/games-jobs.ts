@@ -484,6 +484,15 @@ export function gameJobTable(): readonly AppJob[] {
             run: async () => (await import("./minecraft/spawn-protection")).adoptSpawnProtectionOff()
         },
         {
+            key: "game-world-owners",
+            // Chunk files an earlier world optimizer left owned by root handed
+            // back to the world's owner, so the server can save into them again
+            // (BUG-0009). Once a server is found right it is never asked again.
+            everyMs: 10 * MINUTE,
+            leaseMs: 15 * MINUTE,
+            run: async () => (await import("./minecraft/world-owner-repair")).repairWorldOwners()
+        },
+        {
             key: "game-polaris-component",
             // The Polaris mod on every server Polaris has a mod build for,
             // whatever its switches: the events run their heavy work through it.
