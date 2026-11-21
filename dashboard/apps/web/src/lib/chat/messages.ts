@@ -200,6 +200,10 @@ export interface ChatMessageView {
      * is per author, so a page of messages is a page of different answers.
      */
     readonly forwardable: boolean;
+    /** Advanced chat privacy is on in its conversation: its files are shown,
+     *  never offered as downloads. The attachment route refuses them by the
+     *  same stored value. Absent is off. */
+    readonly shielded?: boolean;
     /** The first web address in it, whatever came of looking it up. The list
      *  needs it even when nothing did: a video Polaris knows how to play still
      *  plays when the site refused to describe itself. */
@@ -2553,6 +2557,7 @@ export async function decorateMessages(
             // setting to honour, and a deleted one has nothing left to send.
             // Nor one carrying a file meant to be seen once: a forward would be a
             // second copy of exactly what was not to be kept.
+            shielded: shielded.has(row.channelId),
             forwardable:
                 row.deletedAt === null &&
                 !shielded.has(row.channelId) &&

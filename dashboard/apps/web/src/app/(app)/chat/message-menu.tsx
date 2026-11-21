@@ -369,7 +369,7 @@ export function MessageMenu({
                     {/* An ordinary download: the route serves it as an
                         attachment, so it is a link rather than anything this has to
                         do. */}
-                    {!message.deleted && loose && (
+                    {!message.deleted && !message.shielded && loose && (
                         <>
                             <ContextMenuItem asChild>
                                 <a
@@ -386,7 +386,7 @@ export function MessageMenu({
                         </>
                     )}
 
-                    {!message.deleted && recording && (
+                    {!message.deleted && !message.shielded && recording && (
                         <>
                             <ContextMenuSub>
                                 <ContextMenuSubTrigger>
