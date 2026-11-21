@@ -30,7 +30,7 @@ Tests (`packages/chat-crypto/test`, 31): round trips for every lock, own known-a
 
 | Piece | Where |
 | --- | --- |
-| Tables `ChatAccountKey`, `ChatAccountKeyLock`, `OpaqueRecord`, `OpaqueLogin`, `OpaqueServerSetup` | `packages/db/prisma/migrations/20271207000000_chat_e2ee_account_key` (additive, rerunnable) |
+| Tables `ChatAccountKey`, `ChatAccountKeyLock`, `OpaqueRecord`, `OpaqueLogin`, `OpaqueServerSetup` | `packages/db/prisma/migrations/20271214000000_chat_e2ee_account_key` (additive, rerunnable) |
 | Server setup sealed with `encryptSecret(..., POLARIS_MASTER_KEY)`, made on first use; a replaced master key drops every record and the accounts fall back to their password hash | `apps/web/src/lib/chat/e2ee/opaque-service.ts` |
 | `/api/e2ee/sign-in` (no session: OPAQUE sign-in, adoption) and `/api/e2ee/keys` (session: public keys, passkey envelopes, OPAQUE unlock of the password envelope). Zod discriminated unions, JSON content type required (no simple cross-site posts), rate limits per address and per account, one refusal body for every cause, 404 while `POLARIS_INTERNAL_CHAT_E2EE` is not `1` | `apps/web/src/lib/chat/e2ee/handlers.ts`, `schemas.ts` |
 | Sealed better-auth endpoint `/polaris/opaque-sign-in`: 404 off the wire, challenged by the second factor like `/sign-in/email`, recorded as a password sign-in, refused for an enforced identity-provider domain | `packages/auth/src/opaque-sign-in.ts` |
