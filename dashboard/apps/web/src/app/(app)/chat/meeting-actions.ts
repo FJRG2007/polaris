@@ -26,6 +26,8 @@ import * as room from "@/lib/chat/meeting-chat";
 import * as calls from "@/lib/chat/call-server";
 import { callsOutsideNow } from "@/lib/backup-access/service";
 import { mayRing } from "@/lib/privacy-service";
+import { postNotice } from "@/lib/chat/notices";
+import { silencedCallDue } from "@/lib/chat/missed-call";
 import { presenceFor } from "@/lib/presence-service";
 import { requirePermission } from "@/lib/session";
 import { publishChatChange } from "@/lib/chat/live";
@@ -112,6 +114,12 @@ export async function startCallAction(
      */
     const other = await chat.directCounterpart(user.id, channelId);
     if (other && !(await mayRing({ id: user.id, isAdmin: user.isAdmin }, other))) {
+        // Silenced rather than lost (ledger row 10): no ring, but a line in the
+        // conversation says they tried. At most one per caller and conversation
+        // in a window, so pressing the button repeatedly cannot fill it.
+        if (silencedCallDue(user.id, channelId)) {
+            await postNotice(channelId, "silencedCall", { subjectId: user.id });
+        }
         return { error: (await getTranslations("chat"))("errors.noCallsFromYou") };
     }
     const result = await guard(() =>

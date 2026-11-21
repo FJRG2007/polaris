@@ -97,3 +97,34 @@ export function missedCallerOf(metadata: string | null): string | null {
     }
     return null;
 }
+
+/** How long one caller's silenced attempts in one conversation make one line. */
+export const SILENCED_CALL_WINDOW_MS = 10 * 60 * 1000;
+
+/** The most caller-and-conversation pairs remembered at once. */
+const MOST_SILENCED_REMEMBERED = 10_000;
+
+const silencedAt = new Map<string, number>();
+
+/**
+ * Whether a silenced call should be written down now (ledger row 10).
+ *
+ * A call kept from ringing by "who can call you" leaves a line in the
+ * conversation, but only the first in a window: pressing the button again must
+ * not become a way to fill somebody's conversation. Kept per process, which is
+ * a bound on noise and not a security boundary - the call itself is refused by
+ * `mayRing` either way. The map is capped and drops its oldest entry, so it
+ * never grows without end.
+ */
+export function silencedCallDue(callerId: string, channelId: string, now = Date.now()): boolean {
+    const key = `${callerId}:${channelId}`;
+    const last = silencedAt.get(key);
+    if (last !== undefined && now - last < SILENCED_CALL_WINDOW_MS) return false;
+    silencedAt.delete(key);
+    silencedAt.set(key, now);
+    if (silencedAt.size > MOST_SILENCED_REMEMBERED) {
+        const oldest = silencedAt.keys().next().value;
+        if (oldest !== undefined) silencedAt.delete(oldest);
+    }
+    return true;
+}

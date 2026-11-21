@@ -34,6 +34,7 @@ export type ChatNoticeKind =
     | "missedCall"
     | "callStarted"
     | "callUnanswered"
+    | "silencedCall"
     | "pinned";
 
 /** Somebody a notice names. */
@@ -122,6 +123,12 @@ export function noticeBody(
             // Follows the line that said the call started, which already names
             // who rang.
             return "Nobody answered the call";
+        case "silencedCall":
+            // A call the person's "who can call you" kept from ringing. Written
+            // down rather than dropped, so somebody with a real reason to call
+            // is not lost: the line stays in the conversation without a sound.
+            // The caller was already told they cannot call, so it leaks nothing.
+            return `${who} called - silenced`;
     }
 }
 
