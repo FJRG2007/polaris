@@ -1,6 +1,13 @@
-# Propuesta: cifrado de extremo a extremo (E2EE) en Polaris Chat
+# Propuesta v2: cifrado de extremo a extremo (E2EE) en Polaris Chat
 
-Fecha: 2026-11-21. Estado: propuesta, sin código. Las afirmaciones sobre otros productos llevan la fuente entre corchetes `[n]`; la lista está al final. Lo que es deducción propia aparece marcado como tal.
+Fecha: 2026-11-21. Estado: propuesta, sin código. Sustituye a la v1 (`docs/chat-e2ee-proposal.md`, rama `docs/e2ee-proposal`). Las afirmaciones sobre otros productos llevan la fuente entre corchetes `[n]`; las fuentes 1-57 son las de la v1 y se mantienen con el mismo número, las nuevas van de la 58 en adelante. Lo que es deducción o estimación propia aparece marcado como tal.
+
+Requisitos del propietario que fija esta versión:
+
+1. El usuario no nota nada salvo que sus datos están más seguros: sin interruptor, sin ceremonia de clave de recuperación en el camino normal, sin etiqueta beta, misma velocidad, mismas funciones. Vale para quien solo usa la web (cualquier navegador, ventanas privadas, ordenadores compartidos) y para escritorio, Android e iOS.
+2. Activado por defecto en todo: canales de espacio (miles de miembros), MD, grupos, hilos, chat de reunión, adjuntos, reacciones, ediciones, encuestas, programados, notas de voz, vistas previas (el servidor pide la URL, aprobado), Polar, automatizaciones, componentes, búsqueda, notificaciones y exportaciones.
+3. Migración de todas las instancias existentes, sin pérdida, reanudable, idempotente, con copia y vuelta atrás, y correcta para quien no vuelve a entrar, cuentas borradas, bots y miembros que se fueron.
+4. Nivel gubernamental, verificado con un proceso de aseguramiento interno (sin auditoría externa obligatoria).
 
 ---
 
@@ -8,375 +15,561 @@ Fecha: 2026-11-21. Estado: propuesta, sin código. Las afirmaciones sobre otros 
 
 | Pregunta | Respuesta |
 | --- | --- |
-| ¿Se puede tener E2EE tipo WhatsApp/Signal sin perder funciones? | Sí para casi todo. Cada función se reubica: o pasa al cliente, o pasa a un **participante explícito** (bot, Polar, webhook) que tiene claves y aparece en la lista de miembros. Así lo hacen WhatsApp con Meta AI y con la Cloud API [5][8][9]. |
-| ¿Dónde hay un coste real? | En 4 puntos, y se declaran en pantalla: (1) lo que se le manda a Polar o a un bot lo lee quien ejecuta ese bot, y en un Polaris autoalojado ese es el operador; (2) las vistas previas de enlaces desde el **navegador web** necesitan que el servidor haga la petición y, por tanto, que vea la URL (escritorio y móvil no); (3) el filtrado automático de contenido en el servidor desaparece y se sustituye por denuncias verificables; (4) buscar requiere indexar en cada dispositivo. |
-| Protocolo | **MLS (RFC 9420)** para el acuerdo de claves de grupo, con una clave de contenido por época derivada del *exporter* de MLS para mensajes, archivos y llamadas. Coste logarítmico en el tamaño del grupo frente al cuadrático de Sender Keys al expulsar a alguien [21]. Es el patrón que Discord usa en DAVE (MLS para las claves, cifrado de tramas para el medio) [11]. |
-| Velocidad y recursos | El **servidor gasta menos**: deja de pedir vistas previas, de indexar texto y de generar miniaturas. El almacenamiento es una sola copia cifrada por mensaje (unos 92 bytes extra: nonce, etiqueta y firma). El **cliente gasta más** en una cosa: el índice de búsqueda local. |
-| Recuperar el historial sin ningún dispositivo | **Clave de recuperación** aleatoria (raíz) + **frase de contraseña opcional** derivada con el KDF del Vault + **recuperación social u organizativa opcional** (la clave repartida con Shamir). El historial se guarda cifrado en el servidor como en Labyrinth de Messenger [13][14], y la copia de seguridad solo contiene **claves**, no mensajes. Sin HSM: un servidor autoalojado no tiene un enclave que limite los intentos, y la propuesta lo dice. |
-| Tamaño | XL. 12 fases; la primera entrega útil (MD y grupos cifrados, con archivos y notificaciones) son las fases 1-4. Requiere una auditoría externa antes de activarlo por defecto (DAVE la tuvo [11]). |
+| ¿Se puede cumplir "el usuario no nota nada" con E2EE real? | Sí para quien entra con **contraseña o passkey**, y para cualquier dispositivo ya aprobado. Las claves se desbloquean con lo mismo que ya usa para entrar (sección 3). No hay pantalla nueva. |
+| ¿Dónde no se puede, sin mentir? | Cuando el único factor del usuario lo controla el servidor (enlace mágico al correo, inicio con una conexión externa, restablecimiento hecho por un administrador). Ahí, quien recupera el historial sin ningún factor del usuario es, por definición, alguien distinto del usuario. La v2 lo resuelve con una **clave de recuperación de la organización con quórum** (M de N administradores, cada uso auditado y visible al usuario). Es la decisión 1 del propietario. |
+| Protocolo | **MLS (RFC 9420)** para pertenencia autenticada, seguridad tras compromiso y claves de llamada [21][58]; **claves de historial por conversación** distribuidas por MLS y guardadas envueltas para cada cuenta, para que el historial se lea desde cualquier dispositivo nuevo (patrón Labyrinth [13][14]). Una copia cifrada por mensaje, sea cual sea el tamaño del grupo. |
+| Migración | La hace el **servidor**, en un proceso aislado, conversación a conversación: cifra el historial que ya tenía en claro, envuelve la clave para cada miembro y para la recuperación de la organización, verifica con recuentos y hashes y solo entonces borra el texto en claro. Reanudable, idempotente, con instantánea de vuelta atrás cifrada (sección 8). |
+| Lo que el servidor deja de ver | Texto, archivos, miniaturas, encuestas, ediciones, reacciones, borradores y notas de voz. |
+| Lo que sigue viendo (metadatos) | Quién está en qué conversación (lo exige el modelo de permisos), cuándo y cuánto se envía, a quién se menciona, y las URL de las vistas previas que pide (aprobado). La sección 2 compara con Threema, que minimiza más; se copian sus técnicas donde no rompen funciones. |
+| Coste visible que queda | (a) La primera búsqueda de historial antiguo en un navegador recién abierto tarda más que hoy si el historial es enorme (sección 6.1). (b) Los usuarios sin contraseña ni passkey que abren una ventana privada sin otro dispositivo propio dependen de la recuperación de la organización o de aprobar desde otro dispositivo (sección 3.5). (c) Las reglas automáticas sobre el **contenido** pasan al cliente. |
+| Aseguramiento | Proceso interno: lista de fallos conocidos con fuentes, revisiones adversariales separadas por área con prueba que falla antes de cada arreglo, vectores RFC 9420, pruebas de propiedades, fuzzing de cada parser, interoperabilidad, migración sobre datos sintéticos grandes y caos. Puertas de lanzamiento explícitas (sección 11). Una auditoría externa queda como opción, no como requisito. |
+| Tamaño | XXL. 14 fases (sección 13). Se activa para todos a la vez cuando pasan las puertas; no hay fase "opcional por conversación" visible para el usuario. |
 
 ---
 
-## 1. Modelo de amenazas: qué protege E2EE en un Polaris autoalojado
+## 1. Modelo de amenazas
 
-Polaris lo ejecuta un operador para su organización o su familia. El roadmap (`docs/chat-roadmap.md`, sección 4) plantea que cifrar en reposo ya cubre mucho. E2EE añade protección frente a:
+### 1.1 Adversarios
 
-| Amenaza | Cifrado en reposo + TLS | E2EE |
+| Adversario | Capacidades | ¿Protege la v2? |
 | --- | --- | --- |
-| Robo del disco o de una copia de la base de datos | Protege si la clave no se roba con ella | Protege |
-| El operador (o quien le robe el acceso de root) lee los chats | No protege | Protege el contenido |
-| Una vulnerabilidad en el panel o en una app instalada que lee la tabla de mensajes | No protege | Protege |
-| Un administrador de **otra** organización en el mismo servidor | Depende del aislamiento | Protege |
-| Metadatos (quién habla con quién, cuándo, tamaños) | No protege | **Tampoco** (el servidor enruta). Sealed sender de Signal reduce una parte [16], pero Polaris necesita la pertenencia a los grupos para los permisos, así que queda fuera. |
-| Un servidor malicioso que inyecta un dispositivo falso en tu lista | - | Solo si los dispositivos los firma la identidad del usuario (sección 8) |
+| Ladrón de disco, de una copia de la base de datos o de un backup | Lee todo lo almacenado, sin límite de tiempo | Sí. Lo almacenado es texto cifrado y claves envueltas. Los envoltorios por contraseña aguantan en proporción a la contraseña (Argon2id, 3.2). |
+| Operador curioso o root robado, **pasivo** (lee la base de datos y la memoria del servidor) | Ve todo lo que pasa por el servidor | Sí para el contenido. No para los metadatos de 0. |
+| Servidor **activo y malicioso** que manipula respuestas de la API | Inyecta dispositivos, reordena, reenvía, retiene commits, sirve claves falsas | Sí, si se cumplen 4.3 (credenciales firmadas por la cuenta, validación estricta de commits) y 4.6 (transparencia de claves). Es el adversario de los ataques a Matrix 2022 y a Threema 2023 [59][61]; la lista de 11.1 sale de ahí. |
+| Servidor activo que **sirve JavaScript modificado** al cliente web | Puede robar claves de cualquier sesión web que cargue ese código | **No del todo, y esto vale para cualquier E2EE en web.** Mitigaciones en 4.7 (verificación del paquete por la extensión y el escritorio, modo "solo apps verificadas" para despliegues gubernamentales). Se declara. |
+| Administrador de **otra** organización en la misma instancia | Acceso a su organización | Sí: sin claves de las conversaciones ajenas. |
+| Quórum de administradores de **tu** organización | Puede reunir la clave de recuperación de la organización | No, si la organización la activa (decisión 1). Cada uso queda en el registro de auditoría encadenado y se notifica al afectado. |
+| Dispositivo perdido o robado | Estado local | Se revoca desde cualquier otro dispositivo o por un administrador: Remove MLS y rotación de las claves de historial; opción de bloqueo remoto del almacenamiento local al estilo DualLock de Threema OnPrem [62]. |
+| Adversario con ordenador cuántico futuro que guarda tráfico hoy | Descifra lo guardado cuando pueda | Se mitiga con envoltorios híbridos ML-KEM desde el principio (4.5, decisión 6). |
 
-Conclusión: en un Polaris autoalojado, E2EE protege sobre todo frente al servidor comprometido y frente a la curiosidad del operador. Por eso cualquier componente que **se ejecute en el servidor** y lea texto plano (Polar, webhooks, bots) tiene que ser un participante visible, nunca una puerta trasera silenciosa.
+### 1.2 Lo que E2EE no resuelve aquí
+
+- Metadatos de pertenencia: Polaris aplica permisos por canal, rol y espacio en el servidor. Threema no guarda en el servidor qué grupos existen ni quién está en ellos [62], pero Threema tampoco tiene canales de servidor con roles. Polaris se aparta aquí a propósito (sección 2.2).
+- Un cliente modificado por su propio usuario puede saltarse cualquier regla aplicada en el cliente.
+- Lo que un participante legítimo hace con lo que lee (capturas, reenvíos).
 
 ---
 
-## 2. Cómo lo resuelven los demás
+## 2. Referentes
 
-| Producto | Texto E2EE | Cómo encajan IA, bots y funciones | Recuperación del historial |
+### 2.1 Comparación
+
+| Producto | Texto E2EE y grupos | Multidispositivo | Recuperación sin dispositivos | Organización / gobierno |
+| --- | --- | --- | --- | --- |
+| **Threema** (referente principal) | NaCl box por destinatario; los grupos se cifran **por separado para cada miembro** y el servidor no conoce los grupos [62]. Secreto hacia delante extremo a extremo con **Ibex** (2022-2023), con prueba formal independiente [63][64]. | Protocolo multidispositivo con **servidor mediador** entre el chat server y los dispositivos; clave de grupo de dispositivos (DGK) aleatoria que el mediador no conoce, transferida por QR con comparación de emojis; los mensajes enviados se "reflejan" a los demás dispositivos cifrados con una clave derivada de la DGK. **Sin PFS mientras el multidispositivo está activo** (lo dice el whitepaper) [62]. | **Threema Safe**: copia de la identidad, contactos y grupos (no mensajes) cifrada con una clave derivada de contraseña con scrypt (N=65536, r=8, p=1) y la ID como sal; el identificador del backup se deriva de la misma clave, así que el servidor no sabe de quién es cada backup; puede alojarse en un servidor propio [62]. | Work y OnPrem: consola central de usuarios y permisos, desactivar funciones, limitar a contactos internos, integración con Entra ID; uso anónimo sin teléfono ni correo [65]. **DualLock** (OnPrem): el almacenamiento local se cifra además con un secreto remoto que el administrador puede bloquear [62]. Administración federal suiza para información "confidencial" desde 2019, según Threema [66]. No se encontró un mecanismo para que la organización lea mensajes. Auditorías: Cure53 (apps 2020, escritorio 2024) y FH Münster (2019) [60]. |
+| **WhatsApp** | Signal Protocol, Sender Keys en grupos [1][2] | Cada dispositivo tiene identidad propia firmada por el móvil [1][2] | Backup E2EE con clave en HSM (OPAQUE, límite de intentos) o clave de 64 dígitos [10][30]; desde octubre de 2025 también con **passkey** (huella, cara o bloqueo de pantalla) [67] | Cloud API: Meta guarda las claves de la empresa [8] |
+| **Messenger** | Signal Protocol [12] | Historial en el servidor con Labyrinth [13][14] | PIN, cuenta de Apple o Google, código de 40 caracteres o código de un solo uso a un dispositivo reciente [68]; PIN protegido en HSM [30] | - |
+| **Apple** | iMessage PQ3 [27] | iCloud Keychain | Depósito protegido por clústeres de HSM; el código se verifica con SRP sin enviarlo a Apple; tras 10 intentos fallidos el HSM destruye el registro [69]. Con **Advanced Data Protection** hay que configurar clave de recuperación o contacto de recuperación; sin ellos Apple no puede recuperar los datos [70] | - |
+| **Google (Android)** | - | - | Backup cifrado con una clave protegida por el PIN o patrón de pantalla, guardada en chips Titan con límite de intentos (Cloud Key Vault) [71] | - |
+| **Element / Matrix** | Olm + Megolm [31] | Dispositivos con cross-signing [36] | Clave de recuperación (SSSS) [35]; dispositivos "deshidratados" (MSC3814) para recibir claves sin dispositivo en línea [72]; Element X exige verificar el dispositivo al entrar [73] | **Tchap** (DINUM, Francia), cliente derivado de Element, servidores internos [74]; **BwMessenger** (Bundeswehr, BWI) [75]; **NI2CE** (OTAN), autoalojado [76]. No se encontró documentación pública de cómo resuelven la recuperación organizativa; no se afirma nada. |
+| **Wire** | Proteus -> MLS [37] | Dispositivos por usuario | - | **Legal hold**: un dispositivo adicional ligado a la cuenta del usuario, gestionado por un servicio de la empresa, que entra en las conversaciones como cualquier dispositivo; indicador rojo en la conversación y junto al nombre; requiere consentimiento [77][78] |
+| **Microsoft Teams** | E2EE solo en llamadas | - | - | Con E2EE no hay grabación de cumplimiento, eDiscovery, DLP, traducción ni transcripción [79] |
+
+Lección: **nadie** que ofrece E2EE real mantiene una recuperación sin factor del usuario que no sea un tercero declarado (HSM del proveedor, contacto de recuperación, dispositivo de legal hold). Y quien quiere cumplimiento (Wire) lo hace con un **participante visible**, nunca con una lectura silenciosa del servidor.
+
+### 2.2 Qué se copia de Threema y en qué se aparta Polaris
+
+| Tema | Threema | Polaris v2 | Motivo |
 | --- | --- | --- | --- |
-| **WhatsApp** | Signal Protocol; en multidispositivo cada dispositivo tiene su identidad, el emisor cifra N veces en 1:1 y los grupos usan Sender Keys; el móvil firma la clave del dispositivo acompañante [1][2]. | **Meta AI**: solo lee los mensajes que la mencionan o que se le comparten [6]; lo que se le dice a Meta AI no es E2EE [7]. **Private Processing**: la IA se ejecuta en una VM confidencial (TEE) con atestación remota y un relay OHTTP de terceros [3][4], auditada por Trail of Bits y NCC [5][29]. **Cloud API**: Meta guarda las claves en nombre de la empresa; el extremo es la empresa [8][9]. | Copia cifrada con clave de 256 bits generada en el dispositivo, guardada en un **HSM Backup Key Vault** con OPAQUE y límite de intentos, u opción de clave de 64 dígitos [10][30]. |
-| **Signal** | Double Ratchet + PQXDH (poscuántico en el saludo inicial) y desde 2025 SPQR / Triple Ratchet con ML-KEM [17][28]. | Sin bots. Las vistas previas las genera el emisor y pasan por un proxy TLS, así que Signal nunca ve la URL [18]. Sealed sender oculta el remitente al servidor [16]. | **PIN + SVR** (enclaves SGX, ahora SVR3 repartido entre varios tipos de enclave) para datos de cuenta [19][20]; **Secure Backups** con clave de 64 caracteres generada en el dispositivo (2025) [15]. |
-| **Messenger** | Signal Protocol (2023). | Algunas funciones se rehicieron de cero, como la búsqueda de stickers con credenciales anónimas [12]. | **Labyrinth**: el historial cifrado vive en el servidor y se carga bajo demanda, con rotación de claves al quitar un dispositivo [12][13]; Labyrinth 1.1 (2026) manda cada mensaje al backup al enviarlo [14]. |
-| **Discord** | **No**: el texto no es E2EE, por moderación y porque sus funciones asumen texto legible [11]. | Voz y vídeo E2EE con **DAVE** (MLS + WebRTC encoded transforms; el SFU reenvía sin poder descifrar) [11][22]. Desde marzo de 2026 los bots que entran en voz **tienen que implementar DAVE**, es decir, ser participantes con claves [23]. | No aplica. |
-| **Telegram** | Los chats en la nube **no** son E2EE (cifrado cliente-servidor); los chats secretos sí, pero solo 1:1, ligados a un dispositivo, sin búsqueda en servidor ni sincronización [24][25]. | Los bots usan la Bot API, que recibe las actualizaciones desde los servidores de Telegram [26]; *deducción*: por eso solo existen donde el servidor tiene el texto, es decir, en chats en la nube. | El chat secreto no se recupera. |
-| **Matrix / Element** | Olm (pares) + Megolm (ratchet de grupo por emisor) [31]. | Búsqueda en salas cifradas solo en escritorio, con un índice local (**Seshat**, Rust + Tantivy, SQLCipher) [32][33]. Los bots son dispositivos miembros de la sala. Historial compartido con quien entra nuevo [34]. | Copia de claves en el servidor protegida con **clave de recuperación** (SSSS) [35]; **cross-signing** y verificación SAS por emoji o QR [35][36]. El algoritmo antiguo de backup tiene defectos conocidos [35]. |
-| **Wire / Webex / RCS** | MLS en producción (Wire, migrando desde Proteus) [37]; Webex con MLS + SFrame para reuniones [38]; RCS Universal Profile 3.0 adopta MLS y Google Messages lo prueba [39][40]. | - | - |
-| **iMessage** | PQ3: poscuántico en el saludo **y** en el ratchet (Apple lo llama nivel 3, frente al nivel 2 de PQXDH) [27]. | Apple Private Cloud Compute: cómputo sin estado y registro de transparencia de lo que ejecutan los nodos [41][42]. | - |
-
-Lección común: **nadie mantiene una función de servidor leyendo texto E2EE**. La reubican en el cliente, en un participante declarado o en un enclave atestado.
-
----
-
-## 3. Protocolo recomendado
-
-### 3.1 Comparación
-
-| Criterio | Signal (Double Ratchet 1:1 + Sender Keys en grupo, como WhatsApp) | MLS (RFC 9420) |
-| --- | --- | --- |
-| Coste al cambiar los miembros | Cada emisor redistribuye su sender key por pares: el coste crece con el cuadrado del grupo (lo dice la introducción del RFC) [21] | `log(N)` cifrados a subárboles por commit [21] |
-| Seguridad tras compromiso (PCS) en grupo | Débil: una sender key robada sirve hasta que se rota | Nativa: tras un Update/Commit el atacante pierde el acceso [21] |
-| Tamaño de grupo objetivo | Grupos pequeños y medianos | "De dos a miles" [21] |
-| Multidispositivo | Cada dispositivo cuenta como un destinatario más (fanout N) [2] | Cada dispositivo es una hoja del árbol; el coste sigue siendo logarítmico |
-| Llamadas | Clave aparte | El mismo grupo MLS deriva la clave de medios (DAVE) [11][22] |
-| Estándar e interoperabilidad | De facto (libsignal) | IETF; RCS, Wire, Webex y Discord lo usan [22][37][38][39] |
-| Madurez de bibliotecas | libsignal (AGPL) | OpenMLS (Rust, compila a WASM) y mls-rs de AWS [43][44] |
-
-**Elección: MLS.** Polaris tiene canales de espacio con decenas de miembros, rosters que cambian, varias organizaciones y varios dispositivos por persona. Ese es justo el caso donde Sender Keys se degrada y MLS no. Además, una sola sesión MLS por conversación sirve a la vez para texto, archivos y llamadas.
-
-### 3.2 Diseño concreto
-
-1. **Un grupo MLS por conversación** (MD, grupo, canal). Hojas = dispositivos. El servidor de Polaris hace de *Delivery Service* (ordena y reparte los commits) y guarda el `GroupInfo` público para permitir uniones externas (RFC 9420, external commits).
-2. **Credenciales firmadas por el usuario, no por el servidor.** Cada dispositivo presenta una credencial firmada por la *clave de identidad de cuenta* del usuario (sección 8). Así un servidor malicioso no puede colar una hoja que nadie reconozca.
-3. **Contenido cifrado con una clave de época** (diseño propio inspirado en DAVE): `K_epoch = MLS-Exporter("polaris/content", epoch)`. Cada mensaje: `K_msg = HKDF(K_epoch, sender_leaf || message_id)`, AES-256-GCM, firmado con la clave de firma MLS del emisor. El servidor guarda **una sola copia** del texto cifrado: es el registro duradero y también lo que se reparte en vivo.
-   - Por qué así y no con mensajes de aplicación MLS puros: los secretos de aplicación de MLS se borran por diseño (secreto hacia delante), y entonces el historial que el servidor guarda no lo podría leer un dispositivo nuevo. Matrix y Messenger resuelven eso guardando **las claves** en un backup [13][35]. Aquí ese backup son 32 bytes por época y conversación, no una segunda copia de los mensajes.
-   - Coste declarado: dentro de una época no hay secreto hacia delante por mensaje. Las épocas rotan en cada alta o baja y cada pocas horas o días (el RFC recomienda Updates "del orden de horas o días" [21]). Es la misma concesión que hace cualquier sistema con historial recuperable.
-   - **Esta construcción es criptografía propia** y necesita revisión externa antes de activarla por defecto.
-4. **Ciphersuite inicial**: `MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519` (0x0001 del RFC). **Poscuántico**: el campo de ciphersuite de MLS permite migrar. Se adopta un suite híbrido con ML-KEM cuando esté estandarizado y soportado por la biblioteca; Signal (PQXDH/SPQR) y Apple (PQ3) muestran que la amenaza "guardar ahora, descifrar después" ya se trata como real [17][27][28].
-5. **Compatibilidad entre versiones**: un cliente sin soporte no puede entrar en una conversación cifrada, y lo ve en pantalla con el botón de actualizar. Es lo que hizo Discord con DAVE en marzo de 2026 [23]. Nunca se degrada en silencio a texto en claro.
+| Push | El payload de APNs va cifrado con una clave simétrica que eligió el cliente; Apple no la conoce [62] | **Se copia**: el push lleva `{conversación, mensaje}` cifrado con una clave del dispositivo; el texto lo descifra el dispositivo | Apple, Google y el servicio de push no ven quién escribe a quién |
+| Datos del dispositivo | Plataforma, versión y etiqueta se cifran con una clave del grupo de dispositivos; el mediador no los lee [62] | **Se copia** para la etiqueta y la lista de dispositivos de cifrado. La lista de **sesiones** de inicio (IP, navegador, `TrustedDevice`) sigue en el servidor porque es seguridad de cuenta | Minimizar sin perder la vista de sesiones |
+| Descubrimiento de contactos | Hashes HMAC que el servidor descarta tras responder [62] | No aplica: Polaris no sube agendas | - |
+| Recibos de entrega y lectura | Mensajes E2EE | `deliveredAt` / `readAt` por mensaje hoy están en `ChatMessage`. **Se copia en parte**: el servidor guarda solo el último leído por persona y conversación (lo necesita para los no leídos) y deja de guardar marcas por mensaje | Menos metadatos sin cambiar lo que se ve |
+| Backup anónimo | El id del backup se deriva de la contraseña [62] | **Se copia** en el envoltorio por contraseña: el registro se localiza por un id derivado, no por el `userId` | Una copia robada no dice de quién es cada envoltorio sin la contraseña |
+| Bloqueo remoto | DualLock [62] | **Se copia** como política de organización (apagada por defecto) | Encaja con dispositivos perdidos en gobierno |
+| Vinculación de dispositivos | QR con clave de autenticación y comparación de emojis [62] | **Se copia** sobre el flujo de QR existente (`deviceAuthorization`, `DeviceCode`) | Ya existe el gesto; se añade el canal cifrado |
+| Grupos | Cifrado por miembro; servidor sin pertenencia [62] | **Se aparta**: MLS, coste logarítmico, servidor con pertenencia | Canales de miles de miembros con roles y permisos |
+| Multidispositivo | Sin PFS con multidispositivo [62] | **Se aparta**: MLS da seguridad tras compromiso con varios dispositivos; el historial recuperable sí implica que no hay secreto hacia delante por mensaje dentro de una época (4.2) | Mismo trade-off que Labyrinth; se declara |
+| Backup de mensajes | Safe no guarda mensajes [62] | **Se aparta**: el historial completo está siempre en el servidor, cifrado | Requisito "cualquier navegador ve todo" |
+| Protocolo de transporte propio | ETH recomendó TLS en lugar del protocolo cliente-servidor propio [61] | Polaris ya usa TLS | Lección aplicada |
 
 ---
 
-## 4. Mapa de funciones: cómo sigue funcionando cada una
+## 3. Gestión de claves invisible
 
-Leyenda de **coste**: `Ninguno` = idéntico para el usuario; `Declarado` = funciona, con una concesión que se explica en pantalla; `Cambia` = la función existe pero se comporta distinto.
+### 3.1 Jerarquía
 
-### 4.1 Mensajería
-
-| Función actual | Cómo funciona con E2EE | Coste |
-| --- | --- | --- |
-| Texto, Markdown, texto enriquecido | Se cifra el documento entero; se renderiza en el cliente como ahora | Ninguno |
-| Editar e historial de ediciones | Una edición es un mensaje cifrado que apunta al `message_id` original; el historial son las versiones cifradas | Ninguno |
-| Borrar para todos | El servidor borra el texto cifrado (ve el id, no el contenido) y los clientes borran su copia local | Ninguno |
-| Reacciones, respuestas, hilos | Reacción = mensaje cifrado pequeño. El id del padre de un hilo viaja en claro (es metadato de estructura), el contenido no | Ninguno |
-| Menciones @persona / @sala y niveles de aviso (`notify.ts`, `room-mentions.ts`) | El emisor adjunta en claro la **lista de ids mencionados** para que el servidor pueda aplicar niveles y silencios. El texto sigue cifrado | Declarado: el servidor sabe a quién se menciona, no qué se dice. Hay un modo estricto opcional: el servidor despierta al destinatario en cada mensaje y la decisión se toma en el dispositivo |
-| Reenviar | Se reutiliza el texto cifrado del archivo con su misma clave (sin volver a subirlo); el texto se cifra para la conversación de destino | Ninguno |
-| Encuestas (`polls.ts`) | Pregunta y opciones cifradas; cada voto es un mensaje cifrado; el recuento se hace en el cliente | Cambia: no hay recuento en el servidor (no se necesitaba) |
-| Mensajes programados (`scheduled.ts`) | El cliente cifra al programar con la clave de la época actual; el servidor guarda el blob y lo publica a su hora. Si la época cambia antes (alguien entra o sale), el servidor avisa al dispositivo del autor para que lo vuelva a cifrar; si no hay ninguno en línea, se publica con la época antigua y los miembros nuevos reciben esa clave por el historial compartido (4.5) | Declarado: un expulsado entre programar y enviar **no** recibe el mensaje porque la época antigua no se le reparte; lo que se reparte es solo a los miembros vigentes |
-| Borradores (`drafts.ts`) | Cifrados con una clave personal del usuario | Ninguno |
-| Mensajes temporales (roadmap) | Temporizador dentro del texto cifrado; los clientes borran y el servidor borra el blob a la hora indicada | Ninguno |
-| Fijados y guardados (`saved-media.ts`) | El servidor guarda la referencia; el contenido ya está cifrado | Ninguno |
-| Avisos de entrada y salida, llamadas perdidas (`notices.ts`, `missed-call.ts`) | Los genera el servidor a partir de metadatos que ya conoce, y siguen así | Ninguno |
-| Referencias a tareas (`PLR-42`, `references.ts`) | La resolución pasa al cliente: el cliente reconoce la referencia y pide la tarea a la API de Tasks con sus propios permisos. Tasks no es E2EE | Ninguno |
-| GIF (Tenor, `tenor.ts`) | La búsqueda sigue por el proxy de Polaris (la consulta la ven el servidor y Tenor, como hoy); el emisor descarga el GIF elegido y lo sube cifrado como un archivo más | Ninguno respecto a hoy |
-| Emojis propios | Recursos de la organización, no contenido del chat: siguen igual | Ninguno |
-| No leídos, confirmaciones de lectura, escribiendo | Metadatos que el servidor ya maneja | Ninguno |
-| Aislamiento entre organizaciones (`isolation.ts`) | Igual. MLS añade además que un administrador de otra organización no puede leer | Mejora |
-
-### 4.2 Archivos y visores
-
-| Función | Con E2EE | Coste |
-| --- | --- | --- |
-| Adjuntos (`attachments.ts`) | Una clave aleatoria AES-256-GCM por archivo, cifrado en **bloques** (64 KiB) para poder reproducir y descargar por rangos; la clave y el SHA-256 del texto en claro van dentro del mensaje cifrado. El almacén (local, NAS, S3) solo ve blobs | Ninguno |
-| Visor de imágenes, audio y vídeo (`attachment-viewer.tsx`) | Un Service Worker descifra los rangos y sirve una URL local (`blob:` o una ruta del propio SW), y el visor recibe eso en lugar de la URL del servidor. El vídeo largo se reproduce por rangos | Ninguno; la descarga ya era necesaria |
-| PDF, hojas (Univer) y documentos | Los editores aceptan bytes en lugar de una URL: el roadmap ya lo señala como el trabajo de fondo | Ninguno, con trabajo en cada visor |
-| Miniaturas y posters (`readAttachmentPoster`) | Los genera el **emisor** y se suben cifrados junto al archivo | Ninguno; el servidor deja de hacerlo |
-| Guardar en Drive | El cliente descifra y sube a Drive. Drive no es E2EE y el botón lo dice | Declarado |
-| Clips de voz y vídeo (`clip-recorder.ts`) | Ya se graban en el cliente; se cifran como cualquier archivo | Ninguno |
-| Retención y limpieza (`tidyChatStorage`) | Siguen funcionando por ids y tamaños | Ninguno |
-| Deduplicación entre conversaciones | Se pierde (cada archivo lleva su propia clave), salvo al reenviar, que reutiliza el mismo blob | Mínimo |
-
-### 4.3 Vistas previas e incrustaciones
-
-Hoy el servidor pide la página a través de `safe-fetch` (`link-preview.ts`) y protege al lector sirviendo la imagen desde Polaris. Con E2EE la tarjeta la **genera el emisor** y viaja cifrada dentro del mensaje (título, descripción y miniatura como adjunto cifrado). Los lectores nunca hacen la petición. Así lo hacen Signal, WhatsApp, iMessage y Wire [18][45][46].
-
-| Cliente que envía | Cómo obtiene la página | Quién ve la URL |
-| --- | --- | --- |
-| Escritorio y móvil (proceso nativo) | Petición directa desde el dispositivo, sin CORS | La web de destino (ve la IP del emisor, igual que en Signal sin su proxy). Opcional: túnel por el servidor sin descifrar TLS, al estilo Signal [18] |
-| Navegador web | El navegador no puede abrir TLS crudo ni saltarse CORS, así que la petición la hace el servidor (`safe-fetch` tal como está) | Declarado: **el servidor ve la URL** y quién la pidió, no la conversación en que se pega. Se puede desactivar por conversación |
-| oEmbed y reproductor de YouTube (`embeds.ts`) | La tarjeta la genera el emisor; el reproductor contacta con YouTube solo al pulsar Play | Ninguno respecto a hoy |
-
-### 4.4 Búsqueda
-
-| Ámbito | Con E2EE | Coste |
-| --- | --- | --- |
-| Buscar en el chat (`lib/chat/search.ts`, `lib/search/*`) | **Índice local** sobre el almacén offline en IndexedDB que se está construyendo: índice invertido de los mensajes descifrados, guardado cifrado con una clave del dispositivo. En escritorio puede usar un índice nativo, como Seshat en Element (Tantivy con un heap de escritura de 50 MB y SQLCipher) [32][33] | Cambia: cada dispositivo indexa lo suyo |
-| Dispositivo nuevo | Descarga el texto cifrado, lo descifra con las claves del backup e indexa en segundo plano: primero lo reciente y luego hacia atrás. Mientras tanto la búsqueda dice hasta qué fecha llega | Declarado: el primer índice tarda y consume batería; se limita a la Wi-Fi y a la carga en móvil |
-| Navegador web efímero (sin almacenamiento persistente) | Busca solo en lo cargado y lo dice | Declarado |
-| Búsqueda global (personas, tareas, páginas) | Sin cambios: no es contenido del chat | Ninguno |
-| Cifrado buscable en el servidor | **Descartado.** Los esquemas buscables filtran patrones de acceso y frecuencias; ningún mensajero de los citados los usa. Es la razón por la que Element indexa en local [32] | - |
-
-### 4.5 Miembros, invitaciones y moderación
-
-| Función | Con E2EE | Coste |
-| --- | --- | --- |
-| Añadir personas (`add-people-dialog.tsx`) | El dispositivo de quien añade hace un Commit MLS `Add` con los KeyPackages del invitado | Ninguno |
-| Enlaces de invitación (`invites.ts`) | El invitado hace un **external commit** con el `GroupInfo` que publica el servidor, sin esperar a que haya un miembro en línea. El servidor solo acepta el commit si la invitación es válida | Ninguno |
-| Historial para quien entra | Un miembro comparte las claves de época del historial visible (como el historial compartido de Element [34]). Política por conversación: "desde que entró" o "todo" | Ninguno; ya existe esa decisión |
-| Expulsar y banear (`bans-dialog.tsx`) | El servidor bloquea al instante (permiso) y el primer dispositivo de un administrador en línea emite el Commit `Remove`; hasta entonces el servidor no reparte nada nuevo al expulsado | Ninguno |
-| Denunciar un mensaje (`reports.ts`, `report-files.ts`) | **Message franking** (Facebook): el emisor incluye un compromiso `HMAC(k_f, texto)` visible para el servidor, que lo sella con su propia clave, el remitente y la hora al recibirlo. Quien denuncia revela el texto y `k_f`, y el moderador comprueba que ese mensaje se envió así [47][48]. Para los archivos se compromete el SHA-256 del texto en claro, porque AES-GCM no compromete la clave y el franking de adjuntos de Facebook se pudo burlar por eso [49] | Declarado: el moderador ve **solo lo que el denunciante le envía**; el contexto adjunto lo elige el denunciante y puede omitir mensajes [50]. Tampoco hay escaneo automático en el servidor |
-| Filtros automáticos de contenido | No existen con E2EE; se sustituyen por filtros locales opcionales en el cliente y por denuncias | Declarado |
-
-### 4.6 Notificaciones
-
-| Plataforma | Con E2EE | Coste |
-| --- | --- | --- |
-| Web (pestaña y Service Worker) | El push lleva `{conversationId, messageId}` y el texto cifrado si cabe; el payload de Web Push ya va cifrado hasta el navegador (RFC 8291) [51]. El SW descifra con las claves locales y muestra el texto | Ninguno |
-| Escritorio | La app descifra antes de llamar a `desktop-notify` | Ninguno |
-| iOS | Una **Notification Service Extension** descifra el payload antes de mostrarlo [52]. Requiere que el estado de claves viva en un contenedor nativo compartido (App Group), no solo en el IndexedDB del WebView | Trabajo nativo real |
-| Android | Un mensaje de solo datos despierta un manejador nativo que descifra y construye la notificación [53]. El estado de claves vive en almacenamiento nativo | Trabajo nativo real |
-| Si el descifrado falla (estado no disponible) | Se muestra "Mensaje nuevo de *Nombre*" con el nombre sacado de los metadatos | Declarado |
-
-### 4.7 Llamadas y reuniones
-
-| Función | Con E2EE | Coste |
-| --- | --- | --- |
-| Audio y vídeo (LiveKit, `livekit-client` 2.22.0) | LiveKit soporta E2EE de medios y datos, por sala, y LiveKit "no guarda ni transporta las claves" [54]. Con un **key provider propio** (`onSetEncryptionKey` por identidad y ratchet [55]) se inyectan claves por emisor derivadas del exporter MLS de la conversación, igual que DAVE [11]. El cliente web necesita el worker `livekit-client/e2ee-worker` [55] | Ninguno para el usuario |
-| Rotación al entrar o salir alguien | Commit MLS -> nueva época -> claves nuevas. DAVE muestra un "Voice Privacy Code" que cambia en cada cambio de época [11] | Ninguno |
-| Grabación (`call-recorder`) | Ya se graba en el navegador de quien pulsa: sigue igual | Ninguno |
-| Combinar audio, fondos virtuales, supresión de ruido | Ya son de cliente | Ninguno |
-| Chat de reunión (`meeting-chat.ts`) | Grupo MLS de la reunión. Los invitados sin cuenta reciben claves de sesión efímeras | Ninguno |
-| Señalización y API de LiveKit | Solo TLS: el servidor de LiveKit las puede leer [54] (quién está en la sala, no lo que se dice) | Metadato, como hoy |
-| Compatibilidad de navegadores | Depende de WebRTC encoded transforms; la doc de LiveKit no lista los navegadores [54][55]. **Sin verificar: hay que probar Safari, Firefox y el WebView de Android/iOS antes de comprometerse** | Por verificar |
-| Procesado futuro en servidor (transcripción, egress) | No es posible sin un participante declarado ("Transcriptor" visible en la llamada), igual que los bots en DAVE [23] | Declarado |
-
-### 4.8 Polar, automatizaciones, bots y componentes
-
-El principio: **lo que corre en el servidor es un participante, se ve en la lista de miembros y tiene sus propias claves.** Nunca una lectura silenciosa.
-
-| Función | Con E2EE | Coste |
-| --- | --- | --- |
-| **Polar en el chat, modo mención (por defecto)** | Polar **no** es miembro del grupo MLS. Cuando alguien escribe `@Polar` o `/polar`, su cliente manda a Polar solo ese mensaje y el contexto que el usuario elige (por ejemplo, "los últimos 20 mensajes") por un canal cifrado hasta Polar. Polar responde, el cliente del invocador publica la respuesta en la conversación y la respuesta va firmada por Polar. Es el modelo de Meta AI: lee solo lo que la menciona o lo que se le comparte [6] | Declarado: lo que se le pasa a Polar lo puede leer el servidor que lo ejecuta (el operador) y el proveedor del modelo, igual que lo que se dice a Meta AI no es E2EE [7]. La interfaz enseña "Compartirás N mensajes con Polar" |
-| **Polar como miembro (opcional por conversación)** | Para resúmenes y respuestas proactivas: un administrador añade a Polar como una hoja MLS más, visible en la lista con la insignia "Puede leer los mensajes". Al quitarlo, Commit `Remove` | Declarado y visible |
-| Polar con clave propia del usuario (BYOK) | Desde escritorio o móvil, el cliente puede llamar al proveedor directamente y el servidor de Polaris no ve el texto (el proveedor sí) | Opción |
-| Polar en TEE | Private Processing de Meta y Private Cloud Compute de Apple ejecutan la IA en VMs confidenciales con atestación y transparencia [3][4][41][42]. En Polaris solo sería posible en hardware con AMD SEV-SNP o Intel TDX y con un modelo **local** dentro del TEE (un proveedor externo vuelve a ver el texto). Un servidor doméstico casi nunca lo tiene, y la ACLU señala que la atestación depende de la firma del fabricante [56] | No recomendado como base; se deja como mejora opcional |
-| **Webhooks entrantes y automatizaciones** (`webhook-sender.ts`, avisos de deploy) | Cada webhook es un **miembro de servicio** ("Automatización: Deploy") cuyas claves guarda el servidor. Recibe el contenido por HTTPS y lo cifra para el grupo. Es exactamente el modelo de la WhatsApp Cloud API, donde Meta guarda las claves de la empresa [8] | Ninguno real: ese contenido ya nace en el servidor |
-| Bots que leen la conversación | Miembro con claves, visible, con alcance elegible: "solo menciones" (como Polar) o "todos los mensajes". Telegram lo evita restringiendo los bots a chats no cifrados [24][26]; aquí se declara | Declarado y visible |
-| **Componentes de mensaje** (botones, formularios) y comandos de app (`/task`) | La definición del componente va dentro del mensaje cifrado. Pulsar envía una interacción cifrada **solo al bot dueño** (un canal 1:1 con ese miembro), no a la fila guardada en el servidor. Un comando de app que crea una tarea lo ejecuta el cliente contra la API de Tasks y publica el resultado cifrado | Cambia por dentro; igual para el usuario |
-| Mensajes automáticos con plantillas (`notice-text.ts`) | Si los genera el servidor, el emisor es un miembro de servicio, como los webhooks | Ninguno |
-
-### 4.9 Plataforma
-
-| Función | Con E2EE | Coste |
-| --- | --- | --- |
-| Exportar e importar Polaris completo | La exportación lleva el texto cifrado tal cual; para que la importación sea plug-and-play el usuario necesita su clave de recuperación. Exportación legible: desde el cliente | Declarado |
-| Estadísticas de consumo de administración | Tamaños y recuentos: siguen | Ninguno |
-| Archivo legal de una organización | Opción por organización: un miembro "Archivo de la organización", visible en todas sus conversaciones, que recibe una copia. Es transparente, nunca oculto. Por defecto, desactivado | Declarado |
-| Versiones antiguas de clientes (escritorio, extensión, móvil) | Las conversaciones cifradas exigen una versión mínima; los clientes antiguos ven "Actualiza para abrir esta conversación" | Declarado |
-
----
-
-## 5. Copia de seguridad y recuperación
-
-### 5.1 Qué se guarda
-
-- **En el servidor, como hoy**: el texto cifrado de cada mensaje y archivo. No hay una segunda copia: el historial **es** el registro cifrado (el patrón Labyrinth [13]).
-- **En el backup de claves del usuario** (también en el servidor, cifrado): la clave de identidad de cuenta, las claves de época de cada conversación (32 bytes cada una) y la clave del índice. Se actualiza **al recibir cada época nueva**, sin esperar a reconectar, como en Labyrinth 1.1 [14].
-- El backup cifra todo con una **clave de backup** aleatoria de 256 bits, y esa clave se envuelve con uno o varios "cierres".
-
-### 5.2 Opciones de cierre
-
-| Cierre | Cómo funciona | Fortaleza en un Polaris autoalojado | Quién lo usa |
+| Clave | Qué es | Dónde vive | Se rota |
 | --- | --- | --- | --- |
-| **Clave de recuperación** | 256 bits aleatorios mostrados como grupos de caracteres (unos 64) y como QR, para guardarlos en el Vault o en papel | La más fuerte: el servidor no puede atacarla | Signal Secure Backups (64 caracteres) [15], Element [35], WhatsApp (64 dígitos) [10] |
-| **Frase de contraseña con KDF** (reutiliza el Vault) | La clave de backup se envuelve con una clave derivada de la frase, con los mismos `KdfSettings` de `packages/core/src/vault.ts` (PBKDF2 por defecto hoy; Argon2id recomendado para esto) y las reglas de `password-safety-rules` | Media: quien tenga la base de datos (incluido el operador) puede probar contraseñas **sin límite**. Aceptable solo con una frase fuerte | Modelo Bitwarden/Vault |
-| **HSM o enclave con límite de intentos** (PIN corto) | El enclave entrega la clave tras un PIN correcto y se autodestruye tras N fallos | **No disponible**: un servidor doméstico no tiene HSM, y un TPM lo controla el mismo operador del que nos protegemos | WhatsApp HSM Vault con OPAQUE [10][30], Signal SVR/SVR3 [19][20] |
-| **Recuperación social u organizativa** | La clave de recuperación se reparte con Shamir (por ejemplo 2 de 3) entre contactos de confianza o administradores de la organización; cada parte va cifrada para ellos | Buena si los custodios no se conchaban; encaja con el concepto de sucesor que ya tiene Polaris | Variante de los esquemas de umbral |
-| **Otro dispositivo propio** | Un dispositivo verificado entrega las claves al nuevo (QR) | La mejor experiencia; no sirve si se pierden todos | WhatsApp, Matrix [2][35] |
+| **Clave de cuenta** (`AK`) | Par de firma (Ed25519) y par HPKE (X25519 + ML-KEM-768 híbrido) del usuario. Firma las credenciales de sus dispositivos y recibe envoltorios de claves de historial | Solo envuelta por "cierres" (3.2); en claro solo en memoria o en el almacén no exportable del dispositivo | Al revocar todos los dispositivos o por compromiso |
+| **Clave de dispositivo** | Hoja MLS y clave de firma por dispositivo; credencial firmada por `AK` | WebCrypto no exportable en IndexedDB (web), almacén del sistema (Keychain, Keystore, DPAPI/safeStorage) | Updates MLS periódicos |
+| **Clave de historial** (`HK(c, e)`) | 32 bytes aleatorios por conversación `c` y periodo `e`; cifra el contenido | Repartida dentro del grupo MLS y guardada envuelta para cada cuenta miembro y para la recuperación de la organización | Al quitar a alguien y cada cierto tiempo |
+| **Clave de recuperación de la organización** (`ORK`) | Par HPKE; la privada se reparte con Shamir M de N entre dispositivos de administradores | Partes cifradas para cada custodio; nunca entera en el servidor | Al cambiar los custodios |
+| **Clave de índice** | Cifra los segmentos del índice de búsqueda (6.1) | Derivada de `HK` por conversación | Con `HK` |
 
-### 5.3 Recomendación
+### 3.2 Cierres de la clave de cuenta (cómo se desbloquea sin ceremonia)
 
-1. Al activar E2EE se genera **siempre** la clave de recuperación. Un botón la guarda en el Vault del propio usuario: el Vault es zero-knowledge, así que no se debilita nada y quien tiene Vault ya tiene dónde guardarla.
-2. **Frase de contraseña opcional**, con Argon2id y un medidor de fuerza que rechaza las débiles. La pantalla explica en una línea que protege menos que la clave.
-3. **Custodios opcionales** (contactos o administradores), con Shamir.
-4. Cualquier dispositivo verificado sirve también como cierre.
+| Cierre | Qué hace | ¿Visible? | Fuerza | Precedente |
+| --- | --- | --- | --- | --- |
+| **Dispositivo** | `AK` envuelta con la clave no exportable del dispositivo | No | Alta mientras el dispositivo no esté comprometido | Todos |
+| **Contraseña** | El cliente deriva de la contraseña dos valores con Argon2id: uno de autenticación (lo que se envía) y uno de envoltorio (que nunca sale). Hoy `better-auth` (`emailAndPassword`) recibe la contraseña y la comprueba en el servidor, así que **el servidor la ve**; con el cambio deja de verla. Alternativa más fuerte: OPAQUE (RFC 9807), que no revela la contraseña ni en el registro y resiste el precálculo tras un compromiso del servidor [80] | No: el usuario escribe lo mismo | Media: con la base de datos robada se pueden probar contraseñas sin límite (igual con OPAQUE tras el compromiso). Política de contraseñas ya existente + Argon2id con parámetros del orden de Threema Desktop (128 MiB) [62] | Modelo Bitwarden; Threema Safe [62] |
+| **Passkey con PRF** | Al iniciar sesión con passkey se pide la extensión PRF de WebAuthn (W3C Recommendation, nivel 3, sección 10.1.4) [81]; su salida envuelve `AK` | No: es el mismo gesto de entrar | Alta (secreto del autenticador) | WhatsApp con passkeys [67] |
+| **Aprobación desde otro dispositivo** | El flujo de QR existente transporta `AK` por un canal cifrado de extremo a extremo entre los dos dispositivos (patrón rendezvous de Threema [62]) | Es el gesto que ya existe para entrar por QR | Alta | WhatsApp [2], Threema [62] |
+| **Recuperación de la organización** (`ORK`) | `AK` envuelta para `ORK`. Para usarla hace falta el quórum | Solo una línea en Seguridad: "Tu organización puede recuperar tu cuenta (N de M administradores)" | Alta frente al servidor; la organización por quórum sí puede | Contacto de recuperación de Apple [70]; legal hold de Wire en espíritu [77] |
 
-### 5.4 He perdido todos mis dispositivos: el recorrido
+Soporte de PRF: Chromium lo envió (intención de lanzamiento en blink-dev) [82]; hay informes de que el flujo entre dispositivos de Safari no devolvía PRF [83] y de fallos en Firefox para macOS [84]. **No se puede depender solo de PRF**: es un cierre más cuando el autenticador lo da, y su ausencia no cambia nada para el usuario.
 
-1. Inicia sesión en un dispositivo nuevo (contraseña de la cuenta y 2FA, como hoy).
-2. Polaris detecta que hay un backup de claves y pide **uno** de: la clave de recuperación (escribir o escanear el QR), la frase de contraseña o "pedir ayuda a mis custodios".
-3. Con custodios: cada custodio recibe una petición en Polaris, confirma (idealmente por otro canal, con un código de verificación) y su dispositivo devuelve su parte cifrada para el dispositivo nuevo. Con el umbral alcanzado se reconstruye la clave.
-4. El dispositivo descifra el backup, recupera la identidad de cuenta y firma su propia credencial de dispositivo; los contactos ven "Ana añadió un dispositivo" (no "la identidad de Ana cambió").
-5. Descarga el historial cifrado bajo demanda, lo muestra al momento (SWR desde la caché local en cuanto existe) e indexa la búsqueda en segundo plano.
-6. Si no tiene **ninguno** de los cierres: puede seguir usando la cuenta con una identidad nueva, los contactos ven el aviso de cambio de identidad y el historial cifrado anterior es irrecuperable. La pantalla de activación lo dice antes, no después.
+### 3.3 Recorridos por tipo de usuario
 
----
-
-## 6. Verificación de dispositivos
-
-| Elemento | Diseño | Precedente |
+| Situación | Qué pasa | ¿Nota algo? |
 | --- | --- | --- |
-| Identidad de cuenta | Un par de claves por usuario que firma cada dispositivo (cross-signing) | Matrix [35][36], firma de cuenta de WhatsApp [1] |
-| Añadir un dispositivo | Se aprueba con el QR desde un dispositivo existente; se **reutiliza el flujo de inicio de sesión por QR** que Polaris ya tiene. Alternativa: la clave de recuperación | WhatsApp, Element |
-| Confianza por defecto | TOFU: la primera identidad vista se acepta y cualquier cambio de **identidad** (no de dispositivo) se marca en la conversación | Verificación automática de dispositivos de WhatsApp [1] |
-| Verificar a alguien | Comparar un número de seguridad o escanear un QR en persona; también 7 emojis (SAS) por videollamada. Queda una insignia de "verificado" | Signal, Matrix SAS [36], código de verificación de DAVE [11] |
-| Organizaciones | Un administrador puede marcar identidades como verificadas para su organización (opcional) | - |
-| Transparencia de claves | Fase posterior: registro de solo-añadir de las claves de identidad para detectar si el servidor da claves distintas a distintas personas | WhatsApp Key Transparency [57] |
+| Contraseña, cualquier navegador, ventana privada u ordenador compartido | Al entrar, el cliente deriva la clave de envoltorio y abre `AK` en memoria. En ventana privada no se escribe nada persistente; al cerrar se pierde y se vuelve a derivar al entrar | No |
+| Passkey con PRF | Igual, con la salida PRF | No |
+| Passkey sin PRF (autenticador o navegador sin soporte) | Si ya hay un cierre de dispositivo: nada. Si es un navegador nuevo: aprobación desde otro dispositivo propio (el QR que ya existe) o recuperación de la organización automática si la organización la configuró como "sin intervención" (decisión 1) | Solo en navegador nuevo, y solo si no tiene contraseña |
+| Enlace mágico o conexión externa (sin contraseña ni passkey) | Igual que la fila anterior | Igual que la fila anterior |
+| 2FA (TOTP, código por SMS) | No es un cierre: un segundo factor que el servidor verifica no protege frente al servidor. Sigue igual como control de acceso | No |
+| Restablece la contraseña (olvidada) | El envoltorio por contraseña ya no abre. Se recupera `AK` con: cualquier dispositivo propio aprobado, passkey PRF, o recuperación de la organización. Tras recuperar, se crea el envoltorio con la contraseña nueva | No, si tiene otro dispositivo, passkey PRF o la organización la tiene activada |
+| Recuperación de cuenta por administrador (`account-recovery-service`, flujo actual) | Hoy el administrador aprueba y deja pasar una contraseña nueva. Con E2EE, aprobar sin `ORK` devuelve la cuenta **sin el historial**; con `ORK`, la misma aprobación dispara la petición de quórum. El afectado y todos los custodios lo ven en el registro | El administrador ve un paso más; el usuario, no |
+| Varias cuentas en el mismo navegador | Un almacén de claves por `userId`, cada uno envuelto por su propio cierre de dispositivo; cambiar de cuenta no mezcla claves ni índices | No |
+| Cerrar sesión | Se borran el almacén de claves, el índice y la caché de mensajes de esa cuenta en ese navegador; las demás cuentas no se tocan. En un dispositivo marcado como de confianza se puede conservar (como hoy con `TrustedDevice`) | No |
+| Usuario nuevo | `AK` se genera en el primer inicio de sesión tras la actualización; los cierres se crean con lo que use para entrar | No |
+| Usuario que no vuelve a entrar nunca | No tiene `AK`. Su historial queda envuelto para `ORK` y para los demás miembros (8.4); si vuelve, recibe las claves al entrar | No |
+| Cuenta borrada | Se borran sus cierres. Sus mensajes en conversaciones compartidas siguen legibles para los demás (claves de historial de la conversación, no suyas) | No |
+| Bots, Polar, webhooks | Miembros de servicio con `AK` propia guardada por el servidor (sección 7) | No |
+| API keys | Una API key autentica, no descifra. Un cliente por API que deba leer el chat es un miembro de servicio o un dispositivo del usuario con su propia credencial firmada | Cambia para integraciones que leían `body` por la API; se declara en la nota de la versión |
 
----
+### 3.4 Dónde está la línea honesta
 
-## 7. Migración del historial existente
+Para un usuario que **solo** tiene factores controlados por el servidor (enlace mágico, conexión externa, restablecimiento por administrador), las tres cosas siguientes no caben juntas: (1) cero pasos visibles en un navegador nuevo, (2) historial completo, (3) que nadie más que él pueda leerlo. La v2 ofrece elegir cuál se cede (decisión 1):
 
-| Opción | Qué hace | Honestidad |
+| Modo | Quién puede recuperar sin factor del usuario | Usuario sin factor propio en navegador nuevo |
 | --- | --- | --- |
-| A. Línea en el historial (por defecto) | Lo anterior queda como estaba, legible por el servidor; una línea dice "A partir de aquí, cifrado de extremo a extremo" (lo que el roadmap ya propone, al estilo Element) | Exacta |
-| B. Recifrar lo anterior (opcional, por conversación) | El cliente de un miembro descarga lo antiguo, lo cifra con una clave de época "histórica", lo sube y el servidor borra el texto en claro, sus índices y las vistas previas. Es resumible y se hace en segundo plano por lotes | El servidor **ya vio** ese texto, y las copias de seguridad del operador pueden conservarlo. Protege frente a un robo futuro de la base de datos, no hacia atrás. La pantalla lo dice |
-| Adjuntos antiguos | Igual que B, archivo a archivo, con el mismo cursor | Igual |
-| Activación | Fase 1: MD y grupos con opción por conversación. Fase final: **activado por defecto** en MD y grupos nuevos, y después en canales de espacio | - |
+| **A. Recuperación de la organización con quórum** (recomendado) | M de N custodios de la organización, auditado y notificado | Recuperación automática si la organización activa "sin intervención" (los custodios pre-autorizan con un umbral de tiempo; ver 3.5), si no, un aviso "Pide acceso a tu organización" |
+| **B. Solo factores del usuario** (máximo para inteligencia) | Nadie | Debe aprobar desde otro dispositivo propio; sin él, el historial anterior no se recupera |
+| **C. Custodia del servidor** | El servidor | Nada visible, pero **no es E2EE frente al servidor** para esos usuarios; la pantalla de Seguridad lo dice |
+
+### 3.5 Recuperación de la organización sin intervención humana en cada uso
+
+Pedir el quórum cada vez que alguien abre una ventana privada no es invisible. Diseño propio (a revisar en 11.2): los custodios firman, con el quórum, una **delegación por política** a un servicio de recuperación que corre en el servidor, con límites: solo para cuentas de la organización, solo tras un inicio de sesión completo (con 2FA si la cuenta lo tiene), solo si la cuenta no tiene ningún factor propio, como máximo K recuperaciones por cuenta y día, y cada uso notificado al usuario y anotado en el registro encadenado. **Esto equivale a custodia del servidor para esos usuarios mientras la delegación esté activa**, y la pantalla de Seguridad del administrador lo dice con esas palabras. Sin delegación, la recuperación espera al quórum.
 
 ---
 
-## 8. Rendimiento y recursos
+## 4. Protocolo
 
-| Dimensión | Hoy | Con E2EE | Fuente o cálculo |
+### 4.1 Por qué MLS (resumen de la v1)
+
+Coste logarítmico por cambio de miembros frente al cuadrático de Sender Keys, seguridad tras compromiso nativa, de dos a miles de miembros, la misma sesión deriva claves de llamada, estándar IETF con arquitectura en RFC 9750 (Servicio de Entrega y Servicio de Autenticación como papeles separados) [21][58]. Threema cifra por miembro y le basta porque sus grupos son pequeños y el servidor no conoce los grupos [62]; Polaris tiene canales de miles.
+
+### 4.2 Diseño
+
+1. **Un grupo MLS por conversación** (MD, grupo, canal, hilo hereda el de su canal, chat de reunión). Hojas = dispositivos. El servidor es el Servicio de Entrega y ordena los commits por época.
+2. **Credenciales firmadas por la clave de cuenta**, nunca por el servidor. El Servicio de Autenticación de RFC 9750 [58] es el propio usuario (su `AK`) más la transparencia de claves (4.6).
+3. **Contenido**: `K_msg = HKDF(HK(c,e), "polaris/msg" || message_id || sender_leaf)`, AES-256-GCM con nonce derivado, firma del dispositivo emisor sobre `(conversación, message_id, epoch, hash del texto cifrado)`. Una sola copia cifrada por mensaje.
+4. **Reparto de `HK`**: quien hace el commit genera `HK` nueva y la manda como mensaje de aplicación MLS. Cada dispositivo que la recibe escribe, si falta, el envoltorio para su propia `AK` (uno por usuario, autoservicio, como Labyrinth 1.1 [14]). El que hace el commit escribe además el envoltorio para `ORK` y para los **miembros durmientes** (sin dispositivo activo en el grupo).
+5. **Hilos**: comparten el grupo del canal. **Ediciones, reacciones, votos, borrados**: mensajes cifrados que apuntan a un `message_id`.
+6. **Coste declarado**: dentro de un periodo `e` no hay secreto hacia delante por mensaje, porque el historial tiene que poder leerse desde un dispositivo nuevo. Es la concesión de Labyrinth y de cualquier historial recuperable [13]. Threema la evita no guardando historial en el servidor [62].
+7. **Esta capa (3 y 4) es criptografía propia** sobre primitivas estándar. Por eso tiene revisor adversarial propio (11.2) y vectores de prueba propios (11.3).
+
+### 4.3 Validaciones que el cliente hace siempre (contra el servidor malicioso)
+
+| Comprobación | Ataque que evita | Fuente |
+| --- | --- | --- |
+| Toda hoja nueva lleva credencial firmada por la `AK` del usuario, y esa `AK` coincide con la vista en el registro de transparencia | Servidor que añade un dispositivo propio | Matrix 2022: el servidor podía añadir dispositivos y confundir identificadores [59] |
+| Pertenencia del grupo MLS = pertenencia autorizada que el servidor declara, y cualquier diferencia se muestra | Servidor que mete a alguien sin que el grupo lo sepa | Crítica a la gestión de grupos de WhatsApp, Signal y Threema [85] |
+| Commits y Welcome validados completos según RFC 9420 (árbol, firmas, transcript hash, `confirmation_tag`), incluidos los external commits | Commits malformados o divergentes | RFC 9420 [21] |
+| Cada mensaje cifrado se liga a `(conversación, epoch, message_id, emisor)` en los datos asociados; contador por emisor y detección de huecos | Reordenar, borrar, reenviar, reflejar mensajes | Threema 2023: reordenación y borrado, repetición y reflexión [61] |
+| Separación de claves por propósito con etiquetas distintas en cada derivación | Interacciones entre protocolos | Lección 2 de ETH sobre Threema [61]; confusión Olm/Megolm en Matrix (CVE-2022-39251) [59] |
+| Estado MLS con versión monótona; rechazar estado anterior | Vuelta atrás del estado local | - |
+| Nunca degradar a texto en claro ni a un ciphersuite más débil sin una nueva versión del protocolo firmada | Downgrade | Telegram: ataques al protocolo y al intercambio de claves del servidor [86] |
+
+### 4.4 Ciphersuite
+
+`MLS_128_DHKEMX25519_AES128GCM_SHA256_Ed25519` al principio; suite híbrido con ML-KEM cuando la biblioteca implemente el borrador del grupo de trabajo, que define ML-KEM-768 + X25519 entre otros y advierte que con firma clásica la autenticidad sigue siendo solo clásica [87].
+
+### 4.5 Poscuántico en lo almacenado
+
+Lo que queda guardado años (envoltorios de `HK` para cuentas y para `ORK`) usa HPKE híbrido X25519 + ML-KEM-768 desde el primer día: es justo lo que un adversario guarda ahora para descifrar después. Coste: unos 1.100 bytes por envoltorio (tamaño de texto cifrado de ML-KEM-768, deducción a confirmar con la biblioteca elegida). Decisión 6.
+
+### 4.6 Transparencia de claves
+
+Registro de solo añadir de `AK` por usuario, verificable por los clientes (patrón de WhatsApp [57]). Sin él, el servidor puede dar una `AK` falsa a un usuario concreto. Se adelanta respecto a la v1 porque "sin verificación manual" (requisito 1) solo es seguro si el cliente comprueba solo.
+
+### 4.7 Confianza en el código web
+
+En la web, el servidor entrega el código que guarda las claves. Medidas:
+
+| Medida | Efecto |
+| --- | --- |
+| Paquete de cifrado separado, con hash publicado en el registro de transparencia de cada versión | Un cambio silencioso para una sola persona queda a la vista |
+| La extensión de Polaris y la app de escritorio verifican ese hash antes de cargar las claves | Quien usa una de las dos está protegido frente a JS modificado |
+| Política de organización "solo apps verificadas" (apagada por defecto) | Despliegues de inteligencia: el navegador sin extensión no abre conversaciones cifradas |
+| CSP estricta, sin `eval`, Trusted Types en el renderizado de mensajes | El XSS en el render es la vía clásica: Signal Desktop CVE-2018-10994 permitía inyectar HTML por un mensaje [88]; Wire tuvo un framework JS antiguo explotable [89] |
+
+---
+
+## 5. Mapa de funciones (cambios respecto a la v1)
+
+Se mantiene el mapa de la v1 (secciones 4.1-4.9) con estos cambios, que salen de los requisitos nuevos:
+
+| Función | v1 | v2 |
+| --- | --- | --- |
+| Activación | Opción por conversación | Siempre, para todo, sin interruptor |
+| Vistas previas de enlaces | Emisor nativo directo; web vía servidor declarado | **Siempre vía servidor** (aprobado, como Discord): el cliente pide la tarjeta a `link-preview.ts` por `safe-fetch`, el servidor ve la URL y quién la pide, **no** en qué conversación se pega; la tarjeta y la miniatura viajan cifradas dentro del mensaje. Lo ven los lectores sin pedir nada |
+| Búsqueda | Índice local; dispositivo nuevo indexa | Índice en segmentos cifrados compartidos (6.1) |
+| Polar y bots | Desactivados en conversaciones cifradas hasta la fase 7 | Funcionan desde el primer día (sección 7) |
+| Migración | Línea en el historial y recifrado opcional | Todo el historial se convierte y se borra el texto en claro (sección 8) |
+| Recuperación | Clave de recuperación siempre | Sin ceremonia (sección 3) |
+| Recibos por mensaje | Metadato | Se reduce a "último leído" (2.2) |
+| Clientes antiguos | Pantalla de "actualiza" | Corte por conversación cuando todos los dispositivos activos lo soportan, con plazo (8.6) |
+| Auditoría externa | Requisito antes de activar | Proceso interno; externa opcional (sección 11) |
+
+---
+
+## 6. Funciones que hoy leen texto en el servidor
+
+Lectores de `ChatMessage.body` en el servidor hoy: `lib/chat/search.ts` (`body contains`, insensible a mayúsculas), `notify.ts` y `toasts.ts` (texto de avisos), `references.ts`, `polls.ts`, `reports.ts`, `notices.ts`, `link-preview.ts`, `chat-service.ts`, `messages.ts`, y fuera del chat `lib/home/alerts.ts`. Cada uno tiene destino:
+
+| Función | Cómo se mueve | ¿Nota algo el usuario? |
+| --- | --- | --- |
+| Búsqueda | 6.1 | Ver 6.1 |
+| No leídos, menciones, niveles de aviso (`notify.ts`, `room-mentions.ts`) | El emisor adjunta en claro la lista de ids mencionados y si es @sala; el servidor sigue aplicando niveles y silencios; recuento de no leídos por "último leído" | No |
+| Texto de las notificaciones | Push con el texto cifrado (si cabe) o con el id; lo descifra el Service Worker, la app de escritorio, la Notification Service Extension en iOS [52] o el manejador de datos en Android [53]; payload cifrado también frente al servicio de push (patrón Threema [62]) | No. Si el estado no está disponible, "Mensaje nuevo de Nombre" |
+| Avisos en Inicio (`home/alerts.ts`) | Solo metadatos del servidor; el extracto lo descifra el cliente al pintar | No |
+| Polar | Sección 7 | No |
+| Moderación y reglas de contenido | Las reglas de `@polaris/core` que dependen de metadatos (lentitud, tamaño, número de adjuntos, permisos) siguen en el servidor. Las que miran el **contenido** se aplican en el cliente emisor con la misma función pura de `core` y se comprueban en el receptor (que oculta lo que las incumple). Denuncias con franking [47][49] | No para quien usa el cliente oficial; un cliente modificado puede saltarse las de contenido (declarado) |
+| Firewall de la plataforma | Es de red y de peticiones, no de contenido de chat: sin cambios | No |
+| Vistas previas | Servidor pide la URL (aprobado), la tarjeta viaja cifrada | No |
+| Miniaturas y posters | Las genera el emisor (el cliente ya graba clips y ya conoce el archivo) y se suben cifradas | No |
+| Transcripción de notas de voz | En el dispositivo cuando hay motor local; si no, Polar como participante con el consentimiento implícito de pulsar "Transcribir" | No |
+| Traducción | En el dispositivo cuando el navegador o el sistema lo permiten; si no, vía Polar | No |
+| Referencias a tareas | Las resuelve el cliente contra la API de Tasks con sus permisos | No |
+| Encuestas | Votos cifrados; recuento en el cliente | No |
+| Programados | El cliente cifra al programar; si el periodo cambia antes de publicar, un dispositivo del autor lo vuelve a cifrar; si ninguno está en línea, el servidor publica el cifrado con la `HK` anterior y los miembros vigentes la tienen (v1 4.1) | No |
+| Exportación del usuario | En el cliente, descifrando | No |
+| Exportación e importación de Polaris completo | Lleva texto cifrado, envoltorios de `AK` y de `HK`; tras importar, los cierres siguen funcionando porque viajan con los datos | No |
+| Exportación de cumplimiento | Sección 9 | - |
+
+### 6.1 Búsqueda instantánea en un navegador recién abierto
+
+Problema: hoy `search.ts` consulta PostgreSQL. Con E2EE el servidor no puede. Un índice local frío en una ventana privada tarda en proporción al historial.
+
+Diseño: **segmentos de índice cifrados y compartidos por conversación**.
+
+| Pieza | Cómo |
+| --- | --- |
+| Segmento | Índice invertido comprimido de un tramo de mensajes de una conversación (por ejemplo, 5.000 mensajes o un periodo `e`), cifrado con la clave de índice derivada de `HK` |
+| Quién lo construye | El primer dispositivo miembro que tiene el tramo descifrado, en segundo plano; para el historial migrado, el propio proceso de migración (ya tenía el texto) |
+| Reutilización | Un segmento sirve a todos los miembros: no se construye por persona |
+| Navegador nuevo | Descarga los segmentos de las conversaciones a las que tiene acceso, recientes primero, en paralelo, los descifra en un Worker y busca en memoria (o en IndexedDB si la sesión no es privada) |
+| Ediciones y borrados | Segmento de corrección pequeño; se compacta periódicamente |
+| Fuga | El servidor ve tamaño y número de segmentos por conversación; no ve términos. Descartado el cifrado buscable con tokens deterministas porque filtra frecuencias y patrones de acceso (v1 4.4) |
+
+Velocidad (estimación a medir en fase 0): un segmento de 5.000 mensajes de unos 150 bytes son unos 750 KB de texto; un índice comprimido suele ocupar una fracción de eso. Los últimos 90 días de un usuario normal caben en pocos MB y se buscan en menos de un segundo tras descargarlos. Para un usuario en cientos de canales con millones de mensajes, la búsqueda de lo antiguo **no** es instantánea en una ventana privada: se muestra lo reciente al momento y lo antiguo según llega, con "buscando más atrás". Es el coste visible (a) de la sección 0 y se declara.
+
+---
+
+## 7. Polar, automatizaciones, bots y componentes
+
+Principio de la v1 sin cambios: lo que corre en el servidor y lee contenido es un **participante con claves**, visible en la lista de miembros.
+
+| Función | v2 |
+| --- | --- |
+| Polar por mención (`@Polar`, `/polar`) | El cliente del invocador envía a Polar el mensaje y el contexto, cifrados para la `AK` de servicio de Polar. Polar responde cifrando para el grupo como miembro de servicio. Igual que hoy para el usuario |
+| Polar con acceso a toda la conversación (resúmenes, proactivo) | Polar como hoja MLS, visible con "Puede leer los mensajes"; se añade o quita como cualquier miembro |
+| Webhooks y automatizaciones | Miembro de servicio cuyas claves guarda el servidor; el contenido nace en el servidor (modelo Cloud API de WhatsApp [8]) |
+| Componentes y comandos de app | Definición dentro del mensaje cifrado; la interacción va cifrada al miembro de servicio dueño; `/task` lo ejecuta el cliente contra Tasks |
+| Avisos del sistema (entradas, salidas, llamadas perdidas) | Eventos tipados que el servidor ya conoce como metadatos; se pintan igual |
+| Honestidad | Lo que se manda a Polar lo lee quien ejecuta Polar (el operador) y el proveedor del modelo. La lista de miembros lo muestra; no hay lectura silenciosa |
+
+---
+
+## 8. Migración de todas las instancias
+
+### 8.1 Quién cifra el historial y qué confianza implica
+
+Lo cifra el **servidor**, porque los clientes pueden no volver nunca y son millones de mensajes. El servidor ya tenía ese texto en claro, así que la migración **no añade** exposición: reduce la futura. Lo que no puede hacer es borrar el pasado: copias de seguridad, WAL archivado, réplicas y cualquier copia anterior conservan el texto hasta que se purgan (8.5).
+
+Minimización de la confianza en el proceso:
+
+| Medida | Efecto |
+| --- | --- |
+| Proceso aislado (`chat-migrator`) con su propia conexión, sin red de salida, sin registro de contenido | Superficie mínima |
+| `HK(c, legacy)` generada dentro del proceso, envuelta al momento para cada miembro con `AK`, para `ORK` y nada más, y borrada de memoria al terminar la conversación | El servidor no conserva ninguna clave que abra el historial migrado |
+| El historial migrado se firma con una clave de migración de un solo uso cuyo público se publica en el registro de transparencia; los clientes lo muestran como "historial anterior a [fecha]" con la misma apariencia | Honesto sobre el origen sin ruido visual |
+| Registro en la auditoría (`chat.migration.*`) de cada lote con recuentos y hashes | Evidencia para SOC 2/ISO, en línea con `docs/compliance.md` |
+
+### 8.2 Fases de la migración en una instancia
+
+| Fase | Qué hace | Reversible |
+| --- | --- | --- |
+| M0 Preparación | Migraciones de esquema **aditivas**: columnas `ciphertext`, `cipherMeta`, `keyEpoch` en mensajes, adjuntos, ediciones, programados, encuestas; tablas de claves envueltas, segmentos de índice y estado de migración por conversación. Nada se borra | Sí |
+| M1 Escritura doble | Los clientes nuevos envían cifrado. Para conversaciones aún no cortadas, el servidor guarda además el texto en claro **solo** si algún dispositivo activo de un miembro es antiguo (8.6) | Sí |
+| M2 Conversión por conversación | El migrador toma conversaciones por lotes, cifra mensajes, ediciones, encuestas, adjuntos (archivo a archivo, en bloques de 64 KiB) y miniaturas; construye segmentos de índice; escribe envoltorios | Sí: el texto en claro sigue |
+| M3 Verificación | Por conversación: recuento de filas en claro = recuento cifrado; para cada mensaje, `SHA-256(texto en claro)` comparado con el hash dentro del cifrado tras descifrar una muestra **completa** con la `HK` antes de borrarla de memoria; para adjuntos, tamaño y SHA-256 por archivo. Cualquier diferencia deja la conversación en "pendiente" y no avanza | Sí |
+| M4 Corte | La conversación pasa a "solo cifrado": la API deja de servir texto en claro de ella | Sí: volver a M3 |
+| M5 Borrado | Tras un periodo de gracia configurable sin incidencias: se vacían las columnas en claro y los archivos sin cifrar se eliminan del almacén (local, NAS, S3); `VACUUM` y reescritura de las tablas afectadas para que el texto no quede en páginas muertas | No, salvo con la instantánea de 8.5 |
+| M6 Retirada | En una versión posterior, el código y las columnas en claro se eliminan **solo si** el estado de migración dice "todo cortado y borrado"; nunca por número de versión | No |
+
+### 8.3 Reanudable, idempotente y escalable
+
+- Estado por conversación en una tabla (`pending`, `converting`, `verifying`, `cut`, `purged`, `failed`) con cursor por `(channelId, createdAt, id)`, que es el índice que ya existe en `ChatMessage`.
+- Cada lote es una transacción: escribe cifrado solo donde `ciphertext IS NULL`. Repetir un lote no cambia nada. Un corte de luz deja como mucho un lote a medias que se repite.
+- Ritmo limitado por carga (CPU y latencia de la base de datos), pausa automática si la instancia está ocupada, con progreso visible en Administración ("Protegiendo el historial del chat: 63%").
+- Rendimiento (estimación a medir en fase 0): AES-GCM con aceleración por hardware cifra a cientos de MB/s; el límite es la base de datos. Con lotes de unos miles de filas y un proceso, el orden de magnitud esperable es de miles de mensajes por segundo, es decir, 10 millones de mensajes en horas, no en días. Los adjuntos dependen del almacén (NAS o S3) y van en una cola aparte.
+- Instancias que se saltan versiones: la migración arranca en la primera versión que la contiene, sea cual sea la anterior, y los pasos destructivos (M5, M6) comprueban el estado, no la versión.
+- Funciona en la edición limitada (sin hostd) porque corre dentro del panel y no necesita variables nuevas en `.env`.
+
+### 8.4 Casos especiales
+
+| Caso | Tratamiento |
+| --- | --- |
+| Miembro que nunca vuelve a entrar | Sin `AK`: no recibe envoltorio. Su historial queda envuelto para `ORK` y para los demás miembros. Si vuelve, al crear su `AK` cualquier dispositivo miembro en línea le escribe los envoltorios en segundo plano (patrón de historial compartido de Element [34]); si no hay ninguno, la recuperación de la organización lo hace |
+| Conversación sin ningún miembro con `AK` (por ejemplo, un MD entre dos personas que no vuelven) | Solo envoltorio para `ORK`. **Sin `ORK` (modo B de 3.4) esa conversación no tiene a quién envolverse**: o se deja sin migrar (texto en claro) hasta que un miembro entre, o se envuelve con una clave de custodia del servidor marcada como tal. Decisión 1 |
+| Cuenta borrada | Sus mensajes se migran como los demás (son de la conversación); no recibe envoltorio |
+| Miembro que se fue | Recibe envoltorio solo para el tramo que ve hoy según la política actual de historial; nada posterior |
+| Bots y webhooks | Su `AK` de servicio se crea en M0; sus mensajes se migran igual |
+| Mensajes programados pendientes | Se cifran con la `HK` vigente al publicar |
+| Denuncias abiertas (`ChatReport`) | El contenido denunciado se conserva en el expediente de moderación como evidencia firmada por la migración, porque el denunciante ya lo compartió; queda en la retención de moderación |
+| Chat de reunión con invitados sin cuenta | Su historial se envuelve para los miembros con cuenta y `ORK` |
+
+### 8.5 Copias, vuelta atrás y purga del pasado
+
+| Pieza | Diseño |
+| --- | --- |
+| Antes de M2 | Backup completo con la función de Backups existente, comprobado (restaurable) antes de empezar; si no hay destino de backup configurado, la migración no empieza y Administración lo dice con el botón para configurarlo |
+| Instantánea de vuelta atrás | Copia de las tablas y archivos en claro, cifrada para `ORK` (o para una clave de vuelta atrás offline si no hay `ORK`), guardada N días |
+| Vuelta atrás | Por conversación (M4 -> M3) o global mientras exista la instantánea; probada en la suite de migración |
+| Purga | Al vencer N días, se destruye la instantánea. Los backups anteriores a la migración siguen conteniendo texto en claro hasta que su retención los elimina; Administración ofrece "Eliminar ahora las copias anteriores con chat en claro" (decisión 4). Sin esto, la frase "el texto en claro se ha eliminado" sería falsa |
+
+### 8.6 Desfase de versiones de los clientes
+
+La web siempre llega actualizada (la sirve la propia instancia). El desfase está en escritorio, extensión, Android e iOS, que hablan con instancias de muchas versiones distintas.
+
+| Regla | Detalle |
+| --- | --- |
+| Capacidad anunciada por dispositivo | Cada cliente declara `e2ee: vN` al conectar |
+| Corte por conversación | Una conversación pasa a M4 cuando todos los dispositivos **activos** (vistos en los últimos N días) de sus miembros soportan E2EE, o al vencer el plazo de transición |
+| Durante la transición | Los clientes antiguos siguen leyendo y escribiendo en claro en las conversaciones no cortadas (lo que hoy ya pasa) |
+| Después | El cliente antiguo ve "Actualiza para seguir en esta conversación" con el botón de actualizar. Escritorio y móvil se actualizan solos, así que es raro |
+| Cliente nuevo contra instancia antigua | El cliente detecta que la instancia no anuncia E2EE y funciona como hoy, sin mostrar nada |
+| Nunca | Descifrar en el servidor para un cliente antiguo |
+
+---
+
+## 9. Controles de organización (gobierno y empresa)
+
+| Necesidad | Opción sin romper E2EE | Recomendación |
+| --- | --- | --- |
+| Retención | El servidor borra el texto cifrado y los envoltorios por antigüedad (no necesita claves); los clientes borran su copia local con la misma política | Igual que hoy, sin cambio visible |
+| Retención legal (legal hold) | Suspender el borrado para un sujeto o una conversación; no necesita claves | Disponible siempre |
+| Exportación de cumplimiento o eDiscovery | **Opción 1**: `ORK` por quórum descifra lo pedido; cada uso queda en el registro encadenado (`evidence.export` ya registra exportaciones con hash) y se notifica a los afectados. **Opción 2**: miembro "Archivo de la organización" visible en las conversaciones del sujeto, con indicador (modelo legal hold de Wire [77][78]). **Opción 3**: ninguna (modelo Threema Work, Teams E2EE [79]) | Opción 1 disponible si existe `ORK`; Opción 2 apagada por defecto, para regulados; la pantalla de cada conversación dice la verdad |
+| Auditoría | Los eventos de claves (dispositivo añadido, recuperación usada, custodios cambiados, migración) entran en el registro de auditoría encadenado que ya existe | Siempre |
+| Dispositivo perdido o persona que se va | Revocar dispositivos (Remove MLS + rotación de `HK`) y, opcional, DualLock [62] | Revocación siempre; DualLock como política |
+| Evidencia SOC 2 / ISO | La evidencia de `docs/compliance.md` añade: estado de migración, porcentaje cifrado, custodios de `ORK`, usos de recuperación | Siempre |
+
+---
+
+## 10. Rendimiento
+
+| Dimensión | Diseño | Coste |
+| --- | --- | --- |
+| Primer pintado | Sin cambios: el armazón y lo que el dispositivo ya tenía (la rama del almacén offline ya abre conversaciones desde lo guardado antes de que conteste la red) se pintan antes de cargar nada criptográfico | Ninguno |
+| Biblioteca MLS (WASM) | Carga diferida en un Worker al abrir el chat; el descifrado de mensajes con `HK` usa WebCrypto (AES-GCM nativo) y no necesita el WASM, así que leer no espera a MLS | Peso y arranque a medir en fase 0 |
+| Descifrado de una conversación | Por lotes, solo la ventana visible, en el Worker | Despreciable por mensaje |
+| Envío | Un AES-GCM y una firma por mensaje | Despreciable |
+| Canal de 10.000 miembros con 3 dispositivos | 30.000 hojas; commit con unos `log2(30.000)` ~ 15 cifrados de ruta [21]; altas y bajas agrupadas en commits periódicos; el servidor propone bajas como remitente externo; los miembros entran al grupo MLS del canal **al abrirlo por primera vez** (external commit), no al unirse al espacio | Árbol de ratchet del orden de MB en canales enormes: se descarga una vez y se actualiza por deltas (estimación) |
+| Dispositivos inactivos | Bajas automáticas tras N días sin conexión (protege la seguridad tras compromiso y reduce el árbol); al volver entran con external commit | Decisión 7 |
+| Mensaje en canal grande | Una escritura y un reparto; nada por destinatario | Igual que hoy |
+| Almacenamiento | Ficheros sin duplicar (10.1); unos 92 B por mensaje (v1) + segmentos de índice + envoltorios (32 B + cabecera por clave, unos 1.100 B con ML-KEM) por periodo y miembro | Moderado; los periodos rotan poco |
+| CPU del servidor | Deja de indexar texto y generar miniaturas; valida commits | Menor que hoy (deducción) |
+
+### 10.1 Almacenamiento sin duplicar bytes
+
+Hoy un reenvío no copia nada: el mensaje nuevo apunta al original (`replyToId` con `forwarded`), y el servidor lee los bytes del original para pintarlo. Guardar un GIF (`lib/chat/saved-media.ts`) sí **copia** el fichero a la conversación de destino cada vez que se reenvía, para que borrar el primer mensaje no se lleve la imagen del segundo. Con cifrado de extremo a extremo el servidor ya no puede leer los bytes, así que las dos rutas se rediseñan alrededor de la misma regla:
+
+| Caso | Diseño | Coste en disco |
+| --- | --- | --- |
+| Adjunto nuevo | El emisor genera una clave aleatoria por fichero (`FK`), cifra por bloques (fase 5) y sube un **blob** cifrado. El mensaje lleva, dentro del contenido cifrado con MLS/`HK`, el identificador del blob, `FK`, el hash del texto cifrado y los metadatos (nombre, tipo, dimensiones, miniatura cifrada). | Un blob |
+| Reenvío | El cliente que reenvía descifra el mensaje original, copia la referencia `(blob, FK, hash)` dentro del contenido del mensaje nuevo, cifrado para la conversación de destino. **No se vuelve a subir ni a cifrar el fichero.** El servidor solo ve que el mensaje nuevo referencia el mismo blob. | Cero bytes adicionales |
+| GIF o imagen guardada | La lista de guardados pasa a ser un registro cifrado con la clave de cuenta que contiene `(blob, FK, hash)`; enviarlo de nuevo es un reenvío. Se elimina la copia de `saved-media.ts`. | Cero bytes adicionales |
+| Varios destinos a la vez | Un reenvío a N conversaciones son N mensajes con la misma referencia. | Cero bytes adicionales |
+
+**Recuento de referencias en el servidor.** La tabla de blobs guarda cuántos mensajes (y guardados, y retenciones de denuncia) apuntan a cada uno. Borrar un mensaje quita su referencia; el fichero se elimina cuando el recuento llega a cero, en un barrido en segundo plano que reutiliza `removeStoredFiles`. Así se conserva la semántica actual: borrar el original no se lleva la imagen de un reenvío. Una denuncia es una referencia más (la evidencia de `keepForReports` deja de mover ficheros y pasa a sujetar el blob). El servidor puede saber que dos mensajes comparten blob, lo mismo que hoy sabe de un reenvío por `replyToId`; no aprende el contenido.
+
+**Quién puede referenciar un blob.** Una referencia nueva solo se acepta si el emisor demuestra que pudo leerlo: el servidor comprueba que el blob ya está referenciado en una conversación de la que el emisor es miembro (o en sus guardados), igual que hoy `requireChannel` comprueba el origen de un reenvío. Sin esa prueba, conocer un identificador de blob permitiría sujetarlo indefinidamente o adjuntarlo en otra sala; aun así no permitiría leerlo, porque falta `FK`.
+
+**Sin cifrado convergente.** No se deriva la clave del contenido (clave = hash del fichero) para deduplicar entre usuarios distintos. Esa técnica permite al servidor confirmar si alguien tiene un fichero concreto y adivinar documentos de baja entropía (ataques de confirmación de fichero y de "aprender el resto"), que es exactamente el adversario del modelo de amenazas. La deduplicación se limita a lo que un cliente decide reutilizar a sabiendas: reenvíos y guardados.
+
+**Guardar en Drive.** Drive no es de extremo a extremo. "Guardar en Drive" descifra en el cliente y sube el fichero en claro a Drive como cualquier subida, con la confirmación habitual; el servidor de chat nunca descifra. Es una copia deliberada, fuera del chat, y se documenta así.
+
+**Miniaturas y vistas previas.** Las genera el emisor, se cifran con su propia clave y viajan como un blob más con su recuento; un reenvío las reutiliza igual que el fichero.
+
+**Migración.** El migrador (8.2) convierte cada adjunto existente en un blob cifrado una sola vez aunque lo referencien varios mensajes (los reenvíos actuales apuntan al original, así que no hay duplicados que reconciliar). Las copias que `saved-media.ts` hizo en el pasado se quedan como blobs independientes: son ficheros distintos con historias de borrado distintas.
+
+---
+
+## 11. Aseguramiento interno (sustituye a la auditoría externa)
+
+### 11.1 Lista de fallos conocidos (cada punto con su prueba en la suite)
+
+| # | Fallo | Qué se exige | Fuente del precedente |
 | --- | --- | --- | --- |
-| Coste de un cambio de miembros en un grupo de N dispositivos | - | `log2(N)` cifrados (N=1.000 -> unos 10) frente a O(N^2) con Sender Keys | RFC 9420 [21] |
-| Fanout de un mensaje | 1 escritura y reparto | 1 escritura y reparto (una sola copia cifrada; nada de N copias por dispositivo como el 1:1 de WhatsApp [2]) | Diseño 3.2 |
-| Tamaño extra por mensaje | 0 | unos 92 B (nonce de 12 + etiqueta de 16 + firma Ed25519 de 64) | Constantes de AES-GCM y Ed25519 |
-| CPU del servidor | Vistas previas, índice de búsqueda, posters | Baja: no descifra, no indexa y no genera miniaturas; solo valida commits | Deducción |
-| Backup de claves | - | 32 B por época y conversación | Diseño 5.1 |
-| CPU del cliente | Render | + AES-GCM con aceleración por hardware (despreciable por mensaje) + indexar | - |
-| Índice de búsqueda local | - | Del orden del tamaño del texto; Seshat usa 50 MB de heap al escribir [33] | [33] |
-| Medios en llamadas | SFU reenvía | SFU reenvía igual; el cifrado de tramas va en el cliente; DAVE apunta a "unos cientos de ms" hasta el primer medio [11] | [11] |
-| Primer arranque de un dispositivo nuevo | Instantáneo | Instantáneo para lo reciente; el índice completo tarda (en segundo plano) | - |
+| 1 | Reutilización de nonce o clave en AEAD | Nonces derivados, nunca aleatorios de 96 bits sin control; clave por mensaje; prueba que fuerza colisiones | RFC 9420 (derivación de nonces y `reuse_guard`) [21] |
+| 2 | Mal uso de AEAD: datos asociados incompletos, compromiso de clave | Datos asociados con conversación, epoch, id, emisor; compromiso de archivos por SHA-256 del claro | Franking de adjuntos de Facebook burlado [49] |
+| 3 | Credencial o firma sin verificar, confusión de identificadores | Verificar toda credencial contra `AK` y transparencia; tipos distintos para id de dispositivo y clave | Matrix CVE-2022-39250 (confusión de clave y dispositivo en SAS) [59] |
+| 4 | Confusión entre protocolos o tipos de mensaje | Etiquetas de dominio en cada derivación y firma | Matrix CVE-2022-39251 (Olm/Megolm) [59]; ETH sobre Threema, lección 2 [61] |
+| 5 | Validación incompleta de commits y épocas | Validación RFC 9420 completa; rechazar épocas pasadas y futuras | RFC 9420 [21] |
+| 6 | Welcome y external join sin validar | Validar `GroupInfo` firmado, árbol y permisos; el servidor solo autoriza, no decide claves | RFC 9420 [21]; RFC 9750 sobre el papel del Servicio de Entrega [58] |
+| 7 | Downgrade de versión o suite | Versión y suite fijadas por grupo; cambio solo por commit firmado | Telegram MTProto [86] |
+| 8 | Repetición, reflexión, reordenación, borrado | Contadores por emisor, detección de huecos, ligado a la conversación | Threema 2023, ataques 3 y 4 [61] |
+| 9 | Vuelta atrás del estado local | Estado versionado, monotonicidad | - |
+| 10 | Borrado de claves y secreto hacia delante | Borrar secretos MLS usados; `HK` antiguas solo envueltas, nunca en claro en disco | RFC 9420 [21] |
+| 11 | Canales laterales de tiempo en JS/WASM | Primitivas de WebCrypto o de bibliotecas en tiempo constante; nada de base64 o comparaciones propias sobre secretos | libolm: base64 con canal lateral de tiempo y firmas maleables (CVE-2024-45192, CVE-2024-45193) [90]; vodozemac CVE-2024-40640 [91] |
+| 12 | Aleatoriedad | Solo `crypto.getRandomValues` / RNG del sistema; prueba que falla si se usa `Math.random` en el paquete | Whitepaper de Threema sobre la calidad de la entropía de claves [62] |
+| 13 | Negociación de ciphersuite | Lista cerrada; desconocido = rechazo | [87] |
+| 14 | Denegabilidad frente a franking | Polaris elige no denegabilidad (firmas) y franking para denuncias; se documenta | [47][49] |
+| 15 | Fugas de metadatos | Push cifrado, etiquetas de dispositivo cifradas, recibos reducidos, ids derivados en envoltorios | Threema [62] |
+| 16 | Compresión antes de cifrar | Nunca comprimir datos con secretos junto a datos controlables por el atacante | Threema 2023, ataque 7 (canal lateral de compresión en backups) [61] |
+| 17 | Impersonación por compromiso de clave efímera | Autenticación ligada a claves de largo plazo en el canal QR | Threema 2023, ataque 1 [61] |
+| 18 | Servidor que gestiona la pertenencia | Pertenencia MLS como verdad criptográfica; diferencias visibles | "More is Less" [85] |
+| 19 | XSS en el render del mensaje | Render sin HTML crudo, CSP, Trusted Types, fuzzing del parser de Markdown | Signal Desktop CVE-2018-10994 / CVE-2018-11101 [88]; auditoría de Wire [89] |
+| 20 | Exportación de identidad que permite clonar | Exportar `AK` solo envuelta y con aviso al resto de dispositivos | Threema 2023, ataque 6 [61] |
+| 21 | Copias de seguridad de claves con algoritmo débil | Backup autenticado (AEAD), no solo cifrado | Aviso de matrix-sdk-crypto sobre el algoritmo antiguo [35] |
 
-El requisito "sin más recursos" se cumple en el servidor y en el almacenamiento. En el cliente hay un coste nuevo e inevitable, el índice de búsqueda, y la propuesta lo acota: primero lo reciente, en segundo plano, y en móvil solo con Wi-Fi y cargando.
+### 11.2 Revisiones adversariales por área
+
+Cinco revisores separados, que no han escrito el código del área que revisan, cada uno con su lista y acceso al modelo de amenazas:
+
+| Área | Alcance |
+| --- | --- |
+| Protocolo | Capa de contenido propia (4.2), reparto de `HK`, validaciones de 4.3, uso de la biblioteca MLS |
+| Gestión de claves | Cierres, recuperación de la organización y su delegación (3.5), transparencia, QR |
+| Migración | Idempotencia, verificación, borrado, vuelta atrás, casos de 8.4 |
+| Almacenamiento en el cliente | IndexedDB, almacenes del sistema, varias cuentas, cierre de sesión, ventanas privadas, Service Worker, extensiones nativas de notificación |
+| Servidor | Servicio de Entrega, autorización de external commits, API sin texto en claro, registros sin contenido, servicios de Polar y webhooks |
+
+Regla: **cada hallazgo entra primero como prueba que falla** en la suite; el arreglo se acepta cuando esa prueba pasa y se queda para siempre como regresión. Los hallazgos se registran en el libro de vulnerabilidades del repositorio (`docs/vulnerabilities`).
+
+### 11.3 Pruebas
+
+| Tipo | Qué cubre |
+| --- | --- |
+| Vectores de RFC 9420 | Los del repositorio de implementaciones del grupo de trabajo: tree math, crypto basics, secret tree, message protection, key schedule, PSK, transcript hashes, Welcome, tree operations, tree validation, TreeKEM, messages, passive client [92] |
+| Vectores propios | Capa de contenido, envoltorios, segmentos de índice, migración; publicados en el repositorio para que cualquier cliente los compruebe |
+| Propiedades | Para cualquier secuencia de altas, bajas, ediciones y borrados: todos los miembros vigentes leen todo lo que deben, ningún expulsado lee nada posterior, el historial migrado es byte a byte igual |
+| Fuzzing | Cada parser: mensajes MLS, envoltorios, cabeceras de adjuntos, segmentos de índice, payloads de push, QR, Markdown del render |
+| Interoperabilidad | Web, escritorio, Android, iOS y extensión contra los mismos vectores y en conversaciones reales mezcladas, incluidas versiones anteriores soportadas |
+| Migración a escala | Conjunto sintético con decenas de millones de mensajes, adjuntos, ediciones, hilos, cuentas borradas, miembros sin `AK`; con cortes de proceso aleatorios a mitad de lote; verificación de recuentos y hashes |
+| Caos | Commits concurrentes, dispositivos offline semanas, relojes desfasados, red que reordena, servidor que reinicia a mitad de commit |
+| Servidor malicioso simulado | Un Servicio de Entrega de pruebas que intenta cada ataque de 11.1 y la suite exige que el cliente lo detecte |
+
+### 11.4 Puertas de lanzamiento (todas en verde antes de activar)
+
+| Puerta | Condición |
+| --- | --- |
+| G1 | Los 21 puntos de 11.1 con prueba en la suite, en verde |
+| G2 | Las cinco revisiones de 11.2 cerradas sin hallazgos abiertos de severidad media o superior |
+| G3 | 100% de vectores RFC 9420 y propios en verde en todos los clientes |
+| G4 | Fuzzing de cada parser con el tiempo mínimo acordado sin fallos nuevos |
+| G5 | Migración a escala: cero diferencias de recuento y hash, y vuelta atrás probada |
+| G6 | Caos y servidor malicioso: sin pérdida de mensajes ni aceptación de ataques |
+| G7 | Rendimiento: primer pintado y envío sin regresión medible frente a la versión anterior |
+| G8 | Modelo de amenazas revisado y firmado |
+
+Una auditoría externa es opcional y se puede añadir en cualquier momento; no bloquea.
 
 ---
 
-## 9. Plan por fases
-
-Tamaños: S, M, L, XL (relativos). Las dependencias van en orden; las fases 5-9 pueden ir en paralelo cuando la 4 esté hecha.
-
-Resultado de la fase 0 (biblioteca elegida, medidas y riesgos): [chat-e2ee-phase0.md](chat-e2ee-phase0.md).
-
-| Fase | Contenido | Tamaño | Depende de |
-| --- | --- | --- | --- |
-| 0 | Modelo de amenazas firmado, prueba técnica de OpenMLS o mls-rs en WASM dentro del navegador, Electron y el WebView de Android/iOS; medir peso y tiempo de arranque; revisión de dependencias | S | - |
-| 1 | Identidad de cuenta, claves de dispositivo, cross-signing, aprobación por QR (reusando el flujo de QR), clave de recuperación, backup de claves con el KDF del Vault, custodios | L | 0 |
-| 2 | Grupos MLS para MD y grupos: Delivery Service en el servidor, cifrado de contenido por época, edición, reacciones, respuestas, encuestas, programados, borradores, temporales; esquema de metadatos en claro mínimo | XL | 1 |
-| 3 | Adjuntos cifrados por bloques, Service Worker de descifrado por rangos, visores con bytes (imagen, audio, vídeo, PDF, hojas), miniaturas en el emisor | L | 2 |
-| 4 | Notificaciones: Web Push con descifrado en el SW, escritorio, extensión nativa de iOS y manejador de Android con estado de claves compartido | L | 2 |
-| 5 | Búsqueda local sobre el almacén offline, rellenado de dispositivos nuevos, estado "indexado hasta" | M | 2 y almacén offline |
-| 6 | Vistas previas en el emisor (nativa directa; web vía servidor y declarado), GIF recifrados | M | 3 |
-| 7 | Polar en modo mención y como miembro, miembros de servicio para webhooks, bots con alcance, interacciones de componentes y comandos de app | L | 2 |
-| 8 | Denuncias con franking y compromiso de archivos, vista de moderación | M | 2, 3 |
-| 9 | Llamadas: key provider de LiveKit alimentado por el exporter MLS, código de privacidad de llamada, prueba en todos los navegadores y WebViews | M | 2 |
-| 10 | Canales de espacio (grupos grandes), external commits para enlaces de invitación, historial compartido para quien entra, archivo de organización opcional | L | 2, 7 |
-| 11 | Migración: línea en el historial y recifrado opcional; activación por defecto en MD y grupos; versión mínima de cliente | M | 1-10 |
-| 12 | Auditoría criptográfica externa del diseño 3.2 y de la implementación; transparencia de claves y suite poscuántico cuando esté disponible | Externo | 11 |
-
-Primera entrega útil: fases 0-4 (MD y grupos cifrados con archivos y notificaciones), con Polar, bots y búsqueda **desactivados dentro de las conversaciones cifradas y anunciado al activarlo**, hasta que lleguen las fases 5 y 7.
-
----
-
-## 10. Riesgos y preguntas abiertas
+## 12. Riesgos
 
 | Riesgo | Mitigación |
 | --- | --- |
-| Criptografía propia en la capa de contenido (3.2) | Mantenerla mínima (exporter + HKDF + AEAD + firma), con vectores de prueba y auditoría externa antes de activarla por defecto |
-| Soporte de encoded transforms en Safari y en los WebViews | Verificar en la fase 0/9. Si falta, la llamada no se une en silencio sin cifrar: avisa |
-| Estado MLS compartido entre el WebView y el código nativo (notificaciones) | Diseñar el almacenamiento de claves en nativo desde la fase 1, no solo en IndexedDB |
-| Pérdida de historial por clave perdida | Clave guardada en el Vault con un clic, custodios y aviso claro antes de activar |
-| Conflictos de commits concurrentes | El servidor ordena los commits por época (papel de Delivery Service del RFC) y rechaza los obsoletos |
-| Biblioteca MLS en WASM: tamaño y cadena de suministro | Medir en la fase 0; fijar la versión en el lockfile; evaluar OpenMLS frente a mls-rs |
+| Criptografía propia (capa de contenido, delegación de recuperación) | Mínima, con revisor propio, vectores y servidor malicioso simulado |
+| JavaScript servido por el servidor | 4.7; se declara |
+| PRF desigual entre navegadores | Cierre opcional; nunca el único |
+| Estado compartido entre WebView y código nativo (notificaciones) | Almacén de claves nativo desde la fase 1 |
+| Canales enormes | Entrada diferida, commits agrupados, bajas automáticas |
+| Texto en claro en copias antiguas | Purga explícita (8.5) |
+| Integraciones que leían `body` por la API | Nota de versión y miembros de servicio |
+
+---
+
+## 13. Decisiones que solo puede tomar el propietario
+
+| # | Decisión | Recomendación | Trade-off en una línea |
+| --- | --- | --- | --- |
+| 1 | Modelo de recuperación por defecto (3.4) | **A: recuperación de la organización con quórum**, sin delegación automática por defecto | Sin ceremonia y sin pérdida para casi todos, a cambio de que la organización por quórum pueda leer; B es lo máximo en privacidad pero pierde historial al perder factores |
+| 2 | Cuentas sin organización (personales en una instancia) | Quórum de administradores de la instancia, con la misma notificación | Las personales quedan protegidas igual; la alternativa (solo factores propios) pierde historial al restablecer |
+| 3 | Archivo de cumplimiento (miembro visible, estilo Wire) | Disponible y apagado por defecto | Sirve a regulados sin tocar a los demás; activado por defecto rompería "no notar nada" |
+| 4 | Purga de copias anteriores con texto en claro | Instantánea de vuelta atrás 30 días y luego ofrecer purgar backups anteriores con un botón | Más días = vuelta atrás más segura y más tiempo con texto en claro |
+| 5 | Plazo de transición para clientes antiguos | Corte por conversación cuando todos los dispositivos activos lo soportan, máximo 30 días | Plazo corto = protección antes; largo = menos avisos de "actualiza" |
+| 6 | Poscuántico desde el primer día en lo almacenado | Sí, HPKE híbrido con ML-KEM-768 para envoltorios | Protege contra "guardar ahora, descifrar después" a cambio de unos 1.100 B por envoltorio |
+| 7 | Baja automática de dispositivos inactivos | 90 días | Más corto mejora la seguridad tras compromiso; más largo evita reentradas |
+| 8 | Modo "solo apps verificadas" para la web | Disponible por organización, apagado por defecto | Cierra la vía del JS modificado a cambio de exigir extensión o app |
+
+---
+
+## 14. Plan por fases actualizado
+
+| Fase | Contenido | Tamaño | Depende de |
+| --- | --- | --- | --- |
+| 0 | Modelo de amenazas; prueba técnica de OpenMLS y mls-rs en WASM (navegador, Electron, WebViews) y nativo; medir peso, arranque, coste de commits en grupos de 30.000 hojas, ritmo del migrador y tamaño de segmentos de índice | M | - |
+| 1 | Clave de cuenta, cierres (dispositivo, contraseña con derivación en el cliente, passkey PRF, QR), cambio del flujo de contraseña de `better-auth` sin romper cuentas existentes (se adopta en el siguiente inicio de sesión), almacenes nativos | L | 0 |
+| 2 | `ORK` con Shamir, custodios, delegación opcional, integración con `account-recovery-service` y registro de auditoría | L | 1 |
+| 3 | Transparencia de claves y verificación del paquete web por extensión y escritorio | L | 1 |
+| 4 | Grupos MLS, Servicio de Entrega, capa de contenido, `HK` y envoltorios, todas las funciones de mensajería (ediciones, reacciones, hilos, encuestas, programados, borradores, temporales, chat de reunión) | XL | 1 |
+| 5 | Adjuntos por bloques, Service Worker de rangos, visores con bytes, miniaturas en el emisor, notas de voz | L | 4 |
+| 6 | Notificaciones: push cifrado, SW, escritorio, iOS NSE, Android | L | 4 |
+| 7 | Búsqueda con segmentos de índice compartidos | L | 4 |
+| 8 | Polar, miembros de servicio, webhooks, componentes, vistas previas vía servidor con tarjeta cifrada, transcripción y traducción | L | 4 |
+| 9 | Canales grandes: entrada diferida, commits agrupados, bajas automáticas, historial para quien entra | L | 4 |
+| 10 | Llamadas con claves del exporter MLS en LiveKit; prueba en Safari, Firefox y WebViews | M | 4 |
+| 11 | Moderación: reglas de contenido en el cliente, franking, archivo de cumplimiento opcional, controles de organización y evidencia | M | 4, 2 |
+| 12 | Migrador (M0-M6), escritura doble, desfase de clientes, Backups previos, instantánea, purga, progreso en Administración | XL | 4-11 |
+| 13 | Aseguramiento interno completo (11.1-11.3) en paralelo desde la fase 4; cierre con las puertas G1-G8 | XL | 4-12 |
+| 14 | Activación para todas las instancias en una versión; migración automática al actualizar; retirada del código en claro en una versión posterior condicionada al estado | M | 13 |
+
+No hay entrega parcial visible: el usuario no debe ver una versión con funciones de menos. Las fases 1-13 se integran detrás de una bandera interna que no se expone en la interfaz, y se activan juntas en la 14.
 
 ---
 
 ## Fuentes
 
-1. WhatsApp Security Whitepaper (multidispositivo, firma de cuenta, verificación automática) - https://www.whatsapp.com/security/WhatsApp-Security-Whitepaper.pdf
-2. Meta Engineering, "How WhatsApp enables multi-device capability" (2021) - https://engineering.fb.com/2021/07/14/security/whatsapp-multi-device/
-3. Meta Engineering, "Building Private Processing for AI tools on WhatsApp" (2025) - https://engineering.fb.com/2025/04/29/security/whatsapp-private-processing-ai-tools/
-4. Meta, Private Processing technical whitepaper - https://ai.meta.com/static-resource/private-processing-technical-whitepaper
-5. Trail of Bits, "What we learned about TEE security from auditing WhatsApp's Private Inference" (2026) - https://blog.trailofbits.com/2026/04/07/what-we-learned-about-tee-security-from-auditing-whatsapps-private-inference/
-6. Factly, cita del Centro de ayuda de WhatsApp sobre Meta AI (solo menciones o lo compartido) - https://factly.in/meta-ai-cannot-access-whatsapp-groups-individual-chats-or-contact-details-the-viral-claim-is-fake
-7. EFF, "What WhatsApp's Advanced Chat Privacy really does" (2025) - https://www.eff.org/deeplinks/2025/09/what-whatsapps-advanced-chat-privacy-really-does
-8. Meta for Developers, WhatsApp Business Platform: Data Privacy & Security (Cloud API guarda las claves) - https://developers.facebook.com/documentation/business-messaging/whatsapp/data-privacy-and-security
-9. WhatsApp Business Platform overview - https://developers.facebook.com/documentation/business-messaging/whatsapp/about-the-platform
-10. Meta Engineering, "WhatsApp end-to-end encrypted backups" (2021) - https://engineering.fb.com/2021/09/10/security/whatsapp-e2ee-backups/
-11. Discord, "Meet DAVE: E2EE for audio & video" - https://discord.com/blog/meet-dave-e2ee-for-audio-video
-12. Meta Engineering, "Building end-to-end security for Messenger" (2023) - https://engineering.fb.com/2023/12/06/security/building-end-to-end-security-for-messenger/
-13. Meta, "The Labyrinth Encrypted Message Storage Protocol" (whitepaper, 2023) - https://engineering.fb.com/wp-content/uploads/2023/12/theLabyrintHencryptedMessagestorageProtocol_12-6-2023.pdf
-14. Meta Engineering, "Labyrinth 1.1" (2026) - https://engineering.fb.com/2026/05/11/security/labyrinth-1-1-end-to-end-encrypted-e2ee-backups-more-reliable/
-15. Signal, "Introducing Signal Secure Backups" (2025) - https://signal.org/blog/introducing-secure-backups/
-16. Signal, "Technology preview: Sealed sender for Signal" - https://signal.org/blog/sealed-sender/
-17. Signal, "Signal Protocol and Post-Quantum Ratchets" (SPQR) - https://signal.org/blog/spqr/
-18. Signal, "I link therefore I am" (vistas previas por proxy) - https://signal.org/blog/i-link-therefore-i-am/
-19. Signal, "Technology Preview for secure value recovery" - https://signal.org/blog/secure-value-recovery/
-20. Connell et al., SVR3, OSDI 2024 - https://usenix.org/system/files/osdi24-connell.pdf
-21. RFC 9420, The Messaging Layer Security (MLS) Protocol - https://www.rfc-editor.org/rfc/rfc9420.html
-22. DAVE protocol (especificación) - https://daveprotocol.com/
-23. Discord Support, DAVE obligatorio para clientes y bots desde marzo de 2026 - https://support.discord.com/hc/en-us/articles/38025123604631/
-24. Telegram FAQ (chats en la nube y chats secretos) - https://telegram.org/faq
-25. Telegram, End-to-End Encryption, Secret Chats - https://core.telegram.org/api/end-to-end
-26. Telegram Bot API (interfaz HTTP vía servidores de Telegram) - https://core.telegram.org/bots/api
-27. Apple Security Research, "iMessage with PQ3" - https://security.apple.com/blog/imessage-pq3/
-28. Dodis et al., Triple Ratchet (ePrint 2025/078) - https://eprint.iacr.org/2025/078
-29. NCC Group, revisión de WhatsApp message summarization (2025) - https://www.fox-it.com/media/ymskbe40/ncc_group_metaplatforms_whatsapp-message_summarization_report_2025-08-27_v10.pdf
-30. Meta Engineering, HSM-based Backup Key Vault (2026) - https://engineering.fb.com/2026/05/01/security/meta-strengthening-end-to-end-encrypted-backups/
-31. Matrix spec, Olm y Megolm - https://spec.matrix.org/v1.19/olm-megolm/
-32. Documentación de Element (KIT): búsqueda en salas cifradas solo en escritorio - https://docs.matrix.kit.edu/en/messaging/search/
-33. Código fuente de Seshat 4.3.0 (Tantivy, heap de escritura de 50 MB) - https://docs.rs/crate/seshat/4.3.0/source/src/index/mod.rs
-34. Element, "Seamless encrypted history sharing arrives in Element" - https://element.io/blog/seamless-encrypted-history-sharing-arrives-in-element
-35. MSC1946 Secure Secret Storage and Sharing - https://github.com/matrix-org/matrix-spec-proposals/blob/main/proposals/1946-secure_server-side_storage.md ; matrix-sdk-crypto backups (aviso sobre el algoritmo antiguo) - https://docs.rs/crate/matrix-sdk-crypto/latest/source/src/backups/mod.rs
-36. Matrix, E2EE cross-signing - https://matrix.org/docs/older/e2ee-cross-signing/
-37. Wire, "Wire MLS is now generally available" - https://wire.com/en/blog/wire-mls-is-now-generally-available ; migración desde Proteus - https://support.wire.com/hc/en-us/articles/18666343787293-Migration-from-Proteus-to-MLS-protocol
-38. Webex, "How MLS enables scalable end-to-end security in Webex" - https://blog.webex.com/hybrid-work/scalable-end-to-end-security-in-webex/
-39. IETF, "RCS adopts MLS" - https://www.ietf.org/blog/rcs-adopts-mls/
-40. 9to5Google, Google Messages prueba MLS para RCS (2025) - https://9to5google.com/2025/07/16/google-messages-rcs-mls/
-41. Apple Security Research, "Private Cloud Compute" - https://security.apple.com/blog/private-cloud-compute/
-42. Apple Security Research, "Expanding Private Cloud Compute" - https://security.apple.com/blog/expanding-pcc
-43. OpenMLS - https://github.com/openmls/openmls
-44. mls-rs (AWS Labs) - https://github.com/awslabs/mls-rs
-45. MacRumors, vistas previas generadas por el emisor en iMessage y WhatsApp - https://www.macrumors.com/2020/10/26/link-previews-may-lead-to-security-vulnerabilities/
-46. Wire Support, "Understand link previews" - https://support.wire.com/hc/en-us/articles/115005707945-Understand-link-previews
-47. Grubbs, Lu, Ristenpart, "Message Franking via Committing Authenticated Encryption" (ePrint 2017/664) - https://eprint.iacr.org/2017/664
-48. Facebook Messenger Secret Conversations whitepaper (franking) - https://fr.slideshare.net/AlbertoSndel/secret-conversations-whitepaper1
-49. Dodis, Grubbs, Ristenpart, Woodage, "Fast Message Franking" (ePrint 2019/016) - https://eprint.iacr.org/2019/016
-50. "Transcript Franking for Encrypted Messaging" (2025) - https://arxiv.org/pdf/2507.19391
-51. RFC 8291, Message Encryption for Web Push - https://www.rfc-editor.org/rfc/rfc8291
-52. Apple Developer, UNNotificationServiceExtension - https://developer.apple.com/documentation/usernotifications/unnotificationserviceextension
-53. Firebase, mensajes de notificación y de datos - https://firebase.google.com/docs/cloud-messaging/concept-options
-54. LiveKit docs, Encryption overview - https://docs.livekit.io/transport/encryption/
-55. LiveKit docs, Encryption: get started (ExternalE2EEKeyProvider, key provider propio, worker) - https://docs.livekit.io/transport/encryption/start.md
-56. ACLU, "Secure messaging and AI don't mix" - https://www.aclu.org/news/privacy-technology/secure-messaging-and-ai-dont-mix
-57. WhatsApp Key Transparency Whitepaper - https://www.whatsapp.com/security/WhatsApp-Key-Transparency-Whitepaper.pdf
+Fuentes 1-57: las de la v1, con los mismos números y URL (ver `docs/chat-e2ee-proposal.md`, sección "Fuentes"). Se usan aquí: 1, 2, 8, 10, 12, 13, 14, 21, 27, 30, 31, 34, 35, 36, 37, 47, 49, 52, 53, 57.
 
-### Fuentes que no se pudieron leer enteras
+58. RFC 9750, The Messaging Layer Security (MLS) Architecture (abril de 2025) - https://www.rfc-editor.org/rfc/rfc9750.html
+59. Albrecht, Celi, Dowling, Jones, "Practically-exploitable Cryptographic Vulnerabilities in Matrix" (ePrint 2023/485) - https://eprint.iacr.org/2023/485.pdf ; resumen de CVE-2022-39250 y CVE-2022-39251 - https://portswigger.net/daily-swig/matrix-address-flaws-that-break-message-encryption-assurances
+60. Threema, auditorías de código (Cure53 2020 apps, Cure53 2024 escritorio, FH Münster 2019) - https://threema.com/en/faq/code-audit ; informe Cure53 de Threema Desktop - https://cure53.de/pentest-report_threema-desktop.pdf
+61. Paterson, Scarlata, Truong, "Three Lessons From Threema: Analysis of a Secure Messenger" (USENIX Security 2023) - https://www.usenix.org/conference/usenixsecurity23/presentation/paterson ; sitio con los siete ataques y lecciones - https://breakingthe3ma.app/ ; respuesta de Threema - https://threema.com/de/blog/news-angebliche-schwachstellen-statement
+62. Threema, Cryptography Whitepaper (multidispositivo con mediador, Ibex, Threema Safe, DualLock, push cifrado, descubrimiento de contactos) - https://threema.com/assets/documents/cryptography_whitepaper.pdf
+63. Threema, "New Communication Protocol Ibex" - https://threema.com/en/blog/ibex
+64. Threema, "Security Proof of Threema's Communication Protocol" y análisis de Ibex 2023 - https://threema.com/en/blog/security-proof-ibex ; https://threema.com/assets/6-resources/audits/security_analysis_ibex_2023.pdf
+65. Threema para autoridades públicas (Work, OnPrem, uso anónimo, consola) - https://threema.com/en/industries/institutions/public-authorities
+66. Threema Work para autoridades (administración federal suiza, ejército) - https://threema.ch/en/work/authorities ; versión discrepante sobre el ejército - https://www.bleepingcomputer.com/news/security/swiss-army-bans-all-chat-apps-but-locally-developed-threema/amp/
+67. WhatsApp, "Encrypting your WhatsApp chat backup just got easier" (passkeys, 30-10-2025) - https://blog.whatsapp.com/encrypting-your-whatsapp-chat-backup-just-got-easier
+68. Messenger Help Center, opciones para restaurar chats cifrados - https://www.messenger.com/help/431055522328649/?locale=en_US
+69. Apple Platform Security, seguridad del depósito de iCloud Keychain - https://support.apple.com/guide/security/sec3e341e75d/web
+70. Apple, clave de recuperación de la cuenta - https://support.apple.com/109345 ; contacto de recuperación - https://support.apple.com/en-al/102641 ; Advanced Data Protection - https://www.apple.com/legal/privacy/data/en/advanced-data-protection/
+71. Google Security Blog, "Google and Android have your back by protecting your backups in the Cloud" (2018) - https://security.googleblog.com/2018/10/google-and-android-have-your-back-by.html ; Cloud Key Vault - https://developer.android.com/about/versions/pie/security/ckv-whitepaper
+72. MSC3814, Dehydrated Devices with SSSS - https://github.com/uhoreg/matrix-doc/blob/shrivelled_sessions/proposals/3814-dehydrated-devices-with-ssss.md
+73. Element, cómo asegurar que tienes una clave de recuperación - https://docs.element.io/latest/element-support/device-verification/how-to-ensure-you-have-a-recovery-key/
+74. Element, caso Tchap - https://element.io/case-studies/tchap
+75. Element, BwMessenger para la Bundeswehr - https://element.io/blog/bwmessenger-goes-live-for-bundeswehr/
+76. Element, NATO NI2CE Messenger - https://element.io/blog/nato-ni2ce-messenger-utilises-the-power-of-decentralised-communication/
+77. Wire docs, Legal hold - https://docs.wire.com/latest/developer/reference/team/legalhold.html
+78. Wire Support, "What is legal hold?" - https://support.wire.com/hc/en-us/articles/360002018278-What-is-legal-hold
+79. Microsoft Learn, Teams encryption (E2EE incompatible con grabación de cumplimiento y eDiscovery) - https://learn.microsoft.com/en-us/microsoftteams/teams-encryption
+80. RFC 9807, The OPAQUE Augmented PAKE Protocol (julio de 2025) - https://www.rfc-editor.org/rfc/rfc9807.html
+81. W3C, Web Authentication Level 3 (Recommendation, 25-08-2026), sección 10.1.4 extensión PRF - https://www.w3.org/TR/webauthn-3/#prf-extension
+82. Chromium blink-dev, "Intent to Ship: WebAuthn PRF extension" - https://groups.google.com/a/chromium.org/g/blink-dev/c/iTNOgLwD2bI
+83. Apple Developer Forums, PRF no soportado en el flujo entre dispositivos de Safari - https://developer.apple.com/forums/thread/774112
+84. Mozilla Bugzilla 1985777 (PRF en Firefox para macOS) - https://bugzilla.mozilla.org/show_bug.cgi?id=1985777
+85. Rösler, Mainka, Schwenk, "More is Less: On the End-to-End Security of Group Chats in Signal, WhatsApp, and Threema" (ePrint 2017/713, EuroS&P 2018) - https://eprint.iacr.org/2017/713
+86. Albrecht, Mareková, Paterson, Stepanovs, "Four Attacks and a Proof for Telegram" (IEEE S&P 2022, ePrint 2023/469) - https://eprint.iacr.org/2023/469
+87. draft-ietf-mls-pq-ciphersuites, ML-KEM and Hybrid Cipher Suites for MLS - https://datatracker.ietf.org/doc/draft-ietf-mls-pq-ciphersuites/
+88. Signal Desktop, CVE-2018-10994 (XSS por mensaje) - https://www.incibe.es/en/incibe-cert/early-warning/vulnerabilities/cve-2018-10994 ; CVE-2018-11101 - https://nvd.nist.gov/vuln/detail/CVE-2018-11101
+89. X41 D-Sec y Kudelski, auditoría de aplicaciones de Wire (2018) - https://x41-dsec.de/security/report/2018/03/06/projects-x41-wire-phase2/ ; auditoría criptográfica (2017) - https://www.x41-dsec.de/reports/Kudelski-X41-Wire-Report-phase1-20170208.pdf
+90. Matrix.org, "libolm deprecation" (CVE-2024-45192, CVE-2024-45193) - https://matrix.org/blog/2024/08/libolm-deprecation/
+91. NVD, CVE-2024-40640 (vodozemac, base64 sin tiempo constante) - https://nvd.nist.gov/vuln/detail/CVE-2024-40640
+92. MLS WG, vectores de prueba de interoperabilidad - https://github.com/mlswg/mls-implementations/blob/main/test-vectors.md
+93. MDN, cuotas de almacenamiento y criterios de desalojo (ventanas privadas, `persist()`, desalojo de Safari a 7 días) - https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria
 
-- Las fuentes 6, 29, 30, 48, 52 y 53 se citan por resúmenes de búsqueda o por fragmentos, no por una lectura completa; antes de usarlas como cita textual conviene abrirlas.
-- La compatibilidad de navegadores con el E2EE de LiveKit no aparece en sus docs y está **sin verificar**.
+### Lo que no se pudo verificar
+
+- Fuentes leídas solo por resúmenes de búsqueda, no enteras: 59 (lista completa de ataques), 64 (análisis de Ibex), 66, 69, 70, 72-76, 79, 82-88. La 62 (whitepaper de Threema) sí se leyó en texto completo; la 61 y la 93, por página.
+- Cómo resuelven Tchap, BwMessenger y NI2CE la recuperación organizativa: no hay documentación pública encontrada; no se afirma nada.
+- Un mecanismo de acceso de la organización a los mensajes en Threema Work u OnPrem: no se encontró; tampoco se afirma que no exista.
+- La auditoría de Threema OnPrem por terceros: no se encontró.
+- Soporte real de PRF por navegador y autenticador hoy: fuentes contradictorias; medir en la fase 0.
+- Todas las cifras de rendimiento marcadas como estimación: se miden en la fase 0.
+- Compatibilidad de navegadores con el E2EE de LiveKit (v1): sigue sin verificar.
