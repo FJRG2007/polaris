@@ -2181,7 +2181,7 @@
         "country": "País o región",
         "search": "Busca por país o prefijo",
         "empty": "Ningún país ni prefijo coincide.",
-        "number": "Número de teléfono",
+        "number": "Teléfono",
         "invalid": "Este número no existe en {country}. Revísalo o elige otro país."
     }
 }
