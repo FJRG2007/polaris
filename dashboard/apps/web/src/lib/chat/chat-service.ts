@@ -169,6 +169,9 @@ export interface ChatChannelView {
     /** Whether anybody may post here, or only whoever runs it (the group's
      *  owner, a space channel's administrators). */
     readonly membersMaySend: boolean;
+    /** Whether anybody in this group may keep a disappearing message, or only
+     *  its owner (`keep.ts`). Absent is yes. */
+    readonly membersMayKeep?: boolean;
     /** Whether this reader may post here as far as that switch goes. Only
      *  decides what the composer draws; sending asks `requirePostable`. */
     readonly maySend: boolean;
@@ -828,6 +831,7 @@ export async function listChannels(
             membersMayMention: true,
             membersMaySend: true,
             advancedPrivacy: true,
+            membersMayKeep: true,
             slowmode: true,
             userLimit: true,
             contentMode: true,
@@ -1050,6 +1054,7 @@ export async function listChannels(
             membersMayMention: channel.membersMayMention,
             mayMentionRoom: roomMentionsAllowed(channel, actor.id),
             membersMaySend: channel.membersMaySend,
+            membersMayKeep: channel.membersMayKeep,
             maySend: !sendClosed(channel, actor.id, mayAdminister),
             advancedPrivacy: channel.advancedPrivacy,
             slowmode: channel.slowmode,
@@ -1505,12 +1510,14 @@ export async function setGroupOptions(
         membersMayInvite?: boolean;
         membersMayMention?: boolean;
         membersMaySend?: boolean;
+        membersMayKeep?: boolean;
         newcomersReadHistory?: boolean;
     }
 ): Promise<void> {
     await requireGroupOwner(actor, channelId);
     if (
         options.membersMaySend === undefined &&
+        options.membersMayKeep === undefined &&
         options.newcomersReadHistory === undefined &&
         options.membersMayEdit === undefined &&
         options.membersMayInvite === undefined &&
@@ -1529,6 +1536,9 @@ export async function setGroupOptions(
                 : {}),
             ...(options.membersMayMention !== undefined
                 ? { membersMayMention: options.membersMayMention }
+                : {}),
+            ...(options.membersMayKeep !== undefined
+                ? { membersMayKeep: options.membersMayKeep }
                 : {}),
             ...(options.membersMaySend !== undefined
                 ? { membersMaySend: options.membersMaySend }

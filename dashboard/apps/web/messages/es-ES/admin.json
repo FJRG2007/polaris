@@ -382,6 +382,17 @@
                 "off": "No",
                 "timerAccount": "El de cada persona"
             }
+        },
+        "moderation": {
+            "title": "Moderación",
+            "description": "Se aplica a todas las conversaciones. Personas y grupos eligen dentro.",
+            "keep": "Permitir guardar mensajes temporales",
+            "keepHint": "Desactivado, nadie puede guardar mensajes. Los guardados siguen.",
+            "restriction": "Restringir cuentas muy bloqueadas o denunciadas",
+            "restrictionHint": "No pueden iniciar chats, crear grupos ni añadir gente un tiempo. Sus chats siguen igual.",
+            "threshold": "Personas distintas",
+            "windowDays": "En días",
+            "hours": "Horas restringida"
         }
     },
     "consumption": {

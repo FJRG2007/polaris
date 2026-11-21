@@ -9,6 +9,7 @@
 import { z } from "zod";
 import * as core from "@polaris/core";
 import * as vanish from "@/lib/chat/vanish";
+import * as keep from "@/lib/chat/keep";
 import { guardChat } from "@/lib/chat/chat-guard";
 import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
@@ -149,4 +150,30 @@ export async function deleteChatForAllAction(channelId: unknown): Promise<{ erro
     const parsed = idSchema.safeParse(channelId);
     if (!parsed.success) return refused("errors.notInConversation");
     return guardChat(() => vanish.deleteChatForAll(me, parsed.data));
+}
+
+/** Keep a disappearing message in the chat. The service decides who may. */
+export async function keepMessageAction(messageId: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = idSchema.safeParse(messageId);
+    if (!parsed.success) return refused("errors.messageGone");
+    return guardChat(() => keep.keepMessage(me, parsed.data));
+}
+
+/** Stop keeping it: its author for everybody, anybody else for themselves. */
+export async function unkeepMessageAction(messageId: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = idSchema.safeParse(messageId);
+    if (!parsed.success) return refused("errors.messageGone");
+    return guardChat(() => keep.unkeepMessage(me, parsed.data));
+}
+
+const keepableSchema = z.object({ messageId: z.string().uuid(), keepable: z.boolean() }).strict();
+
+/** Its author lets it be kept, or not. */
+export async function setKeepableAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = keepableSchema.safeParse(input);
+    if (!parsed.success) return refused("errors.messageGone");
+    return guardChat(() => keep.setKeepable(me, parsed.data.messageId, parsed.data.keepable));
 }

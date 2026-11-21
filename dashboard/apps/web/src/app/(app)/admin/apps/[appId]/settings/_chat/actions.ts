@@ -19,6 +19,8 @@ import { setOrgChatOffered } from "@/lib/chat/isolation";
 import { isDriveShare, setDriveShare } from "@/lib/chat/drive-share";
 import * as calls from "@/lib/chat/call-server";
 import { recordAudit } from "@/lib/audit-service";
+import { setModerationPolicy } from "@/lib/chat/moderation-policy";
+import { moderationPolicySchema } from "@/lib/chat/moderation-policy-rules";
 import { syncCallServerRoute } from "@/lib/chat/call-edge";
 import { saveLinkSafetySettings } from "@/lib/chat/link-safety";
 import { isDmRuleMode, isVanishDuration } from "@/lib/chat/vanish-rules";
@@ -227,6 +229,24 @@ export async function setDeleteChatLineAction(shown: unknown): Promise<{ error?:
         targetType: "setting",
         targetId: "chat.deleteChatLine",
         metadata: { shown }
+    });
+    revalidatePath(CHAT_SETTINGS_PATH);
+    return {};
+}
+
+/** The instance's moderation policy for Chat: keeping disappearing messages
+ *  and the automatic restriction on accounts many people block or report. */
+export async function setModerationPolicyAction(input: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = moderationPolicySchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("admin"))("chat.directRules.invalid") };
+    await setModerationPolicy(parsed.data);
+    await recordAudit({
+        actorId: admin.id,
+        action: "chat.moderationPolicy.set",
+        targetType: "setting",
+        targetId: "chat.policy.moderation",
+        metadata: { ...parsed.data }
     });
     revalidatePath(CHAT_SETTINGS_PATH);
     return {};

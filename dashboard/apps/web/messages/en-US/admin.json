@@ -382,6 +382,17 @@
                 "off": "Off",
                 "timerAccount": "Each person's own default"
             }
+        },
+        "moderation": {
+            "title": "Moderation policy",
+            "description": "Applies to every conversation. People and group owners choose within it.",
+            "keep": "Allow keeping disappearing messages",
+            "keepHint": "Off, nobody can keep a message. Ones already kept stay.",
+            "restriction": "Restrict accounts many people block or report",
+            "restrictionHint": "They cannot start chats, create groups or add people for a while. Existing chats keep working.",
+            "threshold": "Different people",
+            "windowDays": "Within days",
+            "hours": "Restricted for hours"
         }
     },
     "consumption": {

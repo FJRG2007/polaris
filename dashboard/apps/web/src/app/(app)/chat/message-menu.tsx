@@ -40,9 +40,13 @@ import { messageTarget, NOTHING, type MessageTarget } from "./message-target";
 import type { ChatAttachmentView, ChatMessageView } from "@/lib/chat/messages";
 import type { DeleteMessage } from "./delete-message";
 import { useHideMessage } from "./vanish-controls";
+import { runAction } from "@/lib/run-action";
+import { keepMessageAction, setKeepableAction, unkeepMessageAction } from "./vanish-actions";
 import { AUDIO_FORMATS, extensionOf, saveRecording, type AudioFormat } from "./audio-download";
 import {
     AlarmClock,
+    Bookmark,
+    BookmarkX,
     Copy,
     Download,
     ExternalLink,
@@ -246,6 +250,16 @@ export function MessageMenu({
      * taking it down is not offered rather than offered and refused.
      */
     const notice = message.kind === "system";
+    // Keep in chat (`lib/chat/keep.ts`): the server decides; these only offer
+    // what it said this reader may do, and say its refusal if it changed.
+    const keep = message.keep;
+    const disappearing = Boolean(message.expiresAt || keep?.kept);
+    const keepCall = (call: () => Promise<{ error?: string }>) =>
+        void (async () => {
+            const say = (words: string) => toast.show({ title: words });
+            const result = await runAction(call, say);
+            if (result?.error) say(result.error);
+        })();
     const reactable = canPost && !message.deleted && actions.onReact;
     const remindable = !message.deleted && message.kind !== "system";
     const speakable = !message.deleted && Boolean(message.body.trim()) && browserCanSpeak();
@@ -580,6 +594,35 @@ export function MessageMenu({
                         <Star className="size-3.5" />
                         {message.starred ? t("messageMenu.removeFromSaved") : t("messageMenu.save")}
                     </ContextMenuItem>
+                    {!notice && keep?.mayKeep && (
+                        <ContextMenuItem onSelect={() => keepCall(() => keepMessageAction(message.id))}>
+                            <Bookmark className="size-3.5" />
+                            {t("messageMenu.keepInChat")}
+                        </ContextMenuItem>
+                    )}
+                    {!notice && keep?.kept && (keep.keptByMe || mine) && (
+                        <ContextMenuItem onSelect={() => keepCall(() => unkeepMessageAction(message.id))}>
+                            <BookmarkX className="size-3.5" />
+                            {mine ? t("messageMenu.unkeepForEverybody") : t("messageMenu.unkeep")}
+                        </ContextMenuItem>
+                    )}
+                    {!notice && mine && disappearing && (
+                        <ContextMenuItem
+                            onSelect={() =>
+                                keepCall(() =>
+                                    setKeepableAction({
+                                        messageId: message.id,
+                                        keepable: message.keepable === false
+                                    })
+                                )
+                            }
+                        >
+                            <Bookmark className="size-3.5" />
+                            {message.keepable === false
+                                ? t("messageMenu.allowKeeping")
+                                : t("messageMenu.forbidKeeping")}
+                        </ContextMenuItem>
+                    )}
                     {/* Private to this reader. Each preset says what it is for when
                         it is a clock reading rather than a wait. */}
                     {remindable && (

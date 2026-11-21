@@ -273,7 +273,10 @@
         "groupInviteGone": "Esa invitación ya no está abierta.",
         "joinRequestGone": "Esa solicitud ya tiene respuesta.",
         "messageRequestGone": "Esa solicitud ya no está pendiente.",
-        "messageRequestBlockFailed": "No se pudo bloquear. Prueba desde su perfil."
+        "messageRequestBlockFailed": "No se pudo bloquear. Prueba desde su perfil.",
+        "keepNotDisappearing": "Solo se guardan mensajes temporales",
+        "keepNotAllowed": "Este mensaje no se puede guardar",
+        "keepAdminsOnly": "Solo el dueño del grupo guarda mensajes"
     },
     "media": {
         "refused": {
@@ -971,7 +974,12 @@
         "reminderSet": "Recordatorio para el {date} a las {time}",
         "speak": "Leer en voz alta",
         "stopSpeaking": "Dejar de leer",
-        "deleteForMe": "Borrar para mí"
+        "deleteForMe": "Borrar para mí",
+        "keepInChat": "Guardar en chat",
+        "unkeep": "No conservar",
+        "unkeepForEverybody": "No conservar para todos",
+        "forbidKeeping": "No permitir guardarlo",
+        "allowKeeping": "Permitir guardar"
     },
     "poll": {
         "createAPoll": "Crear encuesta",
@@ -1350,7 +1358,9 @@
         "makeOwner": "Hacer dueño",
         "close": "Cerrar",
         "newcomersReadHistory": "Quien entre después ve los mensajes anteriores",
-        "newcomersReadHistoryHint": "Si se desactiva, solo ve lo enviado tras unirse."
+        "newcomersReadHistoryHint": "Si se desactiva, solo ve lo enviado tras unirse.",
+        "letAnybodyKeep": "Todos pueden guardar mensajes",
+        "letAnybodyKeepHint": "Desactivado, solo tú guardas mensajes temporales."
     },
     "newDirect": {
         "newMessage": "Nuevo mensaje",
@@ -2533,7 +2543,8 @@
         "waiting": "Esperando a que los demás acepten tu propuesta",
         "accept": "Aceptar",
         "decline": "Rechazar",
-        "deleteFailed": "No se pudo borrar el chat. Inténtalo de nuevo."
+        "deleteFailed": "No se pudo borrar el chat. Inténtalo de nuevo.",
+        "kept": "Guardado"
     },
     "chatPrivacy": {
         "title": "Privacidad",

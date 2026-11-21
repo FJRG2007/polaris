@@ -82,6 +82,7 @@ import { webhookFace } from "./webhook-face";
 import { chatPrivacyIn, chatPrivacyOf, expiryForChannel } from "./vanish";
 import { hasDirectRules } from "./vanish-rules";
 import { isShielded, shieldedAmong } from "./advanced-privacy";
+import { keepStates } from "./keep";
 import { concealedFor, requireUnlocked, unhideOnMessage } from "./chat-lock";
 
 /** One message, with everything the list needs to draw it. */
@@ -129,6 +130,12 @@ export interface ChatMessageView {
     /** When it disappears (disappearing messages), absent for never. The screen
      *  takes it out at this moment; the server stops serving it then too. */
     readonly expiresAt?: string;
+    /** Keep in chat (`keep.ts`): whether somebody keeps this disappearing
+     *  message, whether this reader does, and whether they may. Absent on a
+     *  message that never disappears. */
+    readonly keep?: { readonly kept: boolean; readonly keptByMe: boolean; readonly mayKeep: boolean };
+    /** Whether its author lets it be kept. Absent means yes. */
+    readonly keepable?: boolean;
     readonly reactions: readonly ChatReactionView[];
     readonly attachments: readonly ChatAttachmentView[];
     /**
@@ -2120,6 +2127,8 @@ export const MESSAGE_SELECT = {
     editedAt: true,
     deletedAt: true,
     expiresAt: true,
+    keptExpiresAt: true,
+    keepable: true,
     createdAt: true,
     webhookId: true,
     authorLabel: true,
@@ -2146,6 +2155,10 @@ interface Row {
     /** When it disappears. Optional so a read that selected its own columns
      *  still decorates. */
     expiresAt?: Date | null;
+    /** Set while somebody keeps it (`keep.ts`), and whether its author lets
+     *  it be kept. Optional for the same reason. */
+    keptExpiresAt?: Date | null;
+    keepable?: boolean;
     createdAt: Date;
     /** Posted through a webhook, and the name it posted under. Optional so a
      *  read that selected its own columns (search) still decorates. */
@@ -2363,6 +2376,8 @@ export async function decorateMessages(
     const mayForward = await allowedBy({ id: actor.id, isAdmin: false }, "forwarding", authorIds);
     // Conversations with advanced chat privacy on, whose messages go nowhere.
     const shielded = await shieldedAmong(rows.map((row) => row.channelId));
+    // Disappearing messages somebody keeps, and whether this reader may.
+    const keeps = await keepStates(actor, rows.map((row) => ({ ...row, expiresAt: row.expiresAt ?? null, audience: row.audience ?? [] })));
     // One query for the page, the same shape as the nicknames above: a block is
     // per reader, so it cannot be answered where the messages are.
     const shut = await blockedBy(actor.id, authorIds);
@@ -2531,6 +2546,8 @@ export async function decorateMessages(
             edited: row.editedAt !== null,
             deleted: row.deletedAt !== null,
             ...(row.expiresAt ? { expiresAt: row.expiresAt.toISOString() } : {}),
+            ...(keeps.has(row.id) ? { keep: keeps.get(row.id) } : {}),
+            ...(row.keepable === false ? { keepable: false } : {}),
             ...translatedView(row, actor.id),
             reactions: [...(onMessage.get(row.id) ?? new Map())]
                 .map(([, tally]) => ({ emoji: tally.emoji, count: tally.count, mine: tally.mine }))

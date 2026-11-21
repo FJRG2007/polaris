@@ -885,6 +885,7 @@ const groupOptionsSchema = z
         membersMayInvite: z.boolean().optional(),
         membersMayMention: z.boolean().optional(),
         membersMaySend: z.boolean().optional(),
+        membersMayKeep: z.boolean().optional(),
         newcomersReadHistory: z.boolean().optional()
     })
     .strict();

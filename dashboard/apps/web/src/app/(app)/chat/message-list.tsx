@@ -1028,10 +1028,10 @@ function Message({
                                 {/* Without a header there is nowhere else to say it, so
                                 the marks sit in the gutter until the hover takes
                                 it for the time. */}
-                                {(pinned || message.starred || message.expiresAt) && (
+                                {(pinned || message.starred || message.expiresAt || message.keep?.kept) && (
                                     <span className="flex items-center gap-0.5 pt-1 group-hover:hidden group-data-[state=open]:hidden">
                                         <Marks pinned={pinned} starred={message.starred} />
-                                        <VanishMark expiresAt={message.expiresAt} />
+                                        <VanishMark expiresAt={message.expiresAt} kept={message.keep?.kept} />
                                     </span>
                                 )}
                             </>
@@ -1188,7 +1188,7 @@ function Message({
                                     className="whitespace-nowrap text-[0.6875rem] text-foreground-subtle"
                                 />
                                 <Marks pinned={pinned} starred={message.starred} />
-                                <VanishMark expiresAt={message.expiresAt} />
+                                <VanishMark expiresAt={message.expiresAt} kept={message.keep?.kept} />
                             </p>
                         )}
 

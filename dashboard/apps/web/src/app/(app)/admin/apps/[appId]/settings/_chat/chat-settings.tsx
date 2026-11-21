@@ -16,6 +16,8 @@ import { DriveShareView } from "./drive-share-view";
 import { linkSafetyOverview } from "@/lib/chat/link-safety";
 import { LinkSafetyView } from "./link-safety-view";
 import { DirectRulesView } from "./direct-rules-view";
+import { ModerationPolicyView } from "./moderation-policy-view";
+import { moderationPolicy } from "@/lib/chat/moderation-policy";
 import { deleteChatLineShown, dmRuleMode, startingRules } from "@/lib/chat/vanish";
 
 /** The screens, by the path segment after `settings` ("" is the first). */
@@ -40,6 +42,7 @@ export async function ChatAdminSettings({ screen }: { screen: ChatAdminScreen })
                     starting={await startingRules()}
                 />
             ) : null}
+            {screen === "" ? <ModerationPolicyView initial={await moderationPolicy()} /> : null}
             {screen === "files" ? <DriveShareView how={await driveShare()} /> : null}
             {screen === "organizations" ? <OrgChatView offered={await orgChatOffered()} /> : null}
             {screen === "links" ? <LinkSafetyView initial={await linkSafetyOverview()} /> : null}

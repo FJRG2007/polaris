@@ -273,7 +273,10 @@
         "groupInviteGone": "That invitation is no longer open.",
         "joinRequestGone": "That request has already been answered.",
         "messageRequestGone": "That request is no longer waiting.",
-        "messageRequestBlockFailed": "Could not block them. Try again from their profile."
+        "messageRequestBlockFailed": "Could not block them. Try again from their profile.",
+        "keepNotDisappearing": "Only disappearing messages can be kept",
+        "keepNotAllowed": "This message cannot be kept",
+        "keepAdminsOnly": "Only the group owner can keep messages here"
     },
     "media": {
         "refused": {
@@ -971,7 +974,12 @@
         "reminderSet": "Reminder set for {date} at {time}",
         "speak": "Speak message",
         "stopSpeaking": "Stop reading",
-        "deleteForMe": "Delete for me"
+        "deleteForMe": "Delete for me",
+        "keepInChat": "Keep in chat",
+        "unkeep": "Stop keeping",
+        "unkeepForEverybody": "Stop keeping for everybody",
+        "forbidKeeping": "Do not allow keeping",
+        "allowKeeping": "Allow keeping"
     },
     "poll": {
         "createAPoll": "Create a poll",
@@ -1350,7 +1358,9 @@
         "makeOwner": "Make owner",
         "close": "Close",
         "newcomersReadHistory": "People added later see earlier messages",
-        "newcomersReadHistoryHint": "When off, they only see messages sent after they join."
+        "newcomersReadHistoryHint": "When off, they only see messages sent after they join.",
+        "letAnybodyKeep": "Let anybody keep messages",
+        "letAnybodyKeepHint": "Off, only you can keep a disappearing message."
     },
     "newDirect": {
         "newMessage": "New message",
@@ -2533,7 +2543,8 @@
         "waiting": "Waiting for the others to accept your proposal",
         "accept": "Accept",
         "decline": "Decline",
-        "deleteFailed": "The chat could not be deleted. Try again."
+        "deleteFailed": "The chat could not be deleted. Try again.",
+        "kept": "Kept in chat"
     },
     "chatPrivacy": {
         "title": "Privacy",

@@ -10,7 +10,7 @@
 
 import { runAction } from "@/lib/run-action";
 import * as vanishActions from "./vanish-actions";
-import { Check, Eye, Link2Off, PenLine, Timer, Trash2 } from "lucide-react";
+import { Bookmark, Check, Eye, Link2Off, PenLine, Timer, Trash2 } from "lucide-react";
 import type { ChatRulesChange } from "./chat-privacy-section";
 import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { ChatMessageView } from "@/lib/chat/messages";
@@ -181,8 +181,17 @@ export function VanishBadge({ seconds }: { seconds: number }) {
 }
 
 /** The mark on a message that will disappear. */
-export function VanishMark({ expiresAt }: { expiresAt?: string }) {
+export function VanishMark({ expiresAt, kept }: { expiresAt?: string; kept?: boolean }) {
     const t = useTranslations("chat");
+    if (kept) {
+        const keptLabel = t("vanish.kept");
+        return (
+            <span title={keptLabel} className="inline-flex shrink-0 text-foreground-subtle">
+                <Bookmark className="size-3" aria-hidden />
+                <span className="sr-only">{keptLabel}</span>
+            </span>
+        );
+    }
     if (!expiresAt) return null;
     const label = t("vanish.mark");
     return (

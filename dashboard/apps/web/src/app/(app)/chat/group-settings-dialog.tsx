@@ -39,6 +39,7 @@ interface GroupOptions {
     newcomersReadHistory?: boolean;
     membersMayMention?: boolean;
     membersMaySend?: boolean;
+    membersMayKeep?: boolean;
 }
 
 export function GroupSettingsDialog({
@@ -79,6 +80,7 @@ export function GroupSettingsDialog({
             channel.membersMayInvite,
             channel.membersMayMention,
             channel.membersMaySend,
+            channel.membersMayKeep,
             channel.newcomerHistory
         ]
     );
@@ -87,6 +89,7 @@ export function GroupSettingsDialog({
         membersMayInvite: pending.membersMayInvite ?? channel.membersMayInvite,
         membersMayMention: pending.membersMayMention ?? channel.membersMayMention,
         membersMaySend: pending.membersMaySend ?? channel.membersMaySend,
+        membersMayKeep: pending.membersMayKeep ?? channel.membersMayKeep !== false,
         newcomersReadHistory: pending.newcomersReadHistory ?? channel.newcomerHistory !== "off"
     };
 
@@ -195,6 +198,23 @@ export function GroupSettingsDialog({
                             disabled={busy}
                             onChange={(next: boolean) => void setSwitch({ membersMaySend: next })}
                             aria-label={t("groupSettings.letAnybodySend")}
+                        />
+                    </label>
+
+                    <label className="flex items-start justify-between gap-3">
+                        <span className="flex min-w-0 flex-col">
+                            <span className="text-sm font-medium">
+                                {t("groupSettings.letAnybodyKeep")}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("groupSettings.letAnybodyKeepHint")}
+                            </span>
+                        </span>
+                        <Switch
+                            checked={shown.membersMayKeep}
+                            disabled={busy}
+                            onChange={(next: boolean) => void setSwitch({ membersMayKeep: next })}
+                            aria-label={t("groupSettings.letAnybodyKeep")}
                         />
                     </label>
 

@@ -10692,6 +10692,9 @@ model ChatChannel {
     // downloads and no forwarding (`lib/chat/advanced-privacy.ts`). Off by
     // default, which is how every conversation behaved before.
     advancedPrivacy Boolean @default(false)
+    // Whether anybody here may keep a disappearing message, or only whoever
+    // runs it (ledger row 9, `lib/chat/keep.ts`). On by default.
+    membersMayKeep Boolean @default(true)
     // How long somebody waits between messages here, in seconds. Zero is off,
     // which is every channel until whoever runs it decides otherwise. Whoever
     // may moderate the room is not held by it - a moderator who cannot answer
@@ -10920,6 +10923,18 @@ model ChatLock {
 // `deletedAt` rather than a delete: a removed message leaves a tombstone, which
 // is what keeps the replies under it from becoming orphans and what stops the
 // message above it from silently absorbing its meaning.
+// Somebody keeping a disappearing message (ledger row 9). `userId` is not a
+// foreign key, for the reason `ChatMessage.authorId` is not one.
+model ChatMessageKeep {
+    messageId String      @db.Uuid
+    userId    String      @db.Uuid
+    createdAt DateTime    @default(now())
+    message   ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+    @@id([messageId, userId])
+    @@index([userId, createdAt])
+}
+
 model ChatMessage {
     id          String    @id @default(uuid(7)) @db.Uuid
     channelId   String    @db.Uuid
@@ -11004,6 +11019,12 @@ model ChatMessage {
     // it was sent. Never served past it, and deleted for real by the sweep
     // (`lib/chat/vanish`). Null is forever.
     expiresAt   DateTime?
+    // Kept in chat (ledger row 9, `lib/chat/keep.ts`): while somebody keeps
+    // a disappearing message its `expiresAt` is cleared, and the expiry it had
+    // waits here to be put back when the last keep goes. Null is not kept.
+    keptExpiresAt DateTime?
+    // Whether its author lets anybody keep it. On unless they said no.
+    keepable    Boolean   @default(true)
     createdAt   DateTime  @default(now())
 
     channel     ChatChannel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
@@ -11022,6 +11043,7 @@ model ChatMessage {
     reports     ChatReport[]
     polarCalls  PolarChatCall[]
     hiddenFor   ChatMessageHidden[]
+    keeps       ChatMessageKeep[]
 
     @@index([channelId, createdAt])
     @@unique([authorId, clientKey])
