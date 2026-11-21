@@ -3918,7 +3918,7 @@
         },
         "seasonal": {
             "title": "Temas de temporada",
-            "body": "Decoración y un pack de sonidos en Halloween, las fiestas de invierno, Año Nuevo y el Año Nuevo Lunar, en las fechas de abajo. Cada persona puede apagar el pack en curso.",
+            "body": "Decoración y un pack de sonidos en Halloween, Navidad, Año Nuevo y el Año Nuevo Lunar, en las fechas de abajo. Cada persona puede apagar el pack en curso.",
             "label": "Temas de temporada para todos",
             "on": "Activados. Cada persona puede apagar el pack en sus Preferencias.",
             "off": "Desactivados para todos.",
