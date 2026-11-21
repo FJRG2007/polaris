@@ -85,7 +85,8 @@ describe("the service worker", () => {
             return value;
         };
         const kept = () => [...(stores.get("polaris-shell-v1")?.keys() ?? [])];
-        return { request, kept, offline };
+        const seed = (name: string, path: string, value: unknown) => void (stores.get(name) ?? stores.set(name, new Map()).get(name)!).set(path, value);
+        return { request, kept, offline, seed };
     }
 
     it("answers with the offline page exactly when a gateway speaks for a dead Polaris", async () => {
@@ -129,5 +130,21 @@ describe("the service worker", () => {
         await worker.request("/favicon.ico", "no-cors");
         expect(worker.kept()).toEqual(["/_next/static/chunks/app.js"]);
         expect(workerSource.match(/\.put\(/g)?.length).toBe(2);
+    });
+
+    it("serves an attachment fetched ahead only when the network cannot answer, and never stores one", async () => {
+        let online = true;
+        const live = answer(200, {}, "image/png");
+        const worker = boot(async () => {
+            if (!online) throw new TypeError("offline");
+            return live;
+        });
+        const copy = answer(200, {}, "image/png");
+        worker.seed("polaris-chat-media", "https://polaris.test/api/chat/attachments/a1", copy);
+        expect(await worker.request("/api/chat/attachments/a1", "no-cors")).toBe(live);
+        online = false;
+        expect(await worker.request("/api/chat/attachments/a1?download=1", "no-cors")).toBe(copy);
+        await expect(worker.request("/api/chat/attachments/a2", "no-cors")).rejects.toThrow("offline");
+        expect(worker.kept()).toEqual([]);
     });
 });

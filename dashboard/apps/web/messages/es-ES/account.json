@@ -2208,5 +2208,18 @@
         "title": "Abrir enlaces en la app de Polaris",
         "body": "Un enlace de Polaris que abras en el navegador se abre en la app de escritorio o del móvil, en los dispositivos donde hayas iniciado sesión en la app.",
         "failed": "No se pudo guardar. Inténtalo de nuevo."
+    },
+    "mediaDownload": {
+        "title": "Descarga automática",
+        "body": "Las fotos, vídeos y documentos recientes se guardan en este dispositivo para abrir los chats sin conexión.",
+        "photos": "Fotos",
+        "videos": "Vídeos",
+        "files": "Documentos",
+        "always": "Siempre",
+        "wifi": "Solo wifi",
+        "never": "Nunca",
+        "cap": "Espacio máximo",
+        "used": "{used} de {cap} en uso",
+        "clear": "Vaciar"
     }
 }

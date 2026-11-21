@@ -24,6 +24,9 @@ const CACHE = "polaris-offline-v4";
 const OFFLINE = "/offline.html";
 /* Read by `account-switch`, which deletes it on sign-out and account changes. */
 const SHELL = "polaris-shell-v1";
+/* Written only by the page (`chat/media-download`), read here when the network
+ * cannot answer for an attachment; deleted with the shell on sign-out. */
+const MEDIA = "polaris-chat-media";
 
 function isChatPage(url) {
     return url.pathname === "/chat" || url.pathname.startsWith("/chat/");
@@ -80,7 +83,7 @@ self.addEventListener("activate", (event) => {
             .then((names) =>
                 Promise.all(
                     names
-                        .filter((name) => name !== CACHE && name !== SHELL)
+                        .filter((name) => name !== CACHE && name !== SHELL && name !== MEDIA)
                         .map((name) => caches.delete(name))
                 )
             )
@@ -109,6 +112,24 @@ self.addEventListener("fetch", (event) => {
                             return answer;
                         })
                 )
+            )
+        );
+        return;
+    }
+    // An attachment fetched ahead for offline reading: the network first, always,
+    // and the copy only when it cannot answer. A ranged request (a video being
+    // streamed) is left to the browser.
+    const ranged = event.request.headers && event.request.headers.get("range");
+    if (url.pathname.startsWith("/api/chat/attachments/") && !ranged) {
+        event.respondWith(
+            fetch(event.request).catch((failure) =>
+                caches
+                    .open(MEDIA)
+                    .then((cache) => cache.match(url.origin + url.pathname, { ignoreSearch: true }))
+                    .then((kept) => {
+                        if (kept) return kept;
+                        throw failure;
+                    })
             )
         );
         return;

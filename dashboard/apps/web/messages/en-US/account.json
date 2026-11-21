@@ -2208,5 +2208,18 @@
         "title": "Open links in the Polaris app",
         "body": "A Polaris link you open in a browser opens in the desktop or phone app instead, on devices where you've signed in to the app.",
         "failed": "Couldn't save that. Try again."
+    },
+    "mediaDownload": {
+        "title": "Media auto-download",
+        "body": "Recent photos, videos and documents are saved on this device so chats open without a connection.",
+        "photos": "Photos",
+        "videos": "Videos",
+        "files": "Documents",
+        "always": "Always",
+        "wifi": "Wi-Fi only",
+        "never": "Never",
+        "cap": "Storage limit",
+        "used": "{used} of {cap} used",
+        "clear": "Clear"
     }
 }

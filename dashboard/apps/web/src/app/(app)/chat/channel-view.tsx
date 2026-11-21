@@ -126,6 +126,7 @@ import { usePolarContext } from "@/components/polar/polar-panel";
 import * as polls from "./chat-reads";
 import * as chatCache from "@/lib/chat/offline/chat-cache";
 import * as outbox from "./outbox";
+import { prefetchMedia } from "./media-download";
 import { newClientKey, type OutboxEntry } from "@/lib/chat/offline/outbox";
 
 /** How close to the bottom still counts as "following along". A few pixels of
@@ -746,6 +747,9 @@ export function ChannelView({
         if (!messages || freshFor.current !== channelId) return;
         if (newerThanRef.current !== null || lockedRef.current !== false) return;
         chatCache.writeCachedMessages(channelId, messages);
+        // Their photos (and, by the reader's setting, videos and documents)
+        // fetched ahead, so the copy above has its pictures offline too.
+        prefetchMedia(chatCache.keptMessages(messages));
     }, [messages, channelId]);
 
     // Locked while it is open - from the row's menu here, or in another tab and

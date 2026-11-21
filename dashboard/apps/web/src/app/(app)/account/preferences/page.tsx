@@ -19,6 +19,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { resolveDisplayPreferences } from "@polaris/core";
 import { SpoilersCard } from "@/app/(app)/chat/spoilers-card";
+import { MediaDownloadCard } from "@/app/(app)/chat/media-download-card";
 import { DeviceCacheCard } from "@/components/device-cache-card";
 import { SeasonalCard } from "@/components/seasonal/seasonal-card";
 import { getSeasonalChoice, seasonCalendar, seasonsAllowed } from "@/lib/seasonal-service";
@@ -93,6 +94,7 @@ export default async function PreferencesPage() {
                 <SeasonalCard allowed={seasonsOn} initial={seasonal} calendar={calendar} />
                 <OpenInAppCard initial={links?.openLinksInApp ?? true} save={setOpenLinksInAppAction} />
                 <SpoilersCard />
+                <MediaDownloadCard />
                 <DeviceCacheCard />
                 {/* The install offer used to be on this page, because this is where the
                     browser's own install prompt was already being held. It has moved to
