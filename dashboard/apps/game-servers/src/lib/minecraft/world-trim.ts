@@ -54,8 +54,11 @@ export interface WorldTrimSettings {
     readonly everyDays: number;
 }
 
+/** See `trimDue`: no automatic run may happen on any server. */
+export const AUTOMATIC_TRIM_DISABLED = true;
+
 export const WORLD_TRIM_DEFAULTS: WorldTrimSettings = {
-    enabled: true,
+    enabled: false,
     keepTicks: 0,
     keepRadius: 8,
     everyDays: 14
@@ -80,8 +83,7 @@ export function readWorldTrim(config: Record<string, unknown>): WorldTrimSetting
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return WORLD_TRIM_DEFAULTS;
     const value = raw as Partial<Record<keyof WorldTrimSettings, unknown>>;
     return {
-        // Absent means the default, which is on. A server that has never been near
-        // this screen is exactly the one whose world has been growing untouched.
+        // Absent means the default, which is off.
         enabled: value.enabled === undefined ? WORLD_TRIM_DEFAULTS.enabled : value.enabled === true,
         keepTicks: clamp(value.keepTicks, 0, 24_000 * 30, WORLD_TRIM_DEFAULTS.keepTicks),
         keepRadius: clamp(value.keepRadius, 0, 64, WORLD_TRIM_DEFAULTS.keepRadius),
@@ -126,6 +128,14 @@ export function trimDue(
     now: Date,
     condition: { running: boolean; edition: "java" | "bedrock" }
 ): boolean {
+    // Automatic runs are off for every server, whatever was saved. A run on a
+    // stopped server takes no backup, and "never stood in" is not "never used":
+    // on 2026-11-21 one deleted 443 chunks holding chests, beds and signs, all
+    // with an InhabitedTime of 0, and left the rewritten region files owned by
+    // root so the server could not save over them. Until the optimizer keeps
+    // every chunk that holds anything placed and preserves file ownership, only
+    // the button (which backs up first) may run it.
+    if (AUTOMATIC_TRIM_DISABLED) return false;
     if (!settings.enabled) return false;
     // Bedrock keeps its world in a key-value store rather than in region files.
     if (condition.edition !== "java") return false;

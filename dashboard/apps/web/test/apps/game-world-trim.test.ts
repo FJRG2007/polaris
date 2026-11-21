@@ -27,10 +27,8 @@ import { english } from "../setup/game-english";
 const stopped = { running: false, edition: "java" as const };
 
 describe("the settings a server carries", () => {
-    it("is on for a server that has never been near the screen", () => {
-        // The whole point of the default: the worlds worth optimizing are the old
-        // ones nobody has been administering.
-        expect(readWorldTrim({}).enabled).toBe(true);
+    it("is off for a server that has never been near the screen", () => {
+        expect(readWorldTrim({}).enabled).toBe(false);
         expect(readWorldTrim({})).toEqual(WORLD_TRIM_DEFAULTS);
     });
 
@@ -70,10 +68,12 @@ describe("when Polaris may do it on its own", () => {
         expect(trimDue(WORLD_TRIM_DEFAULTS, null, new Date(), { running: true, edition: "java" })).toBe(false);
     });
 
-    it("does not stop a server to get the chance", () => {
-        // Stated as the absence of any way to ask: the only input about the
-        // server is whether it is already down.
-        expect(trimDue(WORLD_TRIM_DEFAULTS, null, new Date(), stopped)).toBe(true);
+    it("never runs on its own, even on a stopped server switched on by hand", () => {
+        // 2026-11-21: an automatic run on a stopped server deleted chunks holding
+        // chests and left region files the server could not write.
+        const on = { ...WORLD_TRIM_DEFAULTS, enabled: true };
+        expect(trimDue(on, null, new Date(), stopped)).toBe(false);
+        expect(trimDue(on, { at: "2020-01-01T00:00:00.000Z", ok: true, removed: 0, freedBytes: 0, detail: "" }, new Date(), stopped)).toBe(false);
     });
 
     it("leaves Bedrock alone", () => {
@@ -86,20 +86,6 @@ describe("when Polaris may do it on its own", () => {
 
     it("does nothing when it has been switched off", () => {
         expect(trimDue({ ...WORLD_TRIM_DEFAULTS, enabled: false }, null, new Date(), stopped)).toBe(false);
-    });
-
-    it("waits out the gap between runs", () => {
-        const now = new Date("2026-09-23T12:00:00.000Z");
-        const yesterday = {
-            at: "2026-09-22T12:00:00.000Z",
-            ok: true,
-            removed: 10,
-            freedBytes: 1024,
-            detail: ""
-        };
-        expect(trimDue(WORLD_TRIM_DEFAULTS, yesterday, now, stopped)).toBe(false);
-        const longAgo = { ...yesterday, at: "2026-08-01T12:00:00.000Z" };
-        expect(trimDue(WORLD_TRIM_DEFAULTS, longAgo, now, stopped)).toBe(true);
     });
 
     it("waits out the same gap after a run that failed", () => {
