@@ -1,0 +1,27 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="GPL-3.0-only"
+
+[[mods]]
+modId="polarisac"
+version="${version}"
+displayName="Polaris Anti-Cheat"
+description='''
+Simulates every player's movement and checks what they send, server-side.
+Players join with whatever client the server already asks for.
+'''
+displayTest="IGNORE_ALL_VERSION"
+
+[[dependencies.polarisac]]
+    modId="forge"
+    mandatory=true
+    versionRange="${forge_range}"
+    ordering="NONE"
+    side="SERVER"
+
+[[dependencies.polarisac]]
+    modId="minecraft"
+    mandatory=true
+    versionRange="${minecraft_range}"
+    ordering="NONE"
+    side="SERVER"

@@ -155,11 +155,12 @@ RUN mkdir -p /build/apps/web/public
 # ---------------------------------------------------------------------------
 
 # The anti-cheat, for Paper, Purpur, Spigot, Folia and the servers that load
-# their plugins, 1.8 to the latest, and for NeoForge 1.21.4. The directory is
+# their plugins, 1.8 to the latest, for NeoForge 1.21.4 and for Forge 1.20.1. The directory is
 # GPL-3.0 (resources/minecraft/polaris-anticheat/README.md), so it is its own jar
 # and never part of the dashboard. The plugin is served as it is; the NeoForge
 # build goes to /nested only, for the mod stage below to carry inside the Polaris
-# mod. It asks for a newer Gradle than the stages below. The version carries a
+# mod. The Forge build is served as it is, like the plugin. It asks for a newer
+# Gradle than the stages below. The version carries a
 # fingerprint of its sources, like theirs.
 FROM gradle:9.4.1-jdk21 AS minecraft-anticheat
 
@@ -169,10 +170,12 @@ COPY resources/minecraft/polaris-anticheat/ ./
 # it from ../../polaris-common, which from /ac/bukkit is this folder.
 COPY resources/minecraft/polaris-common/src/chat/ /polaris-common/src/chat/
 RUN fingerprint="$(find . /polaris-common -type f | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-12)" \
-    && POLARIS_AC_COMMIT="$fingerprint" POLARIS_AC_BRANCH=polaris gradle --no-daemon -q :bukkit:build :neoforge:shadowJar -x test \
+    && POLARIS_AC_COMMIT="$fingerprint" POLARIS_AC_BRANCH=polaris gradle --no-daemon -q :bukkit:build :neoforge:shadowJar :forge:assemble -x test \
     && mkdir -p /out /nested \
     && cp bukkit/build/libs/polarisac-bukkit-*.jar /out/polaris-anticheat-bukkit.jar \
     && printf '%s\n' "$fingerprint" > /out/polaris-anticheat-bukkit.jar.version \
+    && cp forge/build/libs/polaris-anticheat-forge-1.20.1.jar /out/polaris-anticheat-forge-1.20.1.jar \
+    && printf '%s\n' "$fingerprint" > /out/polaris-anticheat-forge-1.20.1.jar.version \
     && cp neoforge/build/libs/polaris-anticheat-neoforge-1.21.4.jar /nested/ \
     && printf '%s\n' "$fingerprint" > /nested/polaris-anticheat-neoforge-1.21.4.jar.version
 

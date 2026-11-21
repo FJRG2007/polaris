@@ -80,5 +80,6 @@ include("bukkit-internal")
 include("common")
 include("bukkit")
 include("neoforge")
+include("forge")
 
 if (file("workspace.gradle.kts").exists()) apply(from = "workspace.gradle.kts")
