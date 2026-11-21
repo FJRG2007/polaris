@@ -2469,7 +2469,7 @@
             "satelliteImagery": {
                 "summary": "Mapas satélite e híbridos más nítidos en las ubicaciones compartidas.",
                 "description": "Las ubicaciones compartidas usan imágenes gratuitas de Sentinel-2, que se ven borrosas a nivel de calle. Con una clave de MapTiler o Esri, los mapas satélite e híbridos siguen nítidos mucho más cerca. Las teselas siguen pasando por Polaris, así que el proveedor nunca ve quién mira ni dónde, y la clave nunca llega al navegador.",
-                "apiKeyLabel": "Clave de API",
+                "apiKeyLabel": "Clave API",
                 "apiKeyHelp": "Se prueba con una tesela antes de guardarla. Se guarda cifrada.",
                 "links": {
                     "0": {
