@@ -12,12 +12,17 @@
  * stays as the way to everything else in the gallery.
  * Files is the picker Mail uses, so Drive is there too. Poll is offered only
  * where a poll has somewhere to go.
+ *
+ * Each way in wears its own colour, a filled circle with a white glyph, as
+ * WhatsApp's attach sheet does: after a day the thumb goes to the colour
+ * before the eye reads the word. Solid fills read the same on a light and a
+ * dark sheet, so one colour serves both themes.
  */
 
 import { RecentMedia } from "./recent-media";
 import { phoneMedia } from "@/lib/mobile-media";
 import { useMemo, useRef, type ReactNode } from "react";
-import { Dialog, DialogContent, DialogTitle } from "@polaris/ui";
+import { Dialog, DialogContent, DialogTitle, cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { BarChart3, Camera, Images, MapPin, Paperclip } from "lucide-react";
 
@@ -106,8 +111,9 @@ export function AttachSheet({
                             <>
                                 {device ? null : (
                                     <Tile
-                                        icon={<Camera className="size-6" />}
+                                        icon={<Camera className="size-6 shrink-0" />}
                                         label={t("attachSheet.camera")}
+                                        tone="bg-rose-500"
                                         onClick={() => {
                                             onOpenChange(false);
                                             camera.current?.click();
@@ -115,16 +121,18 @@ export function AttachSheet({
                                     />
                                 )}
                                 <Tile
-                                    icon={<Images className="size-6" />}
+                                    icon={<Images className="size-6 shrink-0" />}
                                     label={t("attachSheet.photos")}
+                                    tone="bg-violet-500"
                                     onClick={() => {
                                         onOpenChange(false);
                                         gallery.current?.click();
                                     }}
                                 />
                                 <Tile
-                                    icon={<Paperclip className="size-6" />}
+                                    icon={<Paperclip className="size-6 shrink-0" />}
                                     label={t("attachSheet.files")}
+                                    tone="bg-indigo-500"
                                     onClick={() => {
                                         onOpenChange(false);
                                         onFiles();
@@ -134,8 +142,9 @@ export function AttachSheet({
                         ) : null}
                         {onPoll ? (
                             <Tile
-                                icon={<BarChart3 className="size-6" />}
+                                icon={<BarChart3 className="size-6 shrink-0" />}
                                 label={t("attachSheet.poll")}
+                                    tone="bg-amber-500"
                                 onClick={() => {
                                     onOpenChange(false);
                                     onPoll();
@@ -144,8 +153,9 @@ export function AttachSheet({
                         ) : null}
                         {onLocation ? (
                             <Tile
-                                icon={<MapPin className="size-6" />}
+                                icon={<MapPin className="size-6 shrink-0" />}
                                 label={t("attachSheet.location")}
+                                    tone="bg-emerald-500"
                                 onClick={() => {
                                     onOpenChange(false);
                                     onLocation();
@@ -159,14 +169,21 @@ export function AttachSheet({
     );
 }
 
-function Tile({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) {
+function Tile({ icon, label, tone, onClick }: { icon: ReactNode; label: string; tone: string; onClick: () => void }) {
     return (
         <button
             type="button"
             onClick={onClick}
-            className="flex min-w-0 flex-col items-center gap-1.5 rounded-xl bg-surface px-1 py-3 text-foreground transition-colors duration-fast active:bg-muted [-webkit-tap-highlight-color:transparent]"
+            className="group flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-1 py-2 text-foreground [-webkit-tap-highlight-color:transparent]"
         >
-            <span className="shrink-0">{icon}</span>
+            <span
+                className={cn(
+                    "grid size-14 shrink-0 place-items-center rounded-full text-white shadow-sm transition-transform duration-fast group-active:scale-95",
+                    tone
+                )}
+            >
+                {icon}
+            </span>
             <span className="w-full truncate text-center text-xs" title={label}>
                 {label}
             </span>

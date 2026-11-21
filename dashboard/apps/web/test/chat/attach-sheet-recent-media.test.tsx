@@ -154,3 +154,15 @@ describe("recent photos in the phone app's + sheet", () => {
         }
     });
 });
+
+describe("the ways to add something", () => {
+    it("each wear a colour of their own, as WhatsApp's do", () => {
+        sheet();
+        const tones = ["Camera", "Photos", "Files", "Poll"].map((name) => {
+            const circle = screen.getByRole("button", { name }).querySelector("span");
+            return [...(circle?.classList ?? [])].find((one) => /^bg-[a-z]+-\d+$/.test(one));
+        });
+        expect(tones.every(Boolean)).toBe(true);
+        expect(new Set(tones).size).toBe(tones.length);
+    });
+});
