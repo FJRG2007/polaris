@@ -297,7 +297,7 @@ export async function postThroughWebhook(
     });
 
     publishChatChange({ channelId: webhook.channelId, kind: "posted", actorId: "" });
-    unfurlLater(input.content);
+    unfurlLater(input.content, { id, channelId: webhook.channelId, authorId: null });
     checkLinksLater(id);
     return id;
 }

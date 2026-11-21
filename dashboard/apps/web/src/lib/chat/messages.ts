@@ -53,6 +53,12 @@ import { channelMentions, isBlankMarkdown } from "@/components/rich-text/markdow
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
 import { confineCustomEmoji, reactionEmoji } from "./custom-emoji";
 import { knownPreviews, unfurl, type KnownPreview, type LinkPreviewView } from "./link-preview";
+import {
+    instancePreviewsAllowed,
+    previewAllowed,
+    previewsWithheld,
+    type PreviewSubject
+} from "./link-preview-policy";
 import { checkLinksLater, flaggedLinksFor, type FlaggedLink } from "./link-safety";
 import {
     ChatAccessError,
@@ -729,7 +735,7 @@ async function sendUnguarded(
 
     publishChatChange({ channelId: input.channelId, kind: "posted", actorId: actor.id });
 
-    unfurlLater(input.body);
+    unfurlLater(input.body, { id, channelId: input.channelId, authorId: actor.id });
     checkLinksLater(id);
     // Not awaited, and never allowed to fail the send: a message going out
     // matters more than the notification about it.
@@ -1013,7 +1019,11 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
     });
 
     // An edit can put a link in a message that did not have one.
-    unfurlLater(input.body);
+    unfurlLater(input.body, {
+        id: input.messageId,
+        channelId: message.channelId,
+        authorId: actor.id
+    });
     checkLinksLater(input.messageId);
 }
 
@@ -1030,9 +1040,16 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
  * nothing was going to reload again until somebody else said something - so the
  * last message in a conversation, which is the one being read, never got one.
  */
-export function unfurlLater(body: string): void {
+export function unfurlLater(body: string, subject?: PreviewSubject): void {
     const link = core.firstLink(body);
-    if (link) void unfurl(link).catch(() => undefined);
+    if (!link) return;
+    // Nothing is fetched where previews are off - instance, conversation or
+    // author (`link-preview-policy.ts`). A caller that names no message is
+    // still held to the instance switch.
+    const allowed = subject ? previewAllowed(subject) : instancePreviewsAllowed();
+    void allowed
+        .then((ok) => (ok ? unfurl(link) : undefined))
+        .catch(() => undefined);
 }
 
 /**
@@ -1053,7 +1070,7 @@ export async function linkPreviewFor(
 ): Promise<LinkPreviewView | null> {
     const message = await prisma.chatMessage.findUnique({
         where: { id: messageId },
-        select: { channelId: true, body: true, deletedAt: true }
+        select: { channelId: true, body: true, deletedAt: true, authorId: true }
     });
     if (!message || message.deletedAt) return null;
     await requireChannel(actor, message.channelId);
@@ -1063,6 +1080,14 @@ export async function linkPreviewFor(
 
     const link = core.firstLink(message.body);
     if (!link) return null;
+    if (
+        !(await previewAllowed({
+            id: messageId,
+            channelId: message.channelId,
+            authorId: message.authorId
+        }))
+    )
+        return null;
 
     await unfurl(link);
     return (await knownPreviews([link])).get(link)?.view ?? null;
@@ -2214,6 +2239,12 @@ export async function decorateMessages(
         // drew said less than the address it replaced - the reference below is
         // what that link becomes instead.
         if (link && !referenceFromUrl(link, origin)) links.set(row.id, link);
+    }
+    // Where previews are off, the link is not one: no card, no player, nothing
+    // asked of the site. The address stays in the text (`link-preview-policy.ts`).
+    if (links.size > 0) {
+        const withheld = await previewsWithheld(rows.filter((row) => links.has(row.id)));
+        for (const id of withheld) links.delete(id);
     }
 
     // How far the reader's own messages got, in a one-to-one conversation where

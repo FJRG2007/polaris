@@ -7,6 +7,7 @@
 import * as core from "@polaris/core";
 import { getSettings } from "@/lib/setting-store";
 import { PUBLIC_KEY } from "@/lib/profile-service";
+import { LINK_PREVIEWS_KEY } from "@/lib/chat/link-preview-policy";
 import { isLockValue, privacyDefaultKey, privacyLockKey } from "@/lib/privacy-service";
 import { DISCOVERY_POLICY_KEY, readDiscoveryPolicy, type DiscoveryPolicy } from "@/lib/discovery-policy";
 
@@ -17,17 +18,21 @@ export interface PrivacyData {
     /** The fields held to their default for every account. */
     locks: core.PrivacyField[];
     discovery: DiscoveryPolicy;
+    /** Whether Chat may draw link previews at all. */
+    linkPreviews: boolean;
 }
 
 export async function readPrivacy(): Promise<PrivacyData> {
     const stored = await getSettings([
         PUBLIC_KEY,
         DISCOVERY_POLICY_KEY,
+        LINK_PREVIEWS_KEY,
         ...core.PRIVACY_FIELDS.map(privacyDefaultKey),
         ...core.PRIVACY_FIELDS.map(privacyLockKey)
     ]);
     return {
         publicProfiles: stored.get(PUBLIC_KEY) === "true",
+        linkPreviews: stored.get(LINK_PREVIEWS_KEY) !== "off",
         defaults: Object.fromEntries(
             core.PRIVACY_FIELDS.map((field) => [
                 field,

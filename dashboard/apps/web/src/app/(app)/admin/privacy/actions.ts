@@ -13,6 +13,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { setDiscoveryPolicy } from "@/lib/people-search";
 import { setProfilesPublic } from "@/lib/profile-service";
+import { LINK_PREVIEWS_KEY, setInstancePreviews } from "@/lib/chat/link-preview-policy";
 import { DISCOVERY_POLICY_KEY, discoveryPolicySchema } from "@/lib/discovery-policy";
 import * as core from "@polaris/core";
 import {
@@ -73,6 +74,29 @@ export async function setPrivacyDefaultAction(
         targetType: "setting",
         targetId: privacyDefaultKey(parsedField.data),
         metadata: { field: parsedField.data, audience: parsedAudience.data }
+    });
+    revalidatePath("/admin/privacy");
+    return {};
+}
+
+/**
+ * Whether Chat may look up posted links and draw them as cards, for the whole
+ * instance (ledger row 4). Audited: turning it off stops addresses leaving the
+ * deployment, and whoever asks later should see who decided and when.
+ */
+export async function setLinkPreviewsAction(allowed: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = z.boolean().safeParse(allowed);
+    if (!parsed.success) {
+        return { error: (await getTranslations("admin"))("privacy.errors.checkSettings") };
+    }
+    await setInstancePreviews(parsed.data);
+    await recordAudit({
+        actorId: admin.id,
+        action: "settings.chat-link-previews",
+        targetType: "setting",
+        targetId: LINK_PREVIEWS_KEY,
+        metadata: { enabled: parsed.data }
     });
     revalidatePath("/admin/privacy");
     return {};

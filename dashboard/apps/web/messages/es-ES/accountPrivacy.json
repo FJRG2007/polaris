@@ -307,5 +307,10 @@
         "keep": "Mantenerla",
         "turnOff": "Quitarla"
     },
-    "lockedByAdmin": "Fijado por tu administrador para todos aquí."
+    "lockedByAdmin": "Fijado por tu administrador para todos aquí.",
+    "linkPreviews": {
+        "label": "Vistas previas de lo que envías",
+        "hint": "Desactivado, tus enlaces quedan como texto: no se consulta nada ni se carga ninguna tarjeta o reproductor.",
+        "forbidden": "Tu administrador ha desactivado las vistas previas de enlaces para todos."
+    }
 }

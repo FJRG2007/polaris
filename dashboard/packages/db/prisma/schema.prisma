@@ -10576,6 +10576,9 @@ model ChatSpaceBan {
 model ChatChannel {
     id            String    @id @default(uuid(7)) @db.Uuid
     groupInvites  ChatGroupInvite[]
+    // Whether links in this conversation are looked up and drawn as cards
+    // (ledger row 4). On by default, as every conversation was before.
+    linkPreviews  Boolean   @default(true)
     spaceId       String?   @db.Uuid
     // The heading it sits under inside its space, or null for the channels above
     // the first one. ON DELETE SET NULL: removing a heading must not remove the
@@ -11806,6 +11809,9 @@ model UserPrivacy {
     // and the time across it. On by default: with a photo of the screen taken
     // from another device, it is what says who it was shown to.
     viewOnceWatermark Boolean @default(true)
+    // Whether links this account sends are looked up and drawn as cards (ledger
+    // row 4). On by default, which is what every account had before.
+    linkPreviews Boolean @default(true)
     // Who may read the two follower lists on a profile. Nullable, and that is
     // the point: null is "nobody has chosen", and what that resolves to is the
     // operator's setting rather than a number frozen into this column. An

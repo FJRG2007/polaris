@@ -83,6 +83,19 @@ export async function changeRulesAction(
     return guardChat(() => vanish.changeRules(me, channel.data, parsed.data));
 }
 
+/** Turn link previews off for a conversation, or back on (ledger row 4). */
+export async function setLinkPreviewsAction(
+    channelId: unknown,
+    on: unknown
+): Promise<{ error?: string }> {
+    const me = await actor();
+    const channel = idSchema.safeParse(channelId);
+    if (!channel.success) return refused("errors.notInConversation");
+    const parsed = z.boolean().safeParse(on);
+    if (!parsed.success) return refused("errors.rulesBadValue");
+    return guardChat(() => vanish.setLinkPreviews(me, channel.data, parsed.data));
+}
+
 /** Withdraw a proposal this reader made and nobody has settled yet. */
 export async function withdrawProposalAction(proposalId: unknown): Promise<{ error?: string }> {
     const me = await actor();

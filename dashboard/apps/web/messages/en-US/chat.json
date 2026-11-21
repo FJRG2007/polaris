@@ -265,7 +265,8 @@
         "locationNotLive": "That is not a live location",
         "placesBusy": "Too many searches. Try again in a minute.",
         "placesUnavailable": "Place search is unavailable right now",
-        "muteMentionsInvalid": "That mute could not be changed"
+        "muteMentionsInvalid": "That mute could not be changed",
+        "groupInviteGone": "That invitation is no longer open."
     },
     "media": {
         "refused": {
@@ -2526,7 +2527,9 @@
         "proposalMine": "Waiting for the other person to accept",
         "withdraw": "Withdraw",
         "accept": "Accept",
-        "decline": "Decline"
+        "decline": "Decline",
+        "previewsOff": "Turn link previews off",
+        "previewsOn": "Turn link previews on"
     },
     "streamQuality": {
         "custom": "Custom",
@@ -2747,7 +2750,6 @@
     },
     "groupInvites": {
         "notification": "{name} invited you to a group",
-        "gone": "That invitation is no longer open.",
         "failed": "That did not go through. Try again.",
         "back": "Back to Chat",
         "title": "Group invitations",

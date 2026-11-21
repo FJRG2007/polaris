@@ -136,6 +136,7 @@ export function ChannelHeader({
         readonly onAllowDelete: (allowed: boolean) => void;
         readonly onRules: (change: ChatRulesChange) => void;
         readonly onDeleteChat: () => void;
+        readonly onLinkPreviews?: (on: boolean) => void;
         /** The conversation's privacy section, drawn in a group's settings
          *  so its owner and admins set it where the rest of the group is. */
         readonly privacy?: React.ReactNode;
@@ -595,6 +596,7 @@ export function ChannelHeader({
                                     onTimer={vanish.onTimer}
                                     onAllowDelete={vanish.onAllowDelete}
                                     onRules={vanish.onRules}
+                                    onLinkPreviews={vanish.onLinkPreviews}
                                     onDeleteChat={vanish.onDeleteChat}
                                 />
                             )}

@@ -10,7 +10,7 @@
 
 import { runAction } from "@/lib/run-action";
 import * as vanishActions from "./vanish-actions";
-import { Check, Eye, PenLine, Timer, Trash2 } from "lucide-react";
+import { Check, Eye, Link2Off, PenLine, Timer, Trash2 } from "lucide-react";
 import type { ChatRulesChange } from "./chat-privacy-section";
 import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { ChatMessageView } from "@/lib/chat/messages";
@@ -200,7 +200,8 @@ export function VanishMenu({
     onTimer,
     onAllowDelete,
     onRules,
-    onDeleteChat
+    onDeleteChat,
+    onLinkPreviews
 }: {
     rules: DirectRulesView;
     onTimer: (seconds: VanishDuration) => void;
@@ -209,6 +210,8 @@ export function VanishMenu({
      *  section makes. */
     onRules: (change: ChatRulesChange) => void;
     onDeleteChat: () => void;
+    /** Turn link previews off for this conversation, or back on. */
+    onLinkPreviews?: (on: boolean) => void;
 }) {
     const t = useTranslations("chat");
     const agreement = rules.mode === "agreement";
@@ -241,6 +244,12 @@ export function VanishMenu({
                 panel is about the person, not the conversation. */}
             {rules.mayChange && ruleMenu("receipts", Eye)}
             {rules.mayChange && ruleMenu("typing", PenLine)}
+            {rules.mayChange && onLinkPreviews && (
+                <DropdownMenuItem onSelect={() => onLinkPreviews(!rules.linkPreviews)}>
+                    <Link2Off className="size-3.5" />
+                    {rules.linkPreviews ? t("chatPrivacy.previewsOff") : t("chatPrivacy.previewsOn")}
+                </DropdownMenuItem>
+            )}
             {/* A group member who does not run it reads the timer in the
                 privacy section, with the reason; the menu offers only what
                 they may do. */}

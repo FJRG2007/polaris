@@ -307,5 +307,10 @@
         "keep": "Keep it on",
         "turnOff": "Turn off"
     },
-    "lockedByAdmin": "Set by your administrator for everybody here."
+    "lockedByAdmin": "Set by your administrator for everybody here.",
+    "linkPreviews": {
+        "label": "Link previews for what you send",
+        "hint": "Off, links you send stay plain text: nothing is fetched and no card or player loads for anyone.",
+        "forbidden": "Your administrator has turned link previews off for everyone here."
+    }
 }

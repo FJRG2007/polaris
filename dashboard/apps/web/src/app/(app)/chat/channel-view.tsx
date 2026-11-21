@@ -2280,6 +2280,20 @@ export function ChannelView({
             }
         );
     };
+    /** Link previews for this conversation: shown at once, put back on refusal. */
+    const setLinkPreviews = (on: boolean) => {
+        const before = vanish.rules;
+        if (!before || !before.mayChange) return;
+        vanish.setRules({ ...before, linkPreviews: on });
+        void runAction(() => vanishActions.setLinkPreviewsAction(channelId, on), setError).then(
+            (result) => {
+                if (!result || result.error) {
+                    if (result?.error) setError(result.error);
+                    vanish.setRules(before);
+                }
+            }
+        );
+    };
     const withdrawProposal = async (proposalId: string) => {
         const before = vanish.rules;
         if (before) vanish.setRules({ ...before, proposal: null });
@@ -2927,6 +2941,7 @@ export function ChannelView({
                                   onTimer: setTimer,
                                   onAllowDelete: allowDeleteForAll,
                                   onRules: changeRules,
+                                  onLinkPreviews: setLinkPreviews,
                                   onDeleteChat: () => setDeletingChat(true),
                                   privacy: privacySection
                               }
@@ -3104,6 +3119,7 @@ export function ChannelView({
                                         onTimer={setTimer}
                                         onAllowDelete={allowDeleteForAll}
                                         onRules={changeRules}
+                                        onLinkPreviews={setLinkPreviews}
                                         onDeleteChat={() => setDeletingChat(true)}
                                     />
                                 ) : undefined

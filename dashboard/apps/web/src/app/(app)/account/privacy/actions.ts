@@ -332,6 +332,23 @@ export async function saveChatTimerAction(seconds: unknown): Promise<{ error?: s
 
 /** On or off. Applies to what is sent from now on: every file keeps the
  *  watermark it was sent with (`ChatAttachment.watermark`). */
+/** Whether links this account sends are looked up and drawn (ledger row 4). */
+export async function saveLinkPreviewsAction(on: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const parsed = z.boolean().safeParse(on);
+    if (!parsed.success) {
+        return { error: (await getTranslations("accountPrivacy"))("errors.notSaved") };
+    }
+    await prisma.userPrivacy.upsert({
+        where: { userId: user.id },
+        create: { userId: user.id, linkPreviews: parsed.data },
+        update: { linkPreviews: parsed.data },
+        select: { userId: true }
+    });
+    revalidatePath(PRIVACY_PATH);
+    return {};
+}
+
 export async function saveViewOnceWatermarkAction(on: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const parsed = z.boolean().safeParse(on);

@@ -9,7 +9,13 @@
 import type { ReactNode } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
-function Section({ id, children }: { id: "profiles" | "defaults" | "discovery"; children: ReactNode }) {
+function Section({
+    id,
+    children
+}: {
+    id: "profiles" | "defaults" | "discovery" | "previews";
+    children: ReactNode;
+}) {
     const t = useTranslations("admin");
     return (
         <section aria-labelledby={`privacy-${id}`} className="flex flex-col gap-3">
@@ -27,17 +33,20 @@ function Section({ id, children }: { id: "profiles" | "defaults" | "discovery"; 
 export function PrivacySections({
     profiles,
     defaults,
-    discovery
+    discovery,
+    previews
 }: {
     profiles: ReactNode;
     defaults: ReactNode;
     discovery: ReactNode;
+    previews: ReactNode;
 }) {
     return (
         <div className="flex flex-col gap-8">
             <Section id="profiles">{profiles}</Section>
             <Section id="defaults">{defaults}</Section>
             <Section id="discovery">{discovery}</Section>
+            <Section id="previews">{previews}</Section>
         </div>
     );
 }

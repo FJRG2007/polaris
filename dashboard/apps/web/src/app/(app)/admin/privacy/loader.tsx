@@ -6,6 +6,7 @@ import { CardSkeleton } from "../region-skeletons";
 import { PrivacySections } from "./privacy-sections";
 import { AfterPaint } from "@/components/after-paint";
 import { PublicProfilesForm } from "./public-profiles-form";
+import { LinkPreviewsForm } from "./link-previews-form";
 import { PrivacyDefaultsForm } from "./privacy-defaults-form";
 import { PeopleDiscoveryForm } from "./people-discovery-form";
 
@@ -29,6 +30,7 @@ export function PrivacyLoader({
                     profiles={<CardSkeleton lines={1} />}
                     defaults={<CardSkeleton lines={6} />}
                     discovery={<CardSkeleton lines={4} />}
+                    previews={<CardSkeleton lines={1} />}
                 />
             }
         >
@@ -39,6 +41,7 @@ export function PrivacyLoader({
                     }
                     defaults={<PrivacyDefaultsForm defaults={data.defaults} locks={data.locks} />}
                     discovery={<PeopleDiscoveryForm policy={data.discovery} />}
+                    previews={<LinkPreviewsForm allowed={data.linkPreviews} />}
                 />
             )}
         </AfterPaint>

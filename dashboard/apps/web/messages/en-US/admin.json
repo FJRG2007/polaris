@@ -4252,6 +4252,12 @@
         "errors": {
             "audience": "That is not an audience a default can be.",
             "checkSettings": "Check the settings and try again"
+        },
+        "previews": {
+            "title": "Link previews",
+            "description": "Whether Chat looks up posted links and shows them as cards.",
+            "label": "Allow link previews",
+            "hint": "Off, this server never fetches a posted address and no screen loads a card or embedded player. Accounts and conversations can also turn them off."
         }
     }
 }

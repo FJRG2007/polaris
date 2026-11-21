@@ -265,7 +265,8 @@
         "locationNotLive": "No es una ubicación en tiempo real",
         "placesBusy": "Demasiadas búsquedas. Prueba en un minuto.",
         "placesUnavailable": "La búsqueda de lugares no está disponible",
-        "muteMentionsInvalid": "No se pudo cambiar el silencio"
+        "muteMentionsInvalid": "No se pudo cambiar el silencio",
+        "groupInviteGone": "Esa invitación ya no está abierta."
     },
     "media": {
         "refused": {
@@ -2526,7 +2527,9 @@
         "proposalMine": "Esperando a que la otra persona acepte",
         "withdraw": "Retirar",
         "accept": "Aceptar",
-        "decline": "Rechazar"
+        "decline": "Rechazar",
+        "previewsOff": "Desactivar vistas previas de enlaces",
+        "previewsOn": "Activar vistas previas de enlaces"
     },
     "streamQuality": {
         "custom": "Personal",
@@ -2747,7 +2750,6 @@
     },
     "groupInvites": {
         "notification": "{name} te ha invitado a un grupo",
-        "gone": "Esa invitación ya no está abierta.",
         "failed": "No se ha podido completar. Inténtalo de nuevo.",
         "back": "Volver al chat",
         "title": "Invitaciones a grupos",

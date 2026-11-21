@@ -130,6 +130,8 @@ export interface DirectRulesView {
     readonly typing: rules.ChatPrivacyRule;
     /** Whether the members have agreed rules (agreement mode only). */
     readonly agreed: boolean;
+    /** Whether links here are looked up and drawn as cards (ledger row 4). */
+    readonly linkPreviews: boolean;
     /** Whether this reader may change the rules - the same question every
      *  write asks. False only in a group, for somebody who does not run it. */
     readonly mayChange: boolean;
@@ -149,6 +151,7 @@ interface DirectChannel {
     readonly rulesAgreedAt: Date | null;
     readonly receipts: string;
     readonly typing: string;
+    readonly linkPreviews: boolean;
 }
 
 const CHANNEL_SELECT = {
@@ -161,7 +164,8 @@ const CHANNEL_SELECT = {
     deleteForAll: true,
     rulesAgreedAt: true,
     receipts: true,
-    typing: true
+    typing: true,
+    linkPreviews: true
 } as const;
 
 /** The conversation, refused unless the reader is one of its members and it
@@ -318,6 +322,7 @@ export async function directRulesFor(
         receipts: current.receipts,
         typing: current.typing,
         agreed: channel.rulesAgreedAt !== null,
+        linkPreviews: channel.linkPreviews,
         mayChange: rules.mayChangeRules(channel, await roleIn(channel, actor), actor.id),
         proposes,
         proposal: pending
@@ -837,4 +842,30 @@ export async function sweepExpiredMessages(
         if (due.length < batchSize) break;
     }
     return removed;
+}
+/**
+ * Turn link previews off for this conversation, or back on (ledger row 4).
+ *
+ * Asked of whoever may change its other rules - in a group, its owner and
+ * admins - and announced in the conversation like them, so nobody wonders why
+ * the cards stopped. Applied at once: stopping a lookup is never something to
+ * wait for the other side to agree to.
+ */
+export async function setLinkPreviews(
+    actor: ChatActor,
+    channelId: string,
+    on: boolean
+): Promise<void> {
+    const channel = await requireDirect(actor, channelId);
+    await requireMayChange(actor, channel);
+    if (channel.linkPreviews === on) return;
+    await requireNotTooFast(actor);
+    await prisma.chatChannel.update({ where: { id: channelId }, data: { linkPreviews: on } });
+    const who = await mentionOf(actor.id);
+    await postNoticeBody(
+        channelId,
+        on ? `${who} turned link previews on` : `${who} turned link previews off`,
+        actor.id
+    );
+    publishChatChange({ channelId, kind: "posted", actorId: actor.id });
 }

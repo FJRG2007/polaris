@@ -4252,6 +4252,12 @@
         "errors": {
             "audience": "Ese público no puede ser el predeterminado.",
             "checkSettings": "Revisa los ajustes y vuelve a intentarlo"
+        },
+        "previews": {
+            "title": "Vistas previas de enlaces",
+            "description": "Si el chat consulta los enlaces publicados y los muestra como tarjetas.",
+            "label": "Permitir vistas previas",
+            "hint": "Desactivado, este servidor nunca consulta una dirección publicada y ninguna pantalla carga tarjetas ni reproductores. Cuentas y conversaciones también pueden desactivarlas."
         }
     }
 }
