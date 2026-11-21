@@ -656,7 +656,6 @@
         "empty": "Aún no hay fotos ni vídeos.",
         "loadFailed": "No se cargaron tus fotos.",
         "retry": "Reintentar",
-        "add": "Añadir {count}",
         "readFailed": "No se abrió esa foto. Reinténtalo.",
         "tooLarge": "Muy grande",
         "video": "Vídeo, {length}",

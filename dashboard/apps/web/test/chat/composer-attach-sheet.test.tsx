@@ -81,6 +81,31 @@ describe("adding to a message on a phone", () => {
         expect(screen.queryByRole("button", { name: "Poll" })).toBeNull();
     });
 
+    it("opens in the keyboard's place under the box, and the text field brings the keyboard back", () => {
+        screenWidth(true);
+        const { container } = chatBox();
+        const plus = screen.getByRole("button", { name: "Add to the message" });
+        fireEvent.click(plus);
+        const panel = screen.getByRole("region", { name: "Add to the message" });
+        // In the composer's own flow, not a dialog over it: the box stays where it is.
+        expect(panel.closest("[data-chat-composer]")).toBeTruthy();
+        expect(screen.queryByRole("dialog")).toBeNull();
+        expect(plus.getAttribute("aria-expanded")).toBe("true");
+        const field = container.querySelector("[contenteditable=true]");
+        expect(field).toBeTruthy();
+        fireEvent.focusIn(field!);
+        expect(screen.queryByRole("region", { name: "Add to the message" })).toBeNull();
+    });
+
+    it("closes again from the same +", () => {
+        screenWidth(true);
+        chatBox();
+        const plus = screen.getByRole("button", { name: "Add to the message" });
+        fireEvent.click(plus);
+        fireEvent.click(plus);
+        expect(screen.queryByRole("region", { name: "Add to the message" })).toBeNull();
+    });
+
     it("keeps the icons on a computer", () => {
         screenWidth(false);
         chatBox();

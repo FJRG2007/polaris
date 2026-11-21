@@ -3,7 +3,10 @@
 /**
  * The phone's recent photos and videos at the top of the composer's "+" sheet,
  * the way Discord and Signal show them: a grid to tap, several at once, with the
- * camera as its first square. Only inside the Polaris phone app, which reads the
+ * camera as its first square. A tap puts the photo straight on the message being
+ * written, shown in the composer's own strip and sent with its Send; a second tap
+ * takes it off. Nothing here moves when it does: the mark is drawn over the
+ * square, and there is no button of its own under the grid. Only inside the Polaris phone app, which reads the
  * gallery for the page (`lib/mobile-media.ts`); a browser keeps the system
  * chooser behind the Photos tile.
  *
@@ -38,22 +41,28 @@ type Load = "loading" | "ready" | "failed";
 export function RecentMedia({
     media,
     maxBytes,
+    attached,
     onCamera,
-    onPick
+    onAttach,
+    onDetach
 }: {
     media: PhoneMedia;
     /** Larger than this cannot be sent here, so it cannot be chosen. */
     maxBytes: number;
+    /** What the message carries now; a square whose photo is among it is marked. */
+    attached: readonly File[];
     onCamera: () => void;
-    onPick: (files: File[]) => void;
+    onAttach: (files: File[]) => void;
+    onDetach: (file: File) => void;
 }) {
     const t = useTranslations("chat");
     const [access, setAccess] = useState<MediaAccess | null>(null);
     const [items, setItems] = useState<DeviceMediaItem[]>([]);
     const [more, setMore] = useState(false);
     const [load, setLoad] = useState<Load>("loading");
-    const [chosen, setChosen] = useState<string[]>([]);
-    const [reading, setReading] = useState(false);
+    // The file each square became, so the strip's copy can be found again.
+    const [read, setRead] = useState<ReadonlyMap<string, File>>(() => new Map());
+    const [reading, setReading] = useState<ReadonlySet<string>>(() => new Set());
     const [readFailed, setReadFailed] = useState(false);
     const busy = useRef(false);
     const end = useRef<HTMLDivElement>(null);
@@ -111,28 +120,27 @@ export function RecentMedia({
         return () => watch.disconnect();
     }, [more, items.length, page]);
 
-    const toggle = (id: string) => {
+    const toggle = async (item: DeviceMediaItem) => {
         setReadFailed(false);
-        setChosen((current) => (current.includes(id) ? current.filter((one) => one !== id) : [...current, id]));
-    };
-
-    const add = async () => {
-        if (reading) return;
-        setReading(true);
-        setReadFailed(false);
+        const known = read.get(item.id);
+        if (known && attached.includes(known)) {
+            onDetach(known);
+            return;
+        }
+        if (reading.has(item.id)) return;
+        setReading((current) => new Set(current).add(item.id));
         try {
-            const byId = new Map(items.map((item) => [item.id, item]));
-            const files: File[] = [];
-            for (const id of chosen) {
-                const item = byId.get(id);
-                if (item) files.push(await media.file(item));
-            }
-            setChosen([]);
-            onPick(files);
+            const file = known ?? (await media.file(item));
+            setRead((current) => new Map(current).set(item.id, file));
+            onAttach([file]);
         } catch {
             setReadFailed(true);
         } finally {
-            setReading(false);
+            setReading((current) => {
+                const next = new Set(current);
+                next.delete(item.id);
+                return next;
+            });
         }
     };
 
@@ -152,7 +160,7 @@ export function RecentMedia({
     );
 
     return (
-        <section aria-label={t("attachSheet.recent")} className="flex min-h-0 flex-col gap-2">
+        <section aria-label={t("attachSheet.recent")} className="relative flex min-h-0 flex-1 flex-col gap-2">
             {access === "limited" ? (
                 <Notice text={t("attachSheet.limitedText")}>
                     <Button size="sm" variant="secondary" onClick={() => media.manage().then(settle, check)}>
@@ -160,7 +168,7 @@ export function RecentMedia({
                     </Button>
                 </Notice>
             ) : null}
-            <div className="grid max-h-[45dvh] grid-cols-3 gap-1 overflow-y-auto overscroll-contain rounded-md">
+            <div className="grid min-h-0 flex-1 auto-rows-min grid-cols-3 gap-1 overflow-y-auto overscroll-contain rounded-md">
                 {camera}
                 {load === "loading" ? (
                     Array.from({ length: 5 }, (_, index) => <Skeleton key={index} className="aspect-square rounded-md" />)
@@ -190,26 +198,32 @@ export function RecentMedia({
                             key={item.id}
                             item={item}
                             media={media}
-                            order={chosen.indexOf(item.id) + 1}
+                            order={attachedOrder(read.get(item.id), attached)}
+                            busy={reading.has(item.id)}
                             tooLarge={maxBytes > 0 && item.size > maxBytes}
-                            onToggle={() => toggle(item.id)}
+                            onToggle={() => void toggle(item)}
                         />
                     ))
                 )}
                 {more ? <div ref={end} className="col-span-3 h-px" aria-hidden /> : null}
             </div>
+            {/* Over the grid, not under it: a line appearing would move every square. */}
             {readFailed ? (
-                <p role="alert" className="text-xs text-danger">
+                <p
+                    role="alert"
+                    className="absolute inset-x-2 bottom-2 truncate rounded-md bg-danger px-3 py-2 text-center text-xs text-white shadow-sm"
+                    title={t("attachSheet.readFailed")}
+                >
                     {t("attachSheet.readFailed")}
                 </p>
             ) : null}
-            {chosen.length > 0 ? (
-                <Button size="lg" className="w-full" disabled={reading} aria-busy={reading} onClick={() => void add()}>
-                    <span className="min-w-0 truncate">{t("attachSheet.add", { count: chosen.length })}</span>
-                </Button>
-            ) : null}
         </section>
     );
+}
+
+/** Its place among what the message carries, 0 when it is not on it. */
+function attachedOrder(file: File | undefined, attached: readonly File[]): number {
+    return file ? attached.indexOf(file) + 1 : 0;
 }
 
 function Notice({ text, wide, children }: { text: string; wide?: boolean; children?: ReactNode }) {
@@ -230,6 +244,7 @@ function Thumb({
     item,
     media,
     order,
+    busy,
     tooLarge,
     onToggle
 }: {
@@ -237,6 +252,8 @@ function Thumb({
     media: PhoneMedia;
     /** Its place in the selection, 0 when it is not chosen. */
     order: number;
+    /** Being read off the phone for the message. */
+    busy: boolean;
     tooLarge: boolean;
     onToggle: () => void;
 }) {
@@ -279,11 +296,17 @@ function Thumb({
             onClick={tooLarge ? undefined : onToggle}
             aria-pressed={order > 0}
             aria-disabled={tooLarge || undefined}
+            aria-busy={busy || undefined}
             aria-label={tooLarge ? `${label}, ${t("attachSheet.tooLarge")}` : label}
             className="relative aspect-square min-w-0 overflow-hidden rounded-md bg-muted [-webkit-tap-highlight-color:transparent]"
         >
             {src ? (
-                <img src={src} alt="" draggable={false} className={cn("size-full object-cover", tooLarge && "opacity-40")} />
+                <img
+                    src={src}
+                    alt=""
+                    draggable={false}
+                    className={cn("size-full object-cover", (tooLarge || busy) && "opacity-40")}
+                />
             ) : null}
             {order > 0 ? <span aria-hidden className="absolute inset-0 rounded-md ring-2 ring-inset ring-primary" /> : null}
             <span

@@ -39,6 +39,7 @@ import { MediaEditor, isEditorMedia } from "./media-editor";
 import { planMediaSend, type EditedMedia } from "./media-edit";
 import { useKeyboardDictates, usePhone } from "@/components/use-phone";
 import { AttachSheet } from "./attach-sheet";
+import { watchKeyboard } from "@/lib/chat/keyboard-height";
 import { speechRecognizer, useDictation, usePrivateDictation } from "./use-dictation";
 import { VideoPreview } from "@/components/video-preview";
 import { ImageViewer } from "@/components/image-viewer";
@@ -447,6 +448,8 @@ export function Composer({
     const [handheld, setHandheld] = useState(false);
     // On a phone the ways to add something sit behind one "+", in a sheet.
     const phone = usePhone();
+    // The keyboard's height, remembered so the "+" panel opens at it.
+    useEffect(() => (phone ? watchKeyboard() : undefined), [phone]);
     const [attaching, setAttaching] = useState(false);
     // A phone's keyboard has a microphone key of its own, so the box offers no
     // second one for dictating (`useKeyboardDictates`); the voice message stays.
@@ -1187,6 +1190,30 @@ export function Composer({
         return accepted.length;
     };
 
+    /** Take one staged file off the message. */
+    const unstage = (index: number): void => {
+        if (index < 0) return;
+        setFiles((current) => current.filter((_, at) => at !== index));
+        // The marks are by position, so removing one
+        // shifts every mark after it.
+        setCovered((current) => {
+            const next = new Set<number>();
+            for (const at of current) {
+                if (at < index) next.add(at);
+                else if (at > index) next.add(at - 1);
+            }
+            return next;
+        });
+        setOnce((current) => {
+            const next = new Map<number, number | null>();
+            for (const [at, seconds] of current) {
+                if (at < index) next.set(at, seconds);
+                else if (at > index) next.set(at - 1, seconds);
+            }
+            return next;
+        });
+    };
+
     /**
      * Open picked photos and videos in the editor, and stage everything else.
      * The editor's items are a message of their own, so they have the whole
@@ -1470,27 +1497,7 @@ export function Composer({
                                     return next;
                                 })
                             }
-                            onRemove={() => {
-                                setFiles((current) => current.filter((_, at) => at !== index));
-                                // The marks are by position, so removing one
-                                // shifts every mark after it.
-                                setCovered((current) => {
-                                    const next = new Set<number>();
-                                    for (const at of current) {
-                                        if (at < index) next.add(at);
-                                        else if (at > index) next.add(at - 1);
-                                    }
-                                    return next;
-                                });
-                                setOnce((current) => {
-                                    const next = new Map<number, number | null>();
-                                    for (const [at, seconds] of current) {
-                                        if (at < index) next.set(at, seconds);
-                                        else if (at > index) next.set(at - 1, seconds);
-                                    }
-                                    return next;
-                                });
-                            }}
+                            onRemove={() => unstage(index)}
                         />
                     ))}
                     {kept.map((one, index) => (
@@ -1656,7 +1663,16 @@ export function Composer({
             {/* One box: the text and the controls that act on it are the same
                 field, the way every chat client draws it. Buttons in a row
                 underneath read as a form somebody has to fill in and submit. */}
-            <div className="rounded-md border border-border bg-field transition-colors focus-within:border-border-strong">
+            <div
+                className="rounded-md border border-border bg-field transition-colors focus-within:border-border-strong"
+                // The text field taken again: the keyboard comes back in the
+                // panel's place, never on top of it.
+                onFocusCapture={(event) => {
+                    if (attaching && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]")) {
+                        setAttaching(false);
+                    }
+                }}
+            >
                 <AiRewriting active={rewriting} className="px-3 pt-2">
                     <RichTextEditor
                         key={generation}
@@ -1731,7 +1747,19 @@ export function Composer({
                         <button
                             type="button"
                             disabled={disabled}
-                            onClick={() => setAttaching(true)}
+                            onClick={() => {
+                                if (attaching) {
+                                    // Back to the keyboard, the way Discord's "+" turns into one.
+                                    setAttaching(false);
+                                    setFocusWhere("keep");
+                                    setFocusAt((current) => current + 1);
+                                    return;
+                                }
+                                // The keyboard goes down and the panel takes its place.
+                                if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+                                setAttaching(true);
+                            }}
+                            aria-expanded={attaching}
                             aria-label={t("attachSheet.title")}
                             title={t("attachSheet.title")}
                             className="me-1 grid size-8 shrink-0 place-items-center rounded-full bg-muted text-foreground transition-colors active:bg-muted/70 disabled:opacity-50 [-webkit-tap-highlight-color:transparent]"
@@ -1950,6 +1978,29 @@ export function Composer({
                 </div>
             </div>
 
+            {/* In the flow under the box, where the keyboard was. */}
+            {phone && (mayAttach || onPoll || onLocation) && (
+                <AttachSheet
+                    open={attaching}
+                    onOpenChange={setAttaching}
+                    onMedia={mayAttach ? pickMedia : undefined}
+                    onAttach={mayAttach ? (picked) => void stage(picked) : undefined}
+                    onDetach={(file) => unstage(files.indexOf(file))}
+                    attached={files}
+                    onFiles={mayAttach ? () => setPicking(true) : undefined}
+                    maxBytes={maxBytes}
+                    onPoll={
+                        onPoll
+                            ? () => {
+                                  setPollError("");
+                                  setPolling(true);
+                              }
+                            : undefined
+                    }
+                    onLocation={onLocation}
+                />
+            )}
+
 
             {/* Mounted only while it is open, so the dialog reads the clock at
                 the moment it is asked rather than at the moment the composer was
@@ -1991,24 +2042,6 @@ export function Composer({
                 />
             )}
 
-            {phone && (mayAttach || onPoll || onLocation) && (
-                <AttachSheet
-                    open={attaching}
-                    onOpenChange={setAttaching}
-                    onMedia={mayAttach ? pickMedia : undefined}
-                    onFiles={mayAttach ? () => setPicking(true) : undefined}
-                    maxBytes={maxBytes}
-                    onPoll={
-                        onPoll
-                            ? () => {
-                                  setPollError("");
-                                  setPolling(true);
-                              }
-                            : undefined
-                    }
-                    onLocation={onLocation}
-                />
-            )}
 
             {picking && (
                 <FilePickerDialog

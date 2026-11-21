@@ -3,14 +3,16 @@
 /**
  * The "+" sheet inside the Polaris phone app: the recent photos and videos in a
  * grid, the way Discord and Signal show them, read from the gallery by the app.
- * Asked for the first time, every refusal with a way on, several chosen at once,
- * and a browser left with the system chooser.
+ * Asked for the first time, every refusal with a way on, a tap that puts the
+ * photo straight on the message (and a second that takes it off), and a browser
+ * left with the system chooser.
  */
 
+import { useState } from "react";
 import { MessagesWrapper } from "../setup/i18n";
 import { AttachSheet } from "@/app/(app)/chat/attach-sheet";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 type Answer = (op: string, args: Record<string, unknown>) => unknown;
 
@@ -55,6 +57,33 @@ function library(access: string): Answer {
         if (op === "read") return { data: PHOTO, size: 11, done: true, offset: args.offset };
         return { error: "unknown" };
     };
+}
+
+/** The sheet beside a composer's staged files, the way the composer wires it. */
+function Composed({ onAttach }: { onAttach: (files: File[]) => void }) {
+    const [files, setFiles] = useState<File[]>([]);
+    return (
+        <>
+            <ul aria-label="Staged">
+                {files.map((file) => (
+                    <li key={file.name}>{file.name}</li>
+                ))}
+            </ul>
+            <AttachSheet
+                open
+                onOpenChange={() => undefined}
+                onMedia={() => undefined}
+                attached={files}
+                onAttach={(picked) => {
+                    onAttach(picked);
+                    setFiles((current) => [...current, ...picked]);
+                }}
+                onDetach={(file) => setFiles((current) => current.filter((one) => one !== file))}
+                onFiles={() => undefined}
+                maxBytes={100 * 1024 * 1024}
+            />
+        </>
+    );
 }
 
 function sheet(onMedia = vi.fn()) {
@@ -107,18 +136,38 @@ describe("recent photos in the phone app's + sheet", () => {
         expect(screen.getByRole("button", { name: "Poll" })).toBeTruthy();
     });
 
-    it("sends several chosen at once, in the order they were tapped", async () => {
+    it("puts a tapped photo straight on the message, and takes it off on a second tap", async () => {
         phoneApp(library("full"));
-        const onMedia = sheet();
-        fireEvent.click(await screen.findByRole("button", { name: "Video, 0:42" }));
+        const onAttach = vi.fn();
+        render(<Composed onAttach={onAttach} />, { wrapper: MessagesWrapper });
+        const video = await screen.findByRole("button", { name: "Video, 0:42" });
+        fireEvent.click(video);
+        await waitFor(() => expect(video.getAttribute("aria-pressed")).toBe("true"));
         fireEvent.click(screen.getByRole("button", { name: "Photo" }));
-        fireEvent.click(screen.getByRole("button", { name: "Add 2" }));
-        await waitFor(() => expect(onMedia).toHaveBeenCalledTimes(1));
-        const files = onMedia.mock.calls[0]![0] as File[];
+        await waitFor(() => expect(onAttach).toHaveBeenCalledTimes(2));
+        const files = onAttach.mock.calls.map((call) => (call[0] as File[])[0]!);
         expect(files.map((file) => [file.name, file.type, file.size])).toEqual([
             ["b.mp4", "video/mp4", 11],
             ["a.jpg", "image/jpeg", 11]
         ]);
+        expect(screen.getByRole("list", { name: "Staged" }).textContent).toBe("b.mp4a.jpg");
+        // Sent with the composer's own Send: there is no button of the grid's own.
+        expect(screen.queryByRole("button", { name: /^Add/ })).toBeNull();
+        expect(within(video).getByText("1")).toBeTruthy();
+
+        fireEvent.click(video);
+        await waitFor(() => expect(screen.getByRole("list", { name: "Staged" }).textContent).toBe("a.jpg"));
+        expect(video.getAttribute("aria-pressed")).toBe("false");
+        expect(onAttach).toHaveBeenCalledTimes(2);
+    });
+
+    it("opens at the keyboard's height, in the page under the composer", async () => {
+        phoneApp(library("full"));
+        render(<Composed onAttach={() => undefined} />, { wrapper: MessagesWrapper });
+        const panel = screen.getByRole("region", { name: "Add to the message" });
+        expect(panel.closest("[role=dialog]")).toBeNull();
+        expect(Number.parseInt(panel.style.height, 10)).toBeGreaterThan(0);
+        await screen.findByRole("button", { name: "Photo" });
     });
 
     it("will not choose what is too large to send here", async () => {

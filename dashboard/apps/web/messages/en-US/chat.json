@@ -656,7 +656,6 @@
         "empty": "No photos or videos yet.",
         "loadFailed": "Couldn't load your photos.",
         "retry": "Try again",
-        "add": "Add {count}",
         "readFailed": "Couldn't open that photo. Try again.",
         "tooLarge": "Too large",
         "video": "Video, {length}",
