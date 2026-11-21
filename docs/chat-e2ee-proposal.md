@@ -194,6 +194,14 @@ Lo que queda guardado años (envoltorios de `HK` para cuentas y para `ORK`) usa 
 
 Registro de solo añadir de `AK` por usuario, verificable por los clientes (patrón de WhatsApp [57]). Sin él, el servidor puede dar una `AK` falsa a un usuario concreto. Se adelanta respecto a la v1 porque "sin verificación manual" (requisito 1) solo es seguro si el cliente comprueba solo.
 
+**Verificación manual opcional y avisos de cambio de clave** (paridad con WhatsApp, fila 34 del registro de `chat-roadmap.md` sección 6). La transparencia sigue siendo lo que protege por defecto y nadie tiene que hacer nada; esto se añade para quien no quiere confiar solo en ella:
+
+- **Código de seguridad por pareja.** Cada conversación directa muestra, en "Cifrado" de su panel de detalles, un número de 60 cifras (12 grupos de 5) y un QR, derivados de las dos `AK` (huella de cada una, ordenadas por id de cuenta, como el código de seguridad de Signal y WhatsApp). Comparado en persona o escaneado con la otra persona, la pareja queda marcada como **verificada** en los dispositivos de los dos; la marca es local y cifrada con la clave de cuenta, el servidor no sabe quién verificó a quién.
+- **Aviso de cambio de clave.** Cuando la `AK` de un miembro cambia (dispositivo nuevo que rehace la cuenta, recuperación de 3.5), cada cliente añade en la conversación una línea local "La clave de seguridad de X ha cambiado" con enlace al código nuevo. Una pareja verificada pierde la marca y el aviso es más visible; no bloquea el envío salvo que la organización lo pida. Un dispositivo nuevo que no cambia la `AK` (se une con 3.2) no genera aviso, solo la línea de dispositivos de la sección 9.
+- **Grupos.** Un aviso por miembro cuya clave cambia; la verificación sigue siendo por pareja.
+- **Política.** La organización puede forzar los avisos de cambio de clave (no se pueden ocultar) y, para perfiles de alto riesgo, exigir verificación manual antes del primer mensaje a un contacto de fuera de la organización. Por defecto: avisos visibles, verificación opcional.
+- **Coherencia con la transparencia.** Un cambio de clave que el registro de 4.6 no confirma es un fallo de verificación, no un aviso: el cliente no cifra hacia esa clave y lo dice.
+
 ### 4.7 Confianza en el código web
 
 En la web, el servidor entrega el código que guarda las claves. Medidas:
