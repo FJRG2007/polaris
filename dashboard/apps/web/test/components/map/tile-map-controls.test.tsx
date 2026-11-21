@@ -41,15 +41,31 @@ describe("the street map", () => {
         expect(screen.getByText(/CC BY 4.0/)).toBeTruthy();
     });
 
-    it("draws satellite tiles through Polaris, and stops at the zoom they still resolve", () => {
+    it("draws satellite tiles through Polaris at the zoom asked for", () => {
         const { container } = render(<TileMap points={[MADRID]} zoom={17} style="satellite" />, {
             wrapper: MessagesWrapper
         });
         const sources = [...container.querySelectorAll("img")].map((img) => img.getAttribute("src") ?? "");
         expect(sources.length).toBeGreaterThan(0);
-        expect(sources.every((src) => src.startsWith("/api/chat/location/tile/15/") && src.endsWith("?layer=imagery"))).toBe(
-            true
-        );
+        expect(
+            sources.every((src) => src.startsWith("/api/chat/location/tile/17/") && src.endsWith("?layer=imagery&v=default"))
+        ).toBe(true);
+    });
+
+    it("zooms past the imagery's deepest level by stretching it, never stopping short", () => {
+        const { container } = render(<TileMap points={[MADRID]} zoom={21} style="hybrid" zoomButtons />, {
+            wrapper: MessagesWrapper
+        });
+        const images = [...container.querySelectorAll("img")];
+        const imagery = images.filter((img) => img.getAttribute("src")?.includes("layer=imagery"));
+        const labels = images.filter((img) => img.getAttribute("src")?.endsWith("?layer=labels"));
+        // The default draws to 18 and its labels to 14; zoom 21 stretches both.
+        expect(imagery.every((img) => img.getAttribute("src")?.startsWith("/api/chat/location/tile/18/"))).toBe(true);
+        expect(imagery[0]?.getAttribute("width")).toBe(String(256 * 2 ** 3));
+        expect(labels.length).toBeGreaterThan(0);
+        expect(labels.every((img) => img.getAttribute("src")?.startsWith("/api/chat/location/tile/14/"))).toBe(true);
+        expect(screen.getByRole("button", { name: "Zoom in" }).hasAttribute("disabled")).toBe(true);
+        expect(screen.getByRole("button", { name: "Zoom out" }).hasAttribute("disabled")).toBe(false);
     });
 
     it("lays the labels over the imagery on a hybrid map, stretched past their last zoom", () => {

@@ -7,7 +7,9 @@
  *
  * No map library. The tiles come through Polaris (`/api/chat/location/tile`), so
  * the reader's address never reaches the tile service. `style` picks streets,
- * satellite or both (`lib/map-layers.ts`); every source is free and keyless.
+ * satellite or both (`lib/map-layers.ts`); the satellite imagery is whichever
+ * provider the administrator chose (`useImagery`), drawn as deep as it goes and
+ * stretched past that, so the zoom never stops short.
  *
  * The credit is the way Apple Maps gives it: a small, quiet "Legal" in the
  * bottom-left corner that opens the full lines on a press. It is never removed -
@@ -21,11 +23,12 @@ import { cn } from "@polaris/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Minus, Plus } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { TILE_SOURCES, maxZoomOf, sourcesOf, tilePath, type MapStyle } from "@/lib/map-layers";
+import { MAP_MAX_ZOOM, TILE_SOURCES, maxZoomOf, sourcesOf, tilePath, type MapStyle } from "@/lib/map-layers";
+import { useImagery } from "@/components/map/use-imagery";
 
 const TILE = 256;
 const MIN_ZOOM = 3;
-const MAX_ZOOM = 19;
+const MAX_ZOOM = MAP_MAX_ZOOM;
 /** The widest the map is ever drawn; tiles are laid to cover this much. */
 const MAX_WIDTH = 1024;
 
@@ -109,6 +112,7 @@ export function TileMap({
     // Tiles are laid to cover this much height; a fluid map covers a tall phone.
     const tall = typeof height === "number" ? height : MAX_WIDTH;
     const maxZoom = Math.min(MAX_ZOOM, maxZoomOf(style));
+    const imagery = useImagery(style !== "map");
     const [zoom, setZoom] = useState(() => Math.min(maxZoom, startZoom ?? fittingZoom(points, 320, tall)));
     // How far the map was dragged from its points, in pixels at the current zoom.
     const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -194,7 +198,8 @@ export function TileMap({
         const tiles: { key: string; src: string; left: number; top: number; size: number }[] = [];
         for (const source of sourcesOf(style)) {
             // Past the deepest zoom a source draws, its last tiles are stretched.
-            const z = Math.min(zoom, TILE_SOURCES[source].nativeMaxZoom);
+            const deepest = source === "imagery" ? imagery.nativeMaxZoom : TILE_SOURCES[source].nativeMaxZoom;
+            const z = Math.min(zoom, deepest);
             const size = TILE * 2 ** (zoom - z);
             const count = 2 ** z;
             const across = Math.ceil(MAX_WIDTH / 2 / size) + 1;
@@ -207,8 +212,8 @@ export function TileMap({
                     if (ty < 0 || ty >= count) continue;
                     const tx = (((cx + dx) % count) + count) % count;
                     tiles.push({
-                        key: `${source}/${z}/${cx + dx}/${ty}`,
-                        src: tilePath(source, z, tx, ty),
+                        key: `${source}/${source === "imagery" ? imagery.version : ""}/${z}/${cx + dx}/${ty}`,
+                        src: tilePath(source, z, tx, ty, source === "imagery" ? imagery.version : undefined),
                         left: (cx + dx) * size - center.x,
                         top: ty * size - center.y,
                         size
@@ -222,8 +227,10 @@ export function TileMap({
             return { point, left: pixel.x - center.x, top: pixel.y - center.y, radius };
         });
         return { tiles, pins };
-    }, [points, zoom, tall, pan, style]);
-    const credits = sourcesOf(style).map((source) => TILE_SOURCES[source].credit);
+    }, [points, zoom, tall, pan, style, imagery]);
+    const credits = sourcesOf(style).flatMap((source) =>
+        source === "imagery" ? imagery.credits : [TILE_SOURCES[source].credit]
+    );
 
     if (!view) return null;
     return (
@@ -356,9 +363,9 @@ export function TileMap({
             <div data-map-credits className={cn("absolute bottom-1 start-1.5 z-10", creditClassName)}>
                 {credit ? (
                     <div className="absolute bottom-full left-0 mb-1 flex w-max max-w-[min(20rem,calc(100vw-2rem))] flex-col gap-1 rounded-md bg-background/95 p-2 text-[11px] leading-snug text-foreground shadow-lg">
-                        {credits.map((line) => (
+                        {credits.map((line, index) => (
                             <a
-                                key={line.href}
+                                key={`${index}/${line.href}`}
                                 href={line.href}
                                 target="_blank"
                                 rel="noreferrer noopener"
