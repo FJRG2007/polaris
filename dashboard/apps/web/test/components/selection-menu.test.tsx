@@ -4,7 +4,7 @@
  * The right-click menu for selected text.
  *
  * Pinned here: it only takes over when the click is on a selection, it leaves
- * a click some screen already answered alone, Shift keeps the browser's menu,
+ * a click some screen already answered alone, the browser's menu never opens,
  * "Ask Polar" hands the selection over as the quote and is not there for an
  * account Polar is not for, and the screens' own menus gain the same options.
  */
@@ -86,7 +86,7 @@ describe("selection menu", () => {
         expect(screen.queryByRole("menu")).toBeNull();
     });
 
-    it("keeps the browser's menu where it does a job: a field, a picture, a video", () => {
+    it("never keeps the browser's menu: not on a field, a picture or a video", () => {
         page(
             <>
                 <img data-testid="picture" alt="" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" />
@@ -96,10 +96,10 @@ describe("selection menu", () => {
                 </div>
             </>
         );
-        expect(rightClick(screen.getByTestId("field"))).toBe(true);
-        expect(rightClick(screen.getByTestId("picture"))).toBe(true);
-        expect(rightClick(screen.getByTestId("clip"))).toBe(true);
-        expect(rightClick(screen.getByTestId("inside"))).toBe(true);
+        expect(rightClick(screen.getByTestId("field"))).toBe(false);
+        expect(rightClick(screen.getByTestId("picture"))).toBe(false);
+        expect(rightClick(screen.getByTestId("clip"))).toBe(false);
+        expect(rightClick(screen.getByTestId("inside"))).toBe(false);
     });
 
     it("opens on selected text, with Ask Polar passing the selection as the quote", () => {
@@ -177,7 +177,9 @@ describe("selection menu", () => {
         page();
         const field = screen.getByTestId("field") as HTMLInputElement;
         field.setSelectionRange(0, 0);
-        expect(rightClick(field)).toBe(true);
+        // The field's own menu answers that one (the root fallback), not this.
+        expect(rightClick(field)).toBe(false);
+        expect(screen.queryByRole("menuitem", { name: /Ask Polar/ })).toBeNull();
         field.setSelectionRange(0, 5);
         expect(rightClick(field)).toBe(false);
         expect(screen.getByRole("menuitem", { name: /Paste/ })).toBeTruthy();
@@ -303,9 +305,10 @@ describe("a link", () => {
         ).toBe("ana@example.com");
     });
 
-    it("leaves a script link to the browser, and takes Shift+right-click on a link", () => {
+    it("offers nothing for a script link, never the browser's menu, and takes Shift+right-click on a link", () => {
         linkPage();
-        expect(rightClick(screen.getByTestId("js"))).toBe(true);
+        expect(rightClick(screen.getByTestId("js"))).toBe(false);
+        expect(screen.queryByRole("menu")).toBeNull();
         expect(rightClick(screen.getByTestId("out"), { shiftKey: true })).toBe(false);
     });
 

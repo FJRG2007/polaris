@@ -258,6 +258,10 @@ export interface PolarisDesktop {
      *  untouched, `locked` behind the lock screen. Absent from an older app,
      *  which then never says it is away. */
     systemIdle?(): Promise<"active" | "idle" | "locked" | "unknown">;
+    /** What Polaris's own right-click menu asks of the app: the spelling
+     *  checker, the clipboard and the picture under the pointer. Absent on an
+     *  app older than it; every answer is a value, never a thrown error. */
+    readonly editing?: DesktopEditing;
     /** Hear this window minimized or sent to the tray (false) and brought back
      *  (true). Absent from an older app, whose page falls back to the window's
      *  focus to tell (`lib/idle.ts`). */
@@ -340,6 +344,17 @@ export type DesktopUpdateCheck = z.infer<typeof updateCheckSchema>;
 export function readDesktopUpdateCheck(raw: unknown): DesktopUpdateCheck {
     const parsed = updateCheckSchema.safeParse(raw);
     return parsed.success ? parsed.data : { kind: "failed" };
+}
+
+/** The desktop app's editing help (its `EditingBridge`). */
+export interface DesktopEditing {
+    spelling(word: string): { readonly misspelled: boolean; readonly suggestions: readonly string[] };
+    addToDictionary(word: string): Promise<boolean>;
+    readClipboard(): Promise<string | null>;
+    writeClipboard(text: string): Promise<boolean>;
+    /** The picture at a point of the page, in CSS pixels. */
+    copyImageAt(x: number, y: number): Promise<boolean>;
+    saveImage(url: string): Promise<boolean>;
 }
 
 /** An update of the desktop app that waits for a restart. */

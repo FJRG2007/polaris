@@ -217,6 +217,20 @@
         "copyAddress": "Copiar dirección",
         "askPolarLink": "Preguntar a Polar"
     },
+    "contextMenu": {
+        "undo": "Deshacer",
+        "redo": "Rehacer",
+        "pastePlain": "Pegar como texto sin formato",
+        "noSuggestions": "Sin sugerencias ortográficas",
+        "addToDictionary": "Añadir al diccionario",
+        "openImage": "Abrir imagen",
+        "copyImage": "Copiar imagen",
+        "saveImage": "Guardar imagen",
+        "copyImageAddress": "Copiar dirección de la imagen",
+        "imageCopied": "Imagen copiada",
+        "imageCopyFailed": "No se pudo copiar la imagen. Guárdala en su lugar.",
+        "imageSaveFailed": "No se pudo guardar la imagen. Ábrela y guárdala desde ahí."
+    },
     "permissionSections": {
         "search": "Buscar permisos",
         "expandAll": "Abrir todo",

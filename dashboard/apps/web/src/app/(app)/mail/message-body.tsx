@@ -357,13 +357,21 @@ export function frameDocument(
       var selection = window.getSelection();
       var text = selection ? String(selection) : "";
       var x = event.clientX, y = event.clientY;
+      // Never the browser's own menu over a message: Polaris's, or nothing.
+      event.preventDefault();
       if (!text.trim()) {
-        // A link with nothing selected: Polaris's link menu, as on any page.
-        // Only its address travels, and the page checks that too.
+        // A link or a picture with nothing selected: Polaris's menu for it, as
+        // on any page. Only the addresses travel, and the page checks them too.
         var anchor = event.target && event.target.closest ? event.target.closest("a[href]") : null;
-        if (!anchor || !/^(https?:|mailto:)/i.test(anchor.href)) return;
-        event.preventDefault();
-        parent.postMessage({ polarisMailMenu: { x: x, y: y, href: anchor.href } }, "*");
+        var href = anchor && /^(https?:|mailto:)/i.test(anchor.href) ? anchor.href : "";
+        var picture = event.target && event.target.closest ? event.target.closest("img") : null;
+        var image = picture ? (picture.currentSrc || picture.src || "") : "";
+        if (!/^https?:/i.test(image)) image = "";
+        if (!href && !image) return;
+        var said = { x: x, y: y };
+        if (href) said.href = href;
+        if (image) said.image = image;
+        parent.postMessage({ polarisMailMenu: said }, "*");
         return;
       }
       if (text.length > ${selectionMenu.FRAMED_SELECTION_MAX}) return;
@@ -548,6 +556,13 @@ export function SandboxedHtml({
                 const box = frame.current.getBoundingClientRect();
                 const found = selectionMenu.framedSelection(menu, box);
                 if (found) selectionMenu.openFramedSelection(found);
+                const media = found
+                    ? null
+                    : selectionMenu.framedMedia(menu, box, window.location.origin);
+                if (media) {
+                    selectionMenu.openFramedMedia(media);
+                    return;
+                }
                 const link = found
                     ? null
                     : selectionMenu.framedLink(menu, box, window.location.origin);

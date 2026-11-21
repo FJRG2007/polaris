@@ -10,17 +10,16 @@
  *   A right-click somewhere else, with an old selection left on the page, is
  *   not a question about that text.
  * - Inside a field (an input, a textarea, an editor), only when text in that
- *   field is selected. With nothing selected the browser's own menu stays: it is
- *   the one that offers spelling corrections and the keyboard's own input
- *   methods, which no page can reproduce.
- * - Never where a surface has said it keeps the browser's menu
- *   (`data-native-context-menu`), and never inside an open menu.
+ *   field is selected. With nothing selected the field's own menu answers
+ *   (`components/context-menu-fallback.tsx`).
+ * - Never inside an open menu. No surface keeps the browser's menu: every
+ *   right-click gets one of Polaris's (`lib/context-menu/target.ts`).
  */
 
 /** Where an editable field starts: the browser's own and the rich editors'. */
 const EDITABLE = "input, textarea, [contenteditable]:not([contenteditable='false'])";
-/** Surfaces that keep the browser's menu, and menus already on screen. */
-const NATIVE = "[data-native-context-menu], [data-radix-menu-content]";
+/** Menus already on screen. */
+const NATIVE = "[data-radix-menu-content]";
 
 export type EditableField = HTMLInputElement | HTMLTextAreaElement | HTMLElement;
 
@@ -252,4 +251,47 @@ export function openFramedSelection(found: FramedSelection): void {
     window.dispatchEvent(
         new CustomEvent<FramedSelection>(FRAMED_SELECTION_EVENT, { detail: found })
     );
+}
+
+/** A right-click on a picture inside a sandboxed frame (a received email). */
+export const FRAMED_MEDIA_EVENT = "polaris:framed-media";
+
+export interface FramedMedia {
+    readonly x: number;
+    readonly y: number;
+    /** The picture's address on the web. */
+    readonly src: string;
+    /** The link around it, when there is one. */
+    readonly link: FramedLink | null;
+}
+
+/**
+ * What a frame posted, read as a picture at a point on this page, or null. Only
+ * an address on the web is taken: a frame's inline or blob picture means
+ * nothing outside it.
+ */
+export function framedMedia(
+    claimed: unknown,
+    offset: { readonly left: number; readonly top: number },
+    pageOrigin: string
+): FramedMedia | null {
+    if (!claimed || typeof claimed !== "object") return null;
+    const { x, y, image, href } = claimed as { x?: unknown; y?: unknown; image?: unknown; href?: unknown };
+    if (typeof x !== "number" || typeof y !== "number") return null;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    if (typeof image !== "string" || image.length > FRAMED_SELECTION_MAX) return null;
+    let url: URL;
+    try {
+        url = new URL(image);
+    } catch {
+        return null;
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    const link = href ? framedLink(claimed, offset, pageOrigin) : null;
+    return { x: offset.left + x, y: offset.top + y, src: url.href, link };
+}
+
+/** Open Polaris's picture menu for a picture inside a frame. */
+export function openFramedMedia(found: FramedMedia): void {
+    window.dispatchEvent(new CustomEvent<FramedMedia>(FRAMED_MEDIA_EVENT, { detail: found }));
 }

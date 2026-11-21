@@ -217,6 +217,20 @@
         "copyAddress": "Copy email address",
         "askPolarLink": "Ask Polar about it"
     },
+    "contextMenu": {
+        "undo": "Undo",
+        "redo": "Redo",
+        "pastePlain": "Paste as plain text",
+        "noSuggestions": "No spelling suggestions",
+        "addToDictionary": "Add to dictionary",
+        "openImage": "Open image",
+        "copyImage": "Copy image",
+        "saveImage": "Save image",
+        "copyImageAddress": "Copy image address",
+        "imageCopied": "Image copied",
+        "imageCopyFailed": "Couldn't copy the image. Save it instead.",
+        "imageSaveFailed": "Couldn't save the image. Open it and save it from there."
+    },
     "permissionSections": {
         "search": "Search permissions",
         "expandAll": "Expand all",

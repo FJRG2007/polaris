@@ -41,6 +41,8 @@ import {
 } from "@polaris/ui";
 import { openSearch } from "@/lib/search/open-search";
 import * as selectionMenu from "@/lib/selection-menu";
+import * as contextMenu from "@/lib/context-menu/target";
+import { canEdit, copyText, deleteSelection, insertText, isTextField } from "@/lib/context-menu/editing";
 import { usePolar } from "@/components/polar/polar-panel";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TextTranslationOffer } from "@/lib/app-extensions/types";
@@ -60,10 +62,6 @@ interface OpenMenu {
     readonly fieldRange: readonly [number, number] | null;
     /** What was selected anywhere else, likewise. */
     readonly range: Range | null;
-}
-
-function isTextField(field: Element | null): field is HTMLInputElement | HTMLTextAreaElement {
-    return !!field && (field.tagName === "INPUT" || field.tagName === "TEXTAREA");
 }
 
 /** Whether this browser will let the page read the clipboard: granted, or it
@@ -100,47 +98,6 @@ function restore(menu: OpenMenu): void {
         const selection = document.getSelection();
         selection?.removeAllRanges();
         selection?.addRange(menu.range);
-    }
-}
-
-async function copyText(text: string): Promise<boolean> {
-    try {
-        await navigator.clipboard.writeText(text);
-        return true;
-    } catch {
-        // A page without the permission still has the selection itself.
-        try {
-            return document.execCommand("copy");
-        } catch {
-            return false;
-        }
-    }
-}
-
-/** Whether the text can be changed where it was selected: a field that is not
- *  read-only or disabled, or a rich editor. Text on the page cannot. */
-function canEdit(field: Element | null): boolean {
-    if (!field) return false;
-    if (isTextField(field)) return !field.readOnly && !field.disabled;
-    return (field as HTMLElement).isContentEditable;
-}
-
-/** Takes the selection out of the field the way the keyboard would, so the
- *  field's own undo and change handling see it. */
-function deleteSelection(field: Element): void {
-    if (document.execCommand("delete")) return;
-    if (isTextField(field)) {
-        field.setRangeText("", field.selectionStart ?? 0, field.selectionEnd ?? 0, "end");
-        field.dispatchEvent(new Event("input", { bubbles: true }));
-    }
-}
-
-/** Typed into the field, so its own undo and change handling see it. */
-function insertText(field: Element, text: string): void {
-    if (document.execCommand("insertText", false, text)) return;
-    if (isTextField(field)) {
-        field.setRangeText(text, field.selectionStart ?? 0, field.selectionEnd ?? 0, "end");
-        field.dispatchEvent(new Event("input", { bubbles: true }));
     }
 }
 
@@ -205,38 +162,27 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
         // knows what was selected at the instant of the click.
         const record = (event: MouseEvent) =>
             selectionMenu.recordContextMenu(selectionMenu.selectionAt(event.target, document));
-        const onContextMenu = (event: MouseEvent) => {
-            // Something on the page already answered it with a menu of its own.
-            if (event.defaultPrevented) return;
+        // Selected text and links, before the root fallback (`lib/context-menu`):
+        // this one knows Search, Translate and Polar. A single misspelled word
+        // selected in a field is the fallback's, which has the suggestions.
+        const onContextMenu: contextMenu.ContextLayer = (event, target) => {
             const keyboard = selectionMenu.fromKeyboard(event);
-            const found = selectionMenu.selectionAt(event.target, document);
-            if (!found) {
-                // A link, with nothing selected on it: Polaris's own menu for it,
-                // so opening it the way this app opens things and asking Polar
-                // about it are one press away. From the keyboard the menu sits
-                // under the link.
-                const linked = selectionMenu.linkAt(event.target, document);
-                if (!linked) {
-                    // Empty space, a card, an icon: the browser's menu there is
-                    // Back, Reload and Inspect, which belong to the browser and
-                    // not to this app. It stays only where it does a job Polaris
-                    // has no menu for: a field (paste, spelling), a picture or a
-                    // video (save, copy), and a link this menu will not take.
-                    if (!keepsBrowserMenu(event.target)) event.preventDefault();
-                    return;
-                }
-                event.preventDefault();
+            if (target.kind === "link") {
+                // A link, with nothing selected on it: opening it the way this
+                // app opens things and asking Polar about it are one press away.
+                // From the keyboard the menu sits under the link.
                 const box = keyboard
                     ? (event.target as Element).closest("a")?.getBoundingClientRect()
                     : null;
                 setLink({
-                    ...linked,
+                    ...target.link,
                     x: box ? box.left : event.clientX,
                     y: box ? box.bottom : event.clientY
                 });
-                return;
+                return true;
             }
-            event.preventDefault();
+            if (target.kind !== "selection") return false;
+            const found = target.found;
             const point = keyboard
                 ? selectionMenu.selectionPoint(found, document)
                 : { x: event.clientX, y: event.clientY };
@@ -253,6 +199,7 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
                         ? selection.getRangeAt(0).cloneRange()
                         : null
             });
+            return true;
         };
         // Text selected inside a sandboxed frame (a received email): the frame's
         // own owner already checked the sender and moved the point onto this page.
@@ -264,15 +211,20 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
         const onFramedLink = (event: Event) =>
             setLink((event as CustomEvent<selectionMenu.FramedLink>).detail);
         window.addEventListener("contextmenu", record, true);
-        window.addEventListener("contextmenu", onContextMenu);
+        const removeLayer = contextMenu.addContextLayer(10, onContextMenu);
         window.addEventListener(selectionMenu.FRAMED_SELECTION_EVENT, onFramed);
         window.addEventListener(selectionMenu.FRAMED_LINK_EVENT, onFramedLink);
         return () => {
             window.removeEventListener("contextmenu", record, true);
-            window.removeEventListener("contextmenu", onContextMenu);
+            removeLayer();
             window.removeEventListener(selectionMenu.FRAMED_SELECTION_EVENT, onFramed);
             window.removeEventListener(selectionMenu.FRAMED_LINK_EVENT, onFramedLink);
         };
+    }, []);
+
+    useEffect(() => {
+        contextMenu.setContextMenuNotice((title) => live.current.toast.show({ title }));
+        return () => contextMenu.setContextMenuNotice(null);
     }, []);
 
     const copy = useCallback(async (text: string) => {
@@ -489,10 +441,4 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
             <SelectionTranslation selection={translating} onClose={() => setTranslating(null)} />
         </MenuExtrasProvider>
     );
-}
-
-/** Where the browser's own right-click menu still does a job Polaris does not. */
-function keepsBrowserMenu(target: EventTarget | null): boolean {
-    if (!(target instanceof Element)) return true;
-    return target.closest("input, textarea, select, [contenteditable]:not([contenteditable='false']), img, video, audio, a[href]") !== null;
 }

@@ -6,6 +6,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { FONT_CLASSES } from "./fonts";
 import { IdleWatch } from "@/components/idle-watch";
 import { DropGuard } from "@/components/drop-guard";
+import { ContextMenuFallback } from "@/components/context-menu-fallback";
 import { localeDirection, themeClass } from "@polaris/core";
 import { resolveSession } from "@/lib/session";
 import { CHUNK_RECOVERY_SCRIPT } from "@/lib/stale-build";
@@ -110,6 +111,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 >
                     <LocaleSync locale={locale} signedIn={session !== null} />
                     <DropGuard />
+                    <ContextMenuFallback />
                     <IdleWatch />
                     <ConnectionBanner />
                     {children}
