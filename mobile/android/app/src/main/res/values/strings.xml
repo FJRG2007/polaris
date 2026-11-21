@@ -27,7 +27,7 @@
     <string name="update_install_message">It is downloaded and checked. Polaris closes to install it; open it again after.</string>
     <string name="update_install">Install</string>
     <string name="update_downloading">Downloading Polaris %1$s...</string>
-    <string name="update_download_failed">The download didn't go through. Try again later.</string>
+    <string name="update_download_failed">The download didn\'t go through. Try again later.</string>
     <string name="update_ready">Polaris %1$s installs when you leave the app.</string>
     <string name="view_once_audio">Playing audio</string>
     <string name="view_once_close">Close</string>
