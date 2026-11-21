@@ -12,6 +12,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { calendarChanged } from "./live";
 import type { CalendarItem } from "../engine";
 import type { WriteContext } from "./objects";
 
@@ -32,6 +33,9 @@ export async function afterObjectChange(change: ObjectChange): Promise<void> {
         select: { id: true, kind: true, sourceId: true, ownerId: true, alarmsMuted: true }
     });
     if (!calendar) return;
+    // First, before the slower effects: every open screen that shows this
+    // calendar reads again, whichever client made the change.
+    calendarChanged({ calendarId: calendar.id, ownerId: calendar.ownerId });
 
     const reminders = await import("./reminders");
     await reminders

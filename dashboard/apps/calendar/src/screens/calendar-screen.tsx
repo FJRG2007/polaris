@@ -56,6 +56,7 @@ import { useCalendarT } from "./i18n";
 import * as model from "./editor-model";
 import { calendarSlots } from "./slots";
 import { MiniMonth } from "./mini-month";
+import { holdWakeStream } from "./live-stream";
 import { useSwipeStep } from "./swipe-step";
 import { ViewPicker } from "./view-picker";
 import type { PartStat } from "../engine";
@@ -97,6 +98,11 @@ const GridView = lazy(() => import("./grid-view"));
 
 /** How often the window on screen is read again while the tab is in view. */
 const REFRESH_MS = 120_000;
+
+/** Where the server says an event in a calendar this reader sees changed, and
+ *  the window event a frame raises. */
+const EVENTS_STREAM_PATH = "/api/calendar/events/stream";
+const EVENTS_CHANGED = "polaris:calendar-events-changed";
 
 /** A press that opens the menu also ends a long-press selection; a selection
  *  reported this soon after the menu opened is that one, not a new one. */
@@ -365,6 +371,18 @@ export function CalendarScreen({ path }: { path: string[] }) {
         dropCached("range");
         refreshRange();
     }, [refreshRange]);
+
+    // An event changed anywhere else - an assistant's calendar tool, an
+    // invitation answered, a Stream Deck key, another tab or device - is pushed
+    // by the server, and the window on screen reads again within a moment.
+    useEffect(() => {
+        window.addEventListener(EVENTS_CHANGED, eventsChanged);
+        const release = holdWakeStream(EVENTS_STREAM_PATH, EVENTS_CHANGED);
+        return () => {
+            window.removeEventListener(EVENTS_CHANGED, eventsChanged);
+            release();
+        };
+    }, [eventsChanged]);
 
     // Linked accounts are pulled while the calendar is in view (see
     // `refreshOpenSources`) - on opening it, every minute, and on coming back

@@ -18,6 +18,7 @@
 import { hostUi } from "@polaris/app-host/client";
 import { CLOCK_CHANNEL, CLOCK_CHANGED_EVENT, CLOCK_SNAPSHOT_KEY } from "@polaris/core";
 import type { ClockSnapshot } from "../../lib/clock/model";
+import { holdWakeStream } from "../live-stream";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /** Raised on the window when this tab changed something, or heard another did. */
@@ -73,78 +74,14 @@ export function announceChange(): void {
  *  an assistant, another device. */
 export const CLOCK_STREAM_PATH = "/api/calendar/time/stream";
 
-interface LiveHold {
-    users: number;
-    source: EventSource | null;
-    onVisibility: (() => void) | null;
-}
-
-/** On the window rather than in module state, so every copy of this module in
- *  the bundle shares one connection per tab. */
-const LIVE = Symbol.for("polaris.calendar.clock.stream");
-
-function liveHold(): LiveHold {
-    const holder = window as unknown as { [LIVE]?: LiveHold };
-    holder[LIVE] ??= { users: 0, source: null, onVisibility: null };
-    return holder[LIVE];
-}
-
 /**
  * Hold the tab's one stream of "your clock changed" open while anything here
  * shows the clock and the tab is in view. A frame - and every reconnect, which
  * may have missed one - raises the same window event a change in this tab
- * does, so every screen reads again. A hidden tab lets its connection go (the
- * browser has only a few per server to share between every tab) and reads once
- * when it is looked at again. Answers the release.
+ * does, so every screen reads again. Answers the release.
  */
 export function holdClockStream(): () => void {
-    if (typeof window === "undefined" || typeof EventSource === "undefined") return () => {};
-    const hold = liveHold();
-    const wake = () => window.dispatchEvent(new CustomEvent(CLOCK_CHANGED));
-    const open = () => {
-        if (hold.source || document.visibilityState === "hidden") return;
-        const source = new EventSource(CLOCK_STREAM_PATH);
-        let opened = false;
-        source.onopen = () => {
-            // The first open is the read the screen already made; a later one is
-            // a reconnect after a gap.
-            if (opened) wake();
-            opened = true;
-        };
-        source.onmessage = wake;
-        source.onerror = () => {
-            // Closed for good (refused, signed out): stop rather than retry. A
-            // dropped connection is retried by the browser on its own.
-            if (source.readyState === EventSource.CLOSED && hold.source === source)
-                hold.source = null;
-        };
-        hold.source = source;
-    };
-    const close = () => {
-        hold.source?.close();
-        hold.source = null;
-    };
-    hold.users += 1;
-    if (hold.users === 1) {
-        hold.onVisibility = () => {
-            if (document.visibilityState === "hidden") return close();
-            if (hold.source) return;
-            open();
-            wake();
-        };
-        document.addEventListener("visibilitychange", hold.onVisibility);
-        open();
-    }
-    let released = false;
-    return () => {
-        if (released) return;
-        released = true;
-        hold.users -= 1;
-        if (hold.users > 0) return;
-        if (hold.onVisibility) document.removeEventListener("visibilitychange", hold.onVisibility);
-        hold.onVisibility = null;
-        close();
-    };
+    return holdWakeStream(CLOCK_STREAM_PATH, CLOCK_CHANGED);
 }
 
 export interface ClockRead {
