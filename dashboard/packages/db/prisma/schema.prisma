@@ -11215,6 +11215,7 @@ model ChatReport {
     @@unique([messageId, reporterId])
     @@index([status, createdAt])
     @@index([channelId])
+    @@index([authorId, createdAt])
 }
 
 // Something about an account that an administrator has to look at.
