@@ -27,6 +27,7 @@
 
 import { dropAllSnapshots } from "@/lib/snapshot-cache";
 import { dropMailCache } from "@/lib/mailbox/mail-cache";
+import { dropChatStore } from "@/lib/chat/offline/chat-cache";
 import { MENU_KEY as APP_MENU_KEY, STORE_KEY as APP_USAGE_KEY } from "@/lib/app-usage";
 import { pauseAutomaticPasskey } from "@/lib/local-passkeys";
 import { adoptLegacyPlaces, forgetPlaces, PREFIX as LAST_PLACE_PREFIX } from "@/lib/last-place";
@@ -60,6 +61,7 @@ export async function forgetAccountTraces(): Promise<void> {
         // Storage refused (a private window, a blocked site): nothing was kept.
     }
     await dropMailCache().catch(() => undefined);
+    await dropChatStore().catch(() => undefined);
 }
 
 const ACCOUNT_KEYS: ReadonlySet<string> = new Set([

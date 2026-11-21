@@ -124,6 +124,7 @@ import { placed } from "./ring-back";
 import { fetchLiveCall } from "./chat-polls";
 import { usePolarContext } from "@/components/polar/polar-panel";
 import * as polls from "./chat-reads";
+import * as chatCache from "@/lib/chat/offline/chat-cache";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -422,6 +423,9 @@ export function ChannelView({
     // of, which id to ask from next - and a state value read inside an awaited
     // function is the one from before the await.
     const held = useRef<readonly ChatMessageView[]>([]);
+    /** The conversation whose window came from the server rather than from
+     *  what this device kept, so a late read of the copy never covers it. */
+    const freshFor = useRef<string | null>(null);
     // Set just before a page is added to the window or let go of, so the layout
     // effect below can put the reader back on the line they were reading:
     // prepending changes the height of everything above them, and without this
@@ -538,6 +542,7 @@ export function ChannelView({
     // different conversation and none of the previous state belongs to it.
     useEffect(() => {
         setMessages(null);
+        freshFor.current = null;
         setPending([]);
         setThread(null);
         setEditing(null);
@@ -620,6 +625,7 @@ export function ChannelView({
         // it: the gate asks for the code instead of showing a refusal.
         if (result.error && result.channel?.locked) {
             forgetUnlockProof(channelId);
+            chatCache.forgetCachedMessages(channelId);
             setNeedsCode(true);
             show([]);
             return;
@@ -631,6 +637,7 @@ export function ChannelView({
             return;
         }
         const page = result.page?.messages ?? [];
+        freshFor.current = channelId;
         following.current = true;
         settling.current = Date.now() + SETTLE_MS;
         setUnseen(0);
@@ -642,9 +649,35 @@ export function ChannelView({
         settle(page);
     }, [channelId, settle, show]);
 
+    // What this device kept of the conversation, drawn while the server is
+    // asked - and all there is to read when there is no network. Never for one
+    // behind the chat lock: those are not kept, and one locked since is dropped.
+    const lockedRef = useRef<boolean | null>(null);
+    lockedRef.current = channel ? channel.locked : null;
+    useEffect(() => {
+        let cancelled = false;
+        void chatCache.readCachedMessages(channelId).then((kept) => {
+            if (cancelled || !kept || kept.length === 0) return;
+            if (freshFor.current === channelId || lockedRef.current === true) return;
+            show(kept);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [channelId, show]);
+
     useEffect(() => {
         void load();
     }, [load]);
+
+    // The newest window, kept as it changes - a load or a message the stream
+    // brought - but only the live end of a conversation the server answered,
+    // and never one behind the lock.
+    useEffect(() => {
+        if (!messages || freshFor.current !== channelId) return;
+        if (newerThanRef.current !== null || lockedRef.current !== false) return;
+        chatCache.writeCachedMessages(channelId, messages);
+    }, [messages, channelId]);
 
     // Locked while it is open - from the row's menu here, or in another tab and
     // brought in by the list - and this tab was never handed the code for it:
@@ -653,6 +686,7 @@ export function ChannelView({
     // while the gate is up opens it again.
     const lockedNow = channel ? channel.locked : null;
     useEffect(() => {
+        if (lockedNow === true) chatCache.forgetCachedMessages(channelId);
         if (lockedNow === true && !needsCode && !unlockProofFor(channelId)) {
             setNeedsCode(true);
             setThread(null);

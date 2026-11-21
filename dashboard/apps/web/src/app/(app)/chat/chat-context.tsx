@@ -17,6 +17,7 @@
 
 import type { ChatLists } from "@/lib/chat/chat-lists";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
+import { chatStore } from "@/lib/chat/offline/chat-cache";
 import * as core from "@polaris/core";
 import { listChannelsAction } from "./actions";
 import type { ChatCategoryView, ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
@@ -228,10 +229,14 @@ export function ChatProvider({
     const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
 
     const keptLists = useRef<KeptLists | null>(null);
+    /** The server has answered, so a late read of the device's copy is moot. */
+    const answered = useRef(false);
     const keepLists = useCallback(
         (lists: KeptLists) => {
             keptLists.current = lists;
+            answered.current = true;
             writeSnapshot(keptListsKey(viewerId), lists);
+            void chatStore.write("lists", "lists", lists);
         },
         [viewerId]
     );
@@ -343,11 +348,25 @@ export function ChatProvider({
         const lists =
             readSnapshot<KeptLists>(keptListsKey(viewerId), KEPT_LISTS_MAX_AGE_MS)?.value ?? null;
         keptLists.current = lists;
-        if (!lists) return;
-        setChannels(lists.channels);
-        setSpaces(lists.spaces);
-        setCategories(lists.categories);
-        setKept(true);
+        chatStore.setOwner(viewerId);
+        const draw = (kept: KeptLists) => {
+            setChannels(kept.channels);
+            setSpaces(kept.spaces);
+            setCategories(kept.categories);
+            setKept(true);
+        };
+        if (lists) return draw(lists);
+        // A new tab, a browser that was closed, an app started with no network:
+        // the copy this device kept, until the server answers.
+        let cancelled = false;
+        void chatStore.read<KeptLists>("lists", "lists").then((stored) => {
+            if (cancelled || !stored || answered.current) return;
+            keptLists.current = stored;
+            draw(stored);
+        });
+        return () => {
+            cancelled = true;
+        };
     }, [viewerId]);
     useEffect(() => {
         refresh();
