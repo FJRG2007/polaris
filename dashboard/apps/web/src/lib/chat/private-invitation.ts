@@ -18,3 +18,18 @@ import { gameInviteIn, gameServerIdIn } from "./game-server-card";
 export function isPrivateInvitation(body: string): boolean {
     return gameInviteIn(body) !== null || gameServerIdIn(body) !== null || activityIdIn(body) !== null;
 }
+
+/**
+ * Why a message may never be forwarded, or null when nothing about it forbids
+ * it. Besides an invitation, a live location: it is the sender's position as it
+ * moves, shared with the people they chose for as long as they chose, and a
+ * forward would hand that to a room they never picked, the way WhatsApp refuses
+ * it. A pin dropped once is a place like any other and stays forwardable.
+ */
+export function forwardBlock(message: {
+    body: string;
+    location?: { mode: string } | null;
+}): "invitation" | "liveLocation" | null {
+    if (message.location?.mode === "live") return "liveLocation";
+    return isPrivateInvitation(message.body) ? "invitation" : null;
+}

@@ -40,7 +40,7 @@ import { messageTarget, NOTHING, type MessageTarget } from "./message-target";
 import type { ChatAttachmentView, ChatMessageView } from "@/lib/chat/messages";
 import type { DeleteMessage } from "./delete-message";
 import { useHideMessage } from "./vanish-controls";
-import { isPrivateInvitation } from "@/lib/chat/private-invitation";
+import { forwardBlock } from "@/lib/chat/private-invitation";
 import { AUDIO_FORMATS, extensionOf, saveRecording, type AudioFormat } from "./audio-download";
 import {
     AlarmClock,
@@ -530,15 +530,18 @@ export function MessageMenu({
                                     {t("messageMenu.forward")}
                                 </ContextMenuItem>
                             )}
-                            {/* The one exception: an invitation looks like any
-                                message to forward, so the menu says why it is not. */}
-                            {actions.onForward && !message.deleted && isPrivateInvitation(message.body) && (
+                            {/* The exceptions: an invitation and a live location
+                                look like any message to forward, so the menu
+                                says why they are not. */}
+                            {actions.onForward && !message.deleted && forwardBlock(message) !== null && (
                                 <ContextMenuItem disabled className="items-start">
                                     <Forward className="mt-0.5 size-3.5" />
                                     <span className="flex min-w-0 flex-col">
                                         {t("messageMenu.forward")}
                                         <span className="text-xs text-muted-foreground">
-                                            {t("messageMenu.invitationNotForwarded")}
+                                            {forwardBlock(message) === "liveLocation"
+                                                ? t("messageMenu.liveLocationNotForwarded")
+                                                : t("messageMenu.invitationNotForwarded")}
                                         </span>
                                     </span>
                                 </ContextMenuItem>

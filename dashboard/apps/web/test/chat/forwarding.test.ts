@@ -76,6 +76,8 @@ const original = {
     forwarded: false,
     // None of its files is one to be seen once.
     attachments: [] as { id: string }[],
+    // Not a location unless a test makes it one.
+    location: null as { mode: string } | null,
     replyCount: 0,
     lastReplyAt: null,
     editedAt: null,
@@ -160,7 +162,7 @@ vi.mock("@polaris/db", () => {
 // rather than as the suite being loaded.
 const { decorateMessages, forward } = await import("@/lib/chat/messages");
 const { activityMark } = await import("@/lib/chat/activity-card");
-const { isPrivateInvitation } = await import("@/lib/chat/private-invitation");
+const { forwardBlock, isPrivateInvitation } = await import("@/lib/chat/private-invitation");
 const { gameInviteMark, gameServerMark } = await import("@/lib/chat/game-server-card");
 
 const ada = { id: "ada" };
@@ -173,6 +175,7 @@ beforeEach(() => {
     original.deletedAt = null;
     original.authorId = "grace";
     original.body = "the thing she said";
+    original.location = null;
 });
 
 describe("a message from somebody who allows it", () => {
@@ -268,6 +271,26 @@ describe("an invitation meant for one person", () => {
 
     it("leaves an ordinary message that only mentions an invite alone", () => {
         expect(isPrivateInvitation("join us: polaris-game-invite:nothing")).toBe(false);
+    });
+});
+
+describe("a location", () => {
+    it("is refused when it is live, even asked for without the menu", async () => {
+        original.body = "";
+        original.location = { mode: "live" };
+        await expect(
+            forward(ada, { messageId: "message-1", channelId: "channel-2", note: "" })
+        ).rejects.toThrow(/live location/i);
+        expect(created).toBe(0);
+        expect(forwardBlock(original)).toBe("liveLocation");
+    });
+
+    it("stays forwardable when it is a pin dropped once", async () => {
+        original.body = "";
+        original.location = { mode: "pin" };
+        expect(forwardBlock(original)).toBeNull();
+        await forward(ada, { messageId: "message-1", channelId: "channel-2", note: "" });
+        expect(created).toBe(1);
     });
 });
 

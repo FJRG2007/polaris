@@ -15,6 +15,7 @@ import { useChatStream } from "./use-chat-stream";
 import { TileMap } from "@/components/map/tile-map";
 import { useCallback, useEffect, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
+import { liveLeft } from "@/lib/chat/live-left";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import type { ChatLocationView } from "@/lib/chat/locations";
 import { LIVE_CHANGED, LocationDialog } from "./location-dialog";
@@ -171,6 +172,12 @@ export function LocationCard({
     const until = shown.liveUntil
         ? new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(new Date(shown.liveUntil))
         : "";
+    const left = shown.liveUntil ? liveLeft(Date.parse(shown.liveUntil), Date.now()) : null;
+    const leftText = !left
+        ? ""
+        : left.hours > 0
+          ? t("location.hoursLeft", { hours: String(left.hours), minutes: String(left.minutes) })
+          : t("location.minutesLeft", { count: left.minutes });
 
     return (
         <div className="mt-1 flex w-full max-w-sm min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-surface">
@@ -229,6 +236,34 @@ export function LocationCard({
                             className="max-sm:!h-full"
                         />
                     </div>
+                    {/* Live or over, how long it has left, and the sender's own way
+                        to end it, as WhatsApp's full map shows them. */}
+                    {shown.mode === "live" ? (
+                        <div className="flex min-w-0 items-center gap-2 text-sm">
+                            <Radio
+                                className={`size-4 shrink-0 ${live ? "animate-pulse text-primary" : "text-muted-foreground"}`}
+                            />
+                            <span className="min-w-0 flex-1 truncate">
+                                {live ? (
+                                    <>
+                                        {t("location.liveUntil", { time: until })}
+                                        {leftText ? ` · ${leftText}` : ""}
+                                    </>
+                                ) : (
+                                    <>
+                                        {t("location.liveEnded")}
+                                        {" · "}
+                                        {t("location.lastUpdated")} <RelativeTime iso={shown.movedAt} />
+                                    </>
+                                )}
+                            </span>
+                            {mine && live ? (
+                                <Button size="sm" variant="danger" disabled={stopping} onClick={() => void stop()}>
+                                    <span className="min-w-0 truncate">{t("location.stopSharing")}</span>
+                                </Button>
+                            ) : null}
+                        </div>
+                    ) : null}
                     <div className="flex min-w-0 items-center gap-2 text-sm">
                         <LocateFixed className="size-4 shrink-0 text-muted-foreground" />
                         {away === null ? (
