@@ -1,12 +1,18 @@
 "use client";
 
 /**
- * Taking the part of the world nobody has been in back off the disk.
+ * Taking the generated land nobody touched back off the disk.
  *
  * The card is deliberately two steps. The first measures and says what would go;
  * the second does it. That is not caution for its own sake - what this removes is
  * chunks, and the only honest way to ask somebody to agree to that is to tell
  * them how many and how much first, with the real number rather than an estimate.
+ * A world the script will not touch (BUG-0009) says why at the first step, and
+ * the second is never offered.
+ *
+ * There is no way to run it without a backup, and no way to have it run on its
+ * own: the script copies the world and checks the copy before it rewrites
+ * anything, and the result offers that copy back.
  *
  * It says plainly that the server stops for it, because it does: a live server
  * holds its region files open and the optimizer will not touch a world underneath
@@ -17,59 +23,77 @@
 import { useState } from "react";
 import { useGameText, useSchemaText } from "../game-text";
 import { formatBytes } from "@polaris/core";
-import { Loader2, Sparkles } from "lucide-react";
-import { optimizeWorldAction, previewWorldTrimAction, saveWorldTrimAction } from "./minecraft-actions";
-import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Checkbox, Input, Switch } from "@polaris/ui";
-import {
-    WORLD_TRIM_DEFAULTS,
-    type WorldTrimRun,
-    type WorldTrimSettings
-} from "../../lib/minecraft/world-trim";
+import { Loader2, RotateCcw, Sparkles } from "lucide-react";
+import { optimizeWorldAction, previewWorldTrimAction, restoreWorldBackupAction } from "./minecraft-actions";
+import { Badge, Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
+import type { WorldTrimRun } from "../../lib/minecraft/world-trim";
+import { RestoreDialog } from "./world-restore-dialog";
 
 export function WorldOptimizeCard({
     installedAppId,
-    settings: saved,
-    lastRun
+    serverName,
+    lastRun,
+    onChanged
 }: {
     installedAppId: string;
-    settings: WorldTrimSettings;
+    serverName: string;
     /** What the last run did, or null when there has not been one. */
     lastRun: WorldTrimRun | null;
+    /** Reload the screen after a restore, which switches the level. */
+    onChanged: () => void | Promise<void>;
 }) {
     const schemaText = useSchemaText();
     const t = useGameText("minecraft");
-    const [settings, setSettings] = useState<WorldTrimSettings>(saved ?? WORLD_TRIM_DEFAULTS);
     const [measuring, setMeasuring] = useState(false);
     const [running, setRunning] = useState(false);
-    const [backup, setBackup] = useState(true);
-    const [found, setFound] = useState<{ summary: string; removed: number } | null>(null);
-    const [done, setDone] = useState<string | null>(null);
+    const [found, setFound] = useState<{ summary: string; removed: number; refused: boolean } | null>(null);
+    const [done, setDone] = useState<{ summary: string; backup: string | null } | null>(null);
     const [failed, setFailed] = useState<string | null>(null);
-
-    async function save(next: WorldTrimSettings): Promise<void> {
-        setSettings(next);
-        await saveWorldTrimAction({ installedAppId, ...next });
-    }
+    const [restoring, setRestoring] = useState(false);
+    const [restoreBusy, setRestoreBusy] = useState(false);
+    const [restored, setRestored] = useState(false);
 
     async function measure(): Promise<void> {
         setMeasuring(true);
         setFailed(null);
         setDone(null);
+        setRestored(false);
         const result = await previewWorldTrimAction(installedAppId);
         setMeasuring(false);
         if (result.error) setFailed(result.error);
-        else setFound({ summary: schemaText(result.summary) ?? "", removed: result.removed ?? 0 });
+        else
+            setFound({
+                summary: schemaText(result.summary) ?? "",
+                removed: result.removed ?? 0,
+                refused: result.refused === true
+            });
     }
 
     async function run(): Promise<void> {
         setRunning(true);
         setFailed(null);
-        const result = await optimizeWorldAction(installedAppId, { backup });
+        const result = await optimizeWorldAction(installedAppId);
         setRunning(false);
         setFound(null);
         if (result.error) setFailed(result.error);
-        else setDone(schemaText(result.summary) ?? t("optimize.done"));
+        else if (result.refused) setFailed(schemaText(result.summary) ?? t("optimize.done"));
+        else setDone({ summary: schemaText(result.summary) ?? t("optimize.done"), backup: result.backup ?? null });
     }
+
+    async function restore(name: string): Promise<void> {
+        setRestoreBusy(true);
+        setFailed(null);
+        const result = await restoreWorldBackupAction(installedAppId, name);
+        setRestoreBusy(false);
+        setRestoring(false);
+        if (result.error) setFailed(result.error);
+        else {
+            setRestored(true);
+            await onChanged();
+        }
+    }
+
+    const canRun = found !== null && found.removed > 0 && !found.refused;
 
     return (
         <Card>
@@ -80,16 +104,14 @@ export function WorldOptimizeCard({
                 </CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-xs text-muted-foreground">
-                    {t("optimize.aWorldKeepsEveryChunk")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("optimize.aWorldKeepsEveryChunk")}</p>
 
                 <div className="flex flex-wrap items-center gap-2">
                     <Button size="sm" variant="secondary" onClick={measure} disabled={measuring || running}>
                         {measuring ? <Loader2 className="size-4 animate-spin" /> : null}
                         {measuring ? t("optimize.measuring") : t("optimize.seeWhatWouldGo")}
                     </Button>
-                    {found && found.removed > 0 && (
+                    {canRun && (
                         <Button size="sm" onClick={run} disabled={running}>
                             {running ? <Loader2 className="size-4 animate-spin" /> : null}
                             {running ? t("optimize.optimizing") : t("optimize.doIt")}
@@ -99,76 +121,60 @@ export function WorldOptimizeCard({
 
                 {found && (
                     <div className="flex flex-col gap-2 rounded-md border border-border px-3 py-2">
-                        <p className="text-xs">{found.summary}</p>
-                        {found.removed > 0 && (
+                        <p className={found.refused ? "text-xs text-warning" : "text-xs"}>{found.summary}</p>
+                        {canRun && (
                             <>
-                                <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Checkbox checked={backup} onChange={(event) => setBackup(event.target.checked)} />
-                                    {t("optimize.backTheWorldUpFirst")}
-                                </label>
-                                <p className="text-xs text-muted-foreground">
-                                    {t("optimize.theServerStopsWhileThis")}
-                                </p>
+                                <p className="text-xs text-muted-foreground">{t("optimize.backupFirst")}</p>
+                                <p className="text-xs text-muted-foreground">{t("optimize.theServerStopsWhileThis")}</p>
                             </>
                         )}
                     </div>
                 )}
 
-                {done && <p className="text-xs text-success">{done}</p>}
+                {done && (
+                    <div className="flex flex-col gap-2 rounded-md border border-border px-3 py-2">
+                        <p className="text-xs text-success">{done.summary}</p>
+                        {done.backup && !restored && (
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="min-w-0 text-xs text-muted-foreground">{t("optimize.backupTaken")}</p>
+                                <Button size="sm" variant="secondary" onClick={() => setRestoring(true)}>
+                                    <RotateCcw className="size-4" />
+                                    {t("optimize.restoreBackup")}
+                                </Button>
+                            </div>
+                        )}
+                        {restored && <p className="text-xs text-muted-foreground">{t("world.restored")}</p>}
+                    </div>
+                )}
                 {failed && <p className="text-xs text-danger">{failed}</p>}
 
-                <div className="flex flex-col gap-2 border-t border-border pt-3">
-                    <div className="flex items-start justify-between gap-3">
-                        <div>
-                            <p className="text-sm font-medium">{t("optimize.keepItTidyOnIts")}</p>
-                            <p className="max-w-lg text-xs text-muted-foreground">
-                                {t("optimize.runsWhileTheServerIs")}
-                            </p>
-                        </div>
-                        <Switch
-                            checked={settings.enabled}
-                            onChange={(enabled) => void save({ ...settings, enabled })}
-                            aria-label={t("optimize.optimizeThisWorldOnIts")}
-                        />
-                    </div>
-                    {settings.enabled && (
-                        <label className="flex max-w-xs items-center gap-2 text-xs">
-                            <span className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t("optimize.atMostOnceEvery")}>{t("optimize.atMostOnceEvery")}</span>
-                            <Input
-                                type="number"
-                                min={1}
-                                max={365}
-                                value={String(settings.everyDays)}
-                                aria-label={t("optimize.daysBetweenAutomaticRuns")}
-                                onChange={(event) =>
-                                    void save({
-                                        ...settings,
-                                        everyDays: Number.parseInt(event.target.value, 10) || 1
-                                    })
-                                }
-                            />
-                            <span className="min-w-0 max-w-full shrink-0 truncate text-muted-foreground" title={t("optimize.days")}>{t("optimize.days")}</span>
-                        </label>
-                    )}
-                    {lastRun && (
-                        <p className="text-xs text-muted-foreground">
-                            {lastRun.ok ? (
-                                <>
-                                    {lastRun.removed > 0
-                                        ? t("optimize.lastRunRemoved", {
-                                              date: new Date(lastRun.at).toLocaleDateString(),
-                                              count: lastRun.removed,
-                                              size: formatBytes(lastRun.freedBytes)
-                                          })
-                                        : t("optimize.lastRunNothing", { date: new Date(lastRun.at).toLocaleDateString() })}
-                                </>
+                {lastRun && !done && (
+                    <p className="border-t border-border pt-3 text-xs text-muted-foreground">
+                        {lastRun.ok ? (
+                            lastRun.removed > 0 ? (
+                                t("optimize.lastRunRemoved", {
+                                    date: new Date(lastRun.at).toLocaleDateString(),
+                                    count: lastRun.removed,
+                                    size: formatBytes(lastRun.freedBytes)
+                                })
                             ) : (
-                                <Badge variant="danger">{lastRun.detail || t("optimize.theLastRunDidNot")}</Badge>
-                            )}
-                        </p>
-                    )}
-                </div>
+                                t("optimize.lastRunNothing", { date: new Date(lastRun.at).toLocaleDateString() })
+                            )
+                        ) : (
+                            <Badge variant="danger">{schemaText(lastRun.detail) || t("optimize.theLastRunDidNot")}</Badge>
+                        )}
+                    </p>
+                )}
             </CardBody>
+
+            {restoring && done?.backup && (
+                <RestoreDialog
+                    serverName={serverName}
+                    pending={restoreBusy}
+                    onClose={() => setRestoring(false)}
+                    onConfirm={() => void restore(done.backup!)}
+                />
+            )}
         </Card>
     );
 }

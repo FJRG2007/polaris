@@ -1372,23 +1372,19 @@
     },
     "optimize": {
         "optimizeTheWorld": "Optimizar el mundo",
-        "aWorldKeepsEveryChunk": "Un mundo guarda cada chunk que alguien haya cargado alguna vez, y casi todo lo cargado es paisaje en el que nadie entra. Esos chunks se generan otra vez, idénticos, en cuanto alguien va allí - así que quitarlos no cuesta nada y suele reducir un mundo a la mitad o más. Se conserva todo en lo que un jugador ha estado, junto con el spawn, los chunks forzados y los sitios donde la gente sale.",
+        "aWorldKeepsEveryChunk": "Un mundo guarda cada chunk que alguien haya cargado, y gran parte es terreno generado que nadie tocó. Esto solo quita chunks sin bloques como cofres, carteles o camas, sin animales ni aldeanos, y sin nadie cerca nunca; se generan igual cuando alguien va allí. El spawn, los chunks forzados y donde la gente sale se conservan siempre.",
         "measuring": "Midiendo",
         "seeWhatWouldGo": "Ver qué se iría",
         "optimizing": "Optimizando",
         "doIt": "Hacerlo",
-        "backTheWorldUpFirst": "Copiar el mundo antes",
         "theServerStopsWhileThis": "El servidor se para mientras esto se ejecuta y vuelve a arrancar después.",
-        "keepItTidyOnIts": "Mantenerlo ordenado solo",
-        "runsWhileTheServerIs": "Se ejecuta cuando el servidor ya está parado y nunca lo para para hacerlo, así que un servidor siempre en marcha nunca se toca.",
-        "optimizeThisWorldOnIts": "Optimizar este mundo por sí solo",
-        "atMostOnceEvery": "Como mucho cada",
-        "daysBetweenAutomaticRuns": "Días entre ejecuciones automáticas",
         "theLastRunDidNot": "La última ejecución falló",
-        "days": "días",
         "lastRunRemoved": "Última ejecución el {date}: {count, number} chunks, {size}.",
         "lastRunNothing": "Última ejecución el {date}: nada que quitar.",
-        "done": "Hecho."
+        "done": "Hecho.",
+        "backupFirst": "Antes se hace y se comprueba una copia del mundo. Sin ella no se quita nada.",
+        "restoreBackup": "Restaurar la copia",
+        "backupTaken": "Se hizo una copia del mundo antes. Si falta algo, restaura esa copia."
     },
     "domain": {
         "address": "Dirección",
@@ -3231,5 +3227,12 @@
         "confirmTitle": "¿Cambiar a {version} y reiniciar?",
         "confirmText": "Los jugadores conectados se desconectan al reiniciar. El mundo se conserva.",
         "askManager": "Quien gestiona este servidor puede cambiarlo."
+    },
+    "trimNotice": {
+        "title": "Este mundo se optimizó el {date}",
+        "body": "Polaris quitó {count, plural, one {1 chunk} other {{count, number} chunks}} de terreno que creía sin usar. En algunos servidores esa comprobación se llevó construcciones reales, así que ya nunca se ejecuta sola. Si falta algo - una construcción, un cofre, una cama - restaura una copia de antes de ese día.",
+        "backupsBefore": "Copias de antes",
+        "noBackupBefore": "No hay ninguna copia de antes de ese día en este servidor.",
+        "allThere": "Todo sigue ahí"
     }
 }

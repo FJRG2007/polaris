@@ -23,7 +23,8 @@ import * as world from "../../lib/minecraft/world";
 import { useCallback, useEffect, useState } from "react";
 import type { WorldView } from "../../lib/minecraft/world-service";
 import { WorldOptimizeCard } from "./minecraft-optimize";
-import { WORLD_TRIM_DEFAULTS } from "../../lib/minecraft/world-trim";
+import { RestoreDialog } from "./world-restore-dialog";
+import { pastTrimToReview } from "../../lib/minecraft/world-trim";
 import {
     BACKUP_EVERY_OPTIONS,
     MAX_KEEP_LAST,
@@ -49,6 +50,7 @@ import {
     newWorldAction,
     importWorldAction,
     restoreWorldBackupAction,
+    acknowledgeWorldTrimAction,
     saveBackupPolicyAction,
     switchWorldAction
 } from "./minecraft-actions";
@@ -119,6 +121,12 @@ export function MinecraftWorld({ installedAppId, name }: { installedAppId: strin
                 container, so a server that cannot be reached is one fact about the
                 page rather than the same sentence printed twice. */}
             <WorldMessage view={view} />
+            <PastTrimNotice
+                installedAppId={installedAppId}
+                serverName={name}
+                view={view}
+                onChanged={reload}
+            />
             <WorldsCard
                 installedAppId={installedAppId}
                 view={view}
@@ -137,8 +145,124 @@ export function MinecraftWorld({ installedAppId, name }: { installedAppId: strin
             {view?.edition !== "bedrock" && (
                 <WorldOptimizeCard
                     installedAppId={installedAppId}
-                    settings={view?.trim ?? WORLD_TRIM_DEFAULTS}
+                    serverName={name}
                     lastRun={view?.lastTrim ?? null}
+                    onChanged={reload}
+                />
+            )}
+        </div>
+    );
+}
+
+/**
+ * A past optimization the operator has not looked at since, with the copies from
+ * before it (BUG-0009). Runs before 2026-11-21 may have been automatic, with no
+ * backup, and may have removed builds; this is where somebody who never saw that
+ * happen finds out, and finds the way back. Gone once they say the world is fine.
+ */
+function PastTrimNotice({
+    installedAppId,
+    serverName,
+    view,
+    onChanged
+}: {
+    installedAppId: string;
+    serverName: string;
+    view: WorldView | null;
+    onChanged: () => Promise<void>;
+}) {
+    const t = useGameText("minecraft");
+    const format = useDisplayFormat();
+    const [busy, setBusy] = useState<string | null>(null);
+    const [restoring, setRestoring] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [restored, setRestored] = useState(false);
+    const run = view ? pastTrimToReview(view.lastTrim) : null;
+    if (!view || !run) return null;
+    const before = view.backups.filter((backup) => Date.parse(backup.createdAt) < Date.parse(run.at));
+
+    async function restore(name: string): Promise<void> {
+        setBusy(name);
+        setError(null);
+        const result = await restoreWorldBackupAction(installedAppId, name);
+        setBusy(null);
+        setRestoring(null);
+        if (result.error) setError(result.error);
+        else {
+            setRestored(true);
+            await onChanged();
+        }
+    }
+
+    async function allThere(): Promise<void> {
+        setBusy("ack");
+        setError(null);
+        const result = await acknowledgeWorldTrimAction(installedAppId);
+        setBusy(null);
+        if (result.error) setError(result.error);
+        else await onChanged();
+    }
+
+    return (
+        <div className="flex flex-col gap-3 rounded-md border border-warning-edge bg-warning-soft px-3 py-3">
+            <div className="flex items-start gap-2">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
+                <div className="flex min-w-0 flex-col gap-1">
+                    <p className="text-sm font-medium">
+                        {t("trimNotice.title", { date: format.dateTime(run.at) })}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("trimNotice.body", { count: run.removed })}
+                    </p>
+                </div>
+            </div>
+            {error && <p className="text-xs text-danger">{error}</p>}
+            {restored ? (
+                <p className="text-xs text-muted-foreground">{t("world.restored")}</p>
+            ) : before.length === 0 ? (
+                <p className="text-xs text-muted-foreground">{t("trimNotice.noBackupBefore")}</p>
+            ) : (
+                <div className="flex flex-col gap-1.5">
+                    <p className="text-xs font-medium">{t("trimNotice.backupsBefore")}</p>
+                    <ul className="flex flex-col gap-1.5">
+                        {before.slice(0, 5).map((backup) => (
+                            <li
+                                key={backup.name}
+                                className="flex items-center justify-between gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-sm"
+                            >
+                                <span className="min-w-0 truncate" title={format.dateTime(backup.createdAt)}>
+                                    {format.dateTime(backup.createdAt)}
+                                </span>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    disabled={busy !== null}
+                                    onClick={() => setRestoring(backup.name)}
+                                >
+                                    {busy === backup.name ? (
+                                        <Loader2 className="size-4 animate-spin" />
+                                    ) : (
+                                        <RotateCcw className="size-4" />
+                                    )}
+                                    {t("world.restore")}
+                                </Button>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+            <div className="flex justify-end">
+                <Button size="sm" variant="ghost" disabled={busy !== null} onClick={() => void allThere()}>
+                    {busy === "ack" && <Loader2 className="size-4 animate-spin" />}
+                    {t("trimNotice.allThere")}
+                </Button>
+            </div>
+            {restoring && (
+                <RestoreDialog
+                    serverName={serverName}
+                    pending={busy !== null}
+                    onClose={() => setRestoring(null)}
+                    onConfirm={() => void restore(restoring)}
                 />
             )}
         </div>
@@ -766,47 +890,6 @@ export function GameServerBackups({
                 onConfirm={() => deleting && void remove(deleting)}
             />
         </Card>
-    );
-}
-
-/** Restoring is not a delete, so it does not borrow the delete dialog: nothing is
- *  destroyed by it, and saying so is what stops it reading as one. */
-function RestoreDialog({
-    serverName,
-    pending,
-    onClose,
-    onConfirm
-}: {
-    serverName: string;
-    pending: boolean;
-    onClose: () => void;
-    onConfirm: () => void;
-}) {
-    const t = useGameText("minecraft");
-    return (
-        <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-md">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <RotateCcw className="size-4" /> {t("world.restoreThisBackup")}
-                    </DialogTitle>
-                </DialogHeader>
-                <div className="flex flex-col gap-4">
-                    <p className="text-sm text-muted-foreground">
-                        {t("world.restoreBody", { name: serverName })}
-                    </p>
-                    <div className="flex justify-end gap-2">
-                        <Button variant="ghost" onClick={onClose} disabled={pending}>
-                            {t("world.cancel")}
-                        </Button>
-                        <Button onClick={onConfirm} disabled={pending}>
-                            {pending && <Loader2 className="size-4 animate-spin" />}
-                            {t("world.restore")}
-                        </Button>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
     );
 }
 

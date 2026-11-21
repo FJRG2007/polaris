@@ -1372,23 +1372,19 @@
     },
     "optimize": {
         "optimizeTheWorld": "Optimize the world",
-        "aWorldKeepsEveryChunk": "A world keeps every chunk anybody has ever loaded, and most of what gets loaded is scenery nobody walks into. Those chunks generate again, identically, the moment somebody goes there - so removing them costs nothing and usually takes a world down by half or more. Anything a player has stood in is kept, along with spawn, forced chunks and everywhere people log out.",
+        "aWorldKeepsEveryChunk": "A world keeps every chunk anybody has ever loaded, and much of it is generated land nobody touched. This removes only chunks with no blocks like chests, signs or beds, no animals or villagers, and nobody ever near them; they generate again the same way when somebody goes there. Spawn, forced chunks and where people log out are always kept.",
         "measuring": "Measuring",
         "seeWhatWouldGo": "See what would go",
         "optimizing": "Optimizing",
         "doIt": "Do it",
-        "backTheWorldUpFirst": "Back the world up first",
         "theServerStopsWhileThis": "The server stops while this runs and starts again afterward.",
-        "keepItTidyOnIts": "Keep it tidy on its own",
-        "runsWhileTheServerIs": "Runs while the server is already stopped and never stops one to do it, so a server that is always up is never touched by this.",
-        "optimizeThisWorldOnIts": "Optimize this world on its own",
-        "atMostOnceEvery": "At most once every",
-        "daysBetweenAutomaticRuns": "Days between automatic runs",
         "theLastRunDidNot": "The last run did not work",
-        "days": "days",
         "lastRunRemoved": "Last run {date}: {count, number} chunks, {size}.",
         "lastRunNothing": "Last run {date}: nothing to take out.",
-        "done": "Done."
+        "done": "Done.",
+        "backupFirst": "A backup of the world is taken and checked first. Nothing is removed without it.",
+        "restoreBackup": "Restore the backup",
+        "backupTaken": "The world was backed up first. If anything is missing, put that backup back."
     },
     "domain": {
         "address": "Address",
@@ -3231,5 +3227,12 @@
         "confirmTitle": "Switch to {version} and restart?",
         "confirmText": "Players online are disconnected while it restarts. The world is kept.",
         "askManager": "Someone who manages this server can switch it."
+    },
+    "trimNotice": {
+        "title": "This world was optimized on {date}",
+        "body": "Polaris removed {count, plural, one {1 chunk} other {{count, number} chunks}} of land it believed nobody had used. On some servers that check missed real builds, so it never runs on its own any more. If anything is missing - a build, a chest, a bed - restore a backup from before that day.",
+        "backupsBefore": "Backups from before then",
+        "noBackupBefore": "There is no backup on this server from before that day.",
+        "allThere": "Everything is still there"
     }
 }
