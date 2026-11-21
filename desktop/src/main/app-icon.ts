@@ -48,7 +48,20 @@ function onAppleGrid(image: NativeImage): NativeImage {
     return nativeImage.createFromBitmap(target, { width: side, height: side });
 }
 
+/** Set the dressed icon; anything that goes wrong leaves the shipped one. */
 export function applyAppIcon(window: BrowserWindow | null, icon: AppIcon): void {
+    try {
+        setIcons(window, icon);
+    } catch {
+        try {
+            setIcons(window, { png: null });
+        } catch {
+            // The shipped icon is what was already up.
+        }
+    }
+}
+
+function setIcons(window: BrowserWindow | null, icon: AppIcon): void {
     const drawn = icon.png ? nativeImage.createFromDataURL(icon.png) : null;
     const image = drawn && !drawn.isEmpty() ? drawn : null;
     if (process.platform === "darwin") {
