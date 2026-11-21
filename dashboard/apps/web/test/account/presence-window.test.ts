@@ -70,6 +70,10 @@ vi.mock("@/lib/presence-schedule-service", () => ({
     scheduleZoneOf: async () => "auto"
 }));
 vi.mock("@/lib/display-prefs-service", () => ({ getPlatformDisplayPreferences: async () => ({}) }));
+const published = vi.hoisted(() => [] as unknown[]);
+vi.mock("@/lib/access-live", () => ({
+    publishAccessChange: (change: unknown) => published.push(change)
+}));
 
 const viewer = { id: "grace", isAdmin: false };
 
@@ -155,6 +159,13 @@ describe("choosing one", () => {
         const { setPresenceChoice } = await import("@/lib/presence-service");
         await setPresenceChoice("ada", "invisible", { minutes: null });
         expect(written).toEqual({ presence: "invisible", presenceUntil: null, presenceSetAt: NOW });
+    });
+
+    it("redraws that account's open tabs, so a choice made on a Stream Deck shows in the menu", async () => {
+        published.length = 0;
+        const { setPresenceChoice } = await import("@/lib/presence-service");
+        await setPresenceChoice("ada", "busy");
+        expect(published).toEqual([{ userIds: ["ada"] }]);
     });
 
     it("clears the window when the answer is to work it out again", async () => {

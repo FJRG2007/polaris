@@ -37,6 +37,7 @@ import { type Presence, type PresenceChoice } from "@polaris/core";
 import { getPlatformDisplayPreferences } from "@/lib/display-prefs-service";
 import { activeSchedulesFor, schedulesOf, scheduleZoneOf } from "@/lib/presence-schedule-service";
 import { meetingsNow } from "@/lib/presence-auto-service";
+import { publishAccessChange } from "@/lib/access-live";
 
 // The vocabulary lives in core, because the picker that sets it is a client
 // component and this file reaches for Prisma the moment it is imported.
@@ -462,6 +463,10 @@ export async function setPresenceChoice(
         where: { id: userId },
         data: { presence: choice, presenceUntil: until, presenceSetAt: new Date() }
     });
+    // The account menu in every open tab draws the choice from the page, so a
+    // choice made on a Stream Deck or another device redraws it over the
+    // account's live stream instead of waiting for the next navigation.
+    publishAccessChange({ userIds: [userId] });
 }
 
 /** The rule, on its own so it can be read in one place. */
