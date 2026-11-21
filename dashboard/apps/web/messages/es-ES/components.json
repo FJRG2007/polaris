@@ -1055,14 +1055,14 @@
             "signOutNamed": "Cerrar {app} en {name}"
         },
         "deviceGroup": {
-            "unnamed": "Dispositivo sin nombre",
+            "unnamed": "Equipo sin nombre",
             "expand": "Mostrar las sesiones de {device}",
             "collapse": "Ocultar las sesiones de {device}",
             "count": "{count, plural, one {# sesión} other {# sesiones}}",
             "lastActive": "Activo <time></time>",
-            "signOut": "Cerrar sesión en este equipo",
+            "signOut": "Desconectar este equipo",
             "signOutNamed": "Cerrar todas las sesiones de {device}",
-            "block": "Bloquear este dispositivo",
+            "block": "Bloquear este equipo",
             "blockHere": "Estás usando este dispositivo, así que no se puede bloquear desde aquí",
             "blockNamed": "Bloquear {device}"
         }

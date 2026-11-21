@@ -205,7 +205,7 @@
         },
         "machine": {
             "signOutTitle": "Sign out {device}?",
-            "signOutDescription": "Every session and app signed in on {device} is signed out. This browser stays signed in.",
+            "signOutDescription": "Every session and app signed in on {device} is signed out. {surface, select, app {This app stays signed in.} other {This browser stays signed in.}}",
             "signOutConfirm": "Sign out device",
             "blockTitle": "Block {device}?",
             "blockDescription": "Everything signed in on {device} is signed out, and the Polaris apps on it cannot sign in to this account again until you unblock it. A browser on that computer does not identify the device, so it is not affected: change your password if you no longer trust whoever has it.",
