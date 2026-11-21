@@ -554,6 +554,37 @@ export type PrivacySettings = z.infer<typeof privacySettingsSchema>;
 export const DEFAULT_PRIVACY: PrivacySettings = privacySettingsSchema.parse({});
 
 /**
+ * What the Privacy Checkup (ledger row 12) suggests for each field: the
+ * circle of people who already know you, and nobody for what a stranger could
+ * misuse. Only ever applied when somebody presses "Use recommended" on a step;
+ * nothing reads it as a default.
+ */
+export const RECOMMENDED_PRIVACY: Record<PrivacyField, PrivacyAudience> = {
+    discoverable: "friendsOfFriends",
+    findByEmail: "nobody",
+    findByPhone: "nobody",
+    profile: "friends",
+    avatar: "friends",
+    photoFullSize: "friends",
+    fullName: "nobody",
+    email: "nobody",
+    phone: "nobody",
+    companies: "friends",
+    followers: "friends",
+    friendRequests: "friendsOfFriends",
+    fileTransfers: "friends",
+    calls: "friends",
+    groupAdds: "friends",
+    lastSeen: "friends",
+    lastActive: "friends",
+    activity: "friends",
+    badges: "friends",
+    readReceipts: "friends",
+    typing: "friends",
+    forwarding: "friends"
+};
+
+/**
  * What one stored value means, or what the field falls back to.
  *
  * The one way to read an audience off a row. A column holds a string somebody

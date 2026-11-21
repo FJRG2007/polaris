@@ -312,5 +312,36 @@
         "label": "Vistas previas de lo que envías",
         "hint": "Desactivado, tus enlaces quedan como texto: no se consulta nada ni se carga ninguna tarjeta o reproductor.",
         "forbidden": "Tu administrador ha desactivado las vistas previas de enlaces para todos."
+    },
+    "checkup": {
+        "title": "Revisión de privacidad",
+        "summary": "Revisa paso a paso quién puede encontrarte, verte y contactarte.",
+        "start": "Empezar",
+        "back": "Volver a privacidad",
+        "progress": "Paso {step} de {total}",
+        "recommended": "Recomendado: {audience}",
+        "useRecommended": "Usar lo recomendado",
+        "previous": "Atrás",
+        "continue": "Siguiente",
+        "saveAndContinue": "Guardar y seguir",
+        "finish": "Hecho",
+        "saved": "Guardado.",
+        "security": {
+            "title": "Seguridad de la cuenta",
+            "intro": "La privacidad solo se mantiene si nadie más puede entrar como tú.",
+            "open": "Abrir",
+            "twoFactor": {
+                "label": "Verificación en dos pasos",
+                "hint": "Un código o llave además de tu contraseña."
+            },
+            "passkeys": {
+                "label": "Llaves de acceso",
+                "hint": "Entra con tu dispositivo en vez de con contraseña."
+            },
+            "sessions": {
+                "label": "Dispositivos con sesión",
+                "hint": "Cierra la sesión donde ya no la uses."
+            }
+        }
     }
 }

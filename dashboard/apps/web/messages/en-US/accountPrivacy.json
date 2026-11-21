@@ -312,5 +312,36 @@
         "label": "Link previews for what you send",
         "hint": "Off, links you send stay plain text: nothing is fetched and no card or player loads for anyone.",
         "forbidden": "Your administrator has turned link previews off for everyone here."
+    },
+    "checkup": {
+        "title": "Privacy Checkup",
+        "summary": "Go through who can find, see and reach you, one step at a time.",
+        "start": "Start",
+        "back": "Back to privacy",
+        "progress": "Step {step} of {total}",
+        "recommended": "Recommended: {audience}",
+        "useRecommended": "Use recommended",
+        "previous": "Back",
+        "continue": "Next",
+        "saveAndContinue": "Save and continue",
+        "finish": "Done",
+        "saved": "Saved.",
+        "security": {
+            "title": "Account security",
+            "intro": "Privacy holds only while nobody else can sign in as you.",
+            "open": "Open",
+            "twoFactor": {
+                "label": "Two-step verification",
+                "hint": "A code or key on top of your password."
+            },
+            "passkeys": {
+                "label": "Passkeys",
+                "hint": "Sign in with your device instead of a password."
+            },
+            "sessions": {
+                "label": "Signed-in devices",
+                "hint": "Sign out anywhere you no longer use."
+            }
+        }
     }
 }

@@ -4,7 +4,7 @@
 
 import Link from "next/link";
 import * as core from "@polaris/core";
-import { CalendarClock, Gamepad2 } from "lucide-react";
+import { CalendarClock, Gamepad2, ListChecks } from "lucide-react";
 import { listBlocked } from "@/lib/blocks";
 import { Button, Card, CardBody } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
@@ -44,6 +44,21 @@ export default async function PrivacyPage() {
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("page.title")}</h1>
                 <p className="text-sm text-muted-foreground">{t("page.intro")}</p>
             </div>
+            {/* A guided walk through the same settings, step by step. */}
+            <Card>
+                <CardBody className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">
+                    <ListChecks className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="min-w-[14rem] flex-1">
+                        <span className="block text-[0.8125rem]">{t("checkup.title")}</span>
+                        <span className="block text-[0.6875rem] leading-snug text-foreground-subtle">
+                            {t("checkup.summary")}
+                        </span>
+                    </span>
+                    <Button size="sm" variant="secondary" asChild>
+                        <Link href="/account/privacy/checkup">{t("checkup.start")}</Link>
+                    </Button>
+                </CardBody>
+            </Card>
             <PrivacyView settings={settings} lists={lists} people={people} locked={[...locks]} />
             <ChatTimerCard seconds={chatPrivacy?.chatVanishAfter ?? 0} />
             <ViewOnceWatermarkCard on={chatPrivacy?.viewOnceWatermark ?? true} />
