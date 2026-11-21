@@ -129,6 +129,71 @@ export async function migrateAccountRules(userId: string): Promise<{ migrated: b
     });
 }
 
+/**
+ * Keep the carried-over rule in step with the old sign-in dialog.
+ *
+ * The old dialog still writes the allowlist columns, and once an account has
+ * moved to rules nothing reads them - so a save there changed nothing, silently.
+ * Until that dialog is replaced, every save it makes is carried into the saved
+ * list and the rule the move created, so the guard enforces exactly what the
+ * dialog now shows. An account that has not moved yet needs nothing: the move
+ * reads the columns when it happens.
+ *
+ * Found by name, like the move names them. A list or rule the owner has renamed
+ * since is no longer reached; a new one is made rather than editing theirs.
+ */
+export async function syncLegacyAllowlist(userId: string): Promise<void> {
+    await prisma.$transaction(async (tx) => {
+        const security = await tx.userSecurity.findUnique({
+            where: { userId },
+            select: { accessRulesMigratedAt: true, allowedCidrs: true, allowedCountries: true, allowedContinents: true }
+        });
+        if (!security?.accessRulesMigratedAt) return;
+        const columns = {
+            allowedCidrs: security.allowedCidrs,
+            allowedCountries: security.allowedCountries,
+            allowedContinents: security.allowedContinents
+        };
+        const [group, bindings, existing] = await Promise.all([
+            tx.accessGroup.findFirst({ where: { ownerId: userId, name: IMPORTED_GROUP_NAME }, select: { id: true } }),
+            tx.userAccessGroup.findMany({ where: { userId, enforced: false }, select: { groupId: true } }),
+            tx.accountAccessRule.findFirst({ where: { userId, name: IMPORTED_RULE_NAME }, select: { id: true } })
+        ]);
+
+        let imported: string | null = group?.id ?? null;
+        if (group) {
+            await tx.accessGroup.update({ where: { id: group.id }, data: columns });
+        } else if (hasEntries(columns)) {
+            imported = (
+                await tx.accessGroup.create({
+                    data: { ownerId: userId, name: IMPORTED_GROUP_NAME, ...columns },
+                    select: { id: true }
+                })
+            ).id;
+        }
+        const groupIds = [
+            ...(imported && hasEntries(columns) ? [imported] : []),
+            ...bindings.map((binding) => binding.groupId)
+        ];
+
+        // Nothing left to allow by is no allowlist at all, as it was before rules.
+        if (groupIds.length === 0) {
+            if (existing) await tx.accountAccessRule.delete({ where: { id: existing.id } });
+            return;
+        }
+        const rule = legacyAllowlistRule(groupIds, IMPORTED_RULE_NAME);
+        const data = {
+            enabled: rule.enabled,
+            action: rule.action,
+            timeZone: rule.timeZone,
+            conditions: rule.conditions as unknown as Prisma.InputJsonValue
+        };
+        if (existing) await tx.accountAccessRule.update({ where: { id: existing.id }, data });
+        // Judged first, as the old allowlist was judged before anything else.
+        else await tx.accountAccessRule.create({ data: { userId, position: -1, name: rule.name, ...data } });
+    });
+}
+
 /** The account's rules, in order. A stored row that no longer parses is reported
  *  and kept out of evaluation - every write goes through the same schema, so this
  *  is a corrupted row, and guessing at what it meant is worse. */

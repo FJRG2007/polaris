@@ -34,6 +34,8 @@ import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { localized } from "../security/action-messages";
 import { newDeviceRefusal } from "@/lib/device-grace";
+import { syncLegacyAllowlist } from "@/lib/account-rules";
+import { revokeSessionsRefusedByRules } from "@/lib/session-guard";
 
 type ActionResult = { error?: string };
 
@@ -82,6 +84,10 @@ export async function saveSignInRulesAction(input: unknown): Promise<ActionResul
     }
 
     await updateSignInRules(user.id, parsed.data);
+    // An account already on rules no longer reads the columns just written:
+    // carry them into its rule, then judge its open sessions by the result.
+    await syncLegacyAllowlist(user.id);
+    await revokeSessionsRefusedByRules(user.id);
     await recordAudit({ actorId: user.id, action: "account.signin-rules.updated" });
     revalidatePath("/account/access");
     return {};
