@@ -2453,7 +2453,7 @@
             "applePush": {
                 "summary": "Haz sonar los iPhone como una llamada, con la app cerrada.",
                 "description": "Las llamadas ya suenan en Android con la app cerrada, y en un iPhone mientras la app está abierta. Con la app cerrada, iOS solo la despierta con un aviso enviado a través de Apple, que necesita una clave de una cuenta de Apple Developer de pago. Pégala aquí y una llamada a quien tenga la app en el iPhone suena como una llamada de teléfono: la pantalla de llamada del sistema, sobre la pantalla bloqueada, con Contestar y Rechazar.",
-                "apiKeyLabel": "Archivo de clave (.p8)",
+                "apiKeyLabel": "Clave (.p8)",
                 "apiKeyHelp": "El archivo .p8 entero tal como se descarga, con la primera y la última línea. Apple solo deja descargarlo una vez.",
                 "links": {
                     "0": {
@@ -2472,11 +2472,11 @@
             "keyIdHint": "Diez letras y números, junto a la clave en tu cuenta de Apple Developer.",
             "teamId": "Team ID",
             "teamIdHint": "Diez letras y números, en Membership details.",
-            "bundleId": "Identificador de la app",
+            "bundleId": "ID de la app",
             "bundleIdHint": "El identificador con el que está firmada la app de iPhone. Déjalo como está salvo que firmaras tu propia versión con otro.",
             "sandbox": "Versión de desarrollo",
             "sandboxHint": "Actívalo para una app lanzada desde Xcode; desactívalo para TestFlight y la App Store.",
-            "use": "Hacer sonar los iPhone",
+            "use": "Sonar en iPhone",
             "useHint": "Desactivado guarda la clave y deja de enviar avisos; los iPhone suenan solo con la app abierta."
         }
     },
