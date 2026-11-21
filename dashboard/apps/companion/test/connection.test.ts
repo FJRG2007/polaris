@@ -7,6 +7,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Connection, type Host, type Phase } from "../src/connection";
 import { PolarisClient, userAgent } from "../../streamdeck/src/polaris";
 
+// The real lookup runs a system program, which fake timers cannot wait for.
+vi.mock("../../../packages/core/src/device-identity-node", () => ({
+    deviceIdentity: async () => ({ id: "device-1", name: "deck-host", osVersion: null })
+}));
+
 afterEach(() => {
     vi.useRealTimers();
 });
