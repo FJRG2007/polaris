@@ -22,6 +22,7 @@ import { voiceActionSchema, voiceStateSchema } from "@/shared/voice-widget";
 import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys";
 import { closeNotice, showNotice } from "./notices";
 import { appBadgeSchema, applyAppBadge } from "./app-badge";
+import { appIconSchema, applyAppIcon } from "./app-icon";
 import { isSafeExternalUrl, isServerUrl, serverPath } from "./navigation";
 import { openExternal } from "./open-external";
 import { clipboardText, dictionaryWord, pagePoint, savableImageUrl } from "./context-menu";
@@ -369,6 +370,15 @@ export function registerIpc(host: IpcHost): void {
         const badge = appBadgeSchema.safeParse(raw);
         if (!badge.success) return false;
         applyAppBadge(BrowserWindow.fromWebContents(event.sender), badge.data);
+        return true;
+    });
+
+    // The season's icon, drawn by the page; the asking window's is the one set.
+    ipcMain.handle(CHANNELS.appIcon, (event, raw: unknown): boolean => {
+        if (!fromPolaris(event)) return false;
+        const icon = appIconSchema.safeParse(raw);
+        if (!icon.success) return false;
+        applyAppIcon(BrowserWindow.fromWebContents(event.sender), icon.data);
         return true;
     });
 

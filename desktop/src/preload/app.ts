@@ -108,6 +108,7 @@ const bridge: PolarisDesktop = {
     openServers: () => ipcRenderer.invoke(CHANNELS.openServers),
     openMailDefaults: () => ipcRenderer.invoke(CHANNELS.openMailDefaults),
     setAppBadge: (input) => ipcRenderer.invoke(CHANNELS.appBadge, input),
+    setAppIcon: (input) => ipcRenderer.invoke(CHANNELS.appIcon, input),
     shareSources: (input) => ipcRenderer.invoke(CHANNELS.shareSources, input),
     chooseShare: (input) => ipcRenderer.invoke(CHANNELS.chooseShare, input),
     drawOnShare: (stroke) => ipcRenderer.invoke(CHANNELS.drawOnShare, stroke),

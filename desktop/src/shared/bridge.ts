@@ -154,6 +154,9 @@ export interface PolarisDesktop {
         readonly count: number;
         readonly overlay: string | null;
     }): Promise<boolean>;
+    /** The app's icon dressed for the season: a PNG data URL the page drew, or
+     *  null for the icon the app ships with. */
+    setAppIcon(input: { readonly png: string | null }): Promise<boolean>;
     /** The screens and windows to share, each with a small picture, for the
      *  page's own picker. Null where the system's picker is the one to use.
      *  `thumbnails: false` answers faster, with names only. */
@@ -624,6 +627,7 @@ export const CHANNELS = {
     openServers: "desktop:open-servers",
     openMailDefaults: "desktop:open-mail-defaults",
     appBadge: "desktop:app-badge",
+    appIcon: "desktop:app-icon",
     textSizeSeen: "desktop:text-size-seen",
     textSize: "local:text-size",
     textSizeChanged: "local:text-size-changed",

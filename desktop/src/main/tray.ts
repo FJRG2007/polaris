@@ -12,6 +12,21 @@ import { Menu, Tray, nativeImage, type MenuItemConstructorOptions } from "electr
 
 let tray: Tray | null = null;
 
+/** The tray icon in the season's dress, or the shipped one for null. A no-op
+ *  until the tray is up, and on macOS, which has none. */
+export function setTrayImage(image: Electron.NativeImage | null): void {
+    if (!tray || tray.isDestroyed()) return;
+    if (image) {
+        // 32 on Windows, where the notification area scales it to the display.
+        const side = process.platform === "win32" ? 32 : 22;
+        tray.setImage(image.resize({ width: side, height: side }));
+        return;
+    }
+    const file = process.platform === "win32" ? "icon.ico" : "icon.png";
+    const shipped = nativeImage.createFromPath(join(__dirname, "..", file));
+    tray.setImage(process.platform === "win32" ? shipped : shipped.resize({ width: 22, height: 22 }));
+}
+
 /** Put the icon up, or refresh what it offers. Clicking it brings Polaris forward. */
 export function installTray(items: readonly MenuItemConstructorOptions[], show: () => void): void {
     if (process.platform === "darwin") return;
