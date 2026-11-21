@@ -218,7 +218,7 @@
         "askPolarLink": "Ask Polar about it"
     },
     "contextMenu": {
-        "undo": "Undo",
+        "undo": "Undo edit",
         "redo": "Redo",
         "pastePlain": "Paste as plain text",
         "noSuggestions": "No spelling suggestions",
