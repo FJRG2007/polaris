@@ -383,6 +383,11 @@ async function ring(
             ...(group ? { group } : {})
         }
     });
+    // An iPhone with the app closed hears it only through Apple; fired and
+    // left, so a slow push never holds up the ring everybody else sees.
+    void import("@/lib/mobile/voip-push").then((push) =>
+        push.ringIphones(heard, { channelId, meetingId, caller: actor.name })
+    );
 }
 
 /**

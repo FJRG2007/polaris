@@ -1,5 +1,6 @@
 "use server";
 
+import { DEFAULT_IOS_BUNDLE } from "@/lib/mobile/voip-push";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { getGithubStatus } from "@/lib/github-service";
@@ -195,6 +196,19 @@ export async function loadIntegrationsAction() {
             filterModuleUrl:
                 entry.slug === "krisp" && typeof state?.config.moduleUrl === "string"
                     ? state.config.moduleUrl
+                    : undefined,
+            // The Apple key's identifiers. Not secret - the .p8 beside them is.
+            applePush:
+                entry.slug === "apple-push"
+                    ? {
+                          keyId: typeof state?.config.keyId === "string" ? state.config.keyId : "",
+                          teamId: typeof state?.config.teamId === "string" ? state.config.teamId : "",
+                          bundleId:
+                              typeof state?.config.bundleId === "string"
+                                  ? state.config.bundleId
+                                  : DEFAULT_IOS_BUNDLE,
+                          sandbox: state?.config.sandbox === true
+                      }
                     : undefined,
             accountLimit:
                 entry.slug === "github"

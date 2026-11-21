@@ -424,6 +424,7 @@ model User {
     activitySettings    UserActivitySettings?
     gameTime            UserGameTime[]
     mobileDeviceKeys    MobileDeviceKey[]
+    mobileVoipTokens    MobileVoipToken[]
     signInApprovals     SignInApproval[]
     chatAttachmentOpens ChatAttachmentOpen[]
     badgesSeen          UserBadgeSeen[]
@@ -11463,6 +11464,22 @@ model MobileDeviceKey {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId, lastUsedAt])
+}
+
+// An iPhone's VoIP push token, so a call rings it like a phone call with the app
+// closed. One per phone per account: registering it again moves it to whoever
+// signed in last. Dropped when Apple says the phone no longer has the app.
+model MobileVoipToken {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    userId     String   @db.Uuid
+    // Hex, as PushKit hands it over.
+    token      String   @unique
+    createdAt  DateTime @default(now())
+    lastUsedAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
 }
 
 // A sign-in waiting on the account's phone: "Is this you?" with Approve and Deny.

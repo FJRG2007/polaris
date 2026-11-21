@@ -17,6 +17,7 @@ import { testKey } from "@/lib/integrations/dymo";
 import { clearProviderPause } from "@/lib/integrations/provider-pause";
 import { applyTunnel } from "@/lib/tunnel-service";
 import { STEAM_PROVIDER } from "@/lib/connections/steam";
+import { APPLE_PUSH_PROVIDER, applePushConfigSchema, validApnsKey } from "@/lib/mobile/voip-push";
 import { connectionFailure, markConnectionFailureSeen } from "@/lib/connections/attention";
 import { dismissAdminWaiting } from "@/lib/admin-waiting";
 import { verifyKey } from "@/lib/integrations/virustotal";
@@ -355,6 +356,62 @@ export async function saveLicensedFilterAction(input: {
             targetType: "integration",
             targetId: "krisp",
             metadata: { enabled: input.enabled }
+        });
+    } catch (caught) {
+        return {
+            error: caught instanceof Error ? caught.message : t("integrations.errors.notSaved")
+        };
+    }
+
+    revalidatePath("/admin/integrations");
+    return {};
+}
+
+/**
+ * The key iPhones are rung through with the app closed (`lib/mobile/voip-push`).
+ *
+ * The identifiers are checked against Apple's shapes and the file is read as a
+ * key before anything is stored, so a paste that could never sign a push is
+ * refused here rather than failing silently on the next call. The file is
+ * tri-state like every secret on this screen: blank keeps the stored one.
+ */
+export async function saveApplePushAction(input: {
+    enabled: boolean;
+    keyId: string;
+    teamId: string;
+    bundleId: string;
+    sandbox: boolean;
+    key?: string;
+}): Promise<{ error?: string }> {
+    const user = await requireAdmin();
+    const t = await getTranslations("admin");
+    const config = applePushConfigSchema.safeParse({
+        keyId: input.keyId?.toUpperCase(),
+        teamId: input.teamId?.toUpperCase(),
+        bundleId: input.bundleId,
+        sandbox: input.sandbox === true
+    });
+    if (!config.success) return { error: t("integrations.errors.applePushIds") };
+    const key = typeof input.key === "string" && input.key.trim() ? input.key.trim() : undefined;
+    if (key !== undefined && !validApnsKey(key)) return { error: t("integrations.errors.applePushKey") };
+
+    try {
+        const existing = await getIntegrationState(APPLE_PUSH_PROVIDER);
+        if (input.enabled && !key && !existing?.hasSecret) {
+            return { error: t("integrations.errors.applePushKey") };
+        }
+        await upsertIntegration(APPLE_PUSH_PROVIDER, {
+            enabled: input.enabled === true,
+            config: config.data,
+            secret: key,
+            installedById: user.id
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "integration.configure",
+            targetType: "integration",
+            targetId: APPLE_PUSH_PROVIDER,
+            metadata: { enabled: input.enabled === true, sandbox: config.data.sandbox }
         });
     } catch (caught) {
         return {

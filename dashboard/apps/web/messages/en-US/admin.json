@@ -2097,7 +2097,9 @@
             "unknownIntegration": "Unknown integration",
             "configureFirst": "Configure the integration before enabling it",
             "githubNotConnected": "Could not connect the GitHub App",
-            "installationsNotRefreshed": "Could not refresh installations"
+            "installationsNotRefreshed": "Could not refresh installations",
+            "applePushKey": "That is not the key file Apple hands out. Paste the whole .p8 file.",
+            "applePushIds": "The Key ID and Team ID are ten letters and digits each, and the app identifier looks like app.example.name."
         },
         "tunnelHint": {
             "ngrok": "That is not an ngrok authtoken. Copy the whole value from the ngrok dashboard.",
@@ -2447,7 +2449,35 @@
                         "label": "Create an API key"
                     }
                 }
+            },
+            "applePush": {
+                "summary": "Ring iPhones like a phone call, with the app closed.",
+                "description": "Calls already ring on Android with the app closed, and on an iPhone while the app is open. With the app closed, iOS only wakes it for a push sent through Apple, which needs a key from a paid Apple Developer account. Paste it here and a call to anybody with the iPhone app rings it like a phone call: the system's own call screen, over the lock screen, with Answer and Decline.",
+                "apiKeyLabel": "Key file (.p8)",
+                "apiKeyHelp": "The whole .p8 file as downloaded, first and last lines included. Apple lets you download it once.",
+                "links": {
+                    "0": {
+                        "label": "Create the key",
+                        "help": "Certificates, Identifiers & Profiles > Keys > +, with Apple Push Notifications service (APNs) ticked. Note its Key ID and download the .p8 file."
+                    },
+                    "1": {
+                        "label": "Find your Team ID",
+                        "help": "Shown under Membership details in your Apple Developer account."
+                    }
+                }
             }
+        },
+        "applePush": {
+            "keyId": "Key ID",
+            "keyIdHint": "Ten letters and digits, shown beside the key in your Apple Developer account.",
+            "teamId": "Team ID",
+            "teamIdHint": "Ten letters and digits, under Membership details.",
+            "bundleId": "App identifier",
+            "bundleIdHint": "The bundle identifier the iPhone app is signed with. Leave it as it is unless you signed your own build under another one.",
+            "sandbox": "Development build",
+            "sandboxHint": "On for an app run from Xcode; off for TestFlight and the App Store.",
+            "use": "Ring iPhones",
+            "useHint": "Off keeps the key and stops the pushes; iPhones then ring only while the app is open."
         }
     },
     "organizations": {

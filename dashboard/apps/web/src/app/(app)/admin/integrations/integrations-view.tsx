@@ -142,6 +142,8 @@ export interface IntegrationCard {
     failure?: ConnectionFailure;
     /** Where a licensed call filter is served from. Set for that card only. */
     filterModuleUrl?: string;
+    /** The Apple push key's identifiers. Set for that card only. */
+    applePush?: { keyId: string; teamId: string; bundleId: string; sandbox: boolean };
     /** Whether a linked account of this service may sign anybody in here, for the
      *  services people link an account of. Undefined for the rest. */
     signInAllowed?: boolean;
@@ -170,6 +172,7 @@ export function dialogFor(card: IntegrationCard): ComponentType<IntegrationDialo
     if (["tenor", "giphy", "lastfm", "tailscale", "deepl", "google-translate"].includes(card.slug))
         return TenorDialog;
     if (card.slug === "krisp") return LicensedFilterDialog;
+    if (card.slug === "apple-push") return ApplePushDialog;
     if (OAUTH_APPS[card.slug]) return OAuthAppDialog;
     return null;
 }
@@ -1250,6 +1253,174 @@ function LicensedFilterDialog({ card, onClose }: { card: IntegrationCard; onClos
                             checked={enabled}
                             onChange={setEnabled}
                             aria-label={t("integrations.filter.use")}
+                        />
+                    </div>
+
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
+
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="ghost" onClick={onClose}>
+                            {tc("actions.cancel")}
+                        </Button>
+                        <Button type="button" onClick={onSave} disabled={saving || unchanged}>
+                            {saving ? (
+                                <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                                tc("actions.save")
+                            )}
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/**
+ * The key an iPhone is rung through with the app closed.
+ *
+ * Four values Apple shows in two places and a file it lets you download once.
+ * The file is a secret like every other on this screen: blank keeps the stored
+ * one. The identifiers are not, so they are read back.
+ */
+function ApplePushDialog({ card, onClose }: { card: IntegrationCard; onClose: () => void }) {
+    const t = useTranslations("admin");
+    const tc = useTranslations("common");
+    const stored = card.applePush ?? { keyId: "", teamId: "", bundleId: "", sandbox: false };
+
+    // Nobody pastes a key meaning to leave it unused.
+    const [enabled, setEnabled] = useState(card.hasSecret ? card.enabled : true);
+    const [keyId, setKeyId] = useState(stored.keyId);
+    const [teamId, setTeamId] = useState(stored.teamId);
+    const [bundleId, setBundleId] = useState(stored.bundleId);
+    const [sandbox, setSandbox] = useState(stored.sandbox);
+    const [key, setKey] = useState("");
+    const [error, setError] = useState<string | null>(null);
+    const values = { enabled, keyId, teamId, bundleId, sandbox, key };
+    // What the dialog opened with: closing it on the same values saves nothing.
+    const [loaded] = useState(() => values);
+    const unchanged = !isDirty(loaded, values);
+    const [saving, startSave] = useTransition();
+
+    function onSave() {
+        setError(null);
+        startSave(async () => {
+            const result = await runAction(
+                () => integrationActions.saveApplePushAction(values),
+                setError
+            );
+            if (!result) return;
+            if (result.error) setError(result.error);
+            else onClose();
+        });
+    }
+
+    const field = (
+        label: string,
+        hint: string,
+        value: string,
+        onChange: (next: string) => void,
+        placeholder: string
+    ) => (
+        <label className="flex min-w-0 flex-col gap-1 text-sm">
+            <span className="font-medium">{label}</span>
+            <Input
+                value={value}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={placeholder}
+                onChange={(event) => onChange(event.target.value)}
+            />
+            <span className="text-xs text-muted-foreground">{hint}</span>
+        </label>
+    );
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <IntegrationLogo slug={card.slug} className="size-5" />
+                        {card.name}
+                    </DialogTitle>
+                    <DialogDescription>{card.description}</DialogDescription>
+                </DialogHeader>
+
+                <div className="flex flex-col gap-4">
+                    <SetupSteps links={card.setupLinks} values={card.setupValues} />
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        {field(
+                            t("integrations.applePush.keyId"),
+                            t("integrations.applePush.keyIdHint"),
+                            keyId,
+                            (next) => setKeyId(next.toUpperCase()),
+                            "ABC123DEFG"
+                        )}
+                        {field(
+                            t("integrations.applePush.teamId"),
+                            t("integrations.applePush.teamIdHint"),
+                            teamId,
+                            (next) => setTeamId(next.toUpperCase()),
+                            "XYZ987WVUT"
+                        )}
+                    </div>
+
+                    {field(
+                        t("integrations.applePush.bundleId"),
+                        t("integrations.applePush.bundleIdHint"),
+                        bundleId,
+                        setBundleId,
+                        "app.example.mobile"
+                    )}
+
+                    <label className="flex flex-col gap-1 text-sm">
+                        <span className="font-medium">
+                            {card.apiKeyLabel ?? t("integrations.dialog.apiKey")}
+                        </span>
+                        <Textarea
+                            value={key}
+                            autoComplete="off"
+                            spellCheck={false}
+                            rows={4}
+                            onChange={(event) => setKey(event.target.value)}
+                            placeholder={
+                                card.hasSecret
+                                    ? t("integrations.dialog.savedKey")
+                                    : t("integrations.dialog.pasteKey")
+                            }
+                            className="rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs"
+                        />
+                        {card.apiKeyHelp ? (
+                            <span className="text-xs text-muted-foreground">{card.apiKeyHelp}</span>
+                        ) : null}
+                    </label>
+
+                    <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                        <span className="min-w-0">
+                            <span className="font-medium">{t("integrations.applePush.sandbox")}</span>
+                            <span className="block text-xs text-muted-foreground">
+                                {t("integrations.applePush.sandboxHint")}
+                            </span>
+                        </span>
+                        <Switch
+                            checked={sandbox}
+                            onChange={setSandbox}
+                            aria-label={t("integrations.applePush.sandbox")}
+                        />
+                    </div>
+
+                    <div className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm">
+                        <span className="min-w-0">
+                            <span className="font-medium">{t("integrations.applePush.use")}</span>
+                            <span className="block text-xs text-muted-foreground">
+                                {t("integrations.applePush.useHint")}
+                            </span>
+                        </span>
+                        <Switch
+                            checked={enabled}
+                            onChange={setEnabled}
+                            aria-label={t("integrations.applePush.use")}
                         />
                     </div>
 

@@ -641,6 +641,33 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
         apiKeyHelp: "Whatever the filter authenticates with. Leave blank if yours needs none."
     },
     {
+        slug: "apple-push",
+        name: "Apple push",
+        category: "Chat",
+        summary: "Ring iPhones like a phone call, with the app closed.",
+        description:
+            // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+            "Calls already ring on Android with the app closed, and on an iPhone while the app is open. With the app closed, iOS only wakes it for a push sent through Apple, which needs a key from a paid Apple Developer account. Paste it here and a call to anybody with the iPhone app rings it like a phone call: the system's own call screen, over the lock screen, with Answer and Decline.",
+        docsUrl: "https://developer.apple.com/documentation/pushkit",
+        setupLinks: [
+            {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+                label: "Create the key",
+                url: "https://developer.apple.com/account/resources/authkeys/list",
+                help: "Certificates, Identifiers & Profiles > Keys > +, with Apple Push Notifications service (APNs) ticked. Note its Key ID and download the .p8 file."
+            },
+            {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+                label: "Find your Team ID",
+                url: "https://developer.apple.com/account",
+                help: "Shown under Membership details in your Apple Developer account."
+            }
+        ],
+        requiresApiKey: true,
+        apiKeyLabel: "Key file (.p8)",
+        apiKeyHelp: "The whole .p8 file as downloaded, first and last lines included. Apple lets you download it once."
+    },
+    {
         slug: "tenor",
         name: "Tenor",
         category: "Chat",

@@ -10,6 +10,7 @@ import { initialsInk, tintFor } from "@polaris/core";
 import { Blocks, Mails, Server } from "lucide-react";
 import { DymoMark } from "./dymo-mark";
 import * as brand from "./brand-icons";
+import { AppleMark } from "@polaris/ui/account-downloads/client-marks";
 import type { ComponentType } from "react";
 import { AGENT_CLIS } from "@polaris/core";
 import { SIGNIN_PREFIX } from "@/lib/agents/agent-signins";
@@ -143,6 +144,8 @@ const SERVICE_MARKS: Record<string, ComponentType<{ className?: string }>> = {
     tailscale: brand.TailscaleMark,
     giphy: brand.GiphyMark,
     krisp: brand.KrispMark,
+    // Apple's own mark, as the downloads page draws it for iOS.
+    "apple-push": AppleMark,
     dymo: DymoMark,
     nuki: brand.NukiMark,
     tplink: brand.TpLinkMark,
