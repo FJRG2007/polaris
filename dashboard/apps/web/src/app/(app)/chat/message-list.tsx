@@ -232,6 +232,7 @@ import {
     Trash2,
     Volume2
 } from "lucide-react";
+import { Clock as WaitingClock } from "lucide-react";
 import * as polls from "./chat-reads";
 import { unlockProofFor } from "./lock-session";
 
@@ -1230,6 +1231,16 @@ function Message({
                                         receipt={message.receipt}
                                         onOpen={() => onExplain(message)}
                                     />
+                                )}
+                                {message.id.startsWith("outbox:") && (
+                                    <span
+                                        role="img"
+                                        title={t("messageList.receipt.pending")}
+                                        aria-label={t("messageList.receipt.pending")}
+                                        className="ms-1 inline-flex align-middle text-foreground-subtle"
+                                    >
+                                        <WaitingClock className="size-3" />
+                                    </span>
                                 )}
                                 {message.edited && (
                                     // A button, not a label: "(edited)" that cannot be

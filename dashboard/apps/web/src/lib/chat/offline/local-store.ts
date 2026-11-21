@@ -93,7 +93,8 @@ export interface LocalStore {
     read<T>(kind: string, id: string): Promise<T | null>;
     /** Every entry of a kind, oldest written first. */
     readAll<T>(kind: string): Promise<{ id: string; value: T }[]>;
-    write(kind: string, id: string, value: unknown): Promise<void>;
+    /** Whether the entry was stored: false with no store here or a failed write. */
+    write(kind: string, id: string, value: unknown): Promise<boolean>;
     forget(kind: string, id: string): Promise<void>;
     /** Everything, for everybody. What signing out does. */
     clear(): Promise<void>;
@@ -175,7 +176,7 @@ export function createLocalStore(
         },
         async write(kind, id, value) {
             const backend = open();
-            if (!backend || !owner || !id || !limits[kind]) return;
+            if (!backend || !owner || !id || !limits[kind]) return false;
             const meta: LocalStoreMeta = {
                 key: localStoreKey(owner, kind, id),
                 owner,
@@ -184,7 +185,13 @@ export function createLocalStore(
                 at: now(),
                 build: build()
             };
-            await backend.put(meta, value).then(pruneSoon, () => undefined);
+            return backend.put(meta, value).then(
+                () => {
+                    pruneSoon();
+                    return true;
+                },
+                () => false
+            );
         },
         async forget(kind, id) {
             const backend = open();

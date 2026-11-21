@@ -485,7 +485,10 @@ export const chatSendSchema = z.object({
      *  alternative for when a side conversation would bury the room. */
     replyToId: z.string().uuid().nullable().optional(),
     /** Set when live translation rewrote what was typed before it was sent. */
-    translation: chatSentTranslationSchema.optional()
+    translation: chatSentTranslationSchema.optional(),
+    /** Made by the sending device: a repeat with the same key is answered with
+     *  the message already stored, so a retried send never posts twice. */
+    clientKey: z.string().uuid().optional()
 });
 
 export type ChatSendInput = z.infer<typeof chatSendSchema>;

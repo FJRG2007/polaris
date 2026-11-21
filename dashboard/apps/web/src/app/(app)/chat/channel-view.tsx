@@ -96,7 +96,7 @@ import {
     savePaneSize,
     storedPaneSize
 } from "./pane-preferences";
-import { ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
+import { AlertCircle, ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
 import { keepReading, readingPosition, type ReadingPosition } from "./reading-position";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { LocationDialog } from "./location-dialog";
@@ -125,6 +125,8 @@ import { fetchLiveCall } from "./chat-polls";
 import { usePolarContext } from "@/components/polar/polar-panel";
 import * as polls from "./chat-reads";
 import * as chatCache from "@/lib/chat/offline/chat-cache";
+import * as outbox from "./outbox";
+import { newClientKey, type OutboxEntry } from "@/lib/chat/offline/outbox";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -232,6 +234,8 @@ export function ChannelView({
     // Polar's answers being written, at the end - see `polar-draft.ts`.
     const { rows: drafting, onFrame: onDraftFrame } = usePolarDrafts(channelId, null, messages);
     const [pending, setPending] = useState<readonly ChatMessageView[]>([]);
+    /** What this device could not send here, waiting for a retry or a delete. */
+    const [unsent, setUnsent] = useState<readonly OutboxEntry[]>([]);
     const [olderThan, setOlderThan] = useState<string | null>(null);
     const [loadingOlder, setLoadingOlder] = useState(false);
     // Whether there is a page below the window too, which there is only after
@@ -653,6 +657,71 @@ export function ChannelView({
     // asked - and all there is to read when there is no network. Never for one
     // behind the chat lock: those are not kept, and one locked since is dropped.
     const lockedRef = useRef<boolean | null>(null);
+    // Held in a ref so the outbox subscription below lives as long as the
+    // conversation, not as long as one render's callbacks.
+    const onOutboxSent = useRef(() => undefined as void);
+    onOutboxSent.current = () => {
+        settle(held.current);
+        void load();
+        refresh();
+    };
+    // The outbox: what was written here and not yet taken by the server, drawn
+    // as waiting after a reload, and settled by its own echo once it is sent.
+    useEffect(() => {
+        let cancelled = false;
+        const reread = (): void => {
+            void outbox.readOutbox(channelId).then((entries) => {
+                if (cancelled) return;
+                const waiting = new Map<string, OutboxEntry>(
+                    entries
+                        .filter((entry) => entry.state === "pending")
+                        .map((entry) => [`outbox:${entry.key}`, entry] as const)
+                );
+                setPending((current) => {
+                    const known = new Set(current.map((entry) => entry.id));
+                    const kept = current.filter(
+                        (entry) =>
+                            !entry.id.startsWith("outbox:") ||
+                            waiting.has(entry.id) ||
+                            sent.current.has(entry.id)
+                    );
+                    const added = [...waiting].flatMap(([id, entry]) =>
+                        known.has(id)
+                            ? []
+                            : [
+                                  draftMessage({
+                                      id,
+                                      channelId,
+                                      authorId: viewerId,
+                                      authorName: viewerName,
+                                      body: entry.body,
+                                      createdAt: entry.createdAt
+                                  })
+                              ]
+                    );
+                    return added.length === 0 && kept.length === current.length
+                        ? current
+                        : [...kept, ...added];
+                });
+                const failed = entries.filter((entry) => entry.state === "failed");
+                setUnsent((current) => (current.length === 0 && failed.length === 0 ? current : failed));
+            });
+        };
+        reread();
+        const stop = outbox.subscribeOutbox((event) => {
+            if (event && event.channelId !== channelId) return;
+            if (event && "sent" in event) {
+                sent.current.set(`outbox:${event.key}`, event.sent);
+                onOutboxSent.current();
+                return;
+            }
+            reread();
+        });
+        return () => {
+            cancelled = true;
+            stop();
+        };
+    }, [channelId, viewerId, viewerName]);
     lockedRef.current = channel ? channel.locked : null;
     useEffect(() => {
         let cancelled = false;
@@ -1901,8 +1970,9 @@ export function ChannelView({
     };
 
     const sendText = async (body: string, translation?: core.ChatSentTranslation) => {
+        const key = newClientKey();
         const draft = draftMessage({
-            id: `pending:${++drafts.current}`,
+            id: !replyingTo && carried ? `pending:${++drafts.current}` : `outbox:${key}`,
             channelId,
             authorId: viewerId,
             authorName: viewerName,
@@ -1921,6 +1991,37 @@ export function ChannelView({
         // and the message has left.
         setReplyingTo(null);
         setCarried(null);
+
+        if (!elsewhere) {
+            // Kept on this device first: written offline, or with a request that
+            // fails, it survives a reload and goes, in order, when it can.
+            if (await outbox.enqueue({ key, channelId, body, replyToId: answering, translation })) {
+                outbox.flushOutbox();
+                return;
+            }
+            // Nowhere to keep it (a private window, a WebView without IndexedDB,
+            // a full disk): sent at once, with the same key, as it always was.
+            const direct = await runAction(
+                () =>
+                    actions.sendAction({
+                        channelId,
+                        body,
+                        replyToId: answering,
+                        translation,
+                        clientKey: key
+                    }),
+                setError
+            );
+            if (direct?.error || !direct?.id) {
+                setPending((current) => current.filter((entry) => entry.id !== draft.id));
+                return;
+            }
+            sent.current.set(draft.id, direct.id);
+            settle(held.current);
+            await load();
+            refresh();
+            return;
+        }
 
         const result = await runAction(
             () =>
@@ -2518,6 +2619,38 @@ export function ChannelView({
                             await loadScheduled();
                         }}
                     />
+                    {unsent.length > 0 && (
+                        <div
+                            role="status"
+                            className="flex flex-col gap-1 border-t border-border px-4 py-2 text-xs"
+                        >
+                            {unsent.map((entry) => (
+                                <div key={entry.key} className="flex min-w-0 items-center gap-2">
+                                    <AlertCircle className="size-3.5 shrink-0 text-destructive" />
+                                    <span
+                                        className="min-w-0 flex-1 truncate"
+                                        title={entry.reason || entry.body}
+                                    >
+                                        {t("outbox.notSent", { excerpt: entry.body })}
+                                    </span>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => void outbox.retry(entry)}
+                                    >
+                                        {t("outbox.retry")}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => void outbox.discard(entry.key)}
+                                    >
+                                        {t("outbox.discard")}
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                     <Composer
                         channelId={channelId}
                         emoji={composerEmoji}

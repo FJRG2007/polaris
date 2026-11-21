@@ -18,6 +18,7 @@
 import type { ChatLists } from "@/lib/chat/chat-lists";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { chatStore } from "@/lib/chat/offline/chat-cache";
+import { useOutboxFlusher } from "./outbox";
 import * as core from "@polaris/core";
 import { listChannelsAction } from "./actions";
 import type { ChatCategoryView, ChatChannelView, ChatSpaceView } from "@/lib/chat/chat-service";
@@ -229,6 +230,7 @@ export function ChatProvider({
     const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
 
     const keptLists = useRef<KeptLists | null>(null);
+    useOutboxFlusher(viewerId);
     /** The server has answered, so a late read of the device's copy is moot. */
     const answered = useRef(false);
     const keepLists = useCallback(

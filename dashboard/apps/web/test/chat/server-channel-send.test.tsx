@@ -199,7 +199,7 @@ describe("sending in a server channel", () => {
         await act(async () => {
             await onSend?.("hello");
         });
-        expect(sentInputs).toEqual([{ channelId: "c1", body: "hello", replyToId: null }]);
+        expect(sentInputs).toEqual([{ channelId: "c1", body: "hello", replyToId: null, clientKey: expect.stringMatching(/^[0-9a-f-]{36}$/) }]);
         expect(screen.getAllByText("m2")).toHaveLength(1);
     });
 });

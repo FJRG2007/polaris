@@ -627,7 +627,8 @@
         "receipt": {
             "sent": "Enviado",
             "delivered": "Entregado",
-            "read": "Leído"
+            "read": "Leído",
+            "pending": "Por enviar"
         },
         "starred": "Destacado",
         "pinnedHere": "Fijado",
@@ -2728,5 +2729,10 @@
         "attribution": "© OpenStreetMap",
         "sharingIn": "{count, plural, one {Compartes ubicación en # chat} other {Compartes ubicación en # chats}}",
         "stopAll": "Parar todo"
+    },
+    "outbox": {
+        "notSent": "No enviado: {excerpt}",
+        "retry": "Reenviar",
+        "discard": "Borrar"
     }
 }

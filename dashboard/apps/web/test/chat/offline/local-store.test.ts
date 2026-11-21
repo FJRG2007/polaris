@@ -84,4 +84,23 @@ describe("local store", () => {
         expect(kept).toHaveLength(CACHED_MESSAGES_PER_CHANNEL);
         expect(kept.at(-1)?.id).toBe(String(CACHED_MESSAGES_PER_CHANNEL + 4));
     });
+
+    it("says when nothing could be kept, so the caller sends at once instead", async () => {
+        const { backend } = memoryBackend();
+        const store = createLocalStore(() => backend, LIMITS, () => "b1", () => 0);
+        expect(await store.write("outbox", "k1", {})).toBe(false);
+        store.setOwner("me");
+        expect(await store.write("outbox", "k1", {})).toBe(true);
+        const missing = createLocalStore(() => null, LIMITS, () => "b1", () => 0);
+        missing.setOwner("me");
+        expect(await missing.write("outbox", "k1", {})).toBe(false);
+        const full = createLocalStore(
+            () => ({ ...backend, put: () => Promise.reject(new Error("QuotaExceededError")) }),
+            LIMITS,
+            () => "b1",
+            () => 0
+        );
+        full.setOwner("me");
+        expect(await full.write("outbox", "k1", {})).toBe(false);
+    });
 });

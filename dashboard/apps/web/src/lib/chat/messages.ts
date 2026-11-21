@@ -505,7 +505,39 @@ export async function readChanged(
  * conversations and how a thread announces itself, and a message that landed
  * without them would be a message nobody is shown.
  */
-export async function send(
+/**
+ * Post a message. A send that carries a device key it already sent is answered
+ * with the message stored the first time - before any check, and again if two
+ * repeats race to the unique index - so a retry after a lost answer never posts
+ * twice.
+ */
+export async function send(...args: Parameters<typeof sendUnguarded>): Promise<string> {
+    const [actor, input] = args;
+    const earlier = (): Promise<string | null> =>
+        input.clientKey
+            ? prisma.chatMessage
+                  .findFirst({
+                      where: { authorId: actor.id, clientKey: input.clientKey },
+                      select: { id: true }
+                  })
+                  .then((row) => row?.id ?? null)
+            : Promise.resolve(null);
+    const already = await earlier();
+    if (already) return already;
+    try {
+        return await sendUnguarded(...args);
+    } catch (error) {
+        // By its code rather than its class, which a mocked client does not carry.
+        const duplicate = (error as { code?: unknown } | null)?.code === "P2002";
+        if (input.clientKey && duplicate) {
+            const raced = await earlier();
+            if (raced) return raced;
+        }
+        throw error;
+    }
+}
+
+async function sendUnguarded(
     actor: ChatActor,
     input: core.ChatSendInput,
     /** Files already written to storage, to be tied to the message in the same
@@ -625,6 +657,7 @@ export async function send(
             data: {
                 channelId: input.channelId,
                 authorId: actor.id,
+                ...(input.clientKey ? { clientKey: input.clientKey } : {}),
                 ...(expiresAt ? { expiresAt } : {}),
                 kind: poll ? "poll" : location ? "location" : "text",
                 body: input.body,

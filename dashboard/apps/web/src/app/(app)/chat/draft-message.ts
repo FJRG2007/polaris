@@ -27,6 +27,7 @@ export function draftMessage(facts: {
      *  about somebody who is not here. */
     readonly authorName: string;
     readonly body: string;
+    readonly createdAt?: string;
 }): ChatMessageView {
     return {
         id: facts.id,
@@ -73,7 +74,7 @@ export function draftMessage(facts: {
         // Nothing has happened to it yet, not even leaving. The first tick
         // arrives with the message the reload brings back.
         receipt: null,
-        createdAt: new Date().toISOString()
+        createdAt: facts.createdAt ?? new Date().toISOString()
     };
 }
 

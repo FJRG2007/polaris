@@ -10837,6 +10837,9 @@ model ChatMessage {
     // Not a foreign key, so a message survives the account that wrote it - what
     // was said stays said, and the name resolves to nobody.
     authorId    String?   @db.Uuid
+    // Made by the sending device, so a send retried after a lost answer is
+    // answered with the message already stored instead of posting it twice.
+    clientKey   String?   @db.Uuid
     // text | system | call
     kind        String    @default("text")
     body        String    @default("")
@@ -10931,6 +10934,7 @@ model ChatMessage {
     hiddenFor   ChatMessageHidden[]
 
     @@index([channelId, createdAt])
+    @@unique([authorId, clientKey])
     // One channel's main conversation or one of its threads, in time order,
     // without stepping over the other's lines.
     @@index([channelId, parentId, createdAt])
