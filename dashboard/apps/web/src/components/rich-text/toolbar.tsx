@@ -57,6 +57,12 @@ export function ToolbarButton({
     );
 }
 
+/** Where the bar over a selection is laid: the dialog the editor is in, or the page. */
+export function floatingRoot(editor: Editor): HTMLElement {
+    const dom = editor.isDestroyed ? null : editor.view.dom;
+    return dom?.closest<HTMLElement>("[role='dialog'], [role='alertdialog']") ?? document.body;
+}
+
 export function SelectionToolbar({ editor }: { editor: Editor }) {
     const t = useTranslations("components");
     const [linking, setLinking] = useState(false);
@@ -83,7 +89,15 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
             shouldShow={({ editor: current, from, to }) =>
                 from !== to && !current.isActive("codeBlock") && !current.isActive("markdownBlock")
             }
-            className="flex items-center gap-0.5 rounded-lg border border-border-strong bg-elevated p-1 shadow-popover"
+            // Out of the editor's own box, which is where it went by default:
+            // the chat composer clips what overflows it, so the bar sat half
+            // under the line being formatted. Laid on the page instead - or on
+            // the dialog the editor is in, which keeps it inside that dialog's
+            // focus and pointer handling - and kept on screen by flipping below
+            // the selection or sliding along it.
+            appendTo={() => floatingRoot(editor)}
+            options={{ strategy: "fixed", placement: "top", offset: 8, flip: { padding: 8 }, shift: { padding: 8 } }}
+            className="pointer-events-auto z-[60] flex items-center gap-0.5 rounded-lg border border-border-strong bg-elevated p-1 shadow-popover"
         >
             {linking ? (
                 <form
