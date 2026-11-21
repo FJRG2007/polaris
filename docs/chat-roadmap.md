@@ -93,7 +93,7 @@ when a deploy finishes".
 | Custom emoji per space                          | ✅     | -    | -    | Discord's model: an emoji belongs to one space and works only there. 50 still + 50 animated, uploaded by the owner and administrators on the space's Emoji page; `:name:` in the box, a section in the picker, reactions, jumbo when a message is only emoji. Stored as `<:name:id>`; the server writes any other as its name (`lib/chat/custom-emoji.ts`).                                                                                                                                                                                                           |
 | Stickers                                        | ⬜     | P2   | M    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | Scheduled messages                              | ⬜     | P2   | M    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Disappearing messages per conversation          | ⬜     | P1   | M    | Signal's model: a window set by either side, applied on both.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| Disappearing messages per conversation          | 🟡     | P1   | M    | Done for direct conversations and groups outside spaces (`lib/chat/vanish.ts`, see section 6 row 8); space channels are the retention row in section 2.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Documents sent to be seen once                  | ⬜     | P2   | M    | PDFs, spreadsheets, Markdown and anything else Polaris previews, opened once in the phone app's protected viewer like photos, videos, voice notes and text are today. |
 | Streamer mode (hide invite codes and addresses) | ⬜     | P2   | S    | Fluxer has it; cheap and genuinely useful on a screen share, which Polaris now does well.                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | Server discovery (a public directory)           | ⬜     | P2   | M    |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -224,3 +224,136 @@ endpoint). Polaris tells the room a recording is running, on every screen and to
 anybody who joins afterwards, but it does not gate the join on agreement. That is
 a policy decision an administrator should own, and it wants a setting rather than
 a default.
+
+---
+
+## 6. WhatsApp privacy and security parity (ledger, 2026-11-21)
+
+Every user-facing privacy, security and restriction feature WhatsApp ships as of
+late 2026, checked against this repository. This section builds nothing; it is
+the list to assign from.
+
+Polaris is read for who will run it: intelligence services, governments,
+militaries, hospitals and large companies. So each row also states the
+**security bar** the feature has to meet (a control a breached server or an
+administrator can walk through is not the feature) and the **policy** an
+organization or instance administrator needs over it (enforce, forbid, default).
+Where WhatsApp leans on a phone number, Polaris adapts it to the account handle
+and email. Where WhatsApp leans on the phone OS (screenshot blocking), the web
+client cannot do it at all and the row says so.
+
+**Status:** Present (evidence given) · Partial (what is missing) · Missing ·
+E2EE plan (covered by a section of [chat-e2ee-proposal.md](chat-e2ee-proposal.md)) · N/A (no Polaris equivalent to protect)
+
+Note: the "Disappearing messages per conversation" row in section 3 was marked
+todo; it exists for direct conversations (row 8 below) and is now marked partial.
+Only space channels lack it, which is the retention row in section 2.
+
+### 6.1 Locking and hiding
+
+| # | Feature | WhatsApp | Polaris status and evidence | What to build (security bar · admin policy) | Size |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Chat Lock, locked-chats folder, secret code, hide locked chats | Lock a chat behind device auth or a separate secret code; locked chats go to a folder that can be hidden entirely and revealed by typing the code in search [1][2] | **Partial.** Lock, own code (scrypt, throttled), text-free notifications, "hide locked" and a signed per-tab unlock proof exist: `lib/chat/chat-lock.ts` (header, `hideLocked` l.85), `chat/lock-dialogs.tsx`, `lib/chat/lock-timing.ts`. Missing: hidden locked chats are reached through the "Locked chats" shelf (`chat/chat-sidebar.tsx` l.677), and no reveal-by-typing-the-code in search was found; no biometric or passkey unlock in the phone and desktop apps | Reveal-by-code in the search field with no visible entry when hidden; biometric (Android BiometricPrompt, iOS LocalAuthentication) and WebAuthn user verification as alternatives to the code. **Bar:** today the code is checked by the server, so a database breach or an administrator can bypass it; with E2EE the code (or a biometric-bound key) must wrap the conversation's local key cache on the device, so a server breach yields nothing. **Policy:** org may require chat lock on chosen spaces; default off | M |
+| 2 | App lock | Biometric or PIN to open the app [14] | **Partial.** Per-app PIN locks, unlocks kept per browser session: `lib/app-lock-service.ts`, `app/(app)/app-lock/`. Biometric exists only for the Vault on Android (`mobile/android/app/src/main/java/app/polaris/mobile/VaultAuthActivity.java`) | Biometric or passkey unlock for app locks on web (WebAuthn UV), Android and iOS; auto-lock after idle; blank the task-switcher snapshot in the phone apps. **Policy:** org "require Chat lock, max idle N min" | M |
+
+### 6.2 Advanced Chat Privacy and media
+
+| # | Feature | WhatsApp | Polaris status and evidence | What to build (security bar · admin policy) | Size |
+| --- | --- | --- | --- | --- | --- |
+| 3 | Advanced Chat Privacy (per chat) | Any member turns it on: nobody can export the chat, media is not auto-saved to phones, and messages cannot be used with Meta AI [3] | **Missing.** No per-conversation switch. Polar reads the conversation's recent history when mentioned (`lib/chat/polar-mention.ts` ~l.297-301); attachments can be downloaded and saved (`chat/media-download.ts`); forwarding is only a per-author audience (`UserPrivacy.forwarding`). There is no chat export today, so nothing to block there yet | `ChatChannel.advancedPrivacy`, toggled by any member, with a notice line. Enforced server-side: `@polar`, app commands and any summary refuse to read the history; download and save-to-Drive routes refuse; forward is hidden and refused; any future export checks it. **Bar:** server-enforced now; under E2EE it becomes client-enforced, so it must be described as binding honest clients only, attestable on verified apps (E2EE plan 4.7). **Policy:** org default on, or forced on and locked for classified orgs | M |
+| 4 | Disable link previews | Per-account switch; also forced by Strict Account Settings [7] | **Partial.** Previews are fetched by the server under a policy (`lib/link-preview/policy.ts`) and links are reputation-checked (`lib/chat/link-safety.ts`); no switch stops them | Per-user "no previews for what I send" and per-conversation off. **Bar:** the E2EE plan (section 5) fetches previews through the server, which learns every URL; an org must be able to turn that off. **Policy:** org forbid or allow; default on | S |
+| 5 | Media auto-download | Choose which media downloads automatically per network; ACP stops auto-saving [3] | **Missing.** Media loads as soon as a message renders; no setting found | Per-user policy per media kind (and Wi-Fi or cellular in the phone apps): a click-to-load placeholder with size and type. **Policy:** org default (for example "never auto-load from people outside the org") | M |
+
+### 6.3 Ephemeral content
+
+| # | Feature | WhatsApp | Polaris status and evidence | What to build (security bar · admin policy) | Size |
+| --- | --- | --- | --- | --- | --- |
+| 6 | View once (photo, video, voice) and its screenshot block | Opened once, cannot be forwarded, saved or screenshotted; voice notes since Dec 2023 [15] | **Partial.** Server-enforced: bytes refused to everything but the Android app, which signs a fresh challenge with a keystore key; the open is recorded before streaming; reader name and time watermarked: `lib/chat/view-once.ts`, `chat/view-once-card.tsx`, `chat/view-once-menu.tsx`, `UserPrivacy.viewOnceWatermark`; `ViewOnceActivity.java` l.68 sets `FLAG_SECURE`. Missing: the iOS app has no protected viewer (nothing under `mobile/ios/Polaris`), so iPhone readers cannot open one; the desktop app has `setContentProtection` but uses it only on call overlays (`desktop/src/main/windows.ts` l.291). Web: screenshot blocking is impossible, and refusing the bytes there is correct | iOS viewer that blanks while `UIScreen.isCaptured` and records screenshots; desktop protected viewer window. A report must be able to hand a view-once item to moderators, as WhatsApp's does. **Bar:** today the server holds the plaintext; under E2EE a per-message key is released once and deleted server-side, with the device attestation kept. **Policy:** org allow or forbid view once (it conflicts with record-keeping duties); watermark forced on | L |
+| 7 | Documents view once | - | Already listed in section 3 ("Documents sent to be seen once") | See section 3 | M |
+| 8 | Disappearing messages and default timer | Per-chat timer 24 h / 7 d / 90 d, a default for new chats, group admins can restrict who changes it [16] | **Present** for direct conversations and groups outside spaces: `lib/chat/vanish.ts`, `lib/chat/vanish-rules.ts` l.21 (off, 24 h, 7 d, 30 d, 90 d), `app/api/cron/chat-disappearing`, default timer `UserPrivacy.chatVanishAfter` with `account/privacy/chat-timer-card.tsx`, instance mode in `admin/apps/[appId]/settings/_chat/direct-rules-view.tsx`. Space channels: retention row in section 2 | Space channel retention (section 2). **Bar:** under E2EE every client deletes its local copy and the server deletes the ciphertext; notification previews must not outlive the message. **Policy:** org minimum and maximum timer, legal hold override (E2EE plan section 9) | - |
+| 9 | Keep in chat | A recipient keeps a disappearing message; the sender is told and can undo; the sender can forbid it; group admins can restrict it [4] | **Missing.** The expiry sweep has no exception (`lib/chat/vanish.ts`) | `ChatMessageKeep` row, sender notice with undo, per-message "cannot be kept", group owner-only option, a "Kept" view beside `chat/saved/saved-view.tsx`; the sweep skips kept rows. **Policy:** org legal hold supersedes; org may forbid keeping | M |
+
+### 6.4 Calls
+
+| # | Feature | WhatsApp | Polaris status and evidence | What to build (security bar · admin policy) | Size |
+| --- | --- | --- | --- | --- | --- |
+| 10 | Silence unknown callers | Calls from unknown numbers do not ring but appear in the call list [5] | **Partial (adapted).** Who may ring is an audience, friends and colleagues by default (`lib/privacy-service.ts` `mayRing` l.214, field `calls`); a refused call is refused, not silenced and listed | A "silenced" outcome: no ring, an entry in missed calls marked silenced (`lib/chat/missed-call.ts`), so a legitimate caller is not lost. **Policy:** org default audience | S |
+| 11 | Protect IP address in calls | Relays calls through WhatsApp servers so the other side never learns your IP [6] | **Present by architecture.** Calls go through the SFU (`chat/use-sfu-call.ts`); there is no peer-to-peer `RTCPeerConnection` in the chat code, so participants never see each other's addresses (the server does) | Nothing for parity. For high-risk deployments: a TURN-over-TLS-only option so a network observer cannot tell a call from web traffic. **Policy:** org "relay only" | - |
+
+### 6.5 Who sees and reaches me
+
+| # | Feature | WhatsApp | Polaris status and evidence | What to build (security bar · admin policy) | Size |
+| --- | --- | --- | --- | --- | --- |
+| 12 | Privacy Checkup | Guided walk through the privacy and security settings [5] | **Missing.** No guided flow | One page that walks `PRIVACY_SECTIONS` and the security card (2FA, passkeys, sessions) with a recommended preset per step, reusing `account/privacy/privacy-view.tsx`. **Policy:** org may require it at first sign-in | M |
+| 13 | Last seen, online, profile photo, about, incl. "my contacts except" | Per-field audiences incl. "My contacts except..." and "Nobody"; hiding yours hides others' from you [14] | **Present.** `packages/core/src/schemas/privacy.ts` l.44 audiences (`everyoneExcept`, `friendsExcept`, `only`, `nobody`, ...), l.192 fields (`lastSeen`, `lastActive`, `avatar`, `photoFullSize`, `profile`, `typing`, `activity`); reciprocity in `lib/presence-service.ts` l.94; administrator defaults in `lib/privacy-service.ts` l.51 | **Policy:** org may lock a field (for example force `lastSeen` to colleagues); today the administrator sets defaults only | S |
+| 14 | Read receipts | Off per account, reciprocal [14] | **Present.** `readReceipts` field; per-group switch with reciprocity in `lib/chat/group-receipts.ts` l.79; `chat/chat-privacy-section.tsx` | Under E2EE receipts shrink to "last read" (E2EE plan 2.2) | - |
+| 15 | Status privacy | Audience for status updates [14] | **N/A.** Polaris has no stories; activity status has its own audience (`activity`) | If stories are built, they take an audience from day one | - |
+| 16 | Who can add me to groups | Everyone / My contacts / except; a refused add becomes a private invite [14] | **Partial.** A fixed rule: only friends and colleagues may add somebody (`lib/chat/group-reach.ts` l.47-50); not the person's choice, and a refused add is only refused | Privacy field `groupAdds` with the usual audiences and the current rule as default; a refused add sends a one-to-one invitation to join instead. **Policy:** org default | S |
+| 17 | Who can message me / unknown senders | Strict Account Settings blocks high-volume messages from unknown accounts; usernames add an optional key [7][8] | **Partial.** Anybody with `chat.use` who is not blocked may open a direct message (`lib/chat/access.ts` `messageable` l.809, `lib/chat/chat-service.ts` `directAllowed` l.1968) | Privacy field `messages` (audience) and a message-requests inbox for senders outside it: first message held, no read receipt, accept, block or report. **Policy:** org "senders from outside the org land in requests" | M |
+| 18 | Usernames, hidden phone number, username key | Usernames hide the phone number; an optional key a stranger must also know before messaging (2026) [8] | **Present** for the handle and hidden identifiers: `account/username-field.tsx`; `UserPrivacy.email` and `phone` default to nobody, `findByEmail`, `findByPhone`, `discoverable`. **Missing:** the key | Optional "contact key" asked when a stranger finds the handle and starts a conversation (pairs with 17). **Bar:** compared server-side in constant time and throttled | S |
+| 19 | Message yourself | A chat with yourself, synced to your devices [14] | **Missing.** `directAllowed` refuses an empty list (`lib/chat/chat-service.ts` l.1974, `pickSomebodyToMessage`); starred messages exist (`chat/saved/saved-view.tsx`) | A self conversation pinned at the top, with files, voice notes and the full composer. **Bar:** under E2EE it is a one-member group across your own devices | S |
+
+### 6.6 Groups and communities
+
+| # | Feature | WhatsApp | Polaris status and evidence | What to build (security bar · admin policy) | Size |
+| --- | --- | --- | --- | --- | --- |
+| 20 | Approve new participants | Joining through a link waits for an admin [13] | **Missing.** A space invite admits whoever holds the code (`lib/chat/invites.ts` header) | Per-space "require approval": a pending queue for owners and administrators with accept and reject, and a notice to them. **Policy:** org forces approval on org spaces | M |
+| 21 | Only admins send / edit info / add members | Group settings restrict sending, editing info and adding members to admins [14] | **Partial.** Groups have `membersMayEdit`, `membersMayInvite`, `membersMayMention` (`packages/db/prisma/schema.prisma` l.10604-10608, `setGroupOptions` in `chat-service.ts` l.1464). No "only admins may send" on groups and no read-only announcement channel in spaces (`mayPost` reflects only a timeout, `lib/chat/access.ts` l.405) | `membersMaySend` on groups; an announcement flag on space channels, enforced on the send path and drawn in the composer | M |
+
+### 6.7 Safety and abuse
+
+| # | Feature | WhatsApp | Polaris status and evidence | What to build (security bar · admin policy) | Size |
+| --- | --- | --- | --- | --- | --- |
+| 22 | Block | Stops messages and calls [11] | **Present** (section 2) | - | - |
+| 23 | Report, with the last five messages | A report sends the last five messages from that person or group; report then block [11] | **Partial.** Per-message reports with excerpt and files (`ChatReport` model, `lib/chat/reports.ts`), block offered afterwards (`components/block-after-report.tsx`). No report of a person or a conversation carrying recent context | "Report conversation" and "Report person" attaching the last N messages the reporter can see. **Bar:** under E2EE a report must carry signed plaintext (message franking) or it proves nothing (E2EE plan section 6) | M |
+| 24 | Account restriction for spam | Many blocks or reports restrict starting new chats, creating groups, adding members and linking devices for a while; existing chats keep working; a countdown is shown [12] | **Partial.** Per-conversation spam limits (`lib/chat/spam-guard.ts`), account standing (`lib/account-standing-service.ts`, `account/standing/`). No automatic, time-limited restriction driven by blocks and reports | Automatic restriction with a visible end time and reason on the standing page; it reaches only new contacts, groups and device links. **Policy:** org thresholds; exemptions only by explicit grant | M |
+| 25 | Strict Account Settings (Jan 2026) | One switch that locks the account to its most restrictive settings: two-step verification and security notifications on, link previews off, unknown high-volume messages blocked, group adds limited, last seen/photo/about to contacts; changeable only from the primary device [7] | **Partial.** Lockdown exists as an emergency stop, not a hardening preset (`account/security/lockdown-card.tsx`); security alerts already cannot be muted (`lib/notifications/security-events.ts`) | "Strict mode" that applies rows 4, 13, 16, 17 and the view-once watermark, requires a second factor, and turns off only with step-up from an existing trusted device. **Policy:** org enforces it for chosen members | M |
+| 26 | Parent-managed accounts | A parent manages a teen's account [17] | **N/A (adapted).** Organizations already manage their members' access; no minor-specific mode | - | - |
+
+### 6.8 Account security
+
+| # | Feature | WhatsApp | Polaris status and evidence | What to build (security bar · admin policy) | Size |
+| --- | --- | --- | --- | --- | --- |
+| 27 | Two-step verification (now alphanumeric) | PIN or password when the account is registered again [9] | **Present.** `account/security/two-factor-methods-card.tsx`, `pin-dialogs.tsx`, `backup-codes-card.tsx` | **Policy:** org "require 2FA" (confirm it covers Chat sessions) | - |
+| 28 | Passkeys (several) | Passkey sign-in, more than one per account [9] | **Present.** `account/security/passkeys-card.tsx`, `auto-passkey-card.tsx` | - | - |
+| 29 | Email verification | A verified email to recover the account [18] | **Present.** `account/emails-view.tsx` (the email is the account identity) | - | - |
+| 30 | Linked devices and new-device notices | List and remove linked devices; notice when one is added [14] | **Present.** `account/sessions/sessions-view.tsx`, `trusted-devices-card.tsx`, `account/devices/`; alerts in `lib/notifications/security-events.ts` | Under E2EE a new device is a key event shown in every conversation (E2EE plan section 9) | - |
+| 31 | Account Protect / device verification | Moving the account to a new phone needs approval on the old one [10] | **Present (not re-audited here).** New-device grace (`lib/device-grace.ts`), QR sign-in (`lib/qr-sign-in-service.ts`), session binding (`account/security/session-binding-card.tsx`) | Confirm a new device's first sign-in can require approval from an existing trusted device. **Policy:** org forces it | S |
+
+### 6.9 Encryption
+
+| # | Feature | WhatsApp | Polaris status and evidence | What to build (security bar · admin policy) | Size |
+| --- | --- | --- | --- | --- | --- |
+| 32 | End-to-end encryption of messages and calls | On for every chat and call | **E2EE plan** (whole proposal; phases in section 14) | - | XL |
+| 33 | End-to-end encrypted backups (password, 64-digit key, passkey; HSM key vault) | Backups encrypted with a key Meta cannot read; passkey option since late 2025; HSM vault hardened in 2026 [19][20] | **E2EE plan** sections 3.2 and 3.5 (account key closures, organization recovery) | Make a passkey (PRF) one of the 3.2 closures | - |
+| 34 | Security code verification and "security code changed" notices | Compare a QR or 60-digit number; optional notice in the chat when a contact's key changes [10] | **Partial in the plan.** Section 4.6 verifies automatically through key transparency, and requirement 1 drops manual verification | Add to the plan: optional manual verification (QR or number) and per-conversation key-change notices, which high-risk users expect even with transparency. **Policy:** org forces key-change notices on | M |
+| 35 | Key transparency (auditable key directory) | Append-only directory that clients check automatically [21] | **E2EE plan** section 4.6 | - | - |
+| 36 | Screenshot block on profile photos | Profile photos cannot be screenshotted on Android [14] | **Missing.** `photoFullSize` decides who may open a photo full size; nothing protects the open view | Android and iOS: a protected window while a full-size photo is open. Web: impossible, and the screen says nothing it cannot keep | S |
+
+### Sources
+
+1. WhatsApp FAQ, Turn chat lock on or off - https://whatsapp.com/faq/en/android/28000010
+2. WhatsApp blog, Introducing secret code for chat lock - https://blog.whatsapp.com/introducing-secret-code-for-chat-lock
+3. WhatsApp blog, Introducing Advanced Chat Privacy - https://blog.whatsapp.com/introducing-advanced-chat-privacy ; EFF analysis - https://www.eff.org/deeplinks/2025/09/what-whatsapps-advanced-chat-privacy-really-does
+4. WhatsApp blog, Keep in chat - https://blog.whatsapp.com/keep-in-chat-your-new-sender-superpower
+5. WhatsApp blog, Silence unknown callers and Privacy Checkup - https://blog.whatsapp.com/new-privacy-features-silence-unknown-callers-and-privacy-checkup
+6. Meta engineering, WhatsApp calls: enhancing security (Protect IP address) - https://engineering.fb.com/2023/11/08/security/whatsapp-calls-enhancing-security/
+7. WhatsApp blog, Strict Account Settings (2026-01-27) - https://blog.whatsapp.com/whatsapps-latest-privacy-protection-strict-account-settings ; what it changes, per MacRumors - https://www.macrumors.com/2026/01/28/whatsapp-launches-strict-account-settings/
+8. Usernames and username key (reservations from 2026-06-29; secondary sources, the official post was not retrievable) - https://thenextweb.com/news/whatsapp-usernames-reserve-phone-number-privacy ; https://www.techrepublic.com/article/news-whatsapp-usernames-phone-number-privacy/
+9. WhatsApp blog, One billion people protected with passkeys (multiple passkeys, alphanumeric two-step verification) - https://blog.whatsapp.com/one-billion-people-are-now-protected-with-passkeys-on-whatsapp-plus-more-account-security-features
+10. WhatsApp blog, Account Protect, Device Verification, Automatic Security Codes - https://blog.whatsapp.com/new-security-features-account-protect-device-verification-automatic-security-codes
+11. WhatsApp FAQ, How to block and report someone - https://faq.whatsapp.com/1142481766359885/
+12. WhatsApp FAQ, About restricted accounts - https://faq.whatsapp.com/717472490411581/
+13. Approve new participants (secondary source) - https://beebom.com/how-approve-new-participants-whatsapp-groups
+14. WhatsApp FAQ, How to change your privacy settings - https://faq.whatsapp.com/3307102709559968/
+15. WhatsApp blog, Voice messages just got more private (view once voice) - https://blog.whatsapp.com/voice-messages-just-got-more-private
+16. WhatsApp blog, Default disappearing messages and multiple durations - https://blog.whatsapp.com/more-control-and-privacy-with-default-disappearing-messages-and-multiple-durations
+17. WhatsApp FAQ, Block and report on parent-managed accounts - https://faq.whatsapp.com/1561915401728939/
+18. Email verification (beta report; current rollout not confirmed) - https://www.phonearena.com/news/whatsapps-email-verification-feature-expanded-beta-release_id152300
+19. Meta, Making it easier to encrypt WhatsApp chat backups (passkeys) - https://about.fb.com/news/2025/10/making-it-easier-to-encrypt-whatsapp-chat-backups/
+20. Meta engineering, Strengthening end-to-end encrypted backups (HSM Backup Key Vault) - https://engineering.fb.com/2026/05/01/security/meta-strengthening-end-to-end-encrypted-backups/
+21. Meta engineering, WhatsApp key transparency - https://engineering.fb.com/2023/04/13/security/whatsapp-key-transparency/
+
+Not verified against an official page: the exact format of WhatsApp's username
+key (reports disagree), and whether hidden locked chats stay hidden on linked
+devices.
