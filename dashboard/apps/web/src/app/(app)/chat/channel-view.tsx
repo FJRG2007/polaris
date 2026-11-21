@@ -21,6 +21,7 @@
  * did not read them.
  */
 
+import { usePolarDrafts } from "./polar-draft";
 import { useAppCommands } from "./use-app-commands";
 import type { ViewOnceChoice } from "@/lib/chat/view-once-choice";
 import * as actions from "./actions";
@@ -227,6 +228,8 @@ export function ChannelView({
         useChat();
     const [unblocking, setUnblocking] = useState(false);
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
+    // Polar's answers being written, at the end - see `polar-draft.ts`.
+    const { rows: drafting, onFrame: onDraftFrame } = usePolarDrafts(channelId, null, messages);
     const [pending, setPending] = useState<readonly ChatMessageView[]>([]);
     const [olderThan, setOlderThan] = useState<string | null>(null);
     const [loadingOlder, setLoadingOlder] = useState(false);
@@ -1215,6 +1218,7 @@ export function ChannelView({
                         checkCall();
                     }
                 }
+                onDraftFrame(frame);
                 if (frame.kind === "typing" && frame.channelId === channelId) {
                     setTypists((current) => [
                         ...current.filter((entry) => entry.userId !== frame.userId),
@@ -1227,7 +1231,7 @@ export function ChannelView({
                     ]);
                 }
             },
-            [channelId, catchUp, checkCall, freshenChanged]
+            [channelId, catchUp, checkCall, freshenChanged, onDraftFrame]
         )
     );
 
@@ -1409,6 +1413,7 @@ export function ChannelView({
         );
         return withSending(stored, [...pending, ...going]);
     }, [messages, pending, outgoing, channelId, viewerId, viewerName]);
+    const rows = useMemo(() => (drafting.length ? [...shown, ...drafting] : shown), [shown, drafting]);
 
     /** Put the newest message on screen. */
     const stick = useCallback(() => {
@@ -1444,7 +1449,7 @@ export function ChannelView({
             readingAt.current = null;
         } else readingAt.current = keepReading(element, readingAt.current);
         setAway(readingOlder(element));
-    }, [shown, stick]);
+    }, [rows, stick]);
 
     /**
      * Stay at the bottom while the conversation is still settling.
@@ -2293,7 +2298,7 @@ export function ChannelView({
 
                 {messages === null ? (
                     <MessagesSkeleton className="h-full" />
-                ) : shown.length === 0 ? (
+                ) : rows.length === 0 ? (
                     <div className="flex h-full items-center justify-center p-6">
                         <EmptyState
                             title={t("channelView.nothingHereYet")}
@@ -2303,7 +2308,7 @@ export function ChannelView({
                 ) : (
                     <MessageList
                         emoji={emojiScope}
-                        messages={shown}
+                        messages={rows}
                         outgoing={outgoing}
                         liveTranslation={channel?.translation}
                         coverMedia={channel?.contentMode === "spoiler"}

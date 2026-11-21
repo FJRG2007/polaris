@@ -12,6 +12,7 @@
  * three levels down a conversation nobody can find again.
  */
 
+import { usePolarDrafts } from "./polar-draft";
 import { useComposerEmoji, type SpaceEmojiScope } from "./space-emoji";
 import { X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -35,7 +36,7 @@ import { PersonCardProvider } from "./person-card";
 import { ResizeHandle } from "@polaris/ui";
 import { resetPaneLayout } from "./pane-preferences";
 import type { ChatMessageView } from "@/lib/chat/messages";
-import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { MessagesSkeleton } from "./messages-skeleton";
 
 /**
@@ -95,6 +96,8 @@ export function ThreadPanel({
     const outgoing = useOutgoing(threadDraftKey(root.id));
     // Replies with files on their way are rows of the thread, under the replies
     // already stored - see `outgoingMessage`.
+    // Polar's answers being written in this thread - see `polar-draft.ts`.
+    const { rows: drafting, onFrame: onDraftFrame } = usePolarDrafts(root.channelId, root.id, messages);
     const shown = useMemo(() => {
         if (!messages) return null;
         const going = unlandedOutgoing(outgoing, messages).map((one) =>
@@ -140,6 +143,8 @@ export function ThreadPanel({
         void load();
     }, [load]);
 
+    const follow = useFollowEnd(messages !== null);
+
     // A reply leaves the thread at its expiry, as it leaves the conversation.
     useDropExpired(messages, setMessages);
 
@@ -159,9 +164,10 @@ export function ThreadPanel({
     useChatStream(
         useCallback(
             (frame) => {
+                onDraftFrame(frame);
                 if (frame.kind === "posted" && frame.channels.includes(root.channelId)) void load();
             },
-            [root.channelId, load]
+            [root.channelId, load, onDraftFrame]
         )
     );
 
@@ -207,13 +213,17 @@ export function ThreadPanel({
                     </button>
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-2">
+                <div
+                    ref={follow.scroller}
+                    onScroll={follow.onScroll}
+                    className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-2"
+                >
                     {shown === null ? (
                         <MessagesSkeleton turns={2} />
                     ) : (
                         <MessageList
                             emoji={emoji}
-                            messages={shown}
+                            messages={drafting.length ? [...shown, ...drafting] : shown}
                             outgoing={outgoing}
                             liveTranslation={translation}
                             viewerId={viewerId}
@@ -339,4 +349,41 @@ export function ThreadPanel({
             </aside>
         </PersonCardProvider>
     );
+}
+
+/** How near the end still counts as reading it. */
+const AT_END_PX = 48;
+
+/**
+ * Keep a reader who is at the end of the thread at the end while it grows - a
+ * reply arriving, Polar's answer being written, a picture loading - and leave
+ * one who scrolled up where they are. A thread opens where it always did (at
+ * its start, or on the reply a link pointed at); a reader is following once they
+ * have scrolled to the end, or the whole thread fits and the end is in view.
+ */
+function useFollowEnd(ready: boolean) {
+    const scroller = useRef<HTMLDivElement | null>(null);
+    const atEnd = useRef(false);
+    useEffect(() => {
+        const element = scroller.current;
+        if (!ready || !element || typeof ResizeObserver === "undefined") return;
+        // Read after each change, for the next: a thread that fit was being
+        // read to its end. Unknown until the first reading, which only looks.
+        let fitting = false;
+        const watcher = new ResizeObserver(() => {
+            if (atEnd.current || fitting) {
+                element.scrollTop = element.scrollHeight;
+                atEnd.current = true;
+            }
+            fitting = element.scrollHeight <= element.clientHeight + AT_END_PX;
+        });
+        for (const child of element.children) watcher.observe(child);
+        return () => watcher.disconnect();
+    }, [ready]);
+    const onScroll = useCallback(() => {
+        const element = scroller.current;
+        if (!element) return;
+        atEnd.current = element.scrollHeight - element.scrollTop - element.clientHeight <= AT_END_PX;
+    }, []);
+    return { scroller, onScroll };
 }

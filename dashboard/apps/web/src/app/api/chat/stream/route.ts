@@ -362,6 +362,13 @@ export async function GET(request: Request): Promise<Response> {
                         send({ kind: "pins", channelId });
                         return;
                     }
+                    // Polar's answer as far as it has written it. Sent as it
+                    // comes, never gathered into a wake: it is the reading
+                    // itself, and one held back is a stutter.
+                    if (change.kind === "draft") {
+                        if (change.draft) send({ kind: "draft", channelId, ...change.draft });
+                        return;
+                    }
                     if (change.kind === "typing") {
                         const frame = {
                             kind: "typing",

@@ -145,6 +145,9 @@ export async function answerPolarMention(
             names: [askerName, ...history.map((line) => line.name), ...(repliedTo ? [repliedTo.name] : [])]
         },
         where: "a chat mention",
+        // Read as it is written, unless the answer goes over one already
+        // there: a "Try again" rewrites that message in place.
+        ...(replace ? {} : { draft: (text: string) => sendDraft(mention, text) }),
         typing: () =>
             publishChatChange({
                 channelId: mention.channelId,
@@ -168,6 +171,7 @@ export async function answerPolarMention(
         const messageId = replace
             ? await rewritePolarMessage(mention.channelId, replace, body, offered)
             : await postPolarMessage(mention, body, offered);
+        if (!replace) sendDraft(mention, body, messageId);
         try {
             await holdCall({
                 id: callId,
@@ -190,9 +194,30 @@ export async function answerPolarMention(
     }
     const body = fit(shownText(answer.text, answer.problem));
     const components = problemComponents(answer.problem, words, mention.authorId);
-    return replace
-        ? rewritePolarMessage(mention.channelId, replace, body, components)
-        : postPolarMessage(mention, body, components);
+    if (replace) return rewritePolarMessage(mention.channelId, replace, body, components);
+    const messageId = await postPolarMessage(mention, body, components);
+    sendDraft(mention, body, messageId);
+    return messageId;
+}
+
+/**
+ * The answer as far as Polar has written it, to every screen in the
+ * conversation. With `messageId`, the answer is posted: the draft holds the
+ * whole of it until that message is on screen in its place, so nothing between
+ * the two goes blank or jumps.
+ */
+function sendDraft(mention: PolarMention, text: string, messageId?: string): void {
+    publishChatChange({
+        channelId: mention.channelId,
+        kind: "draft",
+        actorId: POLAR_AGENT,
+        draft: {
+            key: mention.messageId,
+            parentId: mention.parentId,
+            text,
+            ...(messageId ? { messageId } : {})
+        }
+    });
 }
 
 type Words = Awaited<ReturnType<typeof chatWordsFor>>;

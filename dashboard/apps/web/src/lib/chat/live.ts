@@ -56,6 +56,9 @@ export interface ChatChange {
      *  call-settled - somebody declined a call ringing for them on one of their
      *      devices. Sent to that person alone (`audience`), so every other
      *      device and tab of theirs stops ringing too.
+     *  draft - Polar's answer to a mention as far as it has written it, so the
+     *      conversation reads it growing. Never coalesced and never stored: the
+     *      answer is posted as an ordinary message when it is done.
      *  badge - somebody cleared Chat's badge from the app list. Sent to that
      *      person alone (`audience`), so the badge on their other screens counts
      *      again. Nothing inside Chat moves: no conversation was read. */
@@ -71,7 +74,8 @@ export interface ChatChange {
         | "emoji"
         | "game-invite"
         | "call-settled"
-        | "badge";
+        | "badge"
+        | "draft";
     /** Only on `read`: the mark moved BACKWARDS - somebody put a conversation
      *  back to unread. The same fact changing, so it is the same frame, but the
      *  opposite instruction for anything that withdraws a notice about it. */
@@ -95,6 +99,19 @@ export interface ChatChange {
     /** Only on `game-invite`: the game session somebody was invited to. Sent to
      *  its `audience` alone, who read the invitation through its own check. */
     readonly sessionId?: string;
+    /**
+     * Only on `draft`. `key` is the message being answered, one draft per
+     * mention. `text` is everything written so far - never a piece - so a missed
+     * frame is put right by the next; empty takes the draft back (the model went
+     * to its tools, or its answer was refused). `messageId` is the answer once it
+     * is posted: the draft stays until that message is on screen in its place.
+     */
+    readonly draft?: {
+        readonly key: string;
+        readonly parentId: string | null;
+        readonly text: string;
+        readonly messageId?: string;
+    };
     /** Only on `call-settled`: the call that stopped ringing. */
     readonly meetingId?: string;
     /** Only on `typing` and `call`: what to draw beside the dots, or who is

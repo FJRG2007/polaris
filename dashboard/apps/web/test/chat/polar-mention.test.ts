@@ -91,7 +91,10 @@ vi.mock("@/lib/chat/history-visibility", () => ({
     readableSince: async () => new Date("2026-11-01T00:00:00Z"),
     sinceClause: (floor: Date | null, viewerId: string) => ({ readerClause: { floor, viewerId } })
 }));
-vi.mock("@/lib/chat/live", () => ({ publishChatChange: () => undefined }));
+const changes: { kind: string; draft?: { key: string; text: string; messageId?: string } }[] = [];
+vi.mock("@/lib/chat/live", () => ({
+    publishChatChange: (change: (typeof changes)[number]) => changes.push(change)
+}));
 vi.mock("@/lib/chat/rules", () => ({ rulesForChannel: async () => ({ maxMessageLength: 4000 }) }));
 vi.mock("@/lib/chat/text", () => ({ chatWordsFor: async () => (key: string) => key }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true }) }));
@@ -133,6 +136,24 @@ vi.mock("ai", () => ({
         sentTools.push(input.tools);
         if (answer instanceof Error) throw answer;
         return { text: answer, totalUsage: { inputTokens: 10, outputTokens: 5 } };
+    },
+    // A new mention is streamed: the same answer, in the pieces a stream has.
+    streamText: (input: { system: string; prompt: string; tools?: unknown }) => {
+        asked.push(input);
+        sentTools.push(input.tools);
+        const said = answer;
+        return {
+            stream: (async function* () {
+                yield { type: "start-step" };
+                if (said instanceof Error) {
+                    yield { type: "error", error: said };
+                    return;
+                }
+                yield { type: "text-delta", text: said };
+                yield { type: "finish-step", finishReason: "stop" };
+                yield { type: "finish", totalUsage: { inputTokens: 10, outputTokens: 5 } };
+            })()
+        };
     }
 }));
 
@@ -214,6 +235,14 @@ describe("Polar's answer in Chat", () => {
             })
         ]);
         expect(recorded[0]).toMatchObject({ userId: "u1", payer: "instance", threadId: null });
+    });
+
+    it("is read as it is written, and the draft names the answer once it is posted", async () => {
+        changes.length = 0;
+        const id = await answerPolarMention(mention);
+        const drafts = changes.filter((change) => change.kind === "draft").map((change) => change.draft);
+        expect(drafts[0]).toMatchObject({ key: "q1", text: "Use `git rebase`." });
+        expect(drafts.at(-1)).toEqual({ key: "q1", parentId: null, text: "Use `git rebase`.", messageId: id });
     });
 
     it("reads the conversation as fenced data and offers no tools", async () => {

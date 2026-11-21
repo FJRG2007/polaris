@@ -30,8 +30,9 @@ import { useChat } from "./chat-context";
 import { useHeldCall } from "./call-hold";
 import { Avatar } from "@/components/avatar";
 import { WebhookFace } from "./webhook-face";
+import { AppAgentFace, AuthorTag } from "./author-face";
 import { PersonName } from "@/components/person-name";
-import { PolarBadge, PolarBotCard, PolarFace, POLAR_NAME } from "@/components/polar/polar-bot";
+import { PolarBotCard, PolarFace, POLAR_NAME } from "@/components/polar/polar-bot";
 import { Spoiler } from "./spoiler";
 import { ViewOnceCard } from "./view-once-card";
 import { MessageMenu } from "./message-menu";
@@ -40,7 +41,6 @@ import { copyText } from "./links";
 import { plainText } from "@/components/rich-text/excerpt";
 import { PollCard } from "./poll-card";
 import { LocationCard } from "./location-card";
-import { POLARIS_APPS } from "@/lib/apps";
 import { EphemeralNote, MessageComponents } from "./message-components-view";
 import { hasCard, referenced } from "./message-references";
 import { ReportDialog } from "./report-dialog";
@@ -93,6 +93,7 @@ import { useSwipeReply } from "./swipe-reply";
 import { stopOutgoing, type Outgoing } from "./outgoing";
 import { isGoing, OutgoingFailure, OutgoingFileState } from "./outgoing-bubbles";
 import { isOutgoingRow, outgoingFileIndex, outgoingRowId } from "./outgoing-message";
+import { draftKeyOf, isDraftRow } from "./polar-draft";
 import { heldLocalUrl, landedAs, localUrl, releaseLocal, type Landed } from "./local-media";
 
 /**
@@ -214,7 +215,6 @@ import {
     matchShortcut
 } from "@polaris/ui";
 import {
-    Blocks,
     Check,
     CheckCheck,
     CornerUpLeft,
@@ -387,7 +387,10 @@ export function MessageList({
     outgoing
 }: MessageListProps) {
     // A message still on its way is nothing a key can reply to, edit or delete.
-    const keyed = useMemo(() => messages.filter((message) => !isOutgoingRow(message.id)), [messages]);
+    const keyed = useMemo(
+        () => messages.filter((message) => !isOutgoingRow(message.id) && !isDraftRow(message.id)),
+        [messages]
+    );
     useMessageKeys({ messages: keyed, viewerId, canPost, canModerate, onReply, onEdit, onDelete });
     const sendingById = useMemo(
         () => new Map((outgoing ?? []).map((one) => [outgoingRowId(one.id), one])),
@@ -510,10 +513,15 @@ export function MessageList({
                     // drawing the message a second time.
                     const sending = sendingById.get(message.id);
                     const landed = sending ? undefined : landedAs(message.id);
+                    // Polar's answer still being written: drawn as the message it
+                    // will be, with nothing to press until it is one.
+                    const drafting = isDraftRow(message.id);
+                    const inert = Boolean(sending) || drafting;
 
                     return (
                         <li
-                            key={landed?.key ?? message.id}
+                            key={landed?.key ?? draftKeyOf(message.id) ?? message.id}
+                            aria-busy={drafting || undefined}
                             // Addressable, so a search result can be scrolled to.
                             id={`message-${message.id}`}
                             className={cn(
@@ -553,21 +561,23 @@ export function MessageList({
                                 // Nothing is built on a message the server has
                                 // not stored yet: no reply, reaction, pin or
                                 // edit. Deleting it takes it back.
-                                canPost={canPost && !sending}
-                                canModerate={canModerate && !sending}
-                                onOpenThread={sending ? undefined : onOpenThread}
+                                canPost={canPost && !inert}
+                                canModerate={canModerate && !inert}
+                                onOpenThread={inert ? undefined : onOpenThread}
                                 onReact={react}
                                 onStar={onStar}
                                 pinned={pinnedIds?.has(message.id) ?? false}
-                                onPin={sending ? undefined : onPin}
-                                onMarkUnread={sending ? undefined : onMarkUnread}
+                                onPin={inert ? undefined : onPin}
+                                onMarkUnread={inert ? undefined : onMarkUnread}
                                 inVoice={inVoice}
                                 onJumpTo={onJumpTo}
-                                onReply={sending ? undefined : onReply}
-                                onReplyPrivately={sending ? undefined : onReplyPrivately}
-                                onForward={sending ? undefined : onForward}
-                                onEdit={sending ? undefined : onEdit}
-                                onDelete={sending ? () => stopOutgoing(sending.id) : onDelete}
+                                onReply={inert ? undefined : onReply}
+                                onReplyPrivately={inert ? undefined : onReplyPrivately}
+                                onForward={inert ? undefined : onForward}
+                                onEdit={inert ? undefined : onEdit}
+                                onDelete={
+                                    sending ? () => stopOutgoing(sending.id) : drafting ? () => undefined : onDelete
+                                }
                             />
                         </li>
                     );
@@ -1169,18 +1179,10 @@ function Message({
                                 )}
                                 {/* Not a person: Polar, answering a mention. Its
                                 tag says so, as a bot's does on any platform. */}
-                                {message.fromAgent === "polar" && <PolarBadge />}
-                                {/* Not a person: something outside Polaris posting
-                                through one of the channel's webhooks, under a name
-                                it chose. Discord's APP tag says the same. */}
-                                {(message.fromWebhook || (message.fromAgent && message.fromAgent !== "polar")) && (
-                                    <span
-                                        className="shrink-0 self-center rounded bg-primary px-1 text-[0.625rem] font-semibold uppercase leading-4 text-primary-foreground"
-                                        title={t(message.fromWebhook ? "messageList.webhookHint" : "messageList.appHint")}
-                                    >
-                                        {t("messageList.app")}
-                                    </span>
-                                )}
+                                {/* Or something outside Polaris posting through one
+                                of the channel's webhooks, under a name it chose:
+                                Discord's APP tag says the same. */}
+                                <AuthorTag message={message} />
                                 <MessageTime
                                     iso={message.createdAt}
                                     className="whitespace-nowrap text-[0.6875rem] text-foreground-subtle"
@@ -2485,12 +2487,3 @@ function readableSize(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/** The face of a message one of Polaris's own apps wrote: the app's mark. */
-function AppAgentFace({ agent }: { agent: string }) {
-    const Icon = POLARIS_APPS.find((app) => app.id === agent)?.icon ?? Blocks;
-    return (
-        <span className="inline-flex size-7 items-center justify-center rounded-full bg-primary/15 text-primary">
-            <Icon className="size-4 shrink-0" aria-hidden />
-        </span>
-    );
-}

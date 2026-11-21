@@ -15,6 +15,7 @@
  */
 
 import { generateText, stepCountIs } from "ai";
+import { draftable, streamAnswer } from "./mention-stream";
 import type { chatWordsFor } from "@/lib/chat/text";
 import type { MentionToolkit, PendingCall } from "@/lib/chat/polar-calls";
 
@@ -34,6 +35,10 @@ export interface MentionTurn {
     readonly where: string;
     /** Shown while it writes, repeated until it is done. */
     readonly typing?: () => void;
+    /** Handed what it has written so far while it writes, to show the answer
+     *  growing (`mention-stream.ts`); "" takes it back. Absent, the turn is not
+     *  streamed. Only ever a stand-in: the answer is posted by the caller. */
+    readonly draft?: (text: string) => void;
     /** The question and the names in the prompt, to tell an answer from the
      *  prompt handed back (`echoesPrompt`); the prompt alone otherwise. */
     readonly echo?: { readonly question: string; readonly names: readonly string[] };
@@ -186,7 +191,7 @@ export async function answerMentionWithReason(turn: MentionTurn): Promise<Mentio
             const kit = turn.toolkit ?? null;
             const stepMax = turn.steps ?? 1;
             try {
-                const answer = await generateText({
+                const options = {
                     // The router retries and walks keys and fallbacks itself.
                     maxRetries: 0,
                     model: resolved.model,
@@ -208,10 +213,16 @@ export async function answerMentionWithReason(turn: MentionTurn): Promise<Mentio
                               stopWhen: [stepCountIs(stepMax), () => kit.pending() !== null]
                           }
                         : {})
-                });
+                };
+                const answer = turn.draft
+                    ? await streamAnswer(options, turn.draft, (partial) =>
+                          draftable(partial, toolMarkupIn, withoutPseudoToolCalls)
+                      )
+                    : await generateText(options);
                 text = answer.text;
                 spent = answer.totalUsage;
             } catch (error) {
+                turn.draft?.("");
                 const { classifyProviderFailure, failureLogLine } = await import("@/lib/polar/provider-failure");
                 const failure = classifyProviderFailure(error);
                 const refusals = resolved.routed?.refusals() ?? [];
@@ -252,6 +263,7 @@ export async function answerMentionWithReason(turn: MentionTurn): Promise<Mentio
             if (toolMarkupIn(text)) {
                 console.warn(`polar: ${who} wrote its tool calls as text for ${turn.where}; asking the next model`);
                 noteToolMarkup(userId, answered.option.provider, answered.option.model);
+                turn.draft?.("");
                 continue;
             }
             const said = withoutPseudoToolCalls(text).trim();
@@ -267,6 +279,7 @@ export async function answerMentionWithReason(turn: MentionTurn): Promise<Mentio
             // Nothing, or the prompt handed back: that model failed this turn.
             console.warn(`polar: ${who} ${said ? "echoed its prompt" : "answered nothing"} for ${turn.where}; asking the next model`);
             noteModelEchoed(userId, answered.option.provider, answered.option.model);
+            turn.draft?.("");
         }
     } finally {
         if (dots) clearInterval(dots);
