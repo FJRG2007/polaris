@@ -1916,6 +1916,8 @@ export async function forward(
             authorId: true,
             deletedAt: true,
             body: true,
+            kind: true,
+            components: true,
             // A file meant to be seen once is not passed on, here any more than
             // from the menu that no longer offers it.
             attachments: { where: { viewOnce: true }, select: { id: true }, take: 1 },
@@ -1931,9 +1933,8 @@ export async function forward(
     // An invitation is for the person it was sent to, and a live location for
     // the people its sender chose; the menu does not offer passing either on,
     // and neither does a request made without the menu.
-    const blocked = forwardBlock(original);
-    if (blocked === "invitation") throw new ChatAccessError({ key: "errors.invitationNotForwarded" });
-    if (blocked === "liveLocation") throw new ChatAccessError({ key: "errors.liveLocationNotForwarded" });
+    const blocked = forwardBlock({ ...original, components: storedComponents(original.components) });
+    if (blocked) throw new ChatAccessError({ key: `errors.${blocked}NotForwarded` });
     await requireAgeCleared(actor, original.channelId);
     await history.requireReadable(actor, original.channelId, input.messageId);
     await requireUnlocked(actor, original.channelId, proof);
@@ -1957,6 +1958,11 @@ export async function forward(
             forwarded: true
         }
     );
+}
+
+/** The buttons or form an app stored on a message, as stored: even ones no longer readable count against a forward. */
+function storedComponents(raw: unknown): readonly unknown[] | null {
+    return Array.isArray(raw) ? raw : null;
 }
 
 /**
@@ -2517,11 +2523,18 @@ export async function decorateMessages(
             // second copy of exactly what was not to be kept.
             forwardable:
                 row.deletedAt === null &&
+                // Shown to one reader only; the server refuses passing it on too.
+                !isEphemeral(row.audience) &&
                 (row.authorId === null || mayForward.has(row.authorId)) &&
                 !(onMessageFiles.get(row.id) ?? []).some((file) => file.viewOnce) &&
                 // Nor an invitation meant for one person, nor a live location
                 // (`private-invitation.ts`).
-                forwardBlock({ body: row.body, location: places.get(row.id) }) === null,
+                forwardBlock({
+                    body: row.body,
+                    kind: row.kind,
+                    location: places.get(row.id),
+                    components: storedComponents(row.components)
+                }) === null,
             link: links.get(row.id) ?? null,
             preview: previewOf(row, links, previews),
             previewPending: pendingOf(row, links, previews),

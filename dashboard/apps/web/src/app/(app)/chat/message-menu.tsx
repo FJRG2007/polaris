@@ -247,6 +247,8 @@ export function MessageMenu({
      * taking it down is not offered rather than offered and refused.
      */
     const notice = message.kind === "system";
+    /** Why Forward is shown disabled (`forwardBlock`), or null when nothing forbids it. */
+    const blocked = message.deleted || notice ? null : forwardBlock(message);
     const reactable = canPost && !message.deleted && actions.onReact;
     const remindable = !message.deleted && message.kind !== "system";
     const speakable = !message.deleted && Boolean(message.body.trim()) && browserCanSpeak();
@@ -530,18 +532,16 @@ export function MessageMenu({
                                     {t("messageMenu.forward")}
                                 </ContextMenuItem>
                             )}
-                            {/* The exceptions: an invitation and a live location
-                                look like any message to forward, so the menu
-                                says why they are not. */}
-                            {actions.onForward && !message.deleted && forwardBlock(message) !== null && (
+                            {/* The exceptions (`forwardBlock`) look like any message to
+                                forward, so the menu says why they are not. A line
+                                Polaris wrote itself has no Forward at all. */}
+                            {actions.onForward && blocked !== null && (
                                 <ContextMenuItem disabled className="items-start">
                                     <Forward className="mt-0.5 size-3.5" />
                                     <span className="flex min-w-0 flex-col">
                                         {t("messageMenu.forward")}
                                         <span className="text-xs text-muted-foreground">
-                                            {forwardBlock(message) === "liveLocation"
-                                                ? t("messageMenu.liveLocationNotForwarded")
-                                                : t("messageMenu.invitationNotForwarded")}
+                                            {t(`messageMenu.${blocked}NotForwarded`)}
                                         </span>
                                     </span>
                                 </ContextMenuItem>

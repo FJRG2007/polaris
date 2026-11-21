@@ -64,12 +64,24 @@ vi.mock("@/lib/orgs/org-service", () => ({ memberOrgIds: async () => [] }));
 
 const SENT = new Date("2026-08-16T09:00:00Z");
 
+/** The rest of a stored place, whatever its mode. */
+const LOCATION_ROW = {
+    latitude: 40.4,
+    longitude: -3.7,
+    accuracy: 10,
+    placeName: null,
+    address: null,
+    liveUntil: null,
+    endedAt: null,
+    movedAt: SENT
+};
+
 /** The message being forwarded. Grace wrote it; Ada is reading. */
 const original = {
     id: "message-1",
     channelId: "channel-1",
     authorId: "grace" as string | null,
-    kind: "text",
+    kind: "text" as string,
     body: "the thing she said",
     parentId: null,
     replyToId: null,
@@ -78,6 +90,9 @@ const original = {
     attachments: [] as { id: string }[],
     // Not a location unless a test makes it one.
     location: null as { mode: string } | null,
+    // No app buttons, and shown to everybody, unless a test says otherwise.
+    components: null as unknown,
+    audience: null as unknown,
     replyCount: 0,
     lastReplyAt: null,
     editedAt: null,
@@ -127,6 +142,12 @@ vi.mock("@polaris/db", () => {
         },
         // The disappearing-messages mode, read on every send: never set here.
         setting: { findUnique: async () => null },
+        // A location message's place, read from the original as the list reads it.
+        chatLocation: {
+            findMany: vi.fn(async () =>
+                original.location ? [{ messageId: original.id, ...LOCATION_ROW, mode: original.location.mode }] : []
+            )
+        },
         chatMessage: {
             findUnique: async () => original,
             // The readable check looks the message up by id; nothing else asked
@@ -176,6 +197,9 @@ beforeEach(() => {
     original.authorId = "grace";
     original.body = "the thing she said";
     original.location = null;
+    original.kind = "text";
+    original.components = null;
+    original.audience = null;
 });
 
 describe("a message from somebody who allows it", () => {
@@ -291,6 +315,44 @@ describe("a location", () => {
         expect(forwardBlock(original)).toBeNull();
         await forward(ada, { messageId: "message-1", channelId: "channel-2", note: "" });
         expect(created).toBe(1);
+    });
+});
+
+describe("what only means something where it was sent", () => {
+    it("refuses a request for somebody's location, from the menu and without it", async () => {
+        original.body = "";
+        original.kind = "location";
+        original.location = { mode: "request" };
+        expect(forwardBlock(original)).toBe("locationRequest");
+        const [view] = await decorateMessages(ada, [original]);
+        expect(view?.forwardable).toBe(false);
+        await expect(
+            forward(ada, { messageId: "message-1", channelId: "channel-2", note: "" })
+        ).rejects.toThrow();
+        expect(created).toBe(0);
+    });
+
+    it.each(["system", "call"])("refuses a %s line Polaris wrote itself", async (kind) => {
+        original.kind = kind;
+        expect(forwardBlock(original)).toBe("notice");
+        await expect(
+            forward(ada, { messageId: "message-1", channelId: "channel-2", note: "" })
+        ).rejects.toThrow();
+        expect(created).toBe(0);
+    });
+
+    it("refuses a message carrying an app's buttons", async () => {
+        original.components = [{ type: "button", id: "approve", label: "Approve" }];
+        expect(forwardBlock({ ...original, components: [{}] })).toBe("interactive");
+        await expect(
+            forward(ada, { messageId: "message-1", channelId: "channel-2", note: "" })
+        ).rejects.toThrow();
+        expect(created).toBe(0);
+    });
+
+    it("keeps a poll forwardable, as Telegram does", () => {
+        original.kind = "poll";
+        expect(forwardBlock(original)).toBeNull();
     });
 });
 
