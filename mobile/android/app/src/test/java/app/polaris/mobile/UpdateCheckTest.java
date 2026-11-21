@@ -51,4 +51,16 @@ public class UpdateCheckTest {
         assertFalse(UpdateCheck.storeInstalled(null));
         assertFalse(UpdateCheck.storeInstalled("com.google.android.packageinstaller"));
     }
+
+    @Test
+    public void dueAfterTheIntervalOrSoonAfterAFailure() {
+        long hour = 60L * 60 * 1000;
+        long now = 100 * hour;
+        assertTrue(UpdateCheck.due(now, 0, 0));
+        assertFalse(UpdateCheck.due(now, now - hour, 0));
+        assertTrue(UpdateCheck.due(now, now - UpdateCheck.EVERY_MS, 0));
+        assertFalse(UpdateCheck.due(now, 0, now - 60_000));
+        assertTrue(UpdateCheck.due(now, 0, now - UpdateCheck.RETRY_MS));
+        assertTrue(UpdateCheck.due(now, now + hour, 0));
+    }
 }

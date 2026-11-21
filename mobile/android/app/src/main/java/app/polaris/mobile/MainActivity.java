@@ -119,7 +119,6 @@ public final class MainActivity extends Activity {
         if (saved != null && host.id.equals(saved.getString(SAVED_HOST))) web.restoreState(saved);
         else saved = null;
         if (saved == null || web.getUrl() == null) web.loadUrl(start(getIntent()));
-        UpdateCheck.maybeRun(this);
         listenForNotices();
     }
 
@@ -583,6 +582,8 @@ public final class MainActivity extends Activity {
         NoticeService.start(this);
         DoorWidget.redrawAll(this);
         if (web != null) hostChanged();
+        // On every return to the app, not only a cold start: Android keeps an app alive for days.
+        UpdateCheck.maybeRun(this);
     }
 
     @Override

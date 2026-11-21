@@ -31,7 +31,12 @@ final class UpdateCheck {
     static final String DOWNLOAD = "https://github.com/FJRG2007/polaris/releases/download/";
     static final String TAG_PREFIX = "android-v";
     static final String ASSET = "polaris-android.apk";
-    private static final long EVERY_MS = 12L * 60 * 60 * 1000;
+    /** After a check that reached the releases, the next one waits this long. */
+    static final long EVERY_MS = 3L * 60 * 60 * 1000;
+    /** After one that could not (offline, rate-limited), the next return to the app tries again after this. */
+    static final long RETRY_MS = 10L * 60 * 1000;
+    private static final java.util.concurrent.atomic.AtomicBoolean RUNNING =
+            new java.util.concurrent.atomic.AtomicBoolean();
     private static final int MAX_BYTES = 512 * 1024;
 
     /** Stores that keep the app updated themselves: Google Play, F-Droid and its common clients, Aurora, Obtainium. */
@@ -136,21 +141,36 @@ final class UpdateCheck {
         }, "update-check-now").start();
     }
 
+    /**
+     * Whether the automatic check is due: a check that reached the releases counts for `EVERY_MS`, one that failed only
+     * holds the next try back `RETRY_MS`, so a phone that was offline at the last attempt is not left a day behind.
+     */
+    static boolean due(long now, long checkedAt, long failedAt) {
+        // A clock moved backwards makes every stored time "in the future": treat that as never checked.
+        if (checkedAt > now || failedAt > now) return true;
+        return now - checkedAt >= EVERY_MS && now - failedAt >= RETRY_MS;
+    }
+
     static void maybeRun(Activity activity) {
         if (storeInstalled(installer(activity))) return;
         SharedPreferences prefs = activity.getSharedPreferences("update", Context.MODE_PRIVATE);
-        long now = System.currentTimeMillis();
-        if (now - prefs.getLong("checkedAt", 0) < EVERY_MS) return;
-        prefs.edit().putLong("checkedAt", now).apply();
+        if (!due(System.currentTimeMillis(), prefs.getLong("checkedAt", 0), prefs.getLong("failedAt", 0))) return;
+        if (!RUNNING.compareAndSet(false, true)) return;
         new Thread(() -> {
-            String[] found;
             try {
-                found = newest(fetch(), BuildConfig.VERSION_NAME);
-            } catch (Exception offline) {
-                return;
+                String[] found;
+                try {
+                    found = newest(fetch(), BuildConfig.VERSION_NAME);
+                } catch (Exception offline) {
+                    prefs.edit().putLong("failedAt", System.currentTimeMillis()).apply();
+                    return;
+                }
+                prefs.edit().putLong("checkedAt", System.currentTimeMillis()).remove("failedAt").apply();
+                if (found == null) return;
+                activity.runOnUiThread(() -> offer(activity, found[0], found[1]));
+            } finally {
+                RUNNING.set(false);
             }
-            if (found == null) return;
-            activity.runOnUiThread(() -> offer(activity, found[0], found[1]));
         }, "update-check").start();
     }
 
