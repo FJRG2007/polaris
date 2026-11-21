@@ -1872,6 +1872,21 @@ export async function locationAction(
     return result.error ? { error: result.error } : { location: result.value ?? null };
 }
 
+/**
+ * The street address of a location message, for its full map. Named by the
+ * message only - never by a point or a URL - so the server reads the spot after
+ * the conversation check. Null when it cannot be said; the map shows the
+ * coordinates instead.
+ */
+export async function locationAddressAction(messageId: string): Promise<{ address: locations.PlaceAddress | null }> {
+    const me = await actor();
+    if (!z.string().uuid().safeParse(messageId).success) return { address: null };
+    if (!(await rateLimit(`chat-address:${me.id}`, 30, 60_000)).ok) return { address: null };
+    const language = (await getLocale()).slice(0, 2);
+    const result = await guard(() => locations.addressOf(me, messageId, language));
+    return { address: result.error ? null : (result.value ?? null) };
+}
+
 /** Stop one live share early, or every one of them when no message is named. */
 export async function stopLiveLocationAction(messageId: string | null): Promise<{ error?: string }> {
     const me = await actor();

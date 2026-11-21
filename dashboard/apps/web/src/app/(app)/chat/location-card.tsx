@@ -25,6 +25,9 @@ import { locate, permissionState, type Fix } from "@/lib/geolocation";
 import { directionsUrl, distanceMeters, mapsPlatform, placeUrl } from "@/lib/maps-links";
 import { ExternalLink, LocateFixed, MapPinned, Navigation, Radio } from "lucide-react";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import { usePhone } from "@/components/use-phone";
+import type { MapStyle } from "@/lib/map-layers";
+import { MapStyleSwitch, PhoneLocationViewer } from "./location-viewer";
 
 /** Within this many metres, the reader is at the place rather than some way from it. */
 const HERE_METERS = 50;
@@ -46,6 +49,8 @@ export function LocationCard({
     const locale = useLocale();
     const [shown, setShown] = useState(location);
     const [big, setBig] = useState(false);
+    const [style, setStyle] = useState<MapStyle>("map");
+    const phone = usePhone();
     // Where the reader is, for the big map: asked on its own only when already
     // allowed, otherwise on a press, so opening a map never raises a prompt.
     const [me, setMe] = useState<Fix | null>(null);
@@ -220,20 +225,49 @@ export function LocationCard({
                     </Button>
                 ) : null}
             </div>
-            <Dialog open={big} onOpenChange={setBig}>
+            {phone ? (
+                <PhoneLocationViewer
+                    open={big}
+                    onOpenChange={setBig}
+                    messageId={message.id}
+                    point={point}
+                    viewer={viewer ? { ...viewer, self: true, label: t("location.you") } : null}
+                    heading={shown.mode === "place" ? (shown.placeName ?? null) : null}
+                    callout={{
+                        title: mine
+                            ? t("location.nameYou", { name: message.authorName ?? "" })
+                            : (message.authorName ?? title),
+                        detail: shown.mode === "live" ? (live ? leftText || undefined : t("location.liveEnded")) : undefined
+                    }}
+                    action={
+                        mine && live ? (
+                            <Button size="sm" variant="danger" disabled={stopping} onClick={() => void stop()}>
+                                <span className="min-w-0 truncate">{t("location.stopSharing")}</span>
+                            </Button>
+                        ) : null
+                    }
+                />
+            ) : null}
+            <Dialog open={big && !phone} onOpenChange={setBig}>
                 {/* Full screen on a phone, as WhatsApp opens a location: the map takes
                     whatever the actions below it leave, and pinches and drags like one. */}
                 <DialogContent phone="full" className="flex w-full max-w-2xl flex-col gap-3">
                     <DialogTitle className="min-w-0 truncate">{title}</DialogTitle>
-                    <div className="overflow-hidden rounded-lg border border-border max-sm:min-h-0 max-sm:flex-1">
+                    <div className="relative overflow-hidden rounded-lg border border-border max-sm:min-h-0 max-sm:flex-1">
                         {/* Drawn again once the reader is found, so both pins start in view. */}
                         <TileMap
                             key={viewer ? "both" : "place"}
-                            points={viewer ? [point, { ...viewer, label: t("location.you") }] : [point]}
+                            points={viewer ? [point, { ...viewer, self: true, label: t("location.you") }] : [point]}
                             height={360}
                             zoom={viewer ? undefined : 16}
                             controls
+                            style={style}
                             className="max-sm:!h-full"
+                        />
+                        <MapStyleSwitch
+                            value={style}
+                            onChange={setStyle}
+                            className="absolute bottom-3 left-1/2 max-w-[calc(100%-1.5rem)] -translate-x-1/2 bg-neutral-800/70 text-white"
                         />
                     </div>
                     {/* Live or over, how long it has left, and the sender's own way

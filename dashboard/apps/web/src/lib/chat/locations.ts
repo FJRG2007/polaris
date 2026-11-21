@@ -288,6 +288,33 @@ const searchSchema = z.array(
     })
 );
 
+/**
+ * One ask of Nominatim, in turn with every other from this instance: its policy
+ * allows one request a second from an application, so asks queue one behind the
+ * other with the gap kept after each. The guarded fetch names the product in
+ * its User-Agent. Null when the service could not be asked or answered oddly.
+ */
+async function inTurn<T extends z.ZodTypeAny>(url: URL, schema: T): Promise<z.infer<T> | null> {
+    const ask = queue.then(async () => {
+        const started = Date.now();
+        try {
+            const response = await follow(url, "application/json");
+            if (!response || !response.ok) return null;
+            const bytes = await readCapped(response, ANSWER_BYTES);
+            if (!bytes) return null;
+            const parsed = schema.safeParse(JSON.parse(new TextDecoder().decode(bytes)));
+            return parsed.success ? (parsed.data as z.infer<T>) : null;
+        } catch {
+            return null;
+        } finally {
+            const wait = GAP_MS - (Date.now() - started);
+            if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+        }
+    });
+    queue = ask.catch(() => undefined);
+    return ask;
+}
+
 /** Metres between two points, on a sphere. Pure; exported for tests. */
 export function metersBetween(a: { latitude: number; longitude: number }, b: { latitude: number; longitude: number }): number {
     const rad = Math.PI / 180;
@@ -339,27 +366,116 @@ export async function nearbyPlaces(
         "accept-language": language
     }).toString();
 
-    const ask = queue.then(async () => {
-        const started = Date.now();
-        try {
-            const response = await follow(url, "application/json");
-            if (!response || !response.ok) return null;
-            const bytes = await readCapped(response, ANSWER_BYTES);
-            if (!bytes) return null;
-            const parsed = searchSchema.safeParse(JSON.parse(new TextDecoder().decode(bytes)));
-            return parsed.success ? placesOf(parsed.data, { latitude: lat, longitude: lon }) : null;
-        } catch {
-            return null;
-        } finally {
-            const wait = GAP_MS - (Date.now() - started);
-            if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
-        }
-    });
-    queue = ask.catch(() => undefined);
-    const places = await ask;
+    const answer = await inTurn(url, searchSchema);
+    const places = answer ? placesOf(answer, { latitude: lat, longitude: lon }) : null;
     if (places) {
         if (kept.size >= KEPT) kept.delete(kept.keys().next().value as string);
         kept.set(key, { at: Date.now(), value: places });
     }
     return places;
+}
+
+/** What a location's full map writes over it: the street and number, then the town. */
+export interface PlaceAddress {
+    readonly title: string;
+    readonly subtitle: string | null;
+}
+
+const REVERSE_URL = "https://nominatim.openstreetmap.org/reverse";
+/** Addresses do not move: kept a month, for as many spots as a busy instance shows. */
+const ADDRESSES_KEPT = 2_000;
+const ADDRESS_MS = 30 * 24 * 60 * 60 * 1000;
+/** A failed ask is remembered briefly, so a broken service is not asked on every open. */
+const ADDRESS_MISS_MS = 5 * 60 * 1000;
+const addresses = new Map<string, { at: number; value: PlaceAddress | null }>();
+const asking = new Map<string, Promise<PlaceAddress | null>>();
+
+const reverseSchema = z.object({
+    name: z.string().optional().nullable(),
+    address: z
+        .object({
+            road: z.string().optional(),
+            pedestrian: z.string().optional(),
+            footway: z.string().optional(),
+            path: z.string().optional(),
+            house_number: z.string().optional(),
+            hamlet: z.string().optional(),
+            neighbourhood: z.string().optional(),
+            suburb: z.string().optional(),
+            postcode: z.string().optional(),
+            city: z.string().optional(),
+            town: z.string().optional(),
+            village: z.string().optional(),
+            municipality: z.string().optional(),
+            province: z.string().optional(),
+            county: z.string().optional(),
+            state: z.string().optional(),
+            country: z.string().optional()
+        })
+        .partial()
+        .optional()
+});
+
+/** A reverse answer as two lines, the way Apple Maps heads a pin. Pure; exported for tests. */
+export function addressOfAnswer(answer: z.infer<typeof reverseSchema>): PlaceAddress | null {
+    const a = answer.address ?? {};
+    const street = line(a.road ?? a.pedestrian ?? a.footway ?? a.path);
+    const town = line(a.city ?? a.town ?? a.village ?? a.municipality);
+    const title =
+        (street && a.house_number ? `${street}, ${line(a.house_number)}` : street) ??
+        line(answer.name) ??
+        line(a.hamlet ?? a.neighbourhood ?? a.suburb) ??
+        town;
+    if (!title) return null;
+    const region = line(a.province ?? a.county ?? a.state);
+    const parts = [line(a.postcode), town === title ? null : town, region === town ? null : region];
+    const subtitle = parts.filter(Boolean).join(" ") || line(a.country);
+    return { title, subtitle: subtitle || null };
+}
+
+/**
+ * The address of a location message, for its full map. Addressed by the message
+ * alone: the point is read from the row after the conversation check, so a
+ * client can only ever name a spot it is allowed to see. Rounded to about ten
+ * metres for the cache, so a live share standing still asks once. Undefined
+ * when the message is not a readable location, null when nobody could say.
+ */
+export async function addressOf(
+    actor: { id: string },
+    messageId: string,
+    language: string
+): Promise<PlaceAddress | null | undefined> {
+    const location = await readLocation(actor, messageId);
+    if (!location || location.latitude === null || location.longitude === null) return undefined;
+    const lat = Math.round(location.latitude * 10_000) / 10_000;
+    const lon = Math.round(location.longitude * 10_000) / 10_000;
+    const key = `${language}:${lat},${lon}`;
+    const hit = addresses.get(key);
+    if (hit && Date.now() - hit.at < (hit.value ? ADDRESS_MS : ADDRESS_MISS_MS)) return hit.value;
+    addresses.delete(key);
+
+    const url = new URL(REVERSE_URL);
+    url.search = new URLSearchParams({
+        format: "jsonv2",
+        lat: String(lat),
+        lon: String(lon),
+        zoom: "18",
+        addressdetails: "1",
+        "accept-language": language
+    }).toString();
+    // Readers opening the same spot at once share one ask.
+    const running = asking.get(key);
+    if (running) return running;
+    const ask = inTurn(url, reverseSchema).then((answer) => {
+        const value = answer ? addressOfAnswer(answer) : null;
+        if (addresses.size >= ADDRESSES_KEPT) addresses.delete(addresses.keys().next().value as string);
+        addresses.set(key, { at: Date.now(), value });
+        return value;
+    });
+    asking.set(key, ask);
+    try {
+        return await ask;
+    } finally {
+        asking.delete(key);
+    }
 }

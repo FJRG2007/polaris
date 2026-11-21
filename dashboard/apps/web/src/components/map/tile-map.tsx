@@ -6,13 +6,12 @@
  * squares per zoom level, the ones around the point laid side by side.
  *
  * No map library. The tiles come through Polaris (`/api/chat/location/tile`), so
- * the reader's address never reaches the tile service, and the default service
- * is OpenStreetMap's - free, keyless, credited in the corner as its licence asks.
+ * the reader's address never reaches the tile service. `style` picks streets,
+ * satellite or both (`lib/map-layers.ts`); every source is free and keyless.
  *
- * The credit is compact, the way MapLibre's and Leaflet's compact attribution
- * is: a small "i" in the corner that opens to the line on a press. It is not
- * removed - OpenStreetMap's tile policy and the ODbL require it on the map -
- * only folded away until somebody wants to read it.
+ * The credit is the way Apple Maps gives it: a small, quiet "Legal" in the
+ * bottom-left corner that opens the full lines on a press. It is never removed -
+ * the ODbL and the imagery licence require it on the map.
  *
  * With `controls`, the map is a full one: zoom with the buttons, the mouse
  * wheel or a pinch, and drag (or swipe) to move around.
@@ -20,8 +19,9 @@
 
 import { cn } from "@polaris/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Info, Minus, Plus } from "lucide-react";
+import { Minus, Plus } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { TILE_SOURCES, maxZoomOf, sourcesOf, tilePath, type MapStyle } from "@/lib/map-layers";
 
 const TILE = 256;
 const MIN_ZOOM = 3;
@@ -38,6 +38,10 @@ export interface MapPoint {
     readonly label?: string;
     /** A live share still moving, drawn pulsing. */
     readonly live?: boolean;
+    /** The reader's own position: the blue dot, not a pin. */
+    readonly self?: boolean;
+    /** A bubble above a dropped pin: who, and a line under it. */
+    readonly callout?: { readonly title: string; readonly detail?: string };
 }
 
 /** Pixel position of a point on the whole world at a zoom. Pure; exported for tests. */
@@ -83,33 +87,52 @@ export function TileMap({
     height = 160,
     zoom: startZoom,
     controls = false,
+    zoomButtons = controls,
+    style = "map",
+    creditClassName,
     className
 }: {
     points: readonly MapPoint[];
-    height?: number;
+    /** Pixels, or a CSS length for a map that fills its parent. */
+    height?: number | string;
     zoom?: number;
-    /** Zoom buttons, for the full-size map. */
+    /** Wheel, drag and pinch, for the full-size map. */
     controls?: boolean;
+    /** The +/- buttons; a phone pinches instead. */
+    zoomButtons?: boolean;
+    style?: MapStyle;
+    /** Where the "Legal" credit sits, when the bottom-left corner is taken. */
+    creditClassName?: string;
     className?: string;
 }) {
     const t = useTranslations("chat");
-    const [zoom, setZoom] = useState(() => startZoom ?? fittingZoom(points, 320, height));
+    // Tiles are laid to cover this much height; a fluid map covers a tall phone.
+    const tall = typeof height === "number" ? height : MAX_WIDTH;
+    const maxZoom = Math.min(MAX_ZOOM, maxZoomOf(style));
+    const [zoom, setZoom] = useState(() => Math.min(maxZoom, startZoom ?? fittingZoom(points, 320, tall)));
     // How far the map was dragged from its points, in pixels at the current zoom.
     const [pan, setPan] = useState({ x: 0, y: 0 });
     const [credit, setCredit] = useState(false);
     const box = useRef<HTMLDivElement>(null);
     const zoomRef = useRef(zoom);
     zoomRef.current = zoom;
+    const maxRef = useRef(maxZoom);
+    maxRef.current = maxZoom;
 
     /** One zoom step in or out, keeping the middle of the view where it is. */
     const zoomBy = (by: number) => {
-        const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomRef.current + by));
+        const next = Math.max(MIN_ZOOM, Math.min(maxRef.current, zoomRef.current + by));
         if (next === zoomRef.current) return;
         const scale = 2 ** (next - zoomRef.current);
         zoomRef.current = next;
         setPan((current) => ({ x: current.x * scale, y: current.y * scale }));
         setZoom(next);
     };
+
+    // A style that blurs past some zoom (satellite) steps back out to it.
+    useEffect(() => {
+        if (zoomRef.current > maxZoom) zoomBy(maxZoom - zoomRef.current);
+    }, [maxZoom]);
 
     // The wheel zooms a full map. Registered by hand: React's wheel listener is
     // passive, and the page must not scroll under the map while it zooms.
@@ -133,7 +156,9 @@ export function TileMap({
     const pointers = useRef(new Map<number, { x: number; y: number }>());
     const pinch = useRef(0);
     const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-        if (!controls || (event.target as HTMLElement).closest("button, a")) return;
+        if ((event.target as HTMLElement).closest("button, a, [role=button], [data-map-credits]")) return;
+        setCredit(false);
+        if (!controls) return;
         event.currentTarget.setPointerCapture?.(event.pointerId);
         pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
         pinch.current = spread(pointers.current);
@@ -166,23 +191,29 @@ export function TileMap({
             x: (Math.min(...pixels.map((pixel) => pixel.x)) + Math.max(...pixels.map((pixel) => pixel.x))) / 2 + pan.x,
             y: (Math.min(...pixels.map((pixel) => pixel.y)) + Math.max(...pixels.map((pixel) => pixel.y))) / 2 + pan.y
         };
-        const count = 2 ** zoom;
-        const across = Math.ceil(MAX_WIDTH / 2 / TILE) + 1;
-        const down = Math.ceil(height / 2 / TILE) + 1;
-        const cx = Math.floor(center.x / TILE);
-        const cy = Math.floor(center.y / TILE);
-        const tiles: { key: string; src: string; left: number; top: number }[] = [];
-        for (let dx = -across; dx <= across; dx += 1) {
-            for (let dy = -down; dy <= down; dy += 1) {
-                const ty = cy + dy;
-                if (ty < 0 || ty >= count) continue;
-                const tx = (((cx + dx) % count) + count) % count;
-                tiles.push({
-                    key: `${zoom}/${cx + dx}/${ty}`,
-                    src: `/api/chat/location/tile/${zoom}/${tx}/${ty}`,
-                    left: (cx + dx) * TILE - center.x,
-                    top: ty * TILE - center.y
-                });
+        const tiles: { key: string; src: string; left: number; top: number; size: number }[] = [];
+        for (const source of sourcesOf(style)) {
+            // Past the deepest zoom a source draws, its last tiles are stretched.
+            const z = Math.min(zoom, TILE_SOURCES[source].nativeMaxZoom);
+            const size = TILE * 2 ** (zoom - z);
+            const count = 2 ** z;
+            const across = Math.ceil(MAX_WIDTH / 2 / size) + 1;
+            const down = Math.ceil(tall / 2 / size) + 1;
+            const cx = Math.floor(center.x / size);
+            const cy = Math.floor(center.y / size);
+            for (let dx = -across; dx <= across; dx += 1) {
+                for (let dy = -down; dy <= down; dy += 1) {
+                    const ty = cy + dy;
+                    if (ty < 0 || ty >= count) continue;
+                    const tx = (((cx + dx) % count) + count) % count;
+                    tiles.push({
+                        key: `${source}/${z}/${cx + dx}/${ty}`,
+                        src: tilePath(source, z, tx, ty),
+                        left: (cx + dx) * size - center.x,
+                        top: ty * size - center.y,
+                        size
+                    });
+                }
             }
         }
         const pins = points.map((point, index) => {
@@ -191,7 +222,8 @@ export function TileMap({
             return { point, left: pixel.x - center.x, top: pixel.y - center.y, radius };
         });
         return { tiles, pins };
-    }, [points, zoom, height, pan]);
+    }, [points, zoom, tall, pan, style]);
+    const credits = sourcesOf(style).map((source) => TILE_SOURCES[source].credit);
 
     if (!view) return null;
     return (
@@ -216,8 +248,8 @@ export function TileMap({
                     alt=""
                     draggable={false}
                     loading="lazy"
-                    width={TILE}
-                    height={TILE}
+                    width={tile.size}
+                    height={tile.size}
                     className="absolute max-w-none"
                     style={{ left: `calc(50% + ${tile.left}px)`, top: `calc(50% + ${tile.top}px)` }}
                 />
@@ -231,31 +263,77 @@ export function TileMap({
                     {radius > 6 && radius < MAX_WIDTH ? (
                         <span
                             aria-hidden
-                            className="absolute rounded-full border border-primary/40 bg-primary/15"
+                            className={cn(
+                                "absolute rounded-full border",
+                                point.self ? "border-sky-500/40 bg-sky-500/15" : "border-primary/40 bg-primary/15"
+                            )}
                             style={{ width: radius * 2, height: radius * 2, left: -radius, top: -radius }}
                         />
                     ) : null}
-                    {point.live ? (
+                    {point.self ? (
                         <span
-                            aria-hidden
-                            className="absolute -left-3 -top-3 size-6 animate-ping rounded-full bg-primary/40"
+                            className="absolute -left-2 -top-2 size-4 rounded-full border-[3px] border-white bg-sky-500 shadow-md"
+                            title={point.label}
                         />
-                    ) : null}
-                    <span
-                        className="absolute -left-3 -top-3 grid size-6 place-items-center overflow-hidden rounded-full border-2 border-background bg-primary text-[10px] font-semibold text-primary-foreground shadow"
-                        title={point.label}
-                    >
-                        {point.label ? initials(point.label) : null}
-                    </span>
+                    ) : point.callout ? (
+                        <>
+                            {/* A dropped pin: a red head on a stick, the point at its foot. */}
+                            <span aria-hidden className="absolute -left-px -top-6 h-6 w-0.5 rounded-full bg-neutral-500" />
+                            <span
+                                aria-hidden
+                                className="absolute -left-2 -top-9 size-4 rounded-full border border-red-700/40 bg-red-500 shadow"
+                            />
+                            {point.live ? (
+                                <span
+                                    aria-hidden
+                                    className="absolute -left-2 -top-2 size-4 animate-ping rounded-full bg-emerald-500/50"
+                                />
+                            ) : null}
+                            <span className="absolute bottom-11 left-0 flex w-max max-w-[min(18rem,80vw)] -translate-x-1/2 flex-col items-center">
+                                <span className="flex min-w-0 max-w-full items-stretch overflow-hidden rounded-xl bg-neutral-800/95 text-white shadow-lg">
+                                    <span className="grid w-11 shrink-0 place-items-center bg-emerald-500 text-sm font-semibold">
+                                        {point.label ? initials(point.label) : null}
+                                    </span>
+                                    <span className="flex min-w-0 flex-col justify-center px-3 py-2">
+                                        <span className="truncate text-[15px] leading-5">{point.callout.title}</span>
+                                        {point.callout.detail ? (
+                                            <span className="truncate text-xs leading-4 text-white/70">
+                                                {point.callout.detail}
+                                            </span>
+                                        ) : null}
+                                    </span>
+                                </span>
+                                <span
+                                    aria-hidden
+                                    className="size-0 border-x-[7px] border-t-[7px] border-x-transparent border-t-neutral-800/95"
+                                />
+                            </span>
+                        </>
+                    ) : (
+                        <>
+                            {point.live ? (
+                                <span
+                                    aria-hidden
+                                    className="absolute -left-3 -top-3 size-6 animate-ping rounded-full bg-primary/40"
+                                />
+                            ) : null}
+                            <span
+                                className="absolute -left-3 -top-3 grid size-6 place-items-center overflow-hidden rounded-full border-2 border-background bg-primary text-[10px] font-semibold text-primary-foreground shadow"
+                                title={point.label}
+                            >
+                                {point.label ? initials(point.label) : null}
+                            </span>
+                        </>
+                    )}
                 </div>
             ))}
-            {controls ? (
+            {zoomButtons ? (
                 <div className="absolute right-2 top-2 flex flex-col overflow-hidden rounded-md border border-border bg-background shadow">
                     <button
                         type="button"
                         aria-label={t("location.zoomIn")}
                         title={t("location.zoomIn")}
-                        disabled={zoom >= MAX_ZOOM}
+                        disabled={zoom >= maxZoom}
                         onClick={() => zoomBy(1)}
                         className="grid size-8 place-items-center hover:bg-muted disabled:opacity-50"
                     >
@@ -273,23 +351,29 @@ export function TileMap({
                     </button>
                 </div>
             ) : null}
-            <div className="absolute bottom-1 right-1 flex items-center gap-1 rounded-full bg-background/80 text-[10px] text-muted-foreground">
+            {/* The licences ask for the credit on the map; it stays, small and quiet,
+                and opens to the full lines. A span, as the map in a card sits in a button. */}
+            <div data-map-credits className={cn("absolute bottom-1 start-1.5 z-10", creditClassName)}>
                 {credit ? (
-                    <a
-                        href="https://www.openstreetmap.org/copyright"
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        onClick={(event) => event.stopPropagation()}
-                        className="ps-2 hover:underline"
-                    >
-                        {t("location.attribution")}
-                    </a>
+                    <div className="absolute bottom-full left-0 mb-1 flex w-max max-w-[min(20rem,calc(100vw-2rem))] flex-col gap-1 rounded-md bg-background/95 p-2 text-[11px] leading-snug text-foreground shadow-lg">
+                        {credits.map((line) => (
+                            <a
+                                key={line.href}
+                                href={line.href}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                                onClick={(event) => event.stopPropagation()}
+                                className="hover:underline"
+                            >
+                                {line.text}
+                            </a>
+                        ))}
+                    </div>
                 ) : null}
                 <span
                     role="button"
                     tabIndex={0}
                     aria-label={t("location.mapCredits")}
-                    title={t("location.attribution")}
                     aria-expanded={credit}
                     onClick={(event) => {
                         // The map in a card opens the big one when pressed; this does not.
@@ -303,9 +387,9 @@ export function TileMap({
                         event.preventDefault();
                         setCredit((open) => !open);
                     }}
-                    className="grid size-5 shrink-0 cursor-pointer place-items-center rounded-full hover:text-foreground"
+                    className="cursor-pointer text-[10px] text-white/75 underline decoration-white/40 underline-offset-2 [text-shadow:0_0_2px_rgb(0_0_0/0.8)] hover:text-white"
                 >
-                    <Info className="size-3 shrink-0" />
+                    {t("location.legal")}
                 </span>
             </div>
         </div>
