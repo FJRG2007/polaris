@@ -370,33 +370,8 @@ La web siempre llega actualizada (la sirve la propia instancia). El desfase est�
 | Canal de 10.000 miembros con 3 dispositivos | En teoría `log2(N)` cifrados de ruta por commit [21]. **La fase 0 midió otra cosa** con un árbol recién creado por altas masivas: los nodos intermedios quedan vacíos y un commit de alta o baja crece **lineal**, unos 82 B por miembro (~410 KB a 5.000) [P0]. Por eso los miembros entran al grupo MLS del canal **al abrirlo por primera vez** (external commit), no al unirse al espacio ni en bloque al migrar; cada dispositivo emite un commit de actualización propio al entrar (rellena su ruta); altas y bajas se agrupan en commits periódicos; el servidor propone bajas como remitente externo. El estado estacionario con el árbol lleno está **sin medir** y es lo primero de la fase 4 | Estado por dispositivo ~1 MB a 1.000 miembros y ~5 MB a 5.000 [P0]; crear o migrar un grupo de 5.000 cuesta ~8 s, siempre en un Worker y por tandas [P0] |
 | Dispositivos inactivos | Bajas automáticas tras N días sin conexión (protege la seguridad tras compromiso y reduce el árbol); al volver entran con external commit | Decisión 7 |
 | Mensaje en canal grande | Una escritura y un reparto; nada por destinatario | Igual que hoy |
-| Almacenamiento | Ficheros sin duplicar (10.1); unos 92 B por mensaje (v1) + segmentos de índice + envoltorios (32 B + cabecera por clave, unos 1.100 B con ML-KEM) por periodo y miembro | Moderado; los periodos rotan poco |
+| Almacenamiento | Archivos sin duplicar (10b); unos 92 B por mensaje (v1) + segmentos de índice + envoltorios (32 B + cabecera por clave, unos 1.100 B con ML-KEM) por periodo y miembro | Moderado; los periodos rotan poco |
 | CPU del servidor | Deja de indexar texto y generar miniaturas; valida commits | Menor que hoy (deducción) |
-
-### 10.1 Almacenamiento sin duplicar bytes
-
-Hoy un reenvío no copia nada: el mensaje nuevo apunta al original (`replyToId` con `forwarded`), y el servidor lee los bytes del original para pintarlo. Guardar un GIF (`lib/chat/saved-media.ts`) sí **copia** el fichero a la conversación de destino cada vez que se reenvía, para que borrar el primer mensaje no se lleve la imagen del segundo. Con cifrado de extremo a extremo el servidor ya no puede leer los bytes, así que las dos rutas se rediseñan alrededor de la misma regla:
-
-| Caso | Diseño | Coste en disco |
-| --- | --- | --- |
-| Adjunto nuevo | El emisor genera una clave aleatoria por fichero (`FK`), cifra por bloques (fase 5) y sube un **blob** cifrado. El mensaje lleva, dentro del contenido cifrado con MLS/`HK`, el identificador del blob, `FK`, el hash del texto cifrado y los metadatos (nombre, tipo, dimensiones, miniatura cifrada). | Un blob |
-| Reenvío | El cliente que reenvía descifra el mensaje original, copia la referencia `(blob, FK, hash)` dentro del contenido del mensaje nuevo, cifrado para la conversación de destino. **No se vuelve a subir ni a cifrar el fichero.** El servidor solo ve que el mensaje nuevo referencia el mismo blob. | Cero bytes adicionales |
-| GIF o imagen guardada | La lista de guardados pasa a ser un registro cifrado con la clave de cuenta que contiene `(blob, FK, hash)`; enviarlo de nuevo es un reenvío. Se elimina la copia de `saved-media.ts`. | Cero bytes adicionales |
-| Varios destinos a la vez | Un reenvío a N conversaciones son N mensajes con la misma referencia. | Cero bytes adicionales |
-
-**Recuento de referencias en el servidor.** La tabla de blobs guarda cuántos mensajes (y guardados, y retenciones de denuncia) apuntan a cada uno. Borrar un mensaje quita su referencia; el fichero se elimina cuando el recuento llega a cero, en un barrido en segundo plano que reutiliza `removeStoredFiles`. Así se conserva la semántica actual: borrar el original no se lleva la imagen de un reenvío. Una denuncia es una referencia más (la evidencia de `keepForReports` deja de mover ficheros y pasa a sujetar el blob). El servidor puede saber que dos mensajes comparten blob, lo mismo que hoy sabe de un reenvío por `replyToId`; no aprende el contenido.
-
-**Quién puede referenciar un blob.** Una referencia nueva solo se acepta si el emisor demuestra que pudo leerlo: el servidor comprueba que el blob ya está referenciado en una conversación de la que el emisor es miembro (o en sus guardados), igual que hoy `requireChannel` comprueba el origen de un reenvío. Sin esa prueba, conocer un identificador de blob permitiría sujetarlo indefinidamente o adjuntarlo en otra sala; aun así no permitiría leerlo, porque falta `FK`.
-
-**Sin cifrado convergente.** No se deriva la clave del contenido (clave = hash del fichero) para deduplicar entre usuarios distintos. Esa técnica permite al servidor confirmar si alguien tiene un fichero concreto y adivinar documentos de baja entropía (ataques de confirmación de fichero y de "aprender el resto"), que es exactamente el adversario del modelo de amenazas. La deduplicación se limita a lo que un cliente decide reutilizar a sabiendas: reenvíos y guardados.
-
-**Guardar en Drive.** Drive no es de extremo a extremo. "Guardar en Drive" descifra en el cliente y sube el fichero en claro a Drive como cualquier subida, con la confirmación habitual; el servidor de chat nunca descifra. Es una copia deliberada, fuera del chat, y se documenta así.
-
-**Miniaturas y vistas previas.** Las genera el emisor, se cifran con su propia clave y viajan como un blob más con su recuento; un reenvío las reutiliza igual que el fichero.
-
-**Migración.** El migrador (8.2) convierte cada adjunto existente en un blob cifrado una sola vez aunque lo referencien varios mensajes (los reenvíos actuales apuntan al original, así que no hay duplicados que reconciliar). Las copias que `saved-media.ts` hizo en el pasado se quedan como blobs independientes: son ficheros distintos con historias de borrado distintas.
-
----
 
 ## 10b. Almacenamiento: deduplicación y destinos sin fugas
 
@@ -428,6 +403,8 @@ Conclusión: hoy no hay deduplicación que perder. Hay dos fuentes de copias evi
 | **Recuento de referencias** | El blob se borra cuando su recuento llega a 0, en la misma transacción que borra la última fila; `tidyChatStorage` sigue sin borrar por huérfanos y solo informa | - | Resuelve el motivo del comentario de `saved-media.ts`: borrar un mensaje ya no quita el archivo de otro. También el reenvío que se vacía al borrar el original, porque el mensaje reenviado guarda su propia referencia y su propia clave |
 | **Deduplicación dentro de lo que ya ve quien tiene la clave** | El cliente calcula `HMAC(K_dedup_usuario, SHA-256(claro))` con una clave derivada de su `AK` y lo manda al subir; si coincide con un blob suyo, se reutiliza | Que **ese usuario** sube dos veces el mismo archivo; nada entre usuarios | Medios remotos repetidos y archivos repetidos de la misma persona |
 | **Sin deduplicación entre usuarios** | Se descarta el cifrado convergente (clave derivada del contenido): permite confirmar si alguien tiene un archivo concreto y, con archivos de formato predecible, aprender el resto ("learn-the-remaining-information", Tahoe-LAFS) [94]; el problema está formalizado como cifrado bloqueado por el mensaje [95] | - | Se renuncia a ahorrar entre personas distintas; con datos de gobierno no se negocia |
+| **Quién puede añadir una referencia** | El servidor solo acepta una referencia nueva si el blob ya está referenciado en una conversación de la que el emisor es miembro, o en sus guardados, igual que hoy `requireChannel` comprueba el origen de un reenvío | Lo mismo que hoy con un reenvío | Conocer un id de blob no permite sujetarlo para siempre ni adjuntarlo en otra sala; leerlo es imposible sin la clave |
+| **Denuncias** | La evidencia de `keepForReports` pasa a ser una referencia más al blob en lugar de mover el archivo | Lo mismo que hoy | Borrar el mensaje denunciado no borra la prueba |
 | **Miniaturas** | Siguen generándose en el emisor, como hoy; se cifran con su propia clave dentro del mensaje | Un blob opaco más pequeño | Sin regresión |
 | **Destinos (NAS, conexiones, local)** | Igual que hoy: `chatTarget()` decide dónde va el blob y `placeFile` lo escribe. El destino solo guarda blobs cifrados | Lo mismo que el servidor | Mejora: un NAS compartido o una conexión externa dejan de tener fotos en claro |
 | **Guardar en Drive** (cuando se añada) | El cliente descifra y sube a Drive como un archivo normal, con los permisos de Drive. Drive no es E2EE y el botón lo dice. No se reutiliza el blob del chat: Drive necesita el claro para sus visores, miniaturas y compartición | Lo que Drive ve de cualquier archivo | - |
