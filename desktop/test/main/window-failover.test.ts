@@ -124,6 +124,16 @@ describe("going back to the usual address", () => {
         expect(backStep(PRIMARY, PRIMARY, false)).toBe("now");
         expect(backStep(PRIMARY, PRIMARY, true)).toBe("on-blur");
     });
+
+    it("waits for the usual address to answer twice in a row, so it never bounces", () => {
+        expect(backStep(PRIMARY, PRIMARY, false, 1)).toBe("stay");
+        expect(backStep(PRIMARY, PRIMARY, false, 2)).toBe("now");
+    });
+
+    it("goes back under somebody who has left the computer alone, without waiting for them to leave the window", () => {
+        expect(backStep(PRIMARY, PRIMARY, true, 2, 5_000)).toBe("on-blur");
+        expect(backStep(PRIMARY, PRIMARY, true, 2, 20_000)).toBe("now");
+    });
 });
 
 describe("the quiet sign", () => {

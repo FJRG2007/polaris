@@ -82,14 +82,24 @@ export function activeOrigin(primary: string | null, alternate: string | null): 
 /** What a recheck of the usual address means for a window on an alternate. */
 export type BackStep = "stay" | "now" | "on-blur";
 
+/** How many rechecks in a row the usual address has to answer before the window
+ *  goes back: one answer after an outage is often the line still settling, and
+ *  going back on it would bounce the window between the two addresses. */
+export const ANSWERS_BEFORE_BACK = 2;
+/** How long the person has to leave the computer alone before a window they
+ *  are on goes back without waiting for them to leave it. */
+export const IDLE_BEFORE_BACK_MS = 20_000;
+
 /**
- * The failover answered `resolved` on its recheck. Back to the usual address
- * when it answers: at once when the window is not in use, otherwise as soon as
- * the person leaves it, so a form being typed is not reloaded under them.
+ * The failover answered `resolved` on its recheck, after `answers` rechecks in a
+ * row (this one included) found the usual address answering. Back to it once it
+ * has answered `ANSWERS_BEFORE_BACK` times: at once when the window is not in
+ * use or the computer has been left alone, otherwise as soon as the person
+ * leaves the window, so a form being typed is not reloaded under them.
  */
-export function backStep(resolved: string, primary: string, focused: boolean): BackStep {
-    if (resolved !== primary) return "stay";
-    return focused ? "on-blur" : "now";
+export function backStep(resolved: string, primary: string, focused: boolean, answers = ANSWERS_BEFORE_BACK, idleMs = 0): BackStep {
+    if (resolved !== primary || answers < ANSWERS_BEFORE_BACK) return "stay";
+    return focused && idleMs < IDLE_BEFORE_BACK_MS ? "on-blur" : "now";
 }
 
 /** The window title while on an alternate: the page's own, then the words. */

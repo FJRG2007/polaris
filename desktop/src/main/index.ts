@@ -272,6 +272,8 @@ function watchForPrimary(window: BrowserWindow): void {
     if (recheck) clearInterval(recheck);
     // One wait for the person to leave the window, however many rechecks find the usual address answering.
     let waitingForBlur = false;
+    // Rechecks in a row that found the usual address answering (`ANSWERS_BEFORE_BACK`).
+    let answers = 0;
     recheck = setInterval(() => {
         const primary = current;
         const failover = primary ? failoverFor(primary) : undefined;
@@ -288,7 +290,9 @@ function watchForPrimary(window: BrowserWindow): void {
                 // background and nothing said. The alternate is the same
                 // Polaris, so the window stays on it until the call is over.
                 if (holdsCall(window.webContents)) return;
-                const step = backStep(resolved, primary, window.isFocused());
+                answers = resolved === primary ? answers + 1 : 0;
+                const idleMs = powerMonitor.getSystemIdleTime() * 1000;
+                const step = backStep(resolved, primary, window.isFocused(), answers, idleMs);
                 if (step === "now") moveTo(window, null);
                 if (step !== "on-blur" || waitingForBlur) return;
                 waitingForBlur = true;
