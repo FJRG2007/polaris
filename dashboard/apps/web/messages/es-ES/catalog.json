@@ -78,7 +78,8 @@
         "World": "Mundo",
         "World seed": "Semilla",
         "Xbox Live authentication": "Autenticación de Xbox Live",
-        "Yes": "Sí"
+        "Yes": "Sí",
+        "Allow flight": "Permitir vuelo"
     },
     "categories": {
         "Messaging": "Mensajería",
@@ -178,7 +179,8 @@
             "ENABLE_WHITELIST": "Activado, solo entran los jugadores que añadas. Añádete desde Jugadores.",
             "ENABLE_COMMAND_BLOCK": "Desactivado, los jugadores no pueden ejecutar comandos del servidor desde dentro del mundo.",
             "ENFORCE_SECURE_PROFILE": "Activado, rechaza a los clientes que no pueden demostrar quiénes son.",
-            "SPAWN_PROTECTION": "Los bloques en este radio del spawn solo los pueden cambiar los operadores. 0 lo desactiva."
+            "SPAWN_PROTECTION": "Los bloques en este radio del spawn solo los pueden cambiar los operadores. 0 lo desactiva.",
+            "ALLOW_FLIGHT": "Desactivado expulsa a quien el juego crea que está flotando. Actívalo en servidores con mods: jetpacks, lag y bloques de mods lo disparan."
         },
         "minecraft-bedrock": {
             "VERSION": "LATEST sigue la última versión.",

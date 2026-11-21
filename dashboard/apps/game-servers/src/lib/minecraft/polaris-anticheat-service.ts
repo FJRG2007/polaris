@@ -118,6 +118,62 @@ export async function setAnticheat(
 }
 
 /**
+ * The game's flight check handed to the engine on every server where it already
+ * runs (`flightHandover`) - the servers protected before Polaris did this when
+ * switching it on. Written for the next start, never forced into a running one;
+ * an owner's own value is left alone, and once written this does nothing more
+ * there.
+ */
+export async function adoptFlightHandover(): Promise<{ handed: number }> {
+    const installs = await prisma.installedApp.findMany({
+        where: { catalogId: "minecraft", status: { not: "removed" }, applicationId: { not: null } },
+        select: { id: true, ownerId: true, applicationId: true }
+    });
+    // The keys the decision rests on, for every server in one read.
+    const rows = await prisma.envVar.findMany({
+        where: {
+            scopeType: "application",
+            scopeId: { in: installs.map((install) => install.applicationId!) },
+            key: {
+                in: [
+                    anticheat.ANTICHEAT_KEY,
+                    anticheat.ANTIXRAY_KEY,
+                    anticheat.FLIGHT_KEY,
+                    anticheat.FLIGHT_BY_KEY,
+                    "MODS",
+                    SOFTWARE_KEY,
+                    "VERSION"
+                ]
+            }
+        },
+        select: { scopeId: true, key: true, value: true }
+    });
+    const envs = new Map<string, Map<string, string>>();
+    for (const row of rows) {
+        const env = envs.get(row.scopeId) ?? new Map<string, string>();
+        env.set(row.key, row.value ?? "");
+        envs.set(row.scopeId, env);
+    }
+    let handed = 0;
+    for (const install of installs) {
+        const writes = anticheat.flightHandover(envs.get(install.applicationId!) ?? new Map());
+        if (!writes) continue;
+        try {
+            await setEnvVars(
+                "application",
+                install.applicationId!,
+                install.ownerId,
+                anticheat.anticheatEnvWrites(writes)
+            );
+            handed += 1;
+        } catch (caught) {
+            console.error(`[minecraft-anticheat] could not hand flight over for ${install.id}:`, caught);
+        }
+    }
+    return { handed };
+}
+
+/**
  * Switch the engine on wherever it runs and nobody has decided either way - the
  * servers made before it came on by default. The change is written, not applied:
  * a server loads the plugin on its next start, and nobody is disconnected for it

@@ -78,7 +78,8 @@
         "World": "World",
         "World seed": "World seed",
         "Xbox Live authentication": "Xbox Live authentication",
-        "Yes": "Yes"
+        "Yes": "Yes",
+        "Allow flight": "Allow flight"
     },
     "categories": {
         "Messaging": "Messaging",
@@ -178,7 +179,8 @@
             "ENABLE_WHITELIST": "On means only players you add can join. Add yourself from Players.",
             "ENABLE_COMMAND_BLOCK": "Off keeps players from running server commands from inside the world.",
             "ENFORCE_SECURE_PROFILE": "On rejects clients that cannot prove who they are.",
-            "SPAWN_PROTECTION": "Blocks in this radius of spawn can only be changed by operators. 0 disables it."
+            "SPAWN_PROTECTION": "Blocks in this radius of spawn can only be changed by operators. 0 disables it.",
+            "ALLOW_FLIGHT": "Off kicks anybody the game thinks is floating. Turn it on for modded servers: jetpacks, lag and mod blocks set it off."
         },
         "minecraft-bedrock": {
             "VERSION": "LATEST tracks the newest release.",

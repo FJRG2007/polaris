@@ -320,3 +320,46 @@ describe("the plugin on an old Java", () => {
         expect(anticheat.unfitAnticheatRemoved(plugin, "FABRIC", "1.16.5")).toBeNull();
     });
 });
+
+describe("the game's flight check", () => {
+    const input = { baseUrl: "https://polaris.example", modKey: "k", installedAppId: "app", token: "t" };
+    const paper = (extra: [string, string][] = []) =>
+        new Map<string, string>([["TYPE", "PAPER"], ["VERSION", "1.21.4"], ...extra]);
+
+    it("goes to the engine when it is switched on, since it catches flying itself", () => {
+        const on = anticheat.anticheatEnableEnv(paper(), input);
+        expect(on.get("ALLOW_FLIGHT")).toBe("true");
+        expect(on.get("POLARIS_FLIGHT")).toBe("anticheat");
+    });
+
+    it("leaves a value the owner set alone", () => {
+        const on = anticheat.anticheatEnableEnv(paper([["ALLOW_FLIGHT", "false"]]), input);
+        expect(on.has("ALLOW_FLIGHT")).toBe(false);
+    });
+
+    it("comes back when the engine is switched off, only if Polaris took it", () => {
+        const off = anticheat.anticheatDisableEnv(
+            paper([["ALLOW_FLIGHT", "true"], ["POLARIS_FLIGHT", "anticheat"]])
+        );
+        expect(off.get("ALLOW_FLIGHT")).toBe("false");
+        expect(off.get("POLARIS_FLIGHT")).toBe("vanilla");
+        expect(anticheat.anticheatDisableEnv(paper([["ALLOW_FLIGHT", "true"]])).has("ALLOW_FLIGHT")).toBe(false);
+        // Switched on again, it is handed over again.
+        expect(
+            anticheat.anticheatEnableEnv(paper([["ALLOW_FLIGHT", "false"], ["POLARIS_FLIGHT", "vanilla"]]), input).get(
+                "ALLOW_FLIGHT"
+            )
+        ).toBe("true");
+    });
+
+    it("is handed over on servers protected before, and nowhere the engine does not run", () => {
+        const protectedBefore = anticheat.anticheatEnableEnv(paper(), input);
+        protectedBefore.delete("ALLOW_FLIGHT");
+        protectedBefore.delete("POLARIS_FLIGHT");
+        const env = new Map([...paper(), ...protectedBefore]);
+        expect(anticheat.flightHandover(env)?.get("ALLOW_FLIGHT")).toBe("true");
+        expect(anticheat.flightHandover(new Map([...env, ["POLARIS_FLIGHT", "anticheat"]]))).toBeNull();
+        // Forge: no engine, so the game's own check stays as the owner has it.
+        expect(anticheat.flightHandover(new Map([["TYPE", "FORGE"], ["VERSION", "1.20.1"]]))).toBeNull();
+    });
+});

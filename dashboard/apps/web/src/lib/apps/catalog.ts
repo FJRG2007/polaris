@@ -943,6 +943,18 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     default: "16",
                     tunable: true,
                     group: "Security"
+                },
+                {
+                    key: "ALLOW_FLIGHT",
+                    label: "Allow flight", // i18n-ignore
+                    help: "Off kicks anybody the game thinks is floating. Turn it on for modded servers: jetpacks, lag and mod blocks set it off.",
+                    default: "false",
+                    options: [
+                        { value: "false", label: "Off" }, // i18n-ignore
+                        { value: "true", label: "On" } // i18n-ignore
+                    ],
+                    tunable: true,
+                    group: "Security"
                 }
             ],
             volumes: [{ name: "data", mountPath: "/data", label: "World data" }], // i18n-ignore

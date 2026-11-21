@@ -464,6 +464,16 @@ export function gameJobTable(): readonly AppJob[] {
                 (await import("./minecraft/polaris-anticheat-service")).adoptAnticheatDefaults()
         },
         {
+            key: "game-anticheat-flight",
+            // The game's flight check off wherever Polaris's anti-cheat already
+            // runs and catches flying itself - written for the next start, and
+            // an owner's own value left alone.
+            everyMs: 10 * MINUTE,
+            leaseMs: 15 * MINUTE,
+            run: async () =>
+                (await import("./minecraft/polaris-anticheat-service")).adoptFlightHandover()
+        },
+        {
             key: "game-polaris-component",
             // The Polaris mod on every server Polaris has a mod build for,
             // whatever its switches: the events run their heavy work through it.

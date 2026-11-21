@@ -54,6 +54,53 @@ export const ANTIXRAY_KEY = "POLARIS_ANTIXRAY";
 /** Where a server's Modrinth list lives. */
 export const PROJECTS_KEY = "MODRINTH_PROJECTS";
 
+/** The game's own flight check: `false` kicks anybody it thinks is floating. */
+export const FLIGHT_KEY = "ALLOW_FLIGHT";
+
+/** Who set `ALLOW_FLIGHT`, when Polaris did: `anticheat` while the engine has
+ *  the flight check, `vanilla` once it gave it back. Empty is the owner's (or
+ *  nobody's) value, which Polaris never overrides. */
+export const FLIGHT_BY_KEY = "POLARIS_FLIGHT";
+
+/**
+ * The game's flight check handed to the engine: what to write, or null when
+ * there is nothing to change.
+ *
+ * Vanilla's check guesses from how long a player stays off the ground, so it
+ * kicks people for lag, a ladder, a slime block or a modded jetpack ("Flying is
+ * not enabled on this server") while a real cheat client stays under it. The
+ * engine simulates every movement and flags flying itself, so where it runs the
+ * game's guess is switched off (`allow-flight` on - which gives nobody flight;
+ * only creative mode and items do). An owner who set the value themselves keeps
+ * it. Pure.
+ */
+function flightToEngine(env: ReadonlyMap<string, string>): Map<string, string> | null {
+    const by = (env.get(FLIGHT_BY_KEY) ?? "").trim();
+    const allow = (env.get(FLIGHT_KEY) ?? "").trim();
+    if (by === "anticheat") return null;
+    if (by === "" && allow !== "") return null;
+    return new Map([
+        [FLIGHT_KEY, "true"],
+        [FLIGHT_BY_KEY, "anticheat"]
+    ]);
+}
+
+/** For a server where the engine already runs: the flight check handed over,
+ *  or null. What the sweep writes on servers protected before this existed. */
+export function flightHandover(env: ReadonlyMap<string, string>): Map<string, string> | null {
+    return anticheatActive(env) ? flightToEngine(env) : null;
+}
+
+/** The game's flight check back, for a server losing the engine - only when
+ *  Polaris was the one that switched it off. Pure. */
+export function flightReturned(env: ReadonlyMap<string, string>): [string, string][] {
+    if ((env.get(FLIGHT_BY_KEY) ?? "").trim() !== "anticheat") return [];
+    return [
+        [FLIGHT_KEY, "false"],
+        [FLIGHT_BY_KEY, "vanilla"]
+    ];
+}
+
 /**
  * Anti-cheat plugins from Modrinth this engine replaces, by project slug. Servers
  * used to be seeded with one; two anti-cheats reading the same packets flag each
@@ -216,6 +263,7 @@ export function anticheatEnableEnv(
         ...(projects !== undefined && withoutReplacedAnticheats(projects) !== projects
             ? [[PROJECTS_KEY, withoutReplacedAnticheats(projects)] as [string, string]]
             : []),
+        ...(flightToEngine(current) ?? []),
         [ANTICHEAT_KEY, "on"],
         [URL_KEY, base],
         [SERVER_ID_KEY, input.installedAppId],
@@ -259,7 +307,9 @@ export function anticheatMovedTo(
     return new Map([
         [MODS_KEY, kept],
         [ANTICHEAT_KEY, ""],
-        ...(from?.kind === "mod" ? [[ANTIXRAY_KEY, ""] as [string, string]] : [])
+        ...(from?.kind === "mod" ? [[ANTIXRAY_KEY, ""] as [string, string]] : []),
+        // Unless the build that loads there takes it back on the next sweep.
+        ...flightReturned(env)
     ]);
 }
 
@@ -290,12 +340,14 @@ export function anticheatDisableEnv(current: ReadonlyMap<string, string>): Map<s
         // stays, and is only told to stop hiding ore.
         return new Map([
             [ANTICHEAT_KEY, "off"],
-            [ANTIXRAY_KEY, "off"]
+            [ANTIXRAY_KEY, "off"],
+            ...flightReturned(current)
         ]);
     }
     return new Map([
         [MODS_KEY, withoutAnticheat(current.get(MODS_KEY) ?? "")],
-        [ANTICHEAT_KEY, "off"]
+        [ANTICHEAT_KEY, "off"],
+        ...flightReturned(current)
     ]);
 }
 
