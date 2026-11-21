@@ -947,7 +947,7 @@ function DeploymentsTab({ app, onChanged }: { app: ProjectApp; onChanged: () => 
                         }}
                     />
                     {active && (
-                        <div className="overflow-hidden rounded-xl border border-success-edge bg-success/[0.06]">
+                        <div className="overflow-hidden rounded-xl border border-success-edge bg-card">
                             <div className="flex items-center gap-3 p-3">
                                 <StateBadge deployment={active} />
                                 <DeployAvatar app={app} deployment={active} />

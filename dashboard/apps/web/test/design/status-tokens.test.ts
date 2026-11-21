@@ -24,10 +24,15 @@ const IDENTITY_FILES = new Set(["file-icons.ts", "item-icons.ts"]);
 const RULES: { name: string; pattern: RegExp; allow?: (match: RegExpMatchArray) => boolean }[] = [
     {
         name: "a status tint mixed with an alpha (use bg-<status>-soft)",
-        pattern: /\bbg-(success|warning|danger)\/(\d+)\b/g,
+        // An arbitrary alpha (`bg-success/[0.06]`) is the same mix written longer:
+        // it washed the Deploy tab's current deployment card in green.
+        pattern: /\bbg-(success|warning|danger)\/(\d+\b|\[[\d.]+\])/g,
         // A deeper alpha is a shade of the solid colour - a pressed button, a graded
         // bar - not a chip's fill.
-        allow: (match) => Number(match[2]) > 25
+        allow: (match) => {
+            const alpha = match[2]!;
+            return (alpha.startsWith("[") ? Number(alpha.slice(1, -1)) * 100 : Number(alpha)) > 25;
+        }
     },
     {
         name: "a status border mixed with an alpha (use border-<status>-edge)",
