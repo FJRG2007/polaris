@@ -1,0 +1,23 @@
+{
+    "name": "mls-spike",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "description": "Phase 0 spike: MLS (RFC 9420) library measurements. Not part of the dashboard workspaces and never imported by runtime code.",
+    "license": "AGPL-3.0-only",
+    "scripts": {
+        "node": "node src/node.ts 2 50 500 1000 5000",
+        "browser": "node run-browser.mjs",
+        "sizes": "node sizes.mjs",
+        "openmls:native": "cargo run --release --manifest-path openmls/Cargo.toml -- 2 50 500 1000 5000",
+        "openmls:wasm": "cargo build --release --lib --target wasm32-unknown-unknown --manifest-path openmls/Cargo.toml && wasm-bindgen --target web --out-dir openmls/pkg openmls/target/wasm32-unknown-unknown/release/openmls_spike.wasm"
+    },
+    "dependencies": {
+        "@noble/hashes": "2.3.0",
+        "ts-mls": "1.6.4"
+    },
+    "devDependencies": {
+        "esbuild": "0.28.1",
+        "playwright-core": "1.64.1"
+    }
+}

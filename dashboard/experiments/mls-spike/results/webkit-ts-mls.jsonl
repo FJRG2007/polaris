@@ -1,0 +1,4 @@
+{"engine":"webkit","version":"27.2","entry":"ts-mls","throttle":1}
+{"step":"scriptEvaluatedSinceNavigation","ms":20}
+{"step":"init","ms":2}
+{"error":"NotSupportedError: The operation is not supported."}

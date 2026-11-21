@@ -50,6 +50,7 @@ on:
       - "dashboard/**"
       - "!dashboard/docs/**"
       - "!dashboard/*.md"
+      - "!dashboard/experiments/**"
       - ".github/workflows/dashboard-ci.yml"
   workflow_dispatch:
   workflow_call:

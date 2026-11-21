@@ -281,6 +281,8 @@ El requisito "sin más recursos" se cumple en el servidor y en el almacenamiento
 
 Tamaños: S, M, L, XL (relativos). Las dependencias van en orden; las fases 5-9 pueden ir en paralelo cuando la 4 esté hecha.
 
+Resultado de la fase 0 (biblioteca elegida, medidas y riesgos): [chat-e2ee-phase0.md](chat-e2ee-phase0.md).
+
 | Fase | Contenido | Tamaño | Depende de |
 | --- | --- | --- | --- |
 | 0 | Modelo de amenazas firmado, prueba técnica de OpenMLS o mls-rs en WASM dentro del navegador, Electron y el WebView de Android/iOS; medir peso y tiempo de arranque; revisión de dependencias | S | - |
