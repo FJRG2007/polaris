@@ -43,6 +43,7 @@ import {
 } from "./notice-text";
 import { activityIdIn } from "./activity-card";
 import { gameServerIdIn } from "./game-server-card";
+import { isPrivateInvitation } from "./private-invitation";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { announceRoomMention, refuseRoomMention } from "./room-mentions";
 import { requireNotSpam, requireRoomMentionAllowed } from "./spam-guard";
@@ -1881,6 +1882,7 @@ export async function forward(
             channelId: true,
             authorId: true,
             deletedAt: true,
+            body: true,
             // A file meant to be seen once is not passed on, here any more than
             // from the menu that no longer offers it.
             attachments: { where: { viewOnce: true }, select: { id: true }, take: 1 },
@@ -1891,6 +1893,9 @@ export async function forward(
         throw new ChatAccessError({ key: "errors.messageGone" });
     }
     if (original.attachments.length > 0) throw new ChatAccessError({ key: "errors.viewOnceNotForwarded" });
+    // An invitation is for the person it was sent to; the menu does not offer
+    // passing it on, and neither does a request made without the menu.
+    if (isPrivateInvitation(original.body)) throw new ChatAccessError({ key: "errors.invitationNotForwarded" });
     await requireAgeCleared(actor, original.channelId);
     await history.requireReadable(actor, original.channelId, input.messageId);
     await requireUnlocked(actor, original.channelId, proof);
@@ -2475,7 +2480,9 @@ export async function decorateMessages(
             forwardable:
                 row.deletedAt === null &&
                 (row.authorId === null || mayForward.has(row.authorId)) &&
-                !(onMessageFiles.get(row.id) ?? []).some((file) => file.viewOnce),
+                !(onMessageFiles.get(row.id) ?? []).some((file) => file.viewOnce) &&
+                // Nor an invitation meant for one person (`private-invitation.ts`).
+                !isPrivateInvitation(row.body),
             link: links.get(row.id) ?? null,
             preview: previewOf(row, links, previews),
             previewPending: pendingOf(row, links, previews),

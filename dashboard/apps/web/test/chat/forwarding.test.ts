@@ -159,6 +159,9 @@ vi.mock("@polaris/db", () => {
 // idle machine and times out on a busy one, and reads as this test being broken
 // rather than as the suite being loaded.
 const { decorateMessages, forward } = await import("@/lib/chat/messages");
+const { activityMark } = await import("@/lib/chat/activity-card");
+const { isPrivateInvitation } = await import("@/lib/chat/private-invitation");
+const { gameInviteMark, gameServerMark } = await import("@/lib/chat/game-server-card");
 
 const ada = { id: "ada" };
 
@@ -169,6 +172,7 @@ beforeEach(() => {
     written = undefined;
     original.deletedAt = null;
     original.authorId = "grace";
+    original.body = "the thing she said";
 });
 
 describe("a message from somebody who allows it", () => {
@@ -237,6 +241,33 @@ describe("a message from somebody who does not", () => {
             forward(ada, { messageId: "message-1", channelId: "channel-2", note: "" })
         ).rejects.toThrow(/passed on/);
         expect(created).toBe(0);
+    });
+});
+
+describe("an invitation meant for one person", () => {
+    const server = "0190a1b2-0000-7000-8000-0000000000aa";
+
+    it.each([
+        ["a game server invite", () => gameInviteMark(server, "Steve")],
+        ["the card that lets somebody onto a server", () => gameServerMark(server)],
+        ["an invite to a game in a call", () => activityMark(server)]
+    ])("is not offered when it is %s", async (_, body) => {
+        original.body = body();
+        const [view] = await decorateMessages(ada, [original]);
+        expect(view?.forwardable).toBe(false);
+        expect(isPrivateInvitation(original.body)).toBe(true);
+    });
+
+    it("is refused if it is asked for anyway", async () => {
+        original.body = gameInviteMark(server, "Steve");
+        await expect(
+            forward(ada, { messageId: "message-1", channelId: "channel-2", note: "" })
+        ).rejects.toThrow();
+        expect(created).toBe(0);
+    });
+
+    it("leaves an ordinary message that only mentions an invite alone", () => {
+        expect(isPrivateInvitation("join us: polaris-game-invite:nothing")).toBe(false);
     });
 });
 
