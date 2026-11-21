@@ -497,7 +497,7 @@ export function ChannelView({
     usePolarContext(
         channel ? { record: { kind: "chat channel", id: channelId, name: callTitle } } : null
     );
-    const canPost = channel ? !channel.archived : true;
+    const canPost = channel ? !channel.archived && channel.maySend : true;
 
     /**
      * Pick the conversation up again from a message.
@@ -2700,7 +2700,9 @@ export function ChannelView({
                                               ? `#${channel.name}`
                                               : channel.name
                                   })
-                                : t("channelView.thisConversationIsArchived")
+                                : channel.archived
+                                  ? t("channelView.thisConversationIsArchived")
+                                  : t("channelView.onlyAdminsSend")
                         }
                         editing={editing}
                         replyingTo={replyingTo ?? carried?.message ?? null}

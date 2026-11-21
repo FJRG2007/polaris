@@ -42,6 +42,7 @@ import {
     Link2,
     Loader2,
     Lock,
+    Megaphone,
     ShieldCheck,
     SlidersHorizontal,
     Trash2,
@@ -102,6 +103,8 @@ interface Draft {
     /** The voice room's limit as typed, so an emptied box reads as no limit. */
     readonly limitText: string;
     readonly private: boolean;
+    /** Off is an announcement channel: only its administrators post. */
+    readonly membersMaySend: boolean;
 }
 
 function draftOf(channel: ChatChannelView): Draft {
@@ -111,7 +114,8 @@ function draftOf(channel: ChatChannelView): Draft {
         slowmode: channel.slowmode,
         contentMode: channel.contentMode,
         limitText: channel.userLimit > 0 ? String(channel.userLimit) : "",
-        private: channel.private
+        private: channel.private,
+        membersMaySend: channel.membersMaySend
     };
 }
 
@@ -158,6 +162,7 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
             draft.slowmode !== now.slowmode ||
             draft.contentMode !== now.contentMode ||
             draft.private !== now.private ||
+            draft.membersMaySend !== now.membersMaySend ||
             (voice && userLimit !== null && userLimit !== channel.userLimit)
         );
     }, [draft, channel, stored, voice, userLimit]);
@@ -183,6 +188,9 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
                     slowmode: draft.slowmode,
                     contentMode: draft.contentMode,
                     ...(draft.private !== channel.private ? { private: draft.private } : {}),
+                    ...(draft.membersMaySend !== channel.membersMaySend
+                        ? { membersMaySend: draft.membersMaySend }
+                        : {}),
                     ...(voice && userLimit !== null ? { userLimit } : {})
                 }),
             setError
@@ -696,6 +704,21 @@ function Permissions({
 
     return (
         <>
+            <div className="flex items-start gap-3 rounded-lg border border-border px-3 py-3">
+                <Megaphone className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{t("channelSettings.announcement")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("channelSettings.announcementHint")}
+                    </p>
+                </div>
+                <Switch
+                    checked={!draft.membersMaySend}
+                    onChange={(checked) => onEdit({ membersMaySend: !checked })}
+                    aria-label={t("channelSettings.announcement")}
+                />
+            </div>
+
             <div className="flex items-start gap-3 rounded-lg border border-border px-3 py-3">
                 <Lock className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">

@@ -38,6 +38,7 @@ interface GroupOptions {
     membersMayInvite?: boolean;
     newcomersReadHistory?: boolean;
     membersMayMention?: boolean;
+    membersMaySend?: boolean;
 }
 
 export function GroupSettingsDialog({
@@ -77,6 +78,7 @@ export function GroupSettingsDialog({
             channel.membersMayEdit,
             channel.membersMayInvite,
             channel.membersMayMention,
+            channel.membersMaySend,
             channel.newcomerHistory
         ]
     );
@@ -84,6 +86,7 @@ export function GroupSettingsDialog({
         membersMayEdit: pending.membersMayEdit ?? channel.membersMayEdit,
         membersMayInvite: pending.membersMayInvite ?? channel.membersMayInvite,
         membersMayMention: pending.membersMayMention ?? channel.membersMayMention,
+        membersMaySend: pending.membersMaySend ?? channel.membersMaySend,
         newcomersReadHistory: pending.newcomersReadHistory ?? channel.newcomerHistory !== "off"
     };
 
@@ -175,6 +178,23 @@ export function GroupSettingsDialog({
                                 void setSwitch({ membersMayMention: next })
                             }
                             aria-label={t("groupSettings.letAnybodyUseEveryoneAnd")}
+                        />
+                    </label>
+
+                    <label className="flex items-start justify-between gap-3">
+                        <span className="flex min-w-0 flex-col">
+                            <span className="text-sm font-medium">
+                                {t("groupSettings.letAnybodySend")}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("groupSettings.offOnlyYouCanSend")}
+                            </span>
+                        </span>
+                        <Switch
+                            checked={shown.membersMaySend}
+                            disabled={busy}
+                            onChange={(next: boolean) => void setSwitch({ membersMaySend: next })}
+                            aria-label={t("groupSettings.letAnybodySend")}
                         />
                     </label>
 

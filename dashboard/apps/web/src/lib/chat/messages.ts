@@ -1342,7 +1342,7 @@ export async function react(actor: ChatActor, input: core.ChatReactInput): Promi
         select: { channelId: true, audience: true }
     });
     if (!message || isEphemeral(message.audience)) throw new ChatAccessError({ key: "errors.messageGone" });
-    const access = await requirePostable(actor, message.channelId);
+    const access = await requirePostable(actor, message.channelId, { reacting: true });
     await history.requireReadable(actor, message.channelId, input.messageId);
 
     // A space's own emoji is one reaction whatever it was called when it was

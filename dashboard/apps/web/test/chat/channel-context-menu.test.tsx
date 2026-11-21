@@ -71,6 +71,8 @@ const channel = (id: string, name: string, unread: number) => ({
     membersMayInvite: true,
     mayInvite: true,
     membersMayMention: true,
+    membersMaySend: true,
+    maySend: true,
     mayMentionRoom: true,
     slowmode: 0,
     userLimit: 0,

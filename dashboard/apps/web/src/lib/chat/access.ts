@@ -286,6 +286,13 @@ export interface ChannelAccess {
      * for ten minutes is a lie that makes them go and ask somebody about it.
      */
     readonly mutedUntil: Date | null;
+    /**
+     * Whether posting here is closed to them because only whoever runs it may
+     * post: a group whose owner turned sending off, or an announcement channel
+     * in a space. Kept apart from `mayPost` because reacting and voting stay
+     * open, and because it is refused with its own sentence.
+     */
+    readonly adminsOnly: boolean;
     /** Whether they may rename it, set the topic, or add people. */
     readonly mayAdminister: boolean;
     /**
@@ -324,6 +331,7 @@ export async function channelAccess(
             createdById: true,
             private: true,
             archived: true,
+            membersMaySend: true,
             space: { select: { archived: true } }
         }
     });
@@ -365,6 +373,7 @@ export async function channelAccess(
             member: true,
             mayPost: live && !quiet,
             mutedUntil: quiet ? mutedUntil : null,
+            adminsOnly: sendClosed(channel, actor.id, false),
             mayAdminister: false,
             mayModerate: channel.kind === "group" && groupOwnerId(channel) === actor.id
         };
@@ -404,6 +413,7 @@ export async function channelAccess(
         // a moderator who cannot answer cannot moderate.
         mayPost: live && (!quiet || admin),
         mutedUntil: quiet && !admin ? mutedUntil : null,
+        adminsOnly: sendClosed(channel, actor.id, admin),
         mayAdminister: admin,
         mayModerate: admin
     };
@@ -467,6 +477,31 @@ export async function reachableChannels(
     return reached;
 }
 
+/**
+ * Whether only whoever runs a conversation may post in it and this actor is
+ * not them. A group is run by its owner; a space channel by its administrators.
+ * A direct message has nobody over it, so it is never closed.
+ *
+ * Asked by the send path and by the screen that draws the composer, so the two
+ * cannot disagree.
+ */
+export function sendClosed(
+    channel: {
+        readonly kind: string;
+        readonly spaceId: string | null;
+        readonly ownerId: string | null;
+        readonly createdById?: string | null;
+        readonly membersMaySend: boolean;
+    },
+    actorId: string,
+    administers: boolean
+): boolean {
+    if (channel.membersMaySend !== false) return false;
+    if (channel.spaceId) return !administers;
+    if (channel.kind !== "group") return false;
+    return groupOwnerId(channel) !== actorId;
+}
+
 /** The later of two moments, either of which may be absent. */
 function latest(one: Date | null, two: Date | null): Date | null {
     if (!one) return two;
@@ -481,9 +516,16 @@ export async function requireChannel(actor: ChatActor, channelId: string): Promi
     return access;
 }
 
-/** The same again, for a write. Says which of the two reasons refused it, since
- *  "you are not in it" and "it is archived" call for different next steps. */
-export async function requirePostable(actor: ChatActor, channelId: string): Promise<ChannelAccess> {
+/** The same again, for a write. Says which of the reasons refused it, since
+ *  "you are not in it" and "it is archived" call for different next steps.
+ *
+ *  `reacting` is a reaction or a poll vote: those stay open where only whoever
+ *  runs the conversation may post, the same as WhatsApp's announcement groups. */
+export async function requirePostable(
+    actor: ChatActor,
+    channelId: string,
+    options: { readonly reacting?: boolean } = {}
+): Promise<ChannelAccess> {
     const access = await requireChannel(actor, channelId);
     if (access.mutedUntil) {
         // Said as a wait rather than as a timestamp. Somebody who has just been
@@ -493,6 +535,9 @@ export async function requirePostable(actor: ChatActor, channelId: string): Prom
         throw new ChatAccessError({ key: "errors.timedOut", params: { wait: spokenWait(left) } });
     }
     if (!access.mayPost) throw new ChatAccessError({ key: "errors.conversationArchived" });
+    if (access.adminsOnly && !options.reacting) {
+        throw new ChatAccessError({ key: "errors.onlyAdminsSend" });
+    }
     return access;
 }
 

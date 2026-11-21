@@ -68,6 +68,8 @@ const dm = {
     membersMayInvite: false,
     mayInvite: false,
     membersMayMention: true,
+    membersMaySend: true,
+    maySend: true,
     mayMentionRoom: false,
     slowmode: 0,
     userLimit: 0,

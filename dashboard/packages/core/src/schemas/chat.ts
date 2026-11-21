@@ -377,6 +377,8 @@ export const chatChannelUpdateSchema = z.object({
     /** Moving it under a different heading, or out from under all of them. */
     categoryId: z.string().uuid().nullable().optional(),
     slowmode: chatSlowmodeSchema.optional(),
+    /** False makes it an announcement channel: only its administrators post. */
+    membersMaySend: z.boolean().optional(),
     /** How many people a voice channel holds at once. Zero is no limit. */
     userLimit: chatVoiceUserLimitSchema.optional()
 });

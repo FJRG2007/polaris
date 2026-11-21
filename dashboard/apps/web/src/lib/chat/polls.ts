@@ -225,7 +225,7 @@ export async function vote(
     });
     if (!message?.poll) throw new ChatAccessError({ key: "errors.pollGone" });
     if (message.deletedAt) throw new ChatRuleError({ key: "errors.pollDeleted" });
-    await requirePostable(actor, message.channelId);
+    await requirePostable(actor, message.channelId, { reacting: true });
     await history.requireReadable(actor, message.channelId, input.messageId);
 
     if (core.pollIsClosed(message.poll, now)) throw new ChatRuleError({ key: "errors.pollClosed" });

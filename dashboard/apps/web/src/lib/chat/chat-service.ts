@@ -39,6 +39,7 @@ import {
     pinsAllowed,
     invitesAllowed,
     roomMentionsAllowed,
+    sendClosed,
     membershipReach,
     reachableSpaceIds,
     requireChannel,
@@ -165,6 +166,12 @@ export interface ChatChannelView {
     /** Whether this reader may use `@everyone` and `@here` here. Only decides
      *  what the composer offers; sending asks the same question again. */
     readonly mayMentionRoom: boolean;
+    /** Whether anybody may post here, or only whoever runs it (the group's
+     *  owner, a space channel's administrators). */
+    readonly membersMaySend: boolean;
+    /** Whether this reader may post here as far as that switch goes. Only
+     *  decides what the composer draws; sending asks `requirePostable`. */
+    readonly maySend: boolean;
     /** How long somebody waits between messages here, in seconds. Zero is off.
      *  Read by the composer so the wait is shown while it applies rather than
      *  discovered by being refused. */
@@ -817,6 +824,7 @@ export async function listChannels(
             membersMayEdit: true,
             membersMayInvite: true,
             membersMayMention: true,
+            membersMaySend: true,
             slowmode: true,
             userLimit: true,
             contentMode: true,
@@ -1038,6 +1046,8 @@ export async function listChannels(
             mayInvite: invitesAllowed({ ...channel, mayAdminister }, actor.id),
             membersMayMention: channel.membersMayMention,
             mayMentionRoom: roomMentionsAllowed(channel, actor.id),
+            membersMaySend: channel.membersMaySend,
+            maySend: !sendClosed(channel, actor.id, mayAdminister),
             slowmode: channel.slowmode,
             userLimit: channel.kind === "voice" ? channel.userLimit : 0,
             contentMode: channel.spaceId ? contentModeOf(channel.contentMode) : "default",
@@ -1223,6 +1233,7 @@ export async function duplicateChannel(
             topic: true,
             private: true,
             slowmode: true,
+            membersMaySend: true,
             userLimit: true,
             contentMode: true,
             order: true,
@@ -1264,6 +1275,7 @@ export async function duplicateChannel(
                 private: source.private,
                 kind: source.kind,
                 slowmode: source.slowmode,
+                membersMaySend: source.membersMaySend,
                 userLimit: source.userLimit,
                 contentMode: source.contentMode,
                 order,
@@ -1415,6 +1427,9 @@ export async function updateChannel(
                 ...(input.archived !== undefined ? { archived: input.archived } : {}),
                 ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
                 ...(input.slowmode !== undefined ? { slowmode: input.slowmode } : {}),
+                ...(input.membersMaySend !== undefined
+                    ? { membersMaySend: input.membersMaySend }
+                    : {}),
                 ...(input.userLimit !== undefined ? { userLimit: input.userLimit } : {}),
                 ...(input.private !== undefined ? { private: input.private } : {}),
                 ...(input.contentMode !== undefined ? { contentMode: input.contentMode } : {})
@@ -1485,11 +1500,13 @@ export async function setGroupOptions(
         membersMayEdit?: boolean;
         membersMayInvite?: boolean;
         membersMayMention?: boolean;
+        membersMaySend?: boolean;
         newcomersReadHistory?: boolean;
     }
 ): Promise<void> {
     await requireGroupOwner(actor, channelId);
     if (
+        options.membersMaySend === undefined &&
         options.newcomersReadHistory === undefined &&
         options.membersMayEdit === undefined &&
         options.membersMayInvite === undefined &&
@@ -1508,6 +1525,9 @@ export async function setGroupOptions(
                 : {}),
             ...(options.membersMayMention !== undefined
                 ? { membersMayMention: options.membersMayMention }
+                : {}),
+            ...(options.membersMaySend !== undefined
+                ? { membersMaySend: options.membersMaySend }
                 : {}),
             ...(options.newcomersReadHistory !== undefined
                 ? { newcomerHistory: options.newcomersReadHistory ? "on" : "off" }

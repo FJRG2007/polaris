@@ -10663,6 +10663,10 @@ model ChatChannel {
     // owner. On by default, which is how every group behaved before the owner
     // could decide.
     membersMayMention Boolean @default(true)
+    // Whether anybody may post here, or only whoever runs it: the owner of a
+    // group, the administrators of a space channel (an announcement channel).
+    // On by default, which is how every conversation behaved before.
+    membersMaySend Boolean @default(true)
     // How long somebody waits between messages here, in seconds. Zero is off,
     // which is every channel until whoever runs it decides otherwise. Whoever
     // may moderate the room is not held by it - a moderator who cannot answer

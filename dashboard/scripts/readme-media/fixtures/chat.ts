@@ -91,6 +91,8 @@ function channel(
         membersMayInvite: true,
         mayInvite: true,
         membersMayMention: true,
+        membersMaySend: true,
+        maySend: true,
         mayMentionRoom: true,
         slowmode: 0,
         userLimit: 0,
