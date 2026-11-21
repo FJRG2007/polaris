@@ -64,6 +64,9 @@ export interface SearchableSelectProps {
     className?: string;
     /** Class for the menu. */
     contentClassName?: string;
+    /** What the trigger shows for the chosen option, when its row would be too
+     *  wide there (a flag and a calling code instead of a country's name). */
+    renderValue?: (option: SearchableSelectOption) => ReactNode;
     id?: string;
     "aria-label"?: string;
 }
@@ -96,6 +99,7 @@ export function SearchableSelect({
     disabled,
     className,
     contentClassName,
+    renderValue,
     id,
     "aria-label": ariaLabel
 }: SearchableSelectProps) {
@@ -125,7 +129,9 @@ export function SearchableSelect({
                 )}
             >
                 <span className="flex min-w-0 items-center gap-2">
-                    {selected ? (
+                    {selected && renderValue ? (
+                        renderValue(selected)
+                    ) : selected ? (
                         <>
                             {selected.icon != null && (
                                 <span className="flex shrink-0 items-center">{selected.icon}</span>

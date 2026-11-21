@@ -2176,5 +2176,12 @@
         "selected": "{count} selected",
         "delete": "Delete {count}",
         "clear": "Clear the selection"
+    },
+    "phoneInput": {
+        "country": "Country or region",
+        "search": "Search by country or code",
+        "empty": "No country or code matches.",
+        "number": "Phone number",
+        "invalid": "This number doesn't exist in {country}. Check it or pick another country."
     }
 }

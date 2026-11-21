@@ -80,7 +80,7 @@ function contactMatches(
         return { field: "findByEmail", where: addressMatches(term.toLowerCase()) };
     }
     if (policy.phoneExact) {
-        const phone = core.phoneField.safeParse(term);
+        const phone = core.phoneShapeField.safeParse(term);
         // Only a confirmed number: an unconfirmed one may be a typo for
         // somebody else's, and would hand them this account.
         if (phone.success) {

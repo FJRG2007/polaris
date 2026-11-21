@@ -1,0 +1,2 @@
+// Generated from flag-icons 7.6.0 (flags/4x3/bf.svg). MIT, see ../LICENSE.
+export default "<svg xmlns=\"http://www.w3.org/2000/svg\" id=\"flag-icons-bf\" viewBox=\"0 0 640 480\">\n  <g fill-rule=\"evenodd\">\n    <path fill=\"#de0000\" d=\"M640 479.6H.4V0H640z\"/>\n    <path fill=\"#35a100\" d=\"M639.6 480H0V240.2h639.6z\"/>\n    <path fill=\"#fff300\" d=\"M320 160 338 215.3 396.1 215.3 349.1 249.4 367 304.7 320 270.6 273 304.7 290.9 249.4 243.9 215.3 302 215.3z\"/>\n  </g>\n</svg>";

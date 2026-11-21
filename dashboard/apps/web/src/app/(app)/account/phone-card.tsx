@@ -15,7 +15,7 @@ import { Phone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import type { UserPhoneView } from "@polaris/auth";
-import { otpCodeField, phoneField } from "@polaris/core";
+import { formatPhoneInternational, otpCodeField, phoneField } from "@polaris/core";
 import {
     Badge,
     Button,
@@ -26,7 +26,8 @@ import {
     DialogDescription,
     DialogHeader,
     DialogTitle,
-    Input
+    Input,
+    PhoneInput
 } from "@polaris/ui";
 import {
     removePhoneAction,
@@ -99,7 +100,9 @@ export function PhoneCard({ phone, canSend }: { phone: UserPhoneView | null; can
                 {phone ? (
                     <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
                         <Phone className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="truncate text-sm">{phone.phone}</span>
+                        <span className="truncate text-sm tabular-nums">
+                            {formatPhoneInternational(phone.phone)}
+                        </span>
                         {phone.verified ? (
                             <Badge className="border-success-edge text-success">
                                 {t("phone.confirmed")}
@@ -178,6 +181,7 @@ function SetPhoneDialog({
     const ts = useTranslations("accountSecurity");
     const tv = useTranslations("validation");
     const [phone, setPhone] = useState(current);
+    const [touched, setTouched] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -188,6 +192,7 @@ function SetPhoneDialog({
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!candidate.success) {
+            setTouched(true);
             const issue = candidate.error.issues[0]?.message;
             setError(issue ? knownMessage(ts, tv, issue) : t("phone.checkNumber"));
             return;
@@ -214,20 +219,16 @@ function SetPhoneDialog({
                     <DialogDescription>{t("phone.setDescription")}</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
-                    <label className="flex flex-col gap-1 text-sm">
-                        {t("phone.title")}
-                        <Input
+                    <div className="flex flex-col gap-1 text-sm">
+                        <label htmlFor="account-phone">{t("phone.title")}</label>
+                        <PhoneInput
+                            id="account-phone"
                             value={phone}
-                            placeholder="+34600111222"
-                            autoComplete="tel"
-                            onChange={(event) => setPhone(event.target.value)}
+                            onChange={setPhone}
+                            showError={touched}
+                            onBlur={() => setTouched(true)}
                         />
-                        {phone && !candidate.success ? (
-                            <span className="text-xs text-danger">
-                                {knownMessage(ts, tv, candidate.error.issues[0]?.message)}
-                            </span>
-                        ) : null}
-                    </label>
+                    </div>
                     <label className="flex flex-col gap-1 text-sm">
                         {t("emails.currentPassword")}
                         <Input

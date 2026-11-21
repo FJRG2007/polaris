@@ -11,7 +11,7 @@ import { useCustomFields, fieldLabel as labelOf, optionLabel } from "./custom-fi
 import { currencyName } from "./format";
 import { RefChip, RefChips } from "./cell-display";
 import { CellPicker } from "./cell-picker";
-import { CURRENCIES } from "@polaris/core";
+import { CURRENCIES, toE164 } from "@polaris/core";
 import { hostUi } from "@polaris/app-host/client";
 import { useMemo, useState, type FormEvent } from "react";
 import { normalizeInput, parseAmount, typedCount, type InputValue } from "../model/values";
@@ -33,6 +33,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    PhoneInput,
     Select
 } from "@polaris/ui";
 
@@ -75,6 +76,8 @@ function settle(
         raw = draft.text === NONE ? null : draft.text;
     } else if (field.kind === "number" || field.kind === "money") {
         raw = typedCount(draft.text);
+    } else if (field.kind === "phone" && draft.text !== "" && toE164(draft.text) === null) {
+        return { error: "phone" };
     }
     const result = normalizeInput(field, raw);
     if (!result.ok) return { error: result.reason };
@@ -264,7 +267,16 @@ export function BulkEditDialog({
             case "email":
                 return textInput("email", "email");
             case "phone":
-                return textInput("tel", "tel");
+                return (
+                    <PhoneInput
+                        id="crm-bulk-value"
+                        value={draft.text}
+                        onChange={(text) => {
+                            setDraft({ ...draft, text });
+                            setTouched(true);
+                        }}
+                    />
+                );
             default:
                 return textInput("text");
         }

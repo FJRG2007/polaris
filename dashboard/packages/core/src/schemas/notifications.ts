@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { toE164 } from "../phone.js";
 import { alertMinLevelSchema } from "./alert-filters.js";
 
 /** How an alert can travel. `inapp` and `email` are built in; the other two
@@ -1341,7 +1342,11 @@ export const smsDestinationSchema = z.object({
     phone: z
         .string()
         .trim()
-        .regex(/^\+[1-9]\d{6,14}$/, "Enter the number in international form, like +34600111222"),
+        .regex(/^\+[1-9]\d{6,14}$/, "Enter the number in international form, like +34600111222")
+        .refine(
+            (value) => toE164(value) !== null,
+            "Enter the number in international form, like +34600111222"
+        ),
     minLevel: alertMinLevelSchema.default("info")
 });
 

@@ -147,6 +147,8 @@ export {
     type LanguageSelectProps
 } from "./components/language-select";
 export { LanguageFlag, languageFlagCode } from "./components/language-flag";
+export { CountryFlag, flagKey } from "./components/country-flag";
+export { PhoneInput, phoneCountryOptions, type PhoneInputProps } from "./components/phone-input";
 export {
     AsyncSelect,
     AsyncMultiSelect,

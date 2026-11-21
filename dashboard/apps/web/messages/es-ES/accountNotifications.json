@@ -201,7 +201,6 @@
             "detect": "Detectar por la URL",
             "rawJson": "JSON puro",
             "number": "Número",
-            "numberHint": "En formato internacional, con el prefijo del país.",
             "botToken": "Token",
             "chatId": "ID chat",
             "chatIdHint": "El chat, grupo o canal donde publica el bot, como -1001234567890 o @tucanal."

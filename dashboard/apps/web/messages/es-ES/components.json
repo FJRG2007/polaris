@@ -2176,5 +2176,12 @@
         "selected": "{count} seleccionados",
         "delete": "Eliminar {count}",
         "clear": "Quitar la selección"
+    },
+    "phoneInput": {
+        "country": "País o región",
+        "search": "Busca por país o prefijo",
+        "empty": "Ningún país ni prefijo coincide.",
+        "number": "Número de teléfono",
+        "invalid": "Este número no existe en {country}. Revísalo o elige otro país."
     }
 }

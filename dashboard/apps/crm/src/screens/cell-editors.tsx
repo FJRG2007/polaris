@@ -14,8 +14,8 @@ import { useCrmT } from "./i18n";
 import { Star, X } from "lucide-react";
 import { OptionChip } from "./cell-display";
 import { currencyName } from "./format";
-import { Checkbox, cn, Select, DateInput } from "@polaris/ui";
-import { CURRENCIES } from "@polaris/core";
+import { Checkbox, cn, Select, DateInput, PhoneInput } from "@polaris/ui";
+import { CURRENCIES, toE164 } from "@polaris/core";
 import { hostUi } from "@polaris/app-host/client";
 import type { FieldDef, FieldValue, FullName, Money } from "../model/objects";
 import {
@@ -171,6 +171,44 @@ export function TextEditor({ field, value, onCommit, onCancel }: EditorProps) {
                 aria-label={t(`fields.${field.key === "name" ? "nameOf" : "valueOf"}`)}
                 onChange={(event) => {
                     setText(event.target.value);
+                    setTouched(true);
+                }}
+                onKeyDown={(event) => keys(event, keep, onCancel)}
+            />
+        </Overlay>
+    );
+}
+
+/**
+ * A phone number: the shared phone field, so a number typed here is stored in
+ * the same E.164 form as everywhere else. A number kept from before (an import
+ * written as the source had it) is shown as it is and only rewritten when it
+ * is edited.
+ */
+export function PhoneEditor({ field, value, onCommit, onCancel }: EditorProps) {
+    const t = useCrmT();
+    const check = useCheck(field);
+    const start = typeof value === "string" ? value : "";
+    const [text, setText] = useState(start);
+    const [touched, setTouched] = useState(false);
+    const result = check(text);
+    // A typed number that cannot exist is never kept; the field says why.
+    const refused = text !== start && text !== "" && toE164(text) === null;
+    const keep = () =>
+        result.value === undefined || refused ? onCancel() : onCommit(result.value);
+    return (
+        <Overlay
+            onOutside={keep}
+            error={touched && !refused ? result.error : null}
+            className="w-[20rem]"
+        >
+            <PhoneInput
+                autoFocus
+                value={text}
+                showError={touched}
+                aria-label={t("fields.valueOf")}
+                onChange={(next) => {
+                    setText(next);
                     setTouched(true);
                 }}
                 onKeyDown={(event) => keys(event, keep, onCancel)}
@@ -537,9 +575,10 @@ export function editorFor(field: FieldDef): Editor | null {
 
 function typedEditor(field: FieldDef): Editor | null {
     switch (field.kind) {
+        case "phone":
+            return PhoneEditor;
         case "text":
         case "email":
-        case "phone":
         case "url":
         case "domain":
         case "number":

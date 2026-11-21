@@ -52,7 +52,7 @@ describe("languageFlagCode", () => {
         expect(languageFlagCode("be")).toBeNull();
         expect(languageFlagCode("bn")).toBeNull();
         // A region with no flag here, and a region that is not a country.
-        expect(languageFlagCode("es-MX")).toBeNull();
+        expect(languageFlagCode("en-AC")).toBeNull();
         expect(languageFlagCode("es-419")).toBeNull();
         expect(languageFlagCode("not a tag")).toBeNull();
     });

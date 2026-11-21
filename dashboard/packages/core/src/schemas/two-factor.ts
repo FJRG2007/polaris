@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { toE164 } from "../phone.js";
 
 /** Every second-factor method, in the order the challenge screen offers them. */
 export const TWO_FACTOR_METHODS = ["totp", "email", "whatsapp", "telegram"] as const;
@@ -101,6 +102,8 @@ export const twoFactorPreferencesSchema = z
 
 export type TwoFactorPreferencesInput = z.infer<typeof twoFactorPreferencesSchema>;
 
+const PHONE_HINT = "Use the international form, for example +34600111222";
+
 /**
  * A phone number in international form. Stored and sent exactly as written: the
  * WhatsApp channel addresses a number by digits, and guessing at a country code
@@ -110,11 +113,24 @@ export type TwoFactorPreferencesInput = z.infer<typeof twoFactorPreferencesSchem
  * first, so "+34 600 11 12 22" is the same number rather than a refused one. The
  * prefix is never added: a number without one is still refused.
  */
-export const phoneField = z
+export const phoneShapeField = z
     .string()
     .trim()
     .transform((value) => value.replace(/[\s().-]/g, ""))
-    .pipe(z.string().regex(/^\+[1-9]\d{6,14}$/, "Use the international form, for example +34600111222"));
+    .pipe(z.string().regex(/^\+[1-9]\d{6,14}$/, PHONE_HINT));
+
+/**
+ * The same, and a number that exists: its country's calling code, length and
+ * leading digits all fit, and it is stored in E.164. What every form that takes
+ * a new number checks it with; `phoneShapeField` only finds numbers already
+ * stored, some of them written before this check existed.
+ */
+export const phoneField = phoneShapeField.transform((value, context) => {
+    const number = toE164(value);
+    if (number) return number;
+    context.addIssue({ code: z.ZodIssueCode.custom, message: PHONE_HINT });
+    return z.NEVER;
+});
 
 /** A code Polaris sent, whether to an address or a phone. */
 export const otpCodeField = z

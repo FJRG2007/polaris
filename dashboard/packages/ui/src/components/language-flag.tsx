@@ -10,9 +10,8 @@
  * with no vendored flag, gets no flag at all rather than a wrong one.
  */
 
-import { cn } from "../lib/cn";
 import { FLAG_LOADERS } from "../flags";
-import { useEffect, useState } from "react";
+import { CountryFlag } from "./country-flag";
 
 /** The flag a language with no region in its tag is shown with. */
 const LANGUAGE_FLAG: Readonly<Record<string, string>> = {
@@ -78,47 +77,6 @@ export function languageFlagCode(tag: string): string | null {
     return code && code in FLAG_LOADERS ? code : null;
 }
 
-/** Flags already fetched, so a row drawn again shows its flag at once. */
-const loaded = new Map<string, string>();
-
-function dataUrl(svg: string): string {
-    return `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}")`;
-}
-
 export function LanguageFlag({ tag, className }: { tag: string; className?: string }) {
-    const code = languageFlagCode(tag);
-    const [svg, setSvg] = useState(() => (code ? (loaded.get(code) ?? null) : null));
-
-    useEffect(() => {
-        if (!code) return setSvg(null);
-        const known = loaded.get(code);
-        if (known) return setSvg(known);
-        let alive = true;
-        setSvg(null);
-        FLAG_LOADERS[code]!()
-            .then((module) => {
-                loaded.set(code, module.default);
-                if (alive) setSvg(module.default);
-            })
-            // A flag that cannot be fetched leaves its slot empty; the name is the answer.
-            .catch(() => undefined);
-        return () => {
-            alive = false;
-        };
-    }, [code]);
-
-    // No flag fits: a neutral blank of the same size, so a row without one lines
-    // up with the rows that have one.
-    return (
-        <span
-            aria-hidden
-            data-flag={code ?? "none"}
-            data-icon-placeholder={code ? undefined : ""}
-            className={cn(
-                "inline-block h-3 w-4 shrink-0 rounded-[2px] bg-muted bg-cover bg-center shadow-[0_0_0_1px_rgb(0_0_0/0.08)]",
-                className
-            )}
-            style={svg ? { backgroundImage: dataUrl(svg) } : undefined}
-        />
-    );
+    return <CountryFlag code={languageFlagCode(tag)} className={className} />;
 }

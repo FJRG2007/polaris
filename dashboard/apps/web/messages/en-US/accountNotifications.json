@@ -201,7 +201,6 @@
             "detect": "Detect from the URL",
             "rawJson": "Raw JSON",
             "number": "Number",
-            "numberHint": "International form, including the country code.",
             "botToken": "Bot token",
             "chatId": "Chat ID",
             "chatIdHint": "The chat, group or channel the bot posts to, like -1001234567890 or @yourchannel."

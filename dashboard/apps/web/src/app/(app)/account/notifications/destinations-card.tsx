@@ -42,6 +42,7 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    PhoneInput,
     Select,
     Switch
 } from "@polaris/ui";
@@ -253,6 +254,7 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
     const [url, setUrl] = useState("");
     const [format, setFormat] = useState<string>("auto");
     const [phone, setPhone] = useState("");
+    const [phoneTouched, setPhoneTouched] = useState(false);
     const [botToken, setBotToken] = useState("");
     const [chatId, setChatId] = useState("");
     const [minLevel, setMinLevel] = useState<AlertMinLevel>("info");
@@ -395,17 +397,18 @@ function AddDestinationDialog({ onClose, onAdded }: { onClose: () => void; onAdd
                             </label>
                         </>
                     ) : (
-                        <label className="flex flex-col gap-1 text-sm">
-                            <span className="font-medium">{t("destinations.dialog.number")}</span>
-                            <Input
+                        <div className="flex flex-col gap-1 text-sm">
+                            <label htmlFor="destination-phone" className="font-medium">
+                                {t("destinations.dialog.number")}
+                            </label>
+                            <PhoneInput
+                                id="destination-phone"
                                 value={phone}
-                                onChange={(event) => setPhone(event.target.value)}
-                                placeholder="+34600111222"
+                                onChange={setPhone}
+                                showError={phoneTouched}
+                                onBlur={() => setPhoneTouched(true)}
                             />
-                            <span className="text-xs text-muted-foreground">
-                                {t("destinations.dialog.numberHint")}
-                            </span>
-                        </label>
+                        </div>
                     )}
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="font-medium">{t("destinations.levelLabel")}</span>

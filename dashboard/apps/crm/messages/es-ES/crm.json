@@ -96,7 +96,7 @@
         "required": "Falta el nombre.",
         "tooLong": "Es demasiado largo.",
         "email": "Escribe un correo, como nombre@empresa.com.",
-        "phone": "Escribe un teléfono: solo cifras, espacios y + ( ) -.",
+        "phone": "Escribe el teléfono completo, con su país.",
         "url": "Escribe una dirección web, como https://empresa.com.",
         "domain": "Escribe un dominio, como empresa.com.",
         "number": "Escribe un número.",

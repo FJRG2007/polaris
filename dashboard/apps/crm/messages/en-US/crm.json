@@ -96,7 +96,7 @@
         "required": "A name is required.",
         "tooLong": "That is too long.",
         "email": "Enter an email address, like name@company.com.",
-        "phone": "Enter a phone number: digits, spaces and + ( ) - only.",
+        "phone": "Enter a whole phone number, with its country.",
         "url": "Enter a web address, like https://company.com.",
         "domain": "Enter a domain, like company.com.",
         "number": "Enter a number.",
