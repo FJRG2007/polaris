@@ -134,7 +134,7 @@ export async function installedChangelogAction(): Promise<InstalledUpdate> {
     const range = await installedRange(loadEnv().POLARIS_BUILD_SHA ?? null).catch(
         (): InstalledRange => ({ from: null, to: null })
     );
-    const changelog = range.from ? await updateChangelog(range.from, range.to).catch(() => null) : null;
+    const changelog = range.from ? await updateChangelog(range.from, range.to, "installed").catch(() => null) : null;
     return { ...range, changelog };
 }
 

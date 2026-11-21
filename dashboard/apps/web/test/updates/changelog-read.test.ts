@@ -36,6 +36,36 @@ beforeEach(() => {
 });
 
 describe("what an update carries", () => {
+    it("keeps a read range in the database for its slot, so the next process asks GitHub nothing", async () => {
+        github.mockResolvedValueOnce({
+            total_commits: 1,
+            html_url: "https://github.com/example/polaris/compare/s1...s2",
+            commits: [commit("4444444", "✨ feat(chat): stored")],
+            files: []
+        });
+        const first = await updateChangelog("s1", "s2", "installed");
+        expect(first?.entries.map((entry) => entry.title)).toEqual(["stored"]);
+        const row = JSON.parse(settings.get("updates.changelog.installed")!);
+        expect(row.key).toBe("s1...s2");
+
+        // A fresh process: nothing in memory, the row is all there is.
+        vi.resetModules();
+        const again = await import("@/lib/update-changelog");
+        github.mockClear();
+        const second = await again.updateChangelog("s1", "s2", "installed");
+        expect(github).not.toHaveBeenCalled();
+        expect(second?.entries.map((entry) => entry.title)).toEqual(["stored"]);
+    });
+
+    it("replaces a slot's row when its range moves on, so storage never grows", async () => {
+        settings.set("updates.changelog.available", JSON.stringify({ key: "old...older", changelog: { nonsense: true } }));
+        github.mockResolvedValueOnce({ total_commits: 0, html_url: "u", commits: [], files: [] });
+        await updateChangelog("n1", "n2");
+        expect(github).toHaveBeenCalledTimes(1);
+        expect(JSON.parse(settings.get("updates.changelog.available")!).key).toBe("n1...n2");
+        expect([...settings.keys()].filter((key) => key.startsWith("updates.changelog."))).toHaveLength(1);
+    });
+
     it("lists the range newest first and takes the worst severity from trailers and write-ups", async () => {
         github.mockResolvedValueOnce({
             total_commits: 3,

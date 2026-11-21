@@ -133,19 +133,79 @@ async function read(repo: string, base: string, head: string): Promise<UpdateCha
 }
 
 /**
+ * The two ranges an admin is ever shown - the update on offer and the one that
+ * installed the running build - kept in the database, one row each.
+ *
+ * Reading a range is a dozen requests to GitHub and the slowest thing on the
+ * Updates screen, and the answer never changes for a pair of builds. So each is
+ * read once per deployment rather than once per process: a restart, a second
+ * replica or the next admin finds it already there. One row per slot, replaced
+ * when its range changes, so what is stored never grows - a deployment that
+ * skips years of updates still holds two ranges, each already bounded by
+ * `MAX_PAGES` and `MAX_LISTED` when it was read.
+ */
+export type ChangelogSlot = "available" | "installed";
+
+const SLOT_KEY: Record<ChangelogSlot, string> = {
+    available: "updates.changelog.available",
+    installed: "updates.changelog.installed"
+};
+
+/** The stored range for a slot when it is the pair asked for. A row that does
+ *  not parse, or is for another pair, is no answer - never an error. */
+async function storedRange(slot: ChangelogSlot, key: string): Promise<UpdateChangelog | null> {
+    try {
+        const raw = await getSetting(SLOT_KEY[slot]);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as { key?: unknown; changelog?: Partial<UpdateChangelog> };
+        const log = parsed.changelog;
+        if (
+            parsed.key !== key ||
+            !log ||
+            typeof log.base !== "string" ||
+            typeof log.head !== "string" ||
+            !Array.isArray(log.entries) ||
+            !Array.isArray(log.fixes) ||
+            typeof log.more !== "number" ||
+            typeof log.hidden !== "number" ||
+            typeof log.url !== "string"
+        ) {
+            return null;
+        }
+        return log as UpdateChangelog;
+    } catch {
+        return null;
+    }
+}
+
+/** Keep a read range for its slot. Best-effort: failing to store only means
+ *  the next process reads GitHub again. */
+async function storeRange(slot: ChangelogSlot, key: string, changelog: UpdateChangelog): Promise<void> {
+    await setSetting(SLOT_KEY[slot], JSON.stringify({ key, changelog })).catch(() => undefined);
+}
+
+/**
  * The changelog from the running build to `head`, or null when either end is
- * unknown or GitHub cannot be reached. Asked once per pair.
+ * unknown or GitHub cannot be reached. Asked once per pair, and kept in the
+ * database for its `slot` so a restart or another replica does not ask again.
  */
 export async function updateChangelog(
     base: string | null,
-    head: string | null
+    head: string | null,
+    slot: ChangelogSlot = "available"
 ): Promise<UpdateChangelog | null> {
     if (!base || !head || base === head) return null;
     const key = `${base}...${head}`;
     const known = kept.get(key);
     if (known) return known;
     if (inflight?.key === key) return inflight.promise;
-    const promise = read(loadEnv().POLARIS_REPO, base, head)
+    const promise = (async () => {
+        const stored = await storedRange(slot, key);
+        if (stored) return stored;
+        const result = await read(loadEnv().POLARIS_REPO, base, head);
+        if (result) await storeRange(slot, key, result);
+        return result;
+    })()
         .then((result) => {
             if (result) {
                 kept.set(key, result);

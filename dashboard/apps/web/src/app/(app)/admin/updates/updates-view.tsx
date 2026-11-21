@@ -930,10 +930,10 @@ export function UpdatesView({
                         the two lists never share a commit. What is on offer comes first;
                         what is already running sits below it, folded. */}
                     {available && status?.latest ? (
-                        <UpdateChangelog head={status.latest} base={status.current} />
+                        <UpdateChangelog head={status.latest} base={status.current} checkedAt={status.checkedAt} />
                     ) : null}
 
-                    {status?.current ? <UpdateChangelog kind="installed" head={status.current} /> : null}
+                    {status?.current ? <UpdateChangelog kind="installed" head={status.current} checkedAt={status.checkedAt} /> : null}
 
                     {available || updating || logText ? (
                         <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">

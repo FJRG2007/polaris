@@ -84,7 +84,7 @@ describe("the update installed", () => {
         const installed = await installedChangelogAction();
         expect(installed.from).toBe("aaaaaaa");
         expect(installed.to).toBe("bbbbbbb");
-        expect(updateChangelog).toHaveBeenCalledWith("aaaaaaa", "bbbbbbb");
+        expect(updateChangelog).toHaveBeenCalledWith("aaaaaaa", "bbbbbbb", "installed");
         // Settled into its own row; the start is spent.
         expect(settings.get("updates.installFrom")).toBeUndefined();
         expect(settings.get("updates.lastInstalled")).toMatch(new RegExp(`^${OLD} ${NOW} `));
@@ -135,7 +135,7 @@ describe("installed and available together", () => {
         const installed = await installedChangelogAction();
         await updateChangelogAction();
         expect(updateChangelog.mock.calls).toEqual([
-            ["aaaaaaa", "bbbbbbb"],
+            ["aaaaaaa", "bbbbbbb", "installed"],
             ["bbbbbbb", "ccccccc"]
         ]);
         expect(installed.to).toBe("bbbbbbb");

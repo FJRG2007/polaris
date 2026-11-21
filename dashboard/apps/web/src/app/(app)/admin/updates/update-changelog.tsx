@@ -167,12 +167,17 @@ async function loadRange(kind: ChangelogKind): Promise<RangeRead> {
 export function UpdateChangelog({
     head,
     kind = "available",
-    base = null
+    base = null,
+    checkedAt = null
 }: {
     head: string;
     kind?: ChangelogKind;
     /** The build the range starts at, when the caller already knows it. */
     base?: string | null;
+    /** When the status behind this was last checked. A new check asks again,
+     *  so pressing "Check for updates" brings the list without a reload even
+     *  when the build on offer is the same one an earlier, empty answer was for. */
+    checkedAt?: string | null;
 }) {
     const t = useTranslations("admin");
     const key = `${kind}:${head}`;
@@ -203,14 +208,17 @@ export function UpdateChangelog({
         void loadRange(kind)
             .then((answer) => {
                 if (!live) return;
-                rememberRange(key, answer);
+                // Only a real list is remembered. An empty answer - asked while
+                // the build was still being published, or GitHub out of reach -
+                // would otherwise stand in for the list on every visit after.
+                if (answer.changelog) rememberRange(key, answer);
                 setRead(answer);
             })
             .catch(() => live && setRead((current) => current ?? null));
         return () => {
             live = false;
         };
-    }, [key, kind, folded]);
+    }, [key, kind, folded, checkedAt]);
 
     // Opened from the "updated" notice: bring this range into view once drawn.
     const drawn = read !== undefined;
