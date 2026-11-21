@@ -13,40 +13,14 @@
 
 import * as actions from "./actions";
 import * as core from "@polaris/core";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { phoneMedia } from "@/lib/mobile-media";
+import { locate, type Fix } from "@/lib/geolocation";
 import { TileMap } from "@/components/map/tile-map";
 import type { NearbyPlace } from "@/lib/chat/locations";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Dialog, DialogContent, DialogTitle, Input, cn } from "@polaris/ui";
 import { ArrowLeft, Crosshair, Loader2, MapPin, MapPinned, Navigation, Radio, Search } from "lucide-react";
-
-export type Fix =
-    | { readonly state: "locating" }
-    | { readonly state: "ready"; readonly point: core.GeoPoint }
-    | { readonly state: "denied" | "unavailable" | "unsupported" | "insecure" };
-
-/** Ask the device where it is, once. */
-export function locate(): Promise<Fix> {
-    if (typeof window !== "undefined" && window.isSecureContext === false) {
-        return Promise.resolve({ state: "insecure" });
-    }
-    if (typeof navigator === "undefined" || !navigator.geolocation) return Promise.resolve({ state: "unsupported" });
-    return new Promise((resolve) => {
-        navigator.geolocation.getCurrentPosition(
-            (position) =>
-                resolve({
-                    state: "ready",
-                    point: {
-                        latitude: position.coords.latitude,
-                        longitude: position.coords.longitude,
-                        accuracy: Number.isFinite(position.coords.accuracy) ? Math.round(position.coords.accuracy) : null
-                    }
-                }),
-            (error) => resolve({ state: error.code === error.PERMISSION_DENIED ? "denied" : "unavailable" }),
-            { enableHighAccuracy: true, timeout: 20_000, maximumAge: 15_000 }
-        );
-    });
-}
 
 /** Tells the live sender on this page that a share started or stopped. */
 export const LIVE_CHANGED = "polaris:live-location";
@@ -83,6 +57,9 @@ export function LocationDialog({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const asked = useRef(0);
+    // Inside the phone app, a refusal is undone in the app's own settings page,
+    // which the app can open; a browser's is beside its address bar.
+    const phoneSettings = useMemo(() => phoneMedia(), []);
 
     const ask = () => {
         const id = ++asked.current;
@@ -101,6 +78,17 @@ export function LocationDialog({
         setComment("");
         ask();
     }, [open]);
+
+    // Back from the settings where location was turned on: ask again, so the
+    // map appears without another press.
+    useEffect(() => {
+        if (!open || (fix.state !== "denied" && fix.state !== "dismissed")) return;
+        const back = () => {
+            if (document.visibilityState === "visible") ask();
+        };
+        document.addEventListener("visibilitychange", back);
+        return () => document.removeEventListener("visibilitychange", back);
+    }, [open, fix.state]);
 
     const point = fix.state === "ready" ? fix.point : null;
     const common = { channelId, parentId, replyToId };
@@ -136,8 +124,10 @@ export function LocationDialog({
 
     const problem =
         fix.state === "denied"
-            ? t("location.denied")
-            : fix.state === "unavailable"
+            ? t(phoneSettings ? "location.deniedApp" : "location.denied")
+            : fix.state === "dismissed"
+              ? t("location.dismissed")
+              : fix.state === "unavailable"
               ? t("location.unavailable")
               : fix.state === "unsupported"
                 ? t("location.unsupported")
@@ -178,11 +168,28 @@ export function LocationDialog({
                             ) : (
                                 <span className="flex flex-col items-center gap-2">
                                     <span>{problem}</span>
-                                    {fix.state !== "unsupported" && fix.state !== "insecure" ? (
-                                        <Button size="sm" variant="outline" onClick={ask}>
-                                            {t("location.tryAgain")}
-                                        </Button>
-                                    ) : null}
+                                    <span className="flex flex-wrap justify-center gap-2">
+                                        {/* A phone's WebView may report a lasting refusal as unanswered,
+                                            so the app's settings stay one press away either way. */}
+                                        {(fix.state === "denied" || fix.state === "dismissed") && phoneSettings ? (
+                                            <Button
+                                                size="sm"
+                                                variant={fix.state === "denied" ? "primary" : "outline"}
+                                                onClick={() => void phoneSettings.settings().catch(() => undefined)}
+                                            >
+                                                {t("location.openSettings")}
+                                            </Button>
+                                        ) : null}
+                                        {fix.state !== "unsupported" && fix.state !== "insecure" ? (
+                                            <Button
+                                                size="sm"
+                                                variant={fix.state === "dismissed" ? "primary" : "outline"}
+                                                onClick={ask}
+                                            >
+                                                {fix.state === "dismissed" ? t("location.allow") : t("location.tryAgain")}
+                                            </Button>
+                                        ) : null}
+                                    </span>
                                 </span>
                             )}
                         </div>
