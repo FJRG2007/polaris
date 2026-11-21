@@ -104,10 +104,12 @@ import {
     Settings2,
     ShieldOff,
     Smile,
+    NotebookPen,
     Star,
     Trash2,
     UserMinus,
     UserPlus,
+    Users,
     Video,
     Volume2,
     X
@@ -358,6 +360,8 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                 )
                 .sort(
                     (left, right) =>
+                        // The conversation with yourself first, like a pinned note.
+                        Number(right.self ?? false) - Number(left.self ?? false) ||
                         Number(right.pinned) - Number(left.pinned) ||
                         (right.lastMessageAt ?? "").localeCompare(left.lastMessageAt ?? "")
                 ),
@@ -629,6 +633,44 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                     <Star className="size-3.5 shrink-0" />
                     <span>{t("sidebar.savedMessages")}</span>
                 </Link>
+                {/* The conversation with yourself (ledger row 19), made the
+                    first time it is opened and pinned above the others after. */}
+                <button
+                    type="button"
+                    onClick={() =>
+                        void actions.openSelfAction().then(
+                            (result) =>
+                                result.id
+                                    ? router.push(`/chat/c/${result.id}`)
+                                    : toast.show({
+                                          key: "chat-self",
+                                          title: result.error ?? t("sidebar.messageYourselfFailed")
+                                      }),
+                            () =>
+                                toast.show({
+                                    key: "chat-self",
+                                    title: t("sidebar.messageYourselfFailed")
+                                })
+                        )
+                    }
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-left text-sm text-muted-foreground transition-colors hover:bg-card-hover"
+                >
+                    <NotebookPen className="size-3.5 shrink-0" />
+                    <span className="min-w-0 truncate">{t("sidebar.messageYourself")}</span>
+                </button>
+                {/* Invitations to groups, for whoever has any to answer. */}
+                <Link
+                    href="/chat/invites"
+                    className={cn(
+                        "flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
+                        here === "/chat/invites"
+                            ? "bg-card-hover text-foreground"
+                            : "text-muted-foreground"
+                    )}
+                >
+                    <Users className="size-3.5 shrink-0" />
+                    <span className="min-w-0 truncate">{t("groupInvites.title")}</span>
+                </Link>
 
                 <LockShelfEntries
                     shelf={shelf}
@@ -712,7 +754,7 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                                         active={open === channel.id}
                                         unread={channel.unread}
                                         muted={channel.muted}
-                                        label={channel.name}
+                                        label={channel.self ? t("sidebar.messageYourself") : channel.name}
                                         personId={
                                             channel.others.length === 1
                                                 ? (channel.others[0]?.id ?? null)

@@ -351,6 +351,16 @@ describe("a one-to-one conversation", () => {
         await expect(chat.openDirect(ada, ["alan"])).resolves.toBe("new-channel");
         expect(created?.kind).toBe("dm");
     });
+
+    it("opens the conversation with yourself when you name only yourself", async () => {
+        await expect(chat.openDirect(ada, ["ada"])).resolves.toBe("new-channel");
+        expect(created).toEqual({ kind: "dm", members: ["ada"] });
+    });
+
+    it("still refuses a request that names nobody", async () => {
+        await expect(chat.openDirect(ada, [])).rejects.toBeInstanceOf(ChatAccessError);
+        expect(created).toBeNull();
+    });
 });
 
 describe("adding to a group that already exists", () => {

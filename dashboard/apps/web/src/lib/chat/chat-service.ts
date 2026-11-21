@@ -83,6 +83,8 @@ export interface ChatChannelView {
     /** The heading it sits under, or null for the ones above the first one. */
     readonly categoryId: string | null;
     readonly kind: core.ChatChannelKind;
+    /** Whether this is the conversation with yourself, pinned at the top. */
+    readonly self?: boolean;
     /** For a channel, its name. For a direct message, who is in it - resolved
      *  here because "who is in it" is the name, and the client has no roster. */
     readonly name: string;
@@ -797,6 +799,7 @@ export async function listChannels(
             id: true,
             spaceId: true,
             orgId: true,
+            dmKey: true,
             categoryId: true,
             kind: true,
             name: true,
@@ -981,6 +984,9 @@ export async function listChannels(
             spaceId: channel.spaceId,
             categoryId: channel.categoryId,
             kind: channel.kind as core.ChatChannelKind,
+            // The conversation with yourself (ledger row 19): its key names only
+            // you, which a one-to-one somebody else left never does.
+            self: channel.kind === "dm" && channel.dmKey === core.dmKeyFor([actor.id], channel.orgId),
             // A group that has been named keeps it; one that has not is called
             // after the people in it, which is what it is.
             name: channel.spaceId ? channel.name : channel.name || directName(others),
@@ -1983,7 +1989,15 @@ async function directAllowed(
     kept: readonly string[] = []
 ): Promise<{ others: string[]; orgId: string | null }> {
     const others = [...new Set(userIds)].filter((id) => id !== actor.id);
-    if (others.length === 0) throw new ChatAccessError({ key: "errors.pickSomebodyToMessage" });
+    // Naming only yourself is the conversation with yourself (ledger row 19):
+    // notes, files and voice memos across your own devices. Nobody else is in
+    // it, so none of the rules below - which are all about other people - ask
+    // anything. An empty list still names nobody.
+    if (others.length === 0) {
+        if (!userIds.includes(actor.id))
+            throw new ChatAccessError({ key: "errors.pickSomebodyToMessage" });
+        return { others, orgId: await currentChatOrgId(actor.id) };
+    }
 
     const present = await prisma.user.findMany({
         where: { id: { in: others } },
@@ -2083,7 +2097,8 @@ export async function openDirect(
     const { others, orgId } = await directAllowed(actor, userIds, kept);
 
     const everyone = [actor.id, ...others];
-    if (others.length === 1) {
+    // One other person, or nobody but you: a one-to-one, found by its key.
+    if (others.length <= 1) {
         const key = core.dmKeyFor(everyone, orgId);
         const existing = await prisma.chatChannel.findUnique({
             where: { dmKey: key },

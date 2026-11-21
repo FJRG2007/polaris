@@ -1224,6 +1224,15 @@ export async function deleteChannelAction(channelId: string): Promise<{ error?: 
     return result;
 }
 
+/** The conversation with yourself, made the first time it is asked for. */
+export async function openSelfAction(): Promise<{ id?: string; error?: string }> {
+    const me = await actor();
+    const result = await guard(() => chat.openDirect(me, [me.id]));
+    if (result.error) return { error: result.error };
+    revalidatePath(CHAT_PATH);
+    return { id: result.value };
+}
+
 export async function openDirectAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const me = await actor();
     const parsed = core.chatDirectOpenSchema.safeParse(input);

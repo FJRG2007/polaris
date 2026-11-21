@@ -761,7 +761,9 @@
         "of": " of ",
         "editChannelNamed": "Edit {name}",
         "emoji": "Emoji",
-        "soundboard": "Soundboard"
+        "soundboard": "Soundboard",
+        "messageYourself": "Message yourself",
+        "messageYourselfFailed": "Your own chat could not be opened. Try again."
     },
     "channelView": {
         "loadingMessages": "Loading messages",
