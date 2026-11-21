@@ -18,7 +18,7 @@ export type Fix =
  * "prompt" when nobody has answered yet. Null where it cannot say (Safari before
  * 16, some WebViews), which is read as "ask and see".
  */
-async function permissionState(): Promise<PermissionState | null> {
+export async function permissionState(): Promise<PermissionState | null> {
     try {
         const status = await navigator.permissions?.query({ name: "geolocation" });
         return status?.state ?? null;

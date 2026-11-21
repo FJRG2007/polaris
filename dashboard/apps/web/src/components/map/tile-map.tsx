@@ -8,11 +8,19 @@
  * No map library. The tiles come through Polaris (`/api/chat/location/tile`), so
  * the reader's address never reaches the tile service, and the default service
  * is OpenStreetMap's - free, keyless, credited in the corner as its licence asks.
+ *
+ * The credit is compact, the way MapLibre's and Leaflet's compact attribution
+ * is: a small "i" in the corner that opens to the line on a press. It is not
+ * removed - OpenStreetMap's tile policy and the ODbL require it on the map -
+ * only folded away until somebody wants to read it.
+ *
+ * With `controls`, the map is a full one: zoom with the buttons, the mouse
+ * wheel or a pinch, and drag (or swipe) to move around.
  */
 
 import { cn } from "@polaris/ui";
-import { useMemo, useState } from "react";
-import { Minus, Plus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Info, Minus, Plus } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 const TILE = 256;
@@ -86,13 +94,77 @@ export function TileMap({
 }) {
     const t = useTranslations("chat");
     const [zoom, setZoom] = useState(() => startZoom ?? fittingZoom(points, 320, height));
+    // How far the map was dragged from its points, in pixels at the current zoom.
+    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [credit, setCredit] = useState(false);
+    const box = useRef<HTMLDivElement>(null);
+    const zoomRef = useRef(zoom);
+    zoomRef.current = zoom;
+
+    /** One zoom step in or out, keeping the middle of the view where it is. */
+    const zoomBy = (by: number) => {
+        const next = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomRef.current + by));
+        if (next === zoomRef.current) return;
+        const scale = 2 ** (next - zoomRef.current);
+        zoomRef.current = next;
+        setPan((current) => ({ x: current.x * scale, y: current.y * scale }));
+        setZoom(next);
+    };
+
+    // The wheel zooms a full map. Registered by hand: React's wheel listener is
+    // passive, and the page must not scroll under the map while it zooms.
+    useEffect(() => {
+        const element = box.current;
+        if (!element || !controls) return;
+        let gathered = 0;
+        const wheel = (event: WheelEvent) => {
+            event.preventDefault();
+            // A mouse notch is about 100; a trackpad sends many small ones.
+            gathered += event.deltaMode === 1 ? event.deltaY * 33 : event.deltaY;
+            if (Math.abs(gathered) < 60) return;
+            zoomBy(gathered < 0 ? 1 : -1);
+            gathered = 0;
+        };
+        element.addEventListener("wheel", wheel, { passive: false });
+        return () => element.removeEventListener("wheel", wheel);
+    }, [controls]);
+
+    // Drag to move, two fingers to pinch.
+    const pointers = useRef(new Map<number, { x: number; y: number }>());
+    const pinch = useRef(0);
+    const onPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (!controls || (event.target as HTMLElement).closest("button, a")) return;
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        pinch.current = spread(pointers.current);
+    };
+    const onPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+        const last = pointers.current.get(event.pointerId);
+        if (!last) return;
+        pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        if (pointers.current.size >= 2) {
+            const now = spread(pointers.current);
+            if (pinch.current > 0 && (now / pinch.current > 1.5 || now / pinch.current < 0.67)) {
+                zoomBy(now > pinch.current ? 1 : -1);
+                pinch.current = now;
+            }
+            return;
+        }
+        const dx = event.clientX - last.x;
+        const dy = event.clientY - last.y;
+        setPan((current) => ({ x: current.x - dx, y: current.y - dy }));
+    };
+    const onPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+        pointers.current.delete(event.pointerId);
+        pinch.current = spread(pointers.current);
+    };
 
     const view = useMemo(() => {
         if (points.length === 0) return null;
         const pixels = points.map((point) => worldPixel(point.latitude, point.longitude, zoom));
         const center = {
-            x: (Math.min(...pixels.map((pixel) => pixel.x)) + Math.max(...pixels.map((pixel) => pixel.x))) / 2,
-            y: (Math.min(...pixels.map((pixel) => pixel.y)) + Math.max(...pixels.map((pixel) => pixel.y))) / 2
+            x: (Math.min(...pixels.map((pixel) => pixel.x)) + Math.max(...pixels.map((pixel) => pixel.x))) / 2 + pan.x,
+            y: (Math.min(...pixels.map((pixel) => pixel.y)) + Math.max(...pixels.map((pixel) => pixel.y))) / 2 + pan.y
         };
         const count = 2 ** zoom;
         const across = Math.ceil(MAX_WIDTH / 2 / TILE) + 1;
@@ -119,14 +191,23 @@ export function TileMap({
             return { point, left: pixel.x - center.x, top: pixel.y - center.y, radius };
         });
         return { tiles, pins };
-    }, [points, zoom, height]);
+    }, [points, zoom, height, pan]);
 
     if (!view) return null;
     return (
         <div
+            ref={box}
             dir="ltr"
-            className={cn("relative isolate w-full select-none overflow-hidden bg-muted", className)}
+            className={cn(
+                "relative isolate w-full select-none overflow-hidden bg-muted",
+                controls && "cursor-grab touch-none active:cursor-grabbing",
+                className
+            )}
             style={{ height }}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
         >
             {view.tiles.map((tile) => (
                 <img
@@ -175,7 +256,7 @@ export function TileMap({
                         aria-label={t("location.zoomIn")}
                         title={t("location.zoomIn")}
                         disabled={zoom >= MAX_ZOOM}
-                        onClick={() => setZoom((value) => Math.min(MAX_ZOOM, value + 1))}
+                        onClick={() => zoomBy(1)}
                         className="grid size-8 place-items-center hover:bg-muted disabled:opacity-50"
                     >
                         <Plus className="size-4 shrink-0" />
@@ -185,22 +266,54 @@ export function TileMap({
                         aria-label={t("location.zoomOut")}
                         title={t("location.zoomOut")}
                         disabled={zoom <= MIN_ZOOM}
-                        onClick={() => setZoom((value) => Math.max(MIN_ZOOM, value - 1))}
+                        onClick={() => zoomBy(-1)}
                         className="grid size-8 place-items-center border-t border-border hover:bg-muted disabled:opacity-50"
                     >
                         <Minus className="size-4 shrink-0" />
                     </button>
                 </div>
             ) : null}
-            <a
-                href="https://www.openstreetmap.org/copyright"
-                target="_blank"
-                rel="noreferrer noopener"
-                onClick={(event) => event.stopPropagation()}
-                className="absolute bottom-0 right-0 bg-background/80 px-1 text-[10px] text-muted-foreground"
-            >
-                {t("location.attribution")}
-            </a>
+            <div className="absolute bottom-1 right-1 flex items-center gap-1 rounded-full bg-background/80 text-[10px] text-muted-foreground">
+                {credit ? (
+                    <a
+                        href="https://www.openstreetmap.org/copyright"
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        onClick={(event) => event.stopPropagation()}
+                        className="ps-2 hover:underline"
+                    >
+                        {t("location.attribution")}
+                    </a>
+                ) : null}
+                <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label={t("location.mapCredits")}
+                    title={t("location.attribution")}
+                    aria-expanded={credit}
+                    onClick={(event) => {
+                        // The map in a card opens the big one when pressed; this does not.
+                        event.stopPropagation();
+                        event.preventDefault();
+                        setCredit((open) => !open);
+                    }}
+                    onKeyDown={(event) => {
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.stopPropagation();
+                        event.preventDefault();
+                        setCredit((open) => !open);
+                    }}
+                    className="grid size-5 shrink-0 cursor-pointer place-items-center rounded-full hover:text-foreground"
+                >
+                    <Info className="size-3 shrink-0" />
+                </span>
+            </div>
         </div>
     );
+}
+
+/** How far apart the first two pointers are; 0 with fewer than two. */
+function spread(pointers: Map<number, { x: number; y: number }>): number {
+    const [a, b] = [...pointers.values()];
+    return a && b ? Math.hypot(a.x - b.x, a.y - b.y) : 0;
 }

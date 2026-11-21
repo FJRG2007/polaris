@@ -19,15 +19,14 @@ import type { ChatMessageView } from "@/lib/chat/messages";
 import type { ChatLocationView } from "@/lib/chat/locations";
 import { LIVE_CHANGED, LocationDialog } from "./location-dialog";
 import { Button, Dialog, DialogContent, DialogTitle } from "@polaris/ui";
-import { ExternalLink, MapPinned, Navigation, Radio } from "lucide-react";
+import { openLink } from "@/lib/open-link";
+import { locate, permissionState, type Fix } from "@/lib/geolocation";
+import { directionsUrl, distanceMeters, mapsPlatform, placeUrl } from "@/lib/maps-links";
+import { ExternalLink, LocateFixed, MapPinned, Navigation, Radio } from "lucide-react";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 
-/** The same point on OpenStreetMap's own site, for directions and a bigger map. */
-export function osmLink(latitude: number, longitude: number): string {
-    const lat = latitude.toFixed(6);
-    const lon = longitude.toFixed(6);
-    return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=17/${lat}/${lon}`;
-}
+/** Within this many metres, the reader is at the place rather than some way from it. */
+const HERE_METERS = 50;
 
 export function LocationCard({
     message,
@@ -46,6 +45,25 @@ export function LocationCard({
     const locale = useLocale();
     const [shown, setShown] = useState(location);
     const [big, setBig] = useState(false);
+    // Where the reader is, for the big map: asked on its own only when already
+    // allowed, otherwise on a press, so opening a map never raises a prompt.
+    const [me, setMe] = useState<Fix | null>(null);
+    useEffect(() => {
+        if (!big) return;
+        let current = true;
+        void permissionState().then((state) => {
+            if (state !== "granted" || !current) return;
+            setMe({ state: "locating" });
+            void locate().then((found) => current && setMe(found));
+        });
+        return () => {
+            current = false;
+        };
+    }, [big]);
+    const findMe = () => {
+        setMe({ state: "locating" });
+        void locate().then(setMe);
+    };
     const [answer, setAnswer] = useState<"main" | "live" | null>(null);
     const [stopping, setStopping] = useState(false);
     const [, setTick] = useState(0);
@@ -137,6 +155,19 @@ export function LocationCard({
                   : t("location.liveEnded")
               : t("location.location");
     const coordinates = `${shown.latitude.toFixed(5)}, ${shown.longitude.toFixed(5)}`;
+    const viewer = me?.state === "ready" ? me.point : null;
+    const away = viewer ? distanceMeters(viewer, point) : null;
+    const distanceText =
+        away === null
+            ? ""
+            : away <= HERE_METERS
+              ? t("location.youAreHere")
+              : t("location.away", {
+                    distance:
+                        away < 1000
+                            ? t("location.meters", { meters: String(Math.round(away)) })
+                            : t("location.kilometers", { km: (away / 1000).toFixed(away < 10_000 ? 1 : 0) })
+                });
     const until = shown.liveUntil
         ? new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(new Date(shown.liveUntil))
         : "";
@@ -183,24 +214,60 @@ export function LocationCard({
                 ) : null}
             </div>
             <Dialog open={big} onOpenChange={setBig}>
-                <DialogContent phone="sheet" className="flex w-full max-w-2xl flex-col gap-3">
+                {/* Full screen on a phone, as WhatsApp opens a location: the map takes
+                    whatever the actions below it leave, and pinches and drags like one. */}
+                <DialogContent phone="full" className="flex w-full max-w-2xl flex-col gap-3">
                     <DialogTitle className="min-w-0 truncate">{title}</DialogTitle>
-                    <div className="overflow-hidden rounded-lg border border-border">
-                        <TileMap points={[point]} height={360} zoom={16} controls />
+                    <div className="overflow-hidden rounded-lg border border-border max-sm:min-h-0 max-sm:flex-1">
+                        {/* Drawn again once the reader is found, so both pins start in view. */}
+                        <TileMap
+                            key={viewer ? "both" : "place"}
+                            points={viewer ? [point, { ...viewer, label: t("location.you") }] : [point]}
+                            height={360}
+                            zoom={viewer ? undefined : 16}
+                            controls
+                            className="max-sm:!h-full"
+                        />
+                    </div>
+                    <div className="flex min-w-0 items-center gap-2 text-sm">
+                        <LocateFixed className="size-4 shrink-0 text-muted-foreground" />
+                        {away === null ? (
+                            me?.state === "locating" ? (
+                                <span className="min-w-0 truncate text-muted-foreground">{t("location.locating")}</span>
+                            ) : (
+                                <>
+                                    <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                                        {me?.state === "denied"
+                                            ? t("location.denied")
+                                            : me && me.state !== "ready"
+                                              ? t("location.unavailable")
+                                              : t("location.howFarHint")}
+                                    </span>
+                                    <Button size="sm" variant="outline" onClick={findMe}>
+                                        <span className="min-w-0 truncate">{t("location.howFar")}</span>
+                                    </Button>
+                                </>
+                            )
+                        ) : (
+                            <span className="min-w-0 truncate" title={distanceText}>
+                                {distanceText}
+                            </span>
+                        )}
                     </div>
                     <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
                         <span className="min-w-0 truncate text-xs text-muted-foreground" title={coordinates}>
                             {coordinates}
                         </span>
-                        <a
-                            href={osmLink(shown.latitude, shown.longitude)}
-                            target="_blank"
-                            rel="noreferrer noopener"
-                            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                        >
-                            <ExternalLink className="size-4 shrink-0" />
-                            {t("location.openInMaps")}
-                        </a>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button size="sm" variant="outline" onClick={() => openLink(placeUrl(point, mapsPlatform()))}>
+                                <ExternalLink className="size-4 shrink-0" />
+                                <span className="min-w-0 truncate">{t("location.openInMaps")}</span>
+                            </Button>
+                            <Button size="sm" onClick={() => openLink(directionsUrl(point, mapsPlatform()))}>
+                                <Navigation className="size-4 shrink-0" />
+                                <span className="min-w-0 truncate">{t("location.directions")}</span>
+                            </Button>
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>
