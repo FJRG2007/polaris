@@ -271,6 +271,7 @@
         "placesUnavailable": "La búsqueda de lugares no está disponible",
         "muteMentionsInvalid": "No se pudo cambiar el silencio",
         "groupInviteGone": "Esa invitación ya no está abierta.",
+        "joinRequestGone": "Esa solicitud ya tiene respuesta.",
         "messageRequestGone": "Esa solicitud ya no está pendiente.",
         "messageRequestBlockFailed": "No se pudo bloquear. Prueba desde su perfil."
     },
@@ -768,6 +769,7 @@
         "editChannelNamed": "Editar {name}",
         "emoji": "Emoji",
         "soundboard": "Botonera",
+        "joinRequests": "Solicitudes",
         "messageYourself": "Mensajes para ti",
         "messageYourselfFailed": "No se pudo abrir tu propio chat. Inténtalo de nuevo."
     },
@@ -1556,6 +1558,8 @@
         "thisInvitationHasRunOut": "Esta invitación se ha agotado. Pide otra a quien te la envió.",
         "invitedBy": "{name} te ha invitado.",
         "join": "Entrar en {name}",
+        "askToJoin": "Pedir entrar en {name}",
+        "waiting": "Has pedido entrar. Quien lo lleva te responderá.",
         "opensOn": "Abre en #{name}"
     },
     "editHistory": {
@@ -2798,5 +2802,18 @@
         "block": "Bloquear",
         "blocked": "{name} está bloqueado.",
         "failed": "No se pudo hacer. Inténtalo de nuevo."
+    },
+    "joinRequests": {
+        "title": "Solicitudes",
+        "back": "Volver al chat",
+        "ask": "Preguntar antes de dejar entrar",
+        "askHint": "Una invitación envía una solicitud que aceptas o rechazas aquí.",
+        "waiting": "En espera",
+        "empty": "Nadie espera",
+        "emptyHint": "Las solicitudes para entrar salen aquí.",
+        "askedAt": "Pidió {time}",
+        "accept": "Aceptar",
+        "decline": "Rechazar",
+        "notification": "{name} pidió entrar"
     }
 }

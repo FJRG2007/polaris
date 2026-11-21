@@ -29,6 +29,7 @@ import * as core from "@polaris/core";
 import { randomBytes } from "node:crypto";
 import { publishChatChange } from "./live";
 import { postSpaceNotice } from "./notices";
+import * as joinRequests from "./join-requests";
 import * as messages from "./messages";
 import { openDirect } from "./chat-service";
 import { friendIds } from "@/lib/friends-service";
@@ -77,6 +78,10 @@ export interface ChatInviteOffer {
     /** True when they are in the space already, so the button says "Open" rather
      *  than offering to add them a second time. */
     readonly alreadyIn: boolean;
+    /** The space asks before it lets people in, so the button asks to join. */
+    readonly asksApproval: boolean;
+    /** They have asked already and are waiting on whoever runs the space. */
+    readonly waiting: boolean;
 }
 
 /**
@@ -199,17 +204,28 @@ export async function readInvite(actor: ChatActor, code: string): Promise<ChatIn
             uses: true,
             revokedAt: true,
             createdBy: { select: { name: true } },
-            space: { select: { id: true, name: true, description: true, archived: true } },
+            space: {
+                select: {
+                    id: true,
+                    name: true,
+                    description: true,
+                    archived: true,
+                    requireApproval: true
+                }
+            },
             channel: { select: { id: true, name: true, private: true } }
         }
     });
     if (!invite) return null;
     const landing = invite.channel && !invite.channel.private ? invite.channel : null;
 
-    const member = await prisma.chatSpaceMember.findUnique({
-        where: { spaceId_userId: { spaceId: invite.space.id, userId: actor.id } },
-        select: { id: true }
-    });
+    const [member, waiting] = await Promise.all([
+        prisma.chatSpaceMember.findUnique({
+            where: { spaceId_userId: { spaceId: invite.space.id, userId: actor.id } },
+            select: { id: true }
+        }),
+        joinRequests.isWaiting(actor, invite.space.id)
+    ]);
 
     return {
         code: invite.code,
@@ -220,7 +236,9 @@ export async function readInvite(actor: ChatActor, code: string): Promise<ChatIn
         channelName: landing?.name ?? null,
         invitedBy: invite.createdBy?.name ?? null,
         usable: !invite.space.archived && core.inviteUsable(invite),
-        alreadyIn: member !== null
+        alreadyIn: member !== null,
+        asksApproval: invite.space.requireApproval,
+        waiting: member === null && waiting
     };
 }
 
@@ -232,13 +250,16 @@ export async function readInvite(actor: ChatActor, code: string): Promise<ChatIn
  * one-use invite at the same instant means one of them is refused rather than
  * both being let in.
  *
+ * A space that asks before it lets people in (`join-requests.ts`) takes the
+ * use and files a request instead of a seat, and says so with `pending`.
+ *
  * @returns The space that was joined, and the channel the link opens on when it
  *   names one that joining the space reaches.
  */
 export async function acceptInvite(
     actor: ChatActor,
     code: string
-): Promise<{ spaceId: string; channelId: string | null }> {
+): Promise<{ spaceId: string; channelId: string | null; pending?: boolean }> {
     const invite = await prisma.chatSpaceInvite.findUnique({
         where: { code },
         select: {
@@ -250,7 +271,7 @@ export async function acceptInvite(
             revokedAt: true,
             channelId: true,
             channel: { select: { private: true } },
-            space: { select: { archived: true } }
+            space: { select: { archived: true, requireApproval: true } }
         }
     });
     if (!invite || invite.space.archived)
@@ -279,6 +300,11 @@ export async function acceptInvite(
     });
     if (barred) throw new ChatAccessError({ key: "errors.spaceJoinNotAllowed" });
 
+    // Waiting already: the same request, and no second use spent on it.
+    if (invite.space.requireApproval && (await joinRequests.isWaiting(actor, invite.spaceId))) {
+        return { spaceId: invite.spaceId, channelId: null, pending: true };
+    }
+
     const claimed = await prisma.chatSpaceInvite.updateMany({
         where: {
             id: invite.id,
@@ -288,6 +314,13 @@ export async function acceptInvite(
         data: { uses: { increment: 1 } }
     });
     if (claimed.count === 0) throw new ChatAccessError({ key: "errors.invitationExpired" });
+
+    // A space that asks first: the link was a valid credential, so the use is
+    // spent, but what it buys is a place in the queue rather than a seat.
+    if (invite.space.requireApproval) {
+        await joinRequests.requestToJoin(actor, invite.spaceId);
+        return { spaceId: invite.spaceId, channelId: null, pending: true };
+    }
 
     await prisma.chatSpaceMember.create({
         data: { spaceId: invite.spaceId, userId: actor.id, role: "member" }

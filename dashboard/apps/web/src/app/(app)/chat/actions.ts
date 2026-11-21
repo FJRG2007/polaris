@@ -22,6 +22,7 @@ import { revalidatePath } from "next/cache";
 import * as invites from "@/lib/chat/invites";
 import * as reports from "@/lib/chat/reports";
 import * as advancedPrivacy from "@/lib/chat/advanced-privacy";
+import * as joinRequests from "@/lib/chat/join-requests";
 import * as saved from "@/lib/chat/saved-media";
 import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
@@ -1729,7 +1730,7 @@ export async function readInviteAction(
 
 export async function acceptInviteAction(
     code: string
-): Promise<{ spaceId?: string; channelId?: string | null; error?: string }> {
+): Promise<{ spaceId?: string; channelId?: string | null; pending?: boolean; error?: string }> {
     const me = await actor();
     const parsed = core.inviteCodeSchema.safeParse(code);
     if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notAnInvite") };
@@ -1737,7 +1738,58 @@ export async function acceptInviteAction(
     if (!result.error) revalidatePath(CHAT_PATH);
     return result.error
         ? { error: result.error }
-        : { spaceId: result.value!.spaceId, channelId: result.value!.channelId };
+        : {
+              spaceId: result.value!.spaceId,
+              channelId: result.value!.channelId,
+              ...(result.value!.pending ? { pending: true } : {})
+          };
+}
+
+// ---------------------------------------------------------------------------
+// Requests to join a space that asks first
+// ---------------------------------------------------------------------------
+
+/** The queue and the switch, for whoever runs the space. */
+export async function joinRequestsAction(
+    spaceId: unknown
+): Promise<{
+    queue?: { requireApproval: boolean; requests: joinRequests.JoinRequestView[] };
+    error?: string;
+}> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(spaceId);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notAllowedHere") };
+    const result = await guard(() => joinRequests.joinRequestsFor(me, parsed.data));
+    return result.error ? { error: result.error } : { queue: result.value };
+}
+
+const requireApprovalSchema = z
+    .object({ spaceId: z.string().uuid(), on: z.boolean() })
+    .strict();
+
+export async function setRequireApprovalAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = requireApprovalSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notAllowedHere") };
+    const result = await guard(() =>
+        joinRequests.setRequireApproval(me, parsed.data.spaceId, parsed.data.on)
+    );
+    return result.error ? { error: result.error } : {};
+}
+
+const answerJoinRequestSchema = z
+    .object({ requestId: z.string().uuid(), accept: z.boolean() })
+    .strict();
+
+export async function answerJoinRequestAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = answerJoinRequestSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notAllowedHere") };
+    const result = await guard(() =>
+        joinRequests.answerJoinRequest(me, parsed.data.requestId, parsed.data.accept)
+    );
+    if (!result.error) revalidatePath(CHAT_PATH);
+    return result.error ? { error: result.error } : {};
 }
 
 // ---------------------------------------------------------------------------

@@ -606,6 +606,14 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                                         <Music2 className="size-3.5" />
                                         {t("sidebar.soundboard")}
                                     </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onSelect={() =>
+                                            router.push(`/chat/s/${space.id}/requests`)
+                                        }
+                                    >
+                                        <UserPlus className="size-3.5" />
+                                        {t("sidebar.joinRequests")}
+                                    </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         )

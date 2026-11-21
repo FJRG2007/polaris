@@ -46,6 +46,12 @@ export function InviteView({ code }: { code: string }) {
             if (result?.error) setError(result.error);
             return;
         }
+        // The space asks first: they are in its queue, not in it, so there is
+        // nowhere to go yet.
+        if (result.pending) {
+            setOffer((current) => (current ? { ...current, waiting: true } : current));
+            return;
+        }
         // The rail keeps its own list, so this is a navigation and a reload: the
         // space is new to this browser and nothing else would put it there.
         // Onto the channel the link named, Discord's way, or the space itself.
@@ -112,10 +118,14 @@ export function InviteView({ code }: { code: string }) {
                     >
                         {t("inviteView.openIt")}
                     </Button>
+                ) : offer.waiting ? (
+                    <p className="text-sm text-muted-foreground">{t("inviteView.waiting")}</p>
                 ) : offer.usable ? (
                     <Button size="sm" disabled={busy} onClick={() => void accept()}>
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        {t("inviteView.join", { name: offer.spaceName })}
+                        {offer.asksApproval
+                            ? t("inviteView.askToJoin", { name: offer.spaceName })
+                            : t("inviteView.join", { name: offer.spaceName })}
                     </Button>
                 ) : (
                     <p className="text-sm text-danger">{t("inviteView.thisInvitationHasRunOut")}</p>

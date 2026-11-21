@@ -271,6 +271,7 @@
         "placesUnavailable": "Place search is unavailable right now",
         "muteMentionsInvalid": "That mute could not be changed",
         "groupInviteGone": "That invitation is no longer open.",
+        "joinRequestGone": "That request has already been answered.",
         "messageRequestGone": "That request is no longer waiting.",
         "messageRequestBlockFailed": "Could not block them. Try again from their profile."
     },
@@ -768,6 +769,7 @@
         "editChannelNamed": "Edit {name}",
         "emoji": "Emoji",
         "soundboard": "Soundboard",
+        "joinRequests": "Join requests",
         "messageYourself": "Message yourself",
         "messageYourselfFailed": "Your own chat could not be opened. Try again."
     },
@@ -1556,6 +1558,8 @@
         "thisInvitationHasRunOut": "This invitation has run out. Ask whoever sent it for another.",
         "invitedBy": "{name} invited you.",
         "join": "Join {name}",
+        "askToJoin": "Ask to join {name}",
+        "waiting": "You asked to join. Whoever runs it will answer.",
         "opensOn": "Opens on #{name}"
     },
     "editHistory": {
@@ -2798,5 +2802,18 @@
         "block": "Block",
         "blocked": "{name} is blocked.",
         "failed": "That did not go through. Try again."
+    },
+    "joinRequests": {
+        "title": "Join requests",
+        "back": "Back to chat",
+        "ask": "Ask before letting people in",
+        "askHint": "An invitation sends a request you accept or decline here.",
+        "waiting": "Waiting",
+        "empty": "Nobody is waiting",
+        "emptyHint": "Requests to join appear here.",
+        "askedAt": "Asked {time}",
+        "accept": "Accept",
+        "decline": "Decline",
+        "notification": "{name} asked to join"
     }
 }

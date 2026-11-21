@@ -673,6 +673,10 @@
         "chatGroupInvite": {
             "label": "Group invitations",
             "description": "Someone asked you to join a group they could not add you to."
+        },
+        "chatJoinRequest": {
+            "label": "Requests to join",
+            "description": "Someone asked to join a space you run that asks before letting people in."
         }
     },
     "groups": {

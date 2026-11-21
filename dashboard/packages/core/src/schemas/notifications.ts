@@ -555,6 +555,17 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "chat.joinRequest",
+        group: "people",
+        label: "Requests to join a space",
+        description: "Somebody asked to join a space you run that asks before letting people in.",
+        // The space asks first, so somebody is waiting on an answer only the
+        // people who run it can give; a queue nobody hears about is a door
+        // that never opens.
+        level: "info",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "chat.reminder",
         group: "people",
         label: "Message reminders",

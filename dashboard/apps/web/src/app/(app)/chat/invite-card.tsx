@@ -49,6 +49,8 @@ export function InviteCard({ card, mine }: { card: ChatInviteCard; mine: boolean
     // back if the server refuses.
     const [joined, setJoined] = useState(card.member);
     const [error, setError] = useState("");
+    // The space asks before letting people in, and this one is now asking.
+    const [waiting, setWaiting] = useState(false);
     // Optimistic as well: withdrawn reads as an invalid invite at once, and
     // comes back if the server refuses.
     const [revoked, setRevoked] = useState(false);
@@ -73,6 +75,12 @@ export function InviteCard({ card, mine }: { card: ChatInviteCard; mine: boolean
         if (!result || result.error) {
             setJoined(false);
             if (result?.error) setError(result.error);
+            return;
+        }
+        // The space asks first: a request is waiting, not a seat.
+        if (result.pending) {
+            setJoined(false);
+            setWaiting(true);
             return;
         }
         open(result.channelId ?? card.channelId);
@@ -178,6 +186,7 @@ export function InviteCard({ card, mine }: { card: ChatInviteCard; mine: boolean
                     </Button>
                 )}
             </div>
+            {waiting && <p className="text-xs text-muted-foreground">{t("inviteView.waiting")}</p>}
             {error && (
                 <p role="alert" className="text-xs text-danger">
                     {error}

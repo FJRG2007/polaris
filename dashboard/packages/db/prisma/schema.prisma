@@ -383,6 +383,7 @@ model User {
     chatSpaceMemberships ChatSpaceMember[]
     chatSpacePreferences ChatSpacePreference[]
     chatSpaceBans       ChatSpaceBan[] @relation("ChatSpaceBanUser")
+    chatSpaceJoinRequests ChatSpaceJoinRequest[] @relation("ChatSpaceJoinRequests")
     chatSpaceBansMade   ChatSpaceBan[] @relation("ChatSpaceBanBy")
     chatEmojiUploaded   ChatSpaceEmoji[] @relation("ChatSpaceEmojiUploader")
     chatSoundsUploaded  ChatSpaceSound[] @relation("ChatSpaceSoundUploader")
@@ -10274,11 +10275,16 @@ model ChatSpace {
     /// Whether somebody who joins later reads what was said before they did.
     /// The default for every channel that does not say otherwise.
     newcomerHistory Boolean @default(true)
+    // Whether an invitation files a request that whoever runs the space answers,
+    // instead of a seat (`lib/chat/join-requests.ts`). Off by default, which is
+    // how every space admitted people before.
+    requireApproval Boolean @default(false)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
     owner    User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     org      Organization?     @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    joinRequests ChatSpaceJoinRequest[]
     avatar      ChatSpaceAvatar?
     members     ChatSpaceMember[]
     preferences ChatSpacePreference[]
@@ -10590,6 +10596,21 @@ model ChatSpacePreference {
 // invitation is followed, so a ban survives being forgotten about. Lifting one
 // is deleting it, which is why there is nothing here for "lifted at" - a space
 // that wants that history has the activity log.
+// Somebody waiting to join a space that asks first. One per person per space:
+// asking twice is the same request. Deleted when it is answered either way.
+model ChatSpaceJoinRequest {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    spaceId   String   @db.Uuid
+    userId    String   @db.Uuid
+    createdAt DateTime @default(now())
+
+    space ChatSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    user  User      @relation("ChatSpaceJoinRequests", fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([spaceId, userId])
+    @@index([spaceId, createdAt])
+}
+
 model ChatSpaceBan {
     id        String   @id @default(uuid(7)) @db.Uuid
     spaceId   String   @db.Uuid
