@@ -155,3 +155,39 @@ describe("a selected address", () => {
         expect(linkInSelection("")).toBeNull();
     });
 });
+describe("the editing bridge's checks", async () => {
+    const { clipboardText, dictionaryWord, pagePoint, savableImageUrl, CLIPBOARD_TEXT_MAX } = await import("../../src/main/context-menu");
+
+    it("adds only a single word to the dictionary", () => {
+        expect(dictionaryWord("  Polaris ")).toBe("Polaris");
+        expect(dictionaryWord("don\u2019t")).toBe("don\u2019t");
+        expect(dictionaryWord("cami\u00f3n")).toBe("cami\u00f3n");
+        expect(dictionaryWord("two words")).toBeNull();
+        expect(dictionaryWord("")).toBeNull();
+        expect(dictionaryWord("a".repeat(65))).toBeNull();
+        expect(dictionaryWord(42)).toBeNull();
+    });
+
+    it("refuses clipboard text that is not text or is far too long", () => {
+        expect(clipboardText("hello")).toBe("hello");
+        expect(clipboardText("")).toBe("");
+        expect(clipboardText(null)).toBeNull();
+        expect(clipboardText("x".repeat(CLIPBOARD_TEXT_MAX + 1))).toBeNull();
+    });
+
+    it("scales a page point by the zoom and refuses anything else", () => {
+        expect(pagePoint(10.4, 20, 1.5)).toEqual({ x: 16, y: 30 });
+        expect(pagePoint(-1, 2, 1)).toBeNull();
+        expect(pagePoint(Number.NaN, 2, 1)).toBeNull();
+        expect(pagePoint("1", 2, 1)).toBeNull();
+        expect(pagePoint(1, 2, 0)).toBeNull();
+    });
+
+    it("saves only pictures from an address or inline", () => {
+        expect(savableImageUrl("https://example.com/a.png")).toBe("https://example.com/a.png");
+        expect(savableImageUrl("data:image/png;base64,AAAA")).toBe("data:image/png;base64,AAAA");
+        expect(savableImageUrl("file:///C:/Windows/win.ini")).toBeNull();
+        expect(savableImageUrl("chrome://settings")).toBeNull();
+        expect(savableImageUrl(undefined)).toBeNull();
+    });
+});

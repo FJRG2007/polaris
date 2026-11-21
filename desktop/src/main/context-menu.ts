@@ -9,6 +9,12 @@
  *
  * The shape follows what browsers and electron-context-menu settled on:
  * spelling first, then the link, the image, the selection, and the edit roles.
+ *
+ * A dashboard from this release on answers every right-click itself, with its
+ * own menu (`components/context-menu-fallback.tsx` there), and asks for the
+ * spelling checker and the clipboard through the `editing` bridge instead - so
+ * this menu is what an older Polaris, which still lets some clicks through,
+ * and this app's own pages get. The checks those bridge calls run are here too.
  */
 
 import { openExternal } from "./open-external";
@@ -41,6 +47,42 @@ export function searchLabel(text: string): string {
     const line = text.trim().replace(/\s+/g, " ");
     const shown = line.length > SEARCH_LABEL_LENGTH ? `${line.slice(0, SEARCH_LABEL_LENGTH - 3).trimEnd()}...` : line;
     return `Search Google for "${shown}"`;
+}
+
+/** Longest word the dictionary takes; anything longer is not a word. */
+const WORD_MAX = 64;
+
+/** A word the page asks to add to the dictionary, or null when it is not one. */
+export function dictionaryWord(raw: unknown): string | null {
+    if (typeof raw !== "string") return null;
+    const word = raw.trim();
+    return word.length > 0 && word.length <= WORD_MAX && /^[\p{L}\p{M}'’-]+$/u.test(word) ? word : null;
+}
+
+/** More text than anybody copies by hand; past it the request is refused. */
+export const CLIPBOARD_TEXT_MAX = 16 * 1024 * 1024;
+
+/** Text the page asks to put on the clipboard, or null. */
+export function clipboardText(raw: unknown): string | null {
+    return typeof raw === "string" && raw.length <= CLIPBOARD_TEXT_MAX ? raw : null;
+}
+
+/**
+ * A point the page names, in CSS pixels, as the web contents' own coordinates:
+ * scaled by the zoom the window is drawn at. Null for anything not a point on
+ * the page.
+ */
+export function pagePoint(x: unknown, y: unknown, zoom: number): { readonly x: number; readonly y: number } | null {
+    if (typeof x !== "number" || typeof y !== "number" || !Number.isFinite(x) || !Number.isFinite(y)) return null;
+    if (x < 0 || y < 0 || !Number.isFinite(zoom) || zoom <= 0) return null;
+    return { x: Math.round(x * zoom), y: Math.round(y * zoom) };
+}
+
+/** An image the page asks to save: an address or inline data, never a file
+ *  on this computer or an app's own scheme. */
+export function savableImageUrl(raw: unknown): string | null {
+    if (typeof raw !== "string" || raw.length > CLIPBOARD_TEXT_MAX || !savableImage(raw)) return null;
+    return raw;
 }
 
 /** An image that can be saved: one the page loaded from an address or inline. */

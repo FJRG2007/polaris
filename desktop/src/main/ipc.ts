@@ -24,6 +24,7 @@ import { closeNotice, showNotice } from "./notices";
 import { appBadgeSchema, applyAppBadge } from "./app-badge";
 import { isSafeExternalUrl, isServerUrl, serverPath } from "./navigation";
 import { openExternal } from "./open-external";
+import { clipboardText, dictionaryWord, pagePoint, savableImageUrl } from "./context-menu";
 import { FolderRefusal, zipFolder } from "./folder-zip";
 import { cancelApiKey, keyFormState, submitApiKey } from "./key-flow";
 import { kindOf, openPolarisWindow, type WindowKind } from "./windows";
@@ -55,6 +56,7 @@ import { openPush, pushOf, pushTargetSchema, type PushHost } from "./push-local"
 import {
     app,
     BrowserWindow,
+    clipboard,
     dialog,
     ipcMain,
     nativeImage,
@@ -517,6 +519,37 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.openOutside, (event, raw: unknown): boolean => {
         if (!fromPolaris(event) || typeof raw !== "string" || !isSafeExternalUrl(raw)) return false;
         openExternal(raw);
+        return true;
+    });
+
+    // Polaris's own right-click menu (`EditingBridge`): the dictionary, the
+    // clipboard and the picture under the pointer. The clipboard is read only
+    // while the window has focus, as the browser's own clipboard API is.
+    ipcMain.handle(CHANNELS.editAddWord, (event, raw: unknown): boolean => {
+        const word = dictionaryWord(raw);
+        if (!fromPolaris(event) || !word) return false;
+        return event.sender.session.addWordToSpellCheckerDictionary(word);
+    });
+    ipcMain.handle(CHANNELS.editReadClipboard, async (event): Promise<string | null> => {
+        if (!fromPolaris(event) || !BrowserWindow.fromWebContents(event.sender)?.isFocused()) return null;
+        return await clipboard.readText();
+    });
+    ipcMain.handle(CHANNELS.editWriteClipboard, async (event, raw: unknown): Promise<boolean> => {
+        const text = clipboardText(raw);
+        if (!fromPolaris(event) || text === null) return false;
+        await clipboard.writeText(text);
+        return true;
+    });
+    ipcMain.handle(CHANNELS.editCopyImage, (event, x: unknown, y: unknown): boolean => {
+        const point = fromPolaris(event) ? pagePoint(x, y, event.sender.getZoomFactor()) : null;
+        if (!point) return false;
+        event.sender.copyImageAt(point.x, point.y);
+        return true;
+    });
+    ipcMain.handle(CHANNELS.editSaveImage, (event, raw: unknown): boolean => {
+        const url = savableImageUrl(raw);
+        if (!fromPolaris(event) || !url) return false;
+        event.sender.downloadURL(url);
         return true;
     });
 

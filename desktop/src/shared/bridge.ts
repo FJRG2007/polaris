@@ -194,6 +194,9 @@ export interface PolarisDesktop {
     /** This computer as a runner for Polar Code sessions and the Claude
      *  subscription chat. Absent on a desktop that predates it. */
     readonly computer?: ComputerBridge;
+    /** What Polaris's own right-click menu needs from this app: the spelling
+     *  checker, the clipboard and the picture under the pointer. */
+    readonly editing?: EditingBridge;
 }
 
 /** Where this computer's runner stands. `preparing` is the tool being
@@ -553,6 +556,32 @@ export interface NoticeReply {
     readonly text: string;
 }
 
+/** What the spelling checker says about one word. */
+export interface SpellingCheck {
+    readonly misspelled: boolean;
+    /** Replacements, best first; empty when it has none or the word is fine. */
+    readonly suggestions: readonly string[];
+}
+
+/**
+ * The page draws the right-click menu itself, so Electron raises no
+ * `context-menu` event with its spelling suggestions and its clipboard roles:
+ * these are those, asked for one at a time.
+ */
+export interface EditingBridge {
+    /** Answered in the page's own process, from the same checker Electron uses. */
+    spelling(word: string): SpellingCheck;
+    addToDictionary(word: string): Promise<boolean>;
+    /** The clipboard's text, or null when it was refused - only while the
+     *  window has focus, as the browser's own clipboard API is. */
+    readClipboard(): Promise<string | null>;
+    writeClipboard(text: string): Promise<boolean>;
+    /** Copies the picture at a point of the page, in CSS pixels, as pixels. */
+    copyImageAt(x: number, y: number): Promise<boolean>;
+    /** Downloads a picture, which asks where to save it. */
+    saveImage(url: string): Promise<boolean>;
+}
+
 /** What `powerMonitor.getSystemIdleState` answers. */
 export type SystemIdle = "active" | "idle" | "locked" | "unknown";
 
@@ -579,6 +608,11 @@ export const CHANNELS = {
     computerEvent: "desktop:computer-event",
     defaultBrowser: "desktop:default-browser",
     systemIdle: "desktop:system-idle",
+    editAddWord: "desktop:edit-add-word",
+    editReadClipboard: "desktop:edit-read-clipboard",
+    editWriteClipboard: "desktop:edit-write-clipboard",
+    editCopyImage: "desktop:edit-copy-image",
+    editSaveImage: "desktop:edit-save-image",
     openOutside: "desktop:open-outside",
     windowShown: "desktop:window-shown",
     callHotkeys: "desktop:call-hotkeys",

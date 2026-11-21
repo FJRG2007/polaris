@@ -7,7 +7,7 @@
  * configured Polaris; this file only shapes the calls.
  */
 
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webFrame } from "electron";
 import { followTitleBarColors } from "@/shared/title-bar";
 import { reportTextSize } from "./text-size";
 import { holdOutsideLinks } from "./outside-links";
@@ -137,6 +137,24 @@ const bridge: PolarisDesktop = {
         down: () => ipcRenderer.invoke(CHANNELS.vpnDown),
         status: () => ipcRenderer.invoke(CHANNELS.vpnStatus),
         joinNetwork: (input) => ipcRenderer.invoke(CHANNELS.vpnJoin, input)
+    },
+    editing: {
+        // The checker runs in this process, so a word is answered without a
+        // round trip to the main one; a checker that is off says "fine".
+        spelling: (word) => {
+            if (typeof word !== "string" || word.length === 0 || word.length > 64) return { misspelled: false, suggestions: [] };
+            try {
+                const misspelled = webFrame.isWordMisspelled(word);
+                return { misspelled, suggestions: misspelled ? webFrame.getWordSuggestions(word).slice(0, 5) : [] };
+            } catch {
+                return { misspelled: false, suggestions: [] };
+            }
+        },
+        addToDictionary: (word) => ipcRenderer.invoke(CHANNELS.editAddWord, word),
+        readClipboard: () => ipcRenderer.invoke(CHANNELS.editReadClipboard),
+        writeClipboard: (text) => ipcRenderer.invoke(CHANNELS.editWriteClipboard, text),
+        copyImageAt: (x, y) => ipcRenderer.invoke(CHANNELS.editCopyImage, x, y),
+        saveImage: (url) => ipcRenderer.invoke(CHANNELS.editSaveImage, url)
     },
     computer: {
         state: () => ipcRenderer.invoke(CHANNELS.computerState),
