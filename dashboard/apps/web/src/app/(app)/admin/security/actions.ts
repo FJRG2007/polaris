@@ -30,7 +30,8 @@ export async function saveInstanceSecurityAction(
         metadata: {
             requireSecondFactor: parsed.data.requireSecondFactor,
             acceptedFactors: parsed.data.acceptedFactors,
-            challengeConnectionSignIn: parsed.data.challengeConnectionSignIn
+            challengeConnectionSignIn: parsed.data.challengeConnectionSignIn,
+            requireLoginApproval: parsed.data.requireLoginApproval
         }
     });
     revalidatePath("/admin/security");

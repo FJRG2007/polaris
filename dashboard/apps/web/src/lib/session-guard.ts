@@ -39,6 +39,7 @@ import { describeOrigin } from "@/lib/session-directory";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { evaluateAccountRequest, listAccountRules } from "@/lib/account-rules";
 import { getInstanceSecurity } from "@/lib/instance-security";
+import { approvalDemanded } from "@/lib/login-approval";
 import { beginSignInStepUp, STEP_UP_PATH } from "@/lib/two-factor-policy-service";
 import { notifySessionOpened, notifySessionsClosed } from "@/lib/notifications/session-events";
 import {
@@ -252,6 +253,8 @@ export async function guardSession({
                         idleLockMinutes: true,
                         sessionMaxMinutes: true,
                         requireLoginApproval: true,
+                        // Only whether one exists: allowing a sign-in asks for it.
+                        pinHash: true,
                         bindSessionsToClient: true,
                         pinSessionsToAddress: true,
                         lockdownAt: true
@@ -436,8 +439,12 @@ export async function guardSession({
                 sessionId,
                 ip,
                 country: decision.country,
-                requireApproval:
-                    settings?.requireLoginApproval === true && record.twoFactorEnabled !== true,
+                requireApproval: approvalDemanded({
+                    chosen: settings?.requireLoginApproval === true,
+                    twoFactor: record.twoFactorEnabled === true,
+                    hasPin: Boolean(settings?.pinHash),
+                    demanded: (await getInstanceSecurity()).requireLoginApproval === true
+                }),
                 twoFactorEnabled: record.twoFactorEnabled === true,
                 deviceKey: claimedKey,
                 deviceName: claimedKey ? device.name : null

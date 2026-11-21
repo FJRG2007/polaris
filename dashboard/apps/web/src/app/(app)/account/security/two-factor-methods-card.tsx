@@ -60,6 +60,8 @@ export interface LoginApprovalStatus {
     hasPin: boolean;
     /** Open sessions other than this one, which is what an approval is decided from. */
     otherSessions: number;
+    /** This Polaris holds new sign-ins anyway (for an account with a PIN). */
+    enforced?: boolean;
 }
 
 export function TwoFactorMethodsCard({
@@ -176,6 +178,9 @@ export function TwoFactorMethodsCard({
                         <div className="min-w-0">
                             <p className="text-sm">{t("methods.approval.title")}</p>
                             <p className="text-xs text-muted-foreground">{t("methods.approval.description")}</p>
+                            {approval.enforced ? (
+                                <p className="text-xs text-muted-foreground">{t("methods.approval.enforced")}</p>
+                            ) : null}
                             {twoFactorEnabled ? (
                                 <p className="text-xs text-warning">{t("methods.approval.oneOfTwo")}</p>
                             ) : !approval.hasPin ? (

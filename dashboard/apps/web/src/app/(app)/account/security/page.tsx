@@ -159,6 +159,7 @@ export default async function SecurityPage() {
                     standing={lifecycle}
                     sessionMaxMinutes={settings.sessionMaxMinutes}
                     requireLoginApproval={settings.requireLoginApproval}
+                    loginApprovalEnforced={instancePolicy.requireLoginApproval}
                     emailLinkSignIn={settings.emailLinkSignIn}
                     usernameSignIn={settings.usernameSignIn}
                     autoPasskey={settings.autoPasskey}

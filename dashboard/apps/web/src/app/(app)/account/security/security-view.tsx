@@ -79,6 +79,7 @@ export function SecurityView({
     standing,
     sessionMaxMinutes,
     requireLoginApproval,
+    loginApprovalEnforced = false,
     emailLinkSignIn,
     usernameSignIn,
     autoPasskey,
@@ -115,6 +116,8 @@ export function SecurityView({
     standing: AccountStanding;
     sessionMaxMinutes: number;
     requireLoginApproval: boolean;
+    /** This Polaris holds every new sign-in of an account with a PIN, whatever it chose. */
+    loginApprovalEnforced?: boolean;
     /** Whether a link emailed to this account signs it in. Off unless asked for. */
     emailLinkSignIn: boolean;
     /** Whether the username may stand in for the address at sign-in. */
@@ -238,7 +241,12 @@ export function SecurityView({
                         preferred={twoFactorPreferred}
                         twoFactorEnabled={twoFactorEnabled}
                         trustedDevices={trustedDevices}
-                        approval={{ enabled: requireLoginApproval, hasPin, otherSessions }}
+                        approval={{
+                            enabled: requireLoginApproval,
+                            hasPin,
+                            otherSessions,
+                            enforced: loginApprovalEnforced
+                        }}
                         policy={twoFactorPolicy}
                     />
 

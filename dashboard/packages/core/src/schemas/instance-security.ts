@@ -72,7 +72,13 @@ export const instanceSecuritySchema = z.object({
      * on parsing instead of falling back to the defaults wholesale - which would
      * silently undo whatever the operator had chosen above it.
      */
-    challengeConnectionSignIn: z.boolean().default(false)
+    challengeConnectionSignIn: z.boolean().default(false),
+    /**
+     * Every new sign-in waits until one of the account's signed-in devices allows
+     * it, whatever the account chose for itself, and even with an authenticator
+     * armed. Defaulted for the same reason as the line above.
+     */
+    requireLoginApproval: z.boolean().default(false)
 });
 
 export type InstanceSecurityPolicy = z.infer<typeof instanceSecuritySchema>;
@@ -94,5 +100,6 @@ export type InstanceSecurityPolicy = z.infer<typeof instanceSecuritySchema>;
 export const INSTANCE_SECURITY_DEFAULTS: InstanceSecurityPolicy = {
     requireSecondFactor: true,
     acceptedFactors: ["totp", "email"],
-    challengeConnectionSignIn: false
+    challengeConnectionSignIn: false,
+    requireLoginApproval: false
 };

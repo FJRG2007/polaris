@@ -391,6 +391,7 @@
         "approval": {
             "title": "Aprobar desde una sesión abierta",
             "description": "Un inicio de sesión nuevo espera hasta que lo permitas con tu PIN desde una sesión que ya esté abierta.",
+            "enforced": "Este Polaris lo exige a toda cuenta con PIN de desbloqueo rápido, tenga o no app de autenticación.",
             "oneOfTwo": "Un inicio de sesión pide uno de los dos. Desactiva la app de autenticación para usar esto en su lugar.",
             "pinFirst": "Primero configura un PIN de desbloqueo rápido: permitir un inicio de sesión lo pide.",
             "noOtherSession": "No hay otra sesión abierta: aprobarías desde esta.",

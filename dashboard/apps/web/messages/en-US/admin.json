@@ -3151,6 +3151,10 @@
                 "description": "A code sent to the address on the account, which confirms the address as it goes."
             }
         },
+        "approval": {
+            "title": "Approve new sign-ins from an open session",
+            "hint": "Every new sign-in waits until one of the account's open sessions allows it with the quick unlock PIN, even with an authenticator app. Accounts without a PIN, or with no other open session, are not held."
+        },
         "connection": {
             "title": "Ask again after a connected account",
             "hint": "Signing in with GitHub or Google answers that service first. With this on, Polaris asks for the second step afterward as well.",

@@ -391,6 +391,7 @@
         "approval": {
             "title": "Approve from an open session",
             "description": "A new sign-in waits until you allow it with your PIN from a session that is already open.",
+            "enforced": "This Polaris requires it for every account with a quick unlock PIN, with or without the authenticator app.",
             "oneOfTwo": "A sign-in asks for one of the two. Turn the authenticator app off to use this instead.",
             "pinFirst": "Set a quick unlock PIN first - allowing a sign-in asks for it.",
             "noOtherSession": "No other session open - you would approve from this one.",

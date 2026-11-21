@@ -29,6 +29,7 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
     const [required, setRequired] = useState(policy.requireSecondFactor);
     const [accepted, setAccepted] = useState<SecondFactorEnrollment[]>(policy.acceptedFactors);
     const [connectionChallenge, setConnectionChallenge] = useState(policy.challengeConnectionSignIn);
+    const [approval, setApproval] = useState(policy.requireLoginApproval);
     const [busy, setBusy] = useState(false);
     const [result, setResult] = useState<{ error?: string; ok?: string } | null>(null);
 
@@ -38,7 +39,8 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
     const dirty =
         required !== policy.requireSecondFactor ||
         !sameList ||
-        connectionChallenge !== policy.challengeConnectionSignIn;
+        connectionChallenge !== policy.challengeConnectionSignIn ||
+        approval !== policy.requireLoginApproval;
 
     function toggle(factor: SecondFactorEnrollment, on: boolean) {
         setResult(null);
@@ -53,7 +55,8 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
         const response = await saveInstanceSecurityAction({
             requireSecondFactor: required,
             acceptedFactors: accepted,
-            challengeConnectionSignIn: connectionChallenge
+            challengeConnectionSignIn: connectionChallenge,
+            requireLoginApproval: approval
         });
         setBusy(false);
         setResult(response);
@@ -137,6 +140,25 @@ export function SecurityAdmin({ policy, mailReady }: { policy: InstanceSecurityP
                     {!connectionChallenge ? (
                         <p className="text-xs text-muted-foreground">{t("security.connection.off")}</p>
                     ) : null}
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardBody className="flex flex-col gap-3">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                            <h2 className="text-sm font-medium">{t("security.approval.title")}</h2>
+                            <p className="text-xs text-muted-foreground">{t("security.approval.hint")}</p>
+                        </div>
+                        <Switch
+                            checked={approval}
+                            onChange={(next) => {
+                                setResult(null);
+                                setApproval(next);
+                            }}
+                            aria-label={t("security.approval.title")}
+                        />
+                    </div>
                 </CardBody>
             </Card>
 

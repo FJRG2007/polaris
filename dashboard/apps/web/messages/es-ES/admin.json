@@ -3151,6 +3151,10 @@
                 "description": "Un código enviado a la dirección de la cuenta, que de paso confirma la dirección."
             }
         },
+        "approval": {
+            "title": "Aprobar inicios nuevos desde una sesión abierta",
+            "hint": "Cada inicio de sesión nuevo espera hasta que una sesión abierta de la cuenta lo permita con el PIN de desbloqueo rápido, aunque haya app de autenticación. No se retiene a cuentas sin PIN ni sin otra sesión abierta."
+        },
         "connection": {
             "title": "Volver a preguntar tras una cuenta conectada",
             "hint": "Al iniciar sesión con GitHub o Google, primero responde ese servicio. Activado, Polaris pide también el segundo paso después.",

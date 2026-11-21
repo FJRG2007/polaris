@@ -35,6 +35,17 @@ describe("the instance security policy", () => {
         }).challengeConnectionSignIn).toBe(true);
     });
 
+    it("holds no sign-in for approval unless the operator asks, and keeps a stored policy that predates it", () => {
+        expect(INSTANCE_SECURITY_DEFAULTS.requireLoginApproval).toBe(false);
+        const stored = instanceSecuritySchema.parse({ requireSecondFactor: false, acceptedFactors: ["totp"] });
+        expect(stored.requireLoginApproval).toBe(false);
+        expect(stored.requireSecondFactor).toBe(false);
+        expect(
+            instanceSecuritySchema.parse({ requireSecondFactor: true, acceptedFactors: [], requireLoginApproval: true })
+                .requireLoginApproval
+        ).toBe(true);
+    });
+
     it("keeps the authenticator accepted whatever was stored", () => {
         expect(
             instanceSecuritySchema.parse({ requireSecondFactor: true, acceptedFactors: [] }).acceptedFactors
