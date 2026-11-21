@@ -29,6 +29,7 @@ import * as history from "./history-visibility";
 import { polarMentioned } from "@/components/rich-text/markdown";
 import { answerMentionWithReason, questionOf, type MentionProblem } from "@/lib/polar/mention-answer";
 import type { MessageComponentInput } from "./message-components";
+import { isShielded } from "./advanced-privacy";
 import {
     MENTION_STEPS,
     callComponents,
@@ -127,9 +128,13 @@ export async function answerPolarMention(
         select: { name: true, username: true }
     });
     const askerName = author?.name || author?.username || "";
+    // Advanced chat privacy keeps the conversation out of Polar: the question
+    // is answered on its own, with nothing said before it and nothing it
+    // replies to.
+    const shielded = await isShielded(mention.channelId);
     const [history, repliedTo, toolkit] = await Promise.all([
-        conversationBefore(mention),
-        messageRepliedTo(mention),
+        shielded ? Promise.resolve([]) : conversationBefore(mention),
+        shielded ? Promise.resolve(null) : messageRepliedTo(mention),
         mentionToolkit(mention.authorId)
     ]);
 

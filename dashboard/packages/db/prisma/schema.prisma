@@ -10667,6 +10667,10 @@ model ChatChannel {
     // group, the administrators of a space channel (an announcement channel).
     // On by default, which is how every conversation behaved before.
     membersMaySend Boolean @default(true)
+    // Advanced chat privacy: no Polar or app commands over the history, no
+    // downloads and no forwarding (`lib/chat/advanced-privacy.ts`). Off by
+    // default, which is how every conversation behaved before.
+    advancedPrivacy Boolean @default(false)
     // How long somebody waits between messages here, in seconds. Zero is off,
     // which is every channel until whoever runs it decides otherwise. Whoever
     // may moderate the room is not held by it - a moderator who cannot answer

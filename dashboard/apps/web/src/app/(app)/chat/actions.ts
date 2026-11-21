@@ -21,6 +21,7 @@ import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import * as invites from "@/lib/chat/invites";
 import * as reports from "@/lib/chat/reports";
+import * as advancedPrivacy from "@/lib/chat/advanced-privacy";
 import * as saved from "@/lib/chat/saved-media";
 import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
@@ -919,6 +920,21 @@ export async function setGroupOptionsAction(
     if (!parsed.success)
         return { error: (await getTranslations("chat"))("errors.notAGroupSetting") };
     const result = await guard(() => chat.setGroupOptions(me, channelId, parsed.data));
+    return result.error ? { error: result.error } : {};
+}
+
+/** Advanced chat privacy, on or off. The service decides who may. */
+const advancedPrivacySchema = z
+    .object({ channelId: z.string().uuid(), on: z.boolean() })
+    .strict();
+
+export async function setAdvancedPrivacyAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = advancedPrivacySchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notAllowedHere") };
+    const result = await guard(() =>
+        advancedPrivacy.setAdvancedPrivacy(me, parsed.data.channelId, parsed.data.on)
+    );
     return result.error ? { error: result.error } : {};
 }
 

@@ -96,7 +96,7 @@ import {
     savePaneSize,
     storedPaneSize
 } from "./pane-preferences";
-import { AlertCircle, ArrowDown, Loader2, MessageCircle, Mic, Video, Volume2 } from "lucide-react";
+import { AlertCircle, ArrowDown, Loader2, MessageCircle, Mic, ShieldCheck, Video, Volume2 } from "lucide-react";
 import { keepReading, readingPosition, type ReadingPosition } from "./reading-position";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { LocationDialog } from "./location-dialog";
@@ -111,7 +111,7 @@ import {
     useHide,
     VanishMenu
 } from "./vanish-controls";
-import { Button, EmptyState, ResizeHandle, cn, useToast } from "@polaris/ui";
+import { Button, EmptyState, ResizeHandle, Switch, cn, useToast } from "@polaris/ui";
 import { ConversationSkeleton, MessagesSkeleton } from "./messages-skeleton";
 import { PersonCardProvider } from "./person-card";
 import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
@@ -2325,8 +2325,28 @@ export function ChannelView({
         }
         void reloadRules();
     };
+    // Advanced chat privacy, flipped at once and put back on a refusal. The
+    // server refuses Polar, downloads and forwards by the stored value; this
+    // only draws it.
+    const [shieldedPending, setShieldedPending] = useState<boolean | null>(null);
+    const shielded = shieldedPending ?? channel?.advancedPrivacy ?? false;
+    useEffect(() => setShieldedPending(null), [channel?.advancedPrivacy]);
+    const shield = async (on: boolean) => {
+        setShieldedPending(on);
+        const result = await runAction(
+            () => actions.setAdvancedPrivacyAction({ channelId, on }),
+            setError
+        );
+        if (!result || result.error) {
+            if (result?.error) setError(result.error);
+            setShieldedPending(null);
+            return;
+        }
+        refresh();
+    };
     const privacySection =
         direct && vanish.rules ? (
+            <>
             <ChatPrivacySection
                 rules={vanish.rules}
                 proposerName={
@@ -2337,6 +2357,21 @@ export function ChannelView({
                 onAnswer={answerProposal}
                 onWithdraw={withdrawProposal}
             />
+            <div className="flex items-start gap-3 rounded-lg border border-border px-3 py-3">
+                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{t("channelView.advancedPrivacy")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("channelView.advancedPrivacyHint")}
+                    </p>
+                </div>
+                <Switch
+                    checked={shielded}
+                    onChange={(checked) => void shield(checked)}
+                    aria-label={t("channelView.advancedPrivacy")}
+                />
+            </div>
+            </>
         ) : null;
     /** Empties the screen at once and puts it back on a refusal, which the
      *  dialog then shows. */

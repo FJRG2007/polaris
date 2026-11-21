@@ -105,6 +105,8 @@ interface Draft {
     readonly private: boolean;
     /** Off is an announcement channel: only its administrators post. */
     readonly membersMaySend: boolean;
+    /** Advanced chat privacy: no Polar, downloads or forwarding. */
+    readonly advancedPrivacy: boolean;
 }
 
 function draftOf(channel: ChatChannelView): Draft {
@@ -115,7 +117,8 @@ function draftOf(channel: ChatChannelView): Draft {
         contentMode: channel.contentMode,
         limitText: channel.userLimit > 0 ? String(channel.userLimit) : "",
         private: channel.private,
-        membersMaySend: channel.membersMaySend
+        membersMaySend: channel.membersMaySend,
+        advancedPrivacy: channel.advancedPrivacy
     };
 }
 
@@ -163,6 +166,7 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
             draft.contentMode !== now.contentMode ||
             draft.private !== now.private ||
             draft.membersMaySend !== now.membersMaySend ||
+            draft.advancedPrivacy !== now.advancedPrivacy ||
             (voice && userLimit !== null && userLimit !== channel.userLimit)
         );
     }, [draft, channel, stored, voice, userLimit]);
@@ -195,6 +199,19 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
                 }),
             setError
         );
+        // Its own write: it is any member's call outside a space, so it is not
+        // part of the channel update an administrator saves.
+        if (result && !result.error && draft.advancedPrivacy !== channel.advancedPrivacy) {
+            const shielded = await runAction(
+                () =>
+                    actions.setAdvancedPrivacyAction({
+                        channelId: channel.id,
+                        on: draft.advancedPrivacy
+                    }),
+                setError
+            );
+            if (shielded?.error) setError(shielded.error);
+        }
         setBusy(false);
         if (!result || result.error) {
             if (result?.error) setError(result.error);
@@ -716,6 +733,21 @@ function Permissions({
                     checked={!draft.membersMaySend}
                     onChange={(checked) => onEdit({ membersMaySend: !checked })}
                     aria-label={t("channelSettings.announcement")}
+                />
+            </div>
+
+            <div className="flex items-start gap-3 rounded-lg border border-border px-3 py-3">
+                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">{t("channelView.advancedPrivacy")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("channelView.advancedPrivacyHint")}
+                    </p>
+                </div>
+                <Switch
+                    checked={draft.advancedPrivacy}
+                    onChange={(checked) => onEdit({ advancedPrivacy: checked })}
+                    aria-label={t("channelView.advancedPrivacy")}
                 />
             </div>
 

@@ -34,6 +34,7 @@ import {
 } from "@/lib/chat/attachments";
 import { downloadTicketHeaders } from "@/lib/download-ticket";
 import { viewOnceFile } from "@/lib/chat/view-once";
+import { isShielded } from "@/lib/chat/advanced-privacy";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -102,6 +103,13 @@ export async function GET(
     // offer "download" say so here as well as on the anchor, so what the browser
     // does with it does not rest on an attribute alone.
     const asFile = new URL(request.url).searchParams.get("download") === "1";
+    // Advanced chat privacy: shown in the chat, never handed over as a file.
+    if (asFile && (await isShielded(channelId))) {
+        return Response.json(
+            { error: (await readerWords("chat"))("errors.privateChatNoDownload") },
+            { status: 403 }
+        );
+    }
     const shown =
         !asFile &&
         (isInlineImage(file.contentType) ||

@@ -172,6 +172,8 @@ export interface ChatChannelView {
     /** Whether this reader may post here as far as that switch goes. Only
      *  decides what the composer draws; sending asks `requirePostable`. */
     readonly maySend: boolean;
+    /** Advanced chat privacy: no Polar, downloads or forwarding here. */
+    readonly advancedPrivacy: boolean;
     /** How long somebody waits between messages here, in seconds. Zero is off.
      *  Read by the composer so the wait is shown while it applies rather than
      *  discovered by being refused. */
@@ -825,6 +827,7 @@ export async function listChannels(
             membersMayInvite: true,
             membersMayMention: true,
             membersMaySend: true,
+            advancedPrivacy: true,
             slowmode: true,
             userLimit: true,
             contentMode: true,
@@ -1048,6 +1051,7 @@ export async function listChannels(
             mayMentionRoom: roomMentionsAllowed(channel, actor.id),
             membersMaySend: channel.membersMaySend,
             maySend: !sendClosed(channel, actor.id, mayAdminister),
+            advancedPrivacy: channel.advancedPrivacy,
             slowmode: channel.slowmode,
             userLimit: channel.kind === "voice" ? channel.userLimit : 0,
             contentMode: channel.spaceId ? contentModeOf(channel.contentMode) : "default",

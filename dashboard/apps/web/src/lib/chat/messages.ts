@@ -81,6 +81,7 @@ import { isEphemeral } from "./ephemeral";
 import { webhookFace } from "./webhook-face";
 import { chatPrivacyIn, chatPrivacyOf, expiryForChannel } from "./vanish";
 import { hasDirectRules } from "./vanish-rules";
+import { isShielded, shieldedAmong } from "./advanced-privacy";
 import { concealedFor, requireUnlocked, unhideOnMessage } from "./chat-lock";
 
 /** One message, with everything the list needs to draw it. */
@@ -649,6 +650,10 @@ async function sendUnguarded(
             } else if (quote.forwarded) {
                 await requireChannel(actor, original.channelId);
                 await history.requireReadable(actor, original.channelId, quote.messageId);
+                // Advanced chat privacy: nothing leaves the conversation.
+                if (await isShielded(original.channelId)) {
+                    throw new ChatRuleError({ key: "errors.privateChatNoForward" });
+                }
                 quoted = quote.messageId;
             }
         }
@@ -2352,6 +2357,8 @@ export async function decorateMessages(
     // and deliberately not given one: chat has no instance-wide override, and a
     // setting about your own words is the last place to introduce the first.
     const mayForward = await allowedBy({ id: actor.id, isAdmin: false }, "forwarding", authorIds);
+    // Conversations with advanced chat privacy on, whose messages go nowhere.
+    const shielded = await shieldedAmong(rows.map((row) => row.channelId));
     // One query for the page, the same shape as the nicknames above: a block is
     // per reader, so it cannot be answered where the messages are.
     const shut = await blockedBy(actor.id, authorIds);
@@ -2548,6 +2555,7 @@ export async function decorateMessages(
             // second copy of exactly what was not to be kept.
             forwardable:
                 row.deletedAt === null &&
+                !shielded.has(row.channelId) &&
                 // Shown to one reader only; the server refuses passing it on too.
                 !isEphemeral(row.audience) &&
                 (row.authorId === null || mayForward.has(row.authorId)) &&

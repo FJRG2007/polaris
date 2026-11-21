@@ -54,6 +54,7 @@ function shaped(room: Room) {
         membersMayInvite: false,
         membersMayMention: false,
         membersMaySend: true,
+        advancedPrivacy: false,
         slowmode: 0,
         userLimit: 0,
         contentMode: "all",

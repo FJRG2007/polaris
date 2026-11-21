@@ -35,6 +35,7 @@ const row = (id: string, spaceId: string | null, kind: string, members: string[]
     membersMayInvite: false,
     membersMayMention: false,
     membersMaySend: true,
+    advancedPrivacy: false,
     slowmode: 0,
     userLimit: 0,
     members: members.map((userId) => ({ userId, user: { name: userId } }))

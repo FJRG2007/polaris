@@ -105,6 +105,7 @@ const group = {
     membersMayMention: true,
     membersMaySend: true,
     maySend: true,
+    advancedPrivacy: false,
     mayMentionRoom: false,
     slowmode: 0,
     userLimit: 0,
