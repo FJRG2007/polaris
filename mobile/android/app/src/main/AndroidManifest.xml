@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Messages and calls while the app is closed (NoticeService). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- A ringing call opens its answer screen over the lock screen, as a phone call does. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
     <!-- Location for Chat only, asked when somebody shares it; live sharing runs as a location foreground service. -->
@@ -123,6 +125,20 @@
         <!-- Approve or Deny on "Is this you?": reached only from that notification. -->
         <receiver
             android:name=".SignInAnswer"
+            android:exported="false" />
+
+        <!-- A ringing call: its answer screen over the lock screen, and Decline, reached only from the ring. -->
+        <activity
+            android:name=".IncomingCallActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleInstance"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Polaris" />
+
+        <receiver
+            android:name=".CallDecline"
             android:exported="false" />
 
         <activity

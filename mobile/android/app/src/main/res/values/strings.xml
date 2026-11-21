@@ -35,6 +35,9 @@
     <string name="notices_channel_connection">Connection</string>
     <string name="notices_channel_messages">Messages</string>
     <string name="notices_channel_calls">Calls</string>
+    <string name="call_incoming">Polaris call</string>
+    <string name="call_answer">Answer</string>
+    <string name="call_decline">Decline</string>
     <string name="door_widget_label">Door</string>
     <string name="door_widget_description">Open a door from your home screen</string>
     <string name="door_tap">Tap to open</string>

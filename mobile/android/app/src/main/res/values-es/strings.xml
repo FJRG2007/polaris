@@ -33,6 +33,9 @@
     <string name="notices_channel_connection">Conexión</string>
     <string name="notices_channel_messages">Mensajes</string>
     <string name="notices_channel_calls">Llamadas</string>
+    <string name="call_incoming">Llamada de Polaris</string>
+    <string name="call_answer">Contestar</string>
+    <string name="call_decline">Rechazar</string>
     <string name="door_widget_label">Puerta</string>
     <string name="door_widget_description">Abre una puerta desde la pantalla de inicio</string>
     <string name="door_tap">Toca para abrir</string>

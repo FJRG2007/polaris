@@ -34,7 +34,6 @@ import org.json.JSONObject;
 public final class NoticeService extends Service {
     private static final String CONNECTION = "connection";
     private static final String MESSAGES = "messages";
-    private static final String CALLS = "calls";
     static final String SIGN_IN = "sign_in";
     private static final int RUNNING_ID = 1;
     static final int NOTICE_ID = 2;
@@ -99,7 +98,7 @@ public final class NoticeService extends Service {
         connection.setShowBadge(false);
         manager.createNotificationChannel(connection);
         manager.createNotificationChannel(new NotificationChannel(MESSAGES, getString(R.string.notices_channel_messages), NotificationManager.IMPORTANCE_HIGH));
-        manager.createNotificationChannel(new NotificationChannel(CALLS, getString(R.string.notices_channel_calls), NotificationManager.IMPORTANCE_HIGH));
+        IncomingCall.channel(this);
         manager.createNotificationChannel(new NotificationChannel(SIGN_IN, getString(R.string.notices_channel_sign_in), NotificationManager.IMPORTANCE_HIGH));
     }
 
@@ -166,7 +165,11 @@ public final class NoticeService extends Service {
             String kind = notice.optString("kind");
             String tag = notice.optString("tag");
             NotificationManager manager = getSystemService(NotificationManager.class);
-            if ("call-ended".equals(kind) || "sign-in-ended".equals(kind)) {
+            if ("call-ended".equals(kind)) {
+                IncomingCall.stop(this, tag);
+                return;
+            }
+            if ("sign-in-ended".equals(kind)) {
                 manager.cancel(tag, NOTICE_ID);
                 return;
             }
@@ -179,7 +182,17 @@ public final class NoticeService extends Service {
             if (pageVisible) return;
             String path = notice.optString("path", "/");
             if (!path.startsWith("/")) path = "/";
-            Notification.Builder built = new Notification.Builder(this, "call".equals(kind) ? CALLS : MESSAGES)
+            if ("call".equals(kind)) {
+                // Rung like a phone call. An instance too old to name the call sends neither field; its ring is the
+                // plain notification below, on the same channel.
+                String meetingId = notice.optString("meetingId");
+                String caller = notice.optString("caller", notice.optString("title"));
+                if (IncomingCall.validMeeting(meetingId) && !tag.isEmpty()) {
+                    IncomingCall.ring(this, origin, tag, path, meetingId, caller);
+                    return;
+                }
+            }
+            Notification.Builder built = new Notification.Builder(this, "call".equals(kind) ? IncomingCall.CHANNEL : MESSAGES)
                     .setSmallIcon(R.drawable.ic_notification)
                     .setContentTitle(notice.optString("title"))
                     .setAutoCancel(true)
