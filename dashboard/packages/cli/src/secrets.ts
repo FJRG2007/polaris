@@ -291,7 +291,7 @@ export function secrets(host: Host, dir: string, run: Runner = spawnRunner): Sec
         async save(account, token) {
             if (!TOKEN_SHAPE.test(token)) {
                 throw new CliError(
-                    "Polaris answered with a credential this CLI does not recognise. Run plr cli update, then plr login."
+                    "Polaris answered with a credential this CLI does not recognise. Run plr update, then plr login."
                 );
             }
             if (keychain && (await keychain.set(account, token).catch(() => false))) {

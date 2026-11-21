@@ -119,7 +119,7 @@ describe("changing", () => {
         });
         const { context, stdout } = await testContext({ fetch, env });
         await expect(run(["build-log", "d2", "--follow"], context, clean)).rejects.toThrow(
-            /too old.*plr cli update/
+            /too old.*plr update/
         );
         expect(stdout()).not.toContain("step 1");
     });

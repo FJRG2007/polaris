@@ -249,7 +249,11 @@ type Target = readonly [noun: string, verb?: string];
 export const SHORTCUTS: Readonly<Record<string, Target>> = {
     login: ["auth", "login"],
     logout: ["auth", "logout"],
-    run: ["session", "run"]
+    run: ["session", "run"],
+    // What somebody types to look after the CLI itself. `plr cli update` is the
+    // same command and keeps working; the short one is the name to say.
+    update: ["cli", "update"],
+    uninstall: ["cli", "uninstall"]
 };
 
 /** The names before `plr <noun> <verb>`. Hidden from the help; they keep working. */
@@ -264,9 +268,7 @@ export const DEPRECATED: Readonly<Record<string, Target>> = {
     "build-log": ["deployment", "logs"],
     logs: ["service", "logs"],
     restart: ["service", "restart"],
-    open: ["dashboard", "open"],
-    update: ["cli", "update"],
-    uninstall: ["cli", "uninstall"]
+    open: ["dashboard", "open"]
 };
 
 /**

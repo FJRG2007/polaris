@@ -104,11 +104,11 @@ export async function status(context: Context, flags: Flags): Promise<void> {
     const ui = await fancy(context, flags);
     if (ui) {
         ui.note(lines.join("\n"), "plr status");
-        if (report.cli.updateAvailable) ui.warn("A newer CLI is out. Run plr cli update.");
+        if (report.cli.updateAvailable) ui.warn("A newer CLI is out. Run plr update.");
         if (report.problem) ui.error(report.problem);
         return;
     }
     for (const each of lines) line(context.io, each);
-    if (report.cli.updateAvailable) line(context.io, "A newer CLI is out. Run plr cli update.");
+    if (report.cli.updateAvailable) line(context.io, "A newer CLI is out. Run plr update.");
     if (report.problem) line(context.io, report.problem);
 }

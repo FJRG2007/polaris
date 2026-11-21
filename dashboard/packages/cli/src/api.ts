@@ -239,7 +239,7 @@ export async function call<Schema extends z.ZodTypeAny>(
     const parsed = schema.safeParse(await response.json().catch(() => undefined));
     if (!parsed.success) {
         throw new CliError(
-            `${connection.url} answered in a shape this CLI does not understand. Check that it is a Polaris address; if it is, run plr cli update.`
+            `${connection.url} answered in a shape this CLI does not understand. Check that it is a Polaris address; if it is, run plr update.`
         );
     }
     return parsed.data;
