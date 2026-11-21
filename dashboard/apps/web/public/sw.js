@@ -7,14 +7,32 @@
  * or tunnel answers on behalf of a Polaris it cannot reach, is answered with a
  * short page saying Polaris is not reachable, and nothing else is touched.
  *
- * Nothing is cached but that page. Every request, page loads included, goes to
- * the network as it always has: a stored copy of a screen or a redirect is how a
- * tab shows yesterday's state, and the login handoff in particular must never be
- * replayed.
+ * Every request, page loads included, goes to the network as it always has: a
+ * stored copy of a screen or a redirect is how a tab shows yesterday's state,
+ * and the login handoff in particular must never be replayed.
+ *
+ * The one exception is the chat, so it opens with no network at all, like a
+ * messenger: a page under /chat that loaded is kept, and used only when the
+ * network cannot answer for it - never in place of an answer. The build's own
+ * scripts and styles it needs are kept with it (their names change with every
+ * build, so a kept one is never stale). No API answer is ever kept, nor a
+ * redirect, and the whole shell is deleted when the account signs out or
+ * changes (`account-switch`), so it never shows one account's page to another.
  */
 
 const CACHE = "polaris-offline-v4";
 const OFFLINE = "/offline.html";
+/* Read by `account-switch`, which deletes it on sign-out and account changes. */
+const SHELL = "polaris-shell-v1";
+
+function isChatPage(url) {
+    return url.pathname === "/chat" || url.pathname.startsWith("/chat/");
+}
+
+function keepable(answer) {
+    const type = (answer.headers.get("content-type") || "").toLowerCase();
+    return answer.ok && !answer.redirected && answer.type === "basic" && type.includes("text/html");
+}
 
 /* The same statuses as `isGatewayFailure` in `@polaris/core/instance-fallback`. */
 function isGatewayFailure(status) {
@@ -27,6 +45,23 @@ function offlinePage(answer) {
         .then(
             (page) => page || answer || new Response("Polaris is not reachable.", { status: 503 })
         );
+}
+
+/** Keeps the newest few hundred build files: every update brings new names, and
+ *  the old ones would otherwise pile up forever. */
+function trimStatic(cache) {
+    return cache.keys().then((keys) => {
+        const files = keys.filter((key) => new URL(key.url).pathname.startsWith("/_next/static/"));
+        return Promise.all(files.slice(0, Math.max(0, files.length - 400)).map((key) => cache.delete(key)));
+    });
+}
+
+/** The chat page as it last loaded here, or the offline page. */
+function keptChat(url, answer) {
+    return caches
+        .open(SHELL)
+        .then((cache) => cache.match(url.pathname).then((kept) => kept || cache.match("/chat")))
+        .then((kept) => kept || offlinePage(answer));
 }
 
 self.addEventListener("install", (event) => {
@@ -44,7 +79,9 @@ self.addEventListener("activate", (event) => {
             .keys()
             .then((names) =>
                 Promise.all(
-                    names.filter((name) => name !== CACHE).map((name) => caches.delete(name))
+                    names
+                        .filter((name) => name !== CACHE && name !== SHELL)
+                        .map((name) => caches.delete(name))
                 )
             )
             .then(() => self.clients.claim())
@@ -52,7 +89,49 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+    const url = new URL(event.request.url);
+    if (url.origin !== self.location.origin || event.request.method !== "GET") return;
+    // A build's scripts and styles, once the chat shell has been kept: their
+    // names are content hashes, so the kept copy is the same file.
+    if (url.pathname.startsWith("/_next/static/")) {
+        event.respondWith(
+            caches.open(SHELL).then((cache) =>
+                cache.match(event.request).then(
+                    (kept) =>
+                        kept ||
+                        fetch(event.request).then((answer) => {
+                            if (answer.ok && answer.type === "basic") {
+                                cache
+                                    .put(event.request, answer.clone())
+                                    .then(() => trimStatic(cache))
+                                    .catch(() => undefined);
+                            }
+                            return answer;
+                        })
+                )
+            )
+        );
+        return;
+    }
     if (event.request.mode !== "navigate") return;
+    if (isChatPage(url)) {
+        event.respondWith(
+            fetch(event.request)
+                .then((answer) => {
+                    if (keepable(answer)) {
+                        const copy = answer.clone();
+                        caches
+                            .open(SHELL)
+                            .then((cache) => cache.put(url.pathname, copy))
+                            .catch(() => undefined);
+                        return answer;
+                    }
+                    return isGatewayFailure(answer.status) ? keptChat(url, answer) : answer;
+                })
+                .catch(() => keptChat(url))
+        );
+        return;
+    }
     event.respondWith(
         fetch(event.request)
             .then((answer) => (isGatewayFailure(answer.status) ? offlinePage(answer) : answer))

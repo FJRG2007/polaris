@@ -12,6 +12,7 @@ import { isGatewayFailure } from "@polaris/core/instance-fallback";
 import manifest from "../../src/app/manifest";
 
 const worker = readFileSync(new URL("../../public/sw.js", import.meta.url), "utf8");
+const workerSource = worker;
 
 describe("the manifest", () => {
     it("opens Polaris in a window of its own, through the address that picks the start", () => {
@@ -29,39 +30,104 @@ describe("the manifest", () => {
 });
 
 describe("the service worker", () => {
-    it("answers only page loads, and only when they fail", () => {
-        expect(worker).toContain('if (event.request.mode !== "navigate") return;');
-        expect(worker).toMatch(/fetch\(event\.request\)\s*\.then\(/);
-    });
+    const ORIGIN = "https://polaris.test";
+    type Answer = { ok: boolean; status: number; redirected: boolean; type: string; headers: Headers; clone(): Answer };
+    const answer = (status: number, extra: Partial<Answer> = {}, type = "text/html"): Answer => {
+        const made: Answer = {
+            ok: status >= 200 && status < 300,
+            status,
+            redirected: false,
+            type: "basic",
+            headers: new Headers({ "content-type": type }),
+            clone: () => made,
+            ...extra
+        };
+        return made;
+    };
+
+    /** The worker run in a sandbox, with caches that can be looked into. */
+    function boot(network: (url: string) => Promise<Answer>) {
+        const listeners = new Map<string, (event: unknown) => void>();
+        const offline = new Response("offline");
+        const stores = new Map<string, Map<string, unknown>>();
+        const keyOf = (key: string | { url: string }) =>
+            typeof key === "string" ? key : new URL(key.url).pathname;
+        const store = (name: string) => {
+            if (!stores.has(name)) stores.set(name, new Map());
+            const entries = stores.get(name)!;
+            return {
+                match: async (key: string | { url: string }) => entries.get(keyOf(key)),
+                put: async (key: string | { url: string }, value: unknown) => void entries.set(keyOf(key), value),
+                add: async () => undefined,
+                keys: async () => [...entries.keys()].map((path) => ({ url: `${ORIGIN}${path}` })),
+                delete: async (key: { url: string }) => entries.delete(keyOf(key))
+            };
+        };
+        runInNewContext(worker, {
+            self: {
+                location: { origin: ORIGIN },
+                addEventListener: (name: string, handler: (event: unknown) => void) => listeners.set(name, handler)
+            },
+            caches: { match: async () => offline, open: async (name: string) => store(name) },
+            fetch: (request: { url: string }) => network(request.url),
+            Response,
+            URL
+        });
+        const request = async (path: string, mode = "navigate", origin = ORIGIN) => {
+            let answered: Promise<unknown> | undefined;
+            listeners.get("fetch")?.({
+                request: { url: `${origin}${path}`, method: "GET", mode },
+                respondWith: (reply: Promise<unknown>) => (answered = reply)
+            });
+            const value = answered === undefined ? undefined : await answered;
+            // Let the copy the worker files on the side land.
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            return value;
+        };
+        const kept = () => [...(stores.get("polaris-shell-v1")?.keys() ?? [])];
+        return { request, kept, offline };
+    }
 
     it("answers with the offline page exactly when a gateway speaks for a dead Polaris", async () => {
-        const offline = new Response("offline");
-        const navigate = async (status: number) => {
-            const listeners = new Map<string, (event: unknown) => void>();
-            const self = {
-                addEventListener: (name: string, handler: (event: unknown) => void) =>
-                    listeners.set(name, handler)
-            };
-            runInNewContext(worker, {
-                self,
-                caches: { match: async () => offline },
-                fetch: async () => new Response(null, { status }),
-                Response
-            });
-            let answered: Promise<Response> | undefined;
-            listeners.get("fetch")?.({
-                request: { mode: "navigate" },
-                respondWith: (reply: Promise<Response>) => (answered = reply)
-            });
-            return (await answered) === offline;
-        };
         for (const status of [200, 401, 404, 500, 501, 502, 503, 504, 505, 519, 520, 530, 531]) {
-            expect(await navigate(status), `status ${status}`).toBe(isGatewayFailure(status));
+            const worker = boot(async () => answer(status));
+            expect((await worker.request("/home")) === worker.offline, `status ${status}`).toBe(
+                isGatewayFailure(status)
+            );
+            expect(worker.kept(), `status ${status}`).toEqual([]);
         }
     });
 
-    it("stores nothing but the offline page", () => {
-        expect(worker.match(/cache\.(add|put|addAll)\(/g)).toEqual(["cache.add("]);
-        expect(worker).toContain('const OFFLINE = "/offline.html";');
+    it("keeps a chat page that loaded, and uses it only when the network cannot answer", async () => {
+        let online = true;
+        const page = answer(200);
+        const worker = boot(async () => {
+            if (!online) throw new TypeError("offline");
+            return page;
+        });
+        expect(await worker.request("/chat/c/1")).toBe(page);
+        expect(worker.kept()).toEqual(["/chat/c/1"]);
+        online = false;
+        expect(await worker.request("/chat/c/1")).toBe(page);
+        expect(await worker.request("/home")).toBe(worker.offline);
+    });
+
+    it("never keeps a redirect, a refusal, an API answer or another origin's", async () => {
+        const worker = boot(async (url) =>
+            url.includes("/api/") ? answer(200, {}, "application/json") : url.endsWith("/r") ? answer(200, { redirected: true }) : answer(401)
+        );
+        await worker.request("/chat/r");
+        await worker.request("/chat");
+        expect(await worker.request("/api/chat/lists", "cors")).toBeUndefined();
+        expect(await worker.request("/chat", "navigate", "https://elsewhere.test")).toBeUndefined();
+        expect(worker.kept()).toEqual([]);
+    });
+
+    it("keeps a build's files, which never change under their name, and nothing else", async () => {
+        const worker = boot(async () => answer(200, {}, "text/javascript"));
+        await worker.request("/_next/static/chunks/app.js", "no-cors");
+        await worker.request("/favicon.ico", "no-cors");
+        expect(worker.kept()).toEqual(["/_next/static/chunks/app.js"]);
+        expect(workerSource.match(/\.put\(/g)?.length).toBe(2);
     });
 });

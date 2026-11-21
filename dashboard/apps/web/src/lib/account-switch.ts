@@ -62,6 +62,8 @@ export async function forgetAccountTraces(): Promise<void> {
     }
     await dropMailCache().catch(() => undefined);
     await dropChatStore().catch(() => undefined);
+    // The chat pages the service worker kept to open offline (`public/sw.js`).
+    await globalThis.caches?.delete("polaris-shell-v1").catch(() => undefined);
 }
 
 const ACCOUNT_KEYS: ReadonlySet<string> = new Set([
