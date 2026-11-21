@@ -148,7 +148,7 @@
         },
         "sv_enforceGameBuild": {
             "label": "Game build",
-            "hint": "Pins every player to one GTA update, for resources that need a particular one. Blank is the newest."
+            "hint": "Pins every player to one GTA update, for resources that need a particular one. Blank is the latest."
         },
         "sv_scriptHookAllowed": {
             "label": "Allow ScriptHook mods",

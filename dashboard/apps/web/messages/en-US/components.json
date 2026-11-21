@@ -1368,7 +1368,7 @@
         "checking": "Checking...",
         "restart": "Restart to update",
         "check": {
-            "current": "Polaris {version} is the newest version.",
+            "current": "Polaris {version} is the latest version.",
             "downloading": "Downloading Polaris {version}. It installs by itself.",
             "ready": "Polaris {version} is installed. Restart to use it.",
             "available": "Polaris {version} is out. Download it from this page.",

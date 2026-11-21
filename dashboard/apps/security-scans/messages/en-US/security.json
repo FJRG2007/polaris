@@ -210,7 +210,7 @@
         "fixNone": "None has a fix yet."
     },
     "next": {
-        "updateApp": "Update {app} to its newest version, then scan again.",
+        "updateApp": "Update {app} to its latest version, then scan again.",
         "updatePolaris": "Update Polaris from Settings, then scan again.",
         "updateImage": "Run a newer version of this image, then scan again.",
         "updateDeps": "Update these dependencies in the repository, then deploy again.",

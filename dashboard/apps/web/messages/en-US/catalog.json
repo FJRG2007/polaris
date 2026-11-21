@@ -163,7 +163,7 @@
     "help": {
         "minecraft": {
             "TYPE": "Paper runs plugins and is faster than vanilla. Fabric, Forge and NeoForge run mods.",
-            "VERSION": "LATEST tracks the newest release. Pin one (1.21.4) to keep clients and mods matched.",
+            "VERSION": "LATEST tracks the latest release. Pin one (1.21.4) to keep clients and mods matched.",
             "PAUSE_WHEN_EMPTY_SECONDS": "Seconds with nobody on before the server stops ticking. It keeps its address and comes back the moment somebody joins, so nobody has to start it again. Zero never pauses. Minecraft 1.21.2 and later.",
             "MEMORY": "JVM heap, with a unit: 2G or 2048M. Leave the machine at least a gigabyte for itself.",
             "MOTD": "The line under the server name in the multiplayer list.",
@@ -183,7 +183,7 @@
             "ALLOW_FLIGHT": "Off kicks anybody the game thinks is floating. Turn it on for modded servers: jetpacks, lag and mod blocks set it off."
         },
         "minecraft-bedrock": {
-            "VERSION": "LATEST tracks the newest release.",
+            "VERSION": "LATEST tracks the latest release.",
             "SERVER_NAME": "Shown in the friends and servers list.",
             "LEVEL_SEED": "Blank generates a random world. Only applies before the world is created.",
             "ALLOW_LIST": "On means only players on the allow list can join.",

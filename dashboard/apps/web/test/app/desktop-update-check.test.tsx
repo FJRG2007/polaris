@@ -82,7 +82,7 @@ describe("Check for updates on the Desktop app page", () => {
             fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
         });
         expect(checkForUpdates).toHaveBeenCalledOnce();
-        expect(screen.getByRole("status").textContent).toContain("0.1.14 is the newest version");
+        expect(screen.getByRole("status").textContent).toContain("0.1.14 is the latest version");
         expect(screen.queryByRole("button", { name: "Restart to update" })).toBeNull();
     });
 

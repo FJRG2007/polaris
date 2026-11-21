@@ -2010,7 +2010,7 @@
         },
         "updates": {
             "title": "Connected TVs",
-            "latest": "Newest version: {version}",
+            "latest": "Latest version: {version}",
             "noRelease": "No TV update is published yet.",
             "empty": "No TV is connected to your account.",
             "updateAll": "Update all TVs",

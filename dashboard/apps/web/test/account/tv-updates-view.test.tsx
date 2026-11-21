@@ -70,7 +70,7 @@ describe("the rows", () => {
     it("names the version a TV runs and the newest one", () => {
         const markup = draw([tv()], "3.5");
         expect(markup).toContain("Runs 3.4");
-        expect(markup).toContain("Newest version: 3.5");
+        expect(markup).toContain("Latest version: 3.5");
         expect(markup).toContain(">Update now<");
     });
 

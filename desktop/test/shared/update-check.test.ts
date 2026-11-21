@@ -7,7 +7,7 @@ import { describeUpdateCheck, readUpdateCheck } from "@/shared/update-check";
 
 describe("update check", () => {
     it("says each outcome in words", () => {
-        expect(describeUpdateCheck({ kind: "current", version: "0.1.13" })).toBe("Polaris 0.1.13 is the newest version.");
+        expect(describeUpdateCheck({ kind: "current", version: "0.1.13" })).toBe("Polaris 0.1.13 is the latest version.");
         expect(describeUpdateCheck({ kind: "downloading", version: "0.1.14" })).toContain("Downloading Polaris 0.1.14");
         expect(describeUpdateCheck({ kind: "ready", version: "0.1.14" })).toContain("Restart Polaris");
         expect(describeUpdateCheck({ kind: "available", version: "0.1.14" })).toContain("open its download page");

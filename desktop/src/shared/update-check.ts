@@ -34,7 +34,7 @@ export function readUpdateCheck(raw: unknown): UpdateCheck {
 export function describeUpdateCheck(check: UpdateCheck): string {
     switch (check.kind) {
         case "current":
-            return `Polaris ${check.version} is the newest version.`;
+            return `Polaris ${check.version} is the latest version.`;
         case "downloading":
             return `Downloading Polaris ${check.version}. It installs by itself; you can keep working.`;
         case "ready":
