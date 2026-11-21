@@ -281,12 +281,12 @@ export function TileMap({
                             <span aria-hidden className="absolute -left-px -top-6 h-6 w-0.5 rounded-full bg-neutral-500" />
                             <span
                                 aria-hidden
-                                className="absolute -left-2 -top-9 size-4 rounded-full border border-red-700/40 bg-red-500 shadow"
+                                className="absolute -left-2 -top-9 size-4 rounded-full border border-red-800 bg-red-500 shadow"
                             />
                             {point.live ? (
                                 <span
                                     aria-hidden
-                                    className="absolute -left-2 -top-2 size-4 animate-ping rounded-full bg-emerald-500/50"
+                                    className="absolute -left-2 -top-2 size-4 animate-ping rounded-full bg-emerald-500 opacity-50"
                                 />
                             ) : null}
                             <span className="absolute bottom-11 left-0 flex w-max max-w-[min(18rem,80vw)] -translate-x-1/2 flex-col items-center">
