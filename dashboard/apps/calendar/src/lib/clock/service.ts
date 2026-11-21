@@ -21,6 +21,7 @@ import { isKnownZone } from "../schemas";
 import { CalendarRefusal } from "../errors";
 import { calendarTFor, type CalendarTranslator } from "../i18n";
 import * as model from "./model";
+import { clockChanged } from "./live";
 
 /** A ring due longer ago than this - the server was down through it - is moved
  *  on without telling anybody: "your alarm rang at 07:00" at noon helps nobody. */
@@ -189,6 +190,7 @@ export async function saveAlarm(
         if ((await prisma.clockAlarm.count({ where: { userId } })) >= model.MAX_ALARMS)
             await refusal(userId, "time.errors.tooManyAlarms");
         await prisma.clockAlarm.create({ data: { userId, ...data } });
+        clockChanged(userId);
         return;
     }
     const before = await prisma.clockAlarm.findFirst({
@@ -198,6 +200,7 @@ export async function saveAlarm(
     const changed = await prisma.clockAlarm.updateMany({ where: { id, userId }, data });
     if (changed.count === 0) await refusal(userId, "time.errors.gone");
     await answerRinging(userId, id, before?.nextFireAt ?? null, now);
+    clockChanged(userId);
 }
 
 /** Turn an alarm on or off. On, it rings at its next time from now. */
@@ -221,10 +224,12 @@ export async function setAlarmEnabled(
         }
     });
     await answerRinging(userId, id, alarm.nextFireAt, now);
+    clockChanged(userId);
 }
 
 export async function deleteAlarm(userId: string, id: string): Promise<void> {
-    await prisma.clockAlarm.deleteMany({ where: { id, userId } });
+    const removed = await prisma.clockAlarm.deleteMany({ where: { id, userId } });
+    if (removed.count > 0) clockChanged(userId);
 }
 
 /**
@@ -299,6 +304,7 @@ export async function dismissAlarm(
     const alarm = await ownAlarm(userId, id);
     if (alarm.nextFireAt?.getTime() === due.getTime()) await passRing(alarm, due, now);
     await noteStopped("alarm", userId, id, due);
+    clockChanged(userId);
 }
 
 /** Skip the next ring of an alarm that is on, keeping the ones after it. */
@@ -307,6 +313,7 @@ export async function skipAlarm(userId: string, id: string, now = new Date()): P
     if (!alarm.enabled || !alarm.nextFireAt) return;
     await passRing(alarm, alarm.nextFireAt, now);
     await answerRinging(userId, id, alarm.nextFireAt, now);
+    clockChanged(userId);
 }
 
 /** Ring again in the alarm's snooze length from now. Snoozing a ring that has
@@ -329,6 +336,7 @@ export async function snoozeAlarm(
             ...(due ? { stoppedDue: due } : {})
         }
     });
+    clockChanged(userId);
 }
 
 // ---------------------------------------------------------------------------
@@ -346,11 +354,12 @@ async function ownTimer(userId: string, id: string): Promise<TimerRow> {
 /** The deck action that shows these timers on a Stream Deck or in Companion. */
 const DECK_TIMER = "calendar.timer";
 
-/** Tell this account's decks that a timer moved, so their keys show it within
- *  a second instead of on their next reading. Best effort: a timer change
- *  never fails because of it, and a dashboard without live decks has nobody
- *  to tell. */
+/** Tell this account's decks - and its open Time screens - that a timer
+ *  moved, so their keys show it within a second instead of on their next
+ *  reading. Best effort: a timer change never fails because of it, and a
+ *  dashboard without live decks has nobody to tell. */
 function tellDecks(userId: string): void {
+    clockChanged(userId);
     try {
         void host.deckLive.deckChanged(userId, [DECK_TIMER]).catch(() => undefined);
     } catch {
@@ -607,6 +616,7 @@ export async function changeStopwatch(
         await prisma.clockStopwatch.create({
             data: { userId, startedAt: null, elapsedMs: 0, laps: "[]", ...data }
         });
+        clockChanged(userId);
         return;
     }
     // Conditional on the row this read, so two devices pressing at once cannot
@@ -616,6 +626,7 @@ export async function changeStopwatch(
         data
     });
     if (changed.count === 0) await refusal(userId, "time.errors.changed");
+    clockChanged(userId);
 }
 
 // ---------------------------------------------------------------------------
@@ -657,6 +668,7 @@ export async function addLane(userId: string, label: string): Promise<string> {
         data: { userId, label, startedAt: null, elapsedMs: 0, laps: "[]" },
         select: { id: true }
     });
+    clockChanged(userId);
     return row.id;
 }
 
@@ -666,6 +678,7 @@ export async function renameLane(userId: string, id: string, label: string): Pro
         data: { label }
     });
     if (changed.count === 0) await refusal(userId, "time.errors.gone");
+    clockChanged(userId);
 }
 
 /** The write a change makes to one lane at `now`, or null when it is a no-op. */
@@ -692,7 +705,8 @@ export async function changeLane(
     now = new Date()
 ): Promise<void> {
     if (change === "delete") {
-        await prisma.clockStopwatchLane.deleteMany({ where: { id, userId } });
+        const removed = await prisma.clockStopwatchLane.deleteMany({ where: { id, userId } });
+        if (removed.count > 0) clockChanged(userId);
         return;
     }
     const lane = await prisma.clockStopwatchLane.findFirst({
@@ -708,6 +722,7 @@ export async function changeLane(
         data
     });
     if (changed.count === 0) await refusal(userId, "time.errors.changed");
+    clockChanged(userId);
 }
 
 /**
@@ -725,6 +740,7 @@ export async function changeAllLanes(
             where: { userId, startedAt: null },
             data: { startedAt: now }
         });
+        clockChanged(userId);
         return;
     }
     if (change === "reset") {
@@ -732,6 +748,7 @@ export async function changeAllLanes(
             where: { userId },
             data: { startedAt: null, elapsedMs: 0, laps: "[]" }
         });
+        clockChanged(userId);
         return;
     }
     const running = await prisma.clockStopwatchLane.findMany({
@@ -751,6 +768,7 @@ export async function changeAllLanes(
             })
         )
     );
+    clockChanged(userId);
 }
 
 // ---------------------------------------------------------------------------
@@ -759,6 +777,7 @@ export async function changeAllLanes(
 export async function renameAlarm(userId: string, id: string, label: string): Promise<void> {
     const changed = await prisma.clockAlarm.updateMany({ where: { id, userId }, data: { label } });
     if (changed.count === 0) await refusal(userId, "time.errors.gone");
+    clockChanged(userId);
 }
 
 /** An alarm's copy for `owner`, switched off: two alarms ringing at the same
@@ -798,6 +817,7 @@ export async function duplicateAlarm(userId: string, id: string): Promise<void> 
     if ((await prisma.clockAlarm.count({ where: { userId } })) >= model.MAX_ALARMS)
         await refusal(userId, "time.errors.tooManyAlarms");
     await prisma.clockAlarm.create({ data: alarmCopy(userId, alarm, alarm.zone) });
+    clockChanged(userId);
 }
 
 export async function duplicateTimer(userId: string, id: string): Promise<void> {
@@ -874,6 +894,7 @@ export async function sendCopy(
         await prisma.clockAlarm.create({
             data: alarmCopy(to, alarm, await zoneOf(to, alarm.zone))
         });
+        clockChanged(to);
         label = alarm.label || alarm.time;
     } else {
         const timer = await ownTimer(actor.id, id);
@@ -944,6 +965,7 @@ export async function fireDueClocks(now = new Date()): Promise<{ rung: number; l
     for (const alarm of alarms) {
         const due = alarm.nextFireAt!;
         if (!(await passRing(alarm, due, now))) continue;
+        clockChanged(alarm.userId);
         if (now.getTime() - due.getTime() > STALE_MS) {
             late += 1;
             continue;
