@@ -255,6 +255,17 @@ Fuente: [docs/drive-roadmap.md](drive-roadmap.md)
   por archivo. Los clientes móviles, la federación y las carpetas cifradas de
   extremo a extremo siguen en P2.
 
+### Servidores de juegos
+
+Fuente: [docs/game-servers-roadmap.md](game-servers-roadmap.md)
+
+- **Hecho:** el anti-cheat de Polaris en Paper y familia desde 1.17 y en
+  NeoForge 1.21.4; donde funciona se encarga del control de vuelo del juego.
+- **En curso:** el anti-cheat en Forge, para todas las versiones con jugadores.
+- **Después:** el resto de versiones de NeoForge, Fabric y Quilt, y Paper antes
+  de 1.17, para que funcione igual sea cual sea el servidor, sin configurar nada.
+- **No previsto:** Bedrock.
+
 ### Correo
 
 Fuente: [docs/mail-roadmap.md](mail-roadmap.md)

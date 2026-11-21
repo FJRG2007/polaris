@@ -234,6 +234,18 @@ Source: [docs/drive-roadmap.md](drive-roadmap.md)
 - **Not planned:** a mirrored file index and a database row per file. Mobile
   clients, federation and end-to-end encrypted folders stay P2.
 
+### Game servers
+
+Source: [docs/game-servers-roadmap.md](game-servers-roadmap.md)
+
+- **Done:** Polaris's anti-cheat on Paper and its family from 1.17, and on
+  NeoForge 1.21.4; where it runs it takes over the game's flight check.
+- **In progress:** the anti-cheat on Forge, for every release with a real
+  player base.
+- **Next:** NeoForge's other releases, Fabric and Quilt, and Paper before 1.17,
+  so it runs the same whatever the server is, with nothing to set up.
+- **Not planned:** Bedrock.
+
 ### Mail
 
 Source: [docs/mail-roadmap.md](mail-roadmap.md)
