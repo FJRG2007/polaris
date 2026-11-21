@@ -16,6 +16,8 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 type Message = { id: string; role: string; parts: Array<{ type: string; text?: string }> };
 
 const chats = new Map<string, Message[]>();
+/** What the account's "Reopen the last chat" answers. */
+let reopenSetting = true;
 
 vi.mock("@ai-sdk/react", async () => {
     const { useState } = await import("react");
@@ -85,6 +87,7 @@ function memoryStorage(): Storage {
 
 beforeEach(() => {
     chats.clear();
+    reopenSetting = true;
     vi.stubGlobal("localStorage", memoryStorage());
     vi.stubGlobal("sessionStorage", memoryStorage());
     vi.stubGlobal(
@@ -93,7 +96,7 @@ beforeEach(() => {
             if (url === "/api/polar/models") {
                 return Response.json({ providers: PROVIDERS, tools: {}, isAdmin: false });
             }
-            if (url === "/api/polar/preferences") return Response.json({ reopenLastChat: true });
+            if (url === "/api/polar/preferences") return Response.json({ reopenLastChat: reopenSetting });
             if (url === "/api/polar/threads") {
                 return Response.json({
                     threads: [{ id: "t-panel", title: "Panel chat", updatedAt: "2026-10-19T00:00:00Z" }]
@@ -116,7 +119,7 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-const { PolarChat, rememberedThread } = await import("@/components/polar/polar-panel");
+const { PolarChat, rememberedThread, resetReloadForTests } = await import("@/components/polar/polar-panel");
 const { polarDisplayStore } = await import("@/components/polar/polar-display");
 
 describe("the side panel opened again", () => {
@@ -141,6 +144,27 @@ describe("the side panel opened again", () => {
         expect(
             vi.mocked(fetch).mock.calls.some(([url]) => url === "/api/polar/threads/t-page")
         ).toBe(false);
+    });
+
+    // Reported: with "Reopen the last chat" off, the panel opened after a reload
+    // showed the old chat, and closed and opened again showed a new, empty one.
+    it("stays on the chat it came back to after a reload, with the setting off", async () => {
+        reopenSetting = false;
+        await polarDisplayStore.load();
+        polarDisplayStore.set({ ...polarDisplayStore.get(), reopenLastChat: false });
+        window.localStorage.setItem("polar.thread", "t-panel");
+        resetReloadForTests();
+        vi.spyOn(performance, "getEntriesByType").mockReturnValue([
+            { type: "reload" } as unknown as PerformanceEntry
+        ]);
+
+        const first = render(<PolarChat />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText("Asked in the side panel")).toBeTruthy();
+        await waitFor(() => expect(window.sessionStorage.getItem("polar.thread")).toBe("t-panel"));
+        first.unmount();
+
+        render(<PolarChat />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText("Asked in the side panel")).toBeTruthy();
     });
 
     it("falls back to the browser's chat in a tab that has none of its own", () => {

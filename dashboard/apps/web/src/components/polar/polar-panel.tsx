@@ -1445,9 +1445,10 @@ export function PolarChat({
     // chat picked beside the settings) opens once, and the address goes back
     // to plain /polar; `new` starts one, in the project it names if any, and
     // `session` opens a Code session (`new` for a new task).
-    // Otherwise a reload stays on the chat it was on, and opening Polar starts
-    // a new chat unless the person asked for the last one back; a scoped chat
-    // (a document's own) always comes back, since it belongs to that place.
+    // Otherwise a reload, or Polar opened again in the same tab, stays on the
+    // chat it was on, and a new visit starts a new chat unless the person asked
+    // for the last one back; a scoped chat (a document's own) always comes
+    // back, since it belongs to that place.
     useEffect(() => {
         const params = fullPage ? new URLSearchParams(window.location.search) : null;
         const named = params?.get("thread") ?? null;
@@ -1491,7 +1492,10 @@ export function PolarChat({
             return;
         }
         const keep = chatScope || reloaded() || polarDisplayStore.get().reopenLastChat;
-        const reopen = named ?? (keep ? rememberedThread(threadKey) : null);
+        // The setting decides how a new visit starts. Within this tab - the panel
+        // closed and opened again, /polar left and come back to - Polar stays on
+        // the chat it was last in, unless a new one was asked for (kept empty).
+        const reopen = named ?? (keep ? rememberedThread(threadKey) : readStored(threadKey, "session"));
         if (reopen) {
             void openThread(reopen, named !== null || session === null).finally(() =>
                 setReopened(true)

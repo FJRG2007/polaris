@@ -824,6 +824,14 @@ describe("opening Polar again", () => {
             removeItem: (key: string) => void kept.delete(key),
             clear: () => kept.clear()
         });
+        // This tab's own: empty, as a new tab's is.
+        const tab = new Map<string, string>();
+        vi.stubGlobal("sessionStorage", {
+            getItem: (key: string) => tab.get(key) ?? null,
+            setItem: (key: string, value: string) => void tab.set(key, value),
+            removeItem: (key: string) => void tab.delete(key),
+            clear: () => tab.clear()
+        });
         storedThread = {
             id: "t-old",
             messages: [
@@ -851,12 +859,19 @@ describe("opening Polar again", () => {
         await waitFor(() => expect(opened()).toBe(true));
     });
 
-    it("starts on a new chat when opened again after a reload", async () => {
-        loadedBy("reload");
+    // Opened again after a reload, see panel-reopen.test.tsx.
+    it("comes back to the chat this tab was in, with the setting off", async () => {
+        window.sessionStorage.setItem("polar.thread", "t-old");
         mount();
         await waitFor(() => expect(opened()).toBe(true));
+    });
+
+    it("stays on a new chat this tab asked for, whatever the setting", async () => {
+        window.sessionStorage.setItem("polar.thread", "");
+        mount();
+        await ready();
         cleanup();
-        vi.mocked(globalThis.fetch as ReturnType<typeof vi.fn>).mockClear();
+        polarDisplayStore.set({ ...polarDisplayStore.get(), reopenLastChat: true });
         mount();
         await ready();
         expect(opened()).toBe(false);
