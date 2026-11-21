@@ -56,7 +56,7 @@ public final class ServerActivity extends Activity {
                 return;
             }
             ServerStore.importHosts(this, list);
-            MainActivity.reopen(this);
+            HomeActivity.reopen(this);
             finish();
             return;
         }
@@ -75,7 +75,7 @@ public final class ServerActivity extends Activity {
                 setBusy(false);
                 if (verdict == ServerProbe.Verdict.POLARIS) {
                     ServerStore.add(this, origin);
-                    MainActivity.reopen(this);
+                    HomeActivity.reopen(this);
                     finish();
                 } else {
                     show(getString(reason(verdict)));

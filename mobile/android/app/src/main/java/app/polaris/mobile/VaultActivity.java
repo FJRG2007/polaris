@@ -167,7 +167,7 @@ public final class VaultActivity extends VaultAuthActivity {
         String code = Vault.userCode();
         if (origin == null || code == null) return;
         startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(origin + "/vault/authorize?code=" + Uri.encode(code)),
-                this, MainActivity.class));
+                this, HomeActivity.class));
     }
 
     private void seal() {

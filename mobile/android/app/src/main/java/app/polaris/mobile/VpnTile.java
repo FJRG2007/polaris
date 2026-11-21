@@ -85,7 +85,7 @@ public final class VpnTile extends TileService {
     @SuppressWarnings("deprecation")
     private void openPage() {
         String origin = ServerStore.origin(this);
-        Intent open = new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        Intent open = new Intent(this, HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         if (origin != null) open.setAction(Intent.ACTION_VIEW).setData(Uri.parse(origin + "/vpn"));
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startActivityAndCollapse(PendingIntent.getActivity(this, 0, open,

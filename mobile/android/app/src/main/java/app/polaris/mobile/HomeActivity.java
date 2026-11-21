@@ -51,7 +51,7 @@ import org.json.JSONObject;
  * cannot - the camera and microphone for calls, files picked and saved, the back button, and links to anywhere else
  * opening in the browser instead of inside Polaris.
  */
-public final class MainActivity extends Activity {
+public final class HomeActivity extends Activity {
     private static final int PICK_FILES = 1;
     private static final int MEDIA_PERMISSIONS = 2;
     private static final int CAMERA_FOR_PICK = 3;
@@ -556,7 +556,7 @@ public final class MainActivity extends Activity {
     /** The same, on a page of that Polaris rather than its start. */
     static void reopen(Context context, String url) {
         NoticeService.restart(context);
-        Intent intent = new Intent(context, MainActivity.class)
+        Intent intent = new Intent(context, HomeActivity.class)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         if (url != null) intent.setData(Uri.parse(url));
         context.startActivity(intent);
@@ -587,7 +587,10 @@ public final class MainActivity extends Activity {
     protected void onStop() {
         super.onStop();
         // Leaving the app is when a downloaded update installs itself, so it never closes what the person is doing.
-        if (!isChangingConfigurations()) SelfUpdate.installWhenLeaving(this);
+        if (!isChangingConfigurations()) {
+            SelfUpdate.installWhenLeaving(this);
+            SeasonIcon.applyWhenLeaving(this);
+        }
     }
 
     @Override
@@ -672,7 +675,7 @@ public final class MainActivity extends Activity {
      */
     @android.annotation.TargetApi(34)
     private static final class PredictiveBack {
-        static Object create(MainActivity activity) {
+        static Object create(HomeActivity activity) {
             return new android.window.OnBackAnimationCallback() {
                 private boolean driving;
 

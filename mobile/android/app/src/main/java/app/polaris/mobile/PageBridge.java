@@ -11,9 +11,9 @@ import android.webkit.JavascriptInterface;
  * the page, and the VPN's private key stays in the app.
  */
 final class PageBridge {
-    private final MainActivity activity;
+    private final HomeActivity activity;
 
-    PageBridge(MainActivity activity) {
+    PageBridge(HomeActivity activity) {
         this.activity = activity;
     }
 
@@ -99,6 +99,13 @@ final class PageBridge {
     @JavascriptInterface
     public void protectScreen(boolean on) {
         activity.runOnUiThread(() -> activity.protectScreen(on));
+    }
+
+    /** The season the page decorates with ("winter", "halloween", ...), or "" for none: the launcher icon wears it
+     *  from the next time the person leaves the app (SeasonIcon). */
+    @JavascriptInterface
+    public void setSeasonIcon(String season) {
+        if (season != null && season.length() <= 32) SeasonIcon.remember(activity, season);
     }
 
     /** A link the page opens outside itself. Only the web and mail leave: any other scheme would launch whatever app

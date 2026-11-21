@@ -170,7 +170,7 @@ public final class LiveLocationService extends Service implements LocationListen
         manager.createNotificationChannel(
                 new NotificationChannel(CHANNEL, getString(R.string.live_location_channel), NotificationManager.IMPORTANCE_LOW));
         PendingIntent open = PendingIntent.getActivity(this, 0,
-                new Intent(this, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                new Intent(this, HomeActivity.class).setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         PendingIntent stop = PendingIntent.getService(this, 1,
                 new Intent(this, LiveLocationService.class).setAction(ACTION_STOP),

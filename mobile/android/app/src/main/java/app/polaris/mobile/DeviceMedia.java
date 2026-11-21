@@ -49,16 +49,16 @@ final class DeviceMedia {
     private static final String ASKED = "asked";
     private static final Pattern ID = Pattern.compile("(image|video):(\\d{1,19})");
 
-    private final MainActivity activity;
+    private final HomeActivity activity;
     private final ExecutorService work = Executors.newFixedThreadPool(3);
     /** The page's request waiting on the permission dialog. */
     private String asking;
 
-    DeviceMedia(MainActivity activity) {
+    DeviceMedia(HomeActivity activity) {
         this.activity = activity;
     }
 
-    /** One call from the page; every answer goes back through `MainActivity.mediaAnswer`. Runs on the UI thread. */
+    /** One call from the page; every answer goes back through `HomeActivity.mediaAnswer`. Runs on the UI thread. */
     void call(String id, String op, JSONObject args) {
         switch (op) {
             case "access":

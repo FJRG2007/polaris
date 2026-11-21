@@ -79,7 +79,7 @@ public final class IncomingCallActivity extends Activity {
             return;
         }
         // The page answers from its address (`?answer=1`), the same way the call card on the web does.
-        Intent open = new Intent(this, MainActivity.class)
+        Intent open = new Intent(this, HomeActivity.class)
                 .setAction(Intent.ACTION_VIEW)
                 .setData(Uri.parse(origin + path + "?answer=1"))
                 .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);

@@ -1,0 +1,1 @@
+The app icon dresses up for the season, like the web and desktop apps: a Santa hat at Christmas, a witch's hat at Halloween. It changes after you leave the app, and follows your server's seasonal settings.

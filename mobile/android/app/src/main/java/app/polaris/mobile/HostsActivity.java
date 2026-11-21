@@ -230,10 +230,10 @@ public final class HostsActivity extends Activity {
         ServerStore.Host active = ServerStore.active(this);
         if (active != null && active.id.equals(host.id)) {
             // Already the one open: back to it as it was.
-            startActivity(new Intent(this, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP));
+            startActivity(new Intent(this, HomeActivity.class).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP));
         } else {
             ServerStore.select(this, host.id);
-            MainActivity.reopen(this);
+            HomeActivity.reopen(this);
         }
         finish();
     }
@@ -321,7 +321,7 @@ public final class HostsActivity extends Activity {
                         dialog.dismiss();
                         // The window open now is on the old address: reopen it on the new one.
                         if (current) {
-                            MainActivity.reopen(this);
+                            HomeActivity.reopen(this);
                             finish();
                         } else {
                             draw();
@@ -350,7 +350,7 @@ public final class HostsActivity extends Activity {
             return;
         }
         if (ServerStore.active(this) != null) {
-            MainActivity.reopen(this);
+            HomeActivity.reopen(this);
         } else {
             stopService(new Intent(this, NoticeService.class));
             startActivity(new Intent(this, ServerActivity.class)

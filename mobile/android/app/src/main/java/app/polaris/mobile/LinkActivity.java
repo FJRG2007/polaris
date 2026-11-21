@@ -70,11 +70,11 @@ public final class LinkActivity extends Activity {
             if (!host.origin.equals(page.server)) continue;
             ServerStore.Host active = ServerStore.active(this);
             if (active != null && active.id.equals(host.id)) {
-                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(page.url()), this, MainActivity.class)
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(page.url()), this, HomeActivity.class)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             } else {
                 ServerStore.select(this, host.id);
-                MainActivity.reopen(this, page.url());
+                HomeActivity.reopen(this, page.url());
             }
             finish();
             return;
@@ -97,7 +97,7 @@ public final class LinkActivity extends Activity {
                 if (isFinishing()) return;
                 if (verdict == ServerProbe.Verdict.POLARIS) {
                     ServerStore.add(this, page.server);
-                    MainActivity.reopen(this, page.url());
+                    HomeActivity.reopen(this, page.url());
                 } else {
                     Toast.makeText(this, verdict == ServerProbe.Verdict.UNREACHABLE
                             ? R.string.server_unreachable : R.string.server_not_polaris, Toast.LENGTH_LONG).show();

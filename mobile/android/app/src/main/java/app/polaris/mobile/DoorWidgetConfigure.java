@@ -120,7 +120,7 @@ public final class DoorWidgetConfigure extends Activity {
         Button open = new Button(this);
         open.setText(R.string.door_open_app);
         open.setOnClickListener(view -> {
-            startActivity(new Intent(this, MainActivity.class).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            startActivity(new Intent(this, HomeActivity.class).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
             finish();
         });
         list.addView(open, new LinearLayout.LayoutParams(-1, -2));

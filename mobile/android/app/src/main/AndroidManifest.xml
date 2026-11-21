@@ -50,19 +50,79 @@
         android:theme="@style/Theme.Polaris"
         android:usesCleartextTraffic="true">
 
-        <!-- configChanges: turning the phone keeps the page, a call and a half-typed message as they are. -->
+        <!-- configChanges: turning the phone keeps the page, a call and a half-typed message as they are. Opened from
+             the launcher through one of the entries below, never directly. -->
         <activity
-            android:name=".MainActivity"
+            android:name=".HomeActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
             android:exported="true"
             android:launchMode="singleTask"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- The launcher entry with the plain icon. Keeps the name the app's only screen had, so a home-screen icon
+             placed before the seasonal ones existed still opens the app. Exactly one entry is on (SeasonIcon). -->
+        <activity-alias
+            android:name=".MainActivity"
+            android:enabled="true"
+            android:exported="true"
+            android:targetActivity=".HomeActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
-        </activity>
+        </activity-alias>
+
+        <!-- The same entry in each season's dress, off until the page names that season (SeasonIcon). Icons generated
+             by mobile/scripts/season-icons.mjs. -->
+        <activity-alias
+            android:name=".SeasonHalloween"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_halloween"
+            android:targetActivity=".HomeActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".SeasonWinter"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_winter"
+            android:targetActivity=".HomeActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".SeasonNewYear"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_new_year"
+            android:targetActivity=".HomeActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias
+            android:name=".SeasonLunarNewYear"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_lunar_new_year"
+            android:targetActivity=".HomeActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
 
         <!-- configChanges on every screen: turning or unfolding the phone never restarts one, so an address being
              typed, a check in flight and a photo seen once (which cannot be fetched twice) all survive it. -->
