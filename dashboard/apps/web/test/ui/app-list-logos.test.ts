@@ -25,6 +25,7 @@ const MARKS = /\b(PolarisAppIcon|AppLogo|AppMark|ProductMark)\b/;
 
 const EXEMPT: Readonly<Record<string, string>> = {
     "apps/web/src/app/(app)/app-lock/page.tsx": "names the one locked app in a heading, not a list",
+    "apps/web/src/app/(app)/chat/author-face.tsx": "takes one app's icon for an automated author's face, not a list",
     "apps/web/src/components/app-nav.tsx": "hands the apps to the switcher in @polaris/ui, which draws AppLogo",
     "apps/web/src/components/account-sheet.tsx": "names the one account app as a group heading, not a list"
 };

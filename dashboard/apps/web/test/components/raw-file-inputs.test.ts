@@ -23,6 +23,8 @@ const ALLOWED: Record<string, string> = {
         "public upload link: the visitor is not signed in and has no Drive",
     "apps/web/src/app/s/[token]/share-explorer.tsx":
         "public share link: the visitor is not signed in and has no Drive",
+    "apps/game-servers/src/components/archive-intake.tsx":
+        "a server pack or world .zip sent from this computer straight to the server with progress, the way Deploy's upload is",
     "apps/web/src/app/(app)/apps/deploy/upload-source.tsx":
         "a whole folder, which the picker cannot choose; the .zip button uses the picker",
     "apps/web/src/app/(app)/chat/media-editor.tsx":

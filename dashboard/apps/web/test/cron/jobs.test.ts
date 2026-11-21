@@ -176,6 +176,9 @@ describe("the work Polaris runs on a schedule", () => {
             // Two passes would each write the same server's switch, and read
             // the token the other was about to write.
             "game-anticheat-default",
+            // Two passes would each write the same server's flight setting and
+            // its marker, and one could restore what the other just handed over.
+            "game-anticheat-flight",
             // Two passes would each close the same challenge day and pay
             // everybody who finished something twice.
             "game-challenges",
@@ -194,6 +197,11 @@ describe("the work Polaris runs on a schedule", () => {
             // it back, and one would undo what the other had just added.
             "game-polaris-component",
             "game-schedules",
+            // Two passes would each write the same server's radius and marker.
+            "game-spawn-protection",
+            // One pass reading the archive list while another renames a new
+            // upload in could remove the archive being written.
+            "game-uploaded-archives",
             // Two runners would each archive the same world with `tar`, inside
             // the same container, onto the same disk - and the copy that is worth
             // having is the one the server was not busy competing with.

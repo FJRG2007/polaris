@@ -377,8 +377,9 @@ export function gameJobTable(): readonly AppJob[] {
             everyMs: Number(process.env.POLARIS_GAME_ARCHIVE_SWEEP_MS) || 60 * MINUTE,
             // Leased: two runners deleting the same file is harmless, but one of
             // them reading the list while the other renames a new archive in is
-            // not worth having.
-            leaseMs: 10 * MINUTE,
+            // not worth having. Held past the next pass, so a slow one is not
+            // joined by a second.
+            leaseMs: 75 * MINUTE,
             run: async () => (await import("./minecraft/archives/store")).sweepArchives()
         },
         {
@@ -472,6 +473,15 @@ export function gameJobTable(): readonly AppJob[] {
             leaseMs: 15 * MINUTE,
             run: async () =>
                 (await import("./minecraft/polaris-anticheat-service")).adoptFlightHandover()
+        },
+        {
+            key: "game-spawn-protection",
+            // Spawn protection off on the servers made while Polaris wrote the
+            // game's 16 - written for the next start, and an owner's own radius
+            // left alone. Once a server has it written this does nothing more there.
+            everyMs: 10 * MINUTE,
+            leaseMs: 15 * MINUTE,
+            run: async () => (await import("./minecraft/spawn-protection")).adoptSpawnProtectionOff()
         },
         {
             key: "game-polaris-component",

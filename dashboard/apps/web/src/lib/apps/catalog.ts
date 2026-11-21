@@ -940,7 +940,10 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
                     key: "SPAWN_PROTECTION",
                     label: "Spawn protection", // i18n-ignore
                     help: "Blocks in this radius of spawn can only be changed by operators. 0 disables it.",
-                    default: "16",
+                    // Off: the owner is an operator on every Polaris server, and
+                    // with an operator on the list the game's 16 locks everybody
+                    // else out of building near spawn.
+                    default: "0",
                     tunable: true,
                     group: "Security"
                 },
