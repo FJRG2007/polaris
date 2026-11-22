@@ -37,7 +37,7 @@
             },
             "search": {
                 "title": "Búsqueda",
-                "body": "Encuentra cualquier página, archivo o persona. Ctrl+K la abre desde cualquier sitio."
+                "body": "Encuentra cualquier página, archivo o persona. Alt+Espacio la abre desde cualquier sitio."
             },
             "sidebar": {
                 "title": "Secciones",

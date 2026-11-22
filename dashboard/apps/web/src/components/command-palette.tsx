@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The global search: a header field, Ctrl/Cmd+K from anywhere, and a centered
+ * The global search: a header field, Alt+Space or Ctrl/Cmd+K from anywhere, and a centered
  * panel that finds any page of the dashboard plus the things the user owns.
  *
  * Two halves, and the split is what keeps it cheap. Pages and the resource index
@@ -32,6 +32,7 @@ import { calculate, calculationDigits, calculationText } from "@/lib/search/calc
 import { OPEN_SEARCH_EVENT, requestedQuery, requestedScope } from "@/lib/search/open-search";
 import {
     SegmentedControl,
+    applePlatform,
     cn,
     shortcutPressed,
     useShortcutBindings,
@@ -192,7 +193,7 @@ export function CommandPalette({
     // The key in force, as this keyboard prints it - corrected after mount, since
     // only the browser knows whether it has a command key.
     const hint = useShortcutHint("general.commandPalette");
-    const binding = core.keysOf(useShortcutBindings(), "general.commandPalette")[0];
+    const bindings = core.keysOf(useShortcutBindings(), "general.commandPalette");
     const listRef = useRef<HTMLDivElement>(null);
     const fieldRef = useRef<HTMLInputElement>(null);
     // Set when a result is opened, so closing does not also file the query that
@@ -202,7 +203,12 @@ export function CommandPalette({
     useEffect(() => {
         function onKeyDown(event: KeyboardEvent) {
             if (!shortcutPressed(event, "general.commandPalette")) return;
-            // Browsers put Ctrl+K on the address bar; the dashboard claims it here.
+            // Option+Space in a Mac's text field is a non-breaking space being typed.
+            const pressed = core.bindingOfEvent(event);
+            const where = { editable: core.isEditableTarget(event.target), apple: applePlatform() };
+            if (pressed && !core.launcherPressAllowed(pressed, where)) return;
+            // Browsers put Ctrl+K on the address bar and Windows puts Alt+Space on the
+            // window menu; the dashboard claims both here (see core `launcher.ts`).
             event.preventDefault();
             // Inside Chat it is Chat's quick switcher, as it is in every chat app;
             // Backspace on the empty field widens it to everything again.
@@ -837,7 +843,7 @@ export function CommandPalette({
                 }}
                 title={hint ? t("search.buttonTitle", { hint }) : t("search.label")}
                 aria-label={t("search.label")}
-                aria-keyshortcuts={binding ? ariaShortcut(binding) : undefined}
+                aria-keyshortcuts={bindings.length > 0 ? bindings.map(ariaShortcut).join(" ") : undefined}
                 // Below lg the header is already carrying the switcher and a page's
                 // own controls, so the field collapses to its icon rather than
                 // squeezing them.
