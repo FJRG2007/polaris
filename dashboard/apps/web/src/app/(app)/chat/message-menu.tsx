@@ -24,7 +24,7 @@ import { isPlayable } from "./voice-recorder";
 import { setReminderAction } from "./actions";
 import { ScheduleDialog } from "./schedule-dialog";
 import type { SpaceEmojiScope } from "./space-emoji";
-import { EmojiFace } from "@/components/rich-text/custom-emoji";
+import { EmojiFace, type CustomEmojiSet } from "@/components/rich-text/custom-emoji";
 import { browserCanSpeak, speakInBrowser, type BrowserSpeech } from "@/lib/polar/browser-voice";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat, useDisplayPreferences } from "@/components/display-format";
@@ -33,7 +33,25 @@ import { copyText, messageLink } from "./links";
 import { useAppUrl } from "@/components/app-url";
 import { openLink } from "@/lib/open-link";
 import { imageItems } from "@/components/image-actions";
-import { useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import {
+    cloneElement,
+    Fragment,
+    isValidElement,
+    useRef,
+    useState,
+    useSyncExternalStore,
+    type ReactNode
+} from "react";
+import { useTouchScreen } from "@/components/use-phone";
+import { useLongPress } from "./long-press";
+import { MessageSheet } from "./message-sheet";
+import {
+    filled,
+    type MenuEntry,
+    type MenuModel,
+    type MenuReactions,
+    type MenuSection
+} from "./message-menu-model";
 import { plainText } from "@/components/rich-text/excerpt";
 import { useTranslateToggle } from "./translated-body";
 import { messageTarget, NOTHING, type MessageTarget } from "./message-target";
@@ -223,6 +241,14 @@ export function MessageMenu({
      */
     const pointed = useRef<MessageTarget>(NOTHING);
     const [at, setAt] = useState<MessageTarget>(NOTHING);
+    /** A finger rather than a mouse: the hold opens a sheet instead of the menu. */
+    const touch = useTouchScreen();
+    const [sheetOpen, setSheetOpen] = useState(false);
+    const longPress = useLongPress((target, row) => {
+        pointed.current = messageTarget(target, row, baseUrl);
+        setAt(pointed.current);
+        setSheetOpen(true);
+    });
     const link = at.link;
     const picture = at.image;
     const clip = at.video;
@@ -313,449 +339,425 @@ export function MessageMenu({
         if (failure) toast.show({ title: failure });
     };
 
+    /** Settles what was pressed into state, the render the items are built in. */
+    const point = (target: Element | null, row: Element) => {
+        pointed.current = messageTarget(target, row, baseUrl);
+    };
+
+    // ------------------------------------------------------------------
+    // The actions, once, for the menu and the sheet alike. Whether each one
+    // is offered is decided here and nowhere else.
+    // ------------------------------------------------------------------
+
+    const target: MenuSection[] = [
+        // Forwarding and reporting are left out of the picture's own set here:
+        // they are about the message, and the message's own items are a few
+        // lines below in the same menu.
+        {
+            key: "picture",
+            draw: picture
+                ? (parts) => imageItems({ image: picture, baseUrl, announce, ...parts })
+                : undefined
+        },
+        // The same set for a video, less the one item that means nothing for
+        // one. Without it a right-click on a clip offered the message's own
+        // actions and no way at all to keep the video - which is the thing
+        // being right-clicked.
+        {
+            key: "video",
+            draw: clip
+                ? (parts) => imageItems({ kind: "video", image: clip, baseUrl, announce, ...parts })
+                : undefined
+        },
+        {
+            key: "file",
+            entries: [
+                // An ordinary download: the route serves it as an attachment, so
+                // it is a link rather than anything this has to do.
+                !message.deleted &&
+                    !message.shielded &&
+                    loose && {
+                        key: "download",
+                        icon: Download,
+                        label: t("messageMenu.download"),
+                        title: loose.name,
+                        link: {
+                            href: `/api/chat/attachments/${loose.id}?download=1`,
+                            download: loose.name
+                        }
+                    },
+                // A format rather than a file, because what was recorded is a
+                // container most desktop players will not open. The first one is
+                // what nearly everybody wants; the last is the untouched original.
+                !message.deleted &&
+                    !message.shielded &&
+                    recording && {
+                        key: "audio",
+                        icon: Download,
+                        label: t("messageMenu.downloadTheAudio"),
+                        sub: [
+                            AUDIO_FORMATS.map((choice) => ({
+                                key: choice.format,
+                                label: t(choice.label),
+                                disabled: saving === recording.id,
+                                trailing:
+                                    choice.format === "original" ? (
+                                        <span className="uppercase">{extensionOf(recording.name)}</span>
+                                    ) : undefined,
+                                run: () => void save(recording, choice.format)
+                            }))
+                        ]
+                    }
+            ].filter(present)
+        },
+        {
+            key: "link",
+            entries: link
+                ? [
+                      {
+                          key: "copyLink",
+                          icon: Link2,
+                          label:
+                              link.kind === "email"
+                                  ? t("messageMenu.copyEmailAddress")
+                                  : t("messageMenu.copyLink"),
+                          run: () => void copyText(link.copy)
+                      },
+                      // The address as the browser has it, not the one that gets
+                      // copied: a page inside Polaris opens on this tab's own
+                      // origin, which is the hostname known to work from here.
+                      {
+                          key: "openLink",
+                          icon: ExternalLink,
+                          label:
+                              link.kind === "email"
+                                  ? t("messageMenu.sendAnEmail")
+                                  : t("messageMenu.openLink"),
+                          run: () => openLink(link.open)
+                      }
+                  ]
+                : []
+        }
+    ];
+
+    // The faces first, the way Discord opens this menu: the most common thing
+    // anybody does to a message is react to it. The same faces and the same
+    // press as the hover bar.
+    const reactions: MenuReactions | null = reactable
+        ? {
+              quick: actions.quick ?? [],
+              react: (choice) => actions.onReact?.(message.id, choice),
+              more: actions.onAddReaction
+          }
+        : null;
+
+    const sections: MenuSection[] = [
+        {
+            key: "respond",
+            entries:
+                canPost && !message.deleted
+                    ? [
+                          // The keys said out loud, because a shortcut nobody is
+                          // told about is a shortcut nobody uses.
+                          mine &&
+                              actions.onEdit &&
+                              !notice && {
+                                  key: "edit",
+                                  icon: Pencil,
+                                  label: t("messageMenu.edit"),
+                                  // i18n-ignore: a key on the keyboard
+                                  hint: <ShortcutHint id="chat.edit" />,
+                                  run: () => actions.onEdit?.(message)
+                              },
+                          actions.onReply && {
+                              key: "reply",
+                              icon: CornerUpLeft,
+                              label: t("messageMenu.reply"),
+                              // i18n-ignore: a key on the keyboard
+                              hint: <ShortcutHint id="chat.reply" />,
+                              run: () => actions.onReply?.(message)
+                          },
+                          // Only where there is somebody to answer and it is not
+                          // already just the two of you - see `onReplyPrivately`.
+                          !mine &&
+                              message.authorId &&
+                              actions.onReplyPrivately && {
+                                  key: "replyPrivately",
+                                  icon: MessageCircleReply,
+                                  label: t("messageMenu.replyPrivately"),
+                                  run: () => actions.onReplyPrivately?.(message)
+                              },
+                          // Absent rather than refused whenever it cannot travel -
+                          // the author does not allow it, or it is one of the
+                          // exceptions (`forwardBlock`, folded into `forwardable` on
+                          // the server).
+                          message.forwardable &&
+                              actions.onForward &&
+                              !notice && {
+                                  key: "forward",
+                                  icon: Forward,
+                                  label: t("messageMenu.forward"),
+                                  run: () => actions.onForward?.(message)
+                              },
+                          actions.onOpenThread &&
+                              !notice && {
+                                  key: "thread",
+                                  icon: MessageSquare,
+                                  label: t("messageMenu.replyInAThread"),
+                                  run: () => actions.onOpenThread?.(message)
+                              }
+                      ].filter(present)
+                    : []
+        },
+        {
+            // Discord's order: the conversation's place, then this reader's own
+            // marks, then what can be taken away from it.
+            key: "keep",
+            entries: [
+                actions.onMarkUnread &&
+                    !mine &&
+                    !message.deleted && {
+                        key: "markUnread",
+                        icon: Mail,
+                        label: t("messageMenu.markUnreadFromHere"),
+                        run: () => actions.onMarkUnread?.(message)
+                    },
+                actions.onPin &&
+                    !message.deleted &&
+                    message.kind !== "system" && {
+                        key: "pin",
+                        icon: actions.pinned ? PinOff : Pin,
+                        label: actions.pinned ? t("messageMenu.unpin") : t("messageMenu.pin"),
+                        run: () => actions.onPin?.(message, Boolean(actions.pinned))
+                    },
+                // Two different things, side by side the way WhatsApp puts them:
+                // the star is this reader's own bookmark, the pin is the room's.
+                {
+                    key: "star",
+                    icon: Star,
+                    label: message.starred
+                        ? t("messageMenu.removeFromSaved")
+                        : t("messageMenu.save"),
+                    run: () => actions.onStar(message)
+                },
+                !notice &&
+                    keep?.mayKeep && {
+                        key: "keepInChat",
+                        icon: Bookmark,
+                        label: t("messageMenu.keepInChat"),
+                        run: () => keepCall(() => keepMessageAction(message.id))
+                    },
+                !notice &&
+                    keep?.kept &&
+                    (keep.keptByMe || mine) && {
+                        key: "unkeep",
+                        icon: BookmarkX,
+                        label: mine ? t("messageMenu.unkeepForEverybody") : t("messageMenu.unkeep"),
+                        run: () => keepCall(() => unkeepMessageAction(message.id))
+                    },
+                !notice &&
+                    mine &&
+                    disappearing && {
+                        key: "keepable",
+                        icon: Bookmark,
+                        label:
+                            message.keepable === false
+                                ? t("messageMenu.allowKeeping")
+                                : t("messageMenu.forbidKeeping"),
+                        run: () =>
+                            keepCall(() =>
+                                setKeepableAction({
+                                    messageId: message.id,
+                                    keepable: message.keepable === false
+                                })
+                            )
+                    },
+                // Private to this reader. Each preset says what it is for when it
+                // is a clock reading rather than a wait.
+                remindable && {
+                    key: "remind",
+                    icon: AlarmClock,
+                    label: t("messageMenu.remindMe"),
+                    sub: [
+                        REMINDER_PRESETS.map((preset) => {
+                            const moment = reminderMoment(preset, new Date(), timeZone);
+                            const clock = preset === "tomorrow" || preset === "nextMonday";
+                            return {
+                                key: preset,
+                                label: t(PRESET_LABELS[preset]),
+                                disabled: reminding,
+                                trailing: clock ? format.time(moment) : undefined,
+                                run: () => void remind(moment)
+                            };
+                        }),
+                        [
+                            {
+                                key: "custom",
+                                label: t("messageMenu.custom"),
+                                run: () => setChoosing(true)
+                            }
+                        ]
+                    ]
+                },
+                // What it reads as, not what it is stored as. Markdown escapes its
+                // punctuation, so copying the source hands back a line full of
+                // backslashes for one that reads perfectly well on screen.
+                !message.deleted && {
+                    key: "copyText",
+                    icon: Copy,
+                    label: t("messageMenu.copyText"),
+                    hint: <ShortcutHint id="chat.copy" />,
+                    run: () => void copyText(plainText(message.body))
+                },
+                // On this reader's screen only: the message as sent is untouched,
+                // and the original is one press away.
+                translation && {
+                    key: "translate",
+                    icon: Languages,
+                    label: translation.showing
+                        ? t("translation.showOriginal")
+                        : t("translation.translate"),
+                    run: () => translation.run()
+                },
+                // Offered on a deleted message too: the line is still there,
+                // replies still hang off it, and its address still opens the
+                // conversation at the right place.
+                {
+                    key: "copyMessageLink",
+                    icon: Link2,
+                    label: t("messageMenu.copyMessageLink"),
+                    run: () => void copyText(messageLink(baseUrl, message.channelId, message.id))
+                },
+                // Read by the browser's own voice, in the reader's language. Only
+                // where the browser has one.
+                speakable &&
+                    (readingThis
+                        ? {
+                              key: "speak",
+                              icon: VolumeX,
+                              label: t("messageMenu.stopSpeaking"),
+                              run: stopReading
+                          }
+                        : {
+                              key: "speak",
+                              icon: Volume2,
+                              label: t("messageMenu.speak"),
+                              run: () => readAloud(message.id, plainText(message.body), locale)
+                          }),
+                // Only where there are ticks to explain, which is exactly a
+                // one-to-one or a group, your own message, and the settings
+                // allowing them - the same rule that decides whether the ticks
+                // are drawn, asked once on the server and carried here.
+                message.receipt &&
+                    !message.deleted && {
+                        key: "information",
+                        icon: Info,
+                        label: t("messageMenu.information"),
+                        run: () => actions.onExplain(message)
+                    }
+            ].filter(present)
+        },
+        {
+            key: "remove",
+            entries: [
+                // Anybody's message, gone from this reader's screen only. Absent
+                // where there is no conversation to hide it from.
+                hide &&
+                    !notice && {
+                        key: "deleteForMe",
+                        icon: EyeOff,
+                        label: t("messageMenu.deleteForMe"),
+                        danger: true,
+                        run: () => hide(message)
+                    },
+                // Shift held skips the question - only the click knows it was.
+                canPost &&
+                    !message.deleted &&
+                    !notice &&
+                    (mine || canModerate) && {
+                        key: "delete",
+                        icon: Trash2,
+                        label: t("messageMenu.delete"),
+                        hint: <ShortcutHint id="chat.delete" />,
+                        danger: true,
+                        run: (shift: boolean) => actions.onDelete(message, shift)
+                    }
+            ].filter(present)
+        },
+        {
+            // Red. It is the one consequence in this menu, and reading like Copy
+            // is how a menu stops saying which of its items are heavy.
+            //
+            // Reporting the account is deliberately not here as well: this menu
+            // is about the message, and the account has its own menu on the name.
+            key: "report",
+            entries:
+                !mine && !message.deleted && !notice
+                    ? [
+                          {
+                              key: "report",
+                              icon: Flag,
+                              label: t("messageMenu.reportThisMessage"),
+                              danger: true,
+                              run: () => actions.onReport(message)
+                          }
+                      ]
+                    : []
+        }
+    ];
+
+    const model: MenuModel = { target, reactions, sections };
+
     return (
         <>
-            <ContextMenu
-                // Radix runs the trigger's own handler before it opens, so by the
-                // time this fires the gesture has already been read. Both updates
-                // land in one render, which is the one the items are built in.
-                onOpenChange={(open) => {
-                    if (open) setAt(pointed.current);
-                }}
-            >
-                <ContextMenuTrigger
-                    asChild
-                    onPointerDown={(event) => {
-                        pointed.current = messageTarget(
-                            event.target as Element | null,
-                            event.currentTarget,
-                            baseUrl
-                        );
-                    }}
-                    onContextMenu={(event) => {
-                        pointed.current = messageTarget(
-                            event.target as Element | null,
-                            event.currentTarget,
-                            baseUrl
-                        );
+            {touch ? (
+                // On a touch screen the hold opens the sheet; the right-click
+                // menu, which would open a desktop dropdown under the finger, is
+                // not mounted at all.
+                <div
+                    className="contents"
+                    {...longPress}
+                >
+                    {isValidElement<{ "data-state"?: string }>(children)
+                        ? cloneElement(children, { "data-state": sheetOpen ? "open" : "closed" })
+                        : children}
+                </div>
+            ) : (
+                <ContextMenu
+                    // Radix runs the trigger's own handler before it opens, so by the
+                    // time this fires the gesture has already been read. Both updates
+                    // land in one render, which is the one the items are built in.
+                    onOpenChange={(open) => {
+                        if (open) setAt(pointed.current);
                     }}
                 >
-                    {children}
-                </ContextMenuTrigger>
-                {/* Focus is not handed back to the message row on the way out: Reply
-                    and Edit put the caret in the composer, and the hand-back landed
-                    a beat later and took it straight out again. */}
-                <ContextMenuContent className="w-56" onCloseAutoFocus={keepFocusOnClose}>
-                    {/* Forwarding and reporting are left out of the picture's own
-                        set here: they are about the message, and the message's own
-                        items are a few lines below in the same menu. */}
-                    {picture && (
-                        <>
-                            {imageItems({
-                                image: picture,
-                                baseUrl,
-                                announce,
-                                Item: ContextMenuItem,
-                                Separator: ContextMenuSeparator
-                            })}
-                            <ContextMenuSeparator />
-                        </>
-                    )}
-
-                    {/* The same set for a video, less the one item that means
-                        nothing for one. Without it a right-click on a clip offered
-                        the message's own actions and no way at all to keep the
-                        video - which is the thing being right-clicked. */}
-                    {clip && (
-                        <>
-                            {imageItems({
-                                kind: "video",
-                                image: clip,
-                                baseUrl,
-                                announce,
-                                Item: ContextMenuItem,
-                                Separator: ContextMenuSeparator
-                            })}
-                            <ContextMenuSeparator />
-                        </>
-                    )}
-
-                    {/* An ordinary download: the route serves it as an
-                        attachment, so it is a link rather than anything this has to
-                        do. */}
-                    {!message.deleted && !message.shielded && loose && (
-                        <>
-                            <ContextMenuItem asChild>
-                                <a
-                                    href={`/api/chat/attachments/${loose.id}?download=1`}
-                                    download={loose.name}
-                                >
-                                    <Download className="size-3.5" />
-                                    <span className="min-w-0 truncate" title={loose.name}>
-                                        {t("messageMenu.download")}
-                                    </span>
-                                </a>
-                            </ContextMenuItem>
-                            <ContextMenuSeparator />
-                        </>
-                    )}
-
-                    {!message.deleted && !message.shielded && recording && (
-                        <>
-                            <ContextMenuSub>
-                                <ContextMenuSubTrigger>
-                                    <Download className="size-3.5" />
-                                    <span className="min-w-0 truncate">
-                                        {t("messageMenu.downloadTheAudio")}
-                                    </span>
-                                </ContextMenuSubTrigger>
-                                {/* A format rather than a file, because what was
-                                    recorded is a container most desktop players will
-                                    not open. The first one is what nearly everybody
-                                    wants; the last is the untouched original. */}
-                                <ContextMenuSubContent>
-                                    {AUDIO_FORMATS.map((choice) => (
-                                        <ContextMenuItem
-                                            key={choice.format}
-                                            disabled={saving === recording.id}
-                                            onSelect={() => void save(recording, choice.format)}
-                                        >
-                                            {t(choice.label)}
-                                            {choice.format === "original" && (
-                                                <span className="ms-auto ps-4 text-[0.6875rem] uppercase text-foreground-subtle">
-                                                    {extensionOf(recording.name)}
-                                                </span>
-                                            )}
-                                        </ContextMenuItem>
-                                    ))}
-                                </ContextMenuSubContent>
-                            </ContextMenuSub>
-                            <ContextMenuSeparator />
-                        </>
-                    )}
-
-                    {link && (
-                        <>
-                            <ContextMenuItem onSelect={() => void copyText(link.copy)}>
-                                <Link2 className="size-3.5" />
-                                {link.kind === "email"
-                                    ? t("messageMenu.copyEmailAddress")
-                                    : t("messageMenu.copyLink")}
-                            </ContextMenuItem>
-                            {/* The address as the browser has it, not the one that
-                                gets copied: a page inside Polaris opens on this
-                                tab's own origin, which is the hostname known to
-                                work from here. */}
-                            <ContextMenuItem
-                                onSelect={() =>
-                                    openLink(link.open)
-                                }
-                            >
-                                <ExternalLink className="size-3.5" />
-                                {link.kind === "email"
-                                    ? t("messageMenu.sendAnEmail")
-                                    : t("messageMenu.openLink")}
-                            </ContextMenuItem>
-                            <ContextMenuSeparator />
-                        </>
-                    )}
-
-                    {/* The faces first, the way Discord opens this menu: the most
-                        common thing anybody does to a message is react to it. The
-                        same faces and the same press as the hover bar. */}
-                    {reactable && (
-                        <>
-                            {(actions.quick ?? []).length > 0 && (
-                                <div className="flex items-center gap-1 px-1 py-1">
-                                    {(actions.quick ?? []).map((choice) => {
-                                        const ref = core.parseCustomEmojiToken(choice);
-                                        const named = ref ? core.customEmojiFallback(ref) : choice;
-                                        return (
-                                            <ContextMenuItem
-                                                key={choice}
-                                                aria-label={t("messageList.reactWith", {
-                                                    emoji: named
-                                                })}
-                                                title={t("messageList.reactWith", { emoji: named })}
-                                                onSelect={() =>
-                                                    actions.onReact?.(message.id, choice)
-                                                }
-                                                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted p-0 text-lg"
-                                            >
-                                                <EmojiFace
-                                                    value={choice}
-                                                    set={actions.emoji?.set ?? null}
-                                                />
-                                            </ContextMenuItem>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                            {actions.onAddReaction && (
-                                <ContextMenuItem onSelect={() => actions.onAddReaction?.()}>
-                                    <SmilePlus className="size-3.5" />
-                                    {t("messageMenu.addReaction")}
-                                </ContextMenuItem>
-                            )}
-                            <ContextMenuSeparator />
-                        </>
-                    )}
-
-                    {canPost && !message.deleted && (
-                        <>
-                            {/* The keys said out loud, because a shortcut nobody is
-                                told about is a shortcut nobody uses. */}
-                            {mine && actions.onEdit && !notice && (
-                                <ContextMenuItem onSelect={() => actions.onEdit?.(message)}>
-                                    <Pencil className="size-3.5" />
-                                    {t("messageMenu.edit")}
-                                    {/* i18n-ignore: a key on the keyboard */}
-                                    <ShortcutHint id="chat.edit" />
-                                </ContextMenuItem>
-                            )}
-                            {actions.onReply && (
-                                <ContextMenuItem onSelect={() => actions.onReply?.(message)}>
-                                    <CornerUpLeft className="size-3.5" />
-                                    {t("messageMenu.reply")}
-                                    {/* i18n-ignore: a key on the keyboard */}
-                                    <ShortcutHint id="chat.reply" />
-                                </ContextMenuItem>
-                            )}
-                            {/* Only where there is somebody to answer and it is not
-                                already just the two of you - see `onReplyPrivately`.
-                                It leaves the room without saying so: nothing appears
-                                here, and what they get is these words quoted in the
-                                conversation the two of you would have had anyway. */}
-                            {!mine && message.authorId && actions.onReplyPrivately && (
-                                <ContextMenuItem
-                                    onSelect={() => actions.onReplyPrivately?.(message)}
-                                >
-                                    <MessageCircleReply className="size-3.5" />
-                                    {t("messageMenu.replyPrivately")}
-                                </ContextMenuItem>
-                            )}
-                            {/* Absent rather than refused whenever it cannot travel -
-                                the author does not allow it, or it is one of the
-                                exceptions (`forwardBlock`, folded into `forwardable` on
-                                the server). A menu that offers something and then says
-                                no is worse than one that offers less. */}
-                            {message.forwardable && actions.onForward && !notice && (
-                                <ContextMenuItem onSelect={() => actions.onForward?.(message)}>
-                                    <Forward className="size-3.5" />
-                                    {t("messageMenu.forward")}
-                                </ContextMenuItem>
-                            )}
-                            {actions.onOpenThread && !notice && (
-                                <ContextMenuItem onSelect={() => actions.onOpenThread?.(message)}>
-                                    <MessageSquare className="size-3.5" />
-                                    {t("messageMenu.replyInAThread")}
-                                </ContextMenuItem>
-                            )}
-                            <ContextMenuSeparator />
-                        </>
-                    )}
-
-                    {/* What it reads as, not what it is stored as. Markdown escapes
-                        its punctuation, so copying the source hands back a line full
-                        of backslashes for one that reads perfectly well on screen. */}
-                    {!message.deleted && (
-                        <ContextMenuItem onSelect={() => void copyText(plainText(message.body))}>
-                            <Copy className="size-3.5" />
-                            {t("messageMenu.copyText")}
-                            <ShortcutHint id="chat.copy" />
-                        </ContextMenuItem>
-                    )}
-                    {/* On this reader's screen only: the message as sent is
-                        untouched, and the original is one press away. */}
-                    {translation && (
-                        <ContextMenuItem onSelect={translation.run}>
-                            <Languages className="size-3.5" />
-                            {translation.showing
-                                ? t("translation.showOriginal")
-                                : t("translation.translate")}
-                        </ContextMenuItem>
-                    )}
-                    {actions.onPin && !message.deleted && message.kind !== "system" && (
-                        <ContextMenuItem
-                            onSelect={() => actions.onPin?.(message, Boolean(actions.pinned))}
-                        >
-                            {actions.pinned ? (
-                                <PinOff className="size-3.5" />
-                            ) : (
-                                <Pin className="size-3.5" />
-                            )}
-                            {actions.pinned ? t("messageMenu.unpin") : t("messageMenu.pin")}
-                        </ContextMenuItem>
-                    )}
-                    {/* Two different things, side by side the way WhatsApp puts them:
-                        the star is this reader's own bookmark, the pin is the
-                        room's. */}
-                    <ContextMenuItem onSelect={() => actions.onStar(message)}>
-                        <Star className="size-3.5" />
-                        {message.starred ? t("messageMenu.removeFromSaved") : t("messageMenu.save")}
-                    </ContextMenuItem>
-                    {!notice && keep?.mayKeep && (
-                        <ContextMenuItem onSelect={() => keepCall(() => keepMessageAction(message.id))}>
-                            <Bookmark className="size-3.5" />
-                            {t("messageMenu.keepInChat")}
-                        </ContextMenuItem>
-                    )}
-                    {!notice && keep?.kept && (keep.keptByMe || mine) && (
-                        <ContextMenuItem onSelect={() => keepCall(() => unkeepMessageAction(message.id))}>
-                            <BookmarkX className="size-3.5" />
-                            {mine ? t("messageMenu.unkeepForEverybody") : t("messageMenu.unkeep")}
-                        </ContextMenuItem>
-                    )}
-                    {!notice && mine && disappearing && (
-                        <ContextMenuItem
-                            onSelect={() =>
-                                keepCall(() =>
-                                    setKeepableAction({
-                                        messageId: message.id,
-                                        keepable: message.keepable === false
-                                    })
-                                )
-                            }
-                        >
-                            <Bookmark className="size-3.5" />
-                            {message.keepable === false
-                                ? t("messageMenu.allowKeeping")
-                                : t("messageMenu.forbidKeeping")}
-                        </ContextMenuItem>
-                    )}
-                    {/* Private to this reader. Each preset says what it is for when
-                        it is a clock reading rather than a wait. */}
-                    {remindable && (
-                        <ContextMenuSub>
-                            <ContextMenuSubTrigger>
-                                <AlarmClock className="size-3.5" />
-                                {t("messageMenu.remindMe")}
-                            </ContextMenuSubTrigger>
-                            <ContextMenuSubContent className="w-52">
-                                {REMINDER_PRESETS.map((preset) => {
-                                    const moment = reminderMoment(preset, new Date(), timeZone);
-                                    const clock = preset === "tomorrow" || preset === "nextMonday";
-                                    return (
-                                        <ContextMenuItem
-                                            key={preset}
-                                            disabled={reminding}
-                                            onSelect={() => void remind(moment)}
-                                        >
-                                            <span className="min-w-0 truncate">
-                                                {t(PRESET_LABELS[preset])}
-                                            </span>
-                                            {clock && (
-                                                <span className="ms-auto shrink-0 ps-4 text-xs text-foreground-subtle">
-                                                    {format.time(moment)}
-                                                </span>
-                                            )}
-                                        </ContextMenuItem>
-                                    );
-                                })}
-                                <ContextMenuSeparator />
-                                <ContextMenuItem onSelect={() => setChoosing(true)}>
-                                    {t("messageMenu.custom")}
-                                </ContextMenuItem>
-                            </ContextMenuSubContent>
-                        </ContextMenuSub>
-                    )}
-                    {actions.onMarkUnread && !mine && !message.deleted && (
-                        <ContextMenuItem onSelect={() => actions.onMarkUnread?.(message)}>
-                            <Mail className="size-3.5" />
-                            {t("messageMenu.markUnreadFromHere")}
-                        </ContextMenuItem>
-                    )}
-                    {/* Offered on a deleted message too: the line is still there,
-                        replies still hang off it, and its address still opens the
-                        conversation at the right place. */}
-                    <ContextMenuItem
-                        onSelect={() =>
-                            void copyText(messageLink(baseUrl, message.channelId, message.id))
+                    <ContextMenuTrigger
+                        asChild
+                        onPointerDown={(event) =>
+                            point(event.target as Element | null, event.currentTarget)
+                        }
+                        onContextMenu={(event) =>
+                            point(event.target as Element | null, event.currentTarget)
                         }
                     >
-                        <Link2 className="size-3.5" />
-                        {t("messageMenu.copyMessageLink")}
-                    </ContextMenuItem>
-                    {/* Read by the browser's own voice, in the reader's language.
-                        Only where the browser has one. */}
-                    {speakable &&
-                        (readingThis ? (
-                            <ContextMenuItem onSelect={stopReading}>
-                                <VolumeX className="size-3.5" />
-                                {t("messageMenu.stopSpeaking")}
-                            </ContextMenuItem>
-                        ) : (
-                            <ContextMenuItem
-                                onSelect={() =>
-                                    readAloud(message.id, plainText(message.body), locale)
-                                }
-                            >
-                                <Volume2 className="size-3.5" />
-                                {t("messageMenu.speak")}
-                            </ContextMenuItem>
-                        ))}
-
-                    {/* Only where there are ticks to explain, which is exactly a
-                        one-to-one or a group, your own message, and the settings
-                        allowing them - the same rule that decides whether the ticks
-                        are drawn, asked once on the server and carried here. */}
-                    {message.receipt && !message.deleted && (
-                        <ContextMenuItem onSelect={() => actions.onExplain(message)}>
-                            <Info className="size-3.5" />
-                            {t("messageMenu.information")}
-                        </ContextMenuItem>
-                    )}
-
-                    {/* Anybody's message, gone from this reader's screen only.
-                        Absent where there is no conversation to hide it from. */}
-                    {hide && !notice && (
-                        <>
-                            <ContextMenuSeparator />
-                            <ContextMenuItem variant="danger" onSelect={() => hide(message)}>
-                                <EyeOff className="size-3.5" />
-                                {t("messageMenu.deleteForMe")}
-                            </ContextMenuItem>
-                        </>
-                    )}
-
-                    {canPost && !message.deleted && !notice && (mine || canModerate) && (
-                        <>
-                            {!hide && <ContextMenuSeparator />}
-                            {/* Shift held skips the question - only the click
-                                knows it was. A key press or a tap arrives as a
-                                click as well. */}
-                            <ContextMenuItem
-                                variant="danger"
-                                onClick={(event) => actions.onDelete(message, event.shiftKey)}
-                            >
-                                <Trash2 className="size-3.5" />
-                                {t("messageMenu.delete")}
-                                <ShortcutHint id="chat.delete" />
-                            </ContextMenuItem>
-                        </>
-                    )}
-
-                    {!mine && !message.deleted && !notice && (
-                        <>
-                            <ContextMenuSeparator />
-                            {/* Red. It is the one consequence in this menu, and
-                                reading like Copy is how a menu stops saying which of
-                                its items are heavy.
-
-                                Reporting the account is deliberately not here as
-                                well: this menu is about the message, and the account
-                                has its own menu on the name. */}
-                            <ContextMenuItem
-                                variant="danger"
-                                onSelect={() => actions.onReport(message)}
-                            >
-                                <Flag className="size-3.5" />
-                                {t("messageMenu.reportThisMessage")}
-                            </ContextMenuItem>
-                        </>
-                    )}
-                </ContextMenuContent>
-            </ContextMenu>
+                        {children}
+                    </ContextMenuTrigger>
+                    {/* Focus is not handed back to the message row on the way out: Reply
+                        and Edit put the caret in the composer, and the hand-back landed
+                        a beat later and took it straight out again. */}
+                    <ContextMenuContent className="w-56" onCloseAutoFocus={keepFocusOnClose}>
+                        <DesktopMenu model={model} emojiSet={actions.emoji?.set ?? null} />
+                    </ContextMenuContent>
+                </ContextMenu>
+            )}
+            {touch && (
+                <MessageSheet
+                    open={sheetOpen}
+                    onOpenChange={setSheetOpen}
+                    model={model}
+                    emojiSet={actions.emoji?.set ?? null}
+                />
+            )}
             {/* Outside the menu, which is gone by the time a date is typed. */}
             <ScheduleDialog
                 open={choosing}
@@ -778,5 +780,134 @@ export function MessageMenu({
                 }
             />
         </>
+    );
+}
+
+/** Drops the actions a condition left out, keeping the list's own type. */
+function present<T>(value: T | false | null | undefined | "" | 0): value is T {
+    return Boolean(value);
+}
+
+/** The model as the right-click menu: groups between separators, the faces after
+ *  what was pressed and before the message's own items. */
+function DesktopMenu({
+    model,
+    emojiSet
+}: {
+    model: MenuModel;
+    emojiSet: CustomEmojiSet | null;
+}) {
+    const t = useTranslations("chat");
+    const reactions = model.reactions;
+    const blocks: { key: string; node: ReactNode }[] = filled(model.target).map((section) => ({
+        key: section.key,
+        node: <DesktopSection section={section} />
+    }));
+    if (reactions && (reactions.quick.length > 0 || reactions.more))
+        blocks.push({
+            key: "reactions",
+            node: (
+            <>
+                {reactions.quick.length > 0 && (
+                    <div className="flex items-center gap-1 px-1 py-1">
+                        {reactions.quick.map((choice) => {
+                            const ref = core.parseCustomEmojiToken(choice);
+                            const named = ref ? core.customEmojiFallback(ref) : choice;
+                            return (
+                                <ContextMenuItem
+                                    key={choice}
+                                    aria-label={t("messageList.reactWith", { emoji: named })}
+                                    title={t("messageList.reactWith", { emoji: named })}
+                                    onSelect={() => reactions.react(choice)}
+                                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted p-0 text-lg"
+                                >
+                                    <EmojiFace value={choice} set={emojiSet} />
+                                </ContextMenuItem>
+                            );
+                        })}
+                    </div>
+                )}
+                {reactions.more && (
+                    <ContextMenuItem onSelect={() => reactions.more?.()}>
+                        <SmilePlus className="size-3.5" />
+                        {t("messageMenu.addReaction")}
+                    </ContextMenuItem>
+                )}
+            </>
+            )
+        });
+    for (const section of filled(model.sections))
+        blocks.push({ key: section.key, node: <DesktopSection section={section} /> });
+    return blocks.map((block, index) => (
+        <Fragment key={block.key}>
+            {index > 0 && <ContextMenuSeparator />}
+            {block.node}
+        </Fragment>
+    ));
+}
+
+const DESKTOP_PARTS = { Item: ContextMenuItem, Separator: ContextMenuSeparator };
+
+function DesktopSection({ section }: { section: MenuSection }) {
+    return (
+        <>
+            {section.draw?.(DESKTOP_PARTS)}
+            {section.entries?.map((entry) => <DesktopEntry key={entry.key} entry={entry} />)}
+        </>
+    );
+}
+
+function DesktopEntry({ entry }: { entry: MenuEntry }) {
+    const Icon = entry.icon;
+    const body = (
+        <>
+            {Icon && <Icon className="size-3.5" />}
+            <span className="min-w-0 truncate" title={entry.title}>
+                {entry.label}
+            </span>
+            {entry.trailing && (
+                <span className="ms-auto shrink-0 ps-4 text-xs text-foreground-subtle">{entry.trailing}</span>
+            )}
+            {entry.hint}
+        </>
+    );
+    if (entry.link)
+        return (
+            <ContextMenuItem asChild data-action={entry.key}>
+                <a href={entry.link.href} download={entry.link.download}>
+                    {body}
+                </a>
+            </ContextMenuItem>
+        );
+    if (entry.sub)
+        return (
+            <ContextMenuSub>
+                <ContextMenuSubTrigger data-action={entry.key}>
+                    {Icon && <Icon className="size-3.5" />}
+                    <span className="min-w-0 truncate">{entry.label}</span>
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent className="w-52">
+                    {entry.sub.map((group, index) => (
+                        <Fragment key={index}>
+                            {index > 0 && <ContextMenuSeparator />}
+                            {group.map((item) => (
+                                <DesktopEntry key={item.key} entry={item} />
+                            ))}
+                        </Fragment>
+                    ))}
+                </ContextMenuSubContent>
+            </ContextMenuSub>
+        );
+    return (
+        <ContextMenuItem
+            data-action={entry.key}
+            variant={entry.danger ? "danger" : undefined}
+            disabled={entry.disabled}
+            // The click rather than the select, which is the only one that knows
+            // Shift was held. A key press or a tap arrives as a click as well.
+            onClick={(event) => entry.run?.(event.shiftKey)}
+        >
+            {body}
+        </ContextMenuItem>
     );
 }

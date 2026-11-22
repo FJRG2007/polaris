@@ -36,6 +36,7 @@ import { PolarBotCard, PolarFace, POLAR_NAME } from "@/components/polar/polar-bo
 import { Spoiler } from "./spoiler";
 import { ViewOnceCard } from "./view-once-card";
 import { MessageMenu } from "./message-menu";
+import { useTouchScreen } from "@/components/use-phone";
 import { deleteKeyWithShift, type DeleteMessage } from "./delete-message";
 import { copyText } from "./links";
 import { plainText } from "@/components/rich-text/excerpt";
@@ -889,6 +890,9 @@ function Message({
     const [revealed, setRevealed] = useState(false);
     /** The hover bar's picker, opened from the menu's "Add reaction" too. */
     const [picking, setPicking] = useState(false);
+    /** A finger rather than a mouse: no hover bar, and a long press opens the
+     *  message's actions from the bottom (`MessageMenu`). */
+    const touch = useTouchScreen();
     const direct = useOpenDirect(onError);
     const author = message.authorName ?? "Somebody who has left";
     /** What pressing a name or a face does here: their card, where the screen
@@ -1013,7 +1017,10 @@ function Message({
                     className={cn(
                         "group relative flex gap-2 px-4 transition-colors hover:bg-card-hover/60 data-[state=open]:bg-card-hover",
                         notice ? "py-1" : grouped ? "py-0.5" : "pb-0.5 pt-3",
-                        swipe.enabled && "touch-pan-y touch-pinch-zoom"
+                        swipe.enabled && "touch-pan-y touch-pinch-zoom",
+                        // A hold is the actions, not a selection or the
+                        // browser's own callout; Copy text is in the sheet.
+                        touch && "select-none [-webkit-touch-callout:none]"
                     )}
                 >
                     <span className="w-8 shrink-0">
@@ -1599,7 +1606,33 @@ function Message({
                         )}
                     </div>
 
-                    {canPost && !message.deleted && (
+                    {/* On a touch screen there is no hover to show the bar on, and one
+                        that appeared on a tap covered the next message. The faces
+                        and everything else are in the long-press sheet; only its
+                        full picker opens from here, placed over this row. */}
+                    {canPost && !message.deleted && touch && picking && (
+                        <div className="pointer-events-none absolute end-3 top-0 size-px opacity-0">
+                            <EmojiPicker
+                                disabled={false}
+                                media={false}
+                                custom={
+                                    emoji
+                                        ? {
+                                              spaceName: emoji.spaceName,
+                                              entries: emoji.entries,
+                                              manageHref: null
+                                          }
+                                        : null
+                                }
+                                label={t("messageList.addReaction")}
+                                icon={<SmilePlus className="size-3.5" />}
+                                open={picking}
+                                onOpenChange={setPicking}
+                                onEmoji={(choice) => onReact(message.id, choice)}
+                            />
+                        </div>
+                    )}
+                    {canPost && !message.deleted && !touch && (
                         <div className="absolute end-3 top-0 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border bg-elevated p-0.5 shadow-popover group-focus-within:flex group-hover:flex group-data-[state=open]:flex has-[[aria-expanded=true]]:flex">
                             {quick.slice(0, QUICK_COUNT).map((choice) => {
                                 const ref = core.parseCustomEmojiToken(choice);

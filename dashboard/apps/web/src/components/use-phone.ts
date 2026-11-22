@@ -43,3 +43,26 @@ export function useKeyboardDictates(): boolean {
 
 /** A control's height and width on a touch screen: what a finger can hit. */
 export const TOUCH_TARGET = "[@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11";
+
+/**
+ * A screen worked by a finger: no hover, or a coarse pointer.
+ *
+ * Not the width: a tablet is as wide as a laptop and still has nothing to hover
+ * with, so controls that only appear under a pointer never appear at all, and
+ * ones that appear on a tap get in the way of reading. Live, so a tablet that
+ * has a mouse plugged in switches as it happens. False on the server.
+ */
+export const TOUCH_QUERY = "(hover: none), (pointer: coarse)";
+
+export function useTouchScreen(): boolean {
+    return useSyncExternalStore(
+        (notify) => {
+            if (typeof window.matchMedia !== "function") return () => undefined;
+            const query = window.matchMedia(TOUCH_QUERY);
+            query.addEventListener("change", notify);
+            return () => query.removeEventListener("change", notify);
+        },
+        () => typeof window.matchMedia === "function" && window.matchMedia(TOUCH_QUERY).matches,
+        () => false
+    );
+}

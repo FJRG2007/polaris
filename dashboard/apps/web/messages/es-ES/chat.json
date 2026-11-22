@@ -942,6 +942,8 @@
         "forDuration": "Durante {duration}"
     },
     "messageMenu": {
+        "actions": "Acciones del mensaje",
+        "back": "Volver",
         "preparingTheFile": "Preparando el archivo",
         "copyEmailAddress": "Copiar dirección",
         "copyLink": "Copiar URL",
