@@ -151,6 +151,12 @@ import {
 } from "@polaris/ui";
 import { EditGroupDialog } from "./edit-group-dialog";
 
+/** Where a held conversation row's menu opens on a phone - see its use. */
+const PHONE_MENU_PLACEMENT = { side: "bottom", align: "center" } as const;
+
+/** The width of that menu and its peek: the screen less a margin, capped. */
+const PHONE_MENU_WIDTH = "w-[min(28rem,calc(100vw_-_2rem))]";
+
 /** How the shared mute list draws itself inside a right-click menu. */
 const CONTEXT_PARTS: MenuParts = {
     Item: ContextMenuItem,
@@ -1976,7 +1982,12 @@ function RowMenu({
             <ContextMenu onOpenChange={setPeeking}>
                 <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
                 <ContextMenuContent
-                    className={phone ? "w-[min(24rem,calc(100vw_-_2rem))]" : "w-52"}
+                    // On a phone it opens under the finger and centred on it,
+                    // so the peek takes the screen's width (less a margin)
+                    // whichever side of the screen the row was held on -
+                    // beside the finger it only had the room to one side.
+                    {...(phone ? PHONE_MENU_PLACEMENT : {})}
+                    className={phone ? PHONE_MENU_WIDTH : "w-52"}
                 >
                     {phone && peeking ? (
                         <>

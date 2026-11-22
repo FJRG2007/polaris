@@ -80,7 +80,14 @@ export function ContextMenuSub({
 
 export const ContextMenuContent = forwardRef<
     ElementRef<typeof RadixMenu.Content>,
-    ComponentPropsWithoutRef<typeof RadixMenu.Content>
+    /** `side` and `align` default to beside the pointer (right, start), which
+     *  is what a mouse wants. On a phone, where a held finger can be anywhere
+     *  across the screen, `side="bottom" align="center"` lets a wide menu use
+     *  the whole width instead of only what lies to one side of the finger. */
+    ComponentPropsWithoutRef<typeof RadixMenu.Content> & {
+        side?: "top" | "right" | "bottom" | "left";
+        align?: "start" | "center" | "end";
+    }
 >(({ className, onFocus, onKeyDown, collisionPadding = MENU_GUTTER, children, ...props }, ref) => {
     // The surface itself, in state rather than in a ref, and that is
     // load-bearing: this component sits in the tree whether or not its menu is
