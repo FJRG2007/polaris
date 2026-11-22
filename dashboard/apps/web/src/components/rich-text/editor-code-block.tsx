@@ -169,7 +169,7 @@ function CodeBlockShell({ node, updateAttributes, editor }: NodeViewProps) {
     return (
         <NodeViewWrapper
             data-code=""
-            className="group/code my-1 overflow-hidden rounded-md border border-border bg-muted"
+            className="group/code my-1 overflow-hidden rounded-md border border-border bg-surface"
         >
             <div
                 contentEditable={false}
