@@ -2435,7 +2435,20 @@ export interface ChatUnread {
     /** How many conversations they are in, for a screen that would rather say
      *  "two conversations" than "seventeen messages". */
     readonly conversations: number;
+    /**
+     * The conversations behind the totals, newest first and at most
+     * `MOST_WAITING_LISTED` of them, each with what is waiting and when its
+     * newest message was written (milliseconds). What lets a tab drop the one it
+     * is reading, or has just read, without waiting for the count to be asked
+     * again - see `lib/chat/read-marks`. The totals stay whole however many are
+     * left off. Absent from a server before it.
+     */
+    readonly waiting?: readonly { id: string; unread: number; at: number | null }[];
 }
+
+/** The most conversations `ChatUnread.waiting` names. The one somebody is in
+ *  has nearly always just moved, so it is among the newest. */
+export const MOST_WAITING_LISTED = 200;
 
 /**
  * The conversations this reader has in a chat that is not the one open.
@@ -2521,10 +2534,26 @@ export async function conversationsElsewhere(actor: ChatActor): Promise<ChatElse
 }
 
 export async function unreadTotal(actor: ChatActor): Promise<ChatUnread> {
+    const { messages, conversations } = await unreadTotalNamed(actor);
+    return { messages, conversations };
+}
+
+/** `unreadTotal` with the conversations behind it named, for the badge a tab
+ *  draws (`ChatUnread.waiting`). The bare totals stay what every other caller -
+ *  a Stream Deck key, the launcher - reads. */
+export async function unreadTotalNamed(actor: ChatActor): Promise<ChatUnread> {
     const waiting = await unreadConversations(actor);
     return {
         messages: waiting.reduce((sum, channel) => sum + channel.unread, 0),
-        conversations: waiting.length
+        conversations: waiting.length,
+        waiting: waiting
+            .map((channel) => ({
+                id: channel.id,
+                unread: channel.unread,
+                at: channel.lastMessageAt?.getTime() ?? null
+            }))
+            .sort((left, right) => (right.at ?? 0) - (left.at ?? 0))
+            .slice(0, MOST_WAITING_LISTED)
     };
 }
 

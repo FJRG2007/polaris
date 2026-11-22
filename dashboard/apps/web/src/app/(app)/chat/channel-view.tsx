@@ -127,6 +127,7 @@ import { usePolarContext } from "@/components/polar/polar-panel";
 import * as polls from "./chat-reads";
 import * as chatCache from "@/lib/chat/offline/chat-cache";
 import * as outbox from "./outbox";
+import * as readMarks from "@/lib/chat/read-marks";
 import { prefetchMedia } from "./media-download";
 import { newClientKey, type OutboxEntry } from "@/lib/chat/offline/outbox";
 import { mayStartThread } from "@/lib/chat/thread-rules";
@@ -426,6 +427,9 @@ export function ChannelView({
     // not count as them choosing to read further up.
     const settling = useRef(0);
     const marked = useRef("");
+    // Put back to unread on purpose from this screen: not being read until a new
+    // message is, however the reader is sitting at the bottom of it.
+    const heldBack = useRef(false);
     // Which message each optimistic draft turned into. Reconciling on the id the
     // server gave back rather than on the text is what keeps two people saying
     // "ok" from cancelling each other's draft off the screen.
@@ -483,6 +487,9 @@ export function ChannelView({
             (described?.id === channelId ? described : null),
         [channels, channelId, described]
     );
+    // For the read on the way out, which runs after this render's values are gone.
+    const lastMessageAt = useRef<string | null>(null);
+    lastMessageAt.current = channel?.lastMessageAt ?? null;
     const spaceId = channel?.spaceId ?? null;
     const emojiScope = useSpaceEmojiScope(
         spaceId,
@@ -523,6 +530,8 @@ export function ChannelView({
      * while the list is at the bottom.
      */
     const markUnread = async (message: ChatMessageView) => {
+        heldBack.current = true;
+        readMarks.forgetReadMark(channelId);
         const result = await runAction(
             () => actions.markUnreadAction({ channelId, messageId: message.id }),
             setError
@@ -577,6 +586,7 @@ export function ChannelView({
         setForwarding(null);
         setError("");
         marked.current = "";
+        heldBack.current = false;
         following.current = true;
         olderThanRef.current = null;
         newerThanRef.current = null;
@@ -1665,7 +1675,12 @@ export function ChannelView({
             const newest = held.current[held.current.length - 1];
             if (!newest || marked.current === newest.id) return;
             marked.current = newest.id;
-            void actions.markReadAction({ channelId, messageId: newest.id });
+            heldBack.current = false;
+            // Read on this tab now - the rail, the badge and the tab icon drop it
+            // in the same frame - and on the server in the background, through a
+            // plain request rather than an action, which would wait in line behind
+            // whatever this screen is loading or sending. See `lib/chat/read-marks`.
+            readMarks.markRead(channelId, newest.id, newest.createdAt);
             // What announced these messages while nobody was looking has been
             // answered now, and a notice left behind would send the reader back
             // to something they have just read.
@@ -1679,6 +1694,26 @@ export function ChannelView({
     );
 
     catchUpMarkRef.current = catchUpMark;
+
+    /**
+     * Being read right now: at the newest line, in a tab that is shown and in
+     * front, and not put back to unread from here. Asked whenever a count is
+     * drawn, so a message landing here while it is true is never counted at all
+     * - whether the rail's answer or the messages arrive first. The same
+     * conditions `catchUpMark` reads by, which is what marks it a moment later.
+     */
+    useEffect(
+        () =>
+            readMarks.watchReading(
+                channelId,
+                () =>
+                    !heldBack.current &&
+                    following.current &&
+                    attending.current === true &&
+                    document.visibilityState !== "hidden"
+            ),
+        [channelId, attending]
+    );
 
     /**
      * The first pass is somebody opening this conversation, and every pass after it
@@ -1723,7 +1758,15 @@ export function ChannelView({
         () => () => {
             if (messagesLoaded.current) return;
             if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-            void actions.markChannelsReadAction({ channelIds: [channelId] });
+            const undo = readMarks.readThrough([
+                { id: channelId, lastMessageAt: lastMessageAt.current }
+            ]);
+            void actions
+                .markChannelsReadAction({ channelIds: [channelId] })
+                .then((result) => {
+                    if (result.error) undo();
+                })
+                .catch(undo);
             closeDesktopNotice(`message:${channelId}`);
         },
         [channelId]
@@ -1946,6 +1989,7 @@ export function ChannelView({
     ): Promise<SendOutcome> => {
         if (files.length > 0 || fromDrive.length > 0) {
             following.current = true;
+            catchUpMark(true);
 
             // The files go first and the message names them - see `sendWithFiles`.
             const answered = await sendWithFiles({
@@ -2008,6 +2052,10 @@ export function ChannelView({
         });
         setPending((current) => [...current, draft]);
         following.current = true;
+        // Answering is having read what was answered: everything on screen is
+        // read now, here and on the server, ahead of the message itself. The
+        // send moves the server's mark past it too, but says so to nobody.
+        catchUpMark(true);
 
         const answering = replyingTo?.id ?? null;
         // A message said in another room cannot be a reply here - a reply belongs

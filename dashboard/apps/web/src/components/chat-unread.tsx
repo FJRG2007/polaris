@@ -19,7 +19,17 @@
  */
 
 import { z } from "zod";
-import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from "react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useSyncExternalStore,
+    type ReactNode
+} from "react";
+import * as readMarks from "@/lib/chat/read-marks";
 import { subscribeSharedStream } from "@/lib/shared-stream";
 import { useSessionScope } from "@/components/session-scope";
 import { announcePresence } from "@/components/presence-store";
@@ -29,6 +39,10 @@ import { useShelfSeed } from "@/components/shelf-scope";
 export interface ChatUnread {
     readonly messages: number;
     readonly conversations: number;
+    /** The conversations behind the totals, when the server names them - what
+     *  lets this tab take the one being read off at once. Never read by a
+     *  badge; `useChatUnread` hands out the totals already settled. */
+    readonly waiting?: readonly readMarks.WaitingConversation[];
 }
 
 const NOTHING: ChatUnread = { messages: 0, conversations: 0 };
@@ -66,7 +80,15 @@ export function arrivedIn(frame: unknown): string[] {
     return named.filter((id): id is string => typeof id === "string");
 }
 
-const unreadSchema = z.object({ messages: z.number(), conversations: z.number() });
+const unreadSchema = z.object({
+    messages: z.number(),
+    conversations: z.number(),
+    // Absent from a server before it, which leaves the totals as they come.
+    waiting: z
+        .array(z.object({ id: z.string(), unread: z.number(), at: z.number().nullable() }))
+        .max(1000)
+        .optional()
+});
 
 /** The frames worth re-counting for. A message arriving moves it up, somebody
  *  catching up moves it down, and a conversation appearing or going changes what
@@ -175,5 +197,18 @@ export function ChatUnreadProvider({
         };
     }, [enabled, scope, recount, acknowledge]);
 
-    return <UnreadContext.Provider value={unread}>{children}</UnreadContext.Provider>;
+    // A conversation this tab is reading, or has just read, comes off the totals
+    // now rather than once the read has gone round and the count been asked
+    // again - and stays off when an answer that set off before it lands.
+    const readVersion = useSyncExternalStore(
+        readMarks.subscribeReadMarks,
+        readMarks.readMarksVersion,
+        readMarks.readMarksVersion
+    );
+    const shown = useMemo(() => {
+        void readVersion;
+        return readMarks.settledTotals(unread);
+    }, [unread, readVersion]);
+
+    return <UnreadContext.Provider value={shown}>{children}</UnreadContext.Provider>;
 }

@@ -78,15 +78,20 @@ vi.mock("@/app/(app)/chat/actions", () => ({
     }),
     readSinceAction: async () => ({ page: { messages: arrived } }),
     markChannelsReadAction: async () => ({}),
-    markReadAction: async (input: { channelId: string; messageId: string }) => {
-        marked.push(input);
-        return {};
-    },
     receiptsAction: async () => ({ receipts: {} }),
     readThreadAction: async () => ({ messages: [] }),
     // The profile panel beside a direct message asks for this when it opens.
     profileAction: async () => ({}),
     voicePresenceAction: async () => ({ inRoom: {} })
+}));
+
+// The read goes out through `read-marks` (a plain request, not an action);
+// what is pinned here is the screen deciding to send it.
+vi.mock("@/lib/chat/read-marks", async (original) => ({
+    ...(await original<typeof import("@/lib/chat/read-marks")>()),
+    markRead: (channelId: string, messageId: string) => {
+        marked.push({ channelId, messageId });
+    }
 }));
 
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({

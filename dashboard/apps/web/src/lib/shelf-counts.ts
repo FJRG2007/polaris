@@ -19,7 +19,7 @@
 import { unreadCounts } from "@/lib/mailbox/views";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { badgeClearedAt } from "@/lib/badge-seen";
-import { unreadTotal, type ChatUnread } from "@/lib/chat/chat-service";
+import { unreadTotalNamed, type ChatUnread } from "@/lib/chat/chat-service";
 
 export interface MailWaiting {
     readonly messages: number;
@@ -49,5 +49,5 @@ export async function mailWaitingOnShelf(userId: string): Promise<MailWaiting> {
  *  resolved inside Chat, which is where an organization keeping a chat of its
  *  own is decided - see `chat/isolation`. */
 export async function chatWaitingOnShelf(userId: string): Promise<ChatUnread> {
-    return unreadTotal({ id: userId });
+    return unreadTotalNamed({ id: userId });
 }

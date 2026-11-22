@@ -31,6 +31,7 @@ import {
     useMemo,
     useRef,
     useState,
+    useSyncExternalStore,
     type ReactNode
 } from "react";
 import { useRouter } from "next/navigation";
@@ -38,6 +39,7 @@ import { pollWhileVisible, useToast } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import { ConversationList } from "@/lib/chat/conversation-list";
 import * as polls from "./chat-reads";
+import * as readMarks from "@/lib/chat/read-marks";
 
 /**
  * What this account may do in the chat beyond reading and writing in it.
@@ -560,6 +562,32 @@ export function ChatProvider({
         [rules]
     );
 
+    /**
+     * The conversations as this tab should draw them: a count for one being read
+     * here, or one the server has not caught up on reading yet, is zero now
+     * rather than once the read has gone round. See `lib/chat/read-marks`.
+     */
+    const readVersion = useSyncExternalStore(
+        readMarks.subscribeReadMarks,
+        readMarks.readMarksVersion,
+        readMarks.readMarksVersion
+    );
+    const shown = useMemo(() => {
+        void readVersion;
+        let moved = false;
+        const settled = channels.map((channel) => {
+            const unread = readMarks.settledUnread(
+                channel.id,
+                channel.unread,
+                channel.lastMessageAt
+            );
+            if (unread === channel.unread) return channel;
+            moved = true;
+            return { ...channel, unread };
+        });
+        return moved ? settled : channels;
+    }, [channels, readVersion]);
+
     const value = useMemo(
         () => ({
             viewerId,
@@ -567,7 +595,7 @@ export function ChatProvider({
             may,
             orgId,
             orgName,
-            channels,
+            channels: shown,
             spaces,
             categories,
             blocked,
@@ -591,7 +619,7 @@ export function ChatProvider({
             may,
             orgId,
             orgName,
-            channels,
+            shown,
             spaces,
             categories,
             blocked,

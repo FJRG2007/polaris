@@ -63,6 +63,12 @@ let loaded = true;
 let landRead: (() => void) | null = null;
 const markRead = vi.fn(async () => ({}));
 const markChannelsRead = vi.fn(async () => ({}));
+// The read from the screen goes out through `read-marks` (a plain request, not
+// an action); what is pinned here is the screen deciding to send it.
+vi.mock("@/lib/chat/read-marks", async (original) => ({
+    ...(await original<typeof import("@/lib/chat/read-marks")>()),
+    markRead: (channelId: string, messageId: string) => markRead({ channelId, messageId })
+}));
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
@@ -85,7 +91,6 @@ vi.mock("@/app/(app)/chat/actions", () => ({
                 resolve({ page: { messages: opened, olderThan: null, newerThan: null } });
         }),
     readSinceAction: async () => ({ page: { messages: [] } }),
-    markReadAction: (input: unknown) => markRead(input),
     markChannelsReadAction: (input: unknown) => markChannelsRead(input),
     receiptsAction: async () => ({ receipts: {} }),
     readThreadAction: async () => ({ messages: [] }),

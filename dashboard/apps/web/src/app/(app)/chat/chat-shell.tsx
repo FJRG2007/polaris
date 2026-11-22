@@ -34,6 +34,7 @@ import { BottomTabs, PAGE_BLEED, ResizeHandle } from "@polaris/ui";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
 import { useRef, useMemo, useState, useCallback, type CSSProperties, type ReactNode } from "react";
 import { ChatProvider, useChat, type ChatAllowances } from "./chat-context";
+import * as readMarks from "@/lib/chat/read-marks";
 
 /**
  * What the conversation list may be narrowed and widened to.
@@ -200,6 +201,10 @@ function ChatColumns({ children }: { children: ReactNode }) {
                 // tick on this reader's own last message in that row, so it is
                 // asked for only while that row has a tick still short of read.
                 if (frame.kind === "read") {
+                    // Put back to unread on purpose, here or on another device:
+                    // what this tab read ahead of the server no longer stands.
+                    if (frame.userId === viewerId && frame.unread)
+                        readMarks.forgetReadMark(frame.channelId);
                     if (frame.userId === viewerId) refreshChannels();
                     else if (tickMayMove(rows.current, frame.channelId)) refreshChannels();
                 }

@@ -24,6 +24,7 @@
 import Link from "next/link";
 import { TypingWatch, useTypingIn, type ListTypist } from "./typing-everywhere";
 import * as actions from "./actions";
+import * as readMarks from "@/lib/chat/read-marks";
 import { useChat } from "./chat-context";
 import { Elsewhere } from "./elsewhere";
 import { usePresence } from "@/components/presence-store";
@@ -2000,13 +2001,17 @@ function RowMenu({
                             [
                                 channel.unread === 0 ? (
                                     <ContextMenuItem
-                                        onSelect={() =>
+                                        onSelect={() => {
+                                            // What this tab read ahead of the
+                                            // server must not hide the badge
+                                            // being put back.
+                                            readMarks.forgetReadMark(channel.id);
                                             void patch({ unread: 1 }, () =>
                                                 actions.markUnreadAction({
                                                     channelId: channel.id
                                                 })
-                                            )
-                                        }
+                                            );
+                                        }}
                                     >
                                         <Mail className="size-3.5" />
                                         {t("sidebar.markAsUnread")}
