@@ -2246,7 +2246,9 @@ export function PolarChat({
               ]
             : [])
     ];
-    const slashOpen = !slashDismissed && slashItems.length > 0;
+    // Chat sits mounted under Code and shares its draft there, so its menu
+    // opens only while Chat is the side on screen.
+    const slashOpen = threadShown && !slashDismissed && slashItems.length > 0;
     const slashHighlight =
         slashItems[slashActive] && !slashItems[slashActive].disabled
             ? slashActive
@@ -2980,6 +2982,7 @@ export function PolarChat({
                 )}
                 <div
                     className={cn("flex min-h-0 min-w-0 flex-1 flex-col", !threadShown && "hidden")}
+                    hidden={threadShown ? undefined : true}
                     inert={threadShown ? undefined : true}
                 >
                     {comparison ? (

@@ -129,7 +129,7 @@ function EffortSteps({ effort, onBack }: { effort: ModelEffort; onBack: () => vo
                             {t("effort.recommended")}
                         </span>
                     ) : level === top ? (
-                        <span className="shrink-0 rounded bg-warning/10 px-1.5 py-0.5 text-[10px] text-warning">
+                        <span className="shrink-0 rounded bg-warning-soft px-1.5 py-0.5 text-[10px] text-warning">
                             {t("effort.moreUsage")}
                         </span>
                     ) : null}
