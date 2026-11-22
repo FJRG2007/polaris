@@ -16,7 +16,7 @@ import { canDrawOnShare, drawOnShare, stopDrawing } from "./annotate-overlay";
 import { strokeSchema } from "@/shared/annotate";
 import { setCallHotkeys } from "./call-hotkeys";
 import { followTextSize as followWidgetTextSize, setVoiceState, voiceWidgetAction } from "./voice-widget";
-import { rememberTextSize, textSize } from "./settings";
+import { rememberLauncherEngine, rememberTextSize, textSize } from "./settings";
 import { readTextSize } from "@/shared/text-size";
 import { voiceActionSchema, voiceStateSchema } from "@/shared/voice-widget";
 import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys";
@@ -69,6 +69,8 @@ import {
     webContents
 } from "electron";
 import { ICON_ACCEPT, iconAcceptable } from "./notice-layout";
+import { SEARCH_ENGINE_IDS } from "@/shared/launcher";
+import { clearClipboardHistory, launcherStatus, recordLauncherKey, setLauncherBinding } from "./launcher";
 
 export interface IpcHost extends PushHost {
     /** The game running now, as the watcher last saw it. */
@@ -689,6 +691,24 @@ export function registerIpc(host: IpcHost): void {
     ipcMain.handle(CHANNELS.connectHardwareAcceleration, (event, raw: unknown): boolean => {
         const on = z.boolean().safeParse(raw);
         return from(event, "connect") && on.success && host.setHardwareAcceleration(on.data);
+    });
+    ipcMain.handle(CHANNELS.connectLauncherStatus, (event) => (from(event, "connect") ? launcherStatus() : null));
+    ipcMain.handle(CHANNELS.connectLauncherBinding, (event, raw: unknown) => {
+        const binding = z.string().max(40).safeParse(raw);
+        return from(event, "connect") && binding.success ? setLauncherBinding(binding.data) : null;
+    });
+    ipcMain.handle(CHANNELS.connectLauncherRecord, (event, raw: unknown) => {
+        const recording = z.boolean().safeParse(raw);
+        if (from(event, "connect") && recording.success) recordLauncherKey(recording.data);
+    });
+    ipcMain.handle(CHANNELS.connectLauncherEngine, (event, raw: unknown): boolean => {
+        const engine = z.enum(SEARCH_ENGINE_IDS).safeParse(raw);
+        if (!from(event, "connect") || !engine.success) return false;
+        rememberLauncherEngine(engine.data);
+        return true;
+    });
+    ipcMain.handle(CHANNELS.connectClipboardClear, (event) => {
+        if (from(event, "connect")) clearClipboardHistory();
     });
     ipcMain.handle(CHANNELS.connectToggle, (event, raw: unknown): boolean => {
         const input = z

@@ -22,6 +22,7 @@ import type { UpdateReady } from "./update-ready";
 import type { UpdateCheck } from "./update-check";
 import type { CallHotkey, CallHotkeysInput, CallHotkeysResult } from "./call-hotkeys";
 import type { VoiceAction, VoiceState, WidgetView } from "./voice-widget";
+import type { SearchEngine } from "./launcher";
 
 export type Outcome = { readonly ok: true; } | { readonly ok: false; readonly error: string; };
 
@@ -330,11 +331,30 @@ export interface Preferences {
     readonly voiceWidget: boolean;
     /** That widget only while a game is running. */
     readonly voiceWidgetGameOnly: boolean;
+    /** The launcher opens with its key from anywhere. */
+    readonly launcher: boolean;
+    /** The launcher keeps what was copied, in memory only. */
+    readonly launcherClipboard: boolean;
+    /** Where a web search from the launcher goes. */
+    readonly launcherEngine: SearchEngine;
     readonly version: string;
 }
 
+/** The launcher's key as the settings show it. */
+export interface LauncherStatus {
+    readonly enabled: boolean;
+    /** As a person reads it: `Alt+Space`, `Cmd+K`. */
+    readonly key: string;
+    /** Whether the system gave it to Polaris. */
+    readonly held: boolean;
+    /** What to say when it did not, naming who likely holds it; else null. */
+    readonly problem: string | null;
+    /** Other launchers found on this computer. */
+    readonly others: readonly string[];
+}
+
 /** The switches the settings window keeps with one call. */
-export const PREFERENCE_TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly"] as const;
+export const PREFERENCE_TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly", "launcher", "launcherClipboard"] as const;
 
 export type PreferenceToggle = (typeof PREFERENCE_TOGGLES)[number];
 
@@ -361,6 +381,16 @@ export interface PolarisLocal {
         setHardwareAcceleration(on: boolean): Promise<boolean>;
         /** Keep one of the plain switches. Whether it took. */
         setToggle(name: PreferenceToggle, on: boolean): Promise<boolean>;
+        /** The launcher's key and whether the system gave it, with who likely holds it
+         *  when not. Looks once at the installed and running launchers. */
+        launcherStatus(): Promise<LauncherStatus>;
+        /** Hold a newly recorded key; the old one is kept when the new one is refused. */
+        setLauncherBinding(binding: string): Promise<LauncherStatus>;
+        /** Let the key go while a new one is recorded, so the press reaches the page. */
+        recordLauncherKey(recording: boolean): Promise<void>;
+        setLauncherEngine(engine: SearchEngine): Promise<boolean>;
+        /** Forget every copy the launcher kept. */
+        clearClipboardHistory(): Promise<void>;
         /** Close and open the app again, so a setting read at start applies. */
         relaunch(): Promise<Outcome>;
         /** Put the settings away. */
@@ -663,6 +693,11 @@ export const CHANNELS = {
     connectOpenAtLogin: "local:connect-open-at-login",
     connectHardwareAcceleration: "local:connect-hardware-acceleration",
     connectToggle: "local:connect-toggle",
+    connectLauncherStatus: "local:connect-launcher-status",
+    connectLauncherBinding: "local:connect-launcher-binding",
+    connectLauncherRecord: "local:connect-launcher-record",
+    connectLauncherEngine: "local:connect-launcher-engine",
+    connectClipboardClear: "local:connect-clipboard-clear",
     connectRelaunch: "local:connect-relaunch",
     connectSwitch: "local:connect-switch",
     connectRename: "local:connect-rename",

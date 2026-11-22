@@ -105,6 +105,44 @@
                 </span>
                 <input id="voice-widget-game-only" class="switch" type="checkbox" role="switch" />
             </label>
+            <label class="setting">
+                <span class="setting-text">
+                    <span class="name">Search from anywhere</span>
+                    <span class="hint">Opens Polaris search over any app with its shortcut.</span>
+                </span>
+                <input id="launcher" class="switch" type="checkbox" role="switch" />
+            </label>
+            <div class="setting">
+                <span class="setting-text">
+                    <span class="name">Search shortcut</span>
+                    <span id="launcher-key-hint" class="hint">Alt+Space</span>
+                </span>
+                <button id="launcher-record" class="ghost" type="button">Change</button>
+            </div>
+            <p id="launcher-problem" class="error" role="alert" hidden></p>
+            <label class="setting">
+                <span class="setting-text">
+                    <span class="name">Web search</span>
+                    <span class="hint">Where a web search from Polaris search goes.</span>
+                </span>
+                <select id="launcher-engine">
+                    <option value="duckduckgo">DuckDuckGo</option>
+                    <option value="google">Google</option>
+                    <option value="bing">Bing</option>
+                    <option value="brave">Brave Search</option>
+                    <option value="startpage">Startpage</option>
+                </select>
+            </label>
+            <label class="setting">
+                <span class="setting-text">
+                    <span class="name">Clipboard history</span>
+                    <span class="hint">Polaris search keeps your last 200 copies on this computer, in memory only. Passwords from password managers are skipped. Type "clip" to see them.</span>
+                </span>
+                <input id="launcher-clipboard" class="switch" type="checkbox" role="switch" />
+            </label>
+            <div class="row end">
+                <button id="launcher-clear" class="ghost" type="button">Clear clipboard history</button>
+            </div>
             <div class="row version-row">
                 <p id="version" class="hint version"></p>
                 <button id="check-updates" class="ghost" type="button">Check for updates</button>

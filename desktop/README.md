@@ -20,6 +20,13 @@ window and adds what a browser tab cannot do:
   yourself under Account > Privacy. Only the matched game's name, its program
   and when it started are sent; Polaris shows it only while game sharing is
   switched on there, and keeps nothing of it while it is off.
+- **Search from anywhere**: Alt+Space (or the shortcut you record in Settings >
+  General) opens Polaris search over any app - your projects, servers and
+  pages, installed programs, sums and unit conversions, Ask Polar and a web
+  search. When another launcher already holds the shortcut, Settings names it.
+  An opt-in clipboard history keeps your last 200 copies in memory only and
+  skips what password managers mark as secret. The search window is made on
+  first use and freed after five minutes unused.
 
 Nothing of Polaris runs here: the app is a client of the instance it is pointed
 at. The installable web app (Account > Preferences) stays the option with

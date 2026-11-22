@@ -39,7 +39,8 @@ await build({
     entryPoints: {
         app: join(ROOT, "src/preload/app.ts"),
         local: join(ROOT, "src/preload/local.ts"),
-        usb: join(ROOT, "src/preload/usb.ts")
+        usb: join(ROOT, "src/preload/usb.ts"),
+        launcher: join(ROOT, "src/preload/launcher.ts")
     },
     outdir: join(DIST, "preload")
 });
@@ -52,12 +53,12 @@ await build({
     minify: true,
     logLevel: "info",
     legalComments: "none",
-    entryPoints: ["connect", "api-key", "push", "tv", "usb", "overlay", "voice-widget", "updating"].map((page) => join(ROOT, "src/renderer", `${page}.ts`)),
+    entryPoints: ["connect", "api-key", "push", "tv", "usb", "overlay", "voice-widget", "updating", "launcher"].map((page) => join(ROOT, "src/renderer", `${page}.ts`)),
     outdir: join(DIST, "renderer")
 });
 
 mkdirSync(join(DIST, "renderer"), { recursive: true });
-for (const file of ["connect.html", "api-key.html", "push.html", "tv.html", "usb.html", "overlay.html", "voice-widget.html", "updating.html", "styles.css", "mark.svg"]) {
+for (const file of ["connect.html", "api-key.html", "push.html", "tv.html", "usb.html", "overlay.html", "voice-widget.html", "updating.html", "launcher.html", "styles.css", "mark.svg"]) {
     copyFileSync(join(ROOT, "src/renderer", file), join(DIST, "renderer", file));
 }
 // The dashboard's face, so these windows read the way it does.

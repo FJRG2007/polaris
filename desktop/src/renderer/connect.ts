@@ -20,7 +20,9 @@ import { describeUpdateCheck, type UpdateCheck } from "@/shared/update-check";
 import { describeServer, normalizeServerName, SERVER_NAME_MAX, type ServerRow } from "@/shared/servers";
 import { encodeHostList, HOST_LIST_PREFIX, hostListLink } from "../../../dashboard/packages/core/src/host-list";
 import { encodeQr, qrSvgPath } from "../../../dashboard/packages/core/src/qr";
-import type { HostImport } from "@/shared/bridge";
+import type { HostImport, LauncherStatus } from "@/shared/bridge";
+import type { SearchEngine } from "@/shared/launcher";
+import { bindingFromPress } from "@/shared/launcher-hotkey";
 import jsQR from "jsqr";
 
 const form = byId<HTMLFormElement>("form");
@@ -45,7 +47,9 @@ const toggles = {
     minimizeToTray: byId<HTMLInputElement>("minimize-to-tray"),
     startMinimized: byId<HTMLInputElement>("start-minimized"),
     voiceWidget: byId<HTMLInputElement>("voice-widget"),
-    voiceWidgetGameOnly: byId<HTMLInputElement>("voice-widget-game-only")
+    voiceWidgetGameOnly: byId<HTMLInputElement>("voice-widget-game-only"),
+    launcher: byId<HTMLInputElement>("launcher"),
+    launcherClipboard: byId<HTMLInputElement>("launcher-clipboard")
 } as const;
 const restartDialog = byId<HTMLDialogElement>("confirm-restart");
 const restartFailure = byId<HTMLParagraphElement>("restart-failure");
@@ -616,9 +620,98 @@ openAtLogin.addEventListener("change", () => {
             say(failure, "Polaris could not change this on this computer.");
         });
 });
+const launcherRecord = byId<HTMLButtonElement>("launcher-record");
+const launcherKeyHint = byId<HTMLSpanElement>("launcher-key-hint");
+const launcherProblem = byId<HTMLParagraphElement>("launcher-problem");
+const launcherEngine = byId<HTMLSelectElement>("launcher-engine");
+const launcherClear = byId<HTMLButtonElement>("launcher-clear");
+let recordingKey = false;
+
+/** The search shortcut as the system left it, and who likely holds it when it is taken. */
+function drawLauncherStatus(status: LauncherStatus): void {
+    launcherKeyHint.textContent = status.others.length && status.held
+        ? `${status.key} - also installed: ${status.others.join(", ")}`
+        : status.key;
+    launcherProblem.hidden = !status.problem;
+    launcherProblem.textContent = status.problem ?? "";
+}
+
+async function showLauncherStatus(): Promise<void> {
+    const status = await window.polarisLocal.connect.launcherStatus().catch(() => null);
+    if (status) drawLauncherStatus(status);
+}
+
+function stopRecording(): void {
+    recordingKey = false;
+    launcherRecord.textContent = "Change";
+    document.removeEventListener("keydown", recordKey, true);
+}
+
+/** The next press becomes the shortcut; Esc keeps the old one. */
+function recordKey(event: KeyboardEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === "Escape") {
+        stopRecording();
+        void window.polarisLocal.connect.recordLauncherKey(false).then(showLauncherStatus);
+        return;
+    }
+    const binding = bindingFromPress(event, platformOf());
+    if (!binding) {
+        if (!["Control", "Alt", "Shift", "Meta"].includes(event.key)) {
+            launcherProblem.hidden = false;
+            launcherProblem.textContent = "Use Ctrl, Alt or Cmd with a key, or a function key.";
+        }
+        return;
+    }
+    stopRecording();
+    void window.polarisLocal.connect
+        .setLauncherBinding(binding)
+        .catch(() => null)
+        .then((status) => {
+            if (status) drawLauncherStatus(status);
+            else void window.polarisLocal.connect.recordLauncherKey(false).then(showLauncherStatus);
+        });
+}
+
+/** The platform the page runs on, as Node names it, for how keys are spelled. */
+function platformOf(): NodeJS.Platform {
+    const agent = navigator.userAgent;
+    return /Mac/.test(agent) ? "darwin" : /Windows/.test(agent) ? "win32" : "linux";
+}
+
+launcherRecord.addEventListener("click", () => {
+    if (recordingKey) {
+        stopRecording();
+        void window.polarisLocal.connect.recordLauncherKey(false).then(showLauncherStatus);
+        return;
+    }
+    recordingKey = true;
+    launcherRecord.textContent = "Press the new shortcut...";
+    launcherProblem.hidden = true;
+    void window.polarisLocal.connect.recordLauncherKey(true);
+    document.addEventListener("keydown", recordKey, true);
+});
+launcherEngine.addEventListener("change", () => {
+    say(failure, null);
+    void window.polarisLocal.connect
+        .setLauncherEngine(launcherEngine.value as SearchEngine)
+        .catch(() => false)
+        .then((kept) => {
+            if (!kept) say(failure, "Polaris could not save this setting. Try again.");
+        });
+});
+launcherClear.addEventListener("click", () => {
+    void window.polarisLocal.connect.clearClipboardHistory().then(() => {
+        launcherClear.textContent = "Cleared";
+        setTimeout(() => (launcherClear.textContent = "Clear clipboard history"), 1500);
+    });
+});
+void showLauncherStatus();
 /** "Only while a game is running" means nothing with the widget off. */
 function followVoiceWidget(): void {
     toggles.voiceWidgetGameOnly.disabled = !toggles.voiceWidget.checked;
+    launcherRecord.disabled = !toggles.launcher.checked;
 }
 for (const [name, input] of Object.entries(toggles) as [keyof typeof toggles, HTMLInputElement][]) {
     input.addEventListener("change", () => {
@@ -629,7 +722,11 @@ for (const [name, input] of Object.entries(toggles) as [keyof typeof toggles, HT
             .setToggle(name, wanted)
             .catch(() => false)
             .then((kept) => {
-                if (kept) return;
+                if (kept) {
+                    if (name === "launcher") void showLauncherStatus();
+                    if (name === "launcherClipboard") launcherClear.hidden = !wanted;
+                    return;
+                }
                 input.checked = !wanted;
                 followVoiceWidget();
                 say(failure, "Polaris could not save this setting. Try again.");
@@ -680,6 +777,10 @@ const preferencesLoaded = window.polarisLocal.connect.preferences().catch(() => 
     toggles.startMinimized.checked = preferences.startMinimized;
     toggles.voiceWidget.checked = preferences.voiceWidget;
     toggles.voiceWidgetGameOnly.checked = preferences.voiceWidgetGameOnly;
+    toggles.launcher.checked = preferences.launcher;
+    toggles.launcherClipboard.checked = preferences.launcherClipboard;
+    launcherClear.hidden = !preferences.launcherClipboard;
+    launcherEngine.value = preferences.launcherEngine;
     followVoiceWidget();
     restartPending.hidden = !preferences.restartPending;
     byId("version").textContent = `Polaris ${preferences.version}`;

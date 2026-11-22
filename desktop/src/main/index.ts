@@ -22,6 +22,7 @@ import { openTvInstall } from "./tv-install";
 import { registerIpc } from "./ipc";
 import { runner } from "./runner";
 import { holdsCall, releaseCallHotkeys } from "./call-hotkeys";
+import * as launcher from "./launcher";
 import { closeVoiceWidget, refreshVoiceWidget, setVoiceWidgetGame } from "./voice-widget";
 import { DEEP_LINK_SCHEME, deepLinkIn, readDeepLink } from "@/shared/deep-link";
 import { DeepLinks } from "./deep-links";
@@ -816,6 +817,7 @@ function start(): void {
         // list can group this app with the other Polaris apps on the machine.
         installDeviceHeaders(session.defaultSession, server);
 
+        launcher.startLauncher({ server, showPolaris });
         registerIpc({
             server,
             showPolaris,
@@ -833,6 +835,9 @@ function start(): void {
                     startMinimized: settings.toggle("startMinimized"),
                     voiceWidget: settings.toggle("voiceWidget"),
                     voiceWidgetGameOnly: settings.toggle("voiceWidgetGameOnly"),
+                    launcher: settings.toggle("launcher"),
+                    launcherClipboard: settings.toggle("launcherClipboard"),
+                    launcherEngine: settings.launcherEngine(),
                     version: app.getVersion()
                 };
             },
@@ -848,6 +853,7 @@ function start(): void {
             setToggle: (name, on) => {
                 settings.rememberToggle(name, on);
                 refreshVoiceWidget();
+                if (name === "launcher" || name === "launcherClipboard") launcher.followLauncherSettings();
                 return true;
             },
             relaunch: () => {
@@ -1005,6 +1011,7 @@ function start(): void {
         void runner().use(null);
         releaseCallHotkeys();
         closeVoiceWidget();
+        launcher.stopLauncher();
     });
 
     // An update closes every window before it quits, and none may stay in the tray.

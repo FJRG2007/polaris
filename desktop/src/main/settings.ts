@@ -17,6 +17,8 @@ import type { WindowPlace } from "@/shared/window-place";
 import { readServers, withServer, type SavedServer } from "@/shared/servers";
 import { DEFAULT_TEXT_SIZE, readTextSize, type TextSize } from "@/shared/text-size";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { DEFAULT_LAUNCHER_BINDING } from "@/shared/launcher-hotkey";
+import { SEARCH_ENGINE_IDS, type SearchEngine } from "@/shared/launcher";
 
 /** A platform `docker build --platform` takes, or "" for this computer's own. */
 export const PUSH_PLATFORMS = ["", "linux/amd64", "linux/arm64"] as const;
@@ -63,7 +65,15 @@ const settingsSchema = z.object({
     // Where the widget was dragged to, or null for its corner.
     voiceWidgetPlace: z.object({ x: z.number().int(), y: z.number().int() }).nullable().catch(null),
     // The account's text size last seen in the Polaris window, or null before one was.
-    textSize: z.unknown().transform(readTextSize).catch(null)
+    textSize: z.unknown().transform(readTextSize).catch(null),
+    // On unless somebody turned it off: the launcher opens with its key from anywhere.
+    launcher: z.boolean().catch(true),
+    // The launcher's key in the dashboard's spelling; a file without one uses the default.
+    launcherBinding: z.string().max(40).catch(DEFAULT_LAUNCHER_BINDING),
+    // Off unless somebody turned it on: the launcher keeps what was copied, in memory.
+    launcherClipboard: z.boolean().catch(false),
+    // Where a web search from the launcher goes.
+    launcherEngine: z.enum(SEARCH_ENGINE_IDS).catch("duckduckgo")
 });
 
 type Settings = z.infer<typeof settingsSchema>;
@@ -81,7 +91,11 @@ const EMPTY: Settings = {
     voiceWidget: true,
     voiceWidgetGameOnly: false,
     voiceWidgetPlace: null,
-    textSize: null
+    textSize: null,
+    launcher: true,
+    launcherBinding: DEFAULT_LAUNCHER_BINDING,
+    launcherClipboard: false,
+    launcherEngine: "duckduckgo"
 };
 
 function file(): string {
@@ -174,7 +188,7 @@ export function rememberHardwareAcceleration(on: boolean): void {
 }
 
 /** The switches kept as they are and read when they matter. */
-export const TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly"] as const;
+export const TOGGLES = ["minimizeToTray", "startMinimized", "voiceWidget", "voiceWidgetGameOnly", "launcher", "launcherClipboard"] as const;
 
 export type Toggle = (typeof TOGGLES)[number];
 
@@ -216,4 +230,22 @@ export function pushChoice(serviceId: string): PushChoice | null {
 export function rememberPushChoice(serviceId: string, choice: PushChoice): void {
     const settings = load();
     save({ ...settings, pushes: { ...settings.pushes, [serviceId]: choice } });
+}
+
+/** The launcher's key, in the dashboard's spelling. */
+export function launcherBinding(): string {
+    return load().launcherBinding;
+}
+
+export function rememberLauncherBinding(binding: string): void {
+    save({ ...load(), launcherBinding: binding });
+}
+
+/** Where a web search from the launcher goes. */
+export function launcherEngine(): SearchEngine {
+    return load().launcherEngine;
+}
+
+export function rememberLauncherEngine(engine: SearchEngine): void {
+    save({ ...load(), launcherEngine: engine });
 }
