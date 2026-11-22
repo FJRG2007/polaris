@@ -6,20 +6,21 @@
  * /apple-touch-icon.png - exist and are the images they claim to be.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import manifest from "../../src/app/manifest";
 import { readFileSync } from "node:fs";
 import { MARK_BACKGROUND, MARK_STAR } from "@/lib/favicon";
 import { SERVER_ICON_FILES, serverIcons } from "@/lib/mcp/server-icons";
 import { ImplementationSchema } from "@modelcontextprotocol/sdk/types.js";
 
-const PUBLIC = new URL("../../public/", import.meta.url);
-const APP = new URL("../../src/app/", import.meta.url);
+// Out of season, the manifest lists the plain files these are checked against.
+vi.mock("@/lib/seasonal-service", () => ({ serverSeason: async () => null }));
 
-/** Where a root path is served from: app/icon.svg by Next's file convention,
- *  everything else from public/. */
+const PUBLIC = new URL("../../public/", import.meta.url);
+
+/** Where a root path is served from: public/. */
 function fileFor(path: string): URL {
-    return path === "/icon.svg" ? new URL("icon.svg", APP) : new URL(path.slice(1), PUBLIC);
+    return new URL(path.slice(1), PUBLIC);
 }
 
 /** Width and height from a PNG's IHDR chunk. */
@@ -82,8 +83,8 @@ describe("serverInfo.icons", () => {
         }
     });
 
-    it("are the icons the install manifest lists", () => {
-        const listed = manifest().icons?.map((icon) => icon.src) ?? [];
+    it("are the icons the install manifest lists", async () => {
+        const listed = (await manifest()).icons?.map((icon) => icon.src) ?? [];
         for (const file of SERVER_ICON_FILES) expect(listed).toContain(file.path);
     });
 });

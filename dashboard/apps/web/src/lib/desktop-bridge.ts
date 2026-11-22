@@ -15,6 +15,7 @@
  */
 
 import { z } from "zod";
+import type { SeasonCalendar } from "@polaris/core";
 
 export type DesktopOutcome = { readonly ok: true } | { readonly ok: false; readonly error: string };
 
@@ -296,7 +297,16 @@ export interface PolarisDesktop {
     /** The app's window, taskbar, tray and Dock icon in the season's dress: a
      *  PNG data URL, or null for the plain icon the app ships with. Missing on
      *  a desktop app older than it, which keeps its plain icon. */
-    setAppIcon?(input: { readonly png: string | null }): Promise<boolean>;
+    setAppIcon?(input: {
+        readonly png: string | null;
+        /** From here on, an app that settles several hosts (`appIconSeason`):
+         *  which host this is, its calendar (null with seasons off), and the
+         *  dressed marks it may need by season. An app older than that refuses
+         *  the call, and the page sends `{ png }` alone. */
+        readonly host?: string;
+        readonly calendar?: SeasonCalendar | null;
+        readonly icons?: Partial<Record<string, string>>;
+    }): Promise<boolean>;
     /** The screens and windows to share, each with a small picture, for the
      *  picker this page draws. Null where the system's own picker is the one to
      *  use (macOS). Absent from an app older than the picker, which then shows

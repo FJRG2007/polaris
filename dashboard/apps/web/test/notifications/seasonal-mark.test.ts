@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as core from "@polaris/core";
 
-const ICON = readFileSync(join(__dirname, "../../src/app/icon.svg"), "utf8");
+const ICON = readFileSync(join(__dirname, "../../public/icon.svg"), "utf8");
 
 describe("the seasonal mark", () => {
     it("is the app's own icon when no season is in force", () => {

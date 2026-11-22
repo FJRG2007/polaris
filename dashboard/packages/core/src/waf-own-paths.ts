@@ -82,6 +82,7 @@ export const POLARIS_ROUTE_ROOTS: readonly string[] = [
     "robots.txt",
     "router",
     "s",
+    "season-icon",
     "sa",
     "sounds",
     "status",

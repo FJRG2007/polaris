@@ -7,23 +7,25 @@
 
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { isGatewayFailure } from "@polaris/core/instance-fallback";
 import manifest from "../../src/app/manifest";
+
+vi.mock("@/lib/seasonal-service", () => ({ serverSeason: async () => null }));
 
 const worker = readFileSync(new URL("../../public/sw.js", import.meta.url), "utf8");
 const workerSource = worker;
 
 describe("the manifest", () => {
-    it("opens Polaris in a window of its own, through the address that picks the start", () => {
-        const app = manifest();
+    it("opens Polaris in a window of its own, through the address that picks the start", async () => {
+        const app = await manifest();
         expect(app.display).toBe("standalone");
         expect(app.start_url).toBe("/");
         expect(app.icons?.some((icon) => icon.sizes === "any")).toBe(true);
     });
 
-    it("offers the installed app for mailto links, at the address Mail registers", () => {
-        expect(manifest().protocol_handlers).toEqual([
+    it("offers the installed app for mailto links, at the address Mail registers", async () => {
+        expect((await manifest()).protocol_handlers).toEqual([
             { protocol: "mailto", url: "/mail/compose?url=%s" }
         ]);
     });

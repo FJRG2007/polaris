@@ -29,7 +29,7 @@ describe("the served icon", () => {
     // The badged icon is drawn from the constants rather than from this file, so
     // a change to one and not the other would make the tab flip between two
     // different marks as alerts arrive.
-    const svg = readFileSync(fileURLToPath(new URL("../../src/app/icon.svg", import.meta.url)), "utf8");
+    const svg = readFileSync(fileURLToPath(new URL("../../public/icon.svg", import.meta.url)), "utf8");
 
     it("is the mark the badge is drawn on", () => {
         expect(svg).toContain(`viewBox="0 0 ${MARK_SIZE} ${MARK_SIZE}"`);

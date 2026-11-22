@@ -16,7 +16,7 @@
  * moment it is shown. PNG rather than SVG because a favicon replaced from
  * script is only reliably picked up as a raster image across browsers.
  *
- * The mark below is the same geometry as the static app/icon.svg, which is what
+ * The mark below is the same geometry as the static public/icon.svg, which is what
  * the tab shows before any of this runs. A test holds the two together. In a
  * season it also wears that season's accessory (`season-mark` in core).
  */
