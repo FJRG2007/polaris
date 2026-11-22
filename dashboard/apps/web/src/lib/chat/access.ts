@@ -33,7 +33,7 @@ import * as core from "@polaris/core";
 import { groupOwnerId } from "./ownership";
 import { memberOrgIds } from "@/lib/orgs/org-service";
 import { currentChatOrgId, orgChatPeople } from "./isolation";
-import { findPeople, type FoundPeople } from "@/lib/people-search";
+import { findPeople, SHORTEST_SEARCH, type FoundPeople } from "@/lib/people-search";
 import { blockedBetween } from "@/lib/blocks";
 import { spokenWait } from "./durations";
 import { chatText, type ChatText } from "./text";
@@ -645,6 +645,27 @@ export async function searchForConversation(
 ): Promise<FoundPeople> {
     const reachable = await conversationReach(actor);
     return findPeople(actor, query, { reachableOnly: true, reachable, limit });
+}
+
+/**
+ * The searcher themself, when what they typed names them - every people search
+ * leaves its own searcher out, and this is the way back to the conversation
+ * with yourself, which no longer holds a fixed place on the rail.
+ */
+export async function selfMatching(
+    actor: ChatActor,
+    query: string
+): Promise<{ id: string; name: string } | null> {
+    const term = query.trim().replace(/^@/, "").toLowerCase();
+    if (term.length < SHORTEST_SEARCH) return null;
+    const me = await prisma.user.findUnique({
+        where: { id: actor.id },
+        select: { name: true, username: true }
+    });
+    if (!me) return null;
+    const named = [me.name, me.username].some((text) => text?.toLowerCase().includes(term));
+    if (!named) return null;
+    return { id: actor.id, name: me.name || (me.username ? `@${me.username}` : "") };
 }
 
 /**

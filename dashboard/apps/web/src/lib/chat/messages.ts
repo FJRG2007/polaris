@@ -14,7 +14,12 @@
 import { AUTHOR_SELECT, authorNameOf } from "./author-name";
 import { readComponents, type MessageComponent } from "./message-components";
 import { viewOnceSpent } from "@/lib/chat/view-once";
-import { inviteCards, type ChatInviteCard } from "./invite-cards";
+import {
+    inviteCards,
+    groupInviteCards,
+    type ChatInviteCard,
+    type ChatGroupInviteCard
+} from "./invite-cards";
 import { prisma, Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
@@ -199,6 +204,8 @@ export interface ChatMessageView {
     readonly references: readonly ChatReferenceView[];
     /** The invitation links in it, each drawn as a card under the message. */
     readonly invites: readonly ChatInviteCard[];
+    /** The group invitations in it, each drawn as a card with Join and Decline. */
+    readonly groupInvites?: readonly ChatGroupInviteCard[];
     /**
      * Whether this reader may send it into another conversation.
      *
@@ -2401,7 +2408,16 @@ export async function decorateMessages(
         const codes = core.inviteCodesIn(row.body, origin);
         if (codes.length > 0) invitedTo.set(row.id, codes);
     }
-    const inviteCardsFound = await inviteCards(actor, [...invitedTo.values()].flat());
+    const groupInvitedTo = new Map<string, string[]>();
+    for (const row of rows) {
+        if (row.deletedAt) continue;
+        const ids = core.groupInviteIdsIn(row.body, origin);
+        if (ids.length > 0) groupInvitedTo.set(row.id, ids);
+    }
+    const [inviteCardsFound, groupInviteCardsFound] = await Promise.all([
+        inviteCards(actor, [...invitedTo.values()].flat()),
+        groupInviteCards(actor, [...groupInvitedTo.values()].flat())
+    ]);
     // The webhooks on this page that have a picture of their own - asked only
     // for messages that did not name one, and not at all on most pages.
     const facelessHooks = [
@@ -2577,6 +2593,9 @@ export async function decorateMessages(
             invites: (invitedTo.get(row.id) ?? [])
                 .map((code) => inviteCardsFound.get(code))
                 .filter((card): card is ChatInviteCard => card !== undefined),
+            groupInvites: (groupInvitedTo.get(row.id) ?? [])
+                .map((id) => groupInviteCardsFound.get(id))
+                .filter((card): card is ChatGroupInviteCard => card !== undefined),
             // A message whose author has since deleted their account carries no
             // setting to honour, and a deleted one has nothing left to send.
             // Nor one carrying a file meant to be seen once: a forward would be a

@@ -14,7 +14,12 @@
 import { useCallback } from "react";
 import { AskFriendButton } from "./ask-friend-button";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
-import { searchGroupPeopleAction, searchPeopleAction, type GroupCandidate } from "./actions";
+import {
+    searchPeopleAction,
+    searchGroupPeopleAction,
+    searchDirectPeopleAction,
+    type GroupCandidate
+} from "./actions";
 
 export function ChatPeoplePicker({
     forGroup,
@@ -23,7 +28,8 @@ export function ChatPeoplePicker({
     exclude,
     label,
     meetingId,
-    invitesInstead = false
+    invitesInstead = false,
+    withSelf = false
 }: {
     /** Whether the people picked end up in a group. */
     forGroup: boolean;
@@ -37,6 +43,9 @@ export function ChatPeoplePicker({
     /** Adding to an existing group: people who refuse adds are asked instead,
      *  so they stay pickable. */
     invitesInstead?: boolean;
+    /** Starting a one-to-one: the searcher themself is offered too, which opens
+     *  the conversation with yourself. */
+    withSelf?: boolean;
 }) {
     const searchGroup = useCallback(
         (query: string) => searchGroupPeopleAction(query, meetingId, invitesInstead),
@@ -49,7 +58,7 @@ export function ChatPeoplePicker({
                 onChange={onChange}
                 exclude={exclude}
                 label={label}
-                search={searchPeopleAction}
+                search={withSelf ? searchDirectPeopleAction : searchPeopleAction}
             />
         );
     }

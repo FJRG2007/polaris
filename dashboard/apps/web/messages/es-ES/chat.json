@@ -746,7 +746,6 @@
         "newChannel": "Nuevo canal",
         "newCategory": "Nueva categoría",
         "findOrStartAConversation": "Buscar o iniciar conversación",
-        "savedMessages": "Mensajes destacados",
         "meetings": "Reuniones",
         "nobodyYet": "Aún no hay nadie.",
         "newChannelHere": "Nuevo canal aquí",
@@ -776,8 +775,7 @@
         "emoji": "Emoji",
         "soundboard": "Botonera",
         "joinRequests": "Solicitudes",
-        "messageYourself": "Mensajes para ti",
-        "messageYourselfFailed": "No se pudo abrir tu propio chat. Inténtalo de nuevo."
+        "selfName": "{name} (tú)"
     },
     "channelView": {
         "loadingMessages": "Cargando mensajes",
@@ -2829,5 +2827,14 @@
         "accept": "Aceptar",
         "decline": "Rechazar",
         "notification": "{name} pidió entrar"
+    },
+    "groupInviteCard": {
+        "youWereInvited": "Te han invitado a unirte a un grupo",
+        "youSent": "Enviaste una invitación a un grupo",
+        "closed": "Esta invitación ya no está abierta",
+        "waiting": "Esperando una respuesta",
+        "declined": "Rechazada",
+        "joined": "Dentro",
+        "goTo": "Ir al grupo"
     }
 }

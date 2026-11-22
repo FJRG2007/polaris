@@ -14,11 +14,16 @@ import { useState } from "react";
 import { Button } from "@polaris/ui";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
-import { acceptInviteAction, revokeInviteCardAction } from "./actions";
+import {
+    acceptInviteAction,
+    revokeInviteCardAction,
+    acceptGroupInviteAction,
+    declineGroupInviteAction
+} from "./actions";
 import { useConfirm } from "@/components/confirm-dialog";
-import { Loader2, ShieldX } from "lucide-react";
+import { Loader2, ShieldX, Users } from "lucide-react";
 import { ChatAvatar } from "@/components/chat-avatar";
-import type { ChatInviteCard } from "@/lib/chat/invite-cards";
+import type { ChatGroupInviteCard, ChatInviteCard } from "@/lib/chat/invite-cards";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function InviteCards({
@@ -38,6 +43,146 @@ export function InviteCards({
                 </li>
             ))}
         </ul>
+    );
+}
+
+/**
+ * The cards under a message that carries a group invitation - how one arrives:
+ * in the direct message from whoever asked, like a Discord server invite. Join
+ * and Decline are the same actions /chat/invites uses, which re-check that the
+ * group still exists, has room and would still take this person.
+ */
+export function GroupInviteCards({ invites }: { invites: readonly ChatGroupInviteCard[] }) {
+    if (invites.length === 0) return null;
+    return (
+        <ul className="mt-1 flex flex-col gap-1">
+            {invites.map((card) => (
+                <li key={card.id}>
+                    <GroupInviteCardView card={card} />
+                </li>
+            ))}
+        </ul>
+    );
+}
+
+function GroupInviteCardView({ card }: { card: ChatGroupInviteCard }) {
+    const t = useTranslations("chat");
+    const router = useRouter();
+    // Optimistic: the answer shows the moment it is pressed, and goes back if
+    // the server refuses.
+    const [state, setState] = useState(card.state);
+    const [channelId, setChannelId] = useState(card.channelId);
+    const [busy, setBusy] = useState<"join" | "decline" | null>(null);
+    const [error, setError] = useState("");
+    const name = card.groupName || t("groupInvites.unnamed");
+    const open = state !== "closed";
+
+    const answer = async (how: "join" | "decline") => {
+        const before = state;
+        setBusy(how);
+        setError("");
+        setState(how === "join" ? "joined" : "closed");
+        const result = await runAction(
+            () =>
+                how === "join"
+                    ? acceptGroupInviteAction(card.id)
+                    : declineGroupInviteAction(card.id),
+            setError
+        );
+        setBusy(null);
+        if (!result || result.error) {
+            // Gone stays gone: the server has closed it, and so does the card.
+            const gone = result?.error === t("errors.groupInviteGone");
+            setState(gone ? "closed" : before);
+            if (result?.error) setError(result.error);
+            return;
+        }
+        const joined = "channelId" in result ? result.channelId : undefined;
+        if (how === "join" && typeof joined === "string" && joined) {
+            setChannelId(joined);
+            router.push(`/chat/c/${joined}`);
+            router.refresh();
+        }
+    };
+
+    return (
+        <div className="flex w-full max-w-md flex-col gap-2 rounded-lg border border-border bg-muted/40 p-3">
+            <span className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                {card.forYou ? t("groupInviteCard.youWereInvited") : t("groupInviteCard.youSent")}
+            </span>
+            <div className="flex min-w-0 items-center gap-3">
+                <span
+                    className={
+                        open
+                            ? "flex size-12 shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary"
+                            : "flex size-12 shrink-0 items-center justify-center rounded-md bg-danger-soft text-danger"
+                    }
+                >
+                    {open ? <Users className="size-6" /> : <ShieldX className="size-6" />}
+                </span>
+                <div className="flex min-w-0 flex-1 flex-col">
+                    <span
+                        className={open ? "truncate font-semibold" : "truncate font-semibold text-danger"}
+                        title={open ? name : undefined}
+                    >
+                        {open ? name : t("groupInviteCard.closed")}
+                    </span>
+                    {state === "pending" && !card.forYou ? (
+                        <span className="text-xs text-muted-foreground">
+                            {t("groupInviteCard.waiting")}
+                        </span>
+                    ) : null}
+                </div>
+                {card.forYou && state === "pending" ? (
+                    <>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={busy !== null}
+                            onClick={() => void answer("decline")}
+                            className="shrink-0"
+                        >
+                            {busy === "decline" && <Loader2 className="size-4 animate-spin" />}
+                            {t("groupInvites.decline")}
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="primary"
+                            disabled={busy !== null}
+                            onClick={() => void answer("join")}
+                            className="shrink-0"
+                        >
+                            {busy === "join" && <Loader2 className="size-4 animate-spin" />}
+                            {t("groupInvites.join")}
+                        </Button>
+                    </>
+                ) : null}
+                {state === "joined" ? (
+                    card.forYou && channelId ? (
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            disabled={busy !== null}
+                            title={t("groupInviteCard.goTo")}
+                            onClick={() => router.push(`/chat/c/${channelId}`)}
+                            className="shrink-0"
+                        >
+                            {busy === "join" && <Loader2 className="size-4 animate-spin" />}
+                            {t("groupInviteCard.joined")}
+                        </Button>
+                    ) : (
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                            {t("groupInviteCard.joined")}
+                        </span>
+                    )
+                ) : null}
+            </div>
+            {error && (
+                <p role="alert" className="text-xs text-danger">
+                    {error}
+                </p>
+            )}
+        </div>
     );
 }
 

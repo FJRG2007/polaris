@@ -64,6 +64,7 @@ const TOMBSTONE: Partial<ChatMessageView> = {
     attachments: [],
     references: [],
     invites: [],
+    groupInvites: [],
     link: null,
     preview: null,
     previewPending: false,

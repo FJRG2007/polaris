@@ -2,11 +2,16 @@
  * Invitations to a group conversation (ledger row 16).
  *
  * When somebody's "who can add me to groups" refuses the person adding them,
- * they are asked instead of added: a row here, a quiet notification, and a list
- * at /chat/invites where they accept or decline. Accepting re-checks everything
- * that could have changed since - the group still exists and has room, whoever
- * asked is still in it, and neither has blocked the other - so an old invitation
- * is never a way into a room the rules would now refuse.
+ * they are asked instead of added: a row here, a card with Join and Decline in
+ * the direct message from whoever asked (the way a Discord server invite
+ * arrives), and a quiet notification that opens it. Accepting re-checks
+ * everything that could have changed since - the group still exists and has
+ * room, whoever asked is still in it, and neither has blocked the other - so an
+ * old invitation is never a way into a room the rules would now refuse.
+ *
+ * /chat/invites stays as the list behind the card, and is where the
+ * notification leads when no card could be posted (a block, a restricted
+ * sender): no pending invitation is ever left without a way to answer it.
  */
 
 import { prisma } from "@polaris/db";
@@ -15,11 +20,90 @@ import { chatWordsFor } from "./text";
 import { postNotice } from "./notices";
 import { publishChatChange } from "./live";
 import { blockedBetween } from "@/lib/blocks";
+import { appBaseUrl } from "@/lib/domain-service";
 import { notify } from "@/lib/notifications/dispatch";
 import { ChatAccessError, type ChatActor } from "./access";
 
 /** The most invitations listed at once; older pending ones wait their turn. */
 export const MOST_GROUP_INVITES_LISTED = 50;
+
+/** The list every invitation can be answered from, card or not. */
+const INVITES_PAGE = "/chat/invites";
+
+/** The most older invitations given their card in one pass. */
+const MOST_CARDS_AT_ONCE = 10;
+
+interface InviteParties {
+    readonly id: string;
+    readonly inviterId: string;
+    readonly inviteeId: string;
+}
+
+/**
+ * Post the card for one invitation into the direct message between whoever
+ * asked and whoever is asked. Sent as the inviter, through the same
+ * `openDirect` and `send` every message of theirs takes, so no privacy rule is
+ * stepped around: a block refuses it, and somebody whose "who can message me"
+ * leaves the inviter out gets it as a message request.
+ *
+ * Claimed first (`cardPostedAt`), so it is posted once however many callers
+ * race. A refusal keeps the claim: the invitation is answered from
+ * /chat/invites instead, and asking every time would only be refused again.
+ *
+ * Answers with where the notification about it should lead.
+ */
+async function postInviteCard(invite: InviteParties): Promise<string> {
+    const claimed = await prisma.chatGroupInvite.updateMany({
+        where: { id: invite.id, cardPostedAt: null, acceptedAt: null, declinedAt: null },
+        data: { cardPostedAt: new Date() }
+    });
+    if (claimed.count === 0) return INVITES_PAGE;
+    try {
+        // Loaded here: the conversation service adds people through this file.
+        const [{ openDirect }, messages] = await Promise.all([
+            import("./chat-service"),
+            import("./messages")
+        ]);
+        const inviter = { id: invite.inviterId };
+        const channelId = await openDirect(inviter, [invite.inviteeId]);
+        // Built on the address Polaris hands out, as a space invite link is.
+        const base = (await appBaseUrl()).replace(/\/+$/, "");
+        await messages.send(
+            inviter,
+            { channelId, body: `${base}${core.groupInvitePath(invite.id)}`, replyToId: null },
+            [],
+            null
+        );
+        const member = await prisma.chatChannelMember.findUnique({
+            where: { channelId_userId: { channelId, userId: invite.inviteeId } },
+            select: { requestedAt: true }
+        });
+        // Held as a request: the conversation is off their list until accepted.
+        return member?.requestedAt ? "/chat/requests" : `/chat/c/${channelId}`;
+    } catch (caught) {
+        if (!(caught instanceof ChatAccessError)) {
+            console.error("[chat] could not post a group invitation card", caught);
+        }
+        return INVITES_PAGE;
+    }
+}
+
+/**
+ * Give the invitations waiting on this account that have no card yet - the
+ * ones made before invitations arrived as cards - theirs, once. Asked when
+ * Chat opens; their original notification already leads to /chat/invites, so
+ * nothing new rings for them.
+ */
+export async function postWaitingInviteCards(actor: ChatActor): Promise<void> {
+    const waiting = await prisma.chatGroupInvite.findMany({
+        where: { inviteeId: actor.id, acceptedAt: null, declinedAt: null, cardPostedAt: null },
+        orderBy: { createdAt: "asc" },
+        take: MOST_CARDS_AT_ONCE,
+        select: { id: true, inviterId: true, inviteeId: true }
+    });
+    // One after another, so they land in the order they were asked.
+    for (const invite of waiting) await postInviteCard(invite);
+}
 
 /** How long a declined invitation keeps the same group from asking again. */
 export const DECLINE_HOLDS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -64,7 +148,7 @@ export async function inviteToGroup(
     );
     const wanted = asked.filter((id) => !declined.has(id));
     if (wanted.length === 0) return;
-    await prisma.$transaction(
+    const saved = await prisma.$transaction(
         wanted.map((inviteeId) =>
             prisma.chatGroupInvite.upsert({
                 where: { channelId_inviteeId: { channelId, inviteeId } },
@@ -73,28 +157,33 @@ export async function inviteToGroup(
                     inviterId: actor.id,
                     createdAt: new Date(),
                     acceptedAt: null,
-                    declinedAt: null
-                }
+                    declinedAt: null,
+                    // Asked anew: a new card. One still pending keeps the card
+                    // it has, which answers the same row.
+                    ...(pending.has(inviteeId) ? {} : { cardPostedAt: null })
+                },
+                select: { id: true, inviterId: true, inviteeId: true }
             })
         )
     );
-    const fresh = wanted.filter((id) => !pending.has(id));
+    const fresh = saved.filter((row) => !pending.has(row.inviteeId));
     if (fresh.length === 0) return;
     const [inviter, group] = await Promise.all([
         prisma.user.findUnique({ where: { id: actor.id }, select: { name: true } }),
         prisma.chatChannel.findUnique({ where: { id: channelId }, select: { name: true } })
     ]);
     await Promise.all(
-        fresh.map(async (userId) => {
-            const words = await chatWordsFor(userId);
+        fresh.map(async (invite) => {
+            const href = await postInviteCard(invite);
+            const words = await chatWordsFor(invite.inviteeId);
             return notify({
-                userId,
+                userId: invite.inviteeId,
                 event: "chat.groupInvite",
                 title: words("groupInvites.notification", {
                     name: inviter?.name || words("notices.somebody")
                 }),
                 body: group?.name || null,
-                href: "/chat/invites"
+                href
             }).catch(() => undefined);
         })
     );

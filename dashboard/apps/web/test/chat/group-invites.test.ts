@@ -13,6 +13,7 @@ type Invite = {
     createdAt: Date;
     acceptedAt: Date | null;
     declinedAt: Date | null;
+    cardPostedAt?: Date | null;
 };
 
 let invites: Invite[] = [];
@@ -21,12 +22,33 @@ let blocked = new Set<string>();
 let group: { kind: string; archived: boolean; name: string } | null = null;
 let notified: string[] = [];
 let joined: string[] = [];
+let notifiedHref: string[] = [];
+let sent: { channelId: string; authorId: string; body: string }[] = [];
+let refuseDirect = false;
+let requested = new Set<string>();
 
 vi.mock("@/lib/blocks", () => ({ blockedBetween: async () => blocked }));
 vi.mock("@/lib/notifications/dispatch", () => ({
-    notify: async ({ userId }: { userId: string }) => {
+    notify: async ({ userId, href }: { userId: string; href: string }) => {
         notified.push(userId);
+        notifiedHref.push(href);
         return { inapp: "created" };
+    }
+}));
+vi.mock("@/lib/domain-service", () => ({ appBaseUrl: async () => "https://polaris.example/" }));
+vi.mock("@/lib/chat/chat-service", async () => {
+    const { ChatAccessError } = await import("@/lib/chat/access");
+    return {
+        openDirect: async (actor: { id: string }, ids: string[]) => {
+            if (refuseDirect) throw new ChatAccessError({ key: "errors.blocked" });
+            return `dm-${actor.id}-${ids[0]}`;
+        }
+    };
+});
+vi.mock("@/lib/chat/messages", () => ({
+    send: async (actor: { id: string }, input: { channelId: string; body: string }) => {
+        sent.push({ channelId: input.channelId, authorId: actor.id, body: input.body });
+        return "m1";
     }
 }));
 vi.mock("@/lib/chat/live", () => ({ publishChatChange: () => undefined }));
@@ -45,12 +67,35 @@ vi.mock("@polaris/db", () => {
     return {
         prisma: {
             chatGroupInvite: {
-                findMany: async ({ where }: { where: { channelId: string; inviteeId: { in: string[] } } }) =>
-                    invites.filter(
-                        (row) =>
-                            row.channelId === where.channelId &&
-                            where.inviteeId.in.includes(row.inviteeId)
-                    ),
+                findMany: async ({
+                    where
+                }: {
+                    where: { channelId?: string; inviteeId: string | { in: string[] }; cardPostedAt?: null };
+                }) =>
+                    typeof where.inviteeId === "string"
+                        ? invites.filter(
+                              (row) =>
+                                  row.inviteeId === where.inviteeId &&
+                                  !row.acceptedAt &&
+                                  !row.declinedAt &&
+                                  !row.cardPostedAt
+                          )
+                        : invites.filter(
+                              (row) =>
+                                  row.channelId === where.channelId &&
+                                  (where.inviteeId as { in: string[] }).in.includes(row.inviteeId)
+                          ),
+                updateMany: async ({ where, data }: { where: { id: string }; data: Partial<Invite> }) => {
+                    const row = invites.find(
+                        (entry) =>
+                            entry.id === where.id &&
+                            !entry.cardPostedAt &&
+                            !entry.acceptedAt &&
+                            !entry.declinedAt
+                    );
+                    if (row) Object.assign(row, data);
+                    return { count: row ? 1 : 0 };
+                },
                 findUnique: async ({ where }: { where: { id: string } }) =>
                     invites.find((row) => row.id === where.id) ?? null,
                 upsert: ({ where, create, update }: {
@@ -58,17 +103,20 @@ vi.mock("@polaris/db", () => {
                     create: Omit<Invite, "id" | "createdAt" | "acceptedAt" | "declinedAt">;
                     update: Partial<Invite>;
                 }) => {
-                    const row = find(where);
+                    let row = find(where);
                     if (row) Object.assign(row, update);
-                    else
-                        invites.push({
+                    else {
+                        row = {
                             ...create,
                             id: `invite-${invites.length + 1}`,
                             createdAt: new Date(),
                             acceptedAt: null,
-                            declinedAt: null
-                        });
-                    return Promise.resolve();
+                            declinedAt: null,
+                            cardPostedAt: null
+                        };
+                        invites.push(row);
+                    }
+                    return Promise.resolve({ ...row });
                 },
                 update: ({ where, data }: { where: { id: string }; data: Partial<Invite> }) => {
                     Object.assign(invites.find((row) => row.id === where.id)!, data);
@@ -77,8 +125,22 @@ vi.mock("@polaris/db", () => {
             },
             chatChannel: { findUnique: async () => group },
             chatChannelMember: {
-                findUnique: async ({ where }: { where: { channelId_userId: { userId: string } } }) =>
-                    members.includes(where.channelId_userId.userId) ? { userId: "x" } : null,
+                findUnique: async ({
+                    where,
+                    select
+                }: {
+                    where: { channelId_userId: { channelId: string; userId: string } };
+                    select: Record<string, boolean>;
+                }) =>
+                    select.requestedAt
+                        ? {
+                              requestedAt: requested.has(where.channelId_userId.userId)
+                                  ? new Date()
+                                  : null
+                          }
+                        : members.includes(where.channelId_userId.userId)
+                          ? { userId: "x" }
+                          : null,
                 count: async () => members.length,
                 createMany: ({ data }: { data: { userId: string }[] }) => {
                     joined.push(...data.map((row) => row.userId));
@@ -104,6 +166,10 @@ beforeEach(() => {
     group = { kind: "group", archived: false, name: "Team" };
     notified = [];
     joined = [];
+    notifiedHref = [];
+    sent = [];
+    refuseDirect = false;
+    requested = new Set();
 });
 
 describe("asking instead of adding", () => {
@@ -155,5 +221,54 @@ describe("answering", () => {
         await expect(invitesModule.acceptGroupInvite(alan, invites[0]!.id)).rejects.toBeInstanceOf(
             ChatAccessError
         );
+    });
+});
+
+describe("the card in the direct message", () => {
+    it("posts the invitation as the inviter, into their conversation, once", async () => {
+        await invitesModule.inviteToGroup(ada, "g1", ["alan"]);
+        await invitesModule.inviteToGroup(ada, "g1", ["alan"]);
+        expect(sent).toEqual([
+            {
+                channelId: "dm-ada-alan",
+                authorId: "ada",
+                body: `https://polaris.example/chat/invites?g=${invites[0]!.id}`
+            }
+        ]);
+        expect(notifiedHref).toEqual(["/chat/c/dm-ada-alan"]);
+    });
+
+    it("leads to the requests when the conversation is held as one", async () => {
+        requested.add("alan");
+        await invitesModule.inviteToGroup(ada, "g1", ["alan"]);
+        expect(notifiedHref).toEqual(["/chat/requests"]);
+    });
+
+    it("falls back to the invitations page when no conversation may be opened", async () => {
+        refuseDirect = true;
+        await invitesModule.inviteToGroup(ada, "g1", ["alan"]);
+        expect(sent).toEqual([]);
+        expect(notifiedHref).toEqual(["/chat/invites"]);
+        // Tried once: the next pass does not ask again.
+        refuseDirect = false;
+        await invitesModule.postWaitingInviteCards(alan);
+        expect(sent).toEqual([]);
+    });
+
+    it("gives an invitation from before the card its card once, and rings nobody", async () => {
+        invites.push({
+            id: "old-1",
+            channelId: "g1",
+            inviterId: "ada",
+            inviteeId: "alan",
+            createdAt: new Date(),
+            acceptedAt: null,
+            declinedAt: null,
+            cardPostedAt: null
+        });
+        await invitesModule.postWaitingInviteCards(alan);
+        await invitesModule.postWaitingInviteCards(alan);
+        expect(sent.map((one) => one.body)).toEqual(["https://polaris.example/chat/invites?g=old-1"]);
+        expect(notified).toEqual([]);
     });
 });

@@ -137,3 +137,58 @@ export async function inviteShowsSpace(code: string, spaceId: string): Promise<b
     });
     return invite !== null && invite.spaceId === spaceId && core.inviteUsable(invite);
 }
+
+/**
+ * What a card under a message says about one group invitation, for this
+ * reader. Only the two people the invitation is between are told anything
+ * about it: forwarded anywhere else it reads as gone, and names no group.
+ */
+export interface ChatGroupInviteCard {
+    readonly id: string;
+    /** `pending` is still to answer; `joined` was accepted; `closed` is
+     *  declined, withdrawn, or not this reader's to see. */
+    readonly state: "pending" | "joined" | "closed";
+    /** The reader is the one invited: Join and Decline are theirs. */
+    readonly forYou: boolean;
+    readonly groupName: string;
+    /** The group, to open once this reader has joined it. */
+    readonly channelId: string | null;
+}
+
+/** The cards for every group invitation the messages on a page carry, in one query. */
+export async function groupInviteCards(
+    actor: ChatActor,
+    ids: readonly string[]
+): Promise<Map<string, ChatGroupInviteCard>> {
+    const wanted = [...new Set(ids)].slice(0, 50);
+    const cards = new Map<string, ChatGroupInviteCard>();
+    if (wanted.length === 0) return cards;
+    const rows = await prisma.chatGroupInvite.findMany({
+        where: { id: { in: wanted } },
+        select: {
+            id: true,
+            channelId: true,
+            inviterId: true,
+            inviteeId: true,
+            acceptedAt: true,
+            declinedAt: true,
+            channel: { select: { name: true } }
+        }
+    });
+    for (const id of wanted) {
+        const row = rows.find((entry) => entry.id === id);
+        if (!row || (row.inviteeId !== actor.id && row.inviterId !== actor.id)) {
+            cards.set(id, { id, state: "closed", forYou: false, groupName: "", channelId: null });
+            continue;
+        }
+        const forYou = row.inviteeId === actor.id;
+        cards.set(id, {
+            id,
+            state: row.acceptedAt ? "joined" : row.declinedAt ? "closed" : "pending",
+            forYou,
+            groupName: row.channel.name,
+            channelId: row.acceptedAt && forYou ? row.channelId : null
+        });
+    }
+    return cards;
+}

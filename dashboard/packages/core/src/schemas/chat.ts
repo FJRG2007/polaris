@@ -1500,6 +1500,35 @@ export function inviteCodesIn(body: string, origin: string | null): string[] {
     return found;
 }
 
+/** The address a group invitation is sent as: the invitations page, naming it. */
+export function groupInvitePath(inviteId: string): string {
+    return `/chat/invites?g=${inviteId}`;
+}
+
+/**
+ * The group invitations a message carries (`groupInvitePath`), in the order
+ * they appear - the same rule as `inviteCodesIn`: only this deployment's own
+ * origin, or a relative address, counts.
+ */
+export function groupInviteIdsIn(body: string, origin: string | null): string[] {
+    if (!body.includes("/chat/invites?g=")) return [];
+    const base = origin ? origin.replace(/\/+$/, "") : null;
+    const found: string[] = [];
+    const pattern =
+        /(https?:\/\/[^\s/()<>\]]+)?\/chat\/invites\?g=([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})(?![0-9A-Za-z_-])/g;
+    for (const match of body.matchAll(pattern)) {
+        const host = match[1];
+        const start = match.index ?? 0;
+        // A path glued to something else is not an address.
+        if (!host && start > 0 && !/[\s(<[]/.test(body[start - 1]!)) continue;
+        if (host && (!base || host.toLowerCase() !== base.toLowerCase())) continue;
+        const id = match[2]!.toLowerCase();
+        if (!found.includes(id)) found.push(id);
+        if (found.length >= MAX_INVITE_CARDS) break;
+    }
+    return found;
+}
+
 // ---------------------------------------------------------------------------
 // Location
 // ---------------------------------------------------------------------------

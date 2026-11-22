@@ -20,7 +20,7 @@
 
 import { fittedSize, placeholderUrl } from "@/lib/chat/media-shape";
 import { VanishMark } from "./vanish-controls";
-import { InviteCards } from "./invite-card";
+import { GroupInviteCards, InviteCards } from "./invite-card";
 import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
@@ -1317,6 +1317,7 @@ function Message({
                                     onJumpTo={onJumpTo}
                                 />
                                 <InviteCards invites={message.invites ?? []} mine={mine} />
+                                <GroupInviteCards invites={message.groupInvites ?? []} />
                             </>
                         )}
 

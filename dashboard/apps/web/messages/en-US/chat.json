@@ -746,7 +746,6 @@
         "newChannel": "New channel",
         "newCategory": "New category",
         "findOrStartAConversation": "Find or start a conversation",
-        "savedMessages": "Starred messages",
         "meetings": "Meetings",
         "nobodyYet": "Nobody yet.",
         "newChannelHere": "New channel here",
@@ -776,8 +775,7 @@
         "emoji": "Emoji",
         "soundboard": "Soundboard",
         "joinRequests": "Join requests",
-        "messageYourself": "Message yourself",
-        "messageYourselfFailed": "Your own chat could not be opened. Try again."
+        "selfName": "{name} (you)"
     },
     "channelView": {
         "loadingMessages": "Loading messages",
@@ -2829,5 +2827,14 @@
         "accept": "Accept",
         "decline": "Decline",
         "notification": "{name} asked to join"
+    },
+    "groupInviteCard": {
+        "youWereInvited": "You've been invited to join a group",
+        "youSent": "You sent an invite to join a group",
+        "closed": "This invitation is no longer open",
+        "waiting": "Waiting for an answer",
+        "declined": "Declined",
+        "joined": "Joined",
+        "goTo": "Go to group"
     }
 }

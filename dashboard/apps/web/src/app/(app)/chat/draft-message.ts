@@ -62,6 +62,7 @@ export function draftMessage(facts: {
         // guessed would draw a card and then replace it with a different one.
         references: [],
         invites: [],
+        groupInvites: [],
         // Your own words, which your own setting never stands between you and.
         forwardable: true,
         // The server has not looked at any link in it yet. Left as settled

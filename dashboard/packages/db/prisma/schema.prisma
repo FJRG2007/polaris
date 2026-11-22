@@ -18805,6 +18805,10 @@ model ChatGroupInvite {
     // Set when answered; a row with either set is history, not a pending ask.
     acceptedAt DateTime?
     declinedAt DateTime?
+    // When the card for this ask was posted into the inviter's direct message
+    // with the invitee - or tried and refused. Null means it still has to be,
+    // which is how invitations from before the card existed get theirs once.
+    cardPostedAt DateTime?
 
     channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
     inviter User        @relation("ChatGroupInviter", fields: [inviterId], references: [id], onDelete: Cascade)

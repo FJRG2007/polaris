@@ -164,6 +164,7 @@ export function NewDirectDialog({
 
                 <ChatPeoplePicker
                     forGroup={kind === "group"}
+                    withSelf={kind !== "group"}
                     picked={kind === "group" ? picked : []}
                     onChange={(next) => {
                         if (kind === "group") {
@@ -175,9 +176,10 @@ export function NewDirectDialog({
                         const person = next.at(-1);
                         if (person) void open_([person.id]);
                     }}
-                    // Messaging yourself is not what anybody means by this, and
-                    // the room it would open has nobody else in it.
-                    exclude={[viewerId]}
+                    // A one-to-one may be with yourself: picking your own name
+                    // opens your notes conversation, which has no fixed place on
+                    // the rail. A group of one is not a group.
+                    exclude={kind === "group" ? [viewerId] : []}
                     label={t("newDirect.whoToMessage")}
                 />
 

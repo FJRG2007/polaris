@@ -13,11 +13,12 @@
  * tens of rows - and the palette asks once per pause and keeps the answer.
  */
 
+import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { readerWords } from "@/lib/i18n/reader-words";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { searchMessages } from "@/lib/chat/search";
-import { searchForConversation } from "@/lib/chat/access";
+import { searchForConversation, selfMatching } from "@/lib/chat/access";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { listChannels, listSpaces, type ChatChannelView } from "@/lib/chat/chat-service";
 import { onShelf } from "@/app/(app)/chat/lock-shelf";
@@ -55,25 +56,40 @@ export async function chatLookup(
     // either - a match would say it exists.
     let held: Promise<ChatChannelView[]> | null = null;
     const rail = () =>
-        (held ??= Promise.all([listChannels(actor), lockState(actor.id)]).then(([listed, lock]) =>
-            listed.filter((channel) => onShelf(channel, "all", lock.hideLocked))
+        (held ??= Promise.all([listChannels(actor), lockState(actor.id)]).then(
+            async ([listed, lock]) => {
+                const shown = listed.filter((channel) => onShelf(channel, "all", lock.hideLocked));
+                // The conversation with yourself goes by your own name, as on
+                // the rail - found by typing it, and never an untranslated stand-in.
+                if (!shown.some((channel) => channel.self)) return shown;
+                const me = await prisma.user.findUnique({
+                    where: { id: actor.id },
+                    select: { name: true, username: true }
+                });
+                const name = me?.name || (me?.username ? `@${me.username}` : "");
+                const label = t("search.hits.yourself", { name });
+                return shown.map((channel) => (channel.self ? { ...channel, name: label } : channel));
+            }
         ));
 
     if (scope === "contacts") return people(actor, term, ONE_KIND, t);
     if (scope === "messages") return messages(actor, term, ONE_KIND, t);
-    if (scope === "chats") return conversations(rail, term, ONE_KIND, t);
+    if (scope === "chats") return plain(await conversations(rail, term, ONE_KIND, t));
     if (scope === "channels") return channels(actor, rail, term, ONE_KIND, t);
 
     // All four. With nothing typed only the recent conversations are worth
     // listing: every person and every message is not an answer to anything.
-    if (!term) return conversations(rail, term, ONE_KIND, t);
+    if (!term) return plain(await conversations(rail, term, ONE_KIND, t));
     const [found, chats, rooms, said] = await Promise.all([
         people(actor, term, EACH_KIND, t),
         conversations(rail, term, EACH_KIND, t),
         channels(actor, rail, term, EACH_KIND, t),
         messages(actor, term, EACH_KIND, t)
     ]);
-    return [...found, ...chats, ...rooms, ...said];
+    // You, found as a person, already lead to the conversation with yourself.
+    const youFound = found.some((hit) => hit.id === actor.id);
+    const rest = youFound ? chats.filter((hit) => !hit.self) : chats;
+    return [...found, ...plain(rest), ...rooms, ...said];
 }
 
 async function people(
@@ -82,14 +98,28 @@ async function people(
     limit: number,
     t: Words
 ): Promise<ChatHit[]> {
-    const { people: found } = await searchForConversation(actor, term, limit);
-    return found.map((person) => ({
+    const [{ people: found }, me] = await Promise.all([
+        searchForConversation(actor, term, limit),
+        selfMatching(actor, term)
+    ]);
+    const hits: ChatHit[] = found.map((person) => ({
         id: person.id,
         scope: "contacts",
         label: person.name,
         detail: t("search.hits.message"),
         href: directHref(person.id)
     }));
+    // Typing your own name finds the conversation with yourself, made the
+    // first time it is opened - the way to it now that it has no fixed place.
+    if (!me) return hits;
+    const self: ChatHit = {
+        id: me.id,
+        scope: "contacts",
+        label: t("search.hits.yourself", { name: me.name }),
+        detail: t("search.hits.message"),
+        href: directHref(me.id)
+    };
+    return [self, ...hits].slice(0, limit);
 }
 
 function matches(channel: ChatChannelView, needle: string): boolean {
@@ -112,7 +142,7 @@ async function conversations(
     term: string,
     limit: number,
     t: Words
-): Promise<ChatHit[]> {
+): Promise<(ChatHit & { readonly self: boolean })[]> {
     const needle = term.toLowerCase();
     return (await rail())
         .filter(
@@ -129,8 +159,14 @@ async function conversations(
                 channel.others.map((other) => other.name).join(", ") ||
                 t("search.hits.direct"),
             detail: channel.kind === "group" ? t("search.hits.group") : t("search.hits.direct"),
-            href: `/chat/c/${channel.id}`
+            href: `/chat/c/${channel.id}`,
+            self: channel.self === true
         }));
+}
+
+/** The hits as the palette takes them, without the flag used to sort them out. */
+function plain(hits: readonly (ChatHit & { readonly self: boolean })[]): ChatHit[] {
+    return hits.map(({ self: _self, ...hit }) => hit);
 }
 
 async function channels(

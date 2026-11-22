@@ -292,7 +292,8 @@
             "group": "Group",
             "voice": "Voice",
             "attachment": "Attachment",
-            "saidIn": "{author} in {channel}"
+            "saidIn": "{author} in {channel}",
+            "yourself": "{name} (you)"
         },
         "actions": "Actions",
         "calculator": "Calculator",

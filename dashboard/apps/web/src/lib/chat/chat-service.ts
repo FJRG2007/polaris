@@ -2117,7 +2117,8 @@ async function directAllowed(
  */
 export async function existingDirect(actor: ChatActor, userId: string): Promise<string | null> {
     const { others, orgId } = await directAllowed(actor, [userId]);
-    if (others.length !== 1) return null;
+    // Nobody else is the conversation with yourself, keyed by you alone.
+    if (others.length > 1) return null;
     const existing = await prisma.chatChannel.findUnique({
         where: { dmKey: core.dmKeyFor([actor.id, ...others], orgId) },
         select: { id: true }

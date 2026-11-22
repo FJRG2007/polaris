@@ -106,12 +106,9 @@ import {
     ShieldOff,
     Smile,
     Inbox,
-    NotebookPen,
-    Star,
     Trash2,
     UserMinus,
     UserPlus,
-    Users,
     Video,
     Volume2,
     X
@@ -264,7 +261,8 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
         refresh,
         loaded,
         kept,
-        loadFailed
+        loadFailed,
+        viewerName
     } = useChat();
     const params = useParams<{ channelId?: string; spaceId?: string }>();
     const open = params.channelId ?? null;
@@ -279,7 +277,6 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
             () => setRequests(0)
         );
     }, [here]);
-    const saved = here === "/chat/saved";
     const meetings = here.startsWith("/chat/meetings");
 
     const [folded, setFolded] = useState<readonly string[]>([]);
@@ -373,8 +370,6 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                 )
                 .sort(
                     (left, right) =>
-                        // The conversation with yourself first, like a pinned note.
-                        Number(right.self ?? false) - Number(left.self ?? false) ||
                         Number(right.pinned) - Number(left.pinned) ||
                         (right.lastMessageAt ?? "").localeCompare(left.lastMessageAt ?? "")
                 ),
@@ -640,76 +635,35 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-2">
-                {/* In every rail rather than only above the direct messages.
-                    What somebody kept is theirs, not a space's, and a list that
-                    disappears when you walk into a server is a list people
-                    conclude does not exist. */}
-                <Link
-                    href="/chat/saved"
-                    className={cn(
-                        "flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
-                        saved ? "bg-card-hover text-foreground" : "text-muted-foreground"
-                    )}
-                >
-                    <Star className="size-3.5 shrink-0" />
-                    <span>{t("sidebar.savedMessages")}</span>
-                </Link>
-                {/* The conversation with yourself (ledger row 19), made the
-                    first time it is opened and pinned above the others after. */}
-                <button
-                    type="button"
-                    onClick={() =>
-                        void actions.openSelfAction().then(
-                            (result) =>
-                                result.id
-                                    ? router.push(`/chat/c/${result.id}`)
-                                    : toast.show({
-                                          key: "chat-self",
-                                          title: result.error ?? t("sidebar.messageYourselfFailed")
-                                      }),
-                            () =>
-                                toast.show({
-                                    key: "chat-self",
-                                    title: t("sidebar.messageYourselfFailed")
-                                })
-                        )
-                    }
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-start text-sm text-muted-foreground transition-colors hover:bg-card-hover"
-                >
-                    <NotebookPen className="size-3.5 shrink-0" />
-                    <span className="min-w-0 truncate">{t("sidebar.messageYourself")}</span>
-                </button>
-                {/* Invitations to groups, for whoever has any to answer. */}
-                <Link
-                    href="/chat/invites"
-                    className={cn(
-                        "flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
-                        here === "/chat/invites"
-                            ? "bg-card-hover text-foreground"
-                            : "text-muted-foreground"
-                    )}
-                >
-                    <Users className="size-3.5 shrink-0" />
-                    <span className="min-w-0 truncate">{t("groupInvites.title")}</span>
-                </Link>
-                {/* Conversations from people outside "who can message me". */}
-                <Link
-                    href="/chat/requests"
-                    className={cn(
-                        "flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
-                        here === "/chat/requests"
-                            ? "bg-card-hover text-foreground"
-                            : "text-muted-foreground"
-                    )}
-                >
-                    <Inbox className="size-3.5 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate">{t("messageRequests.title")}</span>
-                    {requests > 0 ? (
-                        <span className="shrink-0 tabular-nums text-[0.6875rem] text-foreground-subtle">
-                            {requests}
+                {/* Starred messages are found from inside each conversation
+                    (/chat/saved?c=), the conversation with yourself is a direct
+                    message like any other, and a group invitation arrives as a
+                    card in the inviter's direct message - so none of them holds
+                    a fixed place here. */}
+                {/* Conversations from people outside "who can message me":
+                    drawn only while some wait, or while their page is open so
+                    the place you are on stays marked. */}
+                {requests > 0 || here === "/chat/requests" ? (
+                    <Link
+                        href="/chat/requests"
+                        className={cn(
+                            "flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
+                            here === "/chat/requests"
+                                ? "bg-card-hover text-foreground"
+                                : "text-muted-foreground"
+                        )}
+                    >
+                        <Inbox className="size-3.5 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate">
+                            {t("messageRequests.title")}
                         </span>
-                    ) : null}
-                </Link>
+                        {requests > 0 ? (
+                            <span className="shrink-0 tabular-nums text-[0.6875rem] text-foreground-subtle">
+                                {requests}
+                            </span>
+                        ) : null}
+                    </Link>
+                ) : null}
 
                 <LockShelfEntries
                     shelf={shelf}
@@ -793,7 +747,11 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                                         active={open === channel.id}
                                         unread={channel.unread}
                                         muted={channel.muted}
-                                        label={channel.self ? t("sidebar.messageYourself") : channel.name}
+                                        label={
+                                            channel.self
+                                                ? t("sidebar.selfName", { name: viewerName })
+                                                : channel.name
+                                        }
                                         personId={
                                             channel.others.length === 1
                                                 ? (channel.others[0]?.id ?? null)

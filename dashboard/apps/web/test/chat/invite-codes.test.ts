@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { inviteCodesIn, spaceInviteAllowed } from "@polaris/core";
+import { groupInviteIdsIn, groupInvitePath, inviteCodesIn, spaceInviteAllowed } from "@polaris/core";
 
 const origin = "https://polaris.example";
 
@@ -42,5 +42,21 @@ describe("who may invite", () => {
         expect(spaceInviteAllowed("admin", "private")).toBe(true);
         expect(spaceInviteAllowed("owner", "private")).toBe(true);
         expect(spaceInviteAllowed(null, "internal")).toBe(false);
+    });
+});
+
+describe("group invitations in a message", () => {
+    const id = "0193a4b2-7c1d-7e2f-9a3b-4c5d6e7f8a9b";
+
+    it("finds the address a group invitation is sent as, on this deployment only", () => {
+        expect(groupInviteIdsIn(`${origin}${groupInvitePath(id)}`, origin)).toEqual([id]);
+        expect(groupInviteIdsIn(`see ${groupInvitePath(id)}`, origin)).toEqual([id]);
+        expect(groupInviteIdsIn(`https://elsewhere.example${groupInvitePath(id)}`, origin)).toEqual([]);
+        expect(groupInviteIdsIn(`foo${groupInvitePath(id)}`, origin)).toEqual([]);
+    });
+
+    it("ignores anything that is not an invitation id", () => {
+        expect(groupInviteIdsIn(`${origin}/chat/invites?g=nope`, origin)).toEqual([]);
+        expect(groupInviteIdsIn(`${origin}/chat/invites`, origin)).toEqual([]);
     });
 });

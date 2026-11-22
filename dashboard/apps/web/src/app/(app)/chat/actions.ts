@@ -74,7 +74,7 @@ import type {
     MessageDelivery
 } from "@/lib/chat/messages";
 import type { ChatChannelView, ChatElsewhere, ChatMemberView } from "@/lib/chat/chat-service";
-import { requirePostable, searchForConversation } from "@/lib/chat/access";
+import { requirePostable, searchForConversation, selfMatching } from "@/lib/chat/access";
 import { mayChangeChatPicture } from "@/lib/chat/picture-access";
 import { MAX_AVATAR_BYTES, sniffImageMime, storeAvatar } from "@/lib/avatar-service";
 
@@ -222,6 +222,25 @@ export async function searchPeopleAction(
     // than as an account that cannot receive a message. A number and nothing
     // else - naming them would say more than the search was asked.
     return { results: found.people, withheld: found.withheld };
+}
+
+/**
+ * The new-conversation picker's search: the same people, and the searcher
+ * themself first when what they typed names them - picking yourself opens the
+ * conversation with yourself, which has no fixed place on the rail.
+ */
+export async function searchDirectPeopleAction(
+    query: string
+): Promise<{ results?: { id: string; name: string }[]; withheld?: number; error?: string }> {
+    const me = await actor();
+    const term = String(query ?? "");
+    const [found, self] = await Promise.all([
+        searchForConversation(me, term),
+        selfMatching(me, term)
+    ]);
+    if (!self) return { results: found.people, withheld: found.withheld };
+    const name = (await getTranslations("chat"))("sidebar.selfName", { name: self.name });
+    return { results: [{ id: self.id, name }, ...found.people], withheld: found.withheld };
 }
 
 /** Somebody the group picker found, and why they cannot be added when they
@@ -1460,9 +1479,17 @@ export async function listMessageRequestsAction(): Promise<{
     return { requests: await messageRequests.pendingMessageRequests(me) };
 }
 
-/** How many message requests wait, for the link on the rail. */
+/**
+ * How many message requests wait, for the link on the rail - read whenever the
+ * rail is up. Also where a group invitation from before invitations arrived as
+ * a direct message gets its card, once: before counting, since a card from
+ * somebody outside "who can message me" is itself a new request.
+ */
 export async function messageRequestCountAction(): Promise<{ count: number }> {
     const me = await actor();
+    await groupInvites.postWaitingInviteCards(me).catch((caught: unknown) => {
+        console.error("[chat] could not post waiting group invitation cards", caught);
+    });
     return { count: await messageRequests.messageRequestCount(me) };
 }
 
