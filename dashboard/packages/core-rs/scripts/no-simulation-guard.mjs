@@ -16,6 +16,10 @@ const repoRoot = join(packageDir, "..", "..", "..");
 // The guard itself and its test spell out the markers they look for.
 const EXEMPT = new Set([fileURLToPath(import.meta.url), join(packageDir, "test", "unit", "checks.test.ts")]);
 
+// The bindings build:rust writes into this package; matched by path, so
+// test/native and test/wasm are still scanned.
+const BUILD_OUTPUT = new Set([join(packageDir, "native"), join(packageDir, "wasm")]);
+
 /** Banned everywhere in scope. */
 const EVERYWHERE = [
     [/\btodo!\s*\(/, "todo!"],
@@ -41,8 +45,8 @@ export function scan(text, { rustLibrary = false } = {}) {
 
 function* walk(dir) {
     for (const entry of readdirSync(dir, { withFileTypes: true })) {
-        if (["node_modules", "dist", "native", "wasm", "target"].includes(entry.name)) continue;
         const path = join(dir, entry.name);
+        if (["node_modules", "dist", "target"].includes(entry.name) || BUILD_OUTPUT.has(path)) continue;
         if (entry.isDirectory()) yield* walk(path);
         else if (/\.(rs|ts|tsx|mjs|js|toml)$/.test(entry.name)) yield path;
     }

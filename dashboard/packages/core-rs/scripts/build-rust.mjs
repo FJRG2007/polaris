@@ -48,17 +48,32 @@ function hostTarget() {
     return found[0];
 }
 
-function run(command, args) {
+function run(command, args, env = process.env) {
     process.stdout.write(`[build-rust] ${command} ${args.join(" ")}\n`);
-    const result = spawnSync(command, args, { cwd: repoRoot, stdio: "inherit" });
+    const result = spawnSync(command, args, { cwd: repoRoot, stdio: "inherit", env });
     if (result.error) throw new Error(`${command} could not start: ${result.error.message}`);
     if (result.status !== 0) throw new Error(`${command} exited with ${result.status}`);
+}
+
+/**
+ * Rust's musl targets link the C runtime statically by default, and a static
+ * C runtime cannot produce a shared library: rustc drops the `cdylib` and no
+ * `.so` is written. A `.node` is loaded into a musl Node process that already
+ * has its own libc, so it links the C runtime dynamically. Set per target here,
+ * not in `.cargo/config.toml`, where it would also make the static musl builds
+ * of the on-device daemons dynamic.
+ */
+function nodeBuildEnv(target, spec) {
+    if (!spec.musl) return process.env;
+    const key = `CARGO_TARGET_${target.toUpperCase().replaceAll("-", "_")}_RUSTFLAGS`;
+    const flags = [process.env[key], "-C target-feature=-crt-static"].filter(Boolean).join(" ");
+    return { ...process.env, [key]: flags };
 }
 
 function buildNode(target) {
     const spec = NODE_TARGETS[target];
     if (!spec) throw new Error(`unknown --node-target ${target}; known: ${Object.keys(NODE_TARGETS).join(", ")}`);
-    run("cargo", ["build", "--locked", "-p", "polaris-core-node", "--profile", "release-node", "--target", target]);
+    run("cargo", ["build", "--locked", "-p", "polaris-core-node", "--profile", "release-node", "--target", target], nodeBuildEnv(target, spec));
     const outDir = join(packageDir, "native");
     mkdirSync(outDir, { recursive: true });
     const dest = join(outDir, nodeFileName(spec));

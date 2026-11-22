@@ -31,6 +31,7 @@
         "check:size": "node scripts/wasm-size.mjs",
         "check:guard": "node scripts/no-simulation-guard.mjs",
         "check:ledger": "node scripts/ledger-check.mjs",
+        "check:bindings": "node scripts/binding-check.mjs",
         "vectors": "node scripts/vectors.mjs"
     },
     "dependencies": {

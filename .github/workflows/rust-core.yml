@@ -1,0 +1,290 @@
+name: rust-core
+
+# The Rust core (docs/rust-core-plan.md): crates/polaris-core*, its Node and
+# WebAssembly bindings, and the facades in dashboard/packages/core-rs. Every
+# target replays the same golden vectors - native Rust, the napi binding on
+# Windows, macOS (Intel and Apple silicon) and musl Linux (x64 and arm64), and
+# the WebAssembly build in Node and in headless Chromium, WebKit and Firefox -
+# so a divergence between targets fails here (plan 4.4).
+#
+# No `paths:` filter on the triggers: a filtered workflow never reports, and a
+# required check that never reports stays pending forever. `changes` decides
+# instead, every job after it is skipped when nothing it checks changed, and
+# `rust-core` always reports - green when the work passed or was not needed.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# A superseded run is stopped on a branch, and left to finish on the default one,
+# for the reason ci.yml gives.
+concurrency:
+  group: rust-core-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_AUDIT: "false"
+  NPM_CONFIG_FETCH_RETRIES: "5"
+  NPM_CONFIG_FETCH_RETRY_MINTIMEOUT: "20000"
+  NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT: "120000"
+  # Only the facade package and the root's dev tools (vitest, tsup, playwright,
+  # typescript), not the whole dashboard: a couple of hundred packages instead of
+  # thousands, on five platforms. Scripts are skipped; nothing this needs runs
+  # one, and Playwright's browsers are installed by their own step.
+  CORE_RS_INSTALL: npm ci -w @polaris/core-rs --include-workspace-root --ignore-scripts --engine-strict=false --prefer-offline
+  WASM_BINDGEN_VERSION: "0.2.130"
+  WASM_BINDGEN_SHA256: 9687f3bb551b9f66f37ed32a40d7913a00f7962db653054e56857bc306c3227f
+  BINARYEN_VERSION: "133"
+  BINARYEN_SHA256: 2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      core: ${{ steps.diff.outputs.core }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Everything the Rust core is built or checked from. A first push of a
+          # branch, a dispatch, or a base that is not in the history (a force
+          # push) has nothing safe to compare against, so it runs everything.
+          pattern='^(crates/polaris-core[^/]*/|dashboard/packages/core-rs/|dashboard/package(-lock)?\.json$|Cargo\.(toml|lock)$|rust-toolchain\.toml$|docs/rust-core-(plan|ledger)\.md$|\.github/workflows/rust-core\.yml$)'
+          case "$EVENT" in
+            pull_request) from="$BASE" ;;
+            push) from="$BEFORE" ;;
+            *) from="" ;;
+          esac
+          if [ -z "$from" ] || [ "$from" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$from^{commit}" 2>/dev/null; then
+            core=true
+          elif git diff --name-only "$from" "$GITHUB_SHA" | grep -Eq "$pattern"; then
+            core=true
+          else
+            core=false
+          fi
+          echo "core=$core" >> "$GITHUB_OUTPUT"
+          echo "Rust core changed: $core"
+
+  rust:
+    name: fmt, clippy, tests, guards
+    needs: changes
+    if: needs.changes.outputs.core == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # rust-toolchain.toml picks the toolchain; this adds the WebAssembly target.
+      - run: cargo --version && rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: rust-core-checks
+      # Plain Node scripts, no install: the plan's guards fail fastest.
+      - name: No-simulation guard (plan 4.6)
+        run: node dashboard/packages/core-rs/scripts/no-simulation-guard.mjs
+      - name: Bindings hold no domain logic (plan 3.1)
+        run: node dashboard/packages/core-rs/scripts/binding-check.mjs
+      - name: Ledger matches the domains (F7)
+        run: node dashboard/packages/core-rs/scripts/ledger-check.mjs
+      - run: cargo fmt --check -p polaris-core -p polaris-core-vectors -p polaris-core-node -p polaris-core-wasm
+      - run: cargo clippy --locked --all-targets -p polaris-core -p polaris-core-vectors -p polaris-core-node -p polaris-core-wasm -- -D warnings
+      - run: cargo clippy --locked --target wasm32-unknown-unknown -p polaris-core -p polaris-core-wasm -- -D warnings
+      - run: cargo test --locked -p polaris-core -p polaris-core-vectors
+
+  native:
+    name: napi ${{ matrix.name }}
+    needs: changes
+    if: needs.changes.outputs.core == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: win32-x64-msvc
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: darwin-x64
+            os: macos-15-intel
+            target: x86_64-apple-darwin
+          - name: darwin-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: linux-x64-musl
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            alpine: true
+          - name: linux-arm64-musl
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            alpine: true
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Windows and macOS: on the runner itself.
+      - if: ${{ !matrix.alpine }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - if: ${{ !matrix.alpine }}
+        run: cargo --version && rustup target add ${{ matrix.target }}
+      - if: ${{ !matrix.alpine }}
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: rust-core-${{ matrix.target }}
+      - if: ${{ !matrix.alpine }}
+        name: Build, then replay the vectors through the binding
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          cargo test --locked -p polaris-core -p polaris-core-vectors
+          cd dashboard
+          $CORE_RS_INSTALL
+          npm run build:rust -w @polaris/core-rs -- --only node --node-target "$TARGET"
+          npm test -w @polaris/core-rs -- --maxWorkers=2
+          npm run test:native -w @polaris/core-rs -- --maxWorkers=2
+
+      # musl Linux: GitHub has no musl runners, and JavaScript actions do not run
+      # inside an Alpine container on arm64, so the build and the tests run in
+      # Node's own Alpine image - the libc the binding is for - started by hand.
+      - if: matrix.alpine
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .ci-cache/cargo-registry
+            target
+          key: rust-core-${{ matrix.target }}-${{ hashFiles('Cargo.lock', 'rust-toolchain.toml') }}
+      - if: matrix.alpine
+        name: Build, then replay the vectors through the binding (Alpine)
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          mkdir -p .ci-cache/cargo-registry
+          docker run --rm \
+            -v "$PWD:/w" -w /w \
+            -v "$PWD/.ci-cache/cargo-registry:/root/.cargo/registry" \
+            -e TARGET -e CORE_RS_INSTALL -e CARGO_INCREMENTAL -e CARGO_TERM_COLOR \
+            -e NPM_CONFIG_FUND -e NPM_CONFIG_AUDIT -e NPM_CONFIG_FETCH_RETRIES \
+            -e NPM_CONFIG_FETCH_RETRY_MINTIMEOUT -e NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT \
+            -e HOST_IDS="$(id -u):$(id -g)" \
+            node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a \
+            sh -euc '
+              trap "chown -R \"\$HOST_IDS\" /w" EXIT
+              apk add --no-cache build-base rustup
+              rustup-init -y --profile minimal --default-toolchain none
+              export PATH="/root/.cargo/bin:$PATH"
+              cargo --version
+              cargo test --locked -p polaris-core -p polaris-core-vectors
+              cd dashboard
+              $CORE_RS_INSTALL
+              npm run build:rust -w @polaris/core-rs -- --only node --node-target "$TARGET"
+              npm test -w @polaris/core-rs -- --maxWorkers=2
+              npm run test:native -w @polaris/core-rs -- --maxWorkers=2
+            '
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: core-rs-native-${{ matrix.name }}
+          path: dashboard/packages/core-rs/native/*.node
+          if-no-files-found: error
+          retention-days: 14
+
+  wasm:
+    name: wasm (Node, Chromium, WebKit, Firefox)
+    needs: changes
+    if: needs.changes.outputs.core == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: cargo --version && rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: rust-core-wasm
+      # Release binaries, checked against the digests GitHub publishes for them.
+      # wasm-bindgen-cli must equal the wasm-bindgen crate's version exactly.
+      - name: Install wasm-bindgen and wasm-opt
+        run: |
+          mkdir -p "$RUNNER_TEMP/tools/bin"
+          cd "$RUNNER_TEMP/tools"
+          wb="wasm-bindgen-$WASM_BINDGEN_VERSION-x86_64-unknown-linux-musl"
+          curl -fsSL --retry 3 -o wb.tar.gz "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$WASM_BINDGEN_VERSION/$wb.tar.gz"
+          echo "$WASM_BINDGEN_SHA256  wb.tar.gz" | sha256sum -c -
+          tar -xzf wb.tar.gz && cp "$wb/wasm-bindgen" bin/
+          by="binaryen-version_$BINARYEN_VERSION-x86_64-linux.tar.gz"
+          curl -fsSL --retry 3 -o by.tar.gz "https://github.com/WebAssembly/binaryen/releases/download/version_$BINARYEN_VERSION/$by"
+          echo "$BINARYEN_SHA256  by.tar.gz" | sha256sum -c -
+          tar -xzf by.tar.gz
+          cp "binaryen-version_$BINARYEN_VERSION/bin/wasm-opt" bin/
+          if [ -d "binaryen-version_$BINARYEN_VERSION/lib" ]; then cp -r "binaryen-version_$BINARYEN_VERSION/lib" .; fi
+          echo "$RUNNER_TEMP/tools/bin" >> "$GITHUB_PATH"
+      - run: wasm-bindgen --version && wasm-opt --version
+      - working-directory: dashboard
+        run: $CORE_RS_INSTALL
+      - working-directory: dashboard
+        run: npm run build:rust -w @polaris/core-rs -- --only wasm
+      - working-directory: dashboard
+        run: npm run build -w @polaris/core-rs
+      - working-directory: dashboard
+        run: npm run typecheck -w @polaris/core-rs
+      - name: Size budget (plan 4.7)
+        working-directory: dashboard
+        run: npm run check:size -w @polaris/core-rs
+      - working-directory: dashboard
+        run: npm run test:wasm -w @polaris/core-rs -- --maxWorkers=2
+      - working-directory: dashboard
+        run: npx playwright install --with-deps chromium webkit firefox
+      - working-directory: dashboard
+        run: npm run test:browsers -w @polaris/core-rs
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: core-rs-wasm
+          path: dashboard/packages/core-rs/wasm/
+          if-no-files-found: error
+          retention-days: 14
+
+  # The one check to require: it always reports, and it is green only when every
+  # job above passed, or was skipped because nothing it checks changed.
+  rust-core:
+    needs: [changes, rust, native, wasm]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) echo "a rust-core job ended $r" >&2; exit 1 ;; esac
+          done
