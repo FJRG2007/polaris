@@ -10803,6 +10803,9 @@ model ChatChannel {
     /// Whether every new post in a forum has to carry at least one of its
     /// tags. Off by default.
     forumRequireTag Boolean @default(false)
+    /// A voice channel run as a stage: whoever walks in listens, and speaks
+    /// once a moderator invites them. Only read for a voice channel.
+    stage         Boolean   @default(false)
     createdAt     DateTime  @default(now())
     updatedAt     DateTime  @updatedAt
 
@@ -12678,6 +12681,10 @@ model MeetingParticipant {
     // a sweep. A browser still carrying the call may take a closed seat back
     // after a reload; never one a moderator closed.
     shownOut       Boolean @default(false)
+    // In a stage's audience: may listen and not publish anything until a
+    // moderator invites them to speak. Set when the seat is made on a stage,
+    // and enforced by the media server the way a mute is.
+    audience       Boolean @default(false)
 
     meeting  Meeting           @relation(fields: [meetingId], references: [id], onDelete: Cascade)
     messages MeetingMessage[]

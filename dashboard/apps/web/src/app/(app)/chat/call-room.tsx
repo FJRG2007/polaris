@@ -294,8 +294,12 @@ export function CallRoom({
     const [asking, setAsking] = useState(false);
     /** Whether this browser can share a screen. Asked after mounting, as the
      *  composer asks about clips: the server has no browser to ask. */
-    const [screenShareable, setScreenShareable] = useState(false);
+    const [shareableDevice, setScreenShareable] = useState(false);
     useEffect(() => setScreenShareable(canShareScreen()), []);
+    // A stage's audience sends nothing until invited to speak, so neither a
+    // share nor a camera is offered to them.
+    const listening = call.moderation.audience === true;
+    const screenShareable = shareableDevice && !listening;
     const bar = useRef<HTMLDivElement>(null);
     const narrow = useNarrow(bar, NARROW_BAR);
 
@@ -356,8 +360,10 @@ export function CallRoom({
                 participantId: seatId,
                 restriction: {
                     serverMuted: person.serverMuted,
-                    serverDeafened: person.serverDeafened
+                    serverDeafened: person.serverDeafened,
+                    audience: person.audience ?? false
                 },
+                stage: call.meeting.stage ?? false,
                 onDone: call.refresh
             }
         };
@@ -1321,7 +1327,9 @@ export function CallRoom({
                             // Only a moderator lifts their own mute, so the button says
                             // who has it rather than offering to undo it.
                             title={
-                                call.moderation.serverMuted || call.moderation.serverDeafened
+                                listening
+                                    ? t("callRoom.inTheAudience")
+                                    : call.moderation.serverMuted || call.moderation.serverDeafened
                                     ? t("callRoom.aModeratorMutedYou")
                                     : call.deafened
                                       ? withKey(t("callRoom.youCannotHearAnybodyAnd"))
@@ -1396,7 +1404,7 @@ export function CallRoom({
                             />
                         </span>
 
-                        <Split
+                        {!listening && <Split
                             label={
                                 call.cameraOn ? t("callRoom.stopVideo") : t("callRoom.startVideo")
                             }
@@ -1430,7 +1438,7 @@ export function CallRoom({
                             backgroundProblem={call.backgroundProblem}
                             look={call.look}
                             onLook={call.setLook}
-                        />
+                        />}
                     </div>
 
                     <div role="group" aria-label={t("callRoom.bar.sharing")} className={CLUSTER}>

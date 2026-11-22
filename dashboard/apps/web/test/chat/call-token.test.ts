@@ -20,11 +20,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const participants: Record<
     string,
-    { name: string; serverMuted?: boolean; serverDeafened?: boolean }
+    { name: string; serverMuted?: boolean; serverDeafened?: boolean; audience?: boolean }
 > = {
     "seat-1": { name: "Ada" },
     "seat-muted": { name: "Grace", serverMuted: true },
-    "seat-deaf": { name: "Linus", serverDeafened: true }
+    "seat-deaf": { name: "Linus", serverDeafened: true },
+    "seat-audience": { name: "Barbara", audience: true }
 };
 
 vi.mock("@polaris/db", () => ({
@@ -174,6 +175,14 @@ describe("what a moderator put on a seat", () => {
             .video as Record<string, unknown>;
         expect(video.canSubscribe).toBe(true);
         expect(video.canPublishSources).not.toContain("microphone");
+    });
+
+    it("lets a stage's audience listen and publish nothing", async () => {
+        const video = claims(await calls.joinToken(endpoint, "meeting-9", "seat-audience"))
+            .video as Record<string, unknown>;
+        expect(video.canPublish).toBe(false);
+        expect(video.canSubscribe).toBe(true);
+        expect(video.canPublishData).toBe(true);
     });
 });
 

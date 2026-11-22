@@ -138,7 +138,8 @@
             "moderatorOnly": "Only a moderator of this server can do that",
             "self": "That is you. Your own controls do that",
             "groupOwner": "Whoever runs the group cannot be moderated",
-            "serverOwner": "The owner of this server cannot be moderated"
+            "serverOwner": "The owner of this server cannot be moderated",
+            "stageOnly": "Only a stage has speakers and an audience"
         },
         "notSent": "That could not be sent",
         "notForwarded": "That could not be forwarded",
@@ -431,7 +432,9 @@
             "unmute": "A moderator unmuted you.",
             "deafen": "A moderator deafened you. You cannot hear the call until a moderator undoes it.",
             "undeafen": "A moderator undeafened you.",
-            "disconnect": "A moderator disconnected you from the call."
+            "disconnect": "A moderator disconnected you from the call.",
+            "invite-to-speak": "A moderator invited you to speak. Unmute to talk.",
+            "move-to-audience": "You are in the audience. Raise your hand to ask to speak."
         }
     },
     "time": {
@@ -471,6 +474,7 @@
         "mute": "Mute",
         "unmute": "Unmute",
         "aModeratorMutedYou": "A moderator muted you",
+        "inTheAudience": "You are in the audience. Raise your hand to ask to speak",
         "stopVideo": "Stop video",
         "startVideo": "Start video",
         "stopSharing": "Stop sharing",
@@ -1317,6 +1321,10 @@
                 "name": "Voice",
                 "hint": "Talk and share your screen together"
             },
+            "stage": {
+                "name": "Stage",
+                "hint": "A few speak, everyone else listens"
+            },
             "announcement": {
                 "name": "Announcement",
                 "hint": "Only administrators post; members read and react"
@@ -1712,7 +1720,18 @@
         "serverMute": "Server mute",
         "serverUndeafen": "Server undeafen",
         "serverDeafen": "Server deafen",
-        "disconnect": "Disconnect"
+        "disconnect": "Disconnect",
+        "inviteToSpeak": "Invite to speak",
+        "moveToAudience": "Move to audience",
+        "done": {
+            "mute": "{name}: muted for everybody.",
+            "unmute": "{name}: unmuted.",
+            "deafen": "{name}: deafened.",
+            "undeafen": "{name}: undeafened.",
+            "disconnect": "{name}: disconnected from the call.",
+            "invite-to-speak": "{name}: invited to speak.",
+            "move-to-audience": "{name}: moved to the audience."
+        }
     },
     "meetingDetails": {
         "meetingDetails": "Meeting details",

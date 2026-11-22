@@ -15,8 +15,17 @@
 
 import { z } from "zod";
 
-/** What a moderator can do to a seat. Each of the first four has its undo. */
-export const CALL_MODERATIONS = ["mute", "unmute", "deafen", "undeafen", "disconnect"] as const;
+/** What a moderator can do to a seat. Each of the first four has its undo, and
+ *  the last two move a seat on a stage between its speakers and its audience. */
+export const CALL_MODERATIONS = [
+    "mute",
+    "unmute",
+    "deafen",
+    "undeafen",
+    "disconnect",
+    "invite-to-speak",
+    "move-to-audience"
+] as const;
 
 export type CallModeration = (typeof CALL_MODERATIONS)[number];
 
@@ -27,7 +36,8 @@ export type ModerationRefusal =
     | "errors.moderation.moderatorOnly"
     | "errors.moderation.self"
     | "errors.moderation.groupOwner"
-    | "errors.moderation.serverOwner";
+    | "errors.moderation.serverOwner"
+    | "errors.moderation.stageOnly";
 
 /** The request, as the action layer accepts it. */
 export const callModerationSchema = z.object({
@@ -41,9 +51,16 @@ export type CallModerationInput = z.infer<typeof callModerationSchema>;
 export interface SeatRestriction {
     readonly serverMuted: boolean;
     readonly serverDeafened: boolean;
+    /** In a stage's audience: listens, publishes nothing until invited to
+     *  speak. Absent is a speaker, which every seat off a stage is. */
+    readonly audience?: boolean;
 }
 
-export const UNRESTRICTED: SeatRestriction = { serverMuted: false, serverDeafened: false };
+export const UNRESTRICTED: SeatRestriction = {
+    serverMuted: false,
+    serverDeafened: false,
+    audience: false
+};
 
 /**
  * Why this actor may not moderate this seat, or null when they may.
@@ -93,6 +110,10 @@ export function restrictionAfter(current: SeatRestriction, action: CallModeratio
             return { ...current, serverDeafened: true };
         case "undeafen":
             return { ...current, serverDeafened: false };
+        case "invite-to-speak":
+            return { ...current, audience: false };
+        case "move-to-audience":
+            return { ...current, audience: true };
         case "disconnect":
             return current;
     }
@@ -139,8 +160,14 @@ export interface MediaPermissions {
  * `subscriptionRules`). That is still the server refusing, not the deafened
  * browser choosing not to listen, because the deafened browser is not the one
  * that grants it.
+ *
+ * In a stage's audience: nothing at all - no microphone, camera or screen -
+ * until a moderator invites them to speak. They still receive everything.
  */
 export function mediaPermissions(restriction: SeatRestriction): MediaPermissions {
+    if (restriction.audience) {
+        return { canPublish: false, canSubscribe: true, canPublishData: true, canPublishSources: [] };
+    }
     const quiet = restriction.serverMuted || restriction.serverDeafened;
     return {
         canPublish: true,
@@ -181,6 +208,7 @@ export function moderationNotice(action: CallModeration): `moderation.notice.${C
 /** What a press of mute or deafen says while a moderator's restriction is on. */
 export function heldBack(restriction: SeatRestriction): `moderation.notice.${CallModeration}` | null {
     if (restriction.serverDeafened) return moderationNotice("deafen");
+    if (restriction.audience) return moderationNotice("move-to-audience");
     if (restriction.serverMuted) return moderationNotice("mute");
     return null;
 }

@@ -72,16 +72,18 @@ describe("who may moderate somebody in a call", () => {
 describe("what each press does to a seat", () => {
     it("takes and gives back each restriction on its own", () => {
         const muted = restrictionAfter(UNRESTRICTED, "mute");
-        expect(muted).toEqual({ serverMuted: true, serverDeafened: false });
+        expect(muted).toEqual({ serverMuted: true, serverDeafened: false, audience: false });
         const both = restrictionAfter(muted, "deafen");
-        expect(both).toEqual({ serverMuted: true, serverDeafened: true });
+        expect(both).toEqual({ serverMuted: true, serverDeafened: true, audience: false });
         expect(restrictionAfter(both, "unmute")).toEqual({
             serverMuted: false,
-            serverDeafened: true
+            serverDeafened: true,
+            audience: false
         });
         expect(restrictionAfter(both, "undeafen")).toEqual({
             serverMuted: true,
-            serverDeafened: false
+            serverDeafened: false,
+            audience: false
         });
     });
 

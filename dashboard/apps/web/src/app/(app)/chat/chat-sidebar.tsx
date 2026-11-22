@@ -117,6 +117,7 @@ import {
     UserPlus,
     Video,
     Volume2,
+    Presentation,
     X
 } from "lucide-react";
 import {
@@ -1250,7 +1251,9 @@ function ChannelRows({
                             onManage={manages ? onManage : undefined}
                             move={manages && mover ? mover(channel) : undefined}
                             icon={
-                                channel.kind === "voice" ? (
+                                channel.kind === "voice" && channel.stage ? (
+                                    <Presentation className="size-3.5 shrink-0 text-muted-foreground" />
+                                ) : channel.kind === "voice" ? (
                                     <Volume2 className="size-3.5 shrink-0 text-muted-foreground" />
                                 ) : core.isAnnouncementChannel(channel) ? (
                                     <Megaphone className="size-3.5 shrink-0 text-muted-foreground" />
@@ -1275,6 +1278,7 @@ function ChannelRows({
                                         key={person.id}
                                         person={person}
                                         moderates={channel.mayModerate}
+                                        stage={channel.stage ?? false}
                                         onModerated={onModerated}
                                     />
                                 ))}
@@ -1398,10 +1402,14 @@ function Section({
 function VoicePerson({
     person,
     moderates,
+    stage,
     onModerated
 }: {
     person: VoicePresence;
     moderates: boolean;
+    /** Whether the room is a stage, which offers moving people between its
+     *  speakers and its audience. */
+    stage: boolean;
     onModerated?: () => void;
 }) {
     const { viewerId } = useChat();
@@ -1434,7 +1442,7 @@ function VoicePerson({
         </PersonRow>
     );
     return (
-        <SeatMenu person={person} moderation={{ moderates, viewerId, onDone: onModerated }}>
+        <SeatMenu person={person} moderation={{ moderates, viewerId, stage, onDone: onModerated }}>
             {row}
         </SeatMenu>
     );

@@ -2764,6 +2764,12 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * device itself stays open underneath, so coming back costs nothing.
      */
     const toggleCamera = useCallback(() => {
+        // A stage's audience publishes nothing until a moderator invites them
+        // to speak; the media server refuses it either way.
+        if (forced.current.audience && !cameraOn) {
+            toastRef.current.show({ key: "call-moderated", title: moderationNotice("move-to-audience") });
+            return;
+        }
         const existing = camera.current;
         /**
          * A camera that is still there to turn back on.
@@ -3013,6 +3019,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         if (screen.current) {
             screen.current.stop();
             stopSharing();
+            return;
+        }
+        if (forced.current.audience) {
+            toastRef.current.show({ key: "call-moderated", title: moderationNotice("move-to-audience") });
             return;
         }
         const level = levelNow("screen");
@@ -4212,16 +4222,33 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
 
     useEffect(() => {
         const own = meeting?.participants.find((person) => person.id === participantId);
+        // A stage's audience is held the way a muted seat is - the microphone
+        // stays off and only a moderator gives it back - and its camera and
+        // screen go with it.
+        const audience = own?.audience ?? false;
         const next: SeatRestriction = {
-            serverMuted: own?.serverMuted ?? false,
-            serverDeafened: own?.serverDeafened ?? false
+            serverMuted: (own?.serverMuted ?? false) || audience,
+            serverDeafened: own?.serverDeafened ?? false,
+            audience
         };
         const was = forced.current;
-        if (was.serverMuted === next.serverMuted && was.serverDeafened === next.serverDeafened) {
+        if (
+            was.serverMuted === next.serverMuted &&
+            was.serverDeafened === next.serverDeafened &&
+            (was.audience ?? false) === audience
+        ) {
             return;
         }
         forced.current = next;
         setModeration(next);
+        if (audience && !was.audience) {
+            if (camera.current) camera.current.enabled = false;
+            setCameraOn(false);
+            if (screen.current) {
+                screen.current.stop();
+                stopSharing();
+            }
+        }
         const quietBefore = was.serverMuted || was.serverDeafened;
         const quietNow = next.serverMuted || next.serverDeafened;
 
@@ -4260,7 +4287,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             micRepairs.current = 0;
             void repairMic();
         }
-    }, [meeting, participantId, repairMic, say, setVoiceEnabled]);
+    }, [meeting, participantId, repairMic, say, setVoiceEnabled, stopSharing]);
 
     const rejoinCall = useCallback(() => {
         const held = room.current;

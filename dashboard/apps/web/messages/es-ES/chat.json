@@ -138,7 +138,8 @@
             "moderatorOnly": "Solo un moderador de este servidor puede hacerlo",
             "self": "Eres tú. Para eso tienes tus propios controles",
             "groupOwner": "Quien gestiona el grupo no se puede moderar",
-            "serverOwner": "El propietario de este servidor no se puede moderar"
+            "serverOwner": "El propietario de este servidor no se puede moderar",
+            "stageOnly": "Solo un escenario tiene ponentes y público"
         },
         "notSent": "No se pudo enviar",
         "notForwarded": "No se pudo reenviar",
@@ -431,7 +432,9 @@
             "unmute": "Un moderador te ha quitado el silencio.",
             "deafen": "Un moderador te ha ensordecido. No oirás la llamada hasta que un moderador lo deshaga.",
             "undeafen": "Un moderador te ha devuelto el audio.",
-            "disconnect": "Un moderador te ha desconectado de la llamada."
+            "disconnect": "Un moderador te ha desconectado de la llamada.",
+            "invite-to-speak": "Un moderador te invita a hablar. Activa el micro.",
+            "move-to-audience": "Estás en el público. Levanta la mano para pedir hablar."
         }
     },
     "time": {
@@ -471,6 +474,7 @@
         "mute": "Callar",
         "unmute": "Hablar",
         "aModeratorMutedYou": "Un moderador te silenció",
+        "inTheAudience": "Estás en el público. Levanta la mano para pedir hablar",
         "stopVideo": "Parar vídeo",
         "startVideo": "Activar vídeo",
         "stopSharing": "No compartir",
@@ -1317,6 +1321,10 @@
                 "name": "Voz",
                 "hint": "Hablad y compartid pantalla juntos"
             },
+            "stage": {
+                "name": "Escenario",
+                "hint": "Unos pocos hablan, el resto escucha"
+            },
             "announcement": {
                 "name": "Anuncios",
                 "hint": "Solo publican administradores; el resto lee"
@@ -1712,7 +1720,18 @@
         "serverMute": "Silenciar",
         "serverUndeafen": "Dejarle oír",
         "serverDeafen": "Ensordecer",
-        "disconnect": "Desconectar"
+        "disconnect": "Desconectar",
+        "inviteToSpeak": "Invitar a hablar",
+        "moveToAudience": "Pasar al público",
+        "done": {
+            "mute": "{name}: silenciado para todos.",
+            "unmute": "{name}: sin silencio.",
+            "deafen": "{name}: ensordecido.",
+            "undeafen": "{name}: vuelve a oír.",
+            "disconnect": "{name}: desconectado de la llamada.",
+            "invite-to-speak": "{name}: invitado a hablar.",
+            "move-to-audience": "{name}: pasado al público."
+        }
     },
     "meetingDetails": {
         "meetingDetails": "Detalles",

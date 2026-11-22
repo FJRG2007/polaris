@@ -244,14 +244,15 @@ export async function joinToken(
     // cannot decide what somebody is called on the way through.
     const participant = await prisma.meetingParticipant.findUnique({
         where: { id: participantId },
-        select: { name: true, serverMuted: true, serverDeafened: true }
+        select: { name: true, serverMuted: true, serverDeafened: true, audience: true }
     });
     // What a moderator has done to this seat travels in the ticket itself, so a
     // browser that reconnects, or leaves and walks back in, arrives already
     // held to it - the media server believes the token and nothing else.
     const held = mediaPermissions({
         serverMuted: participant?.serverMuted ?? false,
-        serverDeafened: participant?.serverDeafened ?? false
+        serverDeafened: participant?.serverDeafened ?? false,
+        audience: participant?.audience ?? false
     });
 
     const token = new AccessToken(endpoint.apiKey, endpoint.apiSecret, {
@@ -262,7 +263,8 @@ export async function joinToken(
     token.addGrant({
         room,
         roomJoin: true,
-        canPublish: true,
+        // False only for a stage's audience, who listen until invited to speak.
+        canPublish: held.canPublish,
         canSubscribe: held.canSubscribe,
         // Only said when something is held back: left out, every source may be
         // published, which is every ordinary seat.
@@ -372,12 +374,14 @@ export async function applyToSeat(
                 return true;
             }
             const permissions = mediaPermissions(change.restriction);
-            if (permissions.canPublishSources.length > 0) {
+            if (!permissions.canPublish || permissions.canPublishSources.length > 0) {
                 // Muted first, so the room goes quiet before the permission
-                // change is even processed.
+                // change is even processed. Moved to a stage's audience, every
+                // track goes, not only the microphone.
                 const seat = await rooms.getParticipant(meetingId, participantId);
                 for (const track of seat.tracks) {
-                    if (Number(track.source) !== MEDIA_SOURCE.MICROPHONE || track.muted) continue;
+                    if (track.muted) continue;
+                    if (permissions.canPublish && Number(track.source) !== MEDIA_SOURCE.MICROPHONE) continue;
                     await rooms
                         .mutePublishedTrack(meetingId, participantId, track.sid, true)
                         .catch(() => undefined);

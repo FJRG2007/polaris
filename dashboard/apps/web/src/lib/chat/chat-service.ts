@@ -171,6 +171,9 @@ export interface ChatChannelView {
     /** Whether anybody may post here, or only whoever runs it (the group's
      *  owner, a space channel's administrators). */
     readonly membersMaySend: boolean;
+    /** A voice channel run as a stage: newcomers listen until invited to
+     *  speak. Absent is an ordinary room. */
+    readonly stage?: boolean;
     /** Whether anybody in this group may keep a disappearing message, or only
      *  its owner (`keep.ts`). Absent is yes. */
     readonly membersMayKeep?: boolean;
@@ -837,6 +840,7 @@ export async function listChannels(
             membersMayInvite: true,
             membersMayMention: true,
             membersMaySend: true,
+            stage: true,
             advancedPrivacy: true,
             membersMayKeep: true,
             slowmode: true,
@@ -1071,6 +1075,7 @@ export async function listChannels(
             membersMayMention: channel.membersMayMention,
             mayMentionRoom: roomMentionsAllowed(channel, actor.id),
             membersMaySend: channel.membersMaySend,
+            stage: channel.stage,
             membersMayKeep: channel.membersMayKeep,
             maySend: !sendClosed(channel, actor.id, mayAdminister),
             advancedPrivacy: channel.advancedPrivacy,
@@ -1225,6 +1230,8 @@ export async function createChannel(
             // An announcement channel is the "Announcement channel" switch
             // already on: only the space's administrators post in it.
             ...(input.announcement && input.kind === "text" ? { membersMaySend: false } : {}),
+            // A stage is a voice channel whose newcomers start in the audience.
+            ...(input.stage && input.kind === "voice" ? { stage: true } : {}),
             categoryId: input.categoryId,
             createdById: actor.id,
             // A private channel with nobody in it is a channel its creator
@@ -1263,6 +1270,7 @@ export async function duplicateChannel(
             private: true,
             slowmode: true,
             membersMaySend: true,
+            stage: true,
             userLimit: true,
             contentMode: true,
             order: true,
@@ -1305,6 +1313,7 @@ export async function duplicateChannel(
                 kind: source.kind,
                 slowmode: source.slowmode,
                 membersMaySend: source.membersMaySend,
+                stage: source.stage,
                 userLimit: source.userLimit,
                 contentMode: source.contentMode,
                 order,

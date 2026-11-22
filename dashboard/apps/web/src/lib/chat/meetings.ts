@@ -96,6 +96,8 @@ export interface MeetingParticipantView {
     readonly serverMuted: boolean;
     /** Whether a moderator deafened them. */
     readonly serverDeafened: boolean;
+    /** In a stage's audience: listening, and speaking only once invited. */
+    readonly audience?: boolean;
 }
 
 export interface MeetingView {
@@ -118,6 +120,8 @@ export interface MeetingView {
      *  What can be done to it differs - a conversation's call has no host to
      *  hand over and no door to lock. */
     readonly standalone: boolean;
+    /** A stage's call: speakers and an audience, moved between by a moderator. */
+    readonly stage?: boolean;
     /** Whether the reader may mute, deafen and disconnect the people in it:
      *  whoever may moderate the conversation the call belongs to. Never true of
      *  a meeting of its own, whose host has their own ways to show somebody
@@ -943,6 +947,7 @@ export async function readMeeting(seat: {
             approveGuests: true,
             requireAccount: true,
             scheduledAt: true,
+            channel: { select: { kind: true, stage: true } },
             participants: {
                 where: { leftAt: null, admission: { not: "denied" } },
                 orderBy: { joinedAt: "asc" },
@@ -953,7 +958,8 @@ export async function readMeeting(seat: {
                     admission: true,
                     joinedAt: true,
                     serverMuted: true,
-                    serverDeafened: true
+                    serverDeafened: true,
+                    audience: true
                 }
             }
         }
@@ -979,6 +985,7 @@ export async function readMeeting(seat: {
         requireAccount: meeting.requireAccount,
         scheduledAt: meeting.scheduledAt?.toISOString() ?? null,
         standalone: meeting.channelId === null,
+        stage: meeting.channel?.kind === "voice" && meeting.channel.stage,
         mayModerate,
         participants: meeting.participants.map((row) => ({
             id: row.id,
@@ -988,7 +995,8 @@ export async function readMeeting(seat: {
             guest: row.userId === null,
             joinedAt: row.joinedAt.toISOString(),
             serverMuted: row.serverMuted,
-            serverDeafened: row.serverDeafened
+            serverDeafened: row.serverDeafened,
+            audience: row.audience
         }))
     };
 }
@@ -1031,6 +1039,8 @@ export interface VoicePresence {
     /** What a moderator put on them, which their own controls cannot lift. */
     readonly serverMuted: boolean;
     readonly serverDeafened: boolean;
+    /** In a stage's audience rather than among its speakers. */
+    readonly audience?: boolean;
 }
 
 const PRESENCE_FIELDS = {
@@ -1041,7 +1051,8 @@ const PRESENCE_FIELDS = {
     deafened: true,
     streaming: true,
     serverMuted: true,
-    serverDeafened: true
+    serverDeafened: true,
+    audience: true
 } as const;
 
 /**
@@ -1212,8 +1223,9 @@ async function seatFor(
     if (admission === "admitted") await requireRoom(meetingId, options?.pastLimit ?? false);
     // A mute or a deafen a moderator put on this account in this space or group
     // is carried into the new seat, so leaving and walking back in is not how
-    // one is lifted.
-    const held = await carriedRestriction(meetingId, userId);
+    // one is lifted. On a stage a new seat starts in the audience, unless it
+    // is somebody who may moderate the room.
+    const held = await carriedRestriction(meetingId, userId, options?.pastLimit ?? false);
     const participant = await prisma.meetingParticipant.create({
         data: { meetingId, userId, name, admission, ...held },
         select: { id: true }
@@ -1231,12 +1243,19 @@ async function seatFor(
  * happened is exactly the record of it. A space is one standing across all of its
  * voice channels, so a seat in any of them counts; a group is its own.
  */
-async function carriedRestriction(meetingId: string, userId: string): Promise<SeatRestriction> {
+async function carriedRestriction(
+    meetingId: string,
+    userId: string,
+    /** Whether this person may moderate the room, who walks onto a stage as a
+     *  speaker rather than into its audience. */
+    mayModerate: boolean
+): Promise<SeatRestriction> {
     const meeting = await prisma.meeting.findUnique({
         where: { id: meetingId },
-        select: { channelId: true, channel: { select: { spaceId: true } } }
+        select: { channelId: true, channel: { select: { spaceId: true, kind: true, stage: true } } }
     });
     if (!meeting?.channelId) return UNRESTRICTED;
+    const audience = seatStartsInAudience(meeting.channel, mayModerate);
     const spaceId = meeting.channel?.spaceId ?? null;
     const last = await prisma.meetingParticipant.findFirst({
         where: {
@@ -1248,8 +1267,18 @@ async function carriedRestriction(meetingId: string, userId: string): Promise<Se
     });
     return {
         serverMuted: last?.serverMuted === true,
-        serverDeafened: last?.serverDeafened === true
+        serverDeafened: last?.serverDeafened === true,
+        audience
     };
+}
+
+/** Whether a new seat in this conversation's call starts in the audience: only
+ *  on a stage, and never for somebody who may moderate it. */
+export function seatStartsInAudience(
+    channel: { readonly kind: string; readonly stage: boolean } | null,
+    mayModerate: boolean
+): boolean {
+    return channel?.kind === "voice" && channel.stage && !mayModerate;
 }
 
 /**

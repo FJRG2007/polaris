@@ -71,6 +71,8 @@ vi.mock("@/app/(app)/chat/lock-actions", () => ({
 }));
 vi.mock("@/components/step-up-dialog", () => ({ StepUpDialog: () => null }));
 vi.mock("@/app/(app)/chat/actions", () => ({
+    // Jumping to a message out of the window asks for the page around it.
+    readAroundAction: async () => ({ error: "" }),
     listScheduledAction: async () => ({ scheduled: [] }),
     readChannelAction: async () => ({
         page: { messages: newest, olderThan: null, newerThan: null }

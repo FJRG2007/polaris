@@ -630,6 +630,7 @@ export function ChannelView({
     const rosterModeration: RosterModeration = {
         moderates: canModerate,
         viewerId,
+        stage: channel?.stage ?? false,
         onDone: checkCall
     };
 

@@ -21,7 +21,17 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { createChannelAction } from "./actions";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
-import { Hash, Images, Loader2, Lock, Megaphone, MessagesSquare, Volume2, type LucideIcon } from "lucide-react";
+import {
+    Hash,
+    Images,
+    Loader2,
+    Lock,
+    Megaphone,
+    MessagesSquare,
+    Presentation,
+    Volume2,
+    type LucideIcon
+} from "lucide-react";
 import {
     Button,
     cn,
@@ -42,6 +52,7 @@ import type { PickedPerson } from "@/components/people-picker";
 const TYPE_ICONS: Record<core.ChatChannelCreateType, LucideIcon> = {
     text: Hash,
     voice: Volume2,
+    stage: Presentation,
     announcement: Megaphone,
     forum: MessagesSquare,
     media: Images
@@ -85,8 +96,11 @@ export function NewChannelDialog({
                     spaceId: space.id,
                     name,
                     topic,
-                    kind: type === "announcement" ? "text" : type,
+                    // Neither is a stored kind: an announcement channel is a text
+                    // one with a switch on, a stage a voice one with its own.
+                    kind: type === "announcement" ? "text" : type === "stage" ? "voice" : type,
                     announcement: type === "announcement",
+                    stage: type === "stage",
                     categoryId,
                     private: privateChannel,
                     memberIds: privateChannel ? members.map((person) => person.id) : []
@@ -196,7 +210,7 @@ export function NewChannelDialog({
                         onChange={(event) => setTopic(event.target.value)}
                     />
 
-                    {type === "voice" && (
+                    {(type === "voice" || type === "stage") && (
                         <p className="text-xs text-muted-foreground">
                             {t("newChannel.aVoiceChannelHasA")}
                         </p>
@@ -234,7 +248,7 @@ export function NewChannelDialog({
                     </Button>
                     <Button size="sm" disabled={busy || !stored} onClick={() => void create()}>
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        {type === "voice" ? t("newChannel.createVoice") : t("newChannel.createText")}
+                        {type === "voice" || type === "stage" ? t("newChannel.createVoice") : t("newChannel.createText")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

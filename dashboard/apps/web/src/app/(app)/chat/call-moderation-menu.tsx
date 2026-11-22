@@ -2,7 +2,8 @@
 
 /**
  * What a moderator's right-click on somebody in a call adds: mute, deafen and
- * disconnect, each with its undo.
+ * disconnect, each with its undo - and on a stage, moving them between its
+ * speakers and its audience.
  *
  * One component for every place a person in a call is drawn - their face in the
  * call, their row under a voice channel in the rail, and the faces a
@@ -16,7 +17,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useToast } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
 import { moderateCallAction } from "./meeting-actions";
-import { HeadphoneOff, Headphones, Mic, MicOff, PhoneOff } from "lucide-react";
+import { HeadphoneOff, Headphones, Mic, MicOff, PhoneOff, Presentation, Users } from "lucide-react";
 import type { CallModeration, SeatRestriction } from "@/lib/chat/voice-moderation";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import {
@@ -34,24 +35,19 @@ export interface SeatModeration {
     readonly participantId: string;
     /** What a moderator has already done to it, so each item offers its undo. */
     readonly restriction: SeatRestriction;
+    /** Whether the call is a stage's, which is what offers inviting somebody
+     *  to speak and moving them back to the audience. */
+    readonly stage?: boolean;
     /** Called once the server has taken it, so the list can redraw. */
     readonly onDone?: () => void;
 }
-
-/** What each press is called, as the item and as the sentence after it. */
-const DONE: Record<CallModeration, string> = {
-    mute: "Muted for everybody.",
-    unmute: "Unmuted.",
-    deafen: "Deafened.",
-    undeafen: "Undeafened.",
-    disconnect: "Disconnected from the call."
-};
 
 /** Send one moderation, and say how it went in a note. */
 export function useModerate(): {
     moderate: (seat: SeatModeration, action: CallModeration, name: string) => Promise<void>;
     busy: boolean;
 } {
+    const t = useTranslations("chat");
     const toast = useToast();
     const [busy, setBusy] = useState(false);
 
@@ -67,7 +63,7 @@ export function useModerate(): {
             toast.show({ title: answer.error });
             return;
         }
-        toast.show({ title: `${name}: ${DONE[action]}`, body: answer.warning });
+        toast.show({ title: t(`callModeration.done.${action}`, { name }), body: answer.warning });
         seat.onDone?.();
     };
 
@@ -78,12 +74,23 @@ export function useModerate(): {
 export function ModerationItems({ seat, name }: { seat: SeatModeration; name: string }) {
     const t = useTranslations("chat");
     const { moderate, busy } = useModerate();
-    const { serverMuted, serverDeafened } = seat.restriction;
+    const { serverMuted, serverDeafened, audience } = seat.restriction;
 
     return (
         <>
             <ContextMenuSeparator />
             <ContextMenuLabel className="text-xs text-muted-foreground">{t("callModeration.moderation")}</ContextMenuLabel>
+            {seat.stage ? (
+                <ContextMenuItem
+                    disabled={busy}
+                    onSelect={() =>
+                        void moderate(seat, audience ? "invite-to-speak" : "move-to-audience", name)
+                    }
+                >
+                    {audience ? <Presentation className="size-3.5" /> : <Users className="size-3.5" />}
+                    {audience ? t("callModeration.inviteToSpeak") : t("callModeration.moveToAudience")}
+                </ContextMenuItem>
+            ) : null}
             <ContextMenuItem
                 disabled={busy}
                 onSelect={() => void moderate(seat, serverMuted ? "unmute" : "mute", name)}
@@ -121,6 +128,8 @@ export interface RosterModeration {
     readonly moderates: boolean;
     /** The reader, who is never offered the menu over themselves. */
     readonly viewerId: string;
+    /** Whether the call is a stage's. */
+    readonly stage?: boolean;
     /** Called once the server has taken a press, so the roster can redraw. */
     readonly onDone?: () => void;
 }
@@ -135,7 +144,7 @@ export function SeatMenu({
     moderation,
     children
 }: {
-    person: Pick<VoicePresence, "id" | "userId" | "name" | "serverMuted" | "serverDeafened">;
+    person: Pick<VoicePresence, "id" | "userId" | "name" | "serverMuted" | "serverDeafened" | "audience">;
     moderation?: RosterModeration;
     /** The row or face itself; it becomes the menu's trigger. */
     children: React.ReactElement;
@@ -152,8 +161,10 @@ export function SeatMenu({
                         participantId: person.id,
                         restriction: {
                             serverMuted: person.serverMuted,
-                            serverDeafened: person.serverDeafened
+                            serverDeafened: person.serverDeafened,
+                            audience: person.audience ?? false
                         },
+                        stage: moderation.stage,
                         onDone: moderation.onDone
                     }}
                 />

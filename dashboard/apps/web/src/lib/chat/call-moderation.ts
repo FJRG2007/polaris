@@ -59,6 +59,7 @@ export async function moderateSeat(
             meetingId: true,
             serverMuted: true,
             serverDeafened: true,
+            audience: true,
             meeting: {
                 select: {
                     endedAt: true,
@@ -66,6 +67,7 @@ export async function moderateSeat(
                     channel: {
                         select: {
                             kind: true,
+                            stage: true,
                             ownerId: true,
                             createdById: true,
                             space: { select: { ownerId: true } }
@@ -93,6 +95,12 @@ export async function moderateSeat(
         group
     });
     if (refusal) throw new ChatAccessError({ key: refusal });
+    // Speakers and an audience are what a stage is; anywhere else every seat
+    // speaks, and there is nobody to invite or to move.
+    const onStage = meeting.channel.kind === "voice" && meeting.channel.stage;
+    if ((action === "invite-to-speak" || action === "move-to-audience") && !onStage) {
+        throw new ChatAccessError({ key: "errors.moderation.stageOnly" });
+    }
 
     if (action === "disconnect") {
         // Told first: once the connection is closed the browser is no longer
@@ -117,7 +125,7 @@ export async function moderateSeat(
     }
 
     const next = restrictionAfter(
-        { serverMuted: seat.serverMuted, serverDeafened: seat.serverDeafened },
+        { serverMuted: seat.serverMuted, serverDeafened: seat.serverDeafened, audience: seat.audience },
         action
     );
     await prisma.meetingParticipant.update({ where: { id: seat.id }, data: next });

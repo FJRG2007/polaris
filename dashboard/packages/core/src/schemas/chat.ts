@@ -63,8 +63,11 @@ export type ChatSpaceChannelKind = (typeof CHAT_SPACE_CHANNEL_KINDS)[number];
  * channel's settings has always written. Reading the type off that one column
  * means every channel made with the switch is already an announcement channel,
  * and the type and the switch can never disagree.
+ *
+ * `stage` is not a stored kind either: it is a voice channel with `stage` on,
+ * so everything that asks whether a room carries a call keeps asking `voice`.
  */
-export const CHAT_CHANNEL_CREATE_TYPES = ["text", "voice", "announcement", "forum", "media"] as const;
+export const CHAT_CHANNEL_CREATE_TYPES = ["text", "voice", "stage", "announcement", "forum", "media"] as const;
 
 export type ChatChannelCreateType = (typeof CHAT_CHANNEL_CREATE_TYPES)[number];
 
@@ -286,6 +289,9 @@ export const chatChannelCreateSchema = z.object({
     /** An announcement channel: a text channel only its administrators post
      *  in (`membersMaySend` off). Absent is an ordinary channel. */
     announcement: z.boolean().optional(),
+    /** A stage: a voice channel whose newcomers listen until a moderator
+     *  invites them to speak. Absent is an ordinary voice channel. */
+    stage: z.boolean().optional(),
     /** The heading it sits under, or null for the ones above the first one. */
     categoryId: z.string().uuid().nullable().default(null),
     /** The people put in a private channel as it is made. */
@@ -293,6 +299,9 @@ export const chatChannelCreateSchema = z.object({
 }).refine((input) => !(input.announcement && input.kind !== "text"), {
     message: "Only a text channel can be an announcement channel",
     path: ["announcement"]
+}).refine((input) => !(input.stage && input.kind !== "voice"), {
+    message: "Only a voice channel can be a stage",
+    path: ["stage"]
 });
 
 export type ChatChannelCreateInput = z.infer<typeof chatChannelCreateSchema>;

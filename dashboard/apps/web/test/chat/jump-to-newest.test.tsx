@@ -69,6 +69,8 @@ vi.mock("@/app/(app)/chat/lock-actions", () => ({
 }));
 vi.mock("@/components/step-up-dialog", () => ({ StepUpDialog: () => null }));
 vi.mock("@/app/(app)/chat/actions", () => ({
+    // Jumping to a message out of the window asks for the page around it.
+    readAroundAction: async () => ({ error: "" }),
     // The conversation asks what this reader has waiting the moment it
     // opens. Nothing, here - but the module is mocked, so it has to be
     // said rather than assumed.

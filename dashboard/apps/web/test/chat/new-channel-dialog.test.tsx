@@ -42,6 +42,7 @@ describe("creating a channel", () => {
         expect(cards.map((card) => card.textContent)).toEqual([
             expect.stringContaining("Text"),
             expect.stringContaining("Voice"),
+            expect.stringContaining("Stage"),
             expect.stringContaining("Announcement"),
             expect.stringContaining("Forum"),
             expect.stringContaining("Media")
@@ -78,6 +79,18 @@ describe("creating a channel", () => {
         fireEvent.click(screen.getByRole("button", { name: "Create voice channel" }));
         await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
         expect(create.mock.calls[0]?.[0]).toMatchObject({ kind: "voice", announcement: false, private: true });
+    });
+
+    it("sends a stage as a voice channel with the stage flag", async () => {
+        create.mockResolvedValue({ id: "channel-stage" });
+        open();
+        fireEvent.click(screen.getByRole("radio", { name: /Stage/ }));
+        fireEvent.change(screen.getByRole("textbox", { name: "Channel name" }), {
+            target: { value: "town-hall" }
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Create voice channel" }));
+        await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+        expect(create.mock.calls[0]?.[0]).toMatchObject({ kind: "voice", stage: true, announcement: false });
     });
 
     it("puts the people picked in a private channel as it is made", async () => {
