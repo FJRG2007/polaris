@@ -1,5 +1,5 @@
 ---
-id: BUG-0012
+id: BUG-0014
 title: Signing in on the web jumps to the desktop app halfway through
 status: fixed-watching
 area: auth / open in app

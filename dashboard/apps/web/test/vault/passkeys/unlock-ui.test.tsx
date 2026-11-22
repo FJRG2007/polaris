@@ -112,6 +112,39 @@ describe("unlock with a passkey", () => {
     });
 });
 
+describe("unlock with a passkey in the desktop app", () => {
+    const APP_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Polaris/0.1.51 Electron/44.3.0";
+    let agent: PropertyDescriptor | undefined;
+
+    beforeEach(() => {
+        support.mockResolvedValue("supported");
+        freshWebStorage();
+        agent = Object.getOwnPropertyDescriptor(window.navigator, "userAgent");
+        Object.defineProperty(window.navigator, "userAgent", { value: APP_AGENT, configurable: true });
+    });
+
+    afterEach(() => {
+        if (agent) Object.defineProperty(window.navigator, "userAgent", agent);
+        else delete (window.navigator as { userAgent?: string }).userAgent;
+    });
+
+    it("says why rather than offering a passkey that never answered in the app", async () => {
+        expect(core.clientFromUserAgent(navigator.userAgent)).toBe("desktop");
+        lockScreen([ENTRY]);
+        expect((await screen.findByTestId("passkey-unavailable")).textContent).toMatch(/browser/i);
+        expect(screen.queryByRole("button", { name: /passkey/i })).toBeNull();
+        expect(unlockWithPasskey).not.toHaveBeenCalled();
+    });
+
+    it("offers one that answered in the app, a security key included", async () => {
+        const { rememberLocalPasskey } = await import("@/lib/local-passkeys");
+        rememberLocalPasskey({ id: ENTRY.credentialId, authenticatorAttachment: "cross-platform" });
+        lockScreen([ENTRY]);
+        expect(await screen.findByRole("button", { name: /passkey/i })).toBeTruthy();
+        expect(unlockWithPasskey).not.toHaveBeenCalled();
+    });
+});
+
 describe("asking for the passkey as the lock screen opens", () => {
     const HERE = { id: ENTRY.credentialId, authenticatorAttachment: "platform" };
     let focus: typeof document.hasFocus;

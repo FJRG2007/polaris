@@ -11,7 +11,9 @@
  * guessed: a credential goes on this list only after it answered a ceremony here
  * as a `platform` authenticator - Windows Hello, Touch ID, Android, a password
  * manager built into the browser. A phone reached by QR code and a USB key report
- * `cross-platform` and are never listed: they may well not be here next time.
+ * `cross-platform` and are never asked for on their own: they may well not be
+ * here next time. They are kept, marked `roaming`, only so the desktop app knows
+ * they can answer in it (`answeredPasskeyIds`).
  *
  * The list is per browser profile and origin (localStorage), holds ids only - a
  * credential id is not a secret and opens nothing - and is pruned by the screens
@@ -37,6 +39,8 @@ interface LocalPasskey {
     readonly misses: number;
     /** When it last answered here, ms since the epoch. */
     readonly usedAt: number;
+    /** A security key or a phone: it answered here, but is not part of this device. */
+    readonly roaming?: true;
 }
 
 function read(): LocalPasskey[] {
@@ -68,28 +72,44 @@ function write(entries: readonly LocalPasskey[]): void {
     }
 }
 
-/** The ids of the passkeys this browser has used itself, most recent first. */
+/** The ids of the passkeys this device holds itself, most recent first. */
 export function localPasskeyIds(): string[] {
     if (typeof window === "undefined") return [];
     return read()
+        .filter((entry) => entry.roaming !== true)
         .sort((a, b) => b.usedAt - a.usedAt)
         .map((entry) => entry.id);
 }
 
+/** Every passkey that has answered in this browser or app, a security key or a
+ *  phone included: what the desktop app can reach at all. */
+export function answeredPasskeyIds(): string[] {
+    if (typeof window === "undefined") return [];
+    return read().map((entry) => entry.id);
+}
+
 /**
  * Note a passkey that was just created or just answered a ceremony in this
- * browser - only when the browser says the authenticator is part of this device.
+ * browser - as one to ask for on its own only when the browser says the
+ * authenticator is part of this device.
  */
 export function rememberLocalPasskey(credential: {
     readonly id: string;
     readonly authenticatorAttachment?: string | null;
 }): void {
     if (typeof window === "undefined") return;
-    if (credential.authenticatorAttachment !== "platform") return;
     const id = credential.id;
     if (!id) return;
-    const others = read().filter((entry) => entry.id !== id);
-    const next = [{ id, misses: 0, usedAt: Date.now() }, ...others]
+    const kept = read();
+    const platform = credential.authenticatorAttachment === "platform";
+    // One this device holds stays that way: an answer that did not say where it
+    // lives is no reason to stop asking for it.
+    if (!platform && kept.some((entry) => entry.id === id && entry.roaming !== true)) return;
+    const others = kept.filter((entry) => entry.id !== id);
+    const entry: LocalPasskey = platform
+        ? { id, misses: 0, usedAt: Date.now() }
+        : { id, misses: 0, usedAt: Date.now(), roaming: true };
+    const next = [entry, ...others]
         .sort((a, b) => b.usedAt - a.usedAt)
         .slice(0, MAX_ENTRIES);
     write(next);

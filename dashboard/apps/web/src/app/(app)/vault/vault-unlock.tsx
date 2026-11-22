@@ -49,16 +49,28 @@ export function VaultUnlock({
     const [password, setPassword] = useState("");
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    /** The enrolled passkeys this address can use, and whether this browser
-     *  can ask them for a PRF output. Read after mount: neither exists on the
-     *  server that drew the page. */
-    const [usable, setUsable] = useState<VaultPasskeyEntry[]>([]);
-    const [support, setSupport] = useState<passkeyClient.PasskeySupport | null>(null);
+    /** Which enrolled passkeys this screen offers (`passkeyOffer`). Read after
+     *  mount: the address, the browser's support and the passkeys that have
+     *  answered here exist only in this tab, not on the server that drew it. */
+    const [offer, setOffer] = useState<passkeyClient.PasskeyOffer | null>(null);
     useEffect(() => {
-        setUsable(passkeyClient.usablePasskeys(passkeys));
-        void passkeyClient.passkeySupport().then(setSupport);
+        let live = true;
+        void passkeyClient.passkeySupport().then((support) => {
+            if (!live) return;
+            setOffer(
+                passkeyClient.passkeyOffer({
+                    usable: passkeyClient.usablePasskeys(passkeys),
+                    support,
+                    localIds: localPasskeys.localPasskeyIds(),
+                    answeredIds: localPasskeys.answeredPasskeyIds(),
+                    inApp: core.clientFromUserAgent(navigator.userAgent) === "desktop"
+                })
+            );
+        });
+        return () => {
+            live = false;
+        };
     }, [passkeys]);
-    const passkeyBlocked = support === "no-webauthn" || support === "no-prf";
 
     // Ask on its own once per lock screen, and only for the enrolled passkeys
     // this browser has itself used (`lib/local-passkeys`) - never one that lives
@@ -67,10 +79,9 @@ export function VaultUnlock({
     // dismissed prompt leaves the screen as it was and this tab asks no more.
     const asked = useRef(false);
     useEffect(() => {
-        if (!autoPasskey || asked.current || support === null || passkeyBlocked) return;
+        if (!autoPasskey || asked.current || offer?.kind !== "offer") return;
         if (localPasskeys.automaticPasskeyPaused()) return;
-        const here = new Set(localPasskeys.localPasskeyIds());
-        const candidates = usable.filter((entry) => here.has(entry.credentialId));
+        const candidates = [...offer.automatic];
         if (candidates.length === 0) return;
         const controller = new AbortController();
         void localPasskeys.whenAttended(controller.signal).then((attended) => {
@@ -79,9 +90,9 @@ export function VaultUnlock({
             void onPasskey(candidates, true);
         });
         return () => controller.abort();
-    }, [autoPasskey, support, passkeyBlocked, usable]);
+    }, [autoPasskey, offer]);
 
-    async function onPasskey(entries: VaultPasskeyEntry[] = usable, automatic = false) {
+    async function onPasskey(entries: readonly VaultPasskeyEntry[], automatic = false) {
         setPending(true);
         setError(null);
         try {
@@ -173,27 +184,27 @@ export function VaultUnlock({
                             </p>
                         ) : null}
                         {error ? <p className="text-sm text-danger">{error}</p> : null}
-                        {usable.length > 0 && support !== null ? (
-                            passkeyBlocked ? (
-                                <p
-                                    className="text-center text-xs text-muted-foreground"
-                                    data-testid="passkey-unavailable"
-                                >
-                                    {support === "no-prf"
-                                        ? t("passkeys.noPrfBrowser")
-                                        : t("passkeys.noWebAuthn")}
-                                </p>
-                            ) : (
-                                <Button
-                                    type="button"
-                                    variant="secondary"
-                                    disabled={pending}
-                                    onClick={() => void onPasskey()}
-                                >
-                                    <KeyRound className="size-4" />
-                                    {t("passkeys.unlock")}
-                                </Button>
-                            )
+                        {offer?.kind === "blocked" || offer?.kind === "not-here" ? (
+                            <p
+                                className="text-center text-xs text-muted-foreground"
+                                data-testid="passkey-unavailable"
+                            >
+                                {offer.kind === "not-here"
+                                    ? t("passkeys.notInApp")
+                                    : offer.reason === "no-prf"
+                                      ? t("passkeys.noPrfBrowser")
+                                      : t("passkeys.noWebAuthn")}
+                            </p>
+                        ) : offer?.kind === "offer" ? (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                disabled={pending}
+                                onClick={() => void onPasskey(offer.entries)}
+                            >
+                                <KeyRound className="size-4" />
+                                {t("passkeys.unlock")}
+                            </Button>
                         ) : null}
                         {/* Nothing that could never have been the password is
                             sent: a wrong guess costs a key derivation on this

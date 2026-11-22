@@ -33,6 +33,18 @@ describe("which passkeys count as on this device", () => {
         expect(local.localPasskeyIds()).toEqual([]);
     });
 
+    it("keeps a phone or USB key only as one that can answer in an app", () => {
+        local.rememberLocalPasskey(PHONE);
+        expect(local.localPasskeyIds()).toEqual([]);
+        expect(local.answeredPasskeyIds()).toEqual([PHONE.id]);
+    });
+
+    it("does not demote a passkey of this device on an answer that did not say where it lives", () => {
+        local.rememberLocalPasskey(HELLO);
+        local.rememberLocalPasskey({ id: HELLO.id, authenticatorAttachment: "cross-platform" });
+        expect(local.localPasskeyIds()).toEqual([HELLO.id]);
+    });
+
     it("keeps one entry per passkey, the latest first", () => {
         const other = { id: "b3RoZXItcGFzc2tleS1oZXJl", authenticatorAttachment: "platform" };
         local.rememberLocalPasskey(HELLO);

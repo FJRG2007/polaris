@@ -170,6 +170,50 @@ export function usablePasskeys(
     return entries.filter((entry) => entry.rpId === window.location.hostname);
 }
 
+/**
+ * What a lock screen offers, from the enrolled passkeys for this address.
+ *
+ * Inside the desktop app only a passkey that has answered in that app is
+ * offered. It reaches the system's own passkeys (Windows Hello, a security key,
+ * a phone by QR code), never the ones a browser keeps for itself:
+ * a passkey saved in Chrome's password manager or a browser extension does not
+ * exist there, and offering it opens a system prompt that can only be
+ * dismissed. A browser offers every enrolled passkey, as it can reach its own.
+ * Either way, only one that has answered here is asked for on its own.
+ */
+export type PasskeyOffer =
+    | { readonly kind: "none" }
+    | { readonly kind: "blocked"; readonly reason: "no-webauthn" | "no-prf" }
+    | { readonly kind: "not-here" }
+    | {
+          readonly kind: "offer";
+          readonly entries: readonly VaultPasskeyEntry[];
+          readonly automatic: readonly VaultPasskeyEntry[];
+      };
+
+export function passkeyOffer(input: {
+    readonly usable: readonly VaultPasskeyEntry[];
+    readonly support: PasskeySupport;
+    /** The ids this device holds and that have answered here (`localPasskeyIds`). */
+    readonly localIds: readonly string[];
+    /** Every id that has answered here, a security key included (`answeredPasskeyIds`). */
+    readonly answeredIds: readonly string[];
+    /** Inside the desktop app rather than a browser. The phone apps are not:
+     *  their web view asks the system's passkey provider, as the browser does. */
+    readonly inApp: boolean;
+}): PasskeyOffer {
+    if (input.usable.length === 0) return { kind: "none" };
+    if (input.support === "no-webauthn" || input.support === "no-prf") {
+        return { kind: "blocked", reason: input.support };
+    }
+    const local = new Set(input.localIds);
+    const answered = new Set([...input.answeredIds, ...input.localIds]);
+    const automatic = input.usable.filter((entry) => local.has(entry.credentialId));
+    if (!input.inApp) return { kind: "offer", entries: input.usable, automatic };
+    const entries = input.usable.filter((entry) => answered.has(entry.credentialId));
+    return entries.length === 0 ? { kind: "not-here" } : { kind: "offer", entries, automatic };
+}
+
 /** Open the vault with whichever of its passkeys the person picks. */
 export async function unlockWithPasskey(
     entries: readonly VaultPasskeyEntry[]

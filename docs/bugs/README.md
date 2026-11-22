@@ -23,3 +23,5 @@ Security findings are not kept here; they live in
 | BUG-0010 | The side panel says it needs Minecraft 1.16 on a 1.20.1 server | Game servers | Fixed, watching | dashboard/apps/game-servers/src/lib/minecraft/server-release.ts | 2026-11-21 |
 | BUG-0011 | A phone in a call, or recording a voice message, sounds cut into pieces | Calls | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/mic-filter.ts | 2026-11-22 |
 | BUG-0012 | The conversation with yourself shows initials instead of your picture | Chat | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/conversation-face.ts | 2026-11-22 |
+| BUG-0013 | Unlock with passkey fails in the desktop app and never starts on its own | Vault | Fixed, watching | dashboard/apps/web/src/lib/vault/passkey-client.ts | 2026-11-22 |
+| BUG-0014 | Signing in on the web jumps to the desktop app halfway through | Auth | Fixed, watching | dashboard/apps/web/src/components/open-in-app.tsx | 2026-11-22 |

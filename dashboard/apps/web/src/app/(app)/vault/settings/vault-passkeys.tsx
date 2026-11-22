@@ -14,12 +14,14 @@
  */
 
 import Link from "next/link";
+import * as core from "@polaris/core";
 import { KeyRound, Loader2 } from "lucide-react";
 import { useVaultSession } from "../vault-session";
 import { useCallback, useEffect, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import { StepUpDialog } from "@/components/step-up-dialog";
 import * as passkeyClient from "@/lib/vault/passkey-client";
+import * as localPasskeys from "@/lib/local-passkeys";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { VaultPasskeyChoice } from "@/lib/vault/passkey-schema";
@@ -44,6 +46,10 @@ export function VaultPasskeys() {
     const [loadFailed, setLoadFailed] = useState(false);
     const [support, setSupport] = useState<passkeyClient.PasskeySupport | null>(null);
     const [host, setHost] = useState("");
+    /** Inside the desktop app, the passkeys that have answered in it: one turned on
+     *  from a browser is offered on the app's lock screen only once it has
+     *  (`passkeyOffer`), which is what "Use in this app" does. */
+    const [inApp, setInApp] = useState<ReadonlySet<string> | null>(null);
     const [asking, setAsking] = useState<VaultPasskeyChoice | null>(null);
     const [pending, setPending] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -61,6 +67,9 @@ export function VaultPasskeys() {
     useEffect(() => {
         let live = true;
         setHost(window.location.hostname);
+        if (core.clientFromUserAgent(navigator.userAgent) === "desktop") {
+            setInApp(new Set(localPasskeys.answeredPasskeyIds()));
+        }
         void load();
         void passkeyClient.passkeySupport().then((value) => live && setSupport(value));
         return () => {
@@ -109,6 +118,7 @@ export function VaultPasskeys() {
                 return;
             }
             setDone(t("passkeys.turnedOn", { name: nameOf(choice) }));
+            if (inApp) setInApp(new Set(localPasskeys.answeredPasskeyIds()));
             await load();
         } catch {
             setError(t("passkeys.failed"));
@@ -216,6 +226,13 @@ export function VaultPasskeys() {
                                 // Off is always allowed; on needs this browser to
                                 // reach the credential, which only its own address can.
                                 const blocked = !on && (unavailable || elsewhere || !vaultKey);
+                                const notInApp =
+                                    on &&
+                                    inApp !== null &&
+                                    !inApp.has(choice.credentialId) &&
+                                    !elsewhere &&
+                                    !unavailable &&
+                                    Boolean(vaultKey);
                                 return (
                                     <li
                                         key={choice.passkeyId}
@@ -253,6 +270,21 @@ export function VaultPasskeys() {
                                         </div>
                                         {pending === choice.passkeyId ? (
                                             <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
+                                        ) : notInApp ? (
+                                            <Button
+                                                size="sm"
+                                                variant="secondary"
+                                                className="shrink-0"
+                                                disabled={pending !== null}
+                                                title={t("passkeys.useInAppHint")}
+                                                onClick={() => {
+                                                    setError(null);
+                                                    setDone(null);
+                                                    void proveThenTurnOn(choice);
+                                                }}
+                                            >
+                                                {t("passkeys.useInApp")}
+                                            </Button>
                                         ) : null}
                                         <Switch
                                             checked={on}
