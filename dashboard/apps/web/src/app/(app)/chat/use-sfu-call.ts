@@ -104,6 +104,7 @@ import { callDevices, isDenial, openMedia, openScreen, refused, settle } from ".
 import { mirrorChoice, mirrorsPicture, setMirrorChoice, type MirrorChoice } from "./call-mirror";
 import { extraPublications, oneVoice, serialized, type PublishedTrack } from "./call-tracks";
 import { retuneScreenEncoding, swapScreen, type EncodedTrack } from "./call-share-menu";
+import { CALL_ROOM_OPTIONS } from "./call-room-options";
 import type { LocalVideoTrack, Participant, Room, Track, TrackPublication } from "livekit-client";
 import { ACTIVITY_ATTRIBUTE, ACTIVITY_TOPIC, reportPoseFailure } from "@/lib/chat/call-activity";
 import { ANNOTATE_TOPIC, ANNOTATORS } from "@/lib/chat/call-annotate";
@@ -1688,63 +1689,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                 return;
             }
 
-            const joined = new Room({
-                /**
-                 * Ask for the resolution the tile is actually drawn at, and stop
-                 * the flow entirely while it is off screen. On a wall of eight
-                 * faces this is most of the bandwidth.
-                 *
-                 * `pixelDensity: "screen"` is the half that was missing, and it
-                 * is why a shared screen looked sharp in this product while the
-                 * faces beside it did not. Left unset, the client asks for the
-                 * tile's size in CSS pixels and assumes one device pixel each -
-                 * so on a laptop that paints two, a 320-wide tile was fed a
-                 * 320-wide picture and then doubled to fill 640 real pixels.
-                 * That is upscaling, and it looks exactly like a soft camera. A
-                 * shared screen escaped it by being the biggest element on the
-                 * page: even halved it cleared the top layer.
-                 *
-                 * It costs bandwidth on a high-density display, which is the
-                 * documented trade and the one being asked for here: the picture
-                 * is the product.
-                 */
-                adaptiveStream: { pixelDensity: "screen" },
-                // Stop sending the quality layers nobody is subscribed to.
-                dynacast: true,
-                publishDefaults: {
-                    // Roughly half the bits for the same picture, which on a
-                    // domestic upstream is the difference between a sharp call
-                    // and a soft one. It also replaces simulcast with layers cut
-                    // from a single encode, so the three sizes below cost one
-                    // encoder instead of three.
-                    //
-                    // Safe to ask for unconditionally. A browser that cannot
-                    // encode it is given the old codec by the client itself, and
-                    // a subscriber that cannot decode it makes the publisher
-                    // fall back for the room - so the worst case is exactly what
-                    // this did before, never a call with no picture.
-                    videoCodec: "vp9",
-                    // Three sizes of the same camera, so the server has something
-                    // to give a small tile and a slow connection without asking
-                    // the publisher to change anything. Read only on the fallback
-                    // path: the codec above carries its own layers.
-                    simulcast: true,
-                    // Cheap on the wire and free of charge: silence costs nothing
-                    // to send, and a lost audio packet is covered by the next.
-                    dtx: true,
-                    red: true
-                },
-                // The devices are opened by this hook, filtered, and handed over -
-                // so nothing here should go looking for one of its own.
-                stopLocalTrackOnUnpublish: false,
-                // The client's own page-leave hook hangs up on `beforeunload`,
-                // which fires before a navigation is even decided. In the
-                // desktop app a link to another site is cancelled and opened in
-                // the system browser, so the page never leaves - but the call
-                // had already been dropped. `pagehide` below is the page
-                // actually going away.
-                disconnectOnPageLeave: false
-            });
+            const joined = new Room(CALL_ROOM_OPTIONS);
             room.current = joined;
             const noteShareDrop = () => {
                 const held = shareRepair.current;
