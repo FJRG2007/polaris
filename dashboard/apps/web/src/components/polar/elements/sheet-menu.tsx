@@ -127,6 +127,7 @@ export function SheetMenuContent({
         <Dialog open={sheet.open} onOpenChange={sheet.setOpen}>
             <DialogContent
                 aria-describedby={undefined}
+                swipeToClose
                 showClose={false}
                 onEscapeKeyDown={onEscapeKeyDown}
                 className="bottom-0 left-0 top-auto flex max-h-[85dvh] w-full max-w-full translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-b-none p-0 pb-[var(--safe-bottom)] data-[state=open]:slide-in-from-bottom-8 data-[state=closed]:slide-out-to-bottom-8"

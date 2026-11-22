@@ -11,8 +11,8 @@
  * replaces the list in place with a way back, rather than opening a second
  * sheet over the first.
  *
- * Tapping the dimmed page, pressing Escape or pulling the sheet down by its top
- * closes it. It scrolls when it is taller than the screen, and keeps clear of
+ * Tapping the dimmed page, pressing Escape or pulling the sheet down - from
+ * anywhere on it while its list is at the top - closes it. It scrolls when it is taller than the screen, and keeps clear of
  * the phone's home bar.
  */
 
@@ -20,7 +20,7 @@ import * as core from "@polaris/core";
 import { EmojiFace, type CustomEmojiSet } from "@/components/rich-text/custom-emoji";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChevronLeft, ChevronRight, SmilePlus } from "lucide-react";
-import { useRef, useState, createContext, useContext, type ReactNode } from "react";
+import { useState, createContext, useContext, type ReactNode } from "react";
 import {
     cn,
     Dialog,
@@ -36,9 +36,6 @@ import {
     type MenuParts,
     type MenuSection
 } from "./message-menu-model";
-
-/** How far the sheet has to be pulled down to close when it is let go. */
-const PULL_TO_CLOSE = 80;
 
 const ROW =
     "flex min-h-12 w-full min-w-0 items-center gap-3 px-4 text-start text-sm text-foreground transition-colors active:bg-card-hover disabled:opacity-50 [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground";
@@ -61,8 +58,6 @@ export function MessageSheet({
     const t = useTranslations("chat");
     /** The submenu standing in for the list, when one was opened. */
     const [page, setPage] = useState<MenuEntry | null>(null);
-    const sheet = useRef<HTMLDivElement>(null);
-    const pull = useRef<{ y: number; id: number } | null>(null);
 
     /** Every way it closes goes back to the list for the next time. */
     const change = (next: boolean) => {
@@ -71,44 +66,21 @@ export function MessageSheet({
     };
     const close = () => change(false);
 
-    const moveTo = (dy: number) => {
-        if (sheet.current) sheet.current.style.transform = dy > 0 ? `translateY(${dy}px)` : "";
-    };
-
     const reactions = model.reactions;
     return (
         <Dialog open={open} onOpenChange={change}>
             <DialogContent
-                ref={sheet}
                 phone="keep"
+                swipeToClose
                 showClose={false}
                 aria-describedby={undefined}
                 onCloseAutoFocus={keepFocusOnClose}
                 className="bottom-0 left-0 right-0 top-auto mx-auto flex max-h-[85dvh] w-full max-w-lg translate-x-0 translate-y-0 flex-col gap-0 overflow-hidden rounded-b-none rounded-t-2xl border-x-0 border-b-0 p-0 pb-[var(--safe-bottom)] sm:border-x data-[state=closed]:slide-out-to-bottom-8 data-[state=open]:slide-in-from-bottom-8"
             >
                 <DialogTitle className="sr-only">{t("messageMenu.actions")}</DialogTitle>
-                {/* The handle: pulling it down closes the sheet. */}
-                <div
-                    className="flex shrink-0 touch-none justify-center pb-2 pt-3"
-                    onPointerDown={(event) => {
-                        pull.current = { y: event.clientY, id: event.pointerId };
-                        event.currentTarget.setPointerCapture?.(event.pointerId);
-                    }}
-                    onPointerMove={(event) => {
-                        if (pull.current?.id === event.pointerId)
-                            moveTo(event.clientY - pull.current.y);
-                    }}
-                    onPointerUp={(event) => {
-                        const from = pull.current;
-                        pull.current = null;
-                        moveTo(0);
-                        if (from && event.clientY - from.y > PULL_TO_CLOSE) close();
-                    }}
-                    onPointerCancel={() => {
-                        pull.current = null;
-                        moveTo(0);
-                    }}
-                >
+                {/* The handle: what says it can be pulled down. The pull itself
+                    works from anywhere on the sheet - see `sheet-swipe`. */}
+                <div className="flex shrink-0 justify-center pb-2 pt-3">
                     <span aria-hidden className="h-1 w-10 rounded-full bg-border-strong" />
                 </div>
                 <Done.Provider value={close}>

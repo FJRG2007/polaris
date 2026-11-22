@@ -5,8 +5,17 @@
 import { cn } from "../lib/cn";
 import { X } from "lucide-react";
 import * as RadixDialog from "@radix-ui/react-dialog";
-import { forwardRef, type ComponentPropsWithoutRef, type ElementRef } from "react";
+import { attachSheetSwipe } from "../lib/sheet-swipe";
 import { useUiStrings } from "../lib/ui-strings";
+import {
+    forwardRef,
+    useCallback,
+    useEffect,
+    useState,
+    type ComponentPropsWithoutRef,
+    type ElementRef,
+    type ForwardedRef
+} from "react";
 
 /** The page dimmed behind anything modal. It fades out as well as in, so a
  *  dialog closing does not leave the page snapping back to full light under it. */
@@ -90,13 +99,31 @@ export const DialogContent = forwardRef<
     ElementRef<typeof RadixDialog.Content>,
     /** `showClose` drops the corner X for dialogs whose own content reaches into
      *  that corner (the search palette); Escape still closes them. `phone` is
-     *  how it sits on a phone (`PhoneLayout`). */
+     *  how it sits on a phone (`PhoneLayout`). `swipeToClose` is pulling it
+     *  down from anywhere to close it (`sheet-swipe`): on by default where it
+     *  is a sheet on a phone, `true` for a dialog that is a sheet everywhere. */
     ComponentPropsWithoutRef<typeof RadixDialog.Content> & {
         showClose?: boolean;
         phone?: PhoneLayout;
+        swipeToClose?: boolean;
     }
->(({ className, children, showClose = true, phone, ...props }, ref) => {
+>(({ className, children, showClose = true, phone, swipeToClose, ...props }, ref) => {
     const layout = phoneLayout(className, phone);
+    const swipe = swipeToClose ?? (layout === "sheet" ? "phone" : false);
+    // The surface in state rather than a ref: this component is mounted while
+    // the dialog is closed, and the node only exists while it is open.
+    const [surface, setSurface] = useState<HTMLDivElement | null>(null);
+    useEffect(() => {
+        if (!surface || !swipe) return;
+        return attachSheetSwipe(surface, swipe === "phone");
+    }, [surface, swipe]);
+    const attach = useCallback(
+        (node: HTMLDivElement | null) => {
+            setSurface(node);
+            setRef(ref, node);
+        },
+        [ref]
+    );
     // A dialog that fills a phone is a screen of its own there, and its close
     // is that screen's back: a swipe from the left takes it away (useSwipeBack).
     const screen = layout === "full" ? "" : undefined;
@@ -104,7 +131,7 @@ export const DialogContent = forwardRef<
         <RadixDialog.Portal>
             <RadixDialog.Overlay className={OVERLAY} />
             <RadixDialog.Content
-                ref={ref}
+                ref={attach}
                 className={cn(
                     // Centred, so a dialog taller than the window would hang off both
                     // ends of it with no way to reach either - including the buttons.
@@ -179,6 +206,11 @@ export const SheetContent = forwardRef<
     </RadixDialog.Portal>
 ));
 SheetContent.displayName = "SheetContent";
+
+function setRef<T>(ref: ForwardedRef<T>, value: T | null): void {
+    if (typeof ref === "function") ref(value);
+    else if (ref) ref.current = value;
+}
 
 /** The close button's name, in the reader's words. */
 function CloseWord() {
