@@ -156,7 +156,15 @@ export interface PolarisDesktop {
     }): Promise<boolean>;
     /** The app's icon dressed for the season: a PNG data URL the page drew, or
      *  null for the icon the app ships with. */
-    setAppIcon(input: { readonly png: string | null }): Promise<boolean>;
+    setAppIcon(input: {
+        readonly png: string | null;
+        /** Which host is reporting, its calendar (null with seasons off) and the
+         *  dressed marks it may need by season: the app settles every host's
+         *  report by one rule. A page from before that sends `{ png }` alone. */
+        readonly host?: string;
+        readonly calendar?: unknown;
+        readonly icons?: Readonly<Record<string, string>>;
+    }): Promise<boolean>;
     /** The screens and windows to share, each with a small picture, for the
      *  page's own picker. Null where the system's picker is the one to use.
      *  `thumbnails: false` answers faster, with names only. */
