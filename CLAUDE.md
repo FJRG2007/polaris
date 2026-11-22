@@ -355,6 +355,14 @@ switch reset the picture to its lowest quality.
 - Test the two-interfaces-on-one-subnet case. A degraded call is checked for
   "switched pair" in the media server's log before anything else.
 
+## Is it an app at all
+
+**Default: no new app.** Before proposing one, or merging, splitting or removing
+one, check `docs/app-boundaries.md`: a new app needs its own primary object, its
+own daily screen, its own access decision and real weight. Settings only, a
+capability that produces another app's object, or something Polar answers is not
+an app - the doc's table says where each goes.
+
 ## Every app is a permission
 
 Who may open an app is managed in one place: roles, group policies and one
