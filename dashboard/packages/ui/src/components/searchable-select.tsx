@@ -67,6 +67,10 @@ export interface SearchableSelectProps {
     /** What the trigger shows for the chosen option, when its row would be too
      *  wide there (a flag and a calling code instead of a country's name). */
     renderValue?: (option: SearchableSelectOption) => ReactNode;
+    /** What is left after typing, in the order drawn - for a list that knows
+     *  which match is the likeliest (a country's own code before a name that
+     *  merely contains it). Defaults to `filterSearchableOptions`. */
+    filter?: (options: readonly SearchableSelectOption[], query: string) => SearchableSelectOption[];
     id?: string;
     "aria-label"?: string;
 }
@@ -100,12 +104,13 @@ export function SearchableSelect({
     className,
     contentClassName,
     renderValue,
+    filter = filterSearchableOptions,
     id,
     "aria-label": ariaLabel
 }: SearchableSelectProps) {
     const [query, setQuery] = useState("");
     const selected = options.find((option) => option.value === value);
-    const found = useMemo(() => filterSearchableOptions(options, query), [options, query]);
+    const found = useMemo(() => filter(options, query), [filter, options, query]);
     const shown = limit !== undefined ? found.slice(0, limit) : found;
     const hidden = found.length - shown.length;
     const typed = query.trim();

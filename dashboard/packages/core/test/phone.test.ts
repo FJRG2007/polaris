@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { phoneField, phoneShapeField } from "../src/schemas/two-factor.js";
 import {
+    defaultPhoneCountry,
     formatPhoneAsTyped,
     formatPhoneInternational,
     isPhoneCountry,
     phoneCountries,
     phoneCallingCode,
+    phoneMainCountry,
     phoneCountryFromLocales,
     phoneCountryOf,
     splitPhone,
@@ -59,6 +61,9 @@ describe("countries", () => {
         expect(phoneCallingCode("ES")).toBe("34");
         expect(isPhoneCountry("ES")).toBe(true);
         expect(isPhoneCountry("XX")).toBe(false);
+        expect(phoneMainCountry("1")).toBe("US");
+        expect(phoneMainCountry("44")).toBe("GB");
+        expect(phoneMainCountry("999")).toBeUndefined();
     });
 
     it("starts on the first region the reader's languages name", () => {
@@ -76,5 +81,29 @@ describe("phoneField", () => {
     it("refuses a well-shaped number that cannot exist", () => {
         expect(phoneShapeField.safeParse("+3460011122").success).toBe(true);
         expect(phoneField.safeParse("+3460011122").success).toBe(false);
+    });
+});
+
+describe("defaultPhoneCountry", () => {
+    it("trusts the country the server placed the request in first", () => {
+        expect(defaultPhoneCountry({ server: "pt", locales: ["es-ES"], timeZone: "Europe/Madrid" })).toBe("PT");
+    });
+
+    it("falls back to the region of the reader's languages", () => {
+        expect(defaultPhoneCountry({ server: null, locales: ["en", "es-MX"], timeZone: "Europe/Madrid" })).toBe("MX");
+    });
+
+    it("skips a server code that is no country", () => {
+        expect(defaultPhoneCountry({ server: "XX", locales: ["fr-FR"] })).toBe("FR");
+    });
+
+    it("then uses the time zone, and only one that names a single country", () => {
+        expect(defaultPhoneCountry({ locales: ["es"], timeZone: "Europe/Madrid" })).toBe("ES");
+        expect(defaultPhoneCountry({ locales: ["es"], timeZone: "Etc/UTC" })).toBe("US");
+    });
+
+    it("ends on the neutral default, or the one given", () => {
+        expect(defaultPhoneCountry({})).toBe("US");
+        expect(defaultPhoneCountry({}, "GB")).toBe("GB");
     });
 });

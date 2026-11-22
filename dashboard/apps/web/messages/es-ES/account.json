@@ -1364,8 +1364,6 @@
         "title": "Teléfono",
         "description": "Se confirma a través de uno de tus propios canales de WhatsApp, que también es el que lleva un código de inicio de sesión cuando lo usas.",
         "remove": "Quitar",
-        "change": "Cambiar",
-        "add": "Añadir",
         "confirmed": "Confirmado",
         "unconfirmed": "Sin confirmar",
         "code": "Código de confirmación",

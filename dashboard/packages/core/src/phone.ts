@@ -16,6 +16,8 @@ import {
     parsePhoneNumberFromString,
     type CountryCode
 } from "libphonenumber-js/min";
+import metadata from "libphonenumber-js/min/metadata";
+import { countryForTimeZone } from "./analytics-geo.js";
 
 export type PhoneCountry = CountryCode;
 
@@ -39,6 +41,17 @@ export function isPhoneCountry(code: string | null | undefined): code is PhoneCo
 /** The calling code dialled before a country's numbers, without the plus: `34`. */
 export function phoneCallingCode(country: PhoneCountry): string {
     return getCountryCallingCode(country);
+}
+
+/**
+ * The country a calling code belongs to first, among those that share it:
+ * `US` for `1`, `GB` for `44`, `RU` for `7`. Undefined for a code nobody uses.
+ * Read from the same metadata `/min` already carries, where each code lists
+ * its main country first.
+ */
+export function phoneMainCountry(callingCode: string): PhoneCountry | undefined {
+    const first = metadata.country_calling_codes[callingCode]?.[0];
+    return isPhoneCountry(first) ? first : undefined;
 }
 
 /**
@@ -100,4 +113,38 @@ export function phoneCountryFromLocales(locales: readonly string[]): PhoneCountr
         }
     }
     return undefined;
+}
+
+/** What a phone field can know about where its reader is, strongest first. */
+export interface PhoneRegionSignals {
+    /** The country the server placed the request in (the edge's country header,
+     *  or the address looked up). */
+    server?: string | null;
+    /** The reader's languages in order of preference (`es-ES`). */
+    locales?: readonly string[];
+    /** The reader's time zone (`Europe/Madrid`). */
+    timeZone?: string | null;
+}
+
+/** The country a field shows when nothing better is known. */
+export const NEUTRAL_PHONE_COUNTRY: PhoneCountry = "US";
+
+/**
+ * The country a phone field starts on when it holds no number: the one the
+ * server placed the request in, else the region named in the reader's
+ * languages, else the country of their time zone, else `fallback`. A zone that
+ * spans several countries, a bare language and an unknown code all fall through
+ * rather than guess.
+ */
+export function defaultPhoneCountry(
+    signals: PhoneRegionSignals,
+    fallback: PhoneCountry = NEUTRAL_PHONE_COUNTRY
+): PhoneCountry {
+    const server = signals.server?.trim().toUpperCase();
+    if (isPhoneCountry(server)) return server;
+    const fromLocales = phoneCountryFromLocales(signals.locales ?? []);
+    if (fromLocales) return fromLocales;
+    const fromZone = countryForTimeZone(signals.timeZone);
+    if (isPhoneCountry(fromZone)) return fromZone;
+    return fallback;
 }

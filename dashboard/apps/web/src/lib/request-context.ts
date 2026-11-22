@@ -10,17 +10,30 @@
 
 import { headers } from "next/headers";
 import { createHash } from "node:crypto";
+import { countryForIp } from "@/lib/analytics-geoip";
 import {
     originHost,
     originIp,
     originUserAgent,
     originUserAgentBrands,
-    originUserAgentPlatform
+    originUserAgentPlatform,
+    resolveCountry
 } from "@polaris/core";
 
 /** Best-effort client IP from the forwarded headers, or undefined. */
 export async function clientIp(): Promise<string | undefined> {
     return originIp(await headers());
+}
+
+/**
+ * The country this request comes from, or null when it cannot be told: the
+ * edge's own country header where a proxy in front sets one, else the address
+ * looked up in the geo database the sessions list already uses. A hint for a
+ * default (a phone field's country), never a fact to authorize on.
+ */
+export async function requestCountry(): Promise<string | null> {
+    const incoming = await headers();
+    return resolveCountry(incoming.get("cf-ipcountry"), null) ?? countryForIp(originIp(incoming));
 }
 
 /** The client user-agent string, or undefined. */

@@ -8,8 +8,10 @@
  * It reports the number in E.164 (`+34600111222`), or an empty string when
  * nothing is typed, so every form stores the same shape the server checks. A
  * number pasted or typed with its own `+` moves the picker to its country. The
- * country starts on the region of the reader's language, or on the number's own
- * country when there already is one.
+ * country starts on the number's own country when there already is one, and
+ * otherwise on where the reader is (see `defaultPhoneCountry`): the country the
+ * server placed the request in, handed down by `PhoneRegionProvider`, else the
+ * region of their languages, else their time zone.
  *
  * Country names come from the runtime (`Intl.DisplayNames`) in the reader's
  * language, so every language Polaris speaks names them without a catalog. The
@@ -22,14 +24,26 @@ import { cn } from "../lib/cn";
 import { Input } from "./input";
 import { CountryFlag } from "./country-flag";
 import { useLocale, useTranslations } from "../i18n";
-import { SearchableSelect, type SearchableSelectOption } from "./searchable-select";
-import { useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
+import { filterSearchableOptions, SearchableSelect, type SearchableSelectOption } from "./searchable-select";
 import {
+    createContext,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type FocusEvent,
+    type KeyboardEvent,
+    type ReactNode
+} from "react";
+import {
+    defaultPhoneCountry,
     formatPhoneAsTyped,
     isPhoneCountry,
     phoneCountries,
     phoneCallingCode,
     phoneCountryFromLocales,
+    phoneMainCountry,
     splitPhone,
     toE164,
     type PhoneCountry
@@ -82,6 +96,52 @@ export function phoneCountryOptions(locale: string): SearchableSelectOption[] {
     return rows;
 }
 
+/**
+ * The options left after typing, the likeliest first: a country whose code or
+ * calling code is exactly what was typed ("es", "+34", "34") - the code's main
+ * country ahead of the others that share it - then one whose
+ * name or calling code starts with it, then any that merely contain it.
+ */
+export function findPhoneCountries(
+    options: readonly SearchableSelectOption[],
+    query: string
+): SearchableSelectOption[] {
+    const found = filterSearchableOptions(options, query);
+    const typed = folded(query.trim().toLowerCase());
+    if (!typed) return found;
+    const digits = /^\+?\d+$/.test(typed) ? typed.replace("+", "") : null;
+    const rank = (option: SearchableSelectOption): number => {
+        if (digits !== null) {
+            const calling = typeof option.hint === "string" ? option.hint.replace("+", "") : "";
+            // The country a shared code belongs to first leads ("+1" is the US).
+            if (calling === digits) return option.value === phoneMainCountry(digits) ? 0 : 1;
+            return calling.startsWith(digits) ? 2 : 3;
+        }
+        if (option.value.toLowerCase() === typed) return 0;
+        const names = folded(String(option.keywords ?? "").toLowerCase());
+        return typeof option.label === "string" && folded(option.label.toLowerCase()).startsWith(typed)
+            ? 1
+            : names.split(" ").some((word) => word.startsWith(typed))
+              ? 2
+              : 3;
+    };
+    // Array sort is stable, so each rank keeps the list's alphabetical order.
+    return found
+        .map((option) => ({ option, rank: rank(option) }))
+        .sort((a, b) => a.rank - b.rank)
+        .map((entry) => entry.option);
+}
+
+const PhoneRegionContext = createContext<string | null>(null);
+
+/**
+ * The country the server placed this request in (an ISO code, or null when it
+ * could not tell), for every phone field below it to start on.
+ */
+export function PhoneRegionProvider({ country, children }: { country: string | null; children: ReactNode }) {
+    return <PhoneRegionContext.Provider value={country}>{children}</PhoneRegionContext.Provider>;
+}
+
 /** What the field reports for `digits` typed as a number of `country`. */
 function reported(digits: string, country: PhoneCountry): string {
     if (!digits) return "";
@@ -129,7 +189,10 @@ export function PhoneInput({
 }: PhoneInputProps) {
     const t = useTranslations("components");
     const locale = useLocale();
-    const startCountry = defaultCountry ?? phoneCountryFromLocales([locale]) ?? "US";
+    const serverCountry = useContext(PhoneRegionContext);
+    // What the first paint can know on both sides; the browser's own signals
+    // follow once there is a browser to ask (below).
+    const startCountry = defaultCountry ?? defaultPhoneCountry({ server: serverCountry, locales: [locale] });
     const [country, setCountry] = useState<PhoneCountry>(
         () => splitPhone(value).country ?? startCountry
     );
@@ -148,12 +211,15 @@ export function PhoneInput({
         setNational(split.national);
     }, [value]);
 
-    // A language with no region says nothing about the phone; the browser's own
-    // list of languages may, once there is a browser to ask.
+    // Neither the server nor the interface language placed the reader: the
+    // browser's languages, then its time zone, may.
     useEffect(() => {
-        if (value || defaultCountry || phoneCountryFromLocales([locale])) return;
-        const found = phoneCountryFromLocales(navigator.languages ?? [navigator.language]);
-        if (found) setCountry(found);
+        if (value || defaultCountry || isPhoneCountry(serverCountry?.toUpperCase()) || phoneCountryFromLocales([locale])) return;
+        const found = defaultPhoneCountry({
+            locales: navigator.languages ?? [navigator.language],
+            timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        });
+        setCountry(found);
         // Only the first paint: a country picked afterwards is the reader's choice.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -204,6 +270,7 @@ export function PhoneInput({
                     value={country}
                     onValueChange={pick}
                     options={options}
+                    filter={findPhoneCountries}
                     searchPlaceholder={t("phoneInput.search")}
                     emptyText={t("phoneInput.empty")}
                     disabled={disabled}

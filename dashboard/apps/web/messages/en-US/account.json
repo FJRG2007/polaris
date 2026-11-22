@@ -1364,8 +1364,6 @@
         "title": "Phone number",
         "description": "Confirmed through one of your own WhatsApp channels, which is also what carries a sign-in code when you use one.",
         "remove": "Remove",
-        "change": "Change",
-        "add": "Add",
         "confirmed": "Confirmed",
         "unconfirmed": "Unconfirmed",
         "code": "Confirmation code",

@@ -7,7 +7,9 @@ import { FONT_CLASSES } from "./fonts";
 import { IdleWatch } from "@/components/idle-watch";
 import { DropGuard } from "@/components/drop-guard";
 import { ContextMenuFallback } from "@/components/context-menu-fallback";
+import { PhoneRegionProvider } from "@polaris/ui";
 import { localeDirection, themeClass } from "@polaris/core";
+import { requestCountry } from "@/lib/request-context";
 import { resolveSession } from "@/lib/session";
 import { CHUNK_RECOVERY_SCRIPT } from "@/lib/stale-build";
 import { INPUT_MODALITY_SCRIPT } from "@/lib/input-modality";
@@ -82,14 +84,16 @@ export async function generateMetadata(): Promise<Metadata> {
  */
 export default async function RootLayout({ children }: { children: ReactNode }) {
     const session = await resolveSession().catch(() => null);
-    const [theme, textSize, locale, client, seasonPreview] = await Promise.all([
+    const [theme, textSize, locale, client, seasonPreview, country] = await Promise.all([
         resolveTheme(session?.id ?? null),
         resolveTextSize(session?.id ?? null),
         getLocale(),
         getClient(),
         // An admin trying a season on paints in it from the first frame; the
         // frame keeps it from there (see `lib/seasonal-preview`).
-        session?.isAdmin ? seasonPreviewFor(session.sessionId).catch(() => null) : null
+        session?.isAdmin ? seasonPreviewFor(session.sessionId).catch(() => null) : null,
+        // Where the reader is, for a phone field to start on their country.
+        requestCountry().catch(() => null)
     ]);
 
     return (
@@ -124,7 +128,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                     <ContextMenuFallback />
                     <IdleWatch />
                     <ConnectionBanner />
-                    {children}
+                    <PhoneRegionProvider country={country}>{children}</PhoneRegionProvider>
                 </I18nProvider>
             </body>
         </html>

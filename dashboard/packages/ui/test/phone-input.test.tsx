@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { PhoneInput, phoneCountryOptions } from "../src/components/phone-input";
+import { findPhoneCountries, PhoneInput, phoneCountryOptions, PhoneRegionProvider } from "../src/components/phone-input";
 
 afterEach(cleanup);
 
@@ -67,5 +67,67 @@ describe("phoneCountryOptions", () => {
         expect(spain.keywords).toContain("+34");
         const peru = phoneCountryOptions("es-ES").find((option) => option.value === "PE")!;
         expect(peru.keywords).toContain("Peru");
+    });
+});
+
+describe("PhoneInput's starting country", () => {
+    it("starts on the country the server placed the request in", () => {
+        render(
+            <PhoneRegionProvider country="PT">
+                <PhoneInput value="" onChange={() => {}} />
+            </PhoneRegionProvider>
+        );
+        expect(document.querySelector("[data-flag='pt']")).not.toBeNull();
+    });
+
+    it("never moves a stored number to the reader's region", () => {
+        render(
+            <PhoneRegionProvider country="PT">
+                <PhoneInput value="+34600111222" onChange={() => {}} />
+            </PhoneRegionProvider>
+        );
+        expect(document.querySelector("[data-flag='es']")).not.toBeNull();
+        expect(document.querySelector("[data-flag='pt']")).toBeNull();
+    });
+
+    it("keeps a country the screen asked for over the region", () => {
+        render(
+            <PhoneRegionProvider country="PT">
+                <PhoneInput value="" defaultCountry="MX" onChange={() => {}} />
+            </PhoneRegionProvider>
+        );
+        expect(document.querySelector("[data-flag='mx']")).not.toBeNull();
+    });
+});
+
+describe("findPhoneCountries", () => {
+    const options = phoneCountryOptions("en-US");
+    const first = (query: string) => findPhoneCountries(options, query)[0]?.value;
+
+    it("puts the country with that calling code first, with or without the plus", () => {
+        expect(first("+34")).toBe("ES");
+        expect(first("34")).toBe("ES");
+        expect(first("+351")).toBe("PT");
+    });
+
+    it("puts the main country of a shared calling code ahead of the others", () => {
+        expect(first("+1")).toBe("US");
+        expect(first("44")).toBe("GB");
+        expect(first("+7")).toBe("RU");
+    });
+
+    it("puts a country's own code first", () => {
+        expect(first("es")).toBe("ES");
+        expect(first("PT")).toBe("PT");
+    });
+
+    it("finds a country by the start of its name, in the reader's language or English", () => {
+        expect(first("spa")).toBe("ES");
+        expect(findPhoneCountries(phoneCountryOptions("es-ES"), "spain")[0]?.value).toBe("ES");
+        expect(findPhoneCountries(phoneCountryOptions("es-ES"), "peru")[0]?.value).toBe("PE");
+    });
+
+    it("leaves the whole list when nothing is typed", () => {
+        expect(findPhoneCountries(options, " ")).toHaveLength(options.length);
     });
 });
