@@ -14,7 +14,7 @@ import { installedSectionApps } from "@/lib/app-access";
 import { navigationEntries } from "@/lib/search/entries";
 import { APP_SECTIONS, POLARIS_APPS, sectionOffered, type AppSection } from "@/lib/apps";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/apps/deploy" }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch: () => {} }), usePathname: () => "/apps/deploy" }));
 
 // The rail marks an app read through the launcher's action, which reaches the
 // server; the bell's provider does too.

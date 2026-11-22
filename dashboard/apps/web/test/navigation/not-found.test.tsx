@@ -20,7 +20,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
 const pathname = vi.fn(() => "/apps/deploy/019fc9e3/admin/settings");
-vi.mock("next/navigation", () => ({ usePathname: () => pathname() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch: () => {} }), usePathname: () => pathname() }));
 
 const { default: NotFound } = await import("@/app/not-found");
 const { default: AppNotFound } = await import("@/app/(app)/not-found");

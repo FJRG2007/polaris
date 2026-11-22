@@ -14,7 +14,7 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let pathname = "/tasks/l/gone";
-vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch: () => {} }), usePathname: () => pathname }));
 
 const { routerSettled, STREAMED_REDIRECT_MARKER, useRouterSettled } = await import(
     "@/components/use-router-settled"

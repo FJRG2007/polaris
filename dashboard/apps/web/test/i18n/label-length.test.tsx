@@ -17,7 +17,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Badge, Button, SegmentedControl, SelectRoot, SelectTrigger, SelectValue } from "@polaris/ui";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/account/sessions" }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/account/sessions", useRouter: () => ({ prefetch: () => {} }) }));
 vi.mock("@/app/(app)/launcher-waiting-actions", () => ({
     markLauncherReadAction: async () => ({})
 }));

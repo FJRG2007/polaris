@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MessagesWrapper } from "../setup/i18n";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/crm/companies" }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch: () => {} }), usePathname: () => "/crm/companies" }));
 
 // The rail marks an app read through the launcher's action, which reaches the
 // server; the bell's provider does too.

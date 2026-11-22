@@ -20,7 +20,7 @@ const nudges: [string, number][] = [];
 let refuse = false;
 const unread: Record<string, number> = { chat: 7, mail: 0 };
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/home" }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch: () => {} }), usePathname: () => "/home" }));
 vi.mock("@/app/(app)/app-launcher-actions", () => ({
     saveFavoriteAppsAction: async () => ({})
 }));

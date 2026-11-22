@@ -14,7 +14,7 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let pathname = "/drive";
-vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch: () => {} }), usePathname: () => pathname }));
 
 const { VisitRecorder } = await import("@/components/overview/visit-recorder");
 const { MENU_ORDER_HOLD_MS, readAppUsage, readMenuUsage, rememberAppOpen } = await import(

@@ -15,7 +15,7 @@ import { APP_SECTIONS } from "@/lib/apps";
 import { vi, describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/account/sessions" }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch: () => {} }), usePathname: () => "/account/sessions" }));
 
 // The rail marks an app read through the launcher's action, which reaches the
 // server; the bell's provider does too.

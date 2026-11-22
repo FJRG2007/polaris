@@ -7,7 +7,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/k/abc" }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch: () => {} }), usePathname: () => "/k/abc" }));
 
 const { MessagesWrapper } = await import("../setup/i18n");
 const { LinkUnavailable } = await import("@/components/public-shell");

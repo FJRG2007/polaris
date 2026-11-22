@@ -24,7 +24,7 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 const save = vi.fn<(input: unknown) => Promise<{ error?: string }>>();
 const show = vi.fn();
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/home" }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch: () => {} }), usePathname: () => "/home" }));
 // The bell's provider reaches the server actions, which read the environment.
 vi.mock("@/components/notifications/notifications-provider", () => ({
     useHoldConversationNotices: () => () => ({ settle: () => undefined, abandon: () => undefined })

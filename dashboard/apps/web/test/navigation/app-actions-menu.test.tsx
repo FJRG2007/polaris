@@ -13,7 +13,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 const save = vi.fn<(input: unknown) => Promise<{ error?: string }>>();
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/home" }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch: () => {} }), usePathname: () => "/home" }));
 vi.mock("@/components/notifications/notifications-provider", () => ({
     useHoldConversationNotices: () => () => ({ settle: () => undefined, abandon: () => undefined })
 }));

@@ -13,7 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 const path = vi.hoisted(() => ({ current: "/home" }));
 const given = vi.hoisted(() => [] as unknown[]);
 
-vi.mock("next/navigation", () => ({ usePathname: () => path.current }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch: () => {} }), usePathname: () => path.current }));
 vi.mock("next/web-vitals", () => ({ useReportWebVitals: (report: unknown) => void given.push(report) }));
 
 const { PageTiming } = await import("@/components/telemetry/page-timing");

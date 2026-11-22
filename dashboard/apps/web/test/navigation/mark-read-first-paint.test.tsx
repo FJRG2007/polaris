@@ -26,7 +26,7 @@ let recounted = false;
 let route: "pending" | LauncherWaiting = "pending";
 const unread: Record<string, number> = { chat: 0, mail: 3, admin: 4 };
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/home" }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch: () => {} }), usePathname: () => "/home" }));
 vi.mock("@/app/(app)/app-launcher-actions", () => ({
     saveFavoriteAppsAction: async () => ({})
 }));
