@@ -16,7 +16,7 @@ import type { StepUpReason } from "@/lib/two-factor-policy";
 import { CodeInput, isWholeCode } from "@/components/code-input";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState, type ComponentType, type FormEvent } from "react";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
+import { Button, Card, CardBody, CardHeader, CardTitle, Input, PhoneInput, PolarisMark } from "@polaris/ui";
 import {
     answerStepUpQuestionsAction,
     proveStepUpFactorAction,
@@ -185,17 +185,12 @@ export function StepUpView({
                             ) : null}
 
                             {needsPhone ? (
-                                <label className="flex flex-col gap-1 text-sm">
-                                    {phoneHint ? t("stepUp.phoneLabel", { hint: phoneHint }) : t("stepUp.phoneLabelPlain")}
-                                    <Input
-                                        type="tel"
-                                        inputMode="tel"
-                                        autoComplete="tel"
-                                        maxLength={32}
-                                        value={phone}
-                                        onChange={(event) => setPhone(event.target.value)}
-                                    />
-                                </label>
+                                <div className="flex flex-col gap-1 text-sm">
+                                    <label htmlFor="step-up-phone">
+                                        {phoneHint ? t("stepUp.phoneLabel", { hint: phoneHint }) : t("stepUp.phoneLabelPlain")}
+                                    </label>
+                                    <PhoneInput id="step-up-phone" value={phone} onChange={setPhone} />
+                                </div>
                             ) : null}
 
                             {needsSending ? (
