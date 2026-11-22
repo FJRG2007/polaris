@@ -879,9 +879,7 @@
                 "hide": "Ocultar los pasos",
                 "steps": {
                     "open": "En la app de Starlink, abre Ajustes y luego Actualizaciones de software.",
-                    "window": "Elige la ventana más cercana a las {time}, la hora en que menos se usa este servidor.",
-                    "defer": "Activa el aplazamiento, para que una actualización espere hasta tres días a esa ventana en vez de instalarse al llegar.",
-                    "router": "El router de Starlink no tiene ventana propia y puede reiniciarse por una actualización a otra hora."
+                    "window": "Elige la franja que incluye las {time}, la hora en que menos se usa este servidor, y guarda."
                 }
             },
             "works": {

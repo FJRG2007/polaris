@@ -879,9 +879,7 @@
                 "hide": "Hide the steps",
                 "steps": {
                     "open": "In the Starlink app, open Settings, then Software updates.",
-                    "window": "Pick the window closest to {time}, the hour this server is least used.",
-                    "defer": "Turn on deferring updates, so one can wait up to three days for that window instead of installing on arrival.",
-                    "router": "The Starlink router has no window of its own and can still restart for an update at another hour."
+                    "window": "Choose the block that contains {time}, the hour this server is least used, and save."
                 }
             },
             "works": {

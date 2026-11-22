@@ -35,7 +35,7 @@ describe("StarlinkUpdateGuide", () => {
         render(<StarlinkUpdateGuide view={view(QUIET_AT)} />);
         expect(screen.queryByText(/steps\.window/)).toBeNull();
         fireEvent.click(screen.getByRole("button", { name: "domains.backup.starlink.show" }));
-        expect(screen.getAllByRole("listitem")).toHaveLength(4);
+        expect(screen.getAllByRole("listitem")).toHaveLength(2);
         expect(screen.getByText(`domains.backup.starlink.steps.window @ time(${QUIET_AT})`)).toBeTruthy();
     });
 });

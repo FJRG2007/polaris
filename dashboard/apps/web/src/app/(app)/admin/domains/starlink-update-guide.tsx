@@ -6,7 +6,8 @@
  * The dish and the Starlink router each drop the line for about a minute to install
  * an update. The dish takes its update window only from the Starlink app - a write
  * from the local network is refused - so this is said as steps with the hour to pick,
- * the one this deployment is least used, in the reader's own time.
+ * the one this deployment is least used, in the reader's own time. The app offers
+ * four six-hour blocks (overnight, morning, afternoon, evening) and nothing else.
  */
 
 import { useState } from "react";
@@ -15,7 +16,7 @@ import type { BackupView } from "@/lib/backup-access/service";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
-const STEPS = ["open", "window", "defer", "router"] as const;
+const STEPS = ["open", "window"] as const;
 
 export function StarlinkUpdateGuide({ view }: { view: BackupView }) {
     const t = useTranslations("admin");
