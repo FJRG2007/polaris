@@ -357,10 +357,24 @@ export function ChatProvider({
     }, [keepLists, receiveChannels, router]);
 
     const channelsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    /** A read of the conversations is on the wire. */
+    const channelsAsking = useRef(false);
+    /** Asked for while a read was on the wire or the tab was hidden: one more
+     *  read is owed, and only one, however many frames asked. */
+    const channelsOwed = useRef(false);
     const refreshChannels = useCallback(() => {
+        // Nobody can see the rail of a hidden tab, and every message, read and
+        // delivery frame asking for it from every open tab was most of the
+        // server actions a chat tab sent. Owed instead, and paid once on return.
+        if (document.visibilityState === "hidden" || channelsAsking.current) {
+            channelsOwed.current = true;
+            return;
+        }
         if (channelsTimer.current) return;
         channelsTimer.current = setTimeout(() => {
             channelsTimer.current = null;
+            channelsOwed.current = false;
+            channelsAsking.current = true;
             const ticket = list.current!.ask();
             void listChannelsAction()
                 .then((result) => {
@@ -371,9 +385,19 @@ export function ChatProvider({
                 })
                 .catch(() => {
                     // The previous list stays, as it does for a full refresh.
+                })
+                .finally(() => {
+                    channelsAsking.current = false;
+                    // What arrived while this read was running may not be in
+                    // its answer: one more read for all of it.
+                    if (channelsOwed.current && document.visibilityState !== "hidden") {
+                        refreshChannelsAgain.current();
+                    }
                 });
         }, CHANNELS_SETTLE_MS);
     }, [keepLists, receiveChannels]);
+    const refreshChannelsAgain = useRef(refreshChannels);
+    refreshChannelsAgain.current = refreshChannels;
 
     const change = useCallback(
         async (
@@ -458,7 +482,11 @@ export function ChatProvider({
             }
             const away = hiddenAt === null ? 0 : Date.now() - hiddenAt;
             hiddenAt = null;
-            if (away >= RESYNC_AFTER_HIDDEN_MS) refresh();
+            if (away >= RESYNC_AFTER_HIDDEN_MS) {
+                // The full read carries the conversations too.
+                channelsOwed.current = false;
+                refresh();
+            } else if (channelsOwed.current) refreshChannelsAgain.current();
         };
         // Restored from the back-forward cache, or the network came back: the
         // stream was gone for however long that was.

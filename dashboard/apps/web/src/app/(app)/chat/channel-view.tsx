@@ -151,8 +151,18 @@ const TYPING_TTL_MS = 4000;
  *  left without hanging up is gone from here within one window and a half. */
 const LIVE_CALL_RECHECK_MS = 15_000;
 
-/** How often a message still drawn as sending reads the conversation again. */
+/** How soon a message still drawn as sending reads the conversation again. */
 const PENDING_RECHECK_MS = 5_000;
+
+/** The longest wait between two of those reads. Each one that finds nothing
+ *  waits twice as long as the last, up to this: a draft that never settles - a
+ *  message deleted or expired before it was read back - used to read the
+ *  conversation every five seconds for as long as the tab stayed open. */
+const PENDING_RECHECK_MAX_MS = 60_000;
+
+/** How long a run of read and delivery frames is gathered before the ticks
+ *  under this reader's messages are asked for once for all of them. */
+const RECEIPTS_SETTLE_MS = 400;
 
 /** Somebody who is mid-something in the box, and when they last said so. */
 interface Typist {
@@ -1014,20 +1024,39 @@ export function ChannelView({
     const waiting = pending.length > 0;
     useEffect(() => {
         if (!waiting) return;
+        // Sooner again whenever the reader comes back, later each time a read
+        // finds nothing, and never while the tab is hidden: coming back, or
+        // focusing the window, reads at once, which is the moment it matters.
+        let wait = PENDING_RECHECK_MS;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const schedule = () => {
+            if (timer) clearTimeout(timer);
+            timer = setTimeout(tick, wait);
+        };
         const recheck = () => {
             settle(held.current);
             void catchUp();
         };
-        const onVisible = () => {
-            if (document.visibilityState === "visible") recheck();
+        const tick = () => {
+            timer = null;
+            if (document.visibilityState === "hidden") return;
+            recheck();
+            wait = Math.min(wait * 2, PENDING_RECHECK_MAX_MS);
+            schedule();
         };
-        const timer = setInterval(recheck, PENDING_RECHECK_MS);
-        document.addEventListener("visibilitychange", onVisible);
-        window.addEventListener("focus", recheck);
+        const onReturn = () => {
+            if (document.visibilityState !== "visible") return;
+            wait = PENDING_RECHECK_MS;
+            recheck();
+            schedule();
+        };
+        schedule();
+        document.addEventListener("visibilitychange", onReturn);
+        window.addEventListener("focus", onReturn);
         return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", onVisible);
-            window.removeEventListener("focus", recheck);
+            if (timer) clearTimeout(timer);
+            document.removeEventListener("visibilitychange", onReturn);
+            window.removeEventListener("focus", onReturn);
         };
     }, [waiting, catchUp, settle]);
 
@@ -1321,6 +1350,47 @@ export function ChannelView({
     }, [channelId, viewerId]);
 
     /**
+     * The ticks asked for once per run of frames rather than once per frame.
+     *
+     * Every member's read and every device's delivery is a frame, and each one
+     * asked again while any of this reader's messages was short of "read" - in
+     * a group where one member never reads, that was a server action per frame
+     * from every open tab, for ever. A run is gathered for a moment, one read is
+     * on the wire at a time, and frames that come during it owe one more.
+     */
+    const receiptsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const receiptsAsking = useRef(false);
+    const receiptsOwed = useRef(false);
+    const askReceipts = useCallback(() => {
+        if (receiptsAsking.current) {
+            receiptsOwed.current = true;
+            return;
+        }
+        if (receiptsTimer.current) return;
+        receiptsTimer.current = setTimeout(() => {
+            receiptsTimer.current = null;
+            receiptsOwed.current = false;
+            receiptsAsking.current = true;
+            void freshenReceipts()
+                .catch(() => undefined)
+                .finally(() => {
+                    receiptsAsking.current = false;
+                    if (receiptsOwed.current) askReceiptsAgain.current();
+                });
+        }, RECEIPTS_SETTLE_MS);
+    }, [freshenReceipts]);
+    const askReceiptsAgain = useRef(askReceipts);
+    askReceiptsAgain.current = askReceipts;
+    useEffect(
+        () => () => {
+            if (receiptsTimer.current) clearTimeout(receiptsTimer.current);
+            receiptsTimer.current = null;
+            receiptsOwed.current = false;
+        },
+        [channelId]
+    );
+
+    /**
      * Messages already on screen that somebody else edited, reacted to or
      * deleted, read again and swapped in where they are.
      *
@@ -1397,7 +1467,7 @@ export function ChannelView({
                     frame.channelId === channelId &&
                     frame.userId !== viewerId
                 ) {
-                    void freshenReceipts();
+                    askReceipts();
                 }
                 // The count beside the call button, kept honest. Nothing is
                 // posted when somebody joins or leaves a call, so before this
@@ -1432,7 +1502,7 @@ export function ChannelView({
                     ]);
                 }
             },
-            [channelId, catchUp, checkCall, freshenChanged, onDraftFrame]
+            [channelId, askReceipts, catchUp, checkCall, freshenChanged, onDraftFrame]
         )
     );
 

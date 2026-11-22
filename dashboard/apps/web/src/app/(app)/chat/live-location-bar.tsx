@@ -12,7 +12,7 @@
  */
 
 import * as actions from "./actions";
-import { Button } from "@polaris/ui";
+import { Button, pollWhileVisible } from "@polaris/ui";
 import { Radio } from "lucide-react";
 import { useChat } from "./chat-context";
 import { LIVE_CHANGED } from "./location-dialog";
@@ -20,6 +20,9 @@ import { useEffect, useRef, useState } from "react";
 import { phoneLiveLocation } from "@/lib/mobile-bridge";
 import type { LiveShareView } from "@/lib/chat/locations";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+
+/** How often the shares are read again while the tab is on screen. */
+export const SHARES_RECHECK_MS = 60_000;
 
 /** How often a page sends the position while a share runs. */
 const SEND_EVERY_MS = 10_000;
@@ -42,10 +45,13 @@ export function LiveLocationBar() {
         reload.current();
         const again = () => reload.current();
         window.addEventListener(LIVE_CHANGED, again);
-        const timer = window.setInterval(again, 60_000);
+        // A share started on another device shows up within a minute while
+        // the tab is on screen; a hidden tab asks nothing, and reads once on
+        // return. It used to ask every minute from every tab, seen or not.
+        const stopPolling = pollWhileVisible(again, SHARES_RECHECK_MS);
         return () => {
             window.removeEventListener(LIVE_CHANGED, again);
-            window.clearInterval(timer);
+            stopPolling();
         };
     }, []);
 

@@ -27,9 +27,11 @@ let lists: {
 const routerRefresh = vi.fn();
 const router = { refresh: routerRefresh };
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
+let channelsAnswer: Promise<void> | null = null;
 vi.mock("@/app/(app)/chat/actions", () => ({
     listChannelsAction: async () => {
         channelsOnly += 1;
+        if (channelsAnswer) await channelsAnswer;
         return { channels: [{ id: "fresh" }] };
     },
     chatRulesAction: async () => ({ rules: null })
@@ -82,7 +84,14 @@ beforeEach(() => {
 afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    channelsAnswer = null;
+    setVisibility("visible");
 });
+
+function setVisibility(state: DocumentVisibilityState): void {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => state });
+    document.dispatchEvent(new Event("visibilitychange"));
+}
 
 describe("the conversation list, asked for again", () => {
     it("is one request for everything the context holds", async () => {
@@ -159,6 +168,54 @@ describe("the conversation list, asked for again", () => {
         // asked for again.
         expect(full).toBe(1);
         expect(chat?.channels.map((entry) => entry.id)).toEqual(["fresh"]);
+    });
+
+    it("asks nothing for a hidden tab, and once on its return however many frames asked", async () => {
+        await mount();
+        setVisibility("hidden");
+        await act(async () => {
+            for (let frame = 0; frame < 50; frame += 1) chat?.refreshChannels();
+            await wait(CHANNELS_SETTLE_MS * 3);
+        });
+        expect(channelsOnly).toBe(0);
+        // Back within a moment: the conversations alone, once.
+        await act(async () => {
+            setVisibility("visible");
+            await wait(CHANNELS_SETTLE_MS + 20);
+        });
+        expect(channelsOnly).toBe(1);
+        expect(full).toBe(1);
+        expect(chat?.channels.map((entry) => entry.id)).toEqual(["fresh"]);
+    });
+
+    it("asks once more, not once per frame, for frames that came during a read", async () => {
+        let answer: () => void = () => undefined;
+        channelsAnswer = new Promise<void>((resolve) => {
+            answer = resolve;
+        });
+        await mount();
+        await act(async () => {
+            chat?.refreshChannels();
+            await wait(CHANNELS_SETTLE_MS + 20);
+        });
+        expect(channelsOnly).toBe(1);
+        // A busy room while the read is on the wire.
+        await act(async () => {
+            for (let frame = 0; frame < 20; frame += 1) {
+                chat?.refreshChannels();
+                await wait(CHANNELS_SETTLE_MS + 5);
+            }
+        });
+        expect(channelsOnly).toBe(1);
+        channelsAnswer = null;
+        await act(async () => {
+            answer();
+            await wait(CHANNELS_SETTLE_MS + 20);
+        });
+        // One more read for everything that arrived meanwhile, then quiet.
+        expect(channelsOnly).toBe(2);
+        await act(() => wait(CHANNELS_SETTLE_MS * 3));
+        expect(channelsOnly).toBe(2);
     });
 
     it.each([401, 403])("stops asking and lets the server decide on a %i", async (status) => {
