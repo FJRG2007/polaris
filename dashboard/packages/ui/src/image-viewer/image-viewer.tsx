@@ -31,6 +31,14 @@
  * here so zoom, pan and fit behave the way they do everywhere else, and keeps
  * everything else its own. The frame never resizes while stepping: the last
  * picture stays up until the next one has decoded, then swaps in place.
+ *
+ * A video is a slide of its own kind in the same set, so a conversation's
+ * pictures and clips are looked through in one place. It plays with the
+ * browser's own controls and is never zoomed: the pointer belongs to the
+ * scrubber, so the stage takes no pointer capture over it, and stepping is the
+ * arrows and the keys. It fades in rather than flying from a thumbnail, stops
+ * when it is stepped away from, and its menu is whatever the caller gives a
+ * video - in the chat, only saving it.
  */
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
@@ -75,6 +83,14 @@ export interface ViewedImage {
     /** A blurred stand-in (an image address, such as a decoded ThumbHash) shown
      *  at the picture's shape until the picture itself has arrived. */
     readonly placeholder?: string;
+    /** A video rather than a picture: played with its own controls, never
+     *  zoomed, and opened with a fade rather than a flight. */
+    readonly video?: boolean;
+    /** A video's still, shown until it plays. */
+    readonly poster?: string;
+    /** False where whoever sent it does not let it be saved, for the menu to
+     *  leave the download out. */
+    readonly downloadable?: boolean;
 }
 
 /** The viewer's own words, in the reader's language. */
@@ -82,6 +98,8 @@ export interface ViewerLabels {
     readonly zoomIn: string;
     readonly zoomOut: string;
     readonly more: string;
+    /** The three dots on a video. Falls back to `more`. */
+    readonly moreVideo?: string;
     readonly close: string;
     readonly previous: string;
     readonly next: string;
@@ -112,6 +130,17 @@ export function thumbnailOf(image: ViewedImage): Element | null {
         if (img.src === wanted || img.currentSrc === wanted) return img;
     }
     return null;
+}
+
+/** The next slide comes in from the side it was asked for. */
+function slideFrom(element: HTMLElement, from: -1 | 1): void {
+    element.animate(
+        [
+            { opacity: 0, translate: `${from * SLIDE_PX}px 0` },
+            { opacity: 1, translate: "0 0" }
+        ],
+        { duration: SLIDE_MS, easing: flying.EASE }
+    );
 }
 
 /** The layers that fade while the picture flies: backdrop, toolbar, arrows. */
@@ -168,6 +197,9 @@ export function ImageViewer({
     const press = useRef<ViewerPress | null>(null);
     const root = useRef<HTMLDivElement | null>(null);
     const picture = useRef<HTMLImageElement | null>(null);
+    /** The video on screen, when the slide is one. */
+    const clip = useRef<HTMLVideoElement | null>(null);
+    const video = image?.video === true;
     const pictureRef = useCallback(
         (node: HTMLImageElement | null) => {
             picture.current = node;
@@ -231,14 +263,31 @@ export function ImageViewer({
         sliding.current = null;
         if (!from || !element || typeof element.animate !== "function") return;
         if (flying.reducedMotion()) return;
-        element.animate(
-            [
-                { opacity: 0, translate: `${from * SLIDE_PX}px 0` },
-                { opacity: 1, translate: "0 0" }
-            ],
-            { duration: SLIDE_MS, easing: flying.EASE }
-        );
+        slideFrom(element, from);
     }, []);
+
+    // A video arrives on its own terms: stepped onto, it slides in like a
+    // picture; opened, it fades in, since there is no thumbnail flight for it.
+    // Whatever it was doing stops the moment it is left - stepped past or
+    // closed - rather than playing on behind the next slide.
+    useLayoutEffect(() => {
+        const element = clip.current;
+        if (!video || !element) return;
+        const from = sliding.current;
+        sliding.current = null;
+        const opening = !flown.current;
+        flown.current = true;
+        if (typeof element.animate === "function" && !flying.reducedMotion()) {
+            if (from) slideFrom(element, from);
+            else if (opening) {
+                element.animate([{ opacity: 0 }, { opacity: 1 }], {
+                    duration: flying.OPEN_MS,
+                    easing: flying.EASE
+                });
+            }
+        }
+        return () => element.pause();
+    }, [video, image?.url]);
 
     /** Grow the picture out of its thumbnail, once it has a size to grow to. */
     const flyIn = useCallback(() => {
@@ -263,6 +312,26 @@ export function ImageViewer({
     const close = useCallback(() => {
         const element = picture.current;
         if (closing.current) return;
+        if (video) {
+            // Fades back out the way it came in: there is no thumbnail to
+            // shrink a video into.
+            const playing = clip.current;
+            playing?.pause();
+            if (!playing || typeof playing.animate !== "function" || flying.reducedMotion()) {
+                onClose();
+                return;
+            }
+            closing.current = true;
+            fadeChrome(root.current, 1, 0, flying.CLOSE_MS);
+            playing
+                .animate([{ opacity: 1 }, { opacity: 0 }], {
+                    duration: flying.CLOSE_MS,
+                    easing: flying.EASE,
+                    fill: "forwards"
+                })
+                .finished.then(onClose, onClose);
+            return;
+        }
         if (!image || !flying.canFly(element)) {
             onClose();
             return;
@@ -287,7 +356,7 @@ export function ImageViewer({
                 now && now !== "none" ? now : "none"
             )
             .then(onClose);
-    }, [image, onClose, origin]);
+    }, [image, onClose, origin, video]);
 
     // Back to fit whenever a different picture is opened: reopening one at three
     // times the size, panned into a corner, is the last picture's state wearing
@@ -315,7 +384,7 @@ export function ImageViewer({
             if (embedded) {
                 // The caller owns Escape and stepping; the zoom keys are the
                 // picture's, unless somebody is typing somewhere on the page.
-                if (typingIn(event.target)) return;
+                if (typingIn(event.target) || video) return;
                 if (shortcutPressed(event, "viewer.zoomIn")) zoomIn();
                 if (shortcutPressed(event, "viewer.zoomOut")) zoomOut();
                 return;
@@ -324,9 +393,12 @@ export function ImageViewer({
                 event.preventDefault();
                 close();
             }
+            // A focused video's own controls seek on the arrows; stepping away
+            // from under them would lose the place somebody was finding.
             const inMenu =
                 event.defaultPrevented ||
-                (event.target instanceof Element && event.target.closest("[role='menu']") !== null);
+                (event.target instanceof Element && event.target.closest("[role='menu']") !== null) ||
+                (typeof HTMLMediaElement !== "undefined" && event.target instanceof HTMLMediaElement);
             if (!inMenu && shortcutPressed(event, "viewer.previousFile")) {
                 event.preventDefault();
                 go(-1);
@@ -335,12 +407,13 @@ export function ImageViewer({
                 event.preventDefault();
                 go(1);
             }
+            if (video) return;
             if (shortcutPressed(event, "viewer.zoomIn")) zoomIn();
             if (shortcutPressed(event, "viewer.zoomOut")) zoomOut();
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [image, close, go, embedded, zoomIn, zoomOut]);
+    }, [image, close, go, embedded, zoomIn, zoomOut, video]);
 
     const say = useCallback((words: string) => {
         setSaid(words);
@@ -351,8 +424,58 @@ export function ImageViewer({
 
     const items = (Item: typeof DropdownMenuItem, Separator: typeof DropdownMenuSeparator) =>
         menu?.({ image, announce: say, Item, Separator });
+    // A menu with nothing in it for this slide - a video that may not be saved -
+    // draws no three dots and leaves the right click to the browser.
+    const menuItems = items(DropdownMenuItem, DropdownMenuSeparator);
+    const hasMenu = Boolean(menu) && menuItems !== null && menuItems !== undefined && menuItems !== false;
 
-    const stage = (
+    const stage = video ? (
+        <div
+            key="video"
+            className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden"
+            // No zoom and no pointer capture: a press on the video is its
+            // controls'. Only a press on the dark around it closes.
+            onPointerDown={(event) => {
+                press.current = {
+                    x: event.clientX,
+                    y: event.clientY,
+                    outside: event.target === event.currentTarget
+                };
+            }}
+            onPointerUp={(event) => {
+                const from = press.current;
+                press.current = null;
+                if (!embedded && closesOnRelease(from, event)) close();
+            }}
+            onPointerCancel={() => {
+                press.current = null;
+            }}
+        >
+            {image.placeholder && arrivedUrl !== image.url && (
+                // eslint-disable-next-line @next/next/no-img-element -- a few-pixel data URL
+                <img
+                    src={image.placeholder}
+                    alt=""
+                    aria-hidden
+                    draggable={false}
+                    className="pointer-events-none absolute inset-0 size-full select-none object-contain"
+                />
+            )}
+            <video
+                key={image.url}
+                ref={clip}
+                data-viewer-video=""
+                src={image.url}
+                poster={image.poster}
+                controls
+                playsInline
+                preload="metadata"
+                aria-label={image.name}
+                onLoadedData={() => setArrivedUrl(image.url)}
+                className="relative max-h-full max-w-full"
+            />
+        </div>
+    ) : (
         <div
             ref={look.frameRef}
             className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden"
@@ -444,7 +567,7 @@ export function ImageViewer({
                 data-image-stage=""
                 className="relative flex size-full min-h-0 min-w-0 flex-col"
             >
-                {menu ? (
+                {hasMenu ? (
                     <ContextMenu>
                         <ContextMenuTrigger asChild>{stage}</ContextMenuTrigger>
                         <ContextMenuContent className="w-56">
@@ -501,40 +624,42 @@ export function ImageViewer({
                     </span>
                 ) : null}
 
-                <button
-                    type="button"
-                    aria-label={labels.zoomOut}
-                    onClick={zoomOut}
-                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                    <ZoomOut className="size-4" />
-                </button>
-                <span className="w-12 shrink-0 text-center text-xs tabular-nums text-muted-foreground">
-                    {Math.round(look.zoom.scale * 100)}%
-                </span>
-                <button
-                    type="button"
-                    aria-label={labels.zoomIn}
-                    onClick={zoomIn}
-                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                    <ZoomIn className="size-4" />
-                </button>
+                {video ? null : (
+                    <>
+                        <button
+                            type="button"
+                            aria-label={labels.zoomOut}
+                            onClick={zoomOut}
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <ZoomOut className="size-4" />
+                        </button>
+                        <span className="w-12 shrink-0 text-center text-xs tabular-nums text-muted-foreground">
+                            {Math.round(look.zoom.scale * 100)}%
+                        </span>
+                        <button
+                            type="button"
+                            aria-label={labels.zoomIn}
+                            onClick={zoomIn}
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <ZoomIn className="size-4" />
+                        </button>
+                    </>
+                )}
 
-                {menu ? (
+                {hasMenu ? (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <button
                                 type="button"
-                                aria-label={labels.more}
+                                aria-label={video ? (labels.moreVideo ?? labels.more) : labels.more}
                                 className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                             >
                                 <MoreHorizontal className="size-4" />
                             </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                            {items(DropdownMenuItem, DropdownMenuSeparator)}
-                        </DropdownMenuContent>
+                        <DropdownMenuContent align="end">{menuItems}</DropdownMenuContent>
                     </DropdownMenu>
                 ) : null}
 
@@ -548,7 +673,7 @@ export function ImageViewer({
                 </button>
             </div>
 
-            {menu ? (
+            {hasMenu ? (
                 <ContextMenu>
                     <ContextMenuTrigger asChild>{stage}</ContextMenuTrigger>
                     <ContextMenuContent className="w-56">

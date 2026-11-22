@@ -287,7 +287,7 @@ describe("what was shared", () => {
         expect(picture.className).toContain("aspect-square");
         expect(picture.querySelector("img")?.getAttribute("loading")).toBe("lazy");
         expect(picture.querySelector("img")?.className).toContain("object-cover");
-        const video = screen.getByRole("link", { name: /b\.jpg/ });
+        const video = screen.getByRole("button", { name: /b\.jpg/ });
         expect(video.querySelector("img")?.getAttribute("src")).toContain("?poster=1");
         expect(video.textContent).toMatch(/1:15/);
         expect(mediaPages).toEqual([{ channelId: "d1", before: null }]);

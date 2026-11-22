@@ -6,8 +6,8 @@
  *
  * The info page shows the newest row or two and a way into the whole of it; the
  * whole of it is the same grid under a heading per month, fetched a page at a
- * time as it is scrolled. A picture opens in the chat's own viewer, stepping
- * through every picture loaded so far; a video opens where the browser plays it.
+ * time as it is scrolled. A tile opens in the chat's own viewer, stepping
+ * through every picture and video loaded so far; a video plays right there.
  */
 
 import { Play } from "lucide-react";
@@ -100,7 +100,10 @@ function viewed(item: SharedMediaItem): ViewedImage {
         name: item.name,
         messageId: item.messageId,
         forwardable: item.forwardable,
-        placeholder: placeholderUrl(item.thumbhash)
+        placeholder: placeholderUrl(item.thumbhash),
+        ...(item.video
+            ? { video: true, poster: item.hasPoster ? `${attachmentImageUrl(item.id)}?poster=1` : undefined }
+            : {})
     };
 }
 
@@ -132,22 +135,6 @@ function MediaTile({ item, onOpen }: { item: SharedMediaItem; onOpen: (item: Sha
     const className =
         "relative block aspect-square min-w-0 overflow-hidden bg-muted bg-cover bg-center outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
     const style = placeholder ? { backgroundImage: `url(${placeholder})` } : undefined;
-    // The viewer is a picture viewer: a video goes to the browser's own
-    // player, which plays, seeks and goes full screen.
-    if (item.video) {
-        return (
-            <a
-                href={attachmentImageUrl(item.id)}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={item.name}
-                className={className}
-                style={style}
-            >
-                {face}
-            </a>
-        );
-    }
     return (
         <button type="button" title={item.name} onClick={() => onOpen(item)} className={className} style={style}>
             {face}
@@ -161,10 +148,10 @@ function TileGrid({ wide, children }: { wide: boolean; children: ReactNode }) {
     );
 }
 
-/** The chat's viewer over the pictures loaded so far, opened on one of them. */
+/** The chat's viewer over the pictures and videos loaded so far, opened on one. */
 function useViewer(items: readonly SharedMediaItem[]) {
     const [viewing, setViewing] = useState<ViewedImage | null>(null);
-    const gallery = useMemo(() => items.filter((item) => !item.video).map(viewed), [items]);
+    const gallery = useMemo(() => items.map(viewed), [items]);
     const viewer = (
         <ImageViewer
             image={viewing}

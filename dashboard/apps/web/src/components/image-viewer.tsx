@@ -8,7 +8,9 @@
  */
 
 import { useAppUrl } from "@/components/app-url";
-import { imageItems } from "@/components/image-actions";
+import { imageItems, savable } from "@/components/image-actions";
+import { downloadFile } from "@/app/(app)/chat/links";
+import { Download } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     ImageViewer as SharedViewer,
@@ -42,6 +44,7 @@ export function ImageViewer({
         zoomIn: t("viewer.zoomIn"),
         zoomOut: t("viewer.zoomOut"),
         more: t("viewer.more"),
+        moreVideo: t("viewer.moreVideo"),
         close: t("viewer.close"),
         previous: t("viewer.previous"),
         next: t("viewer.next"),
@@ -52,7 +55,18 @@ export function ImageViewer({
             {...props}
             labels={labels}
             menu={({ image, announce, Item, Separator }) =>
-                imageItems({ image, baseUrl, announce, onForward, onReport, Item, Separator })
+                // A video in the viewer offers saving it and nothing else, and
+                // nothing at all where whoever sent it does not allow that.
+                image.video ? (
+                    image.downloadable !== false && savable(image.url) ? (
+                        <Item onSelect={() => downloadFile(image.url, image.name)}>
+                            <Download className="size-3.5" />
+                            {t("images.downloadVideo")}
+                        </Item>
+                    ) : null
+                ) : (
+                    imageItems({ image, baseUrl, announce, onForward, onReport, Item, Separator })
+                )
             }
         />
     );
