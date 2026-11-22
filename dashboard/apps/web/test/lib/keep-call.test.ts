@@ -50,7 +50,7 @@ let location: { href: string; pathname: string; search: string; assign: typeof a
 
 beforeEach(() => {
     assign = vi.fn();
-    open = vi.fn();
+    open = vi.fn(() => ({ opener: {} }));
     location = { href: BASE, pathname: "/chat/c/general", search: "", assign };
     (globalThis as { window?: unknown }).window = { sessionStorage: fakeStorage(), location, open };
     vi.spyOn(performance, "getEntriesByType").mockReturnValue([
@@ -177,9 +177,17 @@ describe("moving the page from outside React", () => {
         setCallLive(true);
         navigateInApp("/status/x");
         leavePage("/oauth/login?add=1");
-        expect(open).toHaveBeenCalledWith("/status/x", "_blank", "noopener");
-        expect(open).toHaveBeenCalledWith("/oauth/login?add=1", "_blank", "noopener");
+        expect(open).toHaveBeenCalledWith("/status/x", "_blank");
+        expect(open).toHaveBeenCalledWith("/oauth/login?add=1", "_blank");
+        expect(assign).toHaveBeenCalledTimes(1);
         unbind();
+    });
+
+    it("still goes when the browser blocks the new tab", () => {
+        setCallLive(true);
+        open.mockReturnValueOnce(null);
+        leavePage("/oauth/login?add=1");
+        expect(assign).toHaveBeenCalledWith("/oauth/login?add=1");
     });
 });
 

@@ -162,11 +162,20 @@ export function navigateInApp(href: string): void {
  * on, so the call stays where it is; in this tab otherwise, as before.
  */
 export function leavePage(href: string): void {
-    if (callLive) {
-        window.open(href, "_blank", "noopener");
-        return;
-    }
+    if (callLive && openTab(href)) return;
     window.location.assign(href);
+}
+
+/**
+ * A new tab with no way back to this one. Opened without `noopener` and the
+ * link severed by hand, because `noopener` hands back null either way and a
+ * blocked popup would then be a press that did nothing at all.
+ */
+function openTab(href: string): boolean {
+    const tab = window.open(href, "_blank");
+    if (!tab) return false;
+    tab.opener = null;
+    return true;
 }
 
 /**
@@ -242,7 +251,7 @@ export function useCallLinkGuard(active: boolean): void {
             if (seen?.verdict !== "new-tab") return;
             event.preventDefault();
             event.stopPropagation();
-            window.open(seen.anchor.href, "_blank", "noopener");
+            leavePage(seen.anchor.href);
         };
         const late = (event: MouseEvent) => {
             const seen = read(event, event.defaultPrevented);
