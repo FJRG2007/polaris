@@ -31,6 +31,7 @@ import { setParaAttrs, activeParaAttrs } from './ribbon-tabs'
 import { setSelectionAlign } from '../editor/direction'
 import { IconSparkle } from './icons'
 import { useModalKeys } from './modal-keys'
+import { pasteFromMenu, usePasteBlocked } from '../editor/clipboard-paste'
 
 /**
  * Editor context menu (right click in the document body):
@@ -85,6 +86,7 @@ export function EditorContextMenu({
   onUpdateFields,
 }: EditorContextMenuProps) {
   const { t } = useI18n()
+  const pasteBlocked = usePasteBlocked()
   const ref = useRef<HTMLDivElement>(null)
   const [submenu, setSubmenu] = useState<string | null>(null)
 
@@ -250,29 +252,10 @@ export function EditorContextMenu({
   }
 
   const clipboard = async (action: 'cut' | 'copy' | 'paste' | 'pastePlain') => {
-    if (action === 'paste') {
-      // rich paste: prefer HTML (parsed by editor paste rules, keeps formatting), otherwise plain text
-      try {
-        const items = await navigator.clipboard.read()
-        for (const item of items) {
-          if (item.types.includes('text/html')) {
-            const html = await (await item.getType('text/html')).text()
-            editor
-              .chain()
-              .focus()
-              .insertContent(html, { parseOptions: { preserveWhitespace: true } })
-              .run()
-            return
-          }
-        }
-      } catch {
-        /* clipboard.read unavailable (permission/format): fall back to plain text */
-      }
-      const text = await navigator.clipboard.readText()
-      if (text) insertPlainText(text)
-    } else if (action === 'pastePlain') {
-      const text = await navigator.clipboard.readText()
-      if (text) insertPlainText(text)
+    if (action === 'paste' || action === 'pastePlain') {
+      // read on press and pasted the way Ctrl+V pastes (clipboard-paste.ts);
+      // a refused clipboard shows a toast naming the paste keys
+      await pasteFromMenu(editor, { plain: action === 'pastePlain', insertPlain: insertPlainText })
     } else {
       editor.commands.focus()
       document.execCommand(action)
@@ -326,13 +309,14 @@ export function EditorContextMenu({
       })}
       {item(t('appPaste'), {
         key: '⌘V',
-        disabled: !canEdit,
+        disabled: !canEdit || pasteBlocked,
         onClick: run(() => void clipboard('paste')),
       })}
       {item(t('appPastePlain'), {
-        disabled: !canEdit,
+        disabled: !canEdit || pasteBlocked,
         onClick: run(() => void clipboard('pastePlain')),
       })}
+      {canEdit && pasteBlocked && <div className="ctx-hint">{t('appPasteBlocked')}</div>}
       <div className="ctx-sep" />
       {item(t('appFontMenu'), { key: '⌘D', onClick: run(onFontDialog) })}
       {item(t('appParagraphMenu'), { key: '⌥⌘M', onClick: run(onParagraphDialog) })}

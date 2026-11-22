@@ -17,10 +17,10 @@ import {
 import type { CSSProperties, MouseEvent as ReactMouseEvent, SetStateAction } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import type { Editor } from '@tiptap/core'
-import { DOMParser as PmDOMParser, type Mark as PmMark } from '@tiptap/pm/model'
+import { type Mark as PmMark } from '@tiptap/pm/model'
 import { NodeSelection } from '@tiptap/pm/state'
 import { Dropdown } from '@polaris/genoffice-ui'
-import { markdownPasteHtml } from './editor/markdown-paste'
+import { cleanPastedHtml, handlePastePayload, payloadOf } from './editor/clipboard-paste'
 import { pasteTextSlice } from './editor/paste-text'
 import {
   BLANK_BULLET_NUM_ID,
@@ -164,7 +164,6 @@ import {
   TableInsertModal,
   applyParagraphStyle,
   clearParagraphFormatting,
-  insertImageFromDataUrl,
   insertImageViaDialog,
   insertPageBreakAt,
   setParaAttrs,
@@ -299,52 +298,6 @@ function posFromAnchor(view: Editor['view'], anchor: LineAnchor): number | undef
     return pos >= 0 ? pos : undefined
   } catch {
     return undefined
-  }
-}
-
-/** Clean pasted Word/web HTML: mso conditional comments, <o:p>, and unwrapping <li><p>x</p></li> */
-function cleanPastedHtml(html: string): string {
-  return unwrapSingleCellTable(
-    html
-      .replace(/<!--\[if[\s\S]*?<!\[endif\]-->/g, '')
-      .replace(/<o:p>[\s\S]*?<\/o:p>/g, '')
-      .replace(/<li([^>]*)>\s*<p[^>]*>([\s\S]*?)<\/p>\s*<\/li>/g, '<li$1>$2</li>'),
-  )
-}
-
-/**
- * Word parity: pasting a copy of a SINGLE spreadsheet cell inserts its
- * content as text, not a 1x1 table (alpha ledger r146 — a lone cell copied
- * from Sheets/Excel pasted into Docs as a table and flipped the ribbon into
- * table tools). Only a payload whose entire content is one table with one
- * cell unwraps; anything else — multi-cell tables, tables mixed with prose —
- * stays intact.
- */
-function unwrapSingleCellTable(html: string): string {
-  if (!/<table/i.test(html)) return html
-  try {
-    const doc = new window.DOMParser().parseFromString(html, 'text/html')
-    const body = doc.body
-    const tables = body.querySelectorAll('table')
-    if (tables.length !== 1) return html
-    const table = tables[0]!
-    // The table must be the only real content of the paste. Text equality
-    // covers prose ANYWHERE outside the table — including inside wrappers
-    // that also contain it — and Element.textContent excludes HTML comments,
-    // so Excel's StartFragment markers don't block the unwrap (bugbot).
-    if ((body.textContent ?? '').trim() !== (table.textContent ?? '').trim()) return html
-    // text-less content outside the table (images, separators) also keeps it
-    if (
-      [...body.querySelectorAll('img,svg,video,hr')].some((element) => !table.contains(element))
-    ) {
-      return html
-    }
-    const cells = table.querySelectorAll('td,th')
-    if (cells.length !== 1) return html
-    if (cells[0]!.querySelector('table')) return html
-    return cells[0]!.innerHTML
-  } catch {
-    return html
   }
 }
 
@@ -853,138 +806,12 @@ export function App() {
       // plain-text paste takes the insertion point's formatting like typing
       // (Word Keep Text Only) — the default parser misses storedMarks (r172)
       clipboardTextParser: (text, $context, _plain, view) => pasteTextSlice(text, $context, view),
-      // clipboard images (screenshots/copied images): become inline images; mixed content
-      // with HTML still uses default parsing (text in the HTML takes priority)
-      handlePaste: (view, event) => {
-        const data = event.clipboardData
-        if (!data) return false
-        const html = data.getData('text/html')
-        // web-copied images (r139): "Copy image" in a browser puts a bitmap +
-        // an <img src="http..."> HTML fragment + often the URL as text/plain
-        // on the clipboard. Detect image-only HTML so the bitmap wins over
-        // text parsing, and so a bitmap-less copy can fetch the referenced
-        // image instead of pasting nothing (our parse rules are data:-only).
-        let htmlImgSrcs: string[] = []
-        let htmlHasText = false
-        if (html) {
-          try {
-            const imgDom = new window.DOMParser().parseFromString(html, 'text/html')
-            htmlImgSrcs = [...imgDom.querySelectorAll('img')]
-              .map((img) => img.getAttribute('src') ?? '')
-              .filter(Boolean)
-            htmlHasText = (imgDom.body.textContent ?? '').trim().length > 0
-          } catch {
-            /* unparseable html: treat as not-an-image copy */
-          }
-        }
-        // remote-only: in-app data: copies carry data-image-meta and must keep
-        // going through the DocProtected parse rules (size/align/wrap round-trip
-        // — bugbot); only web copies divert to bitmap/fetch handling
-        const imageOnlyHtml =
-          htmlImgSrcs.length > 0 &&
-          !htmlHasText &&
-          htmlImgSrcs.every((src) => /^https?:\/\//i.test(src))
-        // pasting block HTML onto an empty paragraph: replace wholesale (ProseMirror's default
-        // first-block merge would demote headings to body text; Word keeps the source block format on empty paragraphs)
-        const { $from, empty: selEmpty } = view.state.selection
-        if (
-          !imageOnlyHtml &&
-          html &&
-          selEmpty &&
-          $from.parent.isTextblock &&
-          $from.parent.content.size === 0 &&
-          $from.depth === 1
-        ) {
-          try {
-            const dom = new window.DOMParser().parseFromString(cleanPastedHtml(html), 'text/html')
-            const parsed = PmDOMParser.fromSchema(view.state.schema).parse(dom.body)
-            if (parsed.content.childCount > 0) {
-              view.dispatch(
-                view.state.tr.replaceWith($from.before(1), $from.after(1), parsed.content),
-              )
-              return true
-            }
-          } catch {
-            /* fall back to default paste on parse failure */
-          }
-        }
-        const imageFile = [...data.items]
-          .find((item) => item.type.startsWith('image/'))
-          ?.getAsFile()
-        const text = data.getData('text/plain')
-        // image-only copies keep the bitmap even when text/plain carries the
-        // source URL (browser "Copy image" does that) — Word pastes the picture
-        if (imageFile && (!text.trim() || imageOnlyHtml)) {
-          const reader = new FileReader()
-          reader.onload = () => {
-            const ed = editorRef.current
-            if (ed && typeof reader.result === 'string') {
-              void insertImageFromDataUrl(ed, reader.result, 'Image (pasted)')
-            }
-          }
-          reader.readAsDataURL(imageFile)
-          return true
-        }
-        // bitmap-less web image copy: fetch the referenced image(s) through the
-        // hardened main-process fetcher (SSRF-guarded, CDN headers) and insert
-        if (!imageFile && imageOnlyHtml) {
-          void (async () => {
-            for (const src of htmlImgSrcs.slice(0, 10)) {
-              const ed = editorRef.current
-              if (!ed) return
-              const fetched = await window.desktop.fetchImage(src)
-              if (fetched) {
-                await insertImageFromDataUrl(
-                  ed,
-                  `data:${fetched.mime};base64,${fetched.base64}`,
-                  'Image (pasted)',
-                )
-              }
-            }
-          })()
-          return true
-        }
-        // text/plain-only Markdown (code blocks, terminals, .md files, LLM
-        // output): convert and insert as formatted content instead of literal
-        // "## Heading" / "**bold**" characters
-        if (!html && text) {
-          const markdownHtml = markdownPasteHtml(text)
-          if (markdownHtml !== null) {
-            try {
-              // cleanPastedHtml unwraps <li><p>…</p></li> from loose lists —
-              // docListItem only allows inline content and would shatter them.
-              const dom = new window.DOMParser().parseFromString(
-                cleanPastedHtml(markdownHtml),
-                'text/html',
-              )
-              const parser = PmDOMParser.fromSchema(view.state.schema)
-              if (
-                selEmpty &&
-                $from.parent.isTextblock &&
-                $from.parent.content.size === 0 &&
-                $from.depth === 1
-              ) {
-                // same wholesale replace as block HTML onto an empty paragraph
-                const parsed = parser.parse(dom.body)
-                if (parsed.content.childCount > 0) {
-                  view.dispatch(
-                    view.state.tr.replaceWith($from.before(1), $from.after(1), parsed.content),
-                  )
-                  return true
-                }
-              } else {
-                view.dispatch(
-                  view.state.tr.replaceSelection(parser.parseSlice(dom.body)).scrollIntoView(),
-                )
-                return true
-              }
-            } catch {
-              /* fall back to default literal paste on parse failure */
-            }
-          }
-        }
-        return false
-      },
+      // pictures, block HTML onto an empty paragraph, web image copies and
+      // Markdown text; the menus' Paste takes the same path (clipboard-paste.ts)
+      handlePaste: (view, event) =>
+        event.clipboardData
+          ? handlePastePayload(view, payloadOf(event.clipboardData), () => editorRef.current)
+          : false,
     },
     onSelectionUpdate: () => forceRender(),
     // typing in the main document takes ribbon routing back from any textbox

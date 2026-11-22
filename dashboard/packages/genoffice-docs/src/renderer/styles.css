@@ -9542,6 +9542,16 @@ ruby.doc-ruby rt {
   color: var(--text-dim);
 }
 
+.ctx-hint {
+  box-sizing: border-box;
+  max-width: 240px;
+  padding: 2px 14px 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .ctx-sep {
   height: 1px;
   margin: 4px 10px;

@@ -64,6 +64,7 @@ import {
   updateSelectedTableAttrs,
 } from '../editor/table-properties'
 import { useI18n, type StringKey } from '../i18n/locale'
+import { pasteFromMenu } from '../editor/clipboard-paste'
 import { fontFamiliesFor, isEastAsianFontName } from '../font-list'
 import { useSystemFontFamilies } from '../system-fonts'
 import { cssFontFamily } from '../line-metrics'
@@ -79,7 +80,6 @@ import {
   type InkPenSettings,
   type RevisionDisplayMode,
   type ViewMode,
-  insertImageFromDataUrl,
   applyParagraphStyle,
 } from './ribbon-tabs'
 import { WRAP_OPTIONS } from './ContextMenu'
@@ -1833,55 +1833,10 @@ function RibbonInner({
   const clipboard = async (action: 'cut' | 'copy' | 'paste') => {
     if (action !== 'copy' && !canEdit) return
     if (action === 'paste') {
-      // Same pipeline as Ctrl+V: pasteHTML/pasteText run the editor's full
-      // paste machinery, where readText + insertContent flattened everything
-      // to plain text (r127). The synthesized event carries a real
-      // clipboardData so App's handlePaste branches (empty-paragraph
-      // wholesale replace, markdown conversion, image priority) behave
-      // exactly as on a native paste.
-      const pasteEvent = (html: string | null, text: string): ClipboardEvent => {
-        const data = new DataTransfer()
-        if (html) data.setData('text/html', html)
-        if (text) data.setData('text/plain', text)
-        return new ClipboardEvent('paste', { clipboardData: data })
-      }
-      try {
-        for (const item of await navigator.clipboard.read()) {
-          const text = item.types.includes('text/plain')
-            ? await (await item.getType('text/plain')).text()
-            : ''
-          if (item.types.includes('text/html')) {
-            const html = await (await item.getType('text/html')).text()
-            if (html) {
-              ed.view.pasteHTML(html, pasteEvent(html, text))
-              ed.commands.focus()
-              return
-            }
-          }
-          // image priority mirrors Ctrl+V: an image wins over missing or
-          // whitespace-only plain text (OS clipboards often advertise an
-          // empty text/plain beside image/png)
-          const imageType = item.types.find((type) => type.startsWith('image/'))
-          if (imageType && !text.trim()) {
-            const blob = await item.getType(imageType)
-            const reader = new FileReader()
-            reader.onload = () => {
-              if (typeof reader.result === 'string') {
-                void insertImageFromDataUrl(ed, reader.result, 'Image (pasted)')
-              }
-            }
-            reader.readAsDataURL(blob)
-            return
-          }
-        }
-      } catch {
-        /* clipboard.read unavailable/denied: plain-text fallback below */
-      }
-      const text = await navigator.clipboard.readText()
-      if (text) {
-        ed.view.pasteText(text, pasteEvent(null, text))
-        ed.commands.focus()
-      }
+      // Same pipeline as Ctrl+V (clipboard-paste.ts): pictures, HTML and
+      // Markdown land exactly as on a native paste, and a refused clipboard
+      // says so instead of doing nothing.
+      await pasteFromMenu(ed)
     } else {
       document.execCommand(action)
       ed.commands.focus()

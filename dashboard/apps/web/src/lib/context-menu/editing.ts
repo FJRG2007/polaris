@@ -20,7 +20,9 @@
  * text typed in. Pasted HTML is never inserted by this file.
  */
 
+import * as clipboard from "@polaris/ui/clipboard";
 import { desktopBridge } from "@/lib/desktop-bridge";
+import type { ClipboardContents, ClipboardRead, ClipboardRefusal } from "@polaris/ui/clipboard";
 
 export type TextField = HTMLInputElement | HTMLTextAreaElement;
 
@@ -41,69 +43,14 @@ export async function copyText(text: string): Promise<boolean> {
     return command("copy");
 }
 
-/** What is on the clipboard: the text, HTML when there is some, and pictures. */
-export interface ClipboardContents {
-    readonly text: string;
-    readonly html: string | null;
-    /** Pictures on the clipboard (a screenshot, a copied image), as a paste event carries them. */
-    readonly files: readonly File[];
-}
-
-/** Why the clipboard could not be read: the browser or app said no, or has no way to ask. */
-export type ClipboardRefusal = "denied" | "unsupported";
-
-export type ClipboardRead =
-    | { readonly ok: true; readonly contents: ClipboardContents }
-    | { readonly ok: false; readonly reason: ClipboardRefusal };
-
-function refusalOf(error: unknown): ClipboardRefusal {
-    return (error as { name?: unknown } | null)?.name === "NotAllowedError" ? "denied" : "unsupported";
-}
-
-async function clipboardItems(items: readonly ClipboardItem[]): Promise<ClipboardContents> {
-    let text = "";
-    let html: string | null = null;
-    const files: File[] = [];
-    for (const item of items) {
-        if (!html && item.types.includes("text/html")) html = await (await item.getType("text/html")).text();
-        if (!text && item.types.includes("text/plain")) text = await (await item.getType("text/plain")).text();
-        const picture = item.types.find((type) => type.startsWith("image/"));
-        if (picture) {
-            const blob = await item.getType(picture);
-            files.push(new File([blob], imageName("", picture), { type: picture }));
-        }
-    }
-    return { text, html, files };
-}
+export type { ClipboardContents, ClipboardRead, ClipboardRefusal } from "@polaris/ui/clipboard";
 
 /**
- * Reads everything a paste would carry: `clipboard.read()` first, for HTML and
- * pictures; `readText()` where that is missing or failed (older Firefox reads
- * text only); the desktop app's clipboard last, where the page is refused it
- * altogether (a page on a plain-http address has no clipboard API at all).
+ * Reads everything a paste would carry (`@polaris/ui/clipboard`), with the
+ * desktop app's clipboard last, where the page is refused it altogether.
  */
-export async function readClipboard(): Promise<ClipboardRead> {
-    let reason: ClipboardRefusal = "unsupported";
-    const clipboard = typeof navigator === "undefined" ? undefined : navigator.clipboard;
-    if (typeof clipboard?.read === "function") {
-        try {
-            return { ok: true, contents: await clipboardItems(await clipboard.read()) };
-        } catch (error) {
-            reason = refusalOf(error);
-        }
-    }
-    // Not again after a refusal: the same permission answers both, and Firefox
-    // and Safari would show the person their paste prompt a second time.
-    if (reason !== "denied" && typeof clipboard?.readText === "function") {
-        try {
-            return { ok: true, contents: { text: await clipboard.readText(), html: null, files: [] } };
-        } catch (error) {
-            reason = refusalOf(error);
-        }
-    }
-    const text = await desktopBridge()?.editing?.readClipboard().catch(() => null);
-    if (typeof text === "string") return { ok: true, contents: { text, html: null, files: [] } };
-    return { ok: false, reason };
+export function readClipboard(): Promise<ClipboardRead> {
+    return clipboard.readClipboard(() => desktopBridge()?.editing?.readClipboard());
 }
 
 /** Runs an editing command; false where the browser has none or refused it. */
@@ -237,10 +184,7 @@ export async function pasteFromClipboard(field: Element, options: MenuPasteOptio
 }
 
 /** The paste keys here, for a hint that names them: "Cmd+V" on Apple devices. */
-export function pasteKeys(): string {
-    if (typeof navigator === "undefined") return "Ctrl+V";
-    return /Mac|iPhone|iPad/.test(navigator.userAgent) ? "Cmd+V" : "Ctrl+V";
-}
+export const pasteKeys = clipboard.pasteKeys;
 
 /** Selects everything in the field. */
 export function selectAllIn(field: Element): void {

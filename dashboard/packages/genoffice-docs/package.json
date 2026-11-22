@@ -30,6 +30,7 @@
         "@polaris/genoffice-ui": "*",
         "@polaris/office-layout": "*",
         "@polaris/project-store": "*",
+        "@polaris/ui": "*",
         "@tiptap/core": "3.32.0",
         "@tiptap/extensions": "3.32.0",
         "@tiptap/pm": "3.32.0",

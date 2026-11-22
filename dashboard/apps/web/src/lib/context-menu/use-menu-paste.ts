@@ -10,6 +10,7 @@
 import { desktopBridge } from "@/lib/desktop-bridge";
 import * as editing from "@/lib/context-menu/editing";
 import { useCallback, useEffect, useState } from "react";
+import { watchClipboardBlocked } from "@polaris/ui/clipboard";
 import * as contextMenu from "@/lib/context-menu/target";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -25,21 +26,7 @@ export function usePasteAvailability(): PasteAvailability {
     const [availability, setAvailability] = useState<PasteAvailability>("available");
     useEffect(() => {
         if (desktopBridge()?.editing) return;
-        if (typeof navigator === "undefined" || !navigator.clipboard?.readText) {
-            setAvailability("blocked");
-            return;
-        }
-        let status: PermissionStatus | null = null;
-        const read = () => status && setAvailability(status.state === "denied" ? "blocked" : "available");
-        navigator.permissions
-            ?.query({ name: "clipboard-read" as PermissionName })
-            .then((answer) => {
-                status = answer;
-                read();
-                answer.addEventListener("change", read);
-            })
-            .catch(() => undefined);
-        return () => status?.removeEventListener("change", read);
+        return watchClipboardBlocked((blocked) => setAvailability(blocked ? "blocked" : "available"));
     }, []);
     return availability;
 }

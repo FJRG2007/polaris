@@ -19,6 +19,10 @@
             "types": "./src/lib/use-zoom-pan.ts",
             "import": "./src/lib/use-zoom-pan.ts"
         },
+        "./clipboard": {
+            "types": "./src/lib/clipboard.ts",
+            "import": "./src/lib/clipboard.ts"
+        },
         "./automation": {
             "types": "./src/automation/parts.tsx",
             "import": "./src/automation/parts.tsx"
