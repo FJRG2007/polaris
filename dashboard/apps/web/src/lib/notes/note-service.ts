@@ -24,6 +24,7 @@
 
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
+import { syncNoteLinks } from "@/lib/notes/link-service";
 
 /** A note as the list draws it: enough to choose one, not the whole text. */
 export interface NoteSummary {
@@ -213,6 +214,7 @@ export async function createNote(
         },
         select: { id: true }
     });
+    if (input.body) await syncNoteLinks(note.id, input.body);
     return note.id;
 }
 
@@ -227,6 +229,7 @@ export async function updateNote(input: core.NoteUpdateInput): Promise<boolean> 
             ...(input.archived !== undefined ? { archived: input.archived } : {})
         }
     });
+    if (changed.count > 0 && input.body !== undefined) await syncNoteLinks(input.noteId, input.body);
     return changed.count > 0;
 }
 

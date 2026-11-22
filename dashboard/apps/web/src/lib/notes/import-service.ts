@@ -20,6 +20,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { randomUUID } from "node:crypto";
+import { indexNoteLinks } from "@/lib/notes/link-service";
 
 /** What an import did, for the screen that reports it. */
 export interface ImportResult {
@@ -119,6 +120,10 @@ export async function importVault(
             );
         }
     }
+
+    // The backlink index, from each note's final body.
+    const finalBody = new Map(rewritten.map((row) => [row.id, row.body]));
+    await indexNoteLinks(noteRows.map((row) => ({ id: row.id, body: finalBody.get(row.id) ?? row.body })));
 
     return {
         notes: noteRows.length,

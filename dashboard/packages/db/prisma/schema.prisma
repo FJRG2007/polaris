@@ -574,11 +574,33 @@ model Note {
     // removed some other way.
     folder   NoteFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
     share    NoteShare?
+    linksOut NoteLink[]  @relation("NoteLinkSource")
+    linksIn  NoteLink[]  @relation("NoteLinkTarget")
 
     @@index([userId, archived, updatedAt])
     @@index([userId, parentId])
     @@index([spaceId, archived, updatedAt])
     @@index([folderId])
+}
+
+// One note's body linking to another, which is what a backlink is read from.
+//
+// The body stays the truth: a link is a `polaris:note/<id>` reference in the
+// Markdown, and this row is an index of those, rewritten from the body on every
+// save. It exists so "what links here" is one indexed read by target instead of
+// a scan of every body on the instance. Either note going takes the row with
+// it; the text in the source is left alone, so a deleted target reads as a
+// broken link where it was written, not as a silent edit.
+model NoteLink {
+    sourceId  String   @db.Uuid
+    targetId  String   @db.Uuid
+    createdAt DateTime @default(now())
+
+    source Note @relation("NoteLinkSource", fields: [sourceId], references: [id], onDelete: Cascade)
+    target Note @relation("NoteLinkTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+    @@id([sourceId, targetId])
+    @@index([targetId])
 }
 
 // A shelf of notes that is not one person's.

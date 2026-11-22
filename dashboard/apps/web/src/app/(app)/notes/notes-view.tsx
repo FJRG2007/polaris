@@ -15,6 +15,7 @@
 import { saveFile } from "@/components/transfers/move-file";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
+import NextLink from "next/link";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { NoteMoveDialog } from "./note-move-dialog";
@@ -23,6 +24,7 @@ import { ShareDialog } from "@/components/access/share-dialog";
 import { NoteTree, type ShelfData } from "./note-tree";
 import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { Backlink } from "@/lib/notes/link-service";
 import type { NoteSummary, NoteView } from "@/lib/notes/note-service";
 import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { Badge, Button, ConfirmDeleteDialog, EmptyState, Input } from "@polaris/ui";
@@ -30,6 +32,7 @@ import {
     Archive,
     ChevronRight,
     Download,
+    Link2,
     Move,
     Pin,
     PinOff,
@@ -46,12 +49,15 @@ const SAVE_AFTER = 800;
 export function NotesView({
     shelves,
     note,
-    shared = null
+    shared = null,
+    backlinks = []
 }: {
     shelves: readonly ShelfData[];
     note: NoteView | null;
     /** Opened through a share of this one note rather than its shelf. */
     shared?: "view" | "edit" | null;
+    /** The notes linking to this one that the reader may open. */
+    backlinks?: readonly Backlink[];
 }) {
     const t = useTranslations("notes");
     const router = useRouter();
@@ -304,6 +310,8 @@ export function NotesView({
                             className="min-h-[24rem] flex-1"
                         />
 
+                        <NoteBacklinks backlinks={backlinks} />
+
                         <ConfirmDeleteDialog
                             open={confirmDelete}
                             onOpenChange={setConfirmDelete}
@@ -454,5 +462,39 @@ export function NewNoteButton() {
             </Button>
             {error && <span className="text-xs text-danger">{error}</span>}
         </>
+    );
+}
+
+/** Which notes link here, under the text - the other half of every link. */
+function NoteBacklinks({ backlinks }: { backlinks: readonly Backlink[] }) {
+    const t = useTranslations("notes");
+    return (
+        <section aria-labelledby="note-backlinks" className="flex flex-col gap-2 border-t pt-3">
+            <h2 id="note-backlinks" className="flex items-center gap-1.5 text-sm font-medium">
+                <Link2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                {t("view.backlinksTitle", { count: backlinks.length })}
+            </h2>
+            {backlinks.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t("view.backlinksEmpty")}</p>
+            ) : (
+                <ul className="flex flex-col">
+                    {backlinks.map((link) => (
+                        <li key={link.id} className="min-w-0">
+                            <NextLink
+                                href={`/notes?note=${link.id}`}
+                                className="flex min-w-0 items-center justify-between gap-3 rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                            >
+                                <span className="min-w-0 truncate" title={link.title}>
+                                    {link.title || t("tree.untitled")}
+                                </span>
+                                <span className="shrink-0 text-xs text-muted-foreground">
+                                    <RelativeTime iso={link.updatedAt} />
+                                </span>
+                            </NextLink>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </section>
     );
 }

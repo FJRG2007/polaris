@@ -19,6 +19,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { requirePermission } from "@/lib/session";
 import { NewNoteButton, NotesView } from "./notes-view";
 import { listShelves } from "@/lib/notes/shelf-service";
+import { listBacklinks } from "@/lib/notes/link-service";
 import { getNote, listNotes } from "@/lib/notes/note-service";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +62,7 @@ export default async function NotesPage({
                 shelves={withNotes}
                 note={note?.view ?? null}
                 shared={note?.shared ?? null}
+                backlinks={note?.backlinks ?? []}
             />
         </div>
     );
@@ -77,6 +79,6 @@ async function openable(actor: access.NoteActor, noteId: string) {
         shared = await access.sharedNote(actor, noteId);
         if (!shared) return null;
     }
-    const view = await getNote(noteId);
-    return view ? { view, shared } : null;
+    const [view, backlinks] = await Promise.all([getNote(noteId), listBacklinks(actor, noteId)]);
+    return view ? { view, shared, backlinks } : null;
 }

@@ -76,6 +76,29 @@ export function uniquePath(taken: Set<string>, path: string, extension = ".md"):
 /** A Polaris reference inside a body: `[label](polaris:note/<uuid>)`. */
 const REFERENCE = /\[([^\]]*)\]\(polaris:note\/([0-9a-f-]{8,64})\)/gi;
 
+/** The most links one note is indexed for. A body is capped well below what
+ *  would reach it, so this only bounds a pathological paste. */
+export const NOTE_LINKS_MAX = 500;
+
+const NOTE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * The notes a body links to, as the backlink index stores them: each id once,
+ * lowercased, in the order first written, and only ids shaped like a note's.
+ * A note that links to itself is the caller's to drop, since only it knows its
+ * own id.
+ */
+export function noteLinkTargets(body: string): string[] {
+    const found = new Set<string>();
+    for (const match of body.matchAll(REFERENCE)) {
+        const id = match[2]!.toLowerCase();
+        if (!NOTE_ID.test(id)) continue;
+        found.add(id);
+        if (found.size >= NOTE_LINKS_MAX) break;
+    }
+    return [...found];
+}
+
 /**
  * Turn references back into the wiki links a vault writes.
  *

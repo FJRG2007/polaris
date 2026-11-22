@@ -98,7 +98,9 @@
         "deleteTitle": "Borrar nota",
         "deleteQuestion": "¿Borrar <strong>{name}</strong>?",
         "deleteChildren": "{count, plural, one {Hay una nota} other {Hay # notas}} debajo de esta. Se conservan y suben a donde estaba esta nota.",
-        "deleteAlone": "Nada más enlaza con ella."
+        "deleteAlone": "Nada más enlaza con ella.",
+        "backlinksTitle": "{count, plural, =0 {Enlazada desde} one {Enlazada desde # nota} other {Enlazada desde # notas}}",
+        "backlinksEmpty": "Ninguna nota enlaza aquí todavía. Menciona esta nota en otra para conectarlas."
     },
     "errors": {
         "linkUnavailable": "Este enlace no está disponible.",

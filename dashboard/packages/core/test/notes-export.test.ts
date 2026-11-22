@@ -15,6 +15,8 @@ import {
     fileNameFor,
     layOutExport,
     noteFile,
+    noteLinkTargets,
+    NOTE_LINKS_MAX,
     toWikilinks,
     uniquePath,
     type ExportableFolder,
@@ -179,5 +181,28 @@ describe("the layout", () => {
             []
         );
         expect(files[0]!.text).toBe("see [[Two]]\n");
+    });
+});
+
+describe("the notes a body links to", () => {
+    const a = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
+    const b = "0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5c";
+
+    it("lists each linked note once, lowercased, in the order written", () => {
+        const body = `[One](polaris:note/${b}) and [Two](polaris:note/${a.toUpperCase()}) then [again](polaris:note/${b})`;
+        expect(noteLinkTargets(body)).toEqual([b, a]);
+    });
+
+    it("ignores what is not a note reference", () => {
+        const body = `[short](polaris:note/0190a1b2) [task](polaris:task/${a}) polaris:note/${a} [x](https://example.com/${a})`;
+        expect(noteLinkTargets(body)).toEqual([]);
+    });
+
+    it("stops at the cap", () => {
+        const ids = Array.from({ length: NOTE_LINKS_MAX + 20 }, (_, at) =>
+            `0190a1b2-c3d4-7e5f-8a9b-${at.toString(16).padStart(12, "0")}`
+        );
+        const body = ids.map((id) => `[n](polaris:note/${id})`).join(" ");
+        expect(noteLinkTargets(body)).toHaveLength(NOTE_LINKS_MAX);
     });
 });

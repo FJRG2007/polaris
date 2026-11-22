@@ -98,7 +98,9 @@
         "deleteTitle": "Delete note",
         "deleteQuestion": "Delete <strong>{name}</strong>?",
         "deleteChildren": "{count, plural, one {One note sits} other {# notes sit}} under this one. They are kept, and move up to where this note was.",
-        "deleteAlone": "Nothing else links to it."
+        "deleteAlone": "Nothing else links to it.",
+        "backlinksTitle": "{count, plural, =0 {Linked from} one {Linked from # note} other {Linked from # notes}}",
+        "backlinksEmpty": "No note links here yet. Mention this note in another one to connect them."
     },
     "errors": {
         "linkUnavailable": "This link is not available.",
