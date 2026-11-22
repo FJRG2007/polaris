@@ -401,7 +401,14 @@ async function initApp() {
         scenePass.setMRT(mrt({ output }));
     }
     const colorGrade = createPostProcessing(renderer, scenePassColor, reflections, {
-        bloom: preset.bloom
+        bloom: preset.bloom,
+        depth: scenePass.getTextureNode("depth"),
+        viewZ: scenePass.getViewZNode(),
+        normal: sceneMRT ? scenePass.getTextureNode("normal") : null,
+        camera: cameraSystem.camera,
+        ao: preset.ao && !!sceneMRT,
+        shafts: preset.shafts,
+        motionBlur: preset.motionBlur
     });
     const renderPipeline = new THREE.RenderPipeline(renderer, colorGrade.outputNode);
     // The grade ends with the display transform and its dither (post-processing.js)
@@ -1122,6 +1129,7 @@ async function initApp() {
 
         // Render frame via TSL RenderPipeline (SSR + Bloom)
         viewPosition.copy(cameraSystem.camera.position);
+        colorGrade.update(cameraSystem.camera, lightingSystem.sunLight.position, rawDt);
         pipelineGate.setNearRadius(warmedUp ? 0 : FIRST_FRAME_RADIUS);
         renderPipeline.render();
         // A pipeline that never turns up (a driver that fails it without an error) must not hold the loading screen: no
