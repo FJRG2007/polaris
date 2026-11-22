@@ -139,7 +139,7 @@
             "self": "Eres tú. Para eso tienes tus propios controles",
             "groupOwner": "Quien gestiona el grupo no se puede moderar",
             "serverOwner": "El propietario de este servidor no se puede moderar",
-            "stageOnly": "Solo un escenario tiene ponentes y público"
+            "stageOnly": "Solo un estrado tiene ponentes y público"
         },
         "notSent": "No se pudo enviar",
         "notForwarded": "No se pudo reenviar",
@@ -1323,7 +1323,7 @@
                 "hint": "Hablad y compartid pantalla juntos"
             },
             "stage": {
-                "name": "Escenario",
+                "name": "Estrado",
                 "hint": "Unos pocos hablan, el resto escucha"
             },
             "announcement": {
