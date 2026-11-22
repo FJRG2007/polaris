@@ -48,7 +48,6 @@ import * as conversationList from "@/lib/chat/conversation-list";
 import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { VanishDuration } from "@/lib/chat/vanish-rules";
 import { VanishBadge } from "./vanish-controls";
-import type { ChatRulesChange } from "./chat-privacy-section";
 import {
     ArrowLeft,
     Hash,
@@ -155,7 +154,6 @@ export function ChannelHeader({
         readonly rules: DirectRulesView;
         readonly onTimer: (seconds: VanishDuration) => void;
         readonly onAllowDelete: (allowed: boolean) => void;
-        readonly onRules: (change: ChatRulesChange) => void;
         readonly onDeleteChat: () => void;
         readonly onLinkPreviews?: (on: boolean) => void;
         /** The conversation's privacy section, drawn in a group's settings

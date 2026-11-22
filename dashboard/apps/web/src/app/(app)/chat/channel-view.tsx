@@ -99,7 +99,7 @@ import {
     savePaneSize,
     storedPaneSize
 } from "./pane-preferences";
-import { AlertCircle, ArrowDown, Loader2, MessageCircle, Mic, ShieldCheck, Video, Volume2 } from "lucide-react";
+import { AlertCircle, ArrowDown, Info, Loader2, MessageCircle, Mic, ShieldCheck, Video, Volume2 } from "lucide-react";
 import { keepReading, readingPosition, type ReadingPosition } from "./reading-position";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PublishContext } from "./publish-context";
@@ -112,10 +112,9 @@ import {
     ProposalBar,
     useDirectRules,
     useDropExpired,
-    useHide,
-    VanishMenu
+    useHide
 } from "./vanish-controls";
-import { Button, EmptyState, ResizeHandle, Switch, cn, useToast } from "@polaris/ui";
+import { Button, DropdownMenuItem, EmptyState, ResizeHandle, Switch, cn, useToast } from "@polaris/ui";
 import { ConversationSkeleton, MessagesSkeleton } from "./messages-skeleton";
 import { PersonCardProvider } from "./person-card";
 import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
@@ -3215,7 +3214,6 @@ export function ChannelView({
                                   rules: vanish.rules,
                                   onTimer: setTimer,
                                   onAllowDelete: allowDeleteForAll,
-                                  onRules: changeRules,
                                   onLinkPreviews: setLinkPreviews,
                                   onDeleteChat: () => setDeletingChat(true),
                                   privacy: privacySection
@@ -3384,20 +3382,16 @@ export function ChannelView({
                             // the call moves into a new group instead.
                             mayInvite={channel.kind === "dm" || channel.mayInvite}
                             mayRecord={channel.kind === "dm" || channel.kind === "group"}
-                            // The conversation's own rules - its timer, read
-                            // receipts and typing - in the call's menu too: on
-                            // a phone the call covers the header that holds them.
+                            // The conversation's details - its privacy, its
+                            // timer, deleting it - from the call's menu too: on
+                            // a phone the call covers the header that opens them.
                             moreItems={
-                                direct && vanish.rules ? (
-                                    <VanishMenu
-                                        rules={vanish.rules}
-                                        onTimer={setTimer}
-                                        onAllowDelete={allowDeleteForAll}
-                                        onRules={changeRules}
-                                        onLinkPreviews={setLinkPreviews}
-                                        onDeleteChat={() => setDeletingChat(true)}
-                                    />
-                                ) : undefined
+                                voiceRoom ? undefined : (
+                                    <DropdownMenuItem onSelect={() => setInfoOpen(true)}>
+                                        <Info className="size-4" />
+                                        {t("info.title")}
+                                    </DropdownMenuItem>
+                                )
                             }
                             onStage={setStaged}
                             expanded={expanded}
