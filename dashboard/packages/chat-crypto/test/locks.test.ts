@@ -199,8 +199,14 @@ describe("passkey lock", () => {
         expect(passkey.prfOutputOf({ prf: { results: { first: PRF.buffer } } })?.length).toBe(32);
     });
 
-    it("asks a different PRF input per account", async () => {
-        expect(hex(await passkey.prfInputFor("a"))).not.toBe(hex(await passkey.prfInputFor("b")));
+    it("asks one fixed, labelled PRF input, usable before the account is known", async () => {
+        // One fixed, labelled input: asked for before the account is known.
+        const input = await passkey.prfInput();
+        expect(input.length).toBe(32);
+        expect(hex(input)).toBe(hex(await passkey.prfInput()));
+        const label = bytes.canonical("polaris/chat-e2ee/ak-lock/v1/passkey-prf-input");
+        expect(hex(input)).toBe(hex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes.owned(label)))));
+        expect((await passkey.prfExtension()).prf.eval.first.length).toBe(32);
     });
 });
 

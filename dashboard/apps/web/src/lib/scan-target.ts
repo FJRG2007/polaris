@@ -16,6 +16,9 @@ import { QR_SIGN_IN_PATH } from "@polaris/core";
 /** Pages that answer a code of their own, by the path their QR encodes. */
 const APPROVAL_PATHS: readonly string[] = ["/account/tv"];
 
+/** The QR sign-in's key commitment fragment (`@polaris/chat-crypto/qr-approval`). */
+const KEY_FRAGMENT = /^#k=[A-Za-z0-9_-]{43}\.[A-Za-z0-9_-]{22}$/;
+
 /** The in-app path a scanned or typed payload opens, or null when it holds no code. */
 export function scanTarget(text: string): string | null {
     const trimmed = text.trim();
@@ -25,7 +28,10 @@ export function scanTarget(text: string): string | null {
         if (code) {
             const path = link.pathname.replace(/\/+$/, "");
             const page = APPROVAL_PATHS.includes(path) ? path : QR_SIGN_IN_PATH;
-            return `${page}?code=${encodeURIComponent(code)}`;
+            // A sign-in screen with chat encryption on (internal flag) adds a
+            // key commitment in the fragment; carried only in its exact shape.
+            const fragment = page === QR_SIGN_IN_PATH && KEY_FRAGMENT.test(link.hash) ? link.hash : "";
+            return `${page}?code=${encodeURIComponent(code)}${fragment}`;
         }
     } catch {
         // Not a URL; fall through to treating the payload as the code itself.

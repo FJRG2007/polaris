@@ -8,11 +8,17 @@
  * `prfOutputOf`, no lock is created, and nothing else changes - no error, no
  * prompt, no different sign-in.
  *
- * The PRF input is fixed per account rather than random per credential, so a
- * sign-in can ask for it before the server says which credential is coming
- * back; the authenticator's own per-credential secret is what makes the output
- * unique. The credential id is the lock id in the envelope's binding, so an
- * envelope made for one passkey never opens under another's output.
+ * The PRF input is one fixed, domain-separated value rather than one per
+ * account or per credential: the passkey sign-in is usernameless (the browser's
+ * own chooser picks the account), so the input has to be asked for before
+ * anybody - client or server - knows which account is signing in. The
+ * authenticator's own per-credential secret, mixed with the relying party by
+ * the browser, is what makes the output unique to one passkey on one site. The
+ * account and the credential id are in the envelope's binding, so an envelope
+ * made for one passkey never opens under another's output.
+ *
+ * The output never leaves the tab: the assertion posted to the server is built
+ * field by field and carries no extension results.
  */
 
 import { canonical, owned } from "./bytes";
@@ -21,19 +27,14 @@ import { importLockSecret, openAccountKey, sealAccountKey, type LockBinding } fr
 const PRF_LABEL = "polaris/chat-e2ee/ak-lock/v1/passkey-prf-input";
 export const PRF_OUTPUT_BYTES = 32;
 
-/** The PRF input (`eval.first`) to ask an authenticator for, for one account. */
-export async function prfInputFor(userId: string): Promise<Uint8Array<ArrayBuffer>> {
-    if (!userId) throw new RangeError("A PRF input belongs to an account");
-    return new Uint8Array(
-        await crypto.subtle.digest("SHA-256", owned(canonical(PRF_LABEL, userId)))
-    );
+/** The PRF input (`eval.first`) every passkey sign-in asks for. */
+export async function prfInput(): Promise<Uint8Array<ArrayBuffer>> {
+    return new Uint8Array(await crypto.subtle.digest("SHA-256", owned(canonical(PRF_LABEL))));
 }
 
 /** The `extensions` member to add to `navigator.credentials.get` options. */
-export async function prfExtensionFor(
-    userId: string
-): Promise<{ prf: { eval: { first: Uint8Array<ArrayBuffer> } } }> {
-    return { prf: { eval: { first: await prfInputFor(userId) } } };
+export async function prfExtension(): Promise<{ prf: { eval: { first: Uint8Array<ArrayBuffer> } } }> {
+    return { prf: { eval: { first: await prfInput() } } };
 }
 
 type PrfClientResults = { prf?: { results?: { first?: BufferSource } } };

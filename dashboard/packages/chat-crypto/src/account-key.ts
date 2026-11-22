@@ -87,3 +87,23 @@ export async function accountPublicKeys(accountKey: Uint8Array): Promise<Account
     const hpkePublicKey = new Uint8Array(await new XWing().serializePublicKey(hpke.publicKey));
     return { signPublicKey, hpkePublicKey };
 }
+
+/**
+ * Whether an account's public keys are the ones the account really published.
+ *
+ * Anything that obtains `AK` from a channel the server relays (the QR approval)
+ * or a lock the server stores must ask this before trusting the key: a server
+ * that can hand out envelopes can hand out an envelope of a key it made.
+ * Phase 3 answers it from the key transparency log (design 4.6); until then the
+ * web client's implementation compares against the server-published key, which
+ * stops everything but a server that lies consistently. Only `true` accepts.
+ */
+export interface AccountKeyVerifier {
+    verify(userId: string, akVersion: number, keys: AccountPublicKeys): Promise<boolean>;
+}
+
+/** Equal public keys, byte for byte. Public values: no secret is compared. */
+export function samePublicKeys(a: AccountPublicKeys, b: AccountPublicKeys): boolean {
+    const equal = (x: Uint8Array, y: Uint8Array) => x.length === y.length && x.every((byte, index) => byte === y[index]);
+    return equal(a.signPublicKey, b.signPublicKey) && equal(a.hpkePublicKey, b.hpkePublicKey);
+}

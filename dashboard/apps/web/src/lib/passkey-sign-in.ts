@@ -36,20 +36,27 @@ export interface RequestOptionsJson {
     readonly extensions?: AuthenticationExtensionsClientInputs;
 }
 
-export type PasskeySignInResult = { error: null } | { error: { code?: string } };
+/** A passkey sign-in's outcome. A successful one names the credential and,
+ *  only when extensions were asked for, carries the browser's extension
+ *  results - which stay in this tab and are never part of what is posted. */
+export type PasskeySignInResult =
+    | { error: null; credentialId?: string; extensionResults?: AuthenticationExtensionsClientOutputs }
+    | { error: { code?: string } };
 
 /** The browser's options for these JSON options, limited to `allow` when given. */
 export function requestOptions(
     json: RequestOptionsJson,
-    allow: readonly PasskeyDescriptor[]
+    allow: readonly PasskeyDescriptor[],
+    extra?: AuthenticationExtensionsClientInputs
 ): PublicKeyCredentialRequestOptions {
     const credentials = allow.length > 0 ? allow : (json.allowCredentials ?? []);
+    const extensions = extra ? { ...json.extensions, ...extra } : json.extensions;
     return {
         challenge: fromBase64Url(json.challenge) as BufferSource,
         ...(json.rpId ? { rpId: json.rpId } : {}),
         ...(json.timeout ? { timeout: json.timeout } : {}),
         ...(json.userVerification ? { userVerification: json.userVerification } : {}),
-        ...(json.extensions ? { extensions: json.extensions } : {}),
+        ...(extensions ? { extensions } : {}),
         allowCredentials: credentials.map((credential) => ({
             type: "public-key" as const,
             id: fromBase64Url(credential.id) as BufferSource,
@@ -83,7 +90,9 @@ export function assertionJson(credential: PublicKeyCredential): Record<string, u
  * error like any other failure, so the form is left as it was.
  */
 export async function signInWithPasskeys(
-    allow: readonly PasskeyDescriptor[]
+    allow: readonly PasskeyDescriptor[],
+    /** Extra client extensions (the chat key's PRF, behind the internal flag). */
+    extensions?: AuthenticationExtensionsClientInputs
 ): Promise<PasskeySignInResult> {
     const options = await authClient.$fetch<RequestOptionsJson>(
         "/passkey/generate-authenticate-options",
@@ -93,7 +102,7 @@ export async function signInWithPasskeys(
     let credential: Credential | null;
     try {
         credential = await navigator.credentials.get({
-            publicKey: requestOptions(options.data, allow)
+            publicKey: requestOptions(options.data, allow, extensions)
         });
     } catch {
         return { error: { code: "AUTH_CANCELLED" } };
@@ -113,5 +122,7 @@ export async function signInWithPasskeys(
     localPasskeys.rememberLocalPasskey(key);
     localPasskeys.resumeAutomaticPasskey();
     authClient.$store.notify("$sessionSignal");
-    return { error: null };
+    return extensions
+        ? { error: null, credentialId: key.id, extensionResults: key.getClientExtensionResults() }
+        : { error: null };
 }

@@ -53,6 +53,8 @@ import {
     verifyQuickPin
 } from "@polaris/auth";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { chatE2eeEnabled } from "@/lib/chat/e2ee/flag";
+import { qrKeyOfferSchema, qrKeyTransferSchema, type QrKeyTransfer } from "@polaris/core";
 
 /** How many codes one address may open before it is asked to slow down. Loose
  *  enough for a household behind one address reloading the sign-in screen,
@@ -97,6 +99,18 @@ export interface QrSignInRequest {
     readonly host: string | null;
     readonly requestedAt: string;
     readonly expiresAt: string;
+    /** Chat end-to-end encryption (internal flag only): the waiting browser's
+     *  ephemeral public key, base64url, for the answering device to seal the
+     *  account key to. Absent while the flag is off. */
+    readonly keyOffer?: string;
+}
+
+/** What an approved poll hands the waiting browser besides its session, while
+ *  the internal flag is on: the sealed account key, as the approver sent it. */
+export interface QrKeyDelivery {
+    readonly userId: string;
+    readonly flowId: string;
+    readonly transfer: QrKeyTransfer;
 }
 
 /**
@@ -104,7 +118,11 @@ export interface QrSignInRequest {
  * unauthenticated by nature - nobody has said who they are yet - so it is the
  * one step that a stranger can reach at all.
  */
-export async function openSignInCode(): Promise<{ code?: QrSignInCode; error?: string }> {
+export async function openSignInCode(
+    /** Chat end-to-end encryption (internal flag): the waiting browser's
+     *  ephemeral public key. Ignored while the flag is off or when malformed. */
+    keyOffer?: unknown
+): Promise<{ code?: QrSignInCode; error?: string }> {
     const ip = await clientIp();
     const throttle = await rateLimit(`qr-signin:${ip ?? "unknown"}`, OPEN_LIMIT, OPEN_WINDOW_MS);
     if (!throttle.ok) return { error: (await readerWords("api"))("refusals.qrSignIn.tooManyCodes") };
@@ -131,7 +149,8 @@ export async function openSignInCode(): Promise<{ code?: QrSignInCode; error?: s
             requestUserAgent: userAgent ?? null,
             requestUserAgentBrands: brands ?? null,
             requestUserAgentPlatform: platform ?? null,
-            requestHost: host ?? null
+            requestHost: host ?? null,
+            ...keyOfferData(keyOffer)
         }
     });
 
@@ -153,23 +172,62 @@ export async function openSignInCode(): Promise<{ code?: QrSignInCode; error?: s
  * navigate once this reports back approved.
  */
 export async function redeemSignInCode(deviceCode: string): Promise<QrSignInStatus> {
+    return (await redeem(deviceCode, false)).status;
+}
+
+/**
+ * The same poll, also handing over the sealed account key the approving device
+ * left, in the response that carries the session. Read in the same step that
+ * spends the row, so it is delivered once and to the browser holding the
+ * device code. With the internal flag off it is exactly `redeemSignInCode`.
+ */
+export async function redeemSignInCodeWithKeys(
+    deviceCode: string
+): Promise<{ status: QrSignInStatus; keys: QrKeyDelivery | null }> {
+    return redeem(deviceCode, chatE2eeEnabled());
+}
+
+async function redeem(
+    deviceCode: string,
+    withKeys: boolean
+): Promise<{ status: QrSignInStatus; keys: QrKeyDelivery | null }> {
     // Read before the exchange: it consumes the row, and the pass below has to be
     // left for the right account before the session that spends it exists.
-    const waiting = await prisma.deviceCode.findUnique({
-        where: { deviceCode },
-        select: { userId: true, status: true }
-    });
-    if (!waiting) return "expired";
+    const waiting: { userId: string | null; status: string; userCode?: string; e2eeApproval?: string | null } | null =
+        await prisma.deviceCode.findUnique({
+            where: { deviceCode },
+            select: withKeys
+                ? { userId: true, status: true, userCode: true, e2eeApproval: true }
+                : { userId: true, status: true }
+        });
+    if (!waiting) return { status: "expired", keys: null };
     if (waiting.status === "approved" && waiting.userId) {
         await beginSessionRotation(waiting.userId, (await clientIp()) ?? null);
     }
 
     const exchange = await exchangeDeviceCode(auth, deviceCode, await headers());
-    if (exchange.status !== "approved") return exchange.status;
+    if (exchange.status !== "approved") return { status: exchange.status, keys: null };
 
     const store = await cookies();
     for (const cookie of exchange.cookies) store.set(cookie.name, cookie.value, cookie.options);
-    return "approved";
+    return { status: "approved", keys: withKeys ? keyDelivery(waiting) : null };
+}
+
+/** The offer column for a code being opened, when the flag is on and it parses. */
+function keyOfferData(keyOffer: unknown): { e2eeOffer?: Buffer } {
+    if (!chatE2eeEnabled() || keyOffer === undefined) return {};
+    const parsed = qrKeyOfferSchema.safeParse(keyOffer);
+    return parsed.success ? { e2eeOffer: Buffer.from(parsed.data, "base64url") } : {};
+}
+
+function keyDelivery(row: {
+    userId: string | null;
+    userCode?: string;
+    e2eeApproval?: string | null;
+}): QrKeyDelivery | null {
+    if (!row.userId || !row.userCode || !row.e2eeApproval) return null;
+    const parsed = qrKeyTransferSchema.safeParse(readJson(row.e2eeApproval));
+    return parsed.success ? { userId: row.userId, flowId: row.userCode, transfer: parsed.data } : null;
 }
 
 /**
@@ -191,7 +249,8 @@ export async function describeSignInCode(userCode: string, userId: string): Prom
             requestUserAgent: true,
             requestUserAgentBrands: true,
             requestUserAgentPlatform: true,
-            requestHost: true
+            requestHost: true,
+            ...(chatE2eeEnabled() ? { e2eeOffer: true } : {})
         }
     });
     if (!row || row.status !== "pending" || row.expiresAt <= new Date()) return null;
@@ -209,8 +268,14 @@ export async function describeSignInCode(userCode: string, userId: string): Prom
         origin: [row.requestIp, country].filter(Boolean).join(" - ") || "Unknown",
         host: row.requestHost,
         requestedAt: row.createdAt.toISOString(),
-        expiresAt: row.expiresAt.toISOString()
+        expiresAt: row.expiresAt.toISOString(),
+        ...keyOfferOf(row as { e2eeOffer?: Uint8Array | null })
     };
+}
+
+function keyOfferOf(row: { e2eeOffer?: Uint8Array | null }): { keyOffer?: string } {
+    if (!chatE2eeEnabled() || !row.e2eeOffer) return {};
+    return { keyOffer: Buffer.from(row.e2eeOffer).toString("base64url") };
 }
 
 /** One code this account has answered, as the history lists it. */
@@ -353,6 +418,9 @@ export async function decideSignInCode(
         await clientUserAgentPlatform()
     );
     if (decision.approve) await noteSignInAuthorizer(userId, { sessionId: bySessionId, device: scanner });
+    // The sealed account key goes on the row before the answer does, for the
+    // same reason as the note above: the waiting browser's next poll spends it.
+    if (decision.approve) await storeKeyTransfer(decision.userCode, bySessionId, decision.keyTransfer, request);
 
     const result = await decideDeviceCode(auth, decision.userCode, decision.approve, store);
     if (result.error) return result;
@@ -369,4 +437,27 @@ export async function decideSignInCode(
         metadata: { device: request.device, origin: request.origin, host: request.host, scannedOn: scanner }
     });
     return {};
+}
+
+/**
+ * Keep the approving device's sealed account key for the waiting browser.
+ * Only with the internal flag on, only for a code that carried an offer, and
+ * only when the transfer names the session that is answering - the server
+ * cannot open it, but it can refuse to relay one sealed in another device's
+ * name. Anything short of that stores nothing and the sign-in goes ahead as
+ * it always did; the browser gets its key from another lock later.
+ */
+async function storeKeyTransfer(
+    userCode: string,
+    bySessionId: string,
+    keyTransfer: unknown,
+    request: QrSignInRequest
+): Promise<void> {
+    if (!chatE2eeEnabled() || keyTransfer === undefined || !request.keyOffer) return;
+    const parsed = qrKeyTransferSchema.safeParse(keyTransfer);
+    if (!parsed.success || parsed.data.approverDeviceId !== bySessionId) return;
+    await prisma.deviceCode.update({
+        where: { userCode },
+        data: { e2eeApproval: JSON.stringify(parsed.data) }
+    });
 }

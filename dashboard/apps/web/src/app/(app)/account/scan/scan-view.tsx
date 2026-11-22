@@ -35,7 +35,8 @@ export function ScanView({
     request,
     scanned,
     hasPin,
-    pinLength
+    pinLength,
+    keyDeviceId = null
 }: {
     request: QrSignInRequest | null;
     /** Whether a code was in the address at all, so a dead one can say so. */
@@ -43,9 +44,30 @@ export function ScanView({
     hasPin: boolean;
     /** The PIN's length, null when unknown, so the PIN is checked on its last digit. */
     pinLength: number | null;
+    /** Chat end-to-end encryption (internal flag): this session's id, which an
+     *  approval seals the account key under. Null while the flag is off. */
+    keyDeviceId?: string | null;
 }) {
-    if (request) return <DecideCard request={request} hasPin={hasPin} pinLength={pinLength} />;
+    if (request)
+        return <DecideCard request={request} hasPin={hasPin} pinLength={pinLength} keyDeviceId={keyDeviceId} />;
     return <ReadCard stale={scanned} />;
+}
+
+/**
+ * The chat account key sealed for the browser asking, behind the internal flag
+ * only: needs the waiting browser's offer, this session's id and the
+ * commitment the scanned link carried. Anything missing - or a failure - is
+ * null, and the sign-in is answered exactly as it would be without it.
+ */
+async function sealedKey(request: QrSignInRequest, keyDeviceId: string | null) {
+    if (!keyDeviceId || !request.keyOffer) return null;
+    const client = await import("@/lib/chat/e2ee/account-key-client");
+    return client.sealForScannedCode({
+        approverDeviceId: keyDeviceId,
+        flowId: request.userCode,
+        keyOffer: request.keyOffer,
+        fragment: window.location.hash
+    });
 }
 
 /** The camera, and the typed code for when it is not an option. */
@@ -197,11 +219,13 @@ function ReadCard({ stale }: { stale: boolean }) {
 function DecideCard({
     request,
     hasPin,
-    pinLength
+    pinLength,
+    keyDeviceId
 }: {
     request: QrSignInRequest;
     hasPin: boolean;
     pinLength: number | null;
+    keyDeviceId: string | null;
 }) {
     const t = useTranslations("account");
     const [pin, setPin] = useState("");
@@ -228,7 +252,13 @@ function DecideCard({
         deciding.current = true;
         setBusy(true);
         setError(null);
-        const result = await decideQrSignInAction({ userCode: request.userCode, approve, pin });
+        const keyTransfer = approve ? await sealedKey(request, keyDeviceId) : null;
+        const result = await decideQrSignInAction({
+            userCode: request.userCode,
+            approve,
+            pin,
+            ...(keyTransfer ? { keyTransfer } : {})
+        });
         setBusy(false);
         deciding.current = false;
         if (result.error) {

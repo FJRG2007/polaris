@@ -19,7 +19,8 @@ import { useRouter } from "next/navigation";
 import { Button, Skeleton } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
 import { landAfterSignIn } from "./post-login-target";
-import { pollQrSignIn, startQrSignIn } from "./actions";
+import type { QrOffer } from "@polaris/chat-crypto/qr-approval";
+import { pollQrSignIn, pollQrSignInWithKeys, startQrSignIn } from "./actions";
 import type { QrSignInCode } from "@/lib/qr-sign-in-service";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -44,7 +45,23 @@ function useWideScreen(): boolean {
     return wide;
 }
 
-export function QrSignInPanel() {
+/**
+ * The waiting side's poll. Behind the internal flag (`carryKeys`), an approval
+ * also brings the chat account key the approving device sealed for this
+ * browser's offer, which is opened, verified and kept before the page moves on;
+ * any failure there only means this browser gets the key from another lock.
+ */
+async function poll(deviceCode: string, offer: QrOffer | null): Promise<string> {
+    if (!offer) return pollQrSignIn(deviceCode);
+    const { status, keys } = await pollQrSignInWithKeys(deviceCode);
+    if (status === "approved" && keys) {
+        const client = await import("@/lib/chat/e2ee/account-key-client");
+        await client.acceptKeyDelivery(offer, keys);
+    }
+    return status;
+}
+
+export function QrSignInPanel({ carryKeys = false }: { carryKeys?: boolean }) {
     const router = useRouter();
     const t = useTranslations("auth");
     const wide = useWideScreen();
@@ -53,6 +70,7 @@ export function QrSignInPanel() {
     const [error, setError] = useState<string | null>(null);
     // Opening a code writes a row, so a re-render must never open a second one.
     const opening = useRef(false);
+    const offer = useRef<QrOffer | null>(null);
 
     async function open() {
         if (opening.current) return;
@@ -60,14 +78,21 @@ export function QrSignInPanel() {
         setState("loading");
         setError(null);
         setCode(null);
-        const result = await startQrSignIn();
+        const keys = carryKeys ? await import("@/lib/chat/e2ee/account-key-client") : null;
+        const made = keys ? await keys.createKeyOffer().catch(() => null) : null;
+        offer.current = made?.offer ?? null;
+        const result = made ? await startQrSignIn(made.text) : await startQrSignIn();
         opening.current = false;
         if (!result.code) {
             setError(result.error ?? t("qr.openFailed"));
             setState("error");
             return;
         }
-        setCode(result.code);
+        // The offer's commitment rides in the link's fragment, which the
+        // scanning browser reads and no server ever receives.
+        const url =
+            keys && made ? await keys.offerLink(result.code.url, result.code.userCode, made.offer) : result.code.url;
+        setCode({ ...result.code, url });
         setState("waiting");
     }
 
@@ -85,7 +110,7 @@ export function QrSignInPanel() {
         if (state !== "waiting" || !code) return;
         let live = true;
         const timer = window.setInterval(async () => {
-            const status = await pollQrSignIn(code.deviceCode);
+            const status = await poll(code.deviceCode, offer.current);
             if (!live) return;
             if (status === "approved") {
                 window.clearInterval(timer);

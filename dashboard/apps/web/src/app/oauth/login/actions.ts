@@ -22,6 +22,8 @@ import { emailForUsername, emailLinkSignInAllowed } from "@polaris/auth";
 import {
     openSignInCode,
     redeemSignInCode,
+    redeemSignInCodeWithKeys,
+    type QrKeyDelivery,
     type QrSignInCode,
     type QrSignInStatus
 } from "@/lib/qr-sign-in-service";
@@ -208,8 +210,8 @@ async function currentRelyingPartyId(): Promise<string | null> {
  * nobody has said who they are yet - so it is throttled per address and the code
  * it hands back is useless until somebody already signed in allows it.
  */
-export async function startQrSignIn(): Promise<{ code?: QrSignInCode; error?: string }> {
-    return openSignInCode();
+export async function startQrSignIn(keyOffer?: unknown): Promise<{ code?: QrSignInCode; error?: string }> {
+    return openSignInCode(keyOffer);
 }
 
 /**
@@ -220,6 +222,18 @@ export async function startQrSignIn(): Promise<{ code?: QrSignInCode; error?: st
 export async function pollQrSignIn(deviceCode: unknown): Promise<QrSignInStatus> {
     if (typeof deviceCode !== "string" || deviceCode.length === 0) return "expired";
     return redeemSignInCode(deviceCode);
+}
+
+/**
+ * The same poll for a sign-in screen that offered a key for chat end-to-end
+ * encryption (internal flag): an approval also hands back the account key the
+ * approving device sealed for this browser. With the flag off it carries none.
+ */
+export async function pollQrSignInWithKeys(
+    deviceCode: unknown
+): Promise<{ status: QrSignInStatus; keys: QrKeyDelivery | null }> {
+    if (typeof deviceCode !== "string" || deviceCode.length === 0) return { status: "expired", keys: null };
+    return redeemSignInCodeWithKeys(deviceCode);
 }
 
 /** Matches the passkeys that sign in on an address, including the ones registered

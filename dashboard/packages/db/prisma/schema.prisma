@@ -2107,6 +2107,12 @@ model DeviceCode {
     requestUserAgentBrands   String?
     requestUserAgentPlatform String?
     requestHost      String?
+    // Chat end-to-end encryption, behind the internal flag: the new browser's
+    // ephemeral X-Wing public key, and the approving device's sealed and signed
+    // account key for it. Bytes the server relays and cannot open; gone with
+    // the row when the code is spent or expires.
+    e2eeOffer        Bytes?
+    e2eeApproval     String?
     createdAt       DateTime  @default(now())
 
     user User? @relation(fields: [userId], references: [id], onDelete: Cascade)

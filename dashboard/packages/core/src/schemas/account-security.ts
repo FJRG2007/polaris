@@ -171,12 +171,34 @@ export const qrUserCodeField = z
     .transform((value) => value.replace(/[\s-]/g, ""))
     .pipe(z.string().regex(/^[A-Z0-9]{6,12}$/, "That code is not a Polaris sign-in code"));
 
+/**
+ * The account key sealed for the browser a QR sign-in lets in (chat end-to-end
+ * encryption, docs/chat-e2ee-phase1.md): an X-Wing HPKE envelope of exactly
+ * 1180 bytes and an Ed25519 signature of 64, both base64url, and the session id
+ * of the device that sealed it.
+ */
+export const qrKeyTransferSchema = z.object({
+    akVersion: z.number().int().min(1).max(0x7fffffff),
+    approverDeviceId: z.string().uuid(),
+    envelope: z.string().length(1574).regex(/^[A-Za-z0-9_-]+$/),
+    signature: z.string().length(86).regex(/^[A-Za-z0-9_-]+$/)
+});
+
+export type QrKeyTransfer = z.infer<typeof qrKeyTransferSchema>;
+
+/** The new browser's ephemeral X-Wing public key (1216 bytes), base64url. */
+export const qrKeyOfferSchema = z.string().length(1622).regex(/^[A-Za-z0-9_-]+$/);
+
 /** Answering a scanned code. Approving needs the PIN; refusing only closes a
  *  door, so the field is optional and ignored on a refusal. */
 export const qrSignInDecisionSchema = z.object({
     userCode: qrUserCodeField,
     approve: z.boolean(),
-    pin: z.string().trim().default("")
+    pin: z.string().trim().default(""),
+    /** Chat end-to-end encryption (internal flag): the account key sealed for
+     *  the browser being let in. Opaque to the server and ignored while the
+     *  flag is off, and dropped rather than refusing the answer when malformed. */
+    keyTransfer: qrKeyTransferSchema.optional().catch(undefined)
 });
 
 export type QrSignInDecision = z.infer<typeof qrSignInDecisionSchema>;

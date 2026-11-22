@@ -191,6 +191,7 @@ export async function handleKeys(request: Request): Promise<Response> {
             case "state": {
                 const state = await keys.accountKeyState(user.id);
                 return json({
+                    userId: user.id,
                     accountKey: state && {
                         akVersion: state.akVersion,
                         signPublicKey: text(state.signPublicKey),

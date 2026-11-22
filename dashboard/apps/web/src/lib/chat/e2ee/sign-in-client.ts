@@ -13,17 +13,10 @@
  */
 
 import type { SignInBody } from "@/lib/chat/e2ee/schemas";
-import * as deviceLock from "@polaris/chat-crypto/device-lock";
-import { LOCK_ENVELOPE_BYTES } from "@polaris/chat-crypto/locks";
+import { settleAfterPassword } from "@/lib/chat/e2ee/account-key-client";
 import * as passwordLock from "@polaris/chat-crypto/password-lock";
 
 const ROUTE = "/api/e2ee/sign-in";
-
-function fromText(value: string): Uint8Array {
-    const padded = value.replace(/-/g, "+").replace(/_/g, "/");
-    const binary = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
-    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
-}
 
 async function post<T>(body: SignInBody): Promise<T | null> {
     try {
@@ -48,26 +41,6 @@ interface Started {
 interface ReleasedLock {
     readonly akVersion: number;
     readonly envelope: string;
-}
-
-/** Open the released password envelope and keep the account key behind this
- *  browser's device lock. Best effort: a failure leaves nothing half-written. */
-async function keepAccountKey(userId: string, lockKey: CryptoKey, released: ReleasedLock | null) {
-    if (!released) return;
-    try {
-        const envelope = fromText(released.envelope);
-        if (envelope.length !== LOCK_ENVELOPE_BYTES) return;
-        const accountKey = await passwordLock.openWithPassword(envelope, lockKey, userId, released.akVersion);
-        await deviceLock.createDeviceLock(
-            deviceLock.indexedDbDeviceLockStore(),
-            userId,
-            accountKey,
-            released.akVersion
-        );
-        accountKey.fill(0);
-    } catch {
-        // Not a reason to fail a sign-in; another lock opens it later.
-    }
 }
 
 /**
@@ -98,7 +71,14 @@ export async function signInWithOpaque(
             finishLoginRequest: finished.finishLoginRequest
         });
         if (!done) return null;
-        await keepAccountKey(step.userId, finished.lockKey, done.passwordLock);
+        // With a full session: open the account key, or create it and seal the
+        // password lock (also after a reset). Never fails the sign-in.
+        if (done.challenged !== true)
+            await settleAfterPassword(password, {
+                lockKey: finished.lockKey,
+                userId: step.userId,
+                lock: done.passwordLock
+            });
         return { challenged: done.challenged === true };
     } catch {
         return null;
@@ -108,9 +88,16 @@ export async function signInWithOpaque(
 /**
  * Move the account onto OPAQUE, right after the old password sign-in accepted
  * this password: register a record, then prove it with a full login before the
- * server will ever sign in with it. Never throws.
+ * server will ever sign in with it. With a full session already issued, the
+ * account key is then settled on the adopted record. Never throws.
  */
-export async function adoptOpaque(email: string, password: string): Promise<boolean> {
+export async function adoptOpaque(email: string, password: string, fullSession = false): Promise<boolean> {
+    const adopted = await adopt(email, password);
+    if (adopted && fullSession) await settleAfterPassword(password, null);
+    return adopted;
+}
+
+async function adopt(email: string, password: string): Promise<boolean> {
     try {
         const registration = await passwordLock.startPasswordRegistration(password);
         const answered = await post<{ userId: string; registrationResponse: string }>({

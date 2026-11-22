@@ -15,7 +15,7 @@ import { EnrollView } from "@/app/oauth/enroll/enroll-view";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { validationMessage } from "@/components/i18n/validation-message";
-import { signInWithPasskeys } from "@/lib/passkey-sign-in";
+import { signInWithPasskeys, type PasskeyDescriptor, type PasskeySignInResult } from "@/lib/passkey-sign-in";
 import * as localPasskeys from "@/lib/local-passkeys";
 import {
     accountHasPasskey,
@@ -228,6 +228,26 @@ export function LoginForm({
         window.location.href = url;
     }
 
+    /**
+     * The passkey ceremony. Behind the internal flag only, it also asks the
+     * authenticator for its PRF output and, once signed in, uses it to open or
+     * seal the chat account key before the page moves on; an authenticator
+     * without PRF changes nothing. With the flag off it is exactly the plain
+     * ceremony and never loads the chat key code.
+     */
+    async function passkeySignIn(allow: readonly PasskeyDescriptor[]): Promise<PasskeySignInResult> {
+        if (!opaqueSignIn) return signInWithPasskeys(allow);
+        const prf = await import("@polaris/chat-crypto/passkey-lock");
+        const result = await signInWithPasskeys(allow, await prf.prfExtension());
+        if (result.error || !result.credentialId) return result;
+        const output = prf.prfOutputOf(result.extensionResults);
+        if (output) {
+            const keys = await import("@/lib/chat/e2ee/account-key-client");
+            await keys.settleAfterPasskey(result.credentialId, output);
+        }
+        return { error: null };
+    }
+
     /** Sign in with the device's passkey. The ceremony is the browser's; a
      *  cancelled prompt just leaves the form as it was. With an account typed,
      *  the prompt is narrowed to that account's passkeys so it goes straight to
@@ -240,7 +260,7 @@ export function LoginForm({
         // With no account typed, an empty list is the browser's own chooser -
         // what `signIn.passkey()` asks for - through the one path that notes a
         // passkey this device holds, so the next visit can ask for it on its own.
-        const result = await signInWithPasskeys(allow);
+        const result = await passkeySignIn(allow);
         setPending(false);
         if (result.error) {
             if (result.error.code === "SSO_REQUIRED") {
@@ -271,7 +291,7 @@ export function LoginForm({
             if (allow.length === 0 || controller.signal.aborted) return;
             const attended = await localPasskeys.whenAttended(controller.signal);
             if (!attended || controller.signal.aborted) return;
-            const result = await signInWithPasskeys(allow);
+            const result = await passkeySignIn(allow);
             if (result.error) {
                 if (result.error.code === "SSO_REQUIRED") {
                     setCanSso(true);
@@ -357,7 +377,8 @@ export function LoginForm({
         // OPAQUE while this page still holds it. Never fails the sign-in.
         if (e2ee && !viaOpaque) {
             setPending(true);
-            await e2ee.adoptOpaque(email, parsed.password);
+            const challenged = (data as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect === true;
+            await e2ee.adoptOpaque(email, parsed.password, !challenged);
         }
         window.localStorage.setItem(LAST_IDENTIFIER_KEY, parsed.identifier);
         // With a second factor armed, the password alone issues no session: the
@@ -560,7 +581,7 @@ export function LoginForm({
                             </p>
                         ) : null}
                     </div>
-                    {add?.full ? null : <QrSignInPanel />}
+                    {add?.full ? null : <QrSignInPanel carryKeys={opaqueSignIn} />}
                 </CardBody>
             </Card>
         </main>
