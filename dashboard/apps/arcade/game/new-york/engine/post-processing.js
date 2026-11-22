@@ -14,33 +14,55 @@ import {
   smoothstep,
   length,
   screenUV,
-  screenSize
+  screenSize,
+  screenCoordinate,
+  interleavedGradientNoise,
+  renderOutput
 } from 'three/tsl';
 import { bloom } from 'three/addons/tsl/display/BloomNode.js';
+import { autoExposure } from './auto-exposure.js';
 
-// Scene-linear color grading and lens bloom, composed in the existing final render pass.
+// Scene-linear color grading and lens bloom, composed in the existing final render pass, then the display transform.
+// The tone mapper is AgX (Troy Sobotka's Blender AgX, as fitted for three.js after Filament's implementation): it
+// desaturates towards white in the highlights instead of skewing hue the way ACES' per-channel curve does, so
+// neon, brake lights and the low sun keep their colour. Its flatter base is answered by the grade's contrast.
+// The display transform runs here rather than in RenderPipeline (`outputColorTransform = false` on the pipeline), so
+// the last step can be a dither in display space: half a code value of interleaved gradient noise that breaks the
+// banding 8-bit output leaves in the sky gradient and fog.
 
 // Exposure and white balance belong to the camera, independently of the physical lighting presets.
 // Keep exposure restrained for ACES; stronger bloom stays selective so midtones retain their contrast.
 const LOOKS = {
-  golden:   { exposure: 1.04, contrast: 1.12, saturation: 1.08, balance: [1.045, 1.00, 0.955], bloom: 0.24, threshold: 1.20 },
-  midday:   { exposure: 1.00, contrast: 1.10, saturation: 1.06, balance: [1.015, 1.00, 0.985], bloom: 0.18, threshold: 1.35 },
-  twilight: { exposure: 1.06, contrast: 1.10, saturation: 1.08, balance: [1.025, 0.995, 1.015], bloom: 0.28, threshold: 1.05 },
-  midnight: { exposure: 1.04, contrast: 1.08, saturation: 1.06, balance: [0.985, 1.00, 1.035], bloom: 0.30, threshold: 1.00 }
+  golden:   { exposure: 1.10, contrast: 1.20, saturation: 1.16, balance: [1.045, 1.00, 0.955], bloom: 0.24, threshold: 1.20, auto: 0.55 },
+  midday:   { exposure: 1.06, contrast: 1.18, saturation: 1.14, balance: [1.015, 1.00, 0.985], bloom: 0.18, threshold: 1.35, auto: 0.55 },
+  twilight: { exposure: 1.12, contrast: 1.17, saturation: 1.16, balance: [1.025, 0.995, 1.015], bloom: 0.28, threshold: 1.05, auto: 0.45 },
+  midnight: { exposure: 1.10, contrast: 1.15, saturation: 1.12, balance: [0.985, 1.00, 1.035], bloom: 0.30, threshold: 1.00, auto: 0.35 }
 };
 
 // `bloom: false` (the Low graphics level) leaves the bloom passes out.
 function createPostProcessing(renderer, sceneColor, reflections, { bloom: withBloom = true } = {}) {
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMapping = THREE.AgXToneMapping;
   // Exposure is applied before bloom so its threshold follows the image's exposed brightness.
-  // RenderPipeline performs ACES and the output color-space conversion exactly once, after this graph.
   renderer.toneMappingExposure = 1.0;
 
   const exposure = uniform(1.0);
+  const autoStrength = uniform(0.5);
   const contrast = uniform(1.0);
   const saturation = uniform(1.0);
   const balance = uniform(new THREE.Vector3(1, 1, 1));
-  const exposed = max(sceneColor.rgb.add(reflections.rgb), vec3(0)).mul(exposure).mul(balance);
+  // 0 to 1: how hurt the player is right now (the shooter sets it); drives the red vignette and lens fringing
+  const damage = uniform(0);
+
+  // Lens fringing under damage: red and blue sampled a little apart along the radius
+  const fringe = screenUV.sub(0.5).mul(damage.mul(0.012));
+  const hdr = vec3(
+    sceneColor.sample(screenUV.add(fringe)).r,
+    sceneColor.rgb.g,
+    sceneColor.sample(screenUV.sub(fringe)).b
+  ).add(reflections.rgb);
+  // The camera's metering, tempered: a dark canyon opens up, the sky does not blow the street out
+  const metered = autoExposure(sceneColor);
+  const exposed = max(hdr, vec3(0)).mul(exposure).mul(pow(metered, autoStrength)).mul(balance);
 
   // Limit only bloom's peak radiance, scaling RGB together to retain neon and lamp colors.
   // The original HDR image keeps its full range for the tone mapper's highlight shoulder.
@@ -72,7 +94,13 @@ function createPostProcessing(renderer, sceneColor, reflections, { bloom: withBl
     const aspect = screenSize.x.div(screenSize.y);
     const radius = length(screenUV.sub(0.5).mul(vec2(aspect, 1))).div(length(vec2(aspect, 1).mul(0.5)));
     const vignette = float(1).sub(smoothstep(0.35, 1.0, radius).mul(0.12));
-    return vec4(color.mul(vignette), 1.0);
+    color.mulAssign(vignette);
+    // Damage: the edges darken and run red
+    const hurt = smoothstep(0.25, 1.05, radius).mul(damage);
+    color.assign(mix(color, color.mul(vec3(0.9, 0.12, 0.08)).add(vec3(0.05, 0, 0)), hurt));
+    const display = renderOutput(vec4(color, 1.0));
+    const dither = interleavedGradientNoise(screenCoordinate.xy).sub(0.5).div(255);
+    return vec4(display.rgb.add(dither), 1.0);
   })();
 
   function applyPreset(id) {
@@ -80,6 +108,7 @@ function createPostProcessing(renderer, sceneColor, reflections, { bloom: withBl
     exposure.value = look.exposure;
     contrast.value = look.contrast;
     saturation.value = look.saturation;
+    autoStrength.value = look.auto;
     balance.value.set(...look.balance);
     if (!bloomPass) return;
     bloomPass.strength.value = look.bloom;
@@ -87,7 +116,7 @@ function createPostProcessing(renderer, sceneColor, reflections, { bloom: withBl
   }
 
   applyPreset('golden');
-  return { outputNode, applyPreset };
+  return { outputNode, applyPreset, damage };
 }
 
 export { createPostProcessing };

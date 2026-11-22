@@ -172,6 +172,9 @@ async function initApp() {
     const preset = PRESETS[quality];
     setCastLightShare(preset.castLights);
     renderer.shadowMap.enabled = preset.shadows;
+    // The level's render scale: Low draws fewer pixels and upscales, Ultra supersamples a high-density screen
+    const density = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+    renderer.setPixelRatio(preset.resolutionScale > 1 ? Math.min(preset.resolutionScale, density) : preset.resolutionScale);
     console.log(
         `[init] quality ${quality} (${qualitySetting}), ${renderer.backend.isWebGPUBackend ? "WebGPU" : "WebGL2"}`
     );
@@ -181,6 +184,7 @@ async function initApp() {
     const scene = new THREE.Scene();
     const lightingSystem = new LightingSystem(scene, renderer);
     lightingSystem.sunLight.castShadow = preset.shadows;
+    lightingSystem.configureShadows(preset, renderer);
     await stepDone("lighting");
 
     // 3. Build Manhattan Geography, Iconic Landmarks, Blocks, Street Details & Traffic
@@ -400,6 +404,8 @@ async function initApp() {
         bloom: preset.bloom
     });
     const renderPipeline = new THREE.RenderPipeline(renderer, colorGrade.outputNode);
+    // The grade ends with the display transform and its dither (post-processing.js)
+    renderPipeline.outputColorTransform = false;
     await stepDone("postFX");
 
     // 6. Wire UI Controls (Strictly using safe DOM APIs: textContent, classList, addEventListener)

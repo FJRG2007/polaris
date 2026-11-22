@@ -76,7 +76,9 @@
         "medium": "Medium",
         "mediumHint": "Shadows and glow",
         "high": "High",
-        "highHint": "Shadows, reflections and glow",
+        "highHint": "Soft shadows, reflections, light shafts",
+        "ultra": "Ultra",
+        "ultraHint": "Sharpest image and motion blur",
         "restart": "Changing it restarts the city where you are."
     },
     "modes": {

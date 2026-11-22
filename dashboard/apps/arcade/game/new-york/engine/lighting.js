@@ -19,6 +19,7 @@ import {
 } from 'three/tsl';
 import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
 import { SunLight } from 'three/addons/lights/SunLight.js';
+import { contactHardeningShadowFilter } from './soft-shadows.js';
 import { SunLightNode } from 'three/addons/lights/SunLightNode.js';
 import { cityUniforms } from './tsl-materials.js';
 
@@ -214,6 +215,18 @@ class LightingSystem {
     if (this.envRenderTarget) this.scene.fogNode = this.createAerialFogNode();
   }
 
+  /** The level's shadow tile size and filter (quality.js): contact-hardening soft shadows on High and Ultra. */
+  configureShadows(preset, renderer) {
+    const shadow = this.sunLight.shadow;
+    if (preset.shadowMapSize) shadow.mapSize.set(preset.shadowMapSize, preset.shadowMapSize);
+    if (!preset.softShadows) return;
+    this.uShadowDepthPerMeter = uniform(1 / (shadow.camera.far - shadow.camera.near));
+    shadow.filterNode = contactHardeningShadowFilter({
+      reversed: renderer.reversedDepthBuffer === true,
+      depthPerMeter: this.uShadowDepthPerMeter
+    });
+  }
+
   createAerialFogNode() {
     const toFrag = positionWorld.sub(cameraPosition);
     const dist = length(toFrag);
@@ -296,6 +309,10 @@ class LightingSystem {
     // stays sharp, and expand it with altitude (helicopter / observatory) so shadows reach all the way down to street level.
     const altitude = focusPos && Number.isFinite(focusPos.y) ? Math.max(0, focusPos.y) : 0;
     this.sunLight.shadow.camera.far = Math.max(220, Math.min(600, 200 + altitude * 1.5));
+    if (this.uShadowDepthPerMeter) {
+      const camera = this.sunLight.shadow.camera;
+      this.uShadowDepthPerMeter.value = 1 / Math.max(1, camera.far - camera.near);
+    }
   }
 }
 

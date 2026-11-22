@@ -76,7 +76,9 @@
         "medium": "Media",
         "mediumHint": "Sombras y brillo",
         "high": "Alta",
-        "highHint": "Sombras, reflejos y brillo",
+        "highHint": "Sombras suaves, reflejos y rayos de luz",
+        "ultra": "Ultra",
+        "ultraHint": "Imagen más nítida y desenfoque de movimiento",
         "restart": "Al cambiarla, la ciudad se reinicia donde estás."
     },
     "modes": {
