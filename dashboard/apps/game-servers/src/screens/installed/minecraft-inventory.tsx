@@ -409,7 +409,7 @@ function Slot({
                 handlers && !canDrag && "cursor-not-allowed"
             )}
         >
-            <ItemIcon id={item.id} className="size-full" />
+            <ItemIcon id={item.id} tag={item.data?.snbt} className="size-full" />
             {enchanted && (
                 <span
                     aria-hidden
@@ -491,7 +491,7 @@ function StackDetails({
     return (
         <div className={shell}>
             <span className="relative size-8 shrink-0">
-                <ItemIcon id={item.id} className="size-full" />
+                <ItemIcon id={item.id} tag={item.data?.snbt} className="size-full" />
                 {enchanted && (
                     <span
                         aria-hidden

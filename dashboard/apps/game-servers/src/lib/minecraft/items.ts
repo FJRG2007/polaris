@@ -152,6 +152,48 @@ export const modItemSchema = z.object({
 export type ModItem = z.infer<typeof modItemSchema>;
 
 /**
+ * A picture that depends on what an item carries rather than on its id.
+ *
+ * Some mods register one item and tell its kinds apart by a tag: every gun in
+ * Timeless and Classics Zero is `tacz:modern_kinetic_gun` with a `GunId` naming
+ * which one, and the picture follows the tag. So a variant is the tag key, the
+ * value it holds, and the picture for that value. `item` scopes it to one item
+ * id; null means any item carrying the key, for a key only one kind of item
+ * ever carries.
+ */
+export const modItemVariantSchema = z.object({
+    item: z.string().max(160).nullable(),
+    key: z.string().regex(/^[A-Za-z0-9_]{1,64}$/),
+    value: z.string().min(1).max(160),
+    icon: modItemIconSchema
+});
+
+export type ModItemVariant = z.infer<typeof modItemVariantSchema>;
+
+/** A variant as the server's route reports it, with the build its picture is
+ *  kept under. */
+export interface ModItemVariantView extends ModItemVariant {
+    readonly build: string;
+}
+
+/** The variants out of whatever the route answered; anything else is dropped. */
+export function readModVariants(payload: unknown): ModItemVariantView[] {
+    const rows = (payload as { variants?: unknown } | null)?.variants;
+    if (!Array.isArray(rows)) return [];
+    const variants: ModItemVariantView[] = [];
+    for (const row of rows) {
+        const parsed = modItemVariantSchema.safeParse(row);
+        if (!parsed.success) continue;
+        const build = (row as { build?: unknown }).build;
+        variants.push({
+            ...parsed.data,
+            build: typeof build === "string" && isBuildKey(build) ? build : ""
+        });
+    }
+    return variants;
+}
+
+/**
  * One item a mod adds, as the server's own route reports it.
  *
  * Read out of the mod's jar rather than off the running server, so it is the same

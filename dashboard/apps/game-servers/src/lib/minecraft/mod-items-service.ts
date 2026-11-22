@@ -32,7 +32,7 @@ import { z } from "zod";
 import JSZip from "jszip";
 import { prisma } from "@polaris/db";
 import * as modItems from "./mod-items";
-import { isBuildKey, isIconName, modItemSchema } from "./items";
+import { isBuildKey, isIconName, modItemSchema, modItemVariantSchema } from "./items";
 import { createHash } from "node:crypto";
 import { loadEnv } from "@polaris/config";
 import { dirname, join } from "node:path";
@@ -71,9 +71,14 @@ const MAX_CATALOG_ITEMS = 12000;
 /**
  * What a kept catalogue's shape is. 2 carries the labels in the panel's other
  * languages; a catalogue without it is read again when its jar is at hand, and
- * still answered from when it is not.
+ * still answered from when it is not. 3 carries the pictures chosen by a tag
+ * (a TaCZ gun's `GunId`) and the flat texture of an item drawn in code, so
+ * every jar is read once more to pick them up.
  */
-const CATALOG_VERSION = 2;
+const CATALOG_VERSION = 3;
+
+/** What one kept catalogue may hold of pictures chosen by a tag. */
+const MAX_CATALOG_VARIANTS = 4000;
 
 /** The panel's languages other than English, as the game spells them (`es_es`). */
 const LANGUAGES: readonly string[] = LOCALES.filter((locale) => locale !== "en-US").map(
@@ -155,6 +160,13 @@ export interface ServerModItems {
     /** Mods past `MAX_PROJECTS` on the list, which are not read at all. Named so
      *  the screen can say the catalogue stops short of the server's. */
     readonly skipped: readonly string[];
+    /** Pictures chosen by a tag an item carries, with the build each is kept
+     *  under. */
+    readonly variants: readonly ServerModVariant[];
+}
+
+export interface ServerModVariant extends modItems.ModItemVariant {
+    readonly build: string;
 }
 
 /**
@@ -178,9 +190,28 @@ export async function serverModItems(
         const { withServerContainer } = await import("./service");
         const local = await withServerContainer(ownerId, installedAppId, async (server) =>
             server.edition === "java"
-                ? sharedFolderRead(installedAppId, () =>
-                      readModFolder(containerFolder(server), installedAppId, until)
-                  )
+                ? sharedFolderRead(installedAppId, async () => {
+                      const mods = await readModFolder(
+                          containerFolder(server),
+                          installedAppId,
+                          until
+                      );
+                      // Gun packs are TaCZ's, and only a server running it is asked
+                      // for its pack folder: every other server pays nothing.
+                      const packs =
+                          mods !== null && runsGunPacks(mods.catalogs)
+                              ? await readGunPacks(containerPackFolder(server), until).catch(
+                                    () => null
+                                )
+                              : null;
+                      return mods === null || packs === null
+                          ? mods
+                          : {
+                                catalogs: [...mods.catalogs, ...packs.catalogs],
+                                unread: [...mods.unread, ...packs.unread],
+                                complete: mods.complete && packs.complete
+                            };
+                  })
                 : null
         ).catch(() => null);
         if (local !== null) {
@@ -218,8 +249,10 @@ class Gathered {
     readonly items: ServerModItem[] = [];
     readonly unread: string[] = [];
     readonly skipped: string[] = [];
+    readonly variants: ServerModVariant[] = [];
     complete = true;
     private readonly taken = new Set<string>();
+    private readonly takenVariants = new Set<string>();
 
     full(): boolean {
         return this.items.length >= MAX_ITEMS;
@@ -232,6 +265,13 @@ class Gathered {
             this.taken.add(item.id);
             this.items.push({ ...item, mod: catalog.title, build: catalog.build });
         }
+        for (const variant of catalog.variants) {
+            if (this.variants.length >= MAX_ITEMS) return;
+            const key = `${variant.item ?? "*"}|${variant.key}|${variant.value}`;
+            if (this.takenVariants.has(key)) continue;
+            this.takenVariants.add(key);
+            this.variants.push({ ...variant, build: catalog.build });
+        }
     }
 
     /** The answer, each label in `language` where the jar translated it. The
@@ -243,7 +283,13 @@ class Gathered {
                 ? { ...item, label: translated, english: item.label }
                 : item;
         });
-        return { items, unread: this.unread, skipped: this.skipped, complete: this.complete };
+        return {
+            items,
+            variants: this.variants,
+            unread: this.unread,
+            skipped: this.skipped,
+            complete: this.complete
+        };
     }
 }
 
@@ -365,7 +411,7 @@ export async function readModFolder(
         if (known && jar.size >= 0 && known.size === jar.size && known.modified === jar.modified) {
             const kept = await readCatalog(known.sha1);
             if (kept !== null && kept.v === CATALOG_VERSION) {
-                found[at] = { build: known.sha1, title: kept.title, items: kept.items };
+                found[at] = fromKept(known.sha1, kept);
                 next[jar.name] = known;
                 continue;
             }
@@ -425,7 +471,7 @@ async function readFolderJar(
     const sha1 = createHash("sha1").update(bytes).digest("hex");
     const kept = await readCatalog(sha1);
     if (kept !== null && kept.v === CATALOG_VERSION) {
-        return { build: sha1, title: kept.title, items: kept.items };
+        return fromKept(sha1, kept);
     }
     const read = await catalogFromBytes(sha1, bytes, jarTitle(jar.name), until);
     if (read === null) return Date.now() >= until ? "late" : null;
@@ -465,13 +511,7 @@ function isJarName(name: string): boolean {
  * bare `ls`, whose jars are then simply read every time.
  */
 function containerFolder(server: ServerContainer): ModFolder {
-    const output = async (argv: readonly string[]): Promise<{ text: string; whole: boolean; }> => {
-        if (server.readOut) {
-            return { text: (await collect(await server.readOut(argv))).toString("utf8"), whole: true };
-        }
-        const result = await server.run(argv);
-        return { text: result.output, whole: !mayBeCut(result.output) };
-    };
+    const output = containerOutput(server);
     return {
         list: async () => {
             try {
@@ -513,16 +553,245 @@ function containerFolder(server: ServerContainer): ModFolder {
     };
 }
 
+/** A command's output in the container, and whether all of it arrived. */
+function containerOutput(
+    server: ServerContainer
+): (argv: readonly string[]) => Promise<{ text: string; whole: boolean }> {
+    return async (argv) => {
+        if (server.readOut) {
+            return {
+                text: (await collect(await server.readOut(argv))).toString("utf8"),
+                whole: true
+            };
+        }
+        const result = await server.run(argv);
+        return { text: result.output, whole: !mayBeCut(result.output) };
+    };
+}
+
 /** `find -printf "%s\t%T@\t%f\n"` as jars, skipping any line that is not one. */
-export function parseFolderListing(text: string): FolderJar[] {
+export function parseFolderListing(
+    text: string,
+    accepts: (name: string) => boolean = isJarName
+): FolderJar[] {
     const jars: FolderJar[] = [];
     for (const line of text.split("\n")) {
         const [size, modified, ...rest] = line.split("\t");
         const name = rest.join("\t").replace(/\r$/, "");
-        if (!size || !/^\d+$/.test(size) || !modified || !isJarName(name)) continue;
+        if (!size || !/^\d+$/.test(size) || !modified || !accepts(name)) continue;
         jars.push({ name, size: Number(size), modified: modified.slice(0, 40) });
     }
     return jars;
+}
+
+/**
+ * Where TaCZ loads gun packs from: `<game dir>/tacz`, each pack a folder or a
+ * zip with a `gunpack.meta.json` at its root (`GunPackLoader.scanExtensions`).
+ * The server copies its built-in pack there on first boot, and a third-party
+ * pack is dropped in beside it.
+ */
+export const PACKS_DIR = "/data/tacz";
+
+/** One file of a gun pack folder, by its path under `PACKS_DIR`. */
+export interface PackFile {
+    readonly path: string;
+    readonly size: number;
+    readonly modified: string;
+}
+
+/** The pack folder, as much of it as the pictures need. */
+export interface GunPackFolder {
+    /** The zips at the top, and each folder pack's meta, index and display
+     *  files. Pictures are not listed: a display names its own. */
+    list(): Promise<{
+        zips: readonly FolderJar[];
+        files: readonly PackFile[];
+        whole: boolean;
+    } | null>;
+    readZip(name: string, limit: number): Promise<Uint8Array | null>;
+    /** One file by its path under `PACKS_DIR`, or null when it is not there. */
+    readFile(path: string, limit: number): Promise<Uint8Array | null>;
+}
+
+/** The most one file of a folder pack may weigh: a JSON or a slot picture. */
+const MAX_PACK_FILE_BYTES = 1024 * 1024;
+
+/** Whether a catalogue read off the mods folder means TaCZ is installed. */
+function runsGunPacks(catalogs: readonly BuildCatalog[]): boolean {
+    return catalogs.some(
+        (catalog) =>
+            catalog.variants.length > 0 || catalog.items.some((item) => item.id.startsWith("tacz:"))
+    );
+}
+
+/**
+ * The slot pictures of every gun pack in the server's pack folder.
+ *
+ * Kept like a jar, under a key made of what the listing says about the pack -
+ * its files' paths, sizes and times for a folder, its size and time for a zip -
+ * so a pack nobody touched costs one listing on the next open, not a read of
+ * every file in it.
+ */
+export async function readGunPacks(
+    folder: GunPackFolder,
+    until: number
+): Promise<FolderRead | null> {
+    const listed = await folder.list();
+    if (listed === null) return null;
+    const catalogs: BuildCatalog[] = [];
+    const unread: string[] = [];
+    let complete = listed.whole;
+
+    const packs = new Map<string, PackFile[]>();
+    for (const file of listed.files) {
+        const slash = file.path.indexOf("/");
+        if (slash <= 0) continue;
+        const pack = file.path.slice(0, slash);
+        packs.set(pack, [...(packs.get(pack) ?? []), file]);
+    }
+
+    const sources: { name: string; key: string; read: () => Promise<BuildCatalog | null> }[] = [];
+    for (const [pack, files] of [...packs].sort(([left], [right]) => left.localeCompare(right))) {
+        if (!files.some((file) => file.path === `${pack}/${modItems.GUN_PACK_META}`)) continue;
+        const listing = files
+            .map((file) => `${file.path}\t${file.size}\t${file.modified}`)
+            .sort()
+            .join("\n");
+        const key = createHash("sha1").update(`gun-pack-folder\n${listing}`).digest("hex");
+        const prefix = `${pack}/`;
+        sources.push({
+            name: pack,
+            key,
+            read: () =>
+                catalogFromFiles(
+                    key,
+                    {
+                        paths: files.map((file) => file.path.slice(prefix.length)),
+                        read: async (path) => {
+                            if (Date.now() >= until) throw new OutOfTime("Out of time");
+                            return folder.readFile(`${prefix}${path}`, MAX_PACK_FILE_BYTES);
+                        }
+                    },
+                    pack.slice(0, 120)
+                )
+        });
+    }
+    for (const zip of listed.zips) {
+        const key = createHash("sha1")
+            .update(`gun-pack-zip\n${zip.name}\t${zip.size}\t${zip.modified}`)
+            .digest("hex");
+        sources.push({
+            name: zip.name,
+            key,
+            read: async () => {
+                if (zip.size > MAX_JAR_BYTES) return null;
+                const bytes = await beforeDeadline(folder.readZip(zip.name, MAX_JAR_BYTES), until);
+                return bytes === null || bytes.byteLength === 0
+                    ? null
+                    : catalogFromBytes(
+                          key,
+                          bytes,
+                          zip.name.replace(/\.zip$/i, "").slice(0, 120),
+                          until
+                      );
+            }
+        });
+    }
+
+    for (const source of sources) {
+        const kept = await readCatalog(source.key);
+        if (kept !== null && kept.v === CATALOG_VERSION) {
+            catalogs.push(fromKept(source.key, kept));
+            continue;
+        }
+        if (Date.now() >= until) {
+            complete = false;
+            continue;
+        }
+        const read = await source.read().catch(() => null);
+        if (read !== null) catalogs.push(read);
+        else if (Date.now() >= until) complete = false;
+        else unread.push(source.name);
+    }
+    return { catalogs, unread, complete };
+}
+
+/** A path under the pack folder that names a file in it and nothing else. */
+function isPackPath(path: string): boolean {
+    return (
+        path.length > 0 &&
+        path.length <= 512 &&
+        !path.startsWith("/") &&
+        !/[\u0000-\u001f\u007f]/.test(path) &&
+        !path.split("/").some((part) => part === "" || part === "." || part === "..")
+    );
+}
+
+function isZipName(name: string): boolean {
+    return /\.zip$/i.test(name) && !name.includes("/") && isPackPath(name);
+}
+
+function containerPackFolder(server: ServerContainer): GunPackFolder {
+    const output = containerOutput(server);
+    const read = async (path: string, limit: number): Promise<Uint8Array | null> => {
+        if (!isPackPath(path)) return null;
+        try {
+            return await bounded(await server.readFile(`${PACKS_DIR}/${path}`), limit);
+        } catch {
+            return null;
+        }
+    };
+    return {
+        list: async () => {
+            try {
+                const zips = await output([
+                    "find",
+                    PACKS_DIR,
+                    "-maxdepth",
+                    "1",
+                    "-type",
+                    "f",
+                    "-name",
+                    "*.zip",
+                    "-printf",
+                    "%s\\t%T@\\t%f\\n"
+                ]);
+                const files = await output([
+                    "find",
+                    PACKS_DIR,
+                    "-mindepth",
+                    "2",
+                    "-type",
+                    "f",
+                    "(",
+                    "-name",
+                    modItems.GUN_PACK_META,
+                    "-o",
+                    "-path",
+                    "*/data/*/index/*",
+                    "-o",
+                    "-path",
+                    "*/assets/*/display/*",
+                    ")",
+                    "-printf",
+                    "%s\\t%T@\\t%P\\n"
+                ]);
+                return {
+                    zips: parseFolderListing(zips.text, isZipName),
+                    files: parseFolderListing(files.text, isPackPath).map((file) => ({
+                        path: file.name,
+                        size: file.size,
+                        modified: file.modified
+                    })),
+                    whole: zips.whole && files.whole
+                };
+            } catch {
+                return null;
+            }
+        },
+        readZip: (name, limit) => (isZipName(name) ? read(name, limit) : Promise.resolve(null)),
+        readFile: read
+    };
 }
 
 async function collect(stream: ReadableStream<Uint8Array>): Promise<Buffer> {
@@ -607,13 +876,24 @@ async function readSettings(
 const catalogSchema = z.object({
     v: z.number().int().optional(),
     title: z.string().max(120),
-    items: z.array(modItemSchema).max(MAX_CATALOG_ITEMS)
+    items: z.array(modItemSchema).max(MAX_CATALOG_ITEMS),
+    variants: z.array(modItemVariantSchema).max(MAX_CATALOG_VARIANTS).optional()
 });
+
+/** A catalogue as it is kept on disk. */
+type KeptCatalog = z.infer<typeof catalogSchema>;
+
+/** A kept catalogue as one build's answer. One kept before variants existed has
+ *  none, which is what it had then. */
+function fromKept(build: string, kept: KeptCatalog): BuildCatalog {
+    return { build, title: kept.title, items: kept.items, variants: kept.variants ?? [] };
+}
 
 interface BuildCatalog {
     readonly build: string;
     readonly title: string;
     readonly items: readonly modItems.ModItem[];
+    readonly variants: readonly modItems.ModItemVariant[];
 }
 
 /**
@@ -653,14 +933,14 @@ async function catalogFor(
 
     const kept = await readCatalog(build.sha1);
     if (kept !== null && kept.v === CATALOG_VERSION) {
-        return { build: build.sha1, title: kept.title, items: kept.items };
+        return fromKept(build.sha1, kept);
     }
 
     const read = await sharedRead(build.sha1, build.url, slug, until);
     // A catalogue kept before the current shape still answers when the jar
     // cannot be fetched again: English labels beat no items.
     if (read === null && kept !== null) {
-        return { build: build.sha1, title: kept.title, items: kept.items };
+        return fromKept(build.sha1, kept);
     }
     if (read === null) {
         if (Date.now() >= until) throw new OutOfTime(`Out of time reading ${build.filename}`);
@@ -691,9 +971,7 @@ async function sharedRead(
 }
 
 /** The catalogue kept for one build, or null when there is not one. */
-async function readCatalog(
-    build: string
-): Promise<{ v?: number | undefined; title: string; items: modItems.ModItem[] } | null> {
+async function readCatalog(build: string): Promise<KeptCatalog | null> {
     try {
         const raw = await readFile(join(buildFolder(build), "catalog.json"), "utf8");
         const parsed = catalogSchema.safeParse(JSON.parse(raw));
@@ -752,11 +1030,11 @@ async function catalogFromBytes(
     title: string,
     until: number
 ): Promise<BuildCatalog | null> {
-    let read: modItems.JarItems;
+    let files: modItems.JarFiles;
     try {
         const zip = await JSZip.loadAsync(bytes);
         let spent = 0;
-        read = await modItems.readJarItems({
+        files = {
             paths: Object.keys(zip.files),
             read: async (path: string) => {
                 if (Date.now() >= until) throw new Error(gameMessage("games", "lib.jarTimeout"));
@@ -767,9 +1045,26 @@ async function catalogFromBytes(
                 spent += body.byteLength;
                 return body;
             }
-        }, LANGUAGES);
+        };
     } catch {
         // Not a jar, or one this cannot open. One mod without a picture list.
+        return null;
+    }
+    return catalogFromFiles(sha1, files, title);
+}
+
+/** Read one jar or pack's files into a catalogue and keep it under `sha1`. */
+async function catalogFromFiles(
+    sha1: string,
+    files: modItems.JarFiles,
+    title: string
+): Promise<BuildCatalog | null> {
+    let read: modItems.JarItems;
+    try {
+        read = await modItems.readJarItems(files, LANGUAGES);
+    } catch {
+        // Out of time, or a file this cannot read. Nothing is kept, so the next
+        // open reads it again rather than inheriting half a catalogue.
         return null;
     }
 
@@ -780,7 +1075,8 @@ async function catalogFromBytes(
     const catalog = catalogSchema.safeParse({
         v: CATALOG_VERSION,
         title,
-        items: read.items
+        items: read.items,
+        variants: read.variants
     });
     const kept = catalog.success
         ? catalog.data
@@ -789,10 +1085,13 @@ async function catalogFromBytes(
               title,
               items: read.items
                   .filter((item) => modItemSchema.safeParse(item).success)
-                  .slice(0, MAX_CATALOG_ITEMS)
+                  .slice(0, MAX_CATALOG_ITEMS),
+              variants: read.variants
+                  .filter((variant) => modItemVariantSchema.safeParse(variant).success)
+                  .slice(0, MAX_CATALOG_VARIANTS)
           };
     await keep(sha1, kept, read.icons);
-    return { build: sha1, title: kept.title, items: kept.items };
+    return fromKept(sha1, kept);
 }
 
 /** A promise that settles no later than `until`, rejecting when it would not. The
@@ -907,7 +1206,7 @@ function concat(chunks: readonly Uint8Array[], size: number): Uint8Array {
  */
 async function keep(
     build: string,
-    catalog: { v?: number | undefined; title: string; items: readonly modItems.ModItem[] },
+    catalog: KeptCatalog,
     icons: ReadonlyMap<string, Uint8Array>
 ): Promise<void> {
     try {

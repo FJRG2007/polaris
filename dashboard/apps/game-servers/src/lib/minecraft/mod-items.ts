@@ -44,12 +44,15 @@ import {
     itemLabel,
     normalizeItemId,
     type ModItem,
-    type ModItemIcon
+    type ModItemIcon,
+    type ModItemVariant
 } from "./items";
 
 /** A jar, as much of one as this needs. */
 export interface JarFiles {
-    /** Every entry in it, folders included. */
+    /** Every entry in it, folders included. A gun pack read out of a folder lists
+     *  only its index and display files, so a picture is read by path whether it
+     *  is listed or not. */
     readonly paths: readonly string[];
     /** One entry's bytes, or null when the jar has no such entry. */
     read(path: string): Promise<Uint8Array | null>;
@@ -57,14 +60,52 @@ export interface JarFiles {
 
 /** An item and its picture, as `items` spells both out - one shape between the
  *  jar it is read from, the cache it is kept in, and the panel it is drawn on. */
-export type { ModItem, ModItemIcon };
+export type { ModItem, ModItemIcon, ModItemVariant };
 
 export interface JarItems {
     readonly items: readonly ModItem[];
+    /** Pictures chosen by a tag the item carries rather than by its id. */
+    readonly variants: readonly ModItemVariant[];
     /** The pictures the items point at, by the name they point at them with. One
      *  entry per distinct texture: Rechiseled's 3739 items share 660 pictures. */
     readonly icons: ReadonlyMap<string, Uint8Array>;
 }
+
+/**
+ * Timeless and Classics Zero's gun packs, and which item and tag each kind of
+ * entry in one is told apart by.
+ *
+ * TaCZ registers one gun item, one ammo item and one attachment item, and every
+ * gun, round and scope is one of those with an id in its tag
+ * (`GunItemDataAccessor.GUN_ID_TAG` and its siblings). A pack declares each one
+ * in `data/<ns>/index/<kind>/<path>.json` - the file's location is the id the
+ * tag holds - and that index names a display, `assets/<ns>/display/<kind>/...`,
+ * whose `slot` field is the texture the game draws in an inventory slot. Read in
+ * that order here, which is the order TaCZ's own loaders read it in
+ * (`CommonAssetsManager`, `ClientAssetsManager`, `*Display.init`).
+ *
+ * Guns are left unscoped: a gun pack may give a gun its own item type, and the
+ * GunId identifies the gun whatever item carries it. Ammo is scoped to the ammo
+ * item because the ammo box carries an `AmmoId` too, and a box is not a round.
+ */
+const GUN_PACK_KINDS: readonly {
+    readonly index: string;
+    readonly display: string;
+    readonly item: string | null;
+    readonly key: string;
+}[] = [
+    { index: "guns", display: "guns", item: null, key: "GunId" },
+    { index: "ammo", display: "ammo", item: "tacz:ammo", key: "AmmoId" },
+    { index: "attachments", display: "attachments", item: "tacz:attachment", key: "AttachmentId" }
+];
+
+/** The file that makes a folder a TaCZ gun pack (`GunPackLoader`). */
+export const GUN_PACK_META = "gunpack.meta.json";
+
+/** How many variants one pack may describe, and how many files are read at
+ *  once while they are worked out. */
+const MAX_VARIANTS = 4000;
+const PACK_READS = 8;
 
 /** What one jar may cost, so a mod nobody here has seen cannot fill a disk or
  *  hold a request open. Generous against what real mods weigh - the largest on
@@ -291,7 +332,15 @@ export async function readJarItems(
         }
     }
 
-    return { items, icons };
+    // The gun packs a mod carries inside itself, and a pack read on its own. Kept
+    // apart from the items: a gun is one registered item and a pack is the list
+    // of what that item can be.
+    const variants: ModItemVariant[] = [];
+    for (const root of gunPackRoots(jar.paths)) {
+        variants.push(...(await readGunPackVariants(jar, root, icons)));
+    }
+
+    return { items, variants, icons };
 }
 
 /** The picture for one item, kept in `icons` when it is one the jar carries. */
@@ -339,7 +388,100 @@ async function iconFor(
     // No textures at all means the model itself is vanilla and was never in this
     // jar to read - every block mine is `minecraft:block/<the ore>`.
     const model = splitLocation(modelId);
-    return model.namespace === "minecraft" ? { kind: "vanilla", texture: model.path } : null;
+    if (model.namespace === "minecraft") return { kind: "vanilla", texture: model.path };
+
+    // Or the mod draws it in code: a model with a custom `loader` names no
+    // textures because the loader builds the geometry. The item's own flat
+    // texture is the picture when the jar has one under the conventional name.
+    const flat = `${namespace}:item/${path}`;
+    const file = locationPath(flat, "textures", "png");
+    const name = iconNameFor(flat);
+    if (file === null || name === null || !paths.has(file)) return null;
+    const kept = await keep(name, file, jar, icons);
+    return kept === null ? null : { kind: "mod", name, width: kept.width, height: kept.height };
+}
+
+/** A JSON file out of a jar or pack, or null when it is missing or malformed. */
+async function readJson(jar: JarFiles, path: string): Promise<unknown> {
+    const bytes = await jar.read(path);
+    if (bytes === null) return null;
+    try {
+        return JSON.parse(new TextDecoder().decode(bytes));
+    } catch {
+        return null;
+    }
+}
+
+/** The folders a jar or pack carries TaCZ gun packs in, each with its trailing
+ *  slash: the pack's own root when it is one, and the packs a mod ships inside
+ *  itself (`assets/tacz/custom/tacz_default_gun/`). */
+export function gunPackRoots(paths: readonly string[]): string[] {
+    const roots = new Set<string>();
+    for (const path of paths) {
+        if (path !== GUN_PACK_META && !path.endsWith(`/${GUN_PACK_META}`)) continue;
+        const root = path.slice(0, -GUN_PACK_META.length);
+        if (root.split("/").length <= 5) roots.add(root);
+    }
+    return [...roots].sort();
+}
+
+/**
+ * The slot pictures of one TaCZ gun pack, by the tag value each is chosen by.
+ *
+ * Every id comes out of a file's location and every texture out of a display's
+ * `slot` field, and each is checked as a resource location before it names a
+ * file. An entry whose display or picture is missing is left out, which is the
+ * neutral tile it was already drawn as.
+ */
+export async function readGunPackVariants(
+    jar: JarFiles,
+    root: string,
+    icons: Map<string, Uint8Array>
+): Promise<ModItemVariant[]> {
+    const entries: { kind: (typeof GUN_PACK_KINDS)[number]; value: string; index: string }[] = [];
+    for (const path of jar.paths) {
+        if (!path.startsWith(`${root}data/`) || !path.endsWith(".json")) continue;
+        const parts = path.slice(root.length).split("/");
+        if (parts.length < 5 || parts[2] !== "index") continue;
+        const kind = GUN_PACK_KINDS.find((candidate) => candidate.index === parts[3]);
+        const value = `${parts[1]}:${parts.slice(4).join("/").slice(0, -".json".length)}`;
+        if (!kind || !LOCATION.test(value) || value.includes("..")) continue;
+        entries.push({ kind, value, index: path });
+        if (entries.length >= MAX_VARIANTS) break;
+    }
+
+    const found: (ModItemVariant | null)[] = Array.from({ length: entries.length }, () => null);
+    let cursor = 0;
+    const worker = async (): Promise<void> => {
+        while (cursor < entries.length) {
+            const at = cursor++;
+            const { kind, value, index } = entries[at]!;
+            const pojo = await readJson(jar, index);
+            const display = (pojo as { display?: unknown } | null)?.display;
+            const displayFile =
+                typeof display === "string"
+                    ? locationPath(display, `display/${kind.display}`, "json")
+                    : null;
+            if (displayFile === null) continue;
+            const slot = (
+                (await readJson(jar, `${root}${displayFile}`)) as { slot?: unknown } | null
+            )?.slot;
+            if (typeof slot !== "string") continue;
+            const file = locationPath(slot, "textures", "png");
+            const name = iconNameFor(slot);
+            if (file === null || name === null) continue;
+            const kept = await keep(name, `${root}${file}`, jar, icons);
+            if (kept === null) continue;
+            found[at] = {
+                item: kind.item,
+                key: kind.key,
+                value,
+                icon: { kind: "mod", name, width: kept.width, height: kept.height }
+            };
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(PACK_READS, entries.length) }, worker));
+    return found.filter((variant): variant is ModItemVariant => variant !== null);
 }
 
 /** Keep one picture, once, and report its size. Null for anything that is not a

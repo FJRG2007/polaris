@@ -214,3 +214,28 @@ function readData(fields: ReadonlyMap<string, string>): ItemData | null {
     }
     return null;
 }
+
+/**
+ * A string one item's data holds under `key`, or null.
+ *
+ * Read at the top of the tag, where a 1.20 item keeps what a mod gives it, and
+ * inside `minecraft:custom_data`, where the same thing lives once items carry
+ * components. Which picture a TaCZ gun is drawn with is its `GunId`.
+ */
+export function itemTagString(snbt: string, key: string, depth = 0): string | null {
+    const trimmed = snbt.trim();
+    if (depth > 1 || !trimmed.startsWith("{") || !trimmed.endsWith("}")) return null;
+    let nested: string | null = null;
+    for (const field of splitTopLevel(trimmed.slice(1, -1))) {
+        const colon = topLevelColon(field);
+        if (colon === -1) continue;
+        const name = unquote(field.slice(0, colon));
+        const value = field.slice(colon + 1).trim();
+        if (name === key) {
+            const text = /^["']/.test(value) ? unquote(value) : "";
+            return text.length > 0 ? text : null;
+        }
+        if (name === "minecraft:custom_data" || name === "custom_data") nested = value;
+    }
+    return nested === null ? null : itemTagString(nested, key, depth + 1);
+}

@@ -31,16 +31,26 @@ import {
     subscribeModItems
 } from "./minecraft-mod-items";
 
-export function ItemIcon({ id, className }: { id: string; className?: string }) {
-    // Keyed by id rather than a bare boolean: the same icon element is reused as
-    // a picker's results change under it, and a flag left over from the previous
-    // item would blank out the next one.
+export function ItemIcon({
+    id,
+    tag,
+    className
+}: {
+    id: string;
+    /** The item's data as SNBT, for an item whose picture follows a tag. */
+    tag?: string | null;
+    className?: string;
+}) {
+    // Keyed by the picture's address rather than a bare boolean: the same icon
+    // element is reused as a picker's results change under it, and a flag left
+    // over from the previous item - or the previous gun of the same item - would
+    // blank out the next one.
     const [failed, setFailed] = useState<string | null>(null);
     // Re-read whenever a server's modded catalogue lands, which is what turns the
     // placeholder in an already-drawn slot into the real picture.
     useSyncExternalStore(subscribeModItems, modItemsVersion, noModItems);
 
-    const picture = modItemPictureFor(id);
+    const picture = modItemPictureFor(id, tag);
     // A modded item's picture comes from that server's catalogue, which nothing
     // else may have asked for yet - a player's inventory is drawn without the
     // palette ever opening. The load is shared and cached per server, so a bag of
@@ -52,7 +62,7 @@ export function ItemIcon({ id, className }: { id: string; className?: string }) 
     }, [server, modded]);
     const url = picture?.url ?? itemIconUrl(id);
 
-    if (url === null || failed === id) {
+    if (url === null || failed === url) {
         return <Package className={cn("text-muted-foreground/70", className)} aria-hidden />;
     }
 
@@ -69,7 +79,7 @@ export function ItemIcon({ id, className }: { id: string; className?: string }) 
                 loading="lazy"
                 decoding="async"
                 draggable={false}
-                onError={() => setFailed(id)}
+                onError={() => setFailed(url)}
                 className={cn("[image-rendering:pixelated] select-none object-contain", className)}
             />
         );
@@ -83,7 +93,7 @@ export function ItemIcon({ id, className }: { id: string; className?: string }) 
                 decoding="async"
                 draggable={false}
                 style={fit}
-                onError={() => setFailed(id)}
+                onError={() => setFailed(url)}
                 className="absolute start-0 top-0 max-w-none select-none [image-rendering:pixelated]"
             />
         </span>

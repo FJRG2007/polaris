@@ -31,9 +31,11 @@ import {
     modItemPicture,
     readItemCatalog,
     readModItems,
+    readModVariants,
     type CatalogItem,
     type ItemPicture
 } from "../../lib/minecraft/items";
+import { itemTagString } from "../../lib/minecraft/inventory";
 import { fresh } from "../../lib/fresh";
 
 /** Which server the panel is for, so the palette can add what that server's mods
@@ -89,6 +91,10 @@ const TTL_MS = 5 * 60_000;
 
 const loads = new Map<string, { at: number; load: Promise<ModItemsLoad> }>();
 const pictures = new Map<string, ItemPicture>();
+/** Pictures chosen by a tag, by `<item or *>|<key>|<value>`, and the tag keys
+ *  worth reading for each item id (`*` for any item). */
+const variantPictures = new Map<string, ItemPicture>();
+const variantKeys = new Map<string, Set<string>>();
 const listeners = new Set<() => void>();
 
 /** Bumped whenever pictures arrive, which is what the icons watch. */
@@ -139,7 +145,19 @@ async function fetchModItems(installedAppId: string, t: ModItemsText): Promise<M
         const picture = modItemPicture(item, installedAppId, names);
         if (picture !== null) pictures.set(item.id, picture);
     }
-    if (items.length > 0) {
+    const variants = readModVariants(payload);
+    for (const variant of variants) {
+        const scope = variant.item ?? "*";
+        const picture = modItemPicture(
+            { id: variant.value, label: "", mod: "", build: variant.build, icon: variant.icon },
+            installedAppId,
+            names
+        );
+        if (picture === null) continue;
+        variantPictures.set(`${scope}|${variant.key}|${variant.value}`, picture);
+        variantKeys.set(scope, (variantKeys.get(scope) ?? new Set()).add(variant.key));
+    }
+    if (items.length > 0 || variants.length > 0) {
         filled += 1;
         for (const listener of listeners) listener();
     }
@@ -192,10 +210,28 @@ function namesIn(t: ModItemsText, list: unknown): string | null {
 export function forgetModItems(): void {
     loads.clear();
     pictures.clear();
+    variantPictures.clear();
+    variantKeys.clear();
 }
 
-/** The picture for a modded item, once its server's catalogue has been read. */
-export function modItemPictureFor(id: string): ItemPicture | null {
+/**
+ * The picture for a modded item, once its server's catalogue has been read.
+ *
+ * `tag` is the item's data as SNBT, when the caller has it: an item whose kinds
+ * are told apart by a tag (a TaCZ gun's `GunId`) is drawn as the kind it is, and
+ * falls back to the item's own picture when the tag names nothing known.
+ */
+export function modItemPictureFor(id: string, tag?: string | null): ItemPicture | null {
+    if (tag) {
+        for (const scope of [id, "*"]) {
+            for (const key of variantKeys.get(scope) ?? []) {
+                const value = itemTagString(tag, key);
+                const picture =
+                    value === null ? undefined : variantPictures.get(`${scope}|${key}|${value}`);
+                if (picture) return picture;
+            }
+        }
+    }
     return pictures.get(id) ?? null;
 }
 
