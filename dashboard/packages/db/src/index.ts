@@ -191,18 +191,42 @@ function namedUser(model: string, args: unknown): string[] {
     return found ? [found] : [];
 }
 
-function touchesUserAccess(args: unknown): boolean {
+/**
+ * The columns of an install that say nothing about who reaches it: its own
+ * settings and state, and its secret. Game servers, the DNS blocker and app
+ * bundles keep running state in `config` (a health probe, a log cursor, an
+ * activity sample) and write it every few seconds; announcing each of those as
+ * an access change made every open tab of every account redraw its page on
+ * every tick.
+ */
+const INSTALL_INERT_FIELDS = new Set(["config", "encryptedSecret", "secretNonce", "secretKeyId", "updatedAt"]);
+/** The writes that only change an existing row; a create or a delete adds or
+ *  removes an app whatever it carries. */
+const ROW_UPDATES = new Set(["update", "updateMany", "updateManyAndReturn"]);
+
+function writtenData(args: unknown): Record<string, unknown>[] {
     const shaped = (args ?? {}) as { data?: unknown; update?: unknown };
-    const data = [shaped.data, shaped.update].filter(
+    return [shaped.data, shaped.update].filter(
         (value): value is Record<string, unknown> => !!value && typeof value === "object" && !Array.isArray(value)
     );
-    return data.some((one) => USER_ACCESS_FIELDS.some((field) => field in one));
+}
+
+function touchesUserAccess(args: unknown): boolean {
+    return writtenData(args).some((one) => USER_ACCESS_FIELDS.some((field) => field in one));
+}
+
+/** Whether an update to an install only touches columns access is not worked out from. */
+function onlyInertInstallFields(operation: string, args: unknown): boolean {
+    if (!ROW_UPDATES.has(operation)) return false;
+    const data = writtenData(args);
+    return data.length > 0 && data.every((one) => Object.keys(one).every((field) => INSTALL_INERT_FIELDS.has(field)));
 }
 
 /** What a query means for access: null when it cannot change what anybody reaches. */
 export function accessWriteOf(model: string, operation: string, args: unknown): AccessWrite | null {
     if (!WRITES.has(operation)) return null;
     if (!ACCESS_MODELS.has(model) && !(model === "User" && touchesUserAccess(args))) return null;
+    if (model === "InstalledApp" && onlyInertInstallFields(operation, args)) return null;
     return { model, userIds: namedUser(model, args) };
 }
 

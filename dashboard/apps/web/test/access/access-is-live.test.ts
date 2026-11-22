@@ -157,4 +157,31 @@ describe("a write to what access is worked out from", () => {
             userIds: ["u"]
         });
     });
+
+    // An install's `config` holds running state that game servers, the DNS
+    // blocker and app bundles write every few seconds. Announcing each write
+    // redrew every open tab of every account on every tick (the live access log
+    // showed /home and /admin/updates re-rendered in pairs every few seconds).
+    it("stays quiet for an install's own settings, state and secret", async () => {
+        const { accessWriteOf } = await import("@polaris/db");
+        const where = { id: "i" };
+        expect(accessWriteOf("InstalledApp", "update", { where, data: { config: "{}" } })).toBeNull();
+        expect(accessWriteOf("InstalledApp", "updateMany", { where: { ...where, config: "{}" }, data: { config: "{}" } })).toBeNull();
+        expect(
+            accessWriteOf("InstalledApp", "updateMany", {
+                where,
+                data: { encryptedSecret: null, secretNonce: null, secretKeyId: null }
+            })
+        ).toBeNull();
+    });
+
+    it("still raises one when an install appears, goes, or changes state", async () => {
+        const { accessWriteOf } = await import("@polaris/db");
+        const raised = { model: "InstalledApp", userIds: [] };
+        expect(accessWriteOf("InstalledApp", "update", { where: { id: "i" }, data: { status: "removed" } })).toEqual(raised);
+        expect(accessWriteOf("InstalledApp", "update", { where: { id: "i" }, data: { config: "{}", status: "running" } })).toEqual(raised);
+        expect(accessWriteOf("InstalledApp", "create", { data: { config: "{}" } })).toEqual(raised);
+        expect(accessWriteOf("InstalledApp", "deleteMany", { where: { id: "i" } })).toEqual(raised);
+        expect(accessWriteOf("InstalledApp", "upsert", { where: { id: "i" }, create: {}, update: { config: "{}" } })).toEqual(raised);
+    });
 });
