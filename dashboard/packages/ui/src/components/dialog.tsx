@@ -157,7 +157,7 @@ export const SheetContent = forwardRef<
         <RadixDialog.Content
             ref={ref}
             className={cn(
-                "fixed bottom-0 end-0 top-[var(--window-controls-height)] z-50 flex h-[calc(100dvh-var(--window-controls-height))] w-full max-w-full flex-col overflow-hidden pb-[var(--safe-bottom)] pe-[var(--safe-end)] ps-[var(--safe-start)] pt-[var(--safe-top)] sm:p-0 border-s border-border-strong bg-elevated shadow-modal outline-none transition-[width,max-width] duration sm:bottom-[calc(0.5rem+var(--safe-bottom))] sm:end-[calc(0.5rem+var(--safe-end))] sm:top-[calc(0.5rem+var(--window-controls-height)+var(--safe-top))] sm:h-[calc(100dvh-1rem-var(--window-controls-height)-var(--safe-top)-var(--safe-bottom))] sm:max-w-[calc(100vw-1rem)] sm:rounded-xl sm:border",
+                "fixed bottom-0 end-0 top-[var(--window-controls-height)] z-50 flex h-[calc(100dvh-var(--window-controls-height))] w-full max-w-full flex-col overflow-hidden pb-[var(--safe-bottom)] pe-[var(--safe-end)] ps-[var(--safe-start)] pt-[var(--safe-top)] sm:p-0 border-s border-border-strong bg-background shadow-modal outline-none transition-[width,max-width] duration sm:bottom-[calc(0.5rem+var(--safe-bottom))] sm:end-[calc(0.5rem+var(--safe-end))] sm:top-[calc(0.5rem+var(--window-controls-height)+var(--safe-top))] sm:h-[calc(100dvh-1rem-var(--window-controls-height)-var(--safe-top)-var(--safe-bottom))] sm:max-w-[calc(100vw-1rem)] sm:rounded-xl sm:border",
                 "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:slide-in-from-right-8 data-[state=closed]:slide-out-to-right-8 data-[state=closed]:duration-fast",
                 className
             )}
