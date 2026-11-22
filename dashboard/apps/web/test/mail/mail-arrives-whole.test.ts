@@ -30,7 +30,7 @@ const sync = readFile(`${SRC}lib/mailbox/sync.ts`, "utf8");
 describe("a pass over a folder", () => {
     it("brings the bodies down with it", async () => {
         const source = await sync;
-        expect(source).toContain("await warmBodies(client, account, folder, edge);");
+        expect(source).toContain("await warmBodies(client, account, folder, edge)");
     });
 
     it("does it on the connection the sync already has open", async () => {

@@ -164,6 +164,12 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
     // folder's fetch that the server sat on.
     const started = Date.now();
     let step = "connecting";
+    // Whether this pass changed anything a screen draws. Most passes change
+    // nothing - a mailbox watched every twenty seconds is mostly a mailbox where
+    // nothing arrived - and a frame announcing that sent every open tab of the
+    // person back to recount its unread mail and ask what arrived, several
+    // times a minute per tab, for an answer identical to the last one.
+    let moved = false;
     try {
         // Read before the pass rather than during it, so every folder decides
         // against the same line. Mail arriving in the meantime is newer than the
@@ -173,7 +179,7 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
         const edge = await bodyWindowEdge(account.id);
         await withImap(account, async (client) => {
             step = "listing folders";
-            await syncFolders(client, account.id);
+            if (await syncFolders(client, account.id)) moved = true;
             const folders = await prisma.mailFolder.findMany({
                 where: { accountId: account.id }
             });
@@ -181,17 +187,20 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
             for (const folder of folders) {
                 if (!worthSyncing(folder)) continue;
                 step = `folder ${folder.role}`;
-                await syncFolder(client, account, folder, edge);
+                if (await syncFolder(client, account, folder, edge)) moved = true;
             }
         });
         // After the connection is closed, because this is database work and
         // holding somebody else's IMAP session open through it buys nothing.
         if (edge) await pruneBodies(account.id, edge);
         await recordAccountState(accountId, "ok");
+        // Back from refused or unreachable is news to the rail; ok again is not.
+        if (account.state !== "ok") moved = true;
     } catch (caught) {
         const auth = caught instanceof MailAuthError;
         // A refusal is said to the owner once and spaces the next try out; see
         // `refused.ts`. Anything else is a retry on the ordinary interval.
+        if (auth || failureIsNews(account)) moved = true;
         if (auth) await recordCredentialRefusal(accountId, caught.message);
         // Unreachable while refused says nothing about the credential, so it
         // stays refused: flipping to unreachable and back would announce the
@@ -221,7 +230,7 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
             );
         }
     }
-    publishMail({ accountId, kind: "folders", actorId: account.userId });
+    if (moved) publishMail({ accountId, kind: "folders", actorId: account.userId });
 }
 
 /**
@@ -350,9 +359,12 @@ async function oneFolderPass(accountId: string, folderId: string): Promise<void>
  * finds its way back by the message's own header id when the message reappears
  * somewhere else.
  */
-async function syncFolders(client: ImapFlow, accountId: string): Promise<void> {
+/** Brings the folder list and its counts up to date, and says whether any of
+ *  it moved - what decides whether the pass is worth a frame to the open tabs. */
+async function syncFolders(client: ImapFlow, accountId: string): Promise<boolean> {
     const listed = await client.list({ statusQuery: { messages: true, unseen: true } });
     const seen = new Set<string>();
+    let moved = false;
 
     for (const entry of listed) {
         // A folder that cannot hold messages is a heading in somebody's tree,
@@ -366,7 +378,17 @@ async function syncFolders(client: ImapFlow, accountId: string): Promise<void> {
         );
         const existing = await prisma.mailFolder.findUnique({
             where: { accountId_path: { accountId, path: entry.path } },
-            select: { id: true, subscribed: true, roleLocked: true }
+            select: {
+                id: true,
+                subscribed: true,
+                roleLocked: true,
+                delimiter: true,
+                name: true,
+                role: true,
+                roleFlagged: true,
+                total: true,
+                unread: true
+            }
         });
         const data = {
             delimiter: entry.delimiter || "/",
@@ -379,8 +401,10 @@ async function syncFolders(client: ImapFlow, accountId: string): Promise<void> {
             unread: entry.status?.unseen ?? 0
         };
         if (existing) {
+            if (folderMoved(existing, data)) moved = true;
             await prisma.mailFolder.update({ where: { id: existing.id }, data });
         } else {
+            moved = true;
             await prisma.mailFolder.create({
                 data: {
                     accountId,
@@ -396,15 +420,48 @@ async function syncFolders(client: ImapFlow, accountId: string): Promise<void> {
         }
     }
 
-    await settleDuplicateRoles(accountId);
+    if (await settleDuplicateRoles(accountId)) moved = true;
 
     const gone = await prisma.mailFolder.findMany({
         where: { accountId, path: { notIn: [...seen] } },
         select: { id: true }
     });
     if (gone.length > 0) {
+        moved = true;
         await prisma.mailFolder.deleteMany({ where: { id: { in: gone.map((row) => row.id) } } });
     }
+    return moved;
+}
+
+/** Whether what the server just listed for a folder differs from what is held
+ *  for it. Only the fields a pass writes are compared; a role its owner locked
+ *  is not written, so it is not compared either. */
+export function folderMoved(
+    held: {
+        readonly delimiter: string;
+        readonly name: string;
+        readonly role: string;
+        readonly roleFlagged: boolean;
+        readonly total: number;
+        readonly unread: number;
+    },
+    listed: {
+        readonly delimiter: string;
+        readonly name: string;
+        readonly role?: string;
+        readonly roleFlagged?: boolean;
+        readonly total: number;
+        readonly unread: number;
+    }
+): boolean {
+    return (
+        held.delimiter !== listed.delimiter ||
+        held.name !== listed.name ||
+        held.total !== listed.total ||
+        held.unread !== listed.unread ||
+        (listed.role !== undefined && held.role !== listed.role) ||
+        (listed.roleFlagged !== undefined && held.roleFlagged !== listed.roleFlagged)
+    );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -621,11 +678,11 @@ async function syncFolder(
     folder: FolderRow,
     /** Where the body window ends for this mailbox, forwarded to `warmBodies`. */
     edge: Date | null
-): Promise<void> {
+): Promise<boolean> {
     const lock = await client.getMailboxLock(folder.path, { readOnly: true });
     try {
         const mailbox = client.mailbox;
-        if (!mailbox || typeof mailbox === "boolean") return;
+        if (!mailbox || typeof mailbox === "boolean") return false;
 
         // The one thing that silently corrupts a mail cache. A server may reissue
         // uids from one after a restore, and every uid held here would then point
@@ -655,12 +712,21 @@ async function syncFolder(
         );
 
         // What has arrived, and a few of whatever is still only a headline.
-        await warmBodies(client, account, folder, edge);
+        let moved = validityMoved || arrived.length > 0;
+        if ((await warmBodies(client, account, folder, edge)) > 0) moved = true;
 
         if (!validityMoved) {
-            await reconcileFlags(client, folder, mailbox.highestModseq ?? null);
-            await reconcileDeletions(client, folder);
-            await refillWindow(client, account, folder, mailbox.exists, extraHeaders, cursor);
+            const flagged = await reconcileFlags(client, folder, mailbox.highestModseq ?? null);
+            const dropped = await reconcileDeletions(client, folder);
+            const refilled = await refillWindow(
+                client,
+                account,
+                folder,
+                mailbox.exists,
+                extraHeaders,
+                cursor
+            );
+            if (flagged + dropped + refilled > 0) moved = true;
         }
 
         await prisma.mailFolder.update({
@@ -673,6 +739,7 @@ async function syncFolder(
                 lastSyncAt: new Date()
             }
         });
+        return moved;
     } finally {
         lock.release();
     }
@@ -1269,8 +1336,8 @@ async function warmBodies(
     /** The oldest message worth holding whole, or null while the whole mailbox
      *  fits inside the window. */
     edge: Date | null
-): Promise<void> {
-    if (!BODY_ROLES.has(folder.role)) return;
+): Promise<number> {
+    if (!BODY_ROLES.has(folder.role)) return 0;
     const waiting = await prisma.mailMessage.findMany({
         where: {
             folderId: folder.id,
@@ -1295,7 +1362,7 @@ async function warmBodies(
             headers: true
         }
     });
-    if (waiting.length === 0) return;
+    if (waiting.length === 0) return 0;
 
     const uids = waiting.map((message) => Number(message.uid));
     const owners: BodyOwner[] = [];
@@ -1310,9 +1377,10 @@ async function warmBodies(
     } catch {
         // A server that will not describe these messages will be asked again on
         // the next pass, and they open the old way in the meantime.
-        return;
+        return 0;
     }
-    if (owners.length === 0) return;
+    if (owners.length === 0) return 0;
+    let warmed = 0;
 
     const text = new Map<number, string>();
     const html = new Map<number, string>();
@@ -1336,6 +1404,7 @@ async function warmBodies(
             where: { id: message.id },
             data: { bodyText: body.text, bodyHtml: body.html }
         });
+        warmed += 1;
         // The one moment a message's footer can be read - the same registration
         // opening one used to do, now that opening one usually finds the body
         // already here. Plenty of mail that is unmistakably a mailing list
@@ -1351,6 +1420,7 @@ async function warmBodies(
             counts: false
         }).catch(() => undefined);
     }
+    return warmed;
 }
 
 /**
@@ -1604,7 +1674,7 @@ export async function reconcileFlags(
     client: ImapFlow,
     folder: FolderRow,
     highestModseq: bigint | null
-): Promise<void> {
+): Promise<number> {
     const held = await prisma.mailMessage.findMany({
         where: { folderId: folder.id },
         select: {
@@ -1618,7 +1688,7 @@ export async function reconcileFlags(
         orderBy: { uid: "desc" },
         take: WINDOW
     });
-    if (held.length === 0) return;
+    if (held.length === 0) return 0;
 
     const changed = new Map<number, Set<string>>();
     const uids = held.map((row) => Number(row.uid));
@@ -1638,13 +1708,14 @@ export async function reconcileFlags(
             changed.set(message.uid, message.flags ?? new Set<string>());
         }
     } catch {
-        return;
+        return 0;
     }
 
     // Seen on any message here, the keyword is the folder saying it keeps them.
     const keywords = folder.keywords || [...changed.values()].some((flags) => flags.has(IMPORTANT));
     if (keywords && !folder.keywords) await learnKeywords(folder.id);
 
+    let updated = 0;
     for (const row of held) {
         const flags = changed.get(Number(row.uid));
         if (!flags) continue;
@@ -1668,7 +1739,9 @@ export async function reconcileFlags(
             where: { id: row.id },
             data: { seen, flagged, answered, important }
         });
+        updated += 1;
     }
+    return updated;
 }
 
 /** Remember that a folder keeps keywords, so the next pass believes its silence. */
@@ -1696,8 +1769,8 @@ async function refillWindow(
     /** Where the arrivals pass reads from next: nothing at or past it is put
      *  back here, because it has not arrived yet. */
     cursor: number
-): Promise<void> {
-    if (exists === 0) return;
+): Promise<number> {
+    if (exists === 0) return 0;
     const from = Math.max(1, exists - WINDOW + 1);
     const listed: number[] = [];
     try {
@@ -1705,9 +1778,9 @@ async function refillWindow(
             listed.push(message.uid);
         }
     } catch {
-        return;
+        return 0;
     }
-    if (listed.length === 0) return;
+    if (listed.length === 0) return 0;
     const lowest = listed.reduce((low, uid) => (uid < low ? uid : low), listed[0] ?? 0);
     const held = await prisma.mailMessage.findMany({
         where: { folderId: folder.id, uid: { gte: BigInt(lowest) } },
@@ -1723,9 +1796,10 @@ async function refillWindow(
         ...removedFrom(folder.id)
     ]);
     const missing = missingFromWindow(listed, known, WINDOW, cursor);
-    if (missing.length === 0) return;
+    if (missing.length === 0) return 0;
     const fetched = await collect(client, missing.join(","), { uid: true }, extraHeaders);
-    if (fetched.length > 0) await storeMessages(client, account, folder, fetched, false);
+    if (fetched.length === 0) return 0;
+    return storeMessages(client, account, folder, fetched, false);
 }
 
 /**
@@ -1793,7 +1867,7 @@ export async function accountsToSync(): Promise<string[]> {
  * ordinary folder it is - it exists on the server, and hiding it would be
  * pretending otherwise - and a role somebody chose themselves is never touched.
  */
-async function settleDuplicateRoles(accountId: string): Promise<void> {
+async function settleDuplicateRoles(accountId: string): Promise<boolean> {
     const rows = await prisma.mailFolder.findMany({
         where: { accountId, role: { not: "none" }, roleLocked: false },
         select: { id: true, role: true, roleFlagged: true }
@@ -1802,6 +1876,7 @@ async function settleDuplicateRoles(accountId: string): Promise<void> {
     const losing = rows
         .filter((row) => !row.roleFlagged && flagged.has(row.role))
         .map((row) => row.id);
-    if (losing.length === 0) return;
+    if (losing.length === 0) return false;
     await prisma.mailFolder.updateMany({ where: { id: { in: losing } }, data: { role: "none" } });
+    return true;
 }

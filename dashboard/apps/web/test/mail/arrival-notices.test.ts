@@ -32,6 +32,10 @@ vi.mock("@/lib/desktop-notify", () => ({
     }
 }));
 vi.mock("@/lib/notifications/browser-notices", () => ({ noticeAllowed: () => true }));
+let desktopSounds = false;
+vi.mock("@/lib/notifications/sounding-client", () => ({
+    anotherClientSounds: () => desktopSounds
+}));
 
 const { noticeMailFrame, SHARED_CURSOR_KEY, ARRIVALS_RETRY_MS } =
     await import("@/components/mail-unread");
@@ -67,6 +71,7 @@ function memoryStorage(): Storage {
 
 beforeEach(() => {
     watched = false;
+    desktopSounds = false;
     notices.length = 0;
     asked.length = 0;
     Object.defineProperty(window, "localStorage", { value: memoryStorage(), configurable: true });
@@ -153,6 +158,18 @@ describe("the cursor", () => {
         const cursor = { current: "2026-11-06T09:00:00.000Z" };
         await noticeMailFrame(cursor, false, t);
         expect(window.localStorage.getItem(SHARED_CURSOR_KEY)).toBe("2026-11-06T11:00:00.000Z");
+    });
+});
+
+describe("while the desktop app draws the notices", () => {
+    it("only the tab holding the connection keeps the cursor level", async () => {
+        desktopSounds = true;
+        await noticeMailFrame({ current: "2026-11-06T09:00:00.000Z" }, false, t);
+        expect(asked).toEqual([]);
+        await noticeMailFrame({ current: "2026-11-06T09:00:00.000Z" }, true, t);
+        expect(asked).toEqual(["/api/mail/arrivals"]);
+        expect(window.localStorage.getItem(SHARED_CURSOR_KEY)).toBe("2026-11-06T10:00:00.000Z");
+        expect(notices).toEqual([]);
     });
 });
 

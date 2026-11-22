@@ -58,10 +58,10 @@ describe("the newest window", () => {
 
     it("is refilled on every pass, and as old mail rather than arrivals", async () => {
         const source = await sync;
-        expect(source).toContain(
-            "await refillWindow(client, account, folder, mailbox.exists, extraHeaders, cursor);"
+        expect(source).toMatch(
+            /await refillWindow\(\s*client,\s*account,\s*folder,\s*mailbox\.exists,\s*extraHeaders,\s*cursor\s*\)/
         );
-        expect(source).toContain("await storeMessages(client, account, folder, fetched, false);");
+        expect(source).toContain("return storeMessages(client, account, folder, fetched, false);");
         expect(source).toContain("if (isNew && arrivals) {");
     });
 

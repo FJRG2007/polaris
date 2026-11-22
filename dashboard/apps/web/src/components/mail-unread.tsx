@@ -237,8 +237,13 @@ export async function noticeMailFrame(
     t: NamespaceTranslator<"components">
 ): Promise<void> {
     // The desktop app, when it is the one the server elected, draws mail notices
-    // instead of the browser - never both - and this tab keeps its cursor level.
-    if (tabIsWatched() || anotherClientSounds()) return catchUp(cursor);
+    // instead of the browser - never both - and the tab holding the connection
+    // keeps the device's cursor level. Only that one: every tab is handed the
+    // same frame, and each asking the server for the same cursor was one
+    // request per open tab per frame for a value the shared cursor already
+    // carries to the others.
+    if (tabIsWatched()) return catchUp(cursor);
+    if (anotherClientSounds()) return owner ? catchUp(cursor) : undefined;
     if (owner) return announceArrivals(cursor, t);
 }
 
