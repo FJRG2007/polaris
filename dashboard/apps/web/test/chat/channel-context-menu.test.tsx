@@ -109,6 +109,11 @@ function buildChat(): Record<string, unknown> {
         activeSpaceId: "space-1",
         setActiveSpaceId: () => undefined,
         refresh: () => undefined,
+        // The optimistic write: nothing to draw here, only the call to make.
+        change: async (_patches: unknown, call: () => Promise<unknown>) => {
+            await call();
+            return null;
+        },
         loaded: true,
         blocked: new Set<string>(),
         friends: new Set<string>()

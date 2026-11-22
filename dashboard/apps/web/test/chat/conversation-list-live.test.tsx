@@ -10,7 +10,7 @@
  * was already out, and is taken back with a toast when the server refuses it.
  */
 
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Row = { id: string; pinned: boolean; muted: boolean; lastMessageAt: string; last: null };
@@ -138,6 +138,55 @@ describe("after the tab was away", () => {
             await wait(10);
         });
         expect(full).toBe(2);
+    });
+});
+
+describe("a change from the row's menu", () => {
+    it("pins at once, without waiting for the server or flickering back", async () => {
+        await mount();
+        let store: (value: { error?: string }) => void = () => undefined;
+        let done: Promise<string | null> = Promise.resolve(null);
+        await act(async () => {
+            done = chat!.change(
+                { grace: { pinned: true } },
+                () => new Promise((resolve) => (store = resolve))
+            );
+            await wait(0);
+        });
+        // Drawn before the server has answered.
+        expect(order()).toEqual(["grace", "ada"]);
+        answers = [[row("ada", NOW), row("grace", EVENING, { pinned: true })]];
+        await act(async () => {
+            store({});
+            await done;
+            await wait(10);
+        });
+        expect(order()).toEqual(["grace", "ada"]);
+        expect(screen.queryByRole("status")).toBeNull();
+    });
+
+    it("takes the pin back and says why when the server refuses it", async () => {
+        await mount();
+        let refused: string | null = null;
+        await act(async () => {
+            refused = await chat!.change({ grace: { pinned: true } }, async () => ({
+                error: "Not allowed"
+            }));
+        });
+        expect(refused).toBe("Not allowed");
+        expect(order()).toEqual(["ada", "grace"]);
+        expect(screen.getByText("Not allowed")).toBeTruthy();
+    });
+
+    it("mutes at once and puts it back when the call fails outright", async () => {
+        await mount();
+        await act(async () => {
+            await chat!.change({ ada: { muted: true } }, async () => {
+                throw new Error("offline");
+            });
+        });
+        expect(chat?.channels.find((entry) => entry.id === "ada")?.muted).toBe(false);
+        expect(screen.getByText(/could not be completed/)).toBeTruthy();
     });
 });
 

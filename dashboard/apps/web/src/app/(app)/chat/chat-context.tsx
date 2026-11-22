@@ -34,7 +34,8 @@ import {
     type ReactNode
 } from "react";
 import { useRouter } from "next/navigation";
-import { pollWhileVisible } from "@polaris/ui";
+import { pollWhileVisible, useToast } from "@polaris/ui";
+import { runAction } from "@/lib/run-action";
 import { ConversationList } from "@/lib/chat/conversation-list";
 import * as polls from "./chat-reads";
 
@@ -114,9 +115,22 @@ interface ChatContextValue {
      * the reader's own sends wait behind.
      */
     readonly refreshChannels: () => void;
-    /** One conversation redrawn ahead of the server's answer - the optimistic
-     *  half of a write; the caller puts it back on a refusal. */
-    readonly patchChannel: (channelId: string, patch: Partial<ChatChannelView>) => void;
+    /**
+     * A change to this reader's conversations, drawn at once.
+     *
+     * Every action on a row - pin, mute, mark read, lock, hide - goes through
+     * this: the patches show before the server is asked, stay drawn until an
+     * answer asked for after the write lands (so the old value never flickers
+     * back in between), and come off again on a refusal, which is toasted.
+     * Resolves to the refusal, or null when the server took it.
+     */
+    readonly change: (
+        patches: Readonly<Record<string, Partial<ChatChannelView>>>,
+        call: () => Promise<{ error?: string } | void>,
+        /** False when the caller shows the refusal itself - a dialog that
+         *  asked for a code says it was wrong in place. */
+        options?: { readonly toast?: boolean }
+    ) => Promise<string | null>;
     /** What the instance allows in a conversation of a given shape. The
      *  defaults until the answer arrives, so the composer is never briefly
      *  stricter than the server. */
@@ -235,6 +249,7 @@ export function ChatProvider({
         },
         [redraw]
     );
+    const toast = useToast();
     const [loaded, setLoaded] = useState(false);
     const [kept, setKept] = useState(false);
     const [loadFailed, setLoadFailed] = useState(false);
@@ -358,13 +373,31 @@ export function ChatProvider({
         }, CHANNELS_SETTLE_MS);
     }, [keepLists, receiveChannels]);
 
-    // Drawn over the rows until the next answer replaces them.
-    const patchChannel = useCallback(
-        (channelId: string, patch: Partial<ChatChannelView>) =>
-            setChannels((current) =>
-                current.map((entry) => (entry.id === channelId ? { ...entry, ...patch } : entry))
-            ),
-        []
+    const change = useCallback(
+        async (
+            patches: Readonly<Record<string, Partial<ChatChannelView>>>,
+            call: () => Promise<{ error?: string } | void>,
+            options?: { readonly toast?: boolean }
+        ): Promise<string | null> => {
+            const conversations = list.current!;
+            const write = conversations.begin(new Map(Object.entries(patches)));
+            redraw();
+            let failure = "";
+            const result = await runAction(call, (message) => {
+                failure = message;
+            });
+            const refused = result === null ? failure : (result?.error ?? "");
+            if (refused) {
+                conversations.undo(write);
+                redraw();
+                if (options?.toast !== false) toast.show({ title: refused });
+                return refused;
+            }
+            conversations.settle(write);
+            refresh();
+            return null;
+        },
+        [redraw, refresh, toast]
     );
 
     useEffect(
@@ -546,7 +579,7 @@ export function ChatProvider({
             loadFailed,
             refresh,
             refreshChannels,
-            patchChannel,
+            change,
             rulesFor,
             directThreads,
             callsOff,
@@ -569,7 +602,7 @@ export function ChatProvider({
             loadFailed,
             refresh,
             refreshChannels,
-            patchChannel,
+            change,
             rulesFor,
             directThreads,
             callsOff,

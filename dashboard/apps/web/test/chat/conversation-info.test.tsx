@@ -55,6 +55,7 @@ const GROUP = {
 };
 
 const patches: { id: string; patch: Record<string, unknown> }[] = [];
+const undone: string[] = [];
 const shown: { title: string; body?: string }[] = [];
 let muteCalls: unknown[][] = [];
 let muteAnswer: { error?: string } = {};
@@ -107,7 +108,18 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
         channels: [DIRECT],
         spaces: [],
         refresh: () => undefined,
-        patchChannel: (id: string, patch: Record<string, unknown>) => patches.push({ id, patch })
+        // The list's optimistic write: what was drawn, the call, and what was
+        // taken back on a refusal (the list itself is covered on its own).
+        change: async (
+            drawn: Record<string, Record<string, unknown>>,
+            call: () => Promise<{ error?: string }>
+        ) => {
+            for (const [id, patch] of Object.entries(drawn)) patches.push({ id, patch });
+            const result = await call();
+            if (!result?.error) return null;
+            undone.push(...Object.keys(drawn));
+            return result.error;
+        }
     })
 }));
 
@@ -130,6 +142,7 @@ function info(channel: typeof DIRECT, entries: Record<string, unknown> = {}) {
 
 beforeEach(() => {
     patches.length = 0;
+    undone.length = 0;
     shown.length = 0;
     muteCalls = [];
     muteAnswer = {};
@@ -172,8 +185,8 @@ describe("the mute", () => {
         await userEvent.click(screen.getByRole("button", { name: /Mute notifications/ }));
         await userEvent.click(screen.getByRole("radio", { name: "Until I turn it back on" }));
 
-        await waitFor(() => expect(patches).toHaveLength(2));
-        expect(patches[1]?.patch).toEqual({ muted: false, mutedUntil: null });
+        await waitFor(() => expect(undone).toEqual(["d1"]));
+        expect(patches[0]?.patch).toEqual({ muted: true, mutedUntil: null });
         expect(shown[0]?.body).toBe("Not now");
     });
 

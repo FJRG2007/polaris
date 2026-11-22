@@ -261,6 +261,7 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
         activeSpaceId,
         setActiveSpaceId,
         refresh,
+        change,
         loaded,
         kept,
         loadFailed,
@@ -899,13 +900,15 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                                                             channel.unread > 0
                                                     )
                                                     .map((channel) => channel.id);
-                                                const result = await actions.markChannelsReadAction(
-                                                    {
-                                                        channelIds: ids
-                                                    }
+                                                await change(
+                                                    Object.fromEntries(
+                                                        ids.map((id) => [id, { unread: 0 }])
+                                                    ),
+                                                    () =>
+                                                        actions.markChannelsReadAction({
+                                                            channelIds: ids
+                                                        })
                                                 );
-                                                setError(result.error ?? "");
-                                                refresh();
                                             }}
                                             onToggle={() => toggle(category.id)}
                                             onFoldAll={(fold) =>
@@ -1871,7 +1874,7 @@ function RowMenu({
     const baseUrl = useAppUrl();
     const router = useRouter();
     const here = usePathname();
-    const { blocked, friends, refresh, spaces, patchChannel } = useChat();
+    const { blocked, friends, refresh, spaces, change } = useChat();
     const t = useTranslations("chat");
     const toast = useToast();
     const chatLock = useChatLock();
@@ -1881,39 +1884,27 @@ function RowMenu({
     // thirty rows asks for nothing until one is held.
     const phone = usePhone();
     const [peeking, setPeeking] = useState(false);
-    /** Drawn at once, put back on a refusal - which is answered with its reason. */
-    async function flag(
-        patch: { locked?: boolean; hidden?: boolean },
-        call: () => Promise<{ error?: string }>
-    ): Promise<string | undefined> {
-        const before = { locked: channel.locked, hidden: channel.hidden };
-        patchChannel(channel.id, patch);
-        let failure = "";
-        const result = await runAction(call, (message) => {
-            failure = message;
-        });
-        if (!result || result.error) {
-            patchChannel(channel.id, before);
-            return result?.error || failure || t("lock.failed");
-        }
-        refresh();
-        return undefined;
+    /** Drawn at once, put back on a refusal - which `change` toasts. */
+    function patch(
+        fields: Partial<ChatChannelView>,
+        call: () => Promise<{ error?: string } | void>,
+        options?: { readonly toast?: boolean }
+    ): Promise<string | null> {
+        return change({ [channel.id]: fields }, call, options);
     }
     async function lockThis(): Promise<void> {
         if (!chatLock.state.hasCode) {
             chatLock.openSettings();
             return;
         }
-        const refused = await flag({ locked: true }, () =>
+        await patch({ locked: true }, () =>
             lockActions.setChannelLockedAction({ channelId: channel.id, on: true })
         );
-        if (refused) toast.show({ title: refused });
     }
     async function hideThis(hidden: boolean): Promise<void> {
-        const refused = await flag({ hidden }, () =>
+        await patch({ hidden }, () =>
             lockActions.setChannelHiddenAction({ channelId: channel.id, on: hidden })
         );
-        if (refused) toast.show({ title: refused });
     }
     const [removeFriend, removeFriendDialog] = useRemoveFriend((message) =>
         toast.show({ title: message })
@@ -2009,24 +2000,26 @@ function RowMenu({
                             [
                                 channel.unread === 0 ? (
                                     <ContextMenuItem
-                                        onSelect={async () => {
-                                            await actions.markUnreadAction({
-                                                channelId: channel.id
-                                            });
-                                            refresh();
-                                        }}
+                                        onSelect={() =>
+                                            void patch({ unread: 1 }, () =>
+                                                actions.markUnreadAction({
+                                                    channelId: channel.id
+                                                })
+                                            )
+                                        }
                                     >
                                         <Mail className="size-3.5" />
                                         {t("sidebar.markAsUnread")}
                                     </ContextMenuItem>
                                 ) : (
                                     <ContextMenuItem
-                                        onSelect={async () => {
-                                            await actions.markChannelsReadAction({
-                                                channelIds: [channel.id]
-                                            });
-                                            refresh();
-                                        }}
+                                        onSelect={() =>
+                                            void patch({ unread: 0 }, () =>
+                                                actions.markChannelsReadAction({
+                                                    channelIds: [channel.id]
+                                                })
+                                            )
+                                        }
                                     >
                                         <CheckCheck className="size-3.5" />
                                         {t("channelMenu.markRead")}
@@ -2045,10 +2038,11 @@ function RowMenu({
                                 ),
                                 // Kept for this reader and nobody else.
                                 <ContextMenuItem
-                                    onSelect={async () => {
-                                        await actions.setPinnedAction(channel.id, !channel.pinned);
-                                        refresh();
-                                    }}
+                                    onSelect={() =>
+                                        void patch({ pinned: !channel.pinned }, () =>
+                                            actions.setPinnedAction(channel.id, !channel.pinned)
+                                        )
+                                    }
                                 >
                                     {channel.pinned ? (
                                         <PinOff className="size-3.5" />
@@ -2095,14 +2089,16 @@ function RowMenu({
                                 <MuteOptions
                                     channel={channel}
                                     parts={CONTEXT_PARTS}
-                                    onChoose={async (minutes) => {
-                                        await actions.setMutedAction(channel.id, minutes);
-                                        refresh();
-                                    }}
-                                    onMentions={async (on) => {
-                                        await actions.setMuteMentionsAction(channel.id, on);
-                                        refresh();
-                                    }}
+                                    onChoose={(minutes) =>
+                                        void patch(conversationList.mutedFields(minutes), () =>
+                                            actions.setMutedAction(channel.id, minutes)
+                                        )
+                                    }
+                                    onMentions={(on) =>
+                                        void patch({ muteMentions: on }, () =>
+                                            actions.setMuteMentionsAction(channel.id, on)
+                                        )
+                                    }
                                 />,
                                 // Not in a one-to-one conversation: every
                                 // message in one is addressed to you, so "only
@@ -2112,10 +2108,15 @@ function RowMenu({
                                         level={channel.notifyLevel}
                                         parts={CONTEXT_PARTS}
                                         inheritable={channel.spaceId !== null}
-                                        onChoose={async (level) => {
-                                            await actions.setChannelNotifyAction(channel.id, level);
-                                            refresh();
-                                        }}
+                                        onChoose={(level) =>
+                                            void patch(
+                                                {
+                                                    notifyLevel:
+                                                        level as ChatChannelView["notifyLevel"]
+                                                },
+                                                () => actions.setChannelNotifyAction(channel.id, level)
+                                            )
+                                        }
                                     />
                                 )
                             ],
@@ -2235,14 +2236,17 @@ function RowMenu({
                 open={unlocking}
                 onOpenChange={setUnlocking}
                 title={t("lock.removeLockAsk")}
-                submit={(code) =>
-                    flag({ locked: false }, () =>
-                        lockActions.setChannelLockedAction({
-                            channelId: channel.id,
-                            on: false,
-                            code
-                        })
-                    )
+                submit={async (code) =>
+                    (await patch(
+                        { locked: false },
+                        () =>
+                            lockActions.setChannelLockedAction({
+                                channelId: channel.id,
+                                on: false,
+                                code
+                            }),
+                        { toast: false }
+                    )) ?? undefined
                 }
             />
             {renamingGroup ? (

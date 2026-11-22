@@ -25,7 +25,6 @@ import * as core from "@polaris/core";
 import * as actions from "./actions";
 import { Avatar } from "@/components/avatar";
 import { useChat } from "./chat-context";
-import { runAction } from "@/lib/run-action";
 import { ChatAvatar } from "@/components/chat-avatar";
 import { conversationFace } from "./conversation-face";
 import { PersonName } from "@/components/person-name";
@@ -166,30 +165,21 @@ export function ConversationInfo({
 function useChannelWrite(channel: ChatChannelView) {
     const t = useTranslations("chat");
     const toast = useToast();
-    const { patchChannel, refresh } = useChat();
+    const { change } = useChat();
+    // The list's own optimistic write - see `change` - with this page's note
+    // in place of its plain toast.
     return async (
         patch: Partial<ChatChannelView>,
         call: () => Promise<{ error?: string }>
     ): Promise<boolean> => {
-        const before = Object.fromEntries(
-            Object.keys(patch).map((key) => [key, channel[key as keyof ChatChannelView]])
-        ) as Partial<ChatChannelView>;
-        patchChannel(channel.id, patch);
-        let failure = "";
-        const result = await runAction(call, (message) => {
-            failure = message;
+        const refused = await change({ [channel.id]: patch }, call, { toast: false });
+        if (refused === null) return true;
+        toast.show({
+            key: `chat-info-${channel.id}`,
+            title: t("info.notSaved"),
+            body: refused || undefined
         });
-        if (!result || result.error) {
-            patchChannel(channel.id, before);
-            toast.show({
-                key: `chat-info-${channel.id}`,
-                title: t("info.notSaved"),
-                body: result?.error || failure || undefined
-            });
-            return false;
-        }
-        refresh();
-        return true;
+        return false;
     };
 }
 

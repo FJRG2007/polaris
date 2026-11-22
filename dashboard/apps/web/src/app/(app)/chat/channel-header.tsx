@@ -42,6 +42,7 @@ import { ReportDialog } from "./report-dialog";
 import { ConversationInfo, type SharedKind } from "./conversation-info";
 import { TOUCH_TARGET, usePhone } from "@/components/use-phone";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
+import * as conversationList from "@/lib/chat/conversation-list";
 import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { VanishDuration } from "@/lib/chat/vanish-rules";
 import { VanishBadge, VanishMenu } from "./vanish-controls";
@@ -159,7 +160,7 @@ export function ChannelHeader({
     const t = useTranslations("chat");
     const router = useRouter();
     const baseUrl = useAppUrl();
-    const { may, callsOff, callsOutside, viewerName } = useChat();
+    const { may, callsOff, callsOutside, viewerName, change } = useChat();
     const face = conversationFace(channel, { id: viewerId, name: viewerName });
     const mayCall = may.call;
     const [adding, setAdding] = useState(false);
@@ -231,6 +232,22 @@ export function ChannelHeader({
      * header was silent: the dialog closed, nothing changed, and the screen said
      * nothing about why. Returns whether it worked, so a form can stay open.
      */
+    /**
+     * One of this reader's own settings on the conversation - a mute, what
+     * notifies them. Drawn at once through the list, the same as from the
+     * row's menu, and put back with a toast on a refusal.
+     */
+    const set = async (
+        fields: Partial<ChatChannelView>,
+        run: () => Promise<{ error?: string }>
+    ): Promise<boolean> => {
+        setError("");
+        const refused = await change({ [channel.id]: fields }, run);
+        if (refused !== null) return false;
+        onChanged();
+        return true;
+    };
+
     const act = async (run: () => Promise<{ error?: string }>): Promise<boolean> => {
         setError("");
         const result = await runAction(run, setError);
@@ -510,10 +527,14 @@ export function ChannelHeader({
                                 channel={channel}
                                 parts={DROPDOWN_PARTS}
                                 onChoose={(minutes) =>
-                                    void act(() => actions.setMutedAction(channel.id, minutes))
+                                    void set(conversationList.mutedFields(minutes), () =>
+                                        actions.setMutedAction(channel.id, minutes)
+                                    )
                                 }
                                 onMentions={(on) =>
-                                    act(() => actions.setMuteMentionsAction(channel.id, on))
+                                    set({ muteMentions: on }, () =>
+                                        actions.setMuteMentionsAction(channel.id, on)
+                                    )
                                 }
                             />
                             {/* Not in a one-to-one conversation, where the mute
@@ -526,8 +547,9 @@ export function ChannelHeader({
                                     parts={DROPDOWN_PARTS}
                                     inheritable={channel.spaceId !== null}
                                     onChoose={(level) =>
-                                        void act(() =>
-                                            actions.setChannelNotifyAction(channel.id, level)
+                                        void set(
+                                            { notifyLevel: level as ChatChannelView["notifyLevel"] },
+                                            () => actions.setChannelNotifyAction(channel.id, level)
                                         )
                                     }
                                 />
