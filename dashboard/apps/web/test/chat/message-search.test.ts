@@ -79,7 +79,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { searchMessages } = await import("@/lib/chat/search");
+const { searchMessages, olderThan, encodeSharedCursor, decodeSharedCursor } = await import("@/lib/chat/search");
 const core = await import("@polaris/core");
 
 const actor = { id: "ada" };
@@ -225,5 +225,53 @@ describe("what comes back", () => {
         expect(hits).toHaveLength(1);
         expect(hits[0]?.channelName).toBe("release");
         expect(hits[0]?.inSpace).toBe(true);
+    });
+});
+
+describe("the gallery's pages", () => {
+    const at = (iso: string) => new Date(iso);
+    const id = (n: number) => `00000000-0000-4000-8000-00000000000${n}`;
+
+    /** What the database does with the clause: (createdAt, id) strictly older. */
+    function matches(row: { createdAt: Date; id: string }, clause: ReturnType<typeof olderThan>): boolean {
+        const [earlier, tie] = clause.OR;
+        if (row.createdAt < earlier.createdAt.lt) return true;
+        return row.createdAt.getTime() === tie.createdAt.getTime() && row.id < tie.id.lt;
+    }
+
+    it("walks messages sent in the same millisecond across a page edge, each once", () => {
+        // Newest first, ties broken by id, as the query orders them.
+        const rows = [
+            { createdAt: at("2026-11-02T10:00:00.005Z"), id: id(9) },
+            { createdAt: at("2026-11-02T10:00:00.005Z"), id: id(8) },
+            { createdAt: at("2026-11-02T10:00:00.005Z"), id: id(7) },
+            { createdAt: at("2026-11-02T10:00:00.004Z"), id: id(6) },
+            { createdAt: at("2026-11-02T10:00:00.004Z"), id: id(5) }
+        ];
+        const seen: string[] = [];
+        let cursor: string | null = null;
+        for (let guard = 0; guard < 10; guard++) {
+            const decoded = decodeSharedCursor(cursor);
+            const page = rows.filter((row) => !decoded || matches(row, olderThan(decoded))).slice(0, 2);
+            seen.push(...page.map((row) => row.id));
+            const last = page.at(-1);
+            if (page.length < 2 || !last) break;
+            cursor = encodeSharedCursor({ createdAt: last.createdAt.toISOString(), id: last.id });
+        }
+        expect(seen).toEqual(rows.map((row) => row.id));
+    });
+
+    it("refuses a cursor that is not one", () => {
+        expect(decodeSharedCursor("yesterday")).toBeNull();
+        expect(decodeSharedCursor(null)).toBeNull();
+    });
+
+    it("asks the database for the tuple and the tie-broken order", async () => {
+        const before = { createdAt: at("2026-11-02T10:00:00.005Z"), id: id(8) };
+        await searchMessages(actor, query({ channelId: MINE }), null, { media: true, before, take: 60 });
+        const sent = asked as unknown as { where: { AND: unknown[] }; orderBy: unknown; take: number };
+        expect(sent.where.AND).toContainEqual(olderThan(before));
+        expect(sent.orderBy).toEqual([{ createdAt: "desc" }, { id: "desc" }]);
+        expect(sent.take).toBe(60);
     });
 });

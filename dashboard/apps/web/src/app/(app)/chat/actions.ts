@@ -64,7 +64,7 @@ import {
     sendScheduledNow,
     type ScheduledMessageView
 } from "@/lib/chat/scheduled";
-import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
+import { decodeSharedCursor, encodeSharedCursor, searchMessages, type ChatSearchHit } from "@/lib/chat/search";
 import { callConversationMembers } from "@/lib/chat/meetings";
 import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
 import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
@@ -405,7 +405,7 @@ const SHARED_MEDIA_PAGE = 60;
 
 const sharedMediaSchema = z.object({
     channelId: z.string().uuid(),
-    before: z.string().datetime().nullable().default(null)
+    before: z.string().max(80).nullable().default(null)
 });
 
 /**
@@ -420,11 +420,14 @@ export async function listSharedMediaAction(
     const me = await actor();
     const parsed = sharedMediaSchema.safeParse(input);
     if (!parsed.success) return { items: [], next: null };
+    const before = decodeSharedCursor(parsed.data.before);
+    // A cursor that is not one would start again from the newest page.
+    if (parsed.data.before && !before) return { items: [], next: null };
     const unlock = proofSchema.safeParse(proof);
     const query = core.chatSearchSchema.parse({ channelId: parsed.data.channelId });
     const hits = await searchMessages(me, query, unlock.success ? unlock.data : null, {
         media: true,
-        before: parsed.data.before ? new Date(parsed.data.before) : null,
+        before,
         take: SHARED_MEDIA_PAGE
     });
     const items = hits.flatMap(({ message }) =>
@@ -446,7 +449,10 @@ export async function listSharedMediaAction(
     const last = hits.at(-1);
     return {
         items,
-        next: hits.length === SHARED_MEDIA_PAGE && last ? last.message.createdAt : null
+        next:
+            hits.length === SHARED_MEDIA_PAGE && last
+                ? encodeSharedCursor({ createdAt: last.message.createdAt, id: last.message.id })
+                : null
     };
 }
 

@@ -80,11 +80,12 @@ export async function searchMessages(
             ...(input.authorId ? { authorId: input.authorId } : {}),
             ...(page?.media ? MEDIA_CLAUSE : attachmentClause(input.has)),
             ...dayClause(input.after, input.before),
-            ...(page?.before ? { createdAt: { lt: page.before } } : {}),
             // Nothing from before this reader joined where that is hidden.
-            AND: [history.readableWhere(floors, actor.id)]
+            AND: [history.readableWhere(floors, actor.id), ...(page?.before ? [olderThan(page.before)] : [])]
         },
-        orderBy: { createdAt: "desc" },
+        // The id breaks a tie between two messages sent in one millisecond, so
+        // a page boundary between them neither skips nor repeats either.
+        orderBy: page ? [{ createdAt: "desc" }, { id: "desc" }] : { createdAt: "desc" },
         take: page?.take ?? core.CHAT_SEARCH_LIMIT,
         select: SEARCH_SELECT
     });
@@ -118,8 +119,37 @@ export async function searchMessages(
 /** A page of the gallery: how many messages, and older than which instant. */
 export interface SharedPage {
     readonly media: true;
-    readonly before: Date | null;
+    readonly before: SharedCursor | null;
     readonly take: number;
+}
+
+/** Where a page of the gallery ends: the last message's instant and id. */
+export interface SharedCursor {
+    readonly createdAt: Date;
+    readonly id: string;
+}
+
+/** Strictly after `cursor` in newest-first order: (createdAt, id) < cursor. */
+export function olderThan(cursor: SharedCursor) {
+    return {
+        OR: [
+            { createdAt: { lt: cursor.createdAt } },
+            { createdAt: cursor.createdAt, id: { lt: cursor.id } }
+        ]
+    };
+}
+
+/** The cursor as the client carries it, and back; null when it is not one. */
+export function encodeSharedCursor(cursor: { createdAt: string; id: string }): string {
+    return `${cursor.createdAt}_${cursor.id}`;
+}
+
+export function decodeSharedCursor(raw: string | null): SharedCursor | null {
+    const match = raw ? /^(\d{4}-\d{2}-\d{2}T[\d:.]+Z)_([0-9a-f-]{36})$/i.exec(raw) : null;
+    const [, instant, id] = match ?? [];
+    if (!instant || !id) return null;
+    const createdAt = new Date(instant);
+    return Number.isNaN(createdAt.getTime()) ? null : { createdAt, id: id.toLowerCase() };
 }
 
 /** A picture or a video, the two things the gallery draws as a tile. */
