@@ -11,10 +11,13 @@ import { join } from "node:path";
 import { Menu, Tray, nativeImage, type MenuItemConstructorOptions } from "electron";
 
 let tray: Tray | null = null;
+/** The dressed image asked for, kept for a tray put up after the ask. */
+let wanted: Electron.NativeImage | null = null;
 
 /** The tray icon in the season's dress, or the shipped one for null. A no-op
  *  until the tray is up, and on macOS, which has none. */
 export function setTrayImage(image: Electron.NativeImage | null): void {
+    wanted = image;
     if (!tray || tray.isDestroyed()) return;
     if (image) {
         // 32 on Windows, where the notification area scales it to the display.
@@ -38,6 +41,7 @@ export function installTray(items: readonly MenuItemConstructorOptions[], show: 
         tray = new Tray(process.platform === "win32" ? image : image.resize({ width: 22, height: 22 }));
         tray.setToolTip("Polaris");
         tray.on("click", show);
+        if (wanted) setTrayImage(wanted);
     }
     tray.setContextMenu(
         Menu.buildFromTemplate([

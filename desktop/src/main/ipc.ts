@@ -22,7 +22,7 @@ import { voiceActionSchema, voiceStateSchema } from "@/shared/voice-widget";
 import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys";
 import { closeNotice, showNotice } from "./notices";
 import { appBadgeSchema, applyAppBadge } from "./app-badge";
-import { appIconSchema, applyAppIcon } from "./app-icon";
+import { appIconSchema, reportAppIcon } from "./app-icon";
 import { isSafeExternalUrl, isServerUrl, serverPath } from "./navigation";
 import { openExternal } from "./open-external";
 import { clipboardText, dictionaryWord, pagePoint, savableImageUrl } from "./context-menu";
@@ -373,12 +373,14 @@ export function registerIpc(host: IpcHost): void {
         return true;
     });
 
-    // The season's icon, drawn by the page; the asking window's is the one set.
+    // The season's icon, settled across every window's host (see app-icon).
     ipcMain.handle(CHANNELS.appIcon, (event, raw: unknown): boolean => {
         if (!fromPolaris(event)) return false;
         const icon = appIconSchema.safeParse(raw);
         if (!icon.success) return false;
-        applyAppIcon(BrowserWindow.fromWebContents(event.sender), icon.data);
+        const origin = URL.parse(event.senderFrame?.url ?? "")?.origin;
+        if (!origin) return false;
+        reportAppIcon(origin, icon.data);
         return true;
     });
 
