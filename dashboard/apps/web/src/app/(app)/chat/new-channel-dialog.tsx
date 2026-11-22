@@ -46,6 +46,7 @@ import {
     useToast
 } from "@polaris/ui";
 import { ChatPeoplePicker } from "./chat-people-picker";
+import { ChannelGroupPicker, type PickedGroup } from "./channel-group-picker";
 import type { PickedPerson } from "@/components/people-picker";
 
 /** Each type's icon, shared by its card and the name field. */
@@ -78,6 +79,7 @@ export function NewChannelDialog({
     const [type, setType] = useState<core.ChatChannelCreateType>("text");
     const [privateChannel, setPrivateChannel] = useState(false);
     const [members, setMembers] = useState<readonly PickedPerson[]>([]);
+    const [groups, setGroups] = useState<readonly PickedGroup[]>([]);
     const toast = useToast();
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
@@ -103,7 +105,8 @@ export function NewChannelDialog({
                     stage: type === "stage",
                     categoryId,
                     private: privateChannel,
-                    memberIds: privateChannel ? members.map((person) => person.id) : []
+                    memberIds: privateChannel ? members.map((person) => person.id) : [],
+                    groups: privateChannel ? groups.map((group) => ({ type: group.type, id: group.id })) : []
                 }),
             setError
         );
@@ -114,6 +117,7 @@ export function NewChannelDialog({
         setType("text");
         setPrivateChannel(false);
         setMembers([]);
+        setGroups([]);
         onOpenChange(false);
         refresh();
         if (result.membersError) toast.show({ title: t("newChannel.membersNotAdded"), body: result.membersError });
@@ -233,6 +237,9 @@ export function NewChannelDialog({
                             onChange={setMembers}
                             label={t("newChannel.members")}
                         />
+                    )}
+                    {privateChannel && space && (
+                        <ChannelGroupPicker spaceId={space.id} picked={groups} onChange={setGroups} />
                     )}
 
                     {error && (

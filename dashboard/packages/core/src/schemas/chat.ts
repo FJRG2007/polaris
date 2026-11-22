@@ -279,6 +279,17 @@ export const chatSpaceUpdateSchema = z.object({
 
 export type ChatSpaceUpdateInput = z.infer<typeof chatSpaceUpdateSchema>;
 
+/** How many teams and roles a channel can be opened to as it is made. */
+export const MAX_CHANNEL_GROUPS = 20;
+
+/** A team or role a private channel is opened to. */
+export const chatChannelGroupSchema = z.object({
+    type: z.enum(["team", "role"]),
+    id: z.string().uuid()
+});
+
+export type ChatChannelGroupInput = z.infer<typeof chatChannelGroupSchema>;
+
 export const chatChannelCreateSchema = z.object({
     spaceId: z.string().uuid(),
     name: channelName,
@@ -295,7 +306,9 @@ export const chatChannelCreateSchema = z.object({
     /** The heading it sits under, or null for the ones above the first one. */
     categoryId: z.string().uuid().nullable().default(null),
     /** The people put in a private channel as it is made. */
-    memberIds: z.array(z.string().uuid()).max(MAX_GROUP_MEMBERS).default([])
+    memberIds: z.array(z.string().uuid()).max(MAX_GROUP_MEMBERS).default([]),
+    /** The teams and roles a private channel is opened to as it is made. */
+    groups: z.array(chatChannelGroupSchema).max(MAX_CHANNEL_GROUPS).default([])
 }).refine((input) => !(input.announcement && input.kind !== "text"), {
     message: "Only a text channel can be an announcement channel",
     path: ["announcement"]

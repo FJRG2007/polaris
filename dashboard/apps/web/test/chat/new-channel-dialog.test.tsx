@@ -11,7 +11,15 @@ import { MessagesWrapper } from "../setup/i18n";
 const create = vi.hoisted(() => vi.fn());
 const push = vi.hoisted(() => vi.fn());
 
-vi.mock("@/app/(app)/chat/actions", () => ({ createChannelAction: create }));
+vi.mock("@/app/(app)/chat/actions", () => ({
+    createChannelAction: create,
+    channelGroupCandidatesAction: async () => ({
+        groups: [
+            { type: "team", id: "0190a0a0-0000-7000-8000-0000000000aa", name: "Security", orgName: "Acme" },
+            { type: "role", id: "0190a0a0-0000-7000-8000-0000000000bb", name: "Editors", orgName: "Acme" }
+        ]
+    })
+}));
 vi.mock("@/app/(app)/chat/chat-context", () => ({ useChat: () => ({ refresh: () => undefined }) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/lib/new-build", () => ({ checkForNewBuild: async () => undefined }));
@@ -106,6 +114,27 @@ describe("creating a channel", () => {
         await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
         expect(create.mock.calls[0]?.[0]).toMatchObject({ private: true, memberIds: ["user-1"] });
         await waitFor(() => expect(push).toHaveBeenCalledWith("/chat/c/channel-private"));
+    });
+
+    it("opens a private channel to the teams and roles picked", async () => {
+        create.mockResolvedValue({ id: "channel-teams" });
+        open();
+        expect(screen.queryByRole("textbox", { name: "Teams and roles" })).toBeNull();
+        fireEvent.click(screen.getByRole("switch"));
+        const find = await screen.findByRole("textbox", { name: "Teams and roles" });
+        fireEvent.change(find, { target: { value: "secu" } });
+        const security = await screen.findByRole("button", { name: /Security/ });
+        expect(screen.queryByRole("button", { name: /Editors/ })).toBeNull();
+        fireEvent.click(security);
+        fireEvent.change(screen.getByRole("textbox", { name: "Channel name" }), {
+            target: { value: "ops" }
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Create channel" }));
+        await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+        expect(create.mock.calls[0]?.[0]).toMatchObject({
+            private: true,
+            groups: [{ type: "team", id: "0190a0a0-0000-7000-8000-0000000000aa" }]
+        });
     });
 
     it("sends a forum as its own kind", async () => {

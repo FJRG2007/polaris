@@ -384,10 +384,14 @@ export async function shareCandidates(
 ): Promise<GrantCandidate[]> {
     const orgIds = await owningOrgIds(user, subject, subjectId);
     if (orgIds.length === 0) return [];
+    return groupCandidates(orgIds);
+}
 
+/** Every team and role of these organizations, as a picker lists them. */
+export async function groupCandidates(orgIds: readonly string[]): Promise<GrantCandidate[]> {
     const [teams, roles] = await Promise.all([
         prisma.team.findMany({
-            where: { orgId: { in: orgIds } },
+            where: { orgId: { in: [...orgIds] } },
             orderBy: [{ org: { name: "asc" } }, { name: "asc" }],
             select: {
                 id: true,
@@ -397,7 +401,7 @@ export async function shareCandidates(
             }
         }),
         prisma.orgRole.findMany({
-            where: { orgId: { in: orgIds } },
+            where: { orgId: { in: [...orgIds] } },
             orderBy: [{ org: { name: "asc" } }, { name: "asc" }],
             select: { id: true, name: true, description: true, org: { select: { name: true } } }
         })

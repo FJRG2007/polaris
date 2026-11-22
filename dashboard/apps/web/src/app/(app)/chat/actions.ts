@@ -32,6 +32,7 @@ import * as pins from "@/lib/chat/pins";
 import * as reminders from "@/lib/chat/reminders";
 import * as webhooks from "@/lib/chat/webhooks";
 import * as follows from "@/lib/chat/follows";
+import { channelGroupCandidates, grantChannelGroups } from "@/lib/chat/channel-groups";
 import { confirmAge } from "@/lib/chat/age-gate";
 import { MAX_REREAD } from "@/lib/chat/reread-limit";
 import { allChatRules } from "@/lib/chat/rules";
@@ -1293,8 +1294,38 @@ export async function createChannelAction(
     // never a reason to undo what was made.
     const memberIds = parsed.data.private ? parsed.data.memberIds : [];
     const added = memberIds.length ? await guard(() => chat.addChannelMembers(me, id, memberIds)) : null;
+    const groups = parsed.data.private ? parsed.data.groups : [];
+    const opened = groups.length ? await guard(() => grantChannelGroups(me, id, groups)) : null;
     revalidatePath(CHAT_PATH);
-    return added?.error ? { id, membersError: added.error } : { id };
+    const membersError = added?.error || opened?.error;
+    return membersError ? { id, membersError } : { id };
+}
+
+/** A team or role the Create dialog offers for a private channel. */
+export interface ChannelGroupCandidate {
+    readonly type: "team" | "role";
+    readonly id: string;
+    readonly name: string;
+    readonly orgName: string;
+}
+
+/** The teams and roles a private channel in this space can be opened to. */
+export async function channelGroupCandidatesAction(
+    spaceId: string
+): Promise<{ groups?: ChannelGroupCandidate[]; error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(spaceId);
+    if (!parsed.success) return { groups: [] };
+    const result = await guard(() => channelGroupCandidates(me, parsed.data));
+    if (result.error) return { error: result.error };
+    return {
+        groups: (result.value ?? []).map((group) => ({
+            type: group.type as ChannelGroupCandidate["type"],
+            id: group.id,
+            name: group.name,
+            orgName: group.orgName
+        }))
+    };
 }
 
 /** A copy of a channel under a new name - see `duplicateChannel` for what comes along. */
