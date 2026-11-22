@@ -225,6 +225,7 @@ export { ProductMark, type PolarisProduct } from "./shell/product-mark";
 export {
     AppShell,
     PolarisMark,
+    PolarisStar,
     PageHeader,
     PAGE_FILL,
     PAGE_BLEED,

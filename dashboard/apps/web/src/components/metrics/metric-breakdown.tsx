@@ -58,6 +58,7 @@ import {
     DialogHeader,
     DialogTitle,
     EmptyState,
+    PolarisStar,
     Skeleton
 } from "@polaris/ui";
 import * as polls from "../shared-polls";
@@ -303,27 +304,13 @@ function Rows({
     );
 }
 
-/** The Polaris star alone, the mark the shell draws beside its name. */
-function PolarisGlyph({ className }: { className: string }) {
-    return (
-        <svg
-            viewBox="0 0 24 24"
-            className={`${className} text-primary`}
-            fill="currentColor"
-            aria-hidden
-        >
-            <path d="M12 2l1.9 6.6L20 10l-6.1 1.4L12 18l-1.9-6.6L4 10l6.1-1.4L12 2z" />
-        </svg>
-    );
-}
-
 /** What a row is drawn with: the service's own mark where Deploy draws one, and
  *  otherwise what kind of thing it is. */
 function RowIcon({ row }: { row: BreakdownRow }) {
     const className = "mt-0.5 size-4 shrink-0 text-muted-foreground";
     if (row.service?.source === "image") return <DockerMark className={className} />;
     if (row.service?.source === "github") return <GitHubMark className={className} />;
-    if (row.group === "polaris") return <PolarisGlyph className={className} />;
+    if (row.group === "polaris") return <PolarisStar className={`${className} text-primary`} />;
     if (row.group === "free") return <CircleDashed className={className} aria-hidden />;
     if (row.group === "machine" && row.kind === "rest")
         return <Server className={className} aria-hidden />;

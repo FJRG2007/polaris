@@ -204,6 +204,16 @@ export const PAGE_BLEED =
 export const PAGE_NOTICES =
     "flex flex-col gap-2 empty:hidden -mx-3 -mt-3 mb-3 px-3 pb-2 pt-3 sm:-mx-4 sm:-mt-4 sm:mb-4 sm:px-4 md:-mx-6 md:-mt-5 md:mb-5 md:px-6";
 
+/** The Polaris star alone. Drawn centred in its 24-unit box (y 4 to 20), so it
+ *  sits on the middle of a row like any other icon instead of riding high. */
+export function PolarisStar({ className }: { className?: string }) {
+    return (
+        <svg viewBox="0 0 24 24" className={className} fill="currentColor" aria-hidden="true">
+            <path d="M12 4l1.9 6.6L20 12l-6.1 1.4L12 20l-1.9-6.6L4 12l6.1-1.4L12 4z" />
+        </svg>
+    );
+}
+
 /** The Polaris wordmark: the star glyph plus the name. `nameClassName` lets a
  *  cramped bar drop the name and keep the glyph.
  *
@@ -224,14 +234,7 @@ export function PolarisMark({
 }) {
     return (
         <span className={cn("flex items-center gap-2", className)}>
-            <svg
-                viewBox="0 0 24 24"
-                className="size-[18px] shrink-0 text-primary"
-                fill="currentColor"
-                aria-hidden="true"
-            >
-                <path d="M12 2l1.9 6.6L20 10l-6.1 1.4L12 18l-1.9-6.6L4 10l6.1-1.4L12 2z" />
-            </svg>
+            <PolarisStar className="size-[18px] shrink-0 text-primary" />
             <span className={cn("text-[0.8125rem] font-semibold tracking-tight", nameClassName)}>
                 Polaris
             </span>
