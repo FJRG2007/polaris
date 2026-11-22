@@ -4,6 +4,7 @@
 
 import { prisma } from "@polaris/db";
 import { describeClient } from "@polaris/core";
+import { withAppMarker } from "@/lib/session-row";
 import { sessionClient } from "@/lib/session-device";
 
 /**
@@ -21,9 +22,13 @@ export async function followClientVersion(
     asked: { userAgent: string | null; brands: string | null; platform: string | null }
 ): Promise<void> {
     if (!asked.userAgent || asked.userAgent === state.userAgent) return;
+    // The record was taken from one of the app's requests that went out without
+    // its marker: the app saying so now is the same client, so the record
+    // takes its word and stops reading as the bare WebView.
+    const healed = withAppMarker(asked.userAgent, state.userAgent) === asked.userAgent;
     const was = sessionClient({ userAgent: null, state });
     const here = describeClient(asked.userAgent, asked.brands, asked.platform);
-    if (!was.browser || was.browser !== here.browser || was.os !== here.os) return;
+    if (!healed && (!was.browser || was.browser !== here.browser || was.os !== here.os)) return;
     await prisma.sessionState
         .update({
             where: { sessionId },

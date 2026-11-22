@@ -13,6 +13,7 @@
 
 import { prisma } from "@polaris/db";
 import { DEVICE_KINDS } from "@/lib/device-sessions/kinds";
+import { withAppMarker } from "@/lib/session-row";
 import { describeClient, type ClientReading } from "@polaris/core";
 
 /** A session as this module reads it: better-auth's own columns, and Polaris's
@@ -35,7 +36,7 @@ export interface DescribableSession {
  */
 export function sessionClient(row: DescribableSession): ClientReading {
     return describeClient(
-        row.state?.userAgent ?? row.userAgent,
+        withAppMarker(row.userAgent, row.state?.userAgent ?? null) ?? row.userAgent,
         row.state?.userAgentBrands,
         row.state?.userAgentPlatform
     );

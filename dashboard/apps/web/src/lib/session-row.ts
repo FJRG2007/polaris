@@ -32,7 +32,28 @@ export function sessionUserAgent(row: {
     userAgent: string | null;
     state?: { userAgent: string | null } | null;
 }): string | null {
-    return row.state?.userAgent ?? row.userAgent ?? null;
+    return withAppMarker(row.userAgent, row.state?.userAgent ?? null) ?? row.userAgent ?? null;
+}
+
+/** The phone app's word about itself on the end of the WebView's user-agent
+ *  (`mobile/android` AppAgent, `mobile/ios` WebViewController). */
+const APP_MARKER = / PolarisMobile\/[\d.]+(?: \([^)]*\))?/;
+
+/**
+ * The app's own user-agent where a request of the app's went out without it.
+ *
+ * Android does not carry the app's user-agent onto every request its WebView
+ * makes - a service worker's fetches go out with the bare WebView's - and the
+ * session's record is taken from whichever request reached the server first.
+ * When that was one of those, the phone app read as "Android WebView" on the
+ * list of signed-in devices. A recorded agent that is exactly the marked one
+ * with the marker taken off is that same app, so the marked one is what it is.
+ * Anything else is left as it was: this only puts back what the app said.
+ */
+export function withAppMarker(marked: string | null, recorded: string | null): string | null {
+    if (!marked || !recorded || marked === recorded || APP_MARKER.test(recorded)) return recorded;
+    if (!APP_MARKER.test(marked)) return recorded;
+    return marked.replace(APP_MARKER, "") === recorded ? marked : recorded;
 }
 
 /** How a session proved who it was, as its state row holds it. Both halves are
