@@ -26,8 +26,8 @@ import type { HookDeliveryView } from "@/lib/automations/webhook-service";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { downloadBytes } from "@/lib/download";
 import type { FormSubmissionView } from "@/lib/automations/webhook-service";
-import { Button, CopyButton, Input, SegmentedControl, Select, Textarea, cn, useToast } from "@polaris/ui";
-import { CodeView } from "@/components/json-view";
+import { Button, CopyButton, Input, SegmentedControl, Select, cn, useToast } from "@polaris/ui";
+import { CodeEditor, CodeView } from "@/components/json-view";
 import { ChevronDown, Download, Eye, EyeOff, FlaskConical, Globe, RefreshCw, ShieldAlert } from "lucide-react";
 import {
     exportFormSubmissionsAction,
@@ -735,12 +735,13 @@ function Advanced({
                         </Labeled>
                     </div>
                     <Labeled label={t("webhook.responseBody")} hint={t("webhook.responseBodyHint")}>
-                        <Textarea
-                            rows={3}
-                            className="font-mono text-xs"
+                        <CodeEditor
+                            language="json"
+                            label={t("webhook.responseBody")}
                             value={view.response.body}
                             maxLength={4000}
-                            onChange={(event) => set({ response: { ...view.response, body: event.target.value } })}
+                            onChange={(next) => set({ response: { ...view.response, body: next } })}
+                            className="max-h-72"
                         />
                     </Labeled>
                     </>

@@ -23,10 +23,10 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    SegmentedControl,
-    Textarea
+    SegmentedControl
 } from "@polaris/ui";
 import { runAction } from "@/lib/run-action";
+import { CodeEditor } from "@/components/json-view";
 import { IntegrationLogo } from "@/components/logos";
 import { useHubFlow, type ConnectionOption } from "./connection-hub";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -381,13 +381,13 @@ function CloudDialog({ provider, name, onClose }: { provider: CloudProvider; nam
                             </span>
                             {field.kind === "long" ? (
                                 <>
-                                    <Textarea
-                                        rows={5}
-                                        className="font-mono text-xs"
+                                    <CodeEditor
+                                        language="json"
                                         value={values[field.key] ?? ""}
-                                        onChange={(event) => set(field.key, event.target.value)}
-                                        aria-invalid={invalid.has(field.key) || undefined}
+                                        onChange={(next) => set(field.key, next)}
+                                        invalid={invalid.has(field.key)}
                                         placeholder={t("aiKeys.cloud.serviceAccountPlaceholder")}
+                                        className="max-h-72"
                                     />
                                     <Button
                                         type="button"

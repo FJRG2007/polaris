@@ -18,13 +18,13 @@ import {
     DialogHeader,
     DialogTitle,
     AsyncSelect,
-    Textarea,
     type AsyncLoad
 } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChooseFiles } from "@/components/file-picker/use-choose-files";
 import { readAgentFilesAction, repoAgentFilesAction, type ReadAgentFile } from "./agents-actions";
 import { AGENT_FILE_MAX, type AgentFile } from "@/lib/polar/agents/agent-files";
+import { CodeEditor } from "@/components/json-view";
 
 /** Files read in one go, as the action takes them. */
 const FILES_MAX = 20;
@@ -93,14 +93,14 @@ export function AgentImportDialog({
                 <div className="flex max-h-[65vh] min-w-0 flex-col gap-4 overflow-y-auto overscroll-contain pe-1">
                     <div className="flex min-w-0 flex-col gap-1 text-sm">
                         <label htmlFor="agent-import-paste">{t("settings.agents.import.paste")}</label>
-                        <Textarea
+                        <CodeEditor
                             id="agent-import-paste"
+                            language="markdown"
                             value={pasted}
-                            rows={6}
                             maxLength={AGENT_FILE_MAX}
-                            className="font-mono text-xs"
                             placeholder={"---\ndescription: ...\n---\n..."}
-                            onChange={(event) => setPasted(event.target.value)}
+                            onChange={setPasted}
+                            className="max-h-72"
                         />
                         <div className="flex min-w-0 flex-wrap gap-2">
                             <Button

@@ -13,7 +13,8 @@ import * as core from "@polaris/core";
 import { Plus, Trash2 } from "lucide-react";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, Input, Select, Switch, Textarea, cn } from "@polaris/ui";
+import { Button, Input, Select, Switch, cn } from "@polaris/ui";
+import { CodeEditor } from "@/components/json-view";
 
 type Field = core.PayloadField;
 
@@ -242,13 +243,13 @@ export function PayloadShapeEditor({
                 />
             ) : null}
             {!valid ? <p className="text-xs text-destructive">{t("payloadShape.invalid")}</p> : null}
-            <Textarea
-                rows={3}
-                className="font-mono text-xs"
+            <CodeEditor
+                language="json"
                 value={sample}
                 placeholder={t("payloadShape.samplePlaceholder")}
-                aria-label={t("payloadShape.sample")}
-                onChange={(event) => setSample(event.target.value)}
+                label={t("payloadShape.sample")}
+                onChange={setSample}
+                className="max-h-72"
             />
             <div className="flex min-w-0 flex-wrap items-center gap-2">
                 {sample.trim() ? (

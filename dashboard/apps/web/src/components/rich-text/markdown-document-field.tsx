@@ -7,7 +7,7 @@
  * written back exactly as typed.
  */
 
-import { Textarea } from "@polaris/ui";
+import { CodeEditor } from "@/components/json-view";
 import { RichTextEditor } from "./rich-text-editor";
 import { joinFrontmatter, splitFrontmatter } from "./frontmatter";
 
@@ -33,14 +33,12 @@ export function MarkdownDocumentField({
     return (
         <div className="flex min-w-0 flex-col gap-2">
             {frontmatter ? (
-                <Textarea
-                    aria-label={frontmatterLabel}
-                    rows={Math.min(8, frontmatter.split("\n").length)}
+                <CodeEditor
+                    label={frontmatterLabel}
+                    language="yaml"
                     value={frontmatter.replace(FENCE, "")}
-                    className="font-mono text-xs"
-                    onChange={(event) =>
-                        onChange(joinFrontmatter(`---\n${event.target.value}\n---\n`, body))
-                    }
+                    className="max-h-48"
+                    onChange={(next) => onChange(joinFrontmatter(`---\n${next}\n---\n`, body))}
                 />
             ) : null}
             <RichTextEditor

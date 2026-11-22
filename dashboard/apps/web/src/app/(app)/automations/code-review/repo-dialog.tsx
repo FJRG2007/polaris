@@ -27,6 +27,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { REPO_CUES_MAX } from "@/lib/agents/session-cues";
 import { PREVIEW_COMMAND_MAX } from "@/lib/agents/session-preview-command";
 import { agentWord } from "@/lib/agents/words";
+import { CodeEditor } from "@/components/json-view";
 import {
     AGENT_EFFORTS,
     AGENT_LEARNINGS_MAX,
@@ -285,15 +286,14 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                         <label className="text-sm font-medium" htmlFor="repo-setup-script">
                             {t("repoDialog.setup")}
                         </label>
-                        <Textarea
+                        <CodeEditor
                             id="repo-setup-script"
-                            rows={4}
+                            language="bash"
                             maxLength={8000}
-                            spellCheck={false}
-                            className="font-mono text-xs"
                             value={setupScript}
-                            onChange={(event) => setSetupScript(event.target.value)}
+                            onChange={setSetupScript}
                             placeholder={t("repoDialog.setupPlaceholder")}
+                            className="max-h-72"
                         />
                         <p className="text-xs text-muted-foreground">{t("repoDialog.setupHint")}</p>
                     </div>
@@ -313,13 +313,13 @@ export function RepoDialog({ repo, onClose }: { repo: AgentRepoView; onClose: ()
                         <label className="text-sm font-medium" htmlFor="repo-preview-command">
                             {t("repoDialog.previewCommand")}
                         </label>
-                        <Input
+                        <CodeEditor
                             id="repo-preview-command"
+                            language="bash"
+                            singleLine
                             maxLength={PREVIEW_COMMAND_MAX}
-                            spellCheck={false}
-                            className="font-mono text-xs"
                             value={previewCommand}
-                            onChange={(event) => setPreviewCommand(event.target.value.replace(/[\r\n]+/g, " "))}
+                            onChange={setPreviewCommand}
                             placeholder={t("repoDialog.previewCommandPlaceholder")}
                         />
                         <p className="text-xs text-muted-foreground">{t("repoDialog.previewCommandHint")}</p>

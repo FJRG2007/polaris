@@ -95,6 +95,7 @@ import {
     X
 } from "lucide-react";
 import * as polls from "./deploy-polls";
+import { CodeEditor } from "@/components/json-view";
 
 type ServiceT = NamespaceTranslator<"deployService">;
 
@@ -1274,41 +1275,35 @@ function SourceCards({
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
                             {t("settings.installCommand")}
-                            <Input
+                            <CodeEditor
+                                language="bash"
+                                singleLine
                                 value={draft.installCommand}
-                                onChange={(event) =>
-                                    form.patch({ installCommand: event.target.value })
-                                }
+                                onChange={(next) => form.patch({ installCommand: next })}
                                 // i18n-ignore: an example command
                                 placeholder="pnpm install --frozen-lockfile"
-                                className="font-mono"
-                                {...plain}
                             />
                         </label>
                         <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
                             {t("settings.buildCommand")}
-                            <Input
+                            <CodeEditor
+                                language="bash"
+                                singleLine
                                 value={draft.buildCommand}
-                                onChange={(event) =>
-                                    form.patch({ buildCommand: event.target.value })
-                                }
+                                onChange={(next) => form.patch({ buildCommand: next })}
                                 // i18n-ignore: an example command
                                 placeholder="pnpm run build"
-                                className="font-mono"
-                                {...plain}
                             />
                         </label>
                         <label className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
                             {t("settings.startCommand")}
-                            <Input
+                            <CodeEditor
+                                language="bash"
+                                singleLine
                                 value={draft.startCommand}
-                                onChange={(event) =>
-                                    form.patch({ startCommand: event.target.value })
-                                }
+                                onChange={(next) => form.patch({ startCommand: next })}
                                 // i18n-ignore: an example command
                                 placeholder="next start"
-                                className="font-mono"
-                                {...plain}
                             />
                         </label>
                     </div>

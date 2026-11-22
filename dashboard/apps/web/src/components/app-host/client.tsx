@@ -194,6 +194,12 @@ const CodeLine = dynamic(
     { ssr: false }
 );
 
+/** An editable block of code painted by the same highlighter. */
+const CodeEditor = dynamic(
+    () => import("@/components/json-view").then((module) => module.CodeEditor),
+    { ssr: false }
+);
+
 const LogViewer = dynamic(
     () => import("@/components/log-viewer").then((module) => module.LogViewer),
     { ssr: false }
@@ -271,7 +277,7 @@ export const clientHost = {
     filePicker: { ChooseFilesDialog, FilePickerDialog, useChooseFiles },
     gameLogo: { GameLogo },
     i18nProvider: { useClient, useLocale },
-    jsonView: { CodeLine },
+    jsonView: { CodeLine, CodeEditor },
     logViewer: { LogViewer },
     logos: { IntegrationLogo },
     mediaPlayer: { MediaPlayer },

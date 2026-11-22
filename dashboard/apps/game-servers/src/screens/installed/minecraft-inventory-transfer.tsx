@@ -25,8 +25,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
     SegmentedControl,
-    Select,
-    Textarea
+    Select
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { Download, FileUp, Loader2, Upload } from "lucide-react";
@@ -347,18 +346,18 @@ export function InventoryImportDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
-                    <Textarea
+                    {/* JSON is painted; a CSV export has no grammar and stays plain. */}
+                    <hostUi.jsonView.CodeEditor
                         value={text}
-                        onChange={(event) => {
-                            setText(event.target.value);
+                        onChange={(next: string) => {
+                            setText(next);
                             reset();
                         }}
+                        language={/^\s*[[{]/.test(text) ? "json" : null}
                         placeholder={t("inventoryTransfer.pasteHere")}
-                        aria-label={t("inventoryTransfer.pasteHere")}
-                        aria-invalid={problem ? true : undefined}
-                        rows={5}
-                        className="font-mono text-xs"
-                        spellCheck={false}
+                        label={t("inventoryTransfer.pasteHere")}
+                        invalid={Boolean(problem)}
+                        className="max-h-72"
                     />
                     {problem ? <p className="text-xs text-danger">{problem}</p> : null}
                     <div className="flex flex-wrap items-center gap-3">

@@ -23,11 +23,10 @@ import {
     DialogTitle,
     Input,
     Select,
-    Switch,
-    Textarea
+    Switch
 } from "@polaris/ui";
 import * as actions from "./custom-tools-actions";
-import { CodeView } from "@/components/json-view";
+import { CodeEditor, CodeView, JsonEditor } from "@/components/json-view";
 import * as shared from "@/lib/polar/custom-tools/shared";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { StoredPlugin, StoredTool } from "@/lib/polar/custom-tools/store";
@@ -354,11 +353,23 @@ function ToolDialog({
                             <Input inputMode="numeric" value={draft.timeout} onChange={(event) => set("timeout", event.target.value)} />
                         </Field>
                     </div>
-                    <Field label={t("settings.customTools.fields.input")} error={flag("input", true)}>
-                        <Textarea className="font-mono text-xs" rows={5} value={draft.input} onChange={(event) => set("input", event.target.value)} />
+                    <Field label={t("settings.customTools.fields.input")}>
+                        <JsonEditor
+                            label={t("settings.customTools.fields.input")}
+                            value={draft.input}
+                            onChange={(next) => set("input", next)}
+                            error={flag("input", true)}
+                            className="max-h-72"
+                        />
                     </Field>
                     <Field label={`${t("settings.customTools.fields.script")} *`} error={flag("script", draft.script !== "")}>
-                        <Textarea className="font-mono text-xs" rows={8} value={draft.script} onChange={(event) => set("script", event.target.value)} />
+                        <CodeEditor
+                            value={draft.script}
+                            onChange={(next) => set("script", next)}
+                            language={scriptLanguage(draft.runtime)}
+                            invalid={flag("script", draft.script !== "") !== null}
+                            className="max-h-80"
+                        />
                     </Field>
                     <p className="text-xs text-muted-foreground">{t("settings.customTools.scriptHint")}</p>
                     {error && (

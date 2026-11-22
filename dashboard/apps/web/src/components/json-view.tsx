@@ -237,6 +237,10 @@ export function JsonEditor({
  * file - painted as it is typed, the way `JsonEditor` paints JSON. The field's
  * label, validation and error line stay the caller's: this is only the box, so
  * it takes the `id`, `aria-invalid` and blur a plain textarea would.
+ *
+ * `singleLine` makes it the painted twin of a one-line input - a build or start
+ * command: one row tall, a pasted newline folds to a space, and Enter submits
+ * the form around it the way an input's Enter would.
  */
 export function CodeEditor({
     value,
@@ -248,6 +252,8 @@ export function CodeEditor({
     onBlur,
     placeholder,
     disabled = false,
+    maxLength,
+    singleLine = false,
     className
 }: {
     value: string;
@@ -262,6 +268,8 @@ export function CodeEditor({
     onBlur?: () => void;
     placeholder?: string;
     disabled?: boolean;
+    maxLength?: number;
+    singleLine?: boolean;
     className?: string;
 }) {
     return (
@@ -274,17 +282,34 @@ export function CodeEditor({
         >
             {/* The min height lives on the grid so a click under a short
                 command still lands in the textarea. */}
-            <div className="grid min-h-20 w-fit min-w-full">
+            <div className={cn("grid w-fit min-w-full", singleLine ? "min-h-9" : "min-h-20")}>
                 {language ? (
-                    <Painted code={value} language={language} className="pointer-events-none" />
+                    <Painted
+                        code={value}
+                        language={language}
+                        className={cn("pointer-events-none", singleLine && "py-2")}
+                    />
                 ) : (
-                    <pre className={cn(CODE_LAYER, "pointer-events-none")}>{`${value}\n`}</pre>
+                    <pre className={cn(CODE_LAYER, "pointer-events-none", singleLine && "py-2")}>{`${value}\n`}</pre>
                 )}
                 <textarea
                     id={id}
                     value={value}
-                    onChange={(event) => onChange(event.target.value)}
+                    onChange={(event) =>
+                        onChange(singleLine ? event.target.value.replace(/\r?\n/g, " ") : event.target.value)
+                    }
+                    onKeyDown={
+                        singleLine
+                            ? (event) => {
+                                  if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+                                  event.preventDefault();
+                                  event.currentTarget.form?.requestSubmit();
+                              }
+                            : undefined
+                    }
                     onBlur={onBlur}
+                    rows={singleLine ? 1 : undefined}
+                    maxLength={maxLength}
                     wrap="off"
                     spellCheck={false}
                     disabled={disabled}
@@ -293,6 +318,7 @@ export function CodeEditor({
                     aria-invalid={invalid || undefined}
                     className={cn(
                         CODE_LAYER,
+                        singleLine && "py-2",
                         "resize-none overflow-hidden border-0 bg-transparent text-transparent caret-foreground outline-none placeholder:text-muted-foreground"
                     )}
                 />
