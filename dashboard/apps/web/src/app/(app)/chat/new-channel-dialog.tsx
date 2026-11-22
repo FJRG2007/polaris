@@ -21,7 +21,7 @@ import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { createChannelAction } from "./actions";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
-import { Hash, Loader2, Lock, Megaphone, Volume2, type LucideIcon } from "lucide-react";
+import { Hash, Images, Loader2, Lock, Megaphone, MessagesSquare, Volume2, type LucideIcon } from "lucide-react";
 import {
     Button,
     cn,
@@ -32,14 +32,19 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Switch
+    Switch,
+    useToast
 } from "@polaris/ui";
+import { ChatPeoplePicker } from "./chat-people-picker";
+import type { PickedPerson } from "@/components/people-picker";
 
 /** Each type's icon, shared by its card and the name field. */
 const TYPE_ICONS: Record<core.ChatChannelCreateType, LucideIcon> = {
     text: Hash,
     voice: Volume2,
-    announcement: Megaphone
+    announcement: Megaphone,
+    forum: MessagesSquare,
+    media: Images
 };
 
 export function NewChannelDialog({
@@ -61,6 +66,8 @@ export function NewChannelDialog({
     const [topic, setTopic] = useState("");
     const [type, setType] = useState<core.ChatChannelCreateType>("text");
     const [privateChannel, setPrivateChannel] = useState(false);
+    const [members, setMembers] = useState<readonly PickedPerson[]>([]);
+    const toast = useToast();
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
@@ -78,10 +85,11 @@ export function NewChannelDialog({
                     spaceId: space.id,
                     name,
                     topic,
-                    kind: type === "voice" ? "voice" : "text",
+                    kind: type === "announcement" ? "text" : type,
                     announcement: type === "announcement",
                     categoryId,
-                    private: privateChannel
+                    private: privateChannel,
+                    memberIds: privateChannel ? members.map((person) => person.id) : []
                 }),
             setError
         );
@@ -91,8 +99,10 @@ export function NewChannelDialog({
         setTopic("");
         setType("text");
         setPrivateChannel(false);
+        setMembers([]);
         onOpenChange(false);
         refresh();
+        if (result.membersError) toast.show({ title: t("newChannel.membersNotAdded"), body: result.membersError });
         router.push(`/chat/c/${result.id}`);
     };
 
@@ -201,6 +211,15 @@ export function NewChannelDialog({
                             </span>
                         </span>
                     </label>
+
+                    {privateChannel && (
+                        <ChatPeoplePicker
+                            forGroup={false}
+                            picked={members}
+                            onChange={setMembers}
+                            label={t("newChannel.members")}
+                        />
+                    )}
 
                     {error && (
                         <p role="alert" className="text-sm text-danger">

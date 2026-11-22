@@ -58,6 +58,8 @@ import {
     LogOut,
     Lock,
     Megaphone,
+    Images,
+    MessagesSquare,
     MoreHorizontal,
     Pencil,
     Phone,
@@ -228,11 +230,15 @@ export function ChannelHeader({
     // megaphone even when private.
     const Icon = core.isAnnouncementChannel(channel)
         ? Megaphone
-        : channel.private
-          ? Lock
-          : named
-            ? Hash
-            : Users;
+        : core.isMediaKind(channel.kind)
+          ? Images
+          : core.isForumKind(channel.kind)
+            ? MessagesSquare
+            : channel.private
+              ? Lock
+              : named
+                ? Hash
+                : Users;
 
     /**
      * Run one of these actions and say what happened.

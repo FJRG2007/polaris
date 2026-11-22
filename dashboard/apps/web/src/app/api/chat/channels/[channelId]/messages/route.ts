@@ -116,6 +116,16 @@ function readUploads(raw: FormDataEntryValue | null): string[] {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** The tags of a new forum post: a JSON list of ids, checked by the schema. */
+function readForumTags(value: FormDataEntryValue | null): unknown {
+    if (typeof value !== "string" || value === "") return [];
+    try {
+        return JSON.parse(value);
+    } catch {
+        return null;
+    }
+}
+
 const fieldsSchema = z.object({
     // Empty is allowed here and nowhere else: a message that is only a file is a
     // message, and forcing somebody to type "here" first is a tax on the common
@@ -242,6 +252,21 @@ export async function POST(
     if (!fields.success)
         return Response.json(
             { error: (await readerWords("chat"))("errors.notSent") },
+            { status: 400 }
+        );
+
+    // A new post in a forum: its title and tags travel with the first message.
+    const forumTitle = form.get("forumTitle");
+    const forumPost =
+        forumTitle === null
+            ? null
+            : core.chatForumPostFieldsSchema.safeParse({
+                  title: String(forumTitle),
+                  tagIds: readForumTags(form.get("forumTags"))
+              });
+    if (forumPost && !forumPost.success)
+        return Response.json(
+            { error: (await readerWords("chat"))("errors.forum.titleRequired") },
             { status: 400 }
         );
 
@@ -452,7 +477,10 @@ export async function POST(
                 ...(fields.data.translation ? { translation: fields.data.translation } : {})
             },
             stored,
-            fields.data.replyToId ? { messageId: fields.data.replyToId, forwarded: false } : null
+            fields.data.replyToId ? { messageId: fields.data.replyToId, forwarded: false } : null,
+            null,
+            null,
+            forumPost?.success ? forumPost.data : null
         );
         return Response.json({ id });
     } catch (caught) {

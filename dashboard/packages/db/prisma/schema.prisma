@@ -10706,7 +10706,7 @@ model ChatChannel {
     // the first one. ON DELETE SET NULL: removing a heading must not remove the
     // rooms under it.
     categoryId    String?   @db.Uuid
-    // text | voice | dm | group
+    // text | voice | forum | dm | group
     kind          String    @default("text")
     name          String
     topic         String    @default("")
@@ -10791,6 +10791,12 @@ model ChatChannel {
     /// under the same rules as the timer. Only read for a dm or a group.
     receipts      String    @default("follow")
     typing        String    @default("follow")
+    /// A forum's posting guidelines, shown above its posts. Only read for a
+    /// forum channel; empty is none.
+    forumGuidelines String  @default("")
+    /// Whether every new post in a forum has to carry at least one of its
+    /// tags. Off by default.
+    forumRequireTag Boolean @default(false)
     createdAt     DateTime  @default(now())
     updatedAt     DateTime  @updatedAt
 
@@ -10807,11 +10813,48 @@ model ChatChannel {
     webhooks ChatWebhook[]
     ageConfirmations ChatAgeConfirmation[]
     ruleProposals ChatRuleProposal[]
+    forumTags     ChatForumTag[]
+    forumPosts    ChatForumPost[]
 
     @@index([spaceId, order])
     @@index([categoryId, order])
     @@index([orgId])
     @@index([lastMessageAt])
+}
+
+// A tag a forum's posts can carry, kept by whoever runs the channel.
+model ChatForumTag {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    channelId String   @db.Uuid
+    name      String
+    order     Float    @default(1024)
+    createdAt DateTime @default(now())
+
+    channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+    @@unique([channelId, name])
+}
+
+// A post in a forum: a thread root with a title and tags. The first message
+// is the thread's root, so replies, reactions and the thread panel are the
+// ones every message already has. `lastActivityAt` is the root's time until
+// somebody answers, then the last answer's, so the list sorts in the database.
+model ChatForumPost {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    channelId      String   @db.Uuid
+    rootMessageId  String   @unique @db.Uuid
+    title          String
+    // Ids of `ChatForumTag` rows in the same channel. A deleted tag is
+    // removed from every post that carried it.
+    tagIds         String[] @db.Uuid
+    createdAt      DateTime @default(now())
+    lastActivityAt DateTime @default(now())
+
+    channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+    root    ChatMessage @relation(fields: [rootMessageId], references: [id], onDelete: Cascade)
+
+    @@index([channelId, lastActivityAt])
+    @@index([channelId, createdAt])
 }
 
 // The picture on a space, and the one on a conversation.
@@ -11090,6 +11133,7 @@ model ChatMessage {
     attachments ChatAttachment[]
     poll        ChatPoll?
     location    ChatLocation?
+    forumPost   ChatForumPost?
     stars       ChatStar[]
     reminders   ChatReminder[]
     linkFlags   ChatMessageLinkFlag[]

@@ -98,6 +98,7 @@ import {
     LogOut,
     Mail,
     Megaphone,
+    MessagesSquare,
     MessageSquarePlus,
     Music2,
     Pencil,
@@ -110,6 +111,7 @@ import {
     ShieldOff,
     Smile,
     Inbox,
+    Images,
     Trash2,
     UserMinus,
     UserPlus,
@@ -1248,6 +1250,10 @@ function ChannelRows({
                                     <Volume2 className="size-3.5 shrink-0 text-muted-foreground" />
                                 ) : core.isAnnouncementChannel(channel) ? (
                                     <Megaphone className="size-3.5 shrink-0 text-muted-foreground" />
+                                ) : core.isMediaKind(channel.kind) ? (
+                                    <Images className="size-3.5 shrink-0 text-muted-foreground" />
+                                ) : core.isForumKind(channel.kind) ? (
+                                    <MessagesSquare className="size-3.5 shrink-0 text-muted-foreground" />
                                 ) : channel.private ? (
                                     <Lock className="size-3.5 shrink-0 text-muted-foreground" />
                                 ) : (
@@ -1987,7 +1993,9 @@ function RowMenu({
                                 // whole mechanism - arriving with `answer` on
                                 // it starts the call, the same path answering
                                 // a missed one takes.
-                                channel.kind !== "text" && (
+                                (channel.kind === "dm" ||
+                                    channel.kind === "group" ||
+                                    channel.kind === "voice") && (
                                     <ContextMenuItem
                                         onSelect={() =>
                                             router.push(`/chat/c/${channel.id}?answer=1`)

@@ -15,6 +15,13 @@ vi.mock("@/app/(app)/chat/actions", () => ({ createChannelAction: create }));
 vi.mock("@/app/(app)/chat/chat-context", () => ({ useChat: () => ({ refresh: () => undefined }) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/lib/new-build", () => ({ checkForNewBuild: async () => undefined }));
+vi.mock("@/app/(app)/chat/chat-people-picker", () => ({
+    ChatPeoplePicker: ({ label, onChange }: { label: string; onChange: (picked: { id: string; name: string }[]) => void }) => (
+        <button type="button" onClick={() => onChange([{ id: "user-1", name: "Ana" }])}>
+            {label}
+        </button>
+    )
+}));
 
 afterEach(() => {
     cleanup();
@@ -35,7 +42,9 @@ describe("creating a channel", () => {
         expect(cards.map((card) => card.textContent)).toEqual([
             expect.stringContaining("Text"),
             expect.stringContaining("Voice"),
-            expect.stringContaining("Announcement")
+            expect.stringContaining("Announcement"),
+            expect.stringContaining("Forum"),
+            expect.stringContaining("Media")
         ]);
         expect(cards[0]?.getAttribute("aria-checked")).toBe("true");
     });
@@ -69,5 +78,32 @@ describe("creating a channel", () => {
         fireEvent.click(screen.getByRole("button", { name: "Create voice channel" }));
         await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
         expect(create.mock.calls[0]?.[0]).toMatchObject({ kind: "voice", announcement: false, private: true });
+    });
+
+    it("puts the people picked in a private channel as it is made", async () => {
+        create.mockResolvedValue({ id: "channel-private" });
+        open();
+        expect(screen.queryByRole("button", { name: "People in it" })).toBeNull();
+        fireEvent.click(screen.getByRole("switch"));
+        fireEvent.click(screen.getByRole("button", { name: "People in it" }));
+        fireEvent.change(screen.getByRole("textbox", { name: "Channel name" }), {
+            target: { value: "crew" }
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Create channel" }));
+        await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+        expect(create.mock.calls[0]?.[0]).toMatchObject({ private: true, memberIds: ["user-1"] });
+        await waitFor(() => expect(push).toHaveBeenCalledWith("/chat/c/channel-private"));
+    });
+
+    it("sends a forum as its own kind", async () => {
+        create.mockResolvedValue({ id: "channel-forum" });
+        open();
+        fireEvent.click(screen.getByRole("radio", { name: /Forum/ }));
+        fireEvent.change(screen.getByRole("textbox", { name: "Channel name" }), {
+            target: { value: "help" }
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Create channel" }));
+        await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+        expect(create.mock.calls[0]?.[0]).toMatchObject({ kind: "forum", announcement: false });
     });
 });

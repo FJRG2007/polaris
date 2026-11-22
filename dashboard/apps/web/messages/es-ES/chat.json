@@ -278,7 +278,23 @@
         "keepNotDisappearing": "Solo se guardan mensajes temporales",
         "keepNotAllowed": "Este mensaje no se puede guardar",
         "keepAdminsOnly": "Solo el dueño del grupo guarda mensajes",
-        "spamRestricted": "Mucha gente te bloqueó o denunció: no puedes contactar con gente nueva durante {hours, plural, one {1 hora más} other {# horas más}}. Tus chats siguen igual."
+        "spamRestricted": "Mucha gente te bloqueó o denunció: no puedes contactar con gente nueva durante {hours, plural, one {1 hora más} other {# horas más}}. Tus chats siguen igual.",
+        "forum": {
+            "notAForum": "Este canal no es un foro.",
+            "postInThread": "Una publicación abre su propio hilo; no va dentro de otro.",
+            "postsOnly": "En un foro, abre una publicación o responde en una.",
+            "unknownTag": "Una de esas etiquetas ya no está en este foro.",
+            "tagRequired": "Este foro pide al menos una etiqueta por publicación.",
+            "mediaRequired": "En una galería, cada publicación abre con una imagen o un vídeo.",
+            "titleRequired": "Pon un título de hasta 100 caracteres.",
+            "postGone": "Esta publicación ya no está.",
+            "notYours": "Solo su autor o un administrador puede cambiarla.",
+            "tooManyTags": "Un foro guarda hasta 20 etiquetas.",
+            "tagTaken": "Este foro ya tiene una etiqueta con ese nombre.",
+            "tagGone": "Esta etiqueta ya no está.",
+            "tagName": "Una etiqueta tiene de 1 a 20 caracteres.",
+            "guidelinesTooLong": "Las normas tienen hasta 2000 caracteres."
+        }
     },
     "media": {
         "refused": {
@@ -1237,6 +1253,8 @@
         "aVoiceChannelHasA": "Un canal de voz también tiene conversación, para los enlaces y notas de lo que se habla. Entrar en la llamada es pulsar un botón, no algo que pasa al abrirlo.",
         "private": "Privado",
         "onlyThePeopleAddedTo": "Solo lo ven las personas, equipos y roles que elijas.",
+        "members": "Personas",
+        "membersNotAdded": "El canal se creó, pero no se pudo añadir a las personas",
         "cancel": "Cancelar",
         "inSpace": "En {name}.",
         "createVoice": "Crear canal de voz",
@@ -1254,6 +1272,14 @@
             "announcement": {
                 "name": "Anuncios",
                 "hint": "Solo publican administradores; el resto lee"
+            },
+            "forum": {
+                "name": "Foro",
+                "hint": "Publicaciones con título y etiquetas, cada una un hilo"
+            },
+            "media": {
+                "name": "Galería",
+                "hint": "Imágenes y vídeos, mostrados como galería"
             }
         }
     },
@@ -2873,5 +2899,49 @@
         "declined": "Rechazada",
         "joined": "Dentro",
         "goTo": "Ir al grupo"
+    },
+    "forum": {
+        "media": "Imágenes o vídeos",
+        "mediaHint": "Cada publicación abre con al menos una imagen o un vídeo.",
+        "addMedia": "Añadir",
+        "removeMedia": "Quitar {name}",
+        "noMediaYet": "Sin imágenes aún",
+        "caption": "Texto",
+        "guidelines": "Normas",
+        "searchPosts": "Buscar temas",
+        "sortBy": "Ordenar",
+        "sortActivity": "Actividad reciente",
+        "sortCreated": "Recientes",
+        "newPost": "Nuevo tema",
+        "cannotPost": "No puedes publicar en este foro",
+        "filterByTag": "Por etiqueta",
+        "couldNotLoad": "No se cargaron las publicaciones. Prueba otra vez.",
+        "noMatches": "Nada coincide",
+        "tryAnotherSearch": "Prueba otra palabra o etiqueta.",
+        "noPostsYet": "Sin temas aún",
+        "startTheFirst": "Abre la primera con Nueva publicación.",
+        "showMore": "Ver más",
+        "someone": "Alguien",
+        "replies": "{count, plural, one {# respuesta} other {# respuestas}}",
+        "lastActivity": "Activa",
+        "newPostHint": "Un título, el primer mensaje y sus etiquetas.",
+        "postTitle": "Título",
+        "firstMessage": "Mensaje",
+        "tags": "Etiquetas",
+        "tagRequiredHint": "Elige al menos una etiqueta.",
+        "notPosted": "No se envió. Prueba otra vez.",
+        "post": "Publicar",
+        "settingsTitle": "Foro",
+        "guidelinesPlaceholder": "Qué va aquí y cómo publicar",
+        "saveGuidelines": "Guardar normas",
+        "requireTag": "Pedir etiqueta",
+        "requireTagHint": "Cada publicación nueva lleva al menos una.",
+        "noTagsYet": "Aún no hay etiquetas.",
+        "tagName": "Etiqueta",
+        "saveTag": "Guardar",
+        "renameTag": "Renombrar {name}",
+        "deleteTag": "Borrar {name}",
+        "newTag": "Añadir",
+        "addTag": "Añadir"
     }
 }

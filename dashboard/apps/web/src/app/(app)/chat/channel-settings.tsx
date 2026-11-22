@@ -20,6 +20,7 @@
  */
 
 import Link from "next/link";
+import { ForumSettings } from "./forum-settings";
 import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { useChat } from "./chat-context";
@@ -597,6 +598,8 @@ function Overview({
             </Field>
 
             <NewcomerHistorySetting channel={channel} />
+
+            {core.isForumKind(channel.kind) && <ForumSettings channelId={channel.id} />}
 
             <Field label={t("channelSettings.content")} hint={t(MODE_HINT_KEYS[draft.contentMode])}>
                 <Select

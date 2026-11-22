@@ -42,11 +42,16 @@ export type ChatSpaceRole = (typeof CHAT_SPACE_ROLES)[number];
  * what differs is that the call is the point rather than something started
  * inside a conversation.
  */
-export const CHAT_CHANNEL_KINDS = ["text", "voice", "dm", "group"] as const;
+export const CHAT_CHANNEL_KINDS = ["text", "voice", "forum", "media", "dm", "group"] as const;
 
-/** The two kinds somebody can actually make. A direct message is opened by
- *  picking people, not by choosing a kind. */
-export const CHAT_SPACE_CHANNEL_KINDS = ["text", "voice"] as const;
+/** The kinds somebody can actually make in a space. A direct message is
+ *  opened by picking people, not by choosing a kind.
+ *
+ *  A `forum` is a channel whose view is a list of posts: each post is a
+ *  thread root with a title and tags (`ChatForumPost`), and nothing is said
+ *  in the channel outside a post. A `media` channel is a forum whose posts
+ *  each open with a picture or a video, drawn as a gallery. */
+export const CHAT_SPACE_CHANNEL_KINDS = ["text", "voice", "forum", "media"] as const;
 
 export type ChatSpaceChannelKind = (typeof CHAT_SPACE_CHANNEL_KINDS)[number];
 
@@ -59,7 +64,7 @@ export type ChatSpaceChannelKind = (typeof CHAT_SPACE_CHANNEL_KINDS)[number];
  * means every channel made with the switch is already an announcement channel,
  * and the type and the switch can never disagree.
  */
-export const CHAT_CHANNEL_CREATE_TYPES = ["text", "voice", "announcement"] as const;
+export const CHAT_CHANNEL_CREATE_TYPES = ["text", "voice", "announcement", "forum", "media"] as const;
 
 export type ChatChannelCreateType = (typeof CHAT_CHANNEL_CREATE_TYPES)[number];
 
@@ -282,13 +287,94 @@ export const chatChannelCreateSchema = z.object({
      *  in (`membersMaySend` off). Absent is an ordinary channel. */
     announcement: z.boolean().optional(),
     /** The heading it sits under, or null for the ones above the first one. */
-    categoryId: z.string().uuid().nullable().default(null)
+    categoryId: z.string().uuid().nullable().default(null),
+    /** The people put in a private channel as it is made. */
+    memberIds: z.array(z.string().uuid()).max(MAX_GROUP_MEMBERS).default([])
 }).refine((input) => !(input.announcement && input.kind !== "text"), {
     message: "Only a text channel can be an announcement channel",
     path: ["announcement"]
 });
 
 export type ChatChannelCreateInput = z.infer<typeof chatChannelCreateSchema>;
+
+/** Whether a channel's view is a list of posts rather than a conversation.
+ *  A media channel is one too. */
+export function isForumKind(kind: string): boolean {
+    return kind === "forum" || kind === "media";
+}
+
+/** Whether a forum's posts each open with a picture or a video. */
+export function isMediaKind(kind: string): boolean {
+    return kind === "media";
+}
+
+/** Whether a file can open a post in a media channel. */
+export function isPostMedia(contentType: string): boolean {
+    return contentType.startsWith("image/") || contentType.startsWith("video/");
+}
+
+/** The longest a forum post's title may be, and a tag's name. */
+export const MAX_FORUM_TITLE = 100;
+export const MAX_FORUM_TAG = 20;
+/** How many tags one post carries at most, and one forum keeps. */
+export const MAX_FORUM_POST_TAGS = 5;
+export const MAX_FORUM_TAGS = 20;
+export const MAX_FORUM_GUIDELINES = 2000;
+
+const forumTitle = z.string().trim().min(1).max(MAX_FORUM_TITLE);
+const forumTagIds = z.array(z.string().uuid()).max(MAX_FORUM_POST_TAGS);
+
+/** What makes a message a new forum post: the title and the tags. Sent with
+ *  the first message, which is the post's thread root. */
+export const chatForumPostFieldsSchema = z.object({
+    title: forumTitle,
+    tagIds: forumTagIds.default([])
+});
+
+export type ChatForumPostFields = z.infer<typeof chatForumPostFieldsSchema>;
+
+export const CHAT_FORUM_SORTS = ["activity", "created"] as const;
+
+export type ChatForumSort = (typeof CHAT_FORUM_SORTS)[number];
+
+export const chatForumListSchema = z.object({
+    channelId: z.string().uuid(),
+    sort: z.enum(CHAT_FORUM_SORTS).default("activity"),
+    query: z.string().trim().max(MAX_FORUM_TITLE).default(""),
+    tagId: z.string().uuid().nullable().default(null),
+    /** The last post of the page before, to read the next one from. */
+    after: z.string().uuid().nullable().default(null)
+});
+
+export type ChatForumListInput = z.infer<typeof chatForumListSchema>;
+
+export const chatForumPostUpdateSchema = z.object({
+    postId: z.string().uuid(),
+    title: forumTitle.optional(),
+    tagIds: forumTagIds.optional()
+});
+
+export type ChatForumPostUpdateInput = z.infer<typeof chatForumPostUpdateSchema>;
+
+const forumTagName = z.string().trim().min(1).max(MAX_FORUM_TAG);
+
+export const chatForumTagCreateSchema = z.object({
+    channelId: z.string().uuid(),
+    name: forumTagName
+});
+
+export const chatForumTagRenameSchema = z.object({
+    tagId: z.string().uuid(),
+    name: forumTagName
+});
+
+export const chatForumSettingsSchema = z.object({
+    channelId: z.string().uuid(),
+    guidelines: z.string().trim().max(MAX_FORUM_GUIDELINES).optional(),
+    requireTag: z.boolean().optional()
+});
+
+export type ChatForumSettingsInput = z.infer<typeof chatForumSettingsSchema>;
 
 /**
  * How long somebody waits between messages in one channel, in seconds.

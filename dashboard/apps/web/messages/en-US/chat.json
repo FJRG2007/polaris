@@ -278,7 +278,23 @@
         "keepNotDisappearing": "Only disappearing messages can be kept",
         "keepNotAllowed": "This message cannot be kept",
         "keepAdminsOnly": "Only the group owner can keep messages here",
-        "spamRestricted": "Many people blocked or reported you, so you cannot reach new people for {hours, plural, one {1 more hour} other {# more hours}}. Your existing chats still work."
+        "spamRestricted": "Many people blocked or reported you, so you cannot reach new people for {hours, plural, one {1 more hour} other {# more hours}}. Your existing chats still work.",
+        "forum": {
+            "notAForum": "This channel is not a forum.",
+            "postInThread": "A post starts its own thread; it cannot go inside one.",
+            "postsOnly": "In a forum, start a post or answer inside one.",
+            "unknownTag": "One of those tags is no longer in this forum.",
+            "tagRequired": "This forum needs at least one tag on each post.",
+            "mediaRequired": "In a media channel, each post opens with a picture or a video.",
+            "titleRequired": "Give the post a title of up to 100 characters.",
+            "postGone": "This post is no longer here.",
+            "notYours": "Only its author or an administrator can change this post.",
+            "tooManyTags": "A forum keeps up to 20 tags.",
+            "tagTaken": "This forum already has a tag with that name.",
+            "tagGone": "This tag is no longer here.",
+            "tagName": "A tag name is 1 to 20 characters.",
+            "guidelinesTooLong": "Guidelines are up to 2000 characters."
+        }
     },
     "media": {
         "refused": {
@@ -1237,6 +1253,8 @@
         "aVoiceChannelHasA": "A voice channel has a conversation too, for the links and notes that go with what is being said. Joining the call is a press, not a consequence of opening it.",
         "private": "Private",
         "onlyThePeopleAddedTo": "Only the people, teams and roles you choose can see it.",
+        "members": "People in it",
+        "membersNotAdded": "The channel was made, but the people could not be added",
         "cancel": "Cancel",
         "inSpace": "In {name}.",
         "createVoice": "Create voice channel",
@@ -1254,6 +1272,14 @@
             "announcement": {
                 "name": "Announcement",
                 "hint": "Only administrators post; members read and react"
+            },
+            "forum": {
+                "name": "Forum",
+                "hint": "Posts with a title and tags, each its own thread"
+            },
+            "media": {
+                "name": "Media",
+                "hint": "Pictures and videos, shown as a gallery"
             }
         }
     },
@@ -2873,5 +2899,49 @@
         "declined": "Declined",
         "joined": "Joined",
         "goTo": "Go to group"
+    },
+    "forum": {
+        "media": "Pictures or videos",
+        "mediaHint": "Each post opens with at least one picture or video.",
+        "addMedia": "Add files",
+        "removeMedia": "Remove {name}",
+        "noMediaYet": "No pictures yet",
+        "caption": "Caption",
+        "guidelines": "Guidelines",
+        "searchPosts": "Search posts",
+        "sortBy": "Sort posts",
+        "sortActivity": "Latest activity",
+        "sortCreated": "Newest",
+        "newPost": "New post",
+        "cannotPost": "You cannot post in this forum",
+        "filterByTag": "Filter by tag",
+        "couldNotLoad": "The posts could not be loaded. Try again in a moment.",
+        "noMatches": "No posts match",
+        "tryAnotherSearch": "Try another word or tag.",
+        "noPostsYet": "No posts yet",
+        "startTheFirst": "Start the first one with New post.",
+        "showMore": "Show more",
+        "someone": "Someone",
+        "replies": "{count, plural, one {# reply} other {# replies}}",
+        "lastActivity": "Active",
+        "newPostHint": "A title, the first message and its tags.",
+        "postTitle": "Title",
+        "firstMessage": "Message",
+        "tags": "Post tags",
+        "tagRequiredHint": "Pick at least one tag.",
+        "notPosted": "The post was not sent. Try again.",
+        "post": "Publish",
+        "settingsTitle": "Forum",
+        "guidelinesPlaceholder": "What belongs here and how to post",
+        "saveGuidelines": "Save guidelines",
+        "requireTag": "Require a tag",
+        "requireTagHint": "Every new post must carry at least one tag.",
+        "noTagsYet": "No tags yet.",
+        "tagName": "Tag name",
+        "saveTag": "Save tag",
+        "renameTag": "Rename {name}",
+        "deleteTag": "Delete {name}",
+        "newTag": "Add tag",
+        "addTag": "Add tag"
     }
 }

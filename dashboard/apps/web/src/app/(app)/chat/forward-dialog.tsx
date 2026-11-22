@@ -26,6 +26,7 @@
  * is the kind of thing people stop bothering with.
  */
 
+import * as core from "@polaris/core";
 import type { ChatSentTranslation } from "@polaris/core";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
@@ -166,7 +167,11 @@ export function ForwardDialog({
         setTranslating(false);
     }, [message?.id]);
 
-    const open = useMemo(() => channels.filter((channel) => !channel.archived), [channels]);
+    // A forum takes posts, not loose messages: nothing is forwarded into one.
+    const open = useMemo(
+        () => channels.filter((channel) => !channel.archived && !core.isForumKind(channel.kind)),
+        [channels]
+    );
 
     /** Everywhere this message can go, as one flat list. What the search reads,
      *  and what the browse is carved back out of. */
@@ -175,7 +180,7 @@ export function ForwardDialog({
         return open.map((channel) => ({
             id: channel.id,
             name: channel.name,
-            kind: channel.kind,
+            kind: channel.kind as Target["kind"],
             spaceId: channel.spaceId,
             people: channel.spaceId ? [] : channel.others,
             place: channel.spaceId ? (places.get(channel.spaceId) ?? null) : null

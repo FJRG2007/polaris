@@ -1269,7 +1269,7 @@ export async function deleteSpaceAction(spaceId: string): Promise<{ error?: stri
 
 export async function createChannelAction(
     input: unknown
-): Promise<{ id?: string; error?: string }> {
+): Promise<{ id?: string; error?: string; membersError?: string }> {
     const me = await actor();
     const parsed = core.chatChannelCreateSchema.safeParse(input);
     if (!parsed.success)
@@ -1280,8 +1280,14 @@ export async function createChannelAction(
         };
 
     const result = await guard(() => chat.createChannel(me, parsed.data));
-    if (!result.error) revalidatePath(CHAT_PATH);
-    return result.error ? { error: result.error } : { id: result.value };
+    if (result.error || !result.value) return { error: result.error };
+    const id = result.value;
+    // The channel stands either way: a refusal here is said on the screen,
+    // never a reason to undo what was made.
+    const memberIds = parsed.data.private ? parsed.data.memberIds : [];
+    const added = memberIds.length ? await guard(() => chat.addChannelMembers(me, id, memberIds)) : null;
+    revalidatePath(CHAT_PATH);
+    return added?.error ? { id, membersError: added.error } : { id };
 }
 
 /** A copy of a channel under a new name - see `duplicateChannel` for what comes along. */

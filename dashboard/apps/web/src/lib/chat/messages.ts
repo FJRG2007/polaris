@@ -25,6 +25,7 @@ import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
 import { rulesForChannel } from "./rules";
 import { mayStartThread } from "./thread-rules";
+import { checkForumPost } from "./forum-rules";
 import { directThreadsAllowed } from "./dm-threads";
 import { appCommandIn, commandIn } from "./chat-command";
 import { publishChatChange } from "./live";
@@ -696,7 +697,13 @@ async function sendUnguarded(
         readonly placeName: string | null;
         readonly address: string | null;
         readonly liveUntil: Date | null;
-    } | null = null
+    } | null = null,
+    /**
+     * The title and tags, when this message opens a post in a forum. The post
+     * row is written in the same transaction as its first message, so a post
+     * never exists without the thread it heads.
+     */
+    forumPost: core.ChatForumPostFields | null = null
 ): Promise<string> {
     const access = await requirePostable(actor, input.channelId);
     // A space's emoji only inside that space: anything else the text names is
@@ -785,6 +792,15 @@ async function sendUnguarded(
         }
     }
 
+    // A forum is a list of posts: everything said in it opens a post or
+    // answers inside one.
+    if (forumPost) {
+        const contentTypes = attachments.map((file) => file.contentType);
+        await checkForumPost(input.channelId, access.kind, input.parentId, forumPost, contentTypes);
+    } else if (core.isForumKind(access.kind) && !input.parentId) {
+        throw new ChatRuleError({ key: "errors.forum.postsOnly" });
+    }
+
     // Stamped once, from the timer in force now: changing it later never moves
     // a message already sent.
     const expiresAt = hasDirectRules(access)
@@ -841,6 +857,25 @@ async function sendUnguarded(
             await tx.chatMessage.update({
                 where: { id: input.parentId },
                 data: { replyCount: { increment: 1 }, lastReplyAt: message.createdAt }
+            });
+            // What sorts a forum's list by latest activity.
+            if (core.isForumKind(access.kind)) {
+                await tx.chatForumPost.updateMany({
+                    where: { rootMessageId: input.parentId },
+                    data: { lastActivityAt: message.createdAt }
+                });
+            }
+        }
+        if (forumPost) {
+            await tx.chatForumPost.create({
+                data: {
+                    channelId: input.channelId,
+                    rootMessageId: message.id,
+                    title: forumPost.title,
+                    tagIds: [...new Set(forumPost.tagIds)],
+                    createdAt: message.createdAt,
+                    lastActivityAt: message.createdAt
+                }
             });
         }
         // A hidden conversation comes back with a new message, unless muted.

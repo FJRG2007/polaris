@@ -21,6 +21,7 @@
  * did not read them.
  */
 
+import dynamic from "next/dynamic";
 import { usePolarDrafts } from "./polar-draft";
 import { useAppCommands } from "./use-app-commands";
 import type { ViewOnceChoice } from "@/lib/chat/view-once-choice";
@@ -132,6 +133,10 @@ import * as readMarks from "@/lib/chat/read-marks";
 import { prefetchMedia } from "./media-download";
 import { newClientKey, type OutboxEntry } from "@/lib/chat/offline/outbox";
 import { mayStartThread } from "@/lib/chat/thread-rules";
+
+/** Loaded only when a forum is opened: most channels never need it, and it
+ *  brings the forum's server actions along. */
+const ForumView = dynamic(() => import("./forum-view").then((module) => module.ForumView));
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -2989,6 +2994,14 @@ export function ChannelView({
                 void load();
                 void pins.reload();
             }}
+        />
+    ) : core.isForumKind(channel.kind) ? (
+        // A forum is its list of posts; a post opens in the thread panel.
+        <ForumView
+            channelId={channelId}
+            media={core.isMediaKind(channel.kind)}
+            canPost={canPost}
+            onOpenPost={setThread}
         />
     ) : (
         conversation
