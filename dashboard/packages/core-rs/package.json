@@ -1,0 +1,42 @@
+{
+    "name": "@polaris/core-rs",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "TypeScript facades over the Rust core: the same API as the TypeScript code they replace, a per-domain mode (ts, shadow, rust) and a fallback to TypeScript whenever the Rust build is missing, fails or is slow.",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./probe": {
+            "types": "./dist/probe.d.ts",
+            "import": "./dist/probe.js"
+        },
+        "./vectors": {
+            "types": "./dist/vectors.d.ts",
+            "import": "./dist/vectors.js"
+        }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "scripts": {
+        "build": "tsup src/index.ts src/probe.ts src/vectors.ts --format esm --dts --clean",
+        "build:rust": "node scripts/build-rust.mjs",
+        "typecheck": "tsc --noEmit",
+        "test": "vitest run test/unit",
+        "test:native": "vitest run test/native",
+        "test:wasm": "vitest run test/wasm",
+        "test:browsers": "node scripts/browser-parity.mjs",
+        "check:size": "node scripts/wasm-size.mjs",
+        "check:guard": "node scripts/no-simulation-guard.mjs",
+        "check:ledger": "node scripts/ledger-check.mjs",
+        "vectors": "node scripts/vectors.mjs"
+    },
+    "dependencies": {
+        "@noble/hashes": "2.2.0"
+    },
+    "devDependencies": {
+        "fast-check": "4.10.2"
+    }
+}

@@ -1,0 +1,3 @@
+{
+    "probe": { "mode": "ts", "ledger": "F4", "timeoutMs": 50 }
+}

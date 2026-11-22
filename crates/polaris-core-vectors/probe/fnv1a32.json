@@ -1,0 +1,216 @@
+{
+  "domain": "probe",
+  "op": "fnv1a32",
+  "source": "dashboard/packages/core-rs/src/domains/probe/ts.ts",
+  "cases": [
+    {
+      "name": "empty",
+      "args": [
+        ""
+      ],
+      "expect": {
+        "ok": 2166136261
+      }
+    },
+    {
+      "name": "one letter",
+      "args": [
+        "a"
+      ],
+      "expect": {
+        "ok": 3826002220
+      }
+    },
+    {
+      "name": "standard vector foobar",
+      "args": [
+        "foobar"
+      ],
+      "expect": {
+        "ok": 3214735720
+      }
+    },
+    {
+      "name": "real-shaped e-mail",
+      "args": [
+        "someone@example.com"
+      ],
+      "expect": {
+        "ok": 969230834
+      }
+    },
+    {
+      "name": "printable ASCII",
+      "args": [
+        " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
+      ],
+      "expect": {
+        "ok": 1458624920
+      }
+    },
+    {
+      "name": "NUL",
+      "args": [
+        "\u0000"
+      ],
+      "expect": {
+        "ok": 84696351
+      }
+    },
+    {
+      "name": "two-byte UTF-8",
+      "args": [
+        "é"
+      ],
+      "expect": {
+        "ok": 513665217
+      }
+    },
+    {
+      "name": "combining accent",
+      "args": [
+        "é"
+      ],
+      "expect": {
+        "ok": 4204513055
+      }
+    },
+    {
+      "name": "CJK",
+      "args": [
+        "日本語"
+      ],
+      "expect": {
+        "ok": 2153733351
+      }
+    },
+    {
+      "name": "astral emoji",
+      "args": [
+        "😀"
+      ],
+      "expect": {
+        "ok": 866293256
+      }
+    },
+    {
+      "name": "ZWJ family",
+      "args": [
+        "👩‍👩‍👧‍👦"
+      ],
+      "expect": {
+        "ok": 1808178171
+      }
+    },
+    {
+      "name": "BOM",
+      "args": [
+        "﻿"
+      ],
+      "expect": {
+        "ok": 2169489920
+      }
+    },
+    {
+      "name": "U+FFFF",
+      "args": [
+        "￿"
+      ],
+      "expect": {
+        "ok": 21469476
+      }
+    },
+    {
+      "name": "lone high surrogate",
+      "args": [
+        {
+          "$utf16": [
+            55296
+          ]
+        }
+      ],
+      "expect": {
+        "ok": 55024714
+      }
+    },
+    {
+      "name": "lone low surrogate",
+      "args": [
+        {
+          "$utf16": [
+            56320
+          ]
+        }
+      ],
+      "expect": {
+        "ok": 55024714
+      }
+    },
+    {
+      "name": "surrogates reversed",
+      "args": [
+        {
+          "$utf16": [
+            56320,
+            55296
+          ]
+        }
+      ],
+      "expect": {
+        "ok": 468195463
+      }
+    },
+    {
+      "name": "lone surrogate between letters",
+      "args": [
+        {
+          "$utf16": [
+            97,
+            56319,
+            98
+          ]
+        }
+      ],
+      "expect": {
+        "ok": 1982953453
+      }
+    },
+    {
+      "name": "U+FFFD itself",
+      "args": [
+        "�"
+      ],
+      "expect": {
+        "ok": 55024714
+      }
+    },
+    {
+      "name": "huge (1 MiB)",
+      "args": [
+        {
+          "$repeat": {
+            "text": "Polaris ",
+            "times": 131072
+          }
+        }
+      ],
+      "expect": {
+        "ok": 3151273413
+      }
+    },
+    {
+      "name": "huge emoji run",
+      "args": [
+        {
+          "$repeat": {
+            "text": "👩‍👩‍👧‍👦",
+            "times": 4000
+          }
+        }
+      ],
+      "expect": {
+        "ok": 2728763397
+      }
+    }
+  ]
+}

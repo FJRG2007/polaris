@@ -1,0 +1,22 @@
+[package]
+name = "polaris-core-node"
+version = "0.1.0"
+description = "Node binding of polaris-core (napi-rs): the dashboard server and Electron main load it through @polaris/core-rs."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+polaris-core = { path = "../polaris-core" }
+napi = { version = "=3.16.1", default-features = false, features = ["napi4"] }
+napi-derive = { version = "=3.7.0", default-features = false }
+
+[build-dependencies]
+napi-build = "=2.6.0"

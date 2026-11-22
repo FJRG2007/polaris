@@ -1,0 +1,18 @@
+[package]
+name = "polaris-core"
+version = "0.1.0"
+description = "Polaris' shared core: pure logic written once and built for the server, the browser, the extension and the desktop app."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+
+[dev-dependencies]
+polaris-core-vectors = { path = "../polaris-core-vectors" }
+proptest = "1.7.0"

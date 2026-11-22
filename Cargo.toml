@@ -1,10 +1,15 @@
 # Polaris workspace.
-# The Rust side of Polaris: the privileged host daemon and the tunnel daemon.
+# The Rust side of Polaris: the privileged host daemon, the tunnel daemon, and
+# the shared core (docs/rust-core-plan.md) with its Node and WebAssembly bindings.
 [workspace]
 resolver = "2"
 members = [
     "crates/polaris-hostd",
     "crates/polaris-tunnel",
+    "crates/polaris-core",
+    "crates/polaris-core-vectors",
+    "crates/polaris-core-node",
+    "crates/polaris-core-wasm",
 ]
 exclude = ["vendor/smoltcp"]
 
@@ -36,3 +41,17 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = true
+
+# The Node binding is loaded into a long-lived process (the dashboard server,
+# Electron main). A panic there must unwind into a JavaScript error the facade
+# can fall back from, not abort the whole process, so it is built with this
+# profile instead of `release`. Speed over size: it is not shipped to browsers.
+[profile.release-node]
+inherits = "release"
+panic = "unwind"
+opt-level = 3
+
+# The WebAssembly binding is downloaded by browsers, so it keeps `release`'s
+# size optimisation; wasm32 traps on panic regardless of this setting.
+[profile.release-wasm]
+inherits = "release"

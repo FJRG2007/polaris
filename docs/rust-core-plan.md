@@ -287,6 +287,7 @@ the phase before them reaches "serving". They are not started from this summary.
 | Column | Meaning |
 |---|---|
 | Unit | id from this plan (F1, P1, ...) |
+| Domain | the `core-rs` domain the row owns, or `-`; checked against `src/domains.json` by F7 |
 | TS source | the files it replaces, or "new" |
 | State | not started / in progress / built / shadow / serving / TS removed / blocked |
 | Checks | links to the CI run for each of 4.1-4.8 that applies |
