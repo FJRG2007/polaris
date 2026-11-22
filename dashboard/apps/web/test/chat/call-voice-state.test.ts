@@ -208,7 +208,7 @@ describe("a seat's microphone and headphones", () => {
             { id: "s2", name: "Visitor", userId: null, muted: true, deafened: false }
         ]);
         expect(listed.at(-1)).toMatchObject({
-            OR: [{ hostId: "host" }, { invites: { some: { userId: "host" } } }]
+            AND: expect.arrayContaining([{ OR: [{ hostId: "host" }, { invites: { some: { userId: "host" } } }] }])
         });
     });
 });
