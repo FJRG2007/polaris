@@ -71,15 +71,15 @@ casa hasta gobiernos y empresas con millones o miles de millones de usuarios,
 con cientos o miles de apps oficiales y, como en Home Assistant, potencialmente
 millones de apps de la comunidad.
 
-### Velocidad del cliente: un núcleo en Rust en cada cliente (planificado)
+### La lógica compartida en Rust, para todos los clientes (en curso)
 
-Un núcleo en Rust compartido por todos los clientes - nativo en las apps
-móviles y compilado a WebAssembly en el navegador para el trabajo pesado del
-cliente (sincronización, caché local e índice de búsqueda, criptografía y uso
-sin conexión) - para que la web y los clientes nativos ejecuten el mismo
-código. Nada de esto existe: el primer crate se fue con la beta de Tauri (ver
-arriba), y solo se retoma cuando un cuello de botella medido en el cliente lo
-pida.
+Decidido el 2026-11-23; sustituye a "solo cuando un cuello de botella medido lo
+pida": la lógica compartida se escribe una vez en Rust y se compila para el
+servidor, el navegador, la extensión, la app de escritorio y las pantallas
+nativas de móvil, migrada módulo a módulo sin ningún cambio visible para nadie.
+La interfaz se queda como está. El plan, su listón de tests y sus puertas están
+en [el plan del núcleo en Rust](rust-core-plan.md); lo hecho, en
+[su registro](rust-core-ledger.md).
 
 ### La interfaz de las apps sigue siendo web y aislada (en parte planificado)
 

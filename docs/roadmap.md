@@ -66,14 +66,14 @@ to governments and companies with millions or billions of users, with hundreds
 or thousands of official apps and, as in Home Assistant, potentially millions of
 community apps.
 
-### Client speed: one Rust core in every client (planned)
+### Shared logic in Rust, built for every client (in progress)
 
-A Rust core shared by every client - native in mobile apps, and compiled to
-WebAssembly in the browser for the heavy client work (sync, the local cache and
-search index, crypto and offline use) - so the web and native clients run the
-same code. None of this exists: the first crate went with the Tauri beta (see
-above), and it is started again only when a measured client bottleneck needs
-it.
+Decided on 2026-11-23, replacing "only when a measured bottleneck needs it":
+shared logic is written once in Rust and built for the server, the browser,
+the extension, the desktop app and native mobile screens, migrated module by
+module with no visible change to anybody. The UI stays as it is. The plan, its
+testing bar and its gates are in [the Rust core plan](rust-core-plan.md); what
+is done is in [its ledger](rust-core-ledger.md).
 
 ### App UI stays web-based and sandboxed (partly planned)
 
