@@ -36,8 +36,10 @@
     <string name="battery_allow">Permitir</string>
     <string name="battery_later">Ahora no</string>
     <string name="view_once_failed">Ahora no se puede abrir. Vuelve a intentarlo en un momento.</string>
-    <string name="notices_connected">Conectado para mensajes</string>
+    <string name="notices_connected">Mensajes y llamadas llegan con Polaris cerrado</string>
+    <string name="notices_connected_hide">Toca para ocultar este aviso</string>
     <string name="notices_channel_connection">Conexión</string>
+    <string name="notices_channel_connection_about">Mantiene la llegada de mensajes y llamadas con Polaris cerrado. Desactívalo para ocultar el aviso: los mensajes y las llamadas siguen llegando.</string>
     <string name="notices_channel_messages">Mensajes</string>
     <string name="notices_channel_calls">Llamadas</string>
     <string name="call_incoming">Llamada de Polaris</string>

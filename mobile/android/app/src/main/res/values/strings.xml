@@ -38,8 +38,10 @@
     <string name="battery_allow">Allow</string>
     <string name="battery_later">Not now</string>
     <string name="view_once_failed">This cannot be opened right now. Try again in a moment.</string>
-    <string name="notices_connected">Connected for messages</string>
+    <string name="notices_connected">Messages and calls arrive with Polaris closed</string>
+    <string name="notices_connected_hide">Tap to hide this notice</string>
     <string name="notices_channel_connection">Connection</string>
+    <string name="notices_channel_connection_about">Keeps messages and calls arriving while Polaris is closed. Turn it off to hide the notice: messages and calls still arrive.</string>
     <string name="notices_channel_messages">Messages</string>
     <string name="notices_channel_calls">Calls</string>
     <string name="call_incoming">Polaris call</string>

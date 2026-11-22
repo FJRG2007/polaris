@@ -14,6 +14,7 @@ import android.graphics.drawable.Icon;
 import android.net.Uri;
 import android.os.Build;
 import android.os.IBinder;
+import android.provider.Settings;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -28,8 +29,10 @@ import org.json.JSONObject;
  * The page raises a toast only while it runs, and a WebView has no Web Push, so this service keeps one connection
  * open to the instance (`/api/mobile/notices`) and turns each frame into a notification. It needs no Google account
  * and no setup: the instance decides what is news exactly as it does for a browser, and the phone only draws it.
- * Android requires a service like this to show that it is running, which is the quiet "Connected" notification; it
- * can be hidden from the phone's notification settings without stopping anything.
+ * Android requires a service like this to show that it is running. Messaging apps that go through Google's push
+ * (FCM) need no such service; a self-hosted instance has no push relay of its own, so this connection is the delivery
+ * path and the notice is its cost. It is made as small as Android allows and one tap hides it for good (turning the
+ * "Connection" channel off does not stop the service), see `onStartCommand`.
  */
 public final class NoticeService extends Service {
     private static final String CONNECTION = "connection";
@@ -73,11 +76,18 @@ public final class NoticeService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         channels();
+        // As quiet as Android lets a running service be: folded at the bottom of the shade, no icon in the status bar,
+        // no sound, nothing on the lock screen, and swipeable. Tapping it lands on the switch that hides it for good,
+        // whose page says why it is there (the channel's description); messages keep arriving either way.
         Notification connected = new Notification.Builder(this, CONNECTION)
                 .setSmallIcon(R.drawable.ic_notification)
                 .setContentTitle(getString(R.string.notices_connected))
-                .setContentIntent(open(null, 0))
-                .setOngoing(true)
+                .setContentText(getString(R.string.notices_connected_hide))
+                .setContentIntent(hideConnection())
+                .setCategory(Notification.CATEGORY_SERVICE)
+                .setVisibility(Notification.VISIBILITY_SECRET)
+                .setShowWhen(false)
+                .setLocalOnly(true)
                 .build();
         if (Build.VERSION.SDK_INT >= 34) {
             startForeground(RUNNING_ID, connected, ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING);
@@ -96,6 +106,10 @@ public final class NoticeService extends Service {
         NotificationManager manager = getSystemService(NotificationManager.class);
         NotificationChannel connection = new NotificationChannel(CONNECTION, getString(R.string.notices_channel_connection), NotificationManager.IMPORTANCE_MIN);
         connection.setShowBadge(false);
+        connection.setDescription(getString(R.string.notices_channel_connection_about));
+        connection.setSound(null, null);
+        connection.enableVibration(false);
+        connection.setLockscreenVisibility(Notification.VISIBILITY_SECRET);
         manager.createNotificationChannel(connection);
         manager.createNotificationChannel(new NotificationChannel(MESSAGES, getString(R.string.notices_channel_messages), NotificationManager.IMPORTANCE_HIGH));
         IncomingCall.channel(this);
@@ -240,6 +254,15 @@ public final class NoticeService extends Service {
         // Unlocked first: nobody answers from a locked phone left on a desk.
         if (Build.VERSION.SDK_INT >= 31) action.setAuthenticationRequired(true);
         return action.build();
+    }
+
+    /** The phone's own page for the "Connection" notice, where one switch hides it (part of Android since 8.0). */
+    private PendingIntent hideConnection() {
+        Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())
+                .putExtra(Settings.EXTRA_CHANNEL_ID, CONNECTION)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        return PendingIntent.getActivity(this, 1, intent, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
     private PendingIntent open(Uri page, int request) {
