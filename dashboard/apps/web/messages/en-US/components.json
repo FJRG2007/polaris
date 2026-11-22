@@ -1369,7 +1369,9 @@
         "confirm": "Confirm",
         "codePlaceholder": "6-digit code",
         "resend": "Resend",
-        "send": "Send code"
+        "send": "Send code",
+        "sending": "Sending code...",
+        "sendAgainIn": "Send again in {seconds}s"
     },
     "desktop": {
         "logsTitle": "Logs - {label}",

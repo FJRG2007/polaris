@@ -11,17 +11,19 @@
  * What it asks for is the account's business, not the caller's: it fetches the
  * ways this account can confirm and offers those. A picker only appears when
  * there is genuinely a choice - one way is not a decision anybody wants to be
- * shown - and the code field is disabled until a code has actually been sent, so
- * nobody sits typing into a box waiting for a message that was never asked for.
+ * shown. A way that delivers its code (email, WhatsApp, Telegram) sends it by
+ * itself when the confirmation opens, once, and the button is the resend with its
+ * wait (components/use-code-sending.ts) - the same as the sign-in steps.
  */
 
-import { Loader2, Send } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import type { StepUpChoice } from "@/lib/step-up";
 import { Button, Input, Select } from "@polaris/ui";
 import type { StepUpProofInput } from "@polaris/core";
 import { useEffect, useId, useRef, useState } from "react";
+import { useCodeSending } from "@/components/use-code-sending";
 import { sendStepUpCodeAction } from "@/app/(app)/account/step-up-actions";
-import { codeDigits } from "@/components/code-input";
+import { CodeInput } from "@/components/code-input";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import * as polls from "./shared-polls";
@@ -39,7 +41,8 @@ function proofLabel(t: NamespaceTranslator<"components">, choice: StepUpChoice):
 export function StepUpFields({
     open,
     purpose,
-    onChange
+    onChange,
+    autoSubmit = false
 }: {
     /** Drives the reset: reopening must not inherit the last attempt's code. */
     open: boolean;
@@ -47,20 +50,20 @@ export function StepUpFields({
     purpose: string;
     /** The completed proof, or null while it is still incomplete. */
     onChange: (proof: StepUpProofInput | null) => void;
+    /** Submit the surrounding form once a whole code is typed - only where the
+     *  code is the last thing that form asks for and its submit checks the rest. */
+    autoSubmit?: boolean;
 }) {
     const t = useTranslations("components");
     const fieldId = useId();
     const [choices, setChoices] = useState<StepUpChoice[] | null>(null);
     const [proof, setProof] = useState<StepUpChoice | null>(null);
     const [value, setValue] = useState("");
-    const [sending, setSending] = useState(false);
-    const [sent, setSent] = useState("");
     const [error, setError] = useState("");
 
     useEffect(() => {
         if (!open) return;
         setValue("");
-        setSent("");
         setError("");
         let live = true;
         void polls
@@ -96,6 +99,17 @@ export function StepUpFields({
         }
     }, [proof, value]);
 
+    // Before the early return below: a hook may not be skipped on a render.
+    const sending = useCodeSending({
+        scope: open && proof?.sends ? `step-up:${purpose}:${proof.proof}` : null,
+        auto: true,
+        send: async () => {
+            if (!proof?.sends) return { error: "" };
+            const result = await sendStepUpCodeAction(purpose, proof.proof);
+            return result.error ? { error: result.error } : {};
+        }
+    });
+
     if (!choices) {
         return (
             <p className="text-muted-foreground flex items-center gap-2 text-xs">
@@ -104,18 +118,13 @@ export function StepUpFields({
         );
     }
 
-    const send = async () => {
-        if (!proof?.sends) return;
-        setSending(true);
-        setError("");
-        const result = await sendStepUpCodeAction(purpose, proof.proof);
-        setSending(false);
-        if (result.error) {
-            setError(result.error);
-            return;
-        }
-        setSent(proof.target ? t("stepUp.sentTo", { target: proof.target }) : t("stepUp.sent"));
-    };
+    const sent = sending.sent
+        ? proof?.target
+            ? t("stepUp.sentTo", { target: proof.target })
+            : t("stepUp.sent")
+        : "";
+    const shownError = error || sending.error;
+    const password = proof?.proof === "password";
 
     return (
         <div className="flex flex-col gap-2">
@@ -133,7 +142,6 @@ export function StepUpFields({
                         onValueChange={(next) => {
                             setProof(choices.find((choice) => choice.proof === next) ?? null);
                             setValue("");
-                            setSent("");
                             setError("");
                         }}
                     />
@@ -142,51 +150,50 @@ export function StepUpFields({
 
             <label className="text-muted-foreground flex flex-col gap-1 text-xs" htmlFor={fieldId}>
                 {proof ? proofLabel(t, proof) : t("stepUp.confirm")}
-                <div className="flex items-center gap-2">
+                {password ? (
                     <Input
                         id={fieldId}
                         value={value}
                         className="h-9"
-                        autoComplete={
-                            proof?.proof === "password" ? "current-password" : "one-time-code"
-                        }
-                        type={proof?.proof === "password" ? "password" : "text"}
-                        inputMode={proof?.proof === "password" ? undefined : "numeric"}
-                        placeholder={
-                            proof?.proof === "password"
-                                ? t("stepUp.proofs.password")
-                                : t("stepUp.codePlaceholder")
-                        }
-                        disabled={Boolean(proof?.sends) && !sent}
-                        onChange={(event) =>
-                            setValue(
-                                proof?.proof === "password"
-                                    ? event.target.value
-                                    : codeDigits(event.target.value)
-                            )
-                        }
+                        autoComplete="current-password"
+                        type="password"
+                        placeholder={t("stepUp.proofs.password")}
+                        onChange={(event) => setValue(event.target.value)}
                     />
-                    {proof?.sends && (
-                        <Button
-                            type="button"
-                            size="sm"
-                            variant="secondary"
-                            disabled={sending}
-                            onClick={() => void send()}
-                        >
-                            {sending ? (
-                                <Loader2 className="size-4 shrink-0 animate-spin" />
-                            ) : (
-                                <Send className="size-4 shrink-0" />
-                            )}
-                            {sent ? t("stepUp.resend") : t("stepUp.send")}
-                        </Button>
-                    )}
-                </div>
+                ) : (
+                    <CodeInput
+                        id={fieldId}
+                        value={value}
+                        className="h-9"
+                        autoSubmit={autoSubmit}
+                        placeholder={t("stepUp.codePlaceholder")}
+                        onValueChange={setValue}
+                    />
+                )}
             </label>
 
-            {sent && !error && <p className="text-muted-foreground text-xs">{sent}</p>}
-            {error && <p className="text-danger text-xs">{error}</p>}
+            {proof?.sends && (
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="w-full"
+                    disabled={sending.sending || sending.cooldown > 0}
+                    onClick={sending.resend}
+                >
+                    {sending.sending ? <Loader2 className="size-4 shrink-0 animate-spin" /> : null}
+                    {sending.sending
+                        ? t("stepUp.sending")
+                        : sending.cooldown > 0
+                          ? t("stepUp.sendAgainIn", { seconds: sending.cooldown })
+                          : sent
+                            ? t("stepUp.resend")
+                            : t("stepUp.send")}
+                </Button>
+            )}
+
+            {sent && !shownError && <p className="text-muted-foreground text-xs">{sent}</p>}
+            {shownError && <p className="text-danger text-xs">{shownError}</p>}
         </div>
     );
 }

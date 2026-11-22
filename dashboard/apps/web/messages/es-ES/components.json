@@ -1369,7 +1369,9 @@
         "confirm": "Confirmar",
         "codePlaceholder": "6 dígitos",
         "resend": "Reenviar",
-        "send": "Enviar código"
+        "send": "Enviar código",
+        "sending": "Enviando código...",
+        "sendAgainIn": "Reenviar en {seconds} s"
     },
     "desktop": {
         "logsTitle": "Registros - {label}",

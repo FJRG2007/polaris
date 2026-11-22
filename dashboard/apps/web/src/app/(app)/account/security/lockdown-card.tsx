@@ -14,7 +14,7 @@
  * would be answered by that attacker just as easily.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as core from "@polaris/core";
 import { useRouter } from "next/navigation";
 import { Loader2, ShieldAlert } from "lucide-react";
@@ -219,6 +219,15 @@ function LockdownDialog({
         setProof(null);
         onDone(asking === "disabled" || asking === "deleting");
     }
+
+    // A whole code confirms on its own, as in every other confirmation that asks
+    // for one (components/step-up-dialog.tsx); a password waits for the button.
+    // Each typed code is a new proof object, so a refused one is not resent.
+    const confirmNow = useRef(confirm);
+    confirmNow.current = confirm;
+    useEffect(() => {
+        if (proof && proof.proof !== "password") void confirmNow.current();
+    }, [proof]);
 
     return (
         <Dialog

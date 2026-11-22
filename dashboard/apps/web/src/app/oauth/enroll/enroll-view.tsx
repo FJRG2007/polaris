@@ -48,6 +48,7 @@ import {
     sendEnrollmentCodeAction
 } from "./actions";
 import { CodeInput, isWholeCode } from "@/components/code-input";
+import { useCodeSending } from "@/components/use-code-sending";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 /** One way in, as the server decided this deployment can offer it. */
@@ -178,7 +179,7 @@ export function EnrollView({
 /** A code sent to the address the account signs in with. Answering it confirms
  *  the address as well as arming the factor, which is why nothing asks the person
  *  to click a verification link afterwards. */
-function EmailFactor({
+export function EmailFactor({
     target,
     password,
     onArmed,
@@ -192,22 +193,21 @@ function EmailFactor({
     onBack: (() => void) | null;
 }) {
     const t = useTranslations("auth");
-    const [sent, setSent] = useState(false);
     const [code, setCode] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    async function send() {
-        setBusy(true);
-        setError(null);
-        const result = await sendEnrollmentCodeAction();
-        setBusy(false);
-        if (result.error) {
-            setError(result.error);
-            return;
+    // Sent by itself on choosing email, once; the button is the resend, quiet
+    // for the wait - as on the sign-in steps (components/use-code-sending.ts).
+    const sending = useCodeSending({
+        scope: "enroll:email",
+        auto: true,
+        send: async () => {
+            const result = await sendEnrollmentCodeAction();
+            return result.error ? { error: result.error } : {};
         }
-        setSent(true);
-    }
+    });
+    const shownError = error ?? sending.error;
 
     async function arm(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -234,56 +234,56 @@ function EmailFactor({
                     </p>
                 </div>
 
-                {!sent ? (
-                    <Button onClick={() => void send()} disabled={busy}>
-                        {busy ? t("enroll.email.sending") : t("enroll.email.send")}
-                    </Button>
-                ) : (
-                    <form className="flex flex-col gap-3" onSubmit={(event) => void arm(event)}>
-                        <label className="flex flex-col gap-1 text-sm">
-                            {t("enroll.email.code")}
-                            {/* Submits on its own only when the password is not asked after it. */}
-                            <CodeInput
-                                name="code"
-                                autoSubmit={password !== undefined}
-                                value={code}
-                                onValueChange={setCode}
-                                required
-                            />
-                        </label>
-                        {password === undefined ? (
-                            <>
-                                <label className="flex flex-col gap-1 text-sm">
-                                    {t("enroll.yourPassword")}
-                                    <Input
-                                        name="password"
-                                        type="password"
-                                        autoComplete="current-password"
-                                        required
-                                    />
-                                </label>
-                                <p className="text-xs text-muted-foreground">
-                                    {t("enroll.passwordReason")}
-                                </p>
-                            </>
-                        ) : null}
-                        <div className="flex items-center gap-2">
-                            <Button type="submit" disabled={busy || !isWholeCode(code)}>
-                                {busy ? t("enroll.turningOn") : t("enroll.turnOn")}
-                            </Button>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => void send()}
-                                disabled={busy}
-                            >
-                                {t("enroll.email.sendAnother")}
-                            </Button>
-                        </div>
-                    </form>
-                )}
+                <form className="flex flex-col gap-3" onSubmit={(event) => void arm(event)}>
+                    <label className="flex flex-col gap-1 text-sm">
+                        {t("enroll.email.code")}
+                        {/* Submits on its own only when the password is not asked after it. */}
+                        <CodeInput
+                            name="code"
+                            autoSubmit={password !== undefined}
+                            value={code}
+                            onValueChange={setCode}
+                            required
+                        />
+                    </label>
+                    {password === undefined ? (
+                        <>
+                            <label className="flex flex-col gap-1 text-sm">
+                                {t("enroll.yourPassword")}
+                                <Input
+                                    name="password"
+                                    type="password"
+                                    autoComplete="current-password"
+                                    required
+                                />
+                            </label>
+                            <p className="text-xs text-muted-foreground">
+                                {t("enroll.passwordReason")}
+                            </p>
+                        </>
+                    ) : null}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button type="submit" disabled={busy || !isWholeCode(code)}>
+                            {busy ? t("enroll.turningOn") : t("enroll.turnOn")}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={sending.resend}
+                            disabled={busy || sending.sending || sending.cooldown > 0}
+                        >
+                            {sending.sending
+                                ? t("twoFactor.sending")
+                                : sending.cooldown > 0
+                                  ? t("twoFactor.sendAgainIn", { seconds: sending.cooldown })
+                                  : sending.sent
+                                    ? t("enroll.email.sendAnother")
+                                    : t("enroll.email.send")}
+                        </Button>
+                    </div>
+                </form>
 
-                {error ? <p className="text-xs text-danger">{error}</p> : null}
+                {shownError ? <p className="text-xs text-danger">{shownError}</p> : null}
                 {onBack ? (
                     <button
                         type="button"

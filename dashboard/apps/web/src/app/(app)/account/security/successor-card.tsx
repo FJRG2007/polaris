@@ -158,7 +158,7 @@ function SuccessorDialog({
     };
 
     const submit = async () => {
-        if (!proof) return;
+        if (!ready || busy || !proof) return;
         setBusy(true);
         setError("");
         const result = clearing
@@ -210,7 +210,7 @@ function SuccessorDialog({
                         </label>
                     )}
 
-                    <StepUpFields open={open} purpose="account-successor" onChange={setProof} />
+                    <StepUpFields open={open} purpose="account-successor" onChange={setProof} autoSubmit />
 
                     {!clearing && (
                         <p className="text-muted-foreground text-xs">{t("successor.consent")}</p>
