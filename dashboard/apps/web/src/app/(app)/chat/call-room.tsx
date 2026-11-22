@@ -55,7 +55,7 @@ import type { CameraLook } from "./camera-look";
 import { cameraProblemText, type CameraProblem } from "./camera-problem";
 import { CallNoticeStrip, useCallNotices } from "./call-notice-strip";
 import { playCallSound } from "@/lib/call-sounds";
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { FACE_MAX, fillsTile, useFaceSize, useTileFit } from "./call-grid";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import {
@@ -90,7 +90,7 @@ import {
     type SeatHosting
 } from "./call-menus";
 import { TILE_CONTROLS, useRevealControls } from "./call-tile-controls";
-import { useZoomPan } from "@/components/use-zoom-pan";
+import { useZoomPan } from "@polaris/ui/use-zoom-pan";
 import { rememberStopped, setWatchedStreams, stoppedStreams } from "./call-stream-audio";
 import { useStreamFormat } from "./call-stream-format";
 import { ControlHint, type ControlHintText } from "./control-hint";
@@ -2708,7 +2708,17 @@ function Tile({
     const face = useFaceSize(frame);
     /** Pushing into the picture. Held for every tile and used by the ones that
      *  say so - a face in a grid of eight is not a thing anybody zooms. */
-    const look = useZoomPan();
+    const look = useZoomPan({ idleTouchAction: "pan-x pan-y" });
+    const { targetRef } = look;
+    /** The video moves with the zoom, written onto it by the hook rather than
+     *  through a render - a call re-renders often enough on its own. */
+    const videoRef = useCallback(
+        (node: HTMLVideoElement | null) => {
+            video.current = node;
+            return zoomable ? targetRef(node) : undefined;
+        },
+        [targetRef, zoomable]
+    );
     /** Read for the name plate only. Changing it is the menu's, which is shared
      *  with the faces - see `PersonMenu`. */
     const [volume] = useCallVolume(volumeKey ?? "");
@@ -2942,19 +2952,15 @@ function Tile({
             )}
         >
             <video
-                ref={video}
+                ref={videoRef}
                 autoPlay
                 playsInline
                 muted
-                // No transition on this. It is dragged and wheeled, and an eased
-                // transform lags a finger by its own duration.
-                style={zoomable ? { transform: look.transform } : undefined}
                 onLoadedMetadata={(event) => onShape(event.currentTarget)}
                 // Fired when the picture changes size mid-stream: a phone turned
                 // upright, a camera swapped, a quality step.
                 onResize={(event) => onShape(event.currentTarget)}
                 className={cn(
-                    zoomable && "origin-center will-change-transform",
                     "size-full",
                     // Letterboxed rather than cropped for anything that might be
                     // a screen - and from here, anybody else's picture might be:
@@ -2983,7 +2989,7 @@ function Tile({
                 <AnnotateLayer
                     owner={annotate}
                     aspect={pictureShape}
-                    transform={zoomable ? look.transform : undefined}
+                    zoomRef={zoomable ? targetRef : undefined}
                 />
             )}
             {blank && (
@@ -3142,7 +3148,7 @@ function Tile({
                     {look.zoomed && (
                         <button
                             type="button"
-                            onClick={look.reset}
+                            onClick={() => look.reset()}
                             aria-label={t("callRoom.fitThePictureAgain")}
                             title={t("callRoom.fitThePictureAgain")}
                             className="rounded bg-background/80 px-1.5 py-1 text-[0.625rem] tabular-nums text-muted-foreground transition-colors hover:text-foreground"

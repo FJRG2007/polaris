@@ -15,7 +15,7 @@
 import { MessagesWrapper } from "../setup/i18n";
 import type { CallState } from "@/app/(app)/chat/call-state";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { REVEAL_IDLE_MS } from "@/app/(app)/chat/call-tile-controls";
 import {
     rememberStopped,
@@ -449,7 +449,7 @@ describe("the buttons over a stream", () => {
         expect(tile.queryByRole("button", { name: "Zoom in" })).toBeNull();
     });
 
-    it("are pressed, not dragged, on a zoomed picture", () => {
+    it("are pressed, not dragged, on a zoomed picture", async () => {
         const capture = vi.fn();
         Object.defineProperty(HTMLElement.prototype, "setPointerCapture", {
             configurable: true,
@@ -460,7 +460,8 @@ describe("the buttons over a stream", () => {
         });
         const tile = within(streamTile());
         fireEvent.wheel(document.querySelector("video")!, { deltaY: -100 });
-        expect(tile.getByRole("button", { name: "Zoom in" })).toBeTruthy();
+        // A wheel is committed once it settles, not on every event.
+        await waitFor(() => expect(tile.getByRole("button", { name: "Zoom in" })).toBeTruthy());
         fireEvent.pointerDown(tile.getByRole("button", { name: "Full screen" }), {
             button: 0,
             pointerId: 1

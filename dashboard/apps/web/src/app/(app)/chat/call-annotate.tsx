@@ -258,22 +258,30 @@ function useAnnotate(): Annotate | null {
 /**
  * The strokes on one share, over its picture, and the pen when it is down.
  *
- * Laid over the video with the same transform, so a zoomed picture is drawn on
+ * Moved with the video by the same zoom (`zoomRef`), so a zoomed picture is drawn on
  * where it is shown; points are fractions of the picture itself, worked out
  * from its letterboxed box (`annotation.toPicture`).
  */
 export function AnnotateLayer({
     owner,
     aspect,
-    transform
+    zoomRef
 }: {
     owner: string;
     /** The picture's width over its height, once known. */
     aspect: number | null;
-    transform?: string;
+    /** The zoom's `targetRef`, so the drawing moves with the picture. */
+    zoomRef?: (node: HTMLElement | null) => () => void;
 }) {
     const annotate = useAnnotate();
-    const canvas = useRef<HTMLCanvasElement>(null);
+    const canvas = useRef<HTMLCanvasElement | null>(null);
+    const canvasRef = useCallback(
+        (node: HTMLCanvasElement | null) => {
+            canvas.current = node;
+            return zoomRef?.(node);
+        },
+        [zoomRef]
+    );
     const pen = useRef<{
         id: string;
         pending: Point[];
@@ -381,9 +389,8 @@ export function AnnotateLayer({
 
     return (
         <canvas
-            ref={canvas}
+            ref={canvasRef}
             aria-hidden
-            style={transform ? { transform } : undefined}
             className={cn(
                 "absolute inset-0 size-full origin-center",
                 active ? "cursor-crosshair touch-none" : "pointer-events-none"

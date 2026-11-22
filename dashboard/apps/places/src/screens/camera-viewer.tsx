@@ -37,16 +37,7 @@ import { boxLabel } from "./detection-label";
 import { usePlacesT } from "./use-places-t";
 import { useDetections } from "./use-detections";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-    NO_ZOOM,
-    ZOOM_STEP,
-    coverOf,
-    isZoomed,
-    panBy,
-    zoomBy,
-    zoomTransform,
-    type Zoom
-} from "@polaris/ui/zoom";
+import { useZoomPan } from "@polaris/ui/use-zoom-pan";
 import type { CameraView } from "../lib/cameras";
 import {
     Camera,
@@ -142,9 +133,6 @@ export function CameraViewer({
 }) {
     const t = usePlacesT();
     const frame = useRef<HTMLDivElement | null>(null);
-    /** Takes the wheel listener off again, held here because the ref callback
-     *  that put it on is the only thing that knows about it. */
-    const detachWheel = useRef<(() => void) | null>(null);
     /**
      * Whether the chrome is showing because the pointer just moved.
      *
@@ -300,12 +288,9 @@ export function CameraViewer({
      * Reset whenever the camera changes, so opening a second camera does not
      * open it halfway into a corner of the first one's framing.
      */
-    const [zoom, setZoom] = useState<Zoom>(NO_ZOOM);
-    useEffect(() => setZoom(NO_ZOOM), [camera.id]);
-
-    /** Where a drag started, in fractions of the frame. Null while nothing is
-     *  being dragged. */
-    const dragging = useRef<{ x: number; y: number } | null>(null);
+    const look = useZoomPan();
+    const { reset, measure, frameRef } = look;
+    useEffect(() => reset({ animate: false }), [camera.id, reset]);
 
     /**
      * How much of the frame the picture covers before any zoom.
@@ -315,7 +300,7 @@ export function CameraViewer({
      * limit below is measured against the picture rather than against the frame,
      * or it can be dragged until one of those bars is in the middle.
      */
-    const cover = useMemo(() => coverOf(shape, surfaceShape), [shape, surfaceShape]);
+    useEffect(() => measure(shape, surfaceShape), [shape, surfaceShape, measure]);
 
     /**
      * Whether the sound is on.
@@ -385,16 +370,6 @@ export function CameraViewer({
         );
     }, [videoElement, camera.id, transport, trying, paused, reconnect.waiting]);
 
-    /** Where the pointer is inside the frame, as fractions from its centre, which
-     *  is what the zoom aims at. */
-    const pointAt = useCallback((event: { clientX: number; clientY: number }) => {
-        const box = frame.current?.getBoundingClientRect();
-        if (!box || box.width === 0 || box.height === 0) return { x: 0, y: 0 };
-        return {
-            x: (event.clientX - box.left) / box.width - 0.5,
-            y: (event.clientY - box.top) / box.height - 0.5
-        };
-    }, []);
 
     useEffect(() => {
         const element = video.current;
@@ -403,50 +378,17 @@ export function CameraViewer({
         if (paused) element.pause();
     }, [muted, paused]);
 
-    /** What the wheel handler needs, read at the moment of the wheel rather than
-     *  captured when it was attached - the listener outlives every one of them. */
-    const covering = useRef(cover);
-    covering.current = cover;
-
     /**
-     * The wheel zooms towards the pointer rather than scrolling the dialog.
-     *
-     * Attached by hand rather than as `onWheel`, because React registers its own
-     * wheel listener as passive: `preventDefault` inside a JSX handler is ignored
-     * and the browser scrolls the dialog underneath anyway, which over a picture
-     * taller than the window is the whole view sliding away while somebody tries
-     * to zoom into it.
-     *
-     * On the ref rather than in an effect, and that is the bug this had. An
-     * effect runs once with whatever `frame.current` happens to be, and its
-     * dependencies were `pointAt` - which never changes - and `cover`, which is
-     * a shared constant until both shapes have been measured. So a first run
-     * that found no element never ran again, and the wheel did nothing for the
-     * rest of the dialog's life. A callback ref cannot miss it: it is called
-     * with the node the moment there is one, and with null when it goes.
+     * The frame, for full screen, and for the zoom - whose wheel listener is put
+     * on by a callback ref, because an effect that ran once with no element never
+     * ran again and the wheel did nothing for the rest of the dialog's life.
      */
     const holdFrame = useCallback(
         (element: HTMLDivElement | null) => {
-            detachWheel.current?.();
-            detachWheel.current = null;
             frame.current = element;
-            if (!element) return;
-            const onWheel = (event: WheelEvent) => {
-                event.preventDefault();
-                // Proportional to how hard the wheel was turned, rather than a fixed
-                // step per event. A notch is a small push and a trackpad sends a
-                // stream of tiny ones, and a step and a half on each of those is a
-                // picture that leaps past whatever was being aimed at.
-                const lines = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
-                const amount = Math.max(-240, Math.min(240, event.deltaY * lines));
-                setZoom((current) =>
-                    zoomBy(current, Math.exp(-amount / 320), pointAt(event), covering.current)
-                );
-            };
-            element.addEventListener("wheel", onWheel, { passive: false });
-            detachWheel.current = () => element.removeEventListener("wheel", onWheel);
+            frameRef(element);
         },
-        [pointAt]
+        [frameRef]
     );
 
     /** The pointer moved: show the chrome, and start the clock on hiding it. */
@@ -514,42 +456,14 @@ export function CameraViewer({
                     ref={holdFrame}
                     className={cn(
                         "group/frame relative overflow-hidden bg-black",
-                        isZoomed(zoom) ? "cursor-grab active:cursor-grabbing" : "cursor-default"
+                        look.zoomed ? "cursor-grab active:cursor-grabbing" : "cursor-default"
                     )}
-                    onDoubleClick={(event) =>
-                        setZoom((current) =>
-                            // A second press puts it back rather than pushing
-                            // further in: the way out has to be as easy as the
-                            // way in, and there is no other gesture for it.
-                            isZoomed(current)
-                                ? NO_ZOOM
-                                : zoomBy(current, ZOOM_STEP * 2, pointAt(event), cover)
-                        )
-                    }
-                    onPointerDown={(event) => {
-                        if (!isZoomed(zoom) || event.button !== 0) return;
-                        event.currentTarget.setPointerCapture(event.pointerId);
-                        dragging.current = pointAt(event);
-                    }}
-                    onPointerMove={(event) => {
-                        const from = dragging.current;
-                        if (!from) return;
-                        const to = pointAt(event);
-                        dragging.current = to;
-                        setZoom((current) => panBy(current, to.x - from.x, to.y - from.y, cover));
-                    }}
+                    {...look.frameProps}
                     onPointerMoveCapture={full ? wakeChrome : undefined}
-                    onPointerUp={() => (dragging.current = null)}
-                    onPointerCancel={() => (dragging.current = null)}
                 >
-                    {/* No transition on this. It is dragged and wheeled, and an
-                    eased transform lags a finger by its own duration - which
-                    reads as a picture that will not follow rather than as a
-                    picture that is being animated nicely. */}
-                    <div
-                        className="relative origin-center will-change-transform"
-                        style={{ transform: zoomTransform(zoom, cover) }}
-                    >
+                    {/* Moved by the zoom itself, never through a render: a live
+                    camera re-renders on every frame it is sent. */}
+                    <div ref={look.targetRef} className="relative">
                         {/* eslint-disable-next-line @next/next/no-img-element -- a live
                         frame is never the same twice, so there is nothing for the
                         image optimizer to cache and it would only add a hop. */}
@@ -790,33 +704,27 @@ export function CameraViewer({
                         ) : null}
                         <Control
                             label={t("viewer.zoomOut")}
-                            disabled={!isZoomed(zoom)}
-                            onClick={() =>
-                                setZoom((current) =>
-                                    zoomBy(current, 1 / ZOOM_STEP, undefined, cover)
-                                )
-                            }
+                            disabled={!look.zoomed}
+                            onClick={look.zoomOut}
                         >
                             <ZoomOut className="size-4 shrink-0" />
                         </Control>
                         <Control
                             label={t("viewer.zoomIn")}
-                            onClick={() =>
-                                setZoom((current) => zoomBy(current, ZOOM_STEP, undefined, cover))
-                            }
+                            onClick={look.zoomIn}
                         >
                             <ZoomIn className="size-4 shrink-0" />
                         </Control>
                         {/* Said rather than left to be worked out: a picture that
                             is zoomed looks like a camera that has been pointed
                             somewhere, and the way back is not obvious. */}
-                        {isZoomed(zoom) ? (
+                        {look.zoomed ? (
                             <button
                                 type="button"
-                                onClick={() => setZoom(NO_ZOOM)}
+                                onClick={() => reset()}
                                 className="rounded-full bg-black/60 px-2 py-1 text-[0.6875rem] text-white/80 transition-colors hover:bg-black/80 hover:text-white"
                             >
-                                {t("viewer.zoomReset", { scale: zoom.scale.toFixed(1) })}
+                                {t("viewer.zoomReset", { scale: look.zoom.scale.toFixed(1) })}
                             </button>
                         ) : null}
                     </div>

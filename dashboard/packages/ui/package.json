@@ -15,6 +15,10 @@
             "types": "./src/lib/zoom.ts",
             "import": "./src/lib/zoom.ts"
         },
+        "./use-zoom-pan": {
+            "types": "./src/lib/use-zoom-pan.ts",
+            "import": "./src/lib/use-zoom-pan.ts"
+        },
         "./automation": {
             "types": "./src/automation/parts.tsx",
             "import": "./src/automation/parts.tsx"

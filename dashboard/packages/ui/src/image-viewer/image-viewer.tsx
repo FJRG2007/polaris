@@ -15,10 +15,11 @@
  * it) is what the caller passes in, and a picture with no message behind it
  * simply gets neither.
  *
- * Zoom is the pointer's, which is the only kind that feels right: the wheel
- * zooms around where the pointer is, and a drag moves the picture rather than
- * the page. Double-press toggles between fit and life size, which is the gesture
- * every viewer has settled on.
+ * Zoom is the pointer's, which is the only kind that feels right: the wheel, a
+ * trackpad pinch and two fingers zoom around where they are, and a drag moves
+ * the picture rather than the page. Double-press (or double-tap) toggles between
+ * fit and close up, which is the gesture every viewer has settled on. It is the
+ * same engine as the calls' and the cameras' zoom - see `use-zoom-pan`.
  *
  * The menu is the same set twice - once as three dots and once as the right
  * click - because those are two habits and neither is wrong. What is in it is
@@ -34,6 +35,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import * as flying from "./flight";
+import { useZoomPan } from "../lib/use-zoom-pan";
 import { MoreHorizontal, X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
 import {
     ContextMenu,
@@ -49,14 +51,6 @@ import {
     cn,
     shortcutPressed
 } from "../index";
-
-/** How far in and out a picture goes. Past four times, a photo is pixels; below
- *  a quarter it is a thumbnail nobody asked for. */
-const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 4;
-
-/** What one notch of the wheel does. */
-const WHEEL_STEP = 0.0015;
 
 /** How the next picture arrives: from this far to the side, over this long. */
 const SLIDE_PX = 48;
@@ -163,15 +157,24 @@ export function ImageViewer({
     /** The picture on screen finished loading (each one, as it swaps in). */
     onPictureLoad?: (picture: HTMLImageElement) => void;
 }) {
-    const [zoom, setZoom] = useState(1);
-    const [at, setAt] = useState({ x: 0, y: 0 });
+    // Zoom and pan never go through React while a gesture lasts: the hook
+    // moves the picture on the compositor and tells this component once it
+    // settles. See `use-zoom-pan`.
+    const look = useZoomPan();
+    const { reset, zoomIn, zoomOut, targetRef } = look;
     const [said, setSaid] = useState("");
-    const dragging = useRef<{ x: number; y: number } | null>(null);
     /** Where a press started and whether it started off the picture, so a press
      *  on the dark around it can close and a drag across it cannot. */
     const press = useRef<ViewerPress | null>(null);
     const root = useRef<HTMLDivElement | null>(null);
     const picture = useRef<HTMLImageElement | null>(null);
+    const pictureRef = useCallback(
+        (node: HTMLImageElement | null) => {
+            picture.current = node;
+            return targetRef(node);
+        },
+        [targetRef]
+    );
     // Which picture has arrived, for its blurred stand-in to step aside.
     const [arrivedUrl, setArrivedUrl] = useState<string | null>(null);
     // Whether this opening has flown in yet, and whether it is on its way out.
@@ -265,16 +268,14 @@ export function ImageViewer({
             return;
         }
         closing.current = true;
-        // The box as laid out: the pan moves its centre, the zoom only scales
-        // about it.
-        const rect = element.getBoundingClientRect();
-        const width = element.offsetWidth;
-        const height = element.offsetHeight;
+        // The box as laid out, before the zoom's transform: offsets ignore
+        // transforms, so they are measured from the stage the picture sits in.
+        const stage = element.offsetParent?.getBoundingClientRect();
         const laidOut = {
-            x: rect.left + rect.width / 2 - at.x - width / 2,
-            y: rect.top + rect.height / 2 - at.y - height / 2,
-            width,
-            height
+            x: (stage?.left ?? 0) + element.offsetLeft,
+            y: (stage?.top ?? 0) + element.offsetTop,
+            width: element.offsetWidth,
+            height: element.offsetHeight
         };
         const now = getComputedStyle(element).transform;
         fadeChrome(root.current, 1, 0, flying.CLOSE_MS);
@@ -286,16 +287,15 @@ export function ImageViewer({
                 now && now !== "none" ? now : "none"
             )
             .then(onClose);
-    }, [image, onClose, origin, at.x, at.y]);
+    }, [image, onClose, origin]);
 
     // Back to fit whenever a different picture is opened: reopening one at three
     // times the size, panned into a corner, is the last picture's state wearing
     // this one's pixels.
     useEffect(() => {
-        setZoom(1);
-        setAt({ x: 0, y: 0 });
+        reset({ animate: false });
         setSaid("");
-    }, [image?.url]);
+    }, [image?.url, reset]);
 
     const position = image && gallery ? gallery.findIndex((one) => one.url === image.url) : -1;
     const browsable = Boolean(onNavigate && gallery && gallery.length > 1 && position >= 0);
@@ -316,8 +316,8 @@ export function ImageViewer({
                 // The caller owns Escape and stepping; the zoom keys are the
                 // picture's, unless somebody is typing somewhere on the page.
                 if (typingIn(event.target)) return;
-                if (shortcutPressed(event, "viewer.zoomIn")) setZoom((now) => step(now, 1));
-                if (shortcutPressed(event, "viewer.zoomOut")) setZoom((now) => step(now, -1));
+                if (shortcutPressed(event, "viewer.zoomIn")) zoomIn();
+                if (shortcutPressed(event, "viewer.zoomOut")) zoomOut();
                 return;
             }
             if (event.key === "Escape") {
@@ -335,12 +335,12 @@ export function ImageViewer({
                 event.preventDefault();
                 go(1);
             }
-            if (shortcutPressed(event, "viewer.zoomIn")) setZoom((current) => step(current, 1));
-            if (shortcutPressed(event, "viewer.zoomOut")) setZoom((current) => step(current, -1));
+            if (shortcutPressed(event, "viewer.zoomIn")) zoomIn();
+            if (shortcutPressed(event, "viewer.zoomOut")) zoomOut();
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [image, close, go, embedded]);
+    }, [image, close, go, embedded, zoomIn, zoomOut]);
 
     const say = useCallback((words: string) => {
         setSaid(words);
@@ -354,20 +354,20 @@ export function ImageViewer({
 
     const stage = (
         <div
+            ref={look.frameRef}
             className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden"
-            // A zoomed picture is being moved, not swiped past: the caller's
-            // swipe-to-step never hears a touch that is panning it.
-            onTouchStart={embedded && zoom > 1 ? (event) => event.stopPropagation() : undefined}
-            onTouchEnd={embedded && zoom > 1 ? (event) => event.stopPropagation() : undefined}
-            onWheel={(event) => {
-                setZoom((current) => clamp(current * Math.exp(-event.deltaY * WHEEL_STEP)));
-            }}
-            onDoubleClick={() => {
-                setZoom((current) => (current === 1 ? 2 : 1));
-                setAt({ x: 0, y: 0 });
-            }}
+            // A zoomed or pinched picture is being moved, not swiped past: the
+            // caller's swipe-to-step never hears a touch that is panning it.
+            // Read live, because a pinch that started unzoomed has not told
+            // React yet by the time its fingers lift.
+            onTouchStart={
+                embedded ? (event) => look.engaged() && event.stopPropagation() : undefined
+            }
+            onTouchEnd={
+                embedded ? (event) => look.engaged() && event.stopPropagation() : undefined
+            }
+            onDoubleClick={look.frameProps.onDoubleClick}
             onPointerDown={(event) => {
-                dragging.current = { x: event.clientX - at.x, y: event.clientY - at.y };
                 press.current = {
                     x: event.clientX,
                     y: event.clientY,
@@ -378,26 +378,22 @@ export function ImageViewer({
                     // here on, and every later event says "stage".
                     outside: event.target === event.currentTarget
                 };
-                event.currentTarget.setPointerCapture(event.pointerId);
+                look.frameProps.onPointerDown(event);
             }}
-            onPointerMove={(event) => {
-                const from = dragging.current;
-                if (!from) return;
-                setAt({ x: event.clientX - from.x, y: event.clientY - from.y });
-            }}
+            onPointerMove={look.frameProps.onPointerMove}
             // A press on the dark closes, the way every viewer does -
             // but only a press. A drag that started there was somebody
             // moving the picture, and closing on it would undo the
             // gesture they were in the middle of.
             onPointerUp={(event) => {
                 const from = press.current;
-                dragging.current = null;
                 press.current = null;
+                look.frameProps.onPointerUp(event);
                 if (!embedded && closesOnRelease(from, event)) close();
             }}
-            onPointerCancel={() => {
-                dragging.current = null;
+            onPointerCancel={(event) => {
                 press.current = null;
+                look.frameProps.onPointerCancel(event);
             }}
         >
             {image.placeholder && arrivedUrl !== image.url && (
@@ -412,23 +408,30 @@ export function ImageViewer({
             )}
             {/* eslint-disable-next-line @next/next/no-img-element -- one picture, sized by the viewer */}
             <img
-                ref={picture}
+                ref={pictureRef}
                 data-viewer-picture=""
+                decoding="async"
                 onLoad={(event) => {
                     setArrivedUrl(image.url);
                     flyIn();
                     slideIn();
                     onPictureLoad?.(event.currentTarget);
+                    // Decoded at its full size now, off the main thread, while
+                    // nobody is touching it. Otherwise the browser decodes only
+                    // what the fitted size needs and decodes the whole picture
+                    // again the first time it is zoomed - a 20-megapixel PNG
+                    // froze the view for a third of a second right there.
+                    event.currentTarget.decode?.().catch(() => undefined);
                 }}
                 src={embedded ? (painted ?? image.url) : image.url}
                 alt={image.name}
                 draggable={false}
-                style={{
-                    transform: `translate(${at.x}px, ${at.y}px) scale(${zoom})`
-                }}
+                // No transition class and no shadow or filter here: this is the
+                // layer that moves, and anything that repaints with it is paid
+                // for on every frame of a pan.
                 className={cn(
-                    "max-h-full max-w-full select-none object-contain transition-transform duration-fast",
-                    zoom > 1 ? "cursor-grab" : "cursor-zoom-in"
+                    "max-h-full max-w-full select-none object-contain",
+                    look.zoomed ? "cursor-grab active:cursor-grabbing" : "cursor-zoom-in"
                 )}
             />
         </div>
@@ -452,18 +455,15 @@ export function ImageViewer({
                     stage
                 )}
                 {/* Only once it has been zoomed: back to fit in one press. */}
-                {zoom !== 1 ? (
+                {look.zoomed ? (
                     <button
                         type="button"
                         aria-label={labels.fit ?? labels.zoomOut}
                         title={labels.fit ?? labels.zoomOut}
-                        onClick={() => {
-                            setZoom(1);
-                            setAt({ x: 0, y: 0 });
-                        }}
+                        onClick={() => reset()}
                         className="absolute end-3 top-3 rounded bg-background/80 px-1.5 py-1 text-[0.6875rem] tabular-nums text-muted-foreground transition-colors hover:text-foreground"
                     >
-                        {Math.round(zoom * 100)}%
+                        {Math.round(look.zoom.scale * 100)}%
                     </button>
                 ) : null}
             </div>
@@ -504,18 +504,18 @@ export function ImageViewer({
                 <button
                     type="button"
                     aria-label={labels.zoomOut}
-                    onClick={() => setZoom((current) => step(current, -1))}
+                    onClick={zoomOut}
                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <ZoomOut className="size-4" />
                 </button>
                 <span className="w-12 shrink-0 text-center text-xs tabular-nums text-muted-foreground">
-                    {Math.round(zoom * 100)}%
+                    {Math.round(look.zoom.scale * 100)}%
                 </span>
                 <button
                     type="button"
                     aria-label={labels.zoomIn}
-                    onClick={() => setZoom((current) => step(current, 1))}
+                    onClick={zoomIn}
                     className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                     <ZoomIn className="size-4" />
@@ -612,14 +612,4 @@ export function closesOnRelease(
 function typingIn(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
     return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
-}
-
-function clamp(value: number): number {
-    return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
-}
-
-/** One press of a zoom button: a quarter either way, which is enough to see the
- *  change and small enough to land where somebody meant. */
-function step(current: number, direction: 1 | -1): number {
-    return clamp(current + direction * 0.25);
 }

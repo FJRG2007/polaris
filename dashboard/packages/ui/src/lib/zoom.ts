@@ -156,6 +156,80 @@ export function panBy(zoom: Zoom, dx: number, dy: number, cover: Cover = FILLS):
     );
 }
 
+/** A point in the frame, in fractions from its centre - the unit `zoomBy` aims at. */
+export interface FramePoint {
+    readonly x: number;
+    readonly y: number;
+}
+
+/**
+ * Two fingers moved: zoom by how far apart they went, around where they started,
+ * then carry the picture along with their midpoint.
+ *
+ * The same two steps every pinch implementation converges on (Hammer.js,
+ * panzoom, d3-zoom's touch handler): the spread ratio is the scale change, the
+ * midpoint is the anchor, and the midpoint's travel is a pan - so a pinch that
+ * also drifts sideways keeps whatever was between the fingers between them.
+ */
+export function pinchBy(
+    zoom: Zoom,
+    before: readonly [FramePoint, FramePoint],
+    after: readonly [FramePoint, FramePoint],
+    cover: Cover = FILLS
+): Zoom {
+    const spread = (pair: readonly [FramePoint, FramePoint]) =>
+        Math.hypot(pair[1].x - pair[0].x, pair[1].y - pair[0].y);
+    const middle = (pair: readonly [FramePoint, FramePoint]) => ({
+        x: (pair[0].x + pair[1].x) / 2,
+        y: (pair[0].y + pair[1].y) / 2
+    });
+    const was = spread(before);
+    const factor = was > 0 ? spread(after) / was : 1;
+    const from = middle(before);
+    const to = middle(after);
+    return panBy(zoomBy(zoom, factor, from, cover), to.x - from.x, to.y - from.y, cover);
+}
+
+/**
+ * How much one wheel event zooms by.
+ *
+ * Proportional to how hard the wheel was turned: a notch is a small push and a
+ * trackpad sends a stream of tiny ones, and a fixed step on each of those leaps
+ * past whatever was aimed at. A trackpad pinch arrives as a wheel with `ctrlKey`
+ * set and deltas about a tenth of a scroll's, so it is weighted ten times - the
+ * same correction d3-zoom's `defaultWheelDelta` makes.
+ */
+export function wheelFactor(event: {
+    readonly deltaY: number;
+    readonly deltaMode: number;
+    readonly ctrlKey?: boolean;
+}): number {
+    const lines = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 400 : 1;
+    const pinch = event.ctrlKey ? 10 : 1;
+    const amount = Math.max(-240, Math.min(240, event.deltaY * lines * pinch));
+    return Number.isFinite(amount) ? Math.exp(-amount / 320) : 1;
+}
+
+/**
+ * The transform for a zoom in pixels of a frame that size, for an element
+ * centred in it.
+ *
+ * `translate3d` rather than `translate`: it is what keeps the element on its own
+ * compositor layer in every engine, so moving it is a matter of the GPU placing
+ * a texture and never of laying out or repainting the page. The order is the
+ * one `zoomTransform` explains.
+ */
+export function zoomTransformPx(
+    zoom: Zoom,
+    cover: Cover,
+    frame: { readonly width: number; readonly height: number }
+): string {
+    const { scale, x, y } = clampOffset(zoom, cover);
+    const px = (value: number) => (Number.isFinite(value) ? +value.toFixed(2) : 0);
+    const shift = `${px(x * frame.width)}px, ${px(y * frame.height)}px, 0`;
+    return `translate3d(${shift}) scale(${+scale.toFixed(4)})`;
+}
+
 /**
  * The CSS transform for a zoom.
  *

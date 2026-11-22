@@ -14,7 +14,7 @@
 
 import { cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useZoomPan } from "@/components/use-zoom-pan";
+import { useZoomPan } from "@polaris/ui/use-zoom-pan";
 import { MediaPlayer } from "@/components/media-player";
 
 export function MediaView({
@@ -43,10 +43,7 @@ export function MediaView({
                 look.zoomed && "cursor-grab active:cursor-grabbing"
             )}
         >
-            <div
-                className="size-full origin-center will-change-transform"
-                style={{ transform: look.transform }}
-            >
+            <div ref={look.targetRef} className="size-full">
                 <MediaPlayer src={src} kind={kind} download={download} className="p-4" />
             </div>
             {/* Only once the wheel has been used: a button that says 1.0x says
@@ -55,7 +52,7 @@ export function MediaView({
             {look.zoomed && (
                 <button
                     type="button"
-                    onClick={look.reset}
+                    onClick={() => look.reset()}
                     aria-label={t("media.fitTheVideoAgain")}
                     title={t("media.fitTheVideoAgain")}
                     className="absolute end-3 top-3 rounded bg-background/80 px-1.5 py-1 text-[0.6875rem] tabular-nums text-muted-foreground transition-colors hover:text-foreground"
