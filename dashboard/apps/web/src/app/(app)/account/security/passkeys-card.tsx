@@ -23,7 +23,7 @@
  */
 
 import { useRouter } from "next/navigation";
-import { knownMessage } from "./known-sentences";
+import { passkeyProblem } from "./known-sentences";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { authClient } from "@/lib/auth-client";
@@ -104,7 +104,7 @@ export function PasskeysCard({ passkeys, lock }: { passkeys: PasskeyView[]; lock
         });
         setBusy(false);
         if (result?.error) {
-            setError(result.error.message ? knownMessage(t, tv, result.error.message) : t("passkeys.notCompleted"));
+            setError(passkeyProblem(t, tv, result.error, t("passkeys.notCompleted")));
             return;
         }
         // Made on this device (Windows Hello, Touch ID...): the next sign-in here

@@ -170,3 +170,33 @@ export function knownMessage(
     }
     return validationMessage(tv, message);
 }
+
+/** What the device's own passkey prompt answered, as a code the passkey client
+ *  sets. The browser's sentence for these ("The operation either timed out or
+ *  was not allowed...") names a spec section, not what happened, so it is
+ *  never shown: Windows Hello, Touch ID or a key that was cancelled or left
+ *  waiting reads as exactly that. */
+const PASSKEY_PROMPT: Record<string, "passkeys.cancelled" | "passkeys.alreadyHere" | "passkeys.addressRefused"> = {
+    ERROR_CEREMONY_ABORTED: "passkeys.cancelled",
+    // NotAllowedError: the prompt was dismissed or timed out. The browser does
+    // not say which, on purpose (WebAuthn privacy considerations).
+    ERROR_PASSTHROUGH_SEE_CAUSE_PROPERTY: "passkeys.cancelled",
+    ERROR_AUTHENTICATOR_PREVIOUSLY_REGISTERED: "passkeys.alreadyHere",
+    ERROR_INVALID_DOMAIN: "passkeys.addressRefused",
+    ERROR_INVALID_RP_ID: "passkeys.addressRefused"
+};
+
+/** The sentence for a passkey that was not added: the prompt's own outcome when
+ *  the device answered, the server's known sentence otherwise. */
+export function passkeyProblem(
+    t: NamespaceTranslator<"accountSecurity">,
+    tv: NamespaceTranslator<"validation">,
+    error: { code?: string; message?: string },
+    fallback: string
+): string {
+    const prompt = error.code ? PASSKEY_PROMPT[error.code] : undefined;
+    if (prompt) return t(prompt);
+    // Any other answer from the device prompt: its wording is the browser's.
+    if (error.code?.startsWith("ERROR_")) return fallback;
+    return error.message ? knownMessage(t, tv, error.message) : fallback;
+}

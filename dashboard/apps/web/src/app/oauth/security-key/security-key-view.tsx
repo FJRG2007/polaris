@@ -17,7 +17,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { rememberLocalPasskey } from "@/lib/local-passkeys";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PASSKEY_NAME_MAX, passkeyRelyingPartyId } from "@polaris/core";
-import { knownMessage } from "@/app/(app)/account/security/known-sentences";
+import { passkeyProblem } from "@/app/(app)/account/security/known-sentences";
 import { confirmPasswordForKeyAction, noteKeyAddedAction } from "./actions";
 import { signInWithPasskeys, type PasskeyDescriptor } from "@/lib/passkey-sign-in";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
@@ -82,11 +82,7 @@ export function SecurityKeyView({
         const result = await authClient.passkey.addPasskey({ name: trimmed, returnWebAuthnResponse: true });
         setBusy(false);
         if (result?.error) {
-            setError(
-                result.error.message
-                    ? knownMessage(ts, tv, result.error.message)
-                    : t("securityKey.notCompleted")
-            );
+            setError(passkeyProblem(ts, tv, result.error, t("securityKey.notCompleted")));
             return;
         }
         const created = (result as { webauthn?: { response?: { id: string; authenticatorAttachment?: string } } })
