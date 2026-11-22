@@ -256,5 +256,18 @@
         "togetherHint": "Open a room or join one with a code",
         "togetherDenied": "An admin turned this off for your account",
         "phoneName": "Phone"
+    },
+    "shooter": {
+        "hint": "Right mouse to aim, left mouse to fire, R to reload, wheel or G to switch weapon",
+        "reloading": "Reloading",
+        "wasted": "Wasted",
+        "picked": "{weapon} picked up",
+        "wanted": "Wanted level {level} of 5",
+        "weapons": {
+            "pistol": "Pistol",
+            "smg": "SMG",
+            "rifle": "Rifle",
+            "shotgun": "Shotgun"
+        }
     }
 }

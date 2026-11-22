@@ -256,5 +256,18 @@
         "togetherHint": "Abre una sala o entra con un código",
         "togetherDenied": "Un admin lo ha desactivado en tu cuenta",
         "phoneName": "Móvil"
+    },
+    "shooter": {
+        "hint": "Clic derecho para apuntar, izquierdo para disparar, R recarga, rueda o G cambia de arma",
+        "reloading": "Recargando",
+        "wasted": "Has caído",
+        "picked": "{weapon} recogida",
+        "wanted": "Nivel de búsqueda {level} de 5",
+        "weapons": {
+            "pistol": "Pistola",
+            "smg": "Subfusil",
+            "rifle": "Fusil",
+            "shotgun": "Escopeta"
+        }
     }
 }

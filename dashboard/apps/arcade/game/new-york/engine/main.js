@@ -57,6 +57,7 @@ import { hudReadout } from "./player-rules.js";
 import { GameMenu } from "./game-menu.js";
 import { installBrowserGuards } from "./browser-defaults.js";
 import { startRenderer } from "./graphics-start.js";
+import { Shooter } from "./shooter.js";
 
 // js/main.js
 // Main entry point for New York City (Midtown Manhattan) in Three.js WebGPURenderer & TSL (three.js, bundled by the app build)
@@ -413,6 +414,16 @@ async function initApp() {
     const renderPipeline = new THREE.RenderPipeline(renderer, colorGrade.outputNode);
     // The grade ends with the display transform and its dither (post-processing.js)
     renderPipeline.outputColorTransform = false;
+    // Weapons, crews and the wanted level, on foot and from the driver's seat (shooter.js)
+    const shooter = new Shooter({
+        scene,
+        cameraSystem,
+        controllerManager,
+        colliders: allColliders,
+        canvas: renderer.domElement,
+        damage: colorGrade.damage,
+        soundOn: () => audioSystem.enabled
+    });
     await stepDone("postFX");
 
     // 6. Wire UI Controls (Strictly using safe DOM APIs: textContent, classList, addEventListener)
@@ -1103,6 +1114,7 @@ async function initApp() {
         // Traffic collisions can move the player after controller updates; finalize moving hierarchies here.
         for (const root of dynamicRoots) root.updateMatrixWorld();
         remotePlayers.update(dt, cameraSystem.camera);
+        shooter.update(dt);
     }
 
     if (graphicsLost) return;
