@@ -13,8 +13,6 @@
 
 import {
     BookPlus,
-    ClipboardPaste,
-    ClipboardType,
     Copy,
     Download,
     ExternalLink,
@@ -32,6 +30,8 @@ import * as selectionMenu from "@/lib/selection-menu";
 import { desktopBridge } from "@/lib/desktop-bridge";
 import * as editing from "@/lib/context-menu/editing";
 import * as contextMenu from "@/lib/context-menu/target";
+import { PasteItems } from "@/components/context-menu-paste-items";
+import { useMenuPaste, type MenuPaste } from "@/lib/context-menu/use-menu-paste";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     DropdownMenu,
@@ -89,34 +89,9 @@ function restore(menu: OpenMenu): void {
     }
 }
 
-/** Whether pasting can be asked for at all: refused for good only when the
- *  browser says so and there is no desktop app to ask instead. */
-function usePasteRefused(): boolean {
-    const [refused, setRefused] = useState(false);
-    useEffect(() => {
-        if (desktopBridge()?.editing) return;
-        if (typeof navigator === "undefined" || !navigator.clipboard?.readText) {
-            setRefused(true);
-            return;
-        }
-        let status: PermissionStatus | null = null;
-        const read = () => status && setRefused(status.state === "denied");
-        navigator.permissions
-            ?.query({ name: "clipboard-read" as PermissionName })
-            .then((answer) => {
-                status = answer;
-                read();
-                answer.addEventListener("change", read);
-            })
-            .catch(() => undefined);
-        return () => status?.removeEventListener("change", read);
-    }, []);
-    return refused;
-}
-
 export function ContextMenuFallback() {
     const t = useTranslations("common");
-    const pasteRefused = usePasteRefused();
+    const menuPaste = useMenuPaste();
     const [menu, setMenu] = useState<OpenMenu | null>(null);
 
     useEffect(() => {
@@ -165,7 +140,6 @@ export function ContextMenuFallback() {
         };
     }, []);
 
-    const surface = desktopBridge() ? "app" : "browser";
     const copy = async (text: string) =>
         contextMenu.contextMenuNotice(
             (await editing.copyText(text)) ? t("selectionMenu.copied") : t("selectionMenu.copyFailed")
@@ -173,14 +147,7 @@ export function ContextMenuFallback() {
 
     const paste = async (opened: OpenMenu, plain: boolean) => {
         const field = fieldOf(opened.target);
-        if (!field) return;
-        const contents = await editing.readClipboard(!plain && !editing.isTextField(field));
-        if (!contents) {
-            contextMenu.contextMenuNotice(t("selectionMenu.pasteFailed", { surface }));
-            return;
-        }
-        restore(opened);
-        editing.pasteInto(field, plain ? { text: contents.text, html: null } : contents);
+        if (field) await menuPaste.paste(field, { plain, restore: () => restore(opened) });
     };
 
     const cut = async (opened: OpenMenu, text: string) => {
@@ -224,7 +191,7 @@ export function ContextMenuFallback() {
                         <FieldItems
                             menu={menu}
                             target={target}
-                            pasteRefused={pasteRefused}
+                            menuPaste={menuPaste}
                             onCut={(text) => void cut(menu, text)}
                             onCopy={(text) => void copy(text)}
                             onPaste={(plain) => void paste(menu, plain)}
@@ -244,12 +211,8 @@ export function ContextMenuFallback() {
                                 {t("selectionMenu.copy")}
                                 <MenuShortcut keys="Mod+C" />
                             </DropdownMenuItem>
-                            {editing.canEdit(target.found.field) && !pasteRefused ? (
-                                <DropdownMenuItem onSelect={() => void paste(menu, false)}>
-                                    <ClipboardPaste />
-                                    {t("selectionMenu.paste")}
-                                    <MenuShortcut keys="Mod+V" />
-                                </DropdownMenuItem>
+                            {editing.canEdit(target.found.field) ? (
+                                <PasteItems menuPaste={menuPaste} rich={false} onPaste={(plain) => void paste(menu, plain)} />
                             ) : null}
                         </>
                     ) : null}
@@ -319,14 +282,14 @@ function spellingOf(
 function FieldItems({
     menu,
     target,
-    pasteRefused,
+    menuPaste,
     onCut,
     onCopy,
     onPaste
 }: {
     menu: OpenMenu;
     target: Extract<contextMenu.ContextTarget, { kind: "field" }>;
-    pasteRefused: boolean;
+    menuPaste: MenuPaste;
     onCut: (text: string) => void;
     onCopy: (text: string) => void;
     onPaste: (plain: boolean) => void;
@@ -396,20 +359,7 @@ function FieldItems({
                     <MenuShortcut keys="Mod+C" />
                 </DropdownMenuItem>
             ) : null}
-            {editable && !pasteRefused ? (
-                <DropdownMenuItem onSelect={() => onPaste(false)}>
-                    <ClipboardPaste />
-                    {t("selectionMenu.paste")}
-                    <MenuShortcut keys="Mod+V" />
-                </DropdownMenuItem>
-            ) : null}
-            {editable && rich && !pasteRefused ? (
-                <DropdownMenuItem onSelect={() => onPaste(true)}>
-                    <ClipboardType />
-                    {t("contextMenu.pastePlain")}
-                    <MenuShortcut keys="Mod+Shift+V" />
-                </DropdownMenuItem>
-            ) : null}
+            {editable ? <PasteItems menuPaste={menuPaste} rich={rich} onPaste={onPaste} /> : null}
             <DropdownMenuItem onSelect={() => editing.selectAllIn(field)}>
                 <TextSelect />
                 {t("selectionMenu.selectAll")}

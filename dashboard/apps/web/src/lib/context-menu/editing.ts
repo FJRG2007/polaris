@@ -14,9 +14,10 @@
  * way to change a field that its own undo history and its framework's change
  * handling both see. Undo and Redo are `execCommand("undo"/"redo")` for the same
  * reason - the browser's undo stack has no other door. Paste is offered to the
- * field first as a `paste` event, so an editor that handles pasting itself
- * (formatting, pictures, its own schema) does; a field that does not gets the
- * plain text typed in. Pasted HTML is never inserted by this file.
+ * field first as a `paste` event carrying the clipboard's text, HTML and
+ * pictures, so an editor that handles pasting itself (formatting, pictures, its
+ * own schema) does what it does for Ctrl+V; a field that does not gets the plain
+ * text typed in. Pasted HTML is never inserted by this file.
  */
 
 import { desktopBridge } from "@/lib/desktop-bridge";
@@ -40,35 +41,69 @@ export async function copyText(text: string): Promise<boolean> {
     return command("copy");
 }
 
-/** What is on the clipboard: the text, and HTML when there is some. */
+/** What is on the clipboard: the text, HTML when there is some, and pictures. */
 export interface ClipboardContents {
     readonly text: string;
     readonly html: string | null;
+    /** Pictures on the clipboard (a screenshot, a copied image), as a paste event carries them. */
+    readonly files: readonly File[];
 }
 
-/** Reads the clipboard; null when it was refused. `rich` asks for HTML too. */
-export async function readClipboard(rich: boolean): Promise<ClipboardContents | null> {
-    if (rich && typeof navigator.clipboard?.read === "function") {
-        try {
-            const items = await navigator.clipboard.read();
-            let text = "";
-            let html: string | null = null;
-            for (const item of items) {
-                if (!html && item.types.includes("text/html")) html = await (await item.getType("text/html")).text();
-                if (!text && item.types.includes("text/plain")) text = await (await item.getType("text/plain")).text();
-            }
-            return { text, html };
-        } catch {
-            // Fall through to plain text.
+/** Why the clipboard could not be read: the browser or app said no, or has no way to ask. */
+export type ClipboardRefusal = "denied" | "unsupported";
+
+export type ClipboardRead =
+    | { readonly ok: true; readonly contents: ClipboardContents }
+    | { readonly ok: false; readonly reason: ClipboardRefusal };
+
+function refusalOf(error: unknown): ClipboardRefusal {
+    return (error as { name?: unknown } | null)?.name === "NotAllowedError" ? "denied" : "unsupported";
+}
+
+async function clipboardItems(items: readonly ClipboardItem[]): Promise<ClipboardContents> {
+    let text = "";
+    let html: string | null = null;
+    const files: File[] = [];
+    for (const item of items) {
+        if (!html && item.types.includes("text/html")) html = await (await item.getType("text/html")).text();
+        if (!text && item.types.includes("text/plain")) text = await (await item.getType("text/plain")).text();
+        const picture = item.types.find((type) => type.startsWith("image/"));
+        if (picture) {
+            const blob = await item.getType(picture);
+            files.push(new File([blob], imageName("", picture), { type: picture }));
         }
     }
-    try {
-        return { text: await navigator.clipboard.readText(), html: null };
-    } catch {
-        // Refused here: the desktop app's clipboard.
+    return { text, html, files };
+}
+
+/**
+ * Reads everything a paste would carry: `clipboard.read()` first, for HTML and
+ * pictures; `readText()` where that is missing or failed (older Firefox reads
+ * text only); the desktop app's clipboard last, where the page is refused it
+ * altogether (a page on a plain-http address has no clipboard API at all).
+ */
+export async function readClipboard(): Promise<ClipboardRead> {
+    let reason: ClipboardRefusal = "unsupported";
+    const clipboard = typeof navigator === "undefined" ? undefined : navigator.clipboard;
+    if (typeof clipboard?.read === "function") {
+        try {
+            return { ok: true, contents: await clipboardItems(await clipboard.read()) };
+        } catch (error) {
+            reason = refusalOf(error);
+        }
+    }
+    // Not again after a refusal: the same permission answers both, and Firefox
+    // and Safari would show the person their paste prompt a second time.
+    if (reason !== "denied" && typeof clipboard?.readText === "function") {
+        try {
+            return { ok: true, contents: { text: await clipboard.readText(), html: null, files: [] } };
+        } catch (error) {
+            reason = refusalOf(error);
+        }
     }
     const text = await desktopBridge()?.editing?.readClipboard().catch(() => null);
-    return typeof text === "string" ? { text, html: null } : null;
+    if (typeof text === "string") return { ok: true, contents: { text, html: null, files: [] } };
+    return { ok: false, reason };
 }
 
 /** Runs an editing command; false where the browser has none or refused it. */
@@ -108,22 +143,103 @@ export function insertText(field: Element, text: string): void {
     }
 }
 
-/**
- * Pastes into the field at its selection: offered as a `paste` event first,
- * then typed as plain text when nothing took it. `html` only travels inside
- * that event, for an editor that parses it through its own rules.
- */
-export function pasteInto(field: Element, contents: ClipboardContents): void {
+/** What a paste did: the field took it, or its text was typed in; or there was
+ *  nothing on the clipboard, or only pictures for a field that takes none. */
+export type PasteResult = "taken" | "typed" | "empty" | "no-text";
+
+function transferOf(contents: ClipboardContents): DataTransfer | null {
     try {
         const transfer = new DataTransfer();
-        transfer.setData("text/plain", contents.text);
+        if (contents.text) transfer.setData("text/plain", contents.text);
         if (contents.html) transfer.setData("text/html", contents.html);
-        const event = new ClipboardEvent("paste", { clipboardData: transfer, bubbles: true, cancelable: true });
-        if (!field.dispatchEvent(event)) return;
+        for (const file of contents.files) transfer.items.add(file);
+        return transfer;
     } catch {
-        // No DataTransfer to build one with: plain text below.
+        return null;
     }
-    insertText(field, contents.text);
+}
+
+/** A paste event carrying `transfer`, or null where this browser drops the data
+ *  of an event a page builds (the field would then receive an empty paste). */
+function pasteEvent(transfer: DataTransfer): ClipboardEvent | null {
+    try {
+        const event = new ClipboardEvent("paste", { clipboardData: transfer, bubbles: true, cancelable: true });
+        return event.clipboardData === transfer ? event : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Pastes into the field at its selection the way the paste keys do: the field
+ * gets a `paste` event carrying the text, HTML and pictures, so an editor that
+ * handles pasting itself (Markdown, a composer staging a screenshot as an
+ * attachment, a terminal) does exactly what it does for Ctrl+V. When nothing
+ * took it, the text is typed in, as the browser would.
+ *
+ * "Took it" is a handler cancelling the event, or stopping it on its way up: a
+ * terminal sends the text on and stops the event without cancelling it, and
+ * typing the text in as well would send it twice. `html` only travels inside
+ * the event, for an editor that parses it through its own rules. `typeText`
+ * replaces the typing for an editor that reads typed-in text its own way.
+ */
+export function pasteInto(
+    field: Element,
+    contents: ClipboardContents,
+    typeText: (text: string) => void = (text) => insertText(field, text)
+): PasteResult {
+    if (!contents.text && !contents.html && contents.files.length === 0) return "empty";
+    const transfer = transferOf(contents);
+    const event = transfer ? pasteEvent(transfer) : null;
+    if (event) {
+        let reached = false;
+        const arrived = (seen: Event) => {
+            if (seen === event) reached = true;
+        };
+        const view = field.ownerDocument.defaultView ?? window;
+        view.addEventListener("paste", arrived);
+        let open = true;
+        try {
+            open = field.dispatchEvent(event);
+        } finally {
+            view.removeEventListener("paste", arrived);
+        }
+        if (!open || !reached) return "taken";
+    }
+    if (!contents.text) return "no-text";
+    typeText(contents.text);
+    return "typed";
+}
+
+/** What pasting from a menu came to: what the field did, or why the clipboard stayed shut. */
+export type MenuPasteOutcome = PasteResult | ClipboardRefusal;
+
+export interface MenuPasteOptions {
+    /** Text only, as Ctrl+Shift+V: no HTML and no pictures. */
+    readonly plain?: boolean;
+    /** Puts the caret and selection back where the menu was opened, just before pasting. */
+    readonly restore?: () => void;
+    /** How the text goes in when the field leaves the paste to the browser (see `pasteInto`). */
+    readonly typeText?: (text: string) => void;
+}
+
+/**
+ * A menu's Paste: reads the clipboard inside the press (what lets the browser
+ * allow it), puts the caret back where the menu was opened, and pastes through
+ * `pasteInto`. The one implementation every Paste row uses.
+ */
+export async function pasteFromClipboard(field: Element, options: MenuPasteOptions = {}): Promise<MenuPasteOutcome> {
+    const read = await readClipboard();
+    if (!read.ok) return read.reason;
+    const contents = options.plain ? { text: read.contents.text, html: null, files: [] } : read.contents;
+    options.restore?.();
+    return pasteInto(field, contents, options.typeText);
+}
+
+/** The paste keys here, for a hint that names them: "Cmd+V" on Apple devices. */
+export function pasteKeys(): string {
+    if (typeof navigator === "undefined") return "Ctrl+V";
+    return /Mac|iPhone|iPad/.test(navigator.userAgent) ? "Cmd+V" : "Ctrl+V";
 }
 
 /** Selects everything in the field. */

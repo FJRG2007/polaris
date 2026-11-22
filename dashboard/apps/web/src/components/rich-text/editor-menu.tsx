@@ -11,11 +11,12 @@
  * whatever the surface itself can do with what is selected.
  *
  * The clipboard is here, which it once was not. Cut and copy are the editor's
- * own selection written out; paste is the half that needs the browser's
- * permission, so it is read when the menu opens and the row says what it found -
- * something to paste, nothing to paste, or a browser that will not say. Every row
- * carries its key as well, because when a page is refused the clipboard the key
- * still works and that is the answer somebody needs at that moment.
+ * own selection written out; paste reads the clipboard when it is pressed (the
+ * press is what lets a browser allow it) and hands the editor the same paste
+ * event Ctrl+V does, so a screenshot reaches a composer's attachments and text
+ * is read as Markdown exactly as the keys would have it. Where it cannot read,
+ * it says so. Every row carries its key as well, because when a page is refused
+ * the clipboard the key still works and that is the answer somebody needs.
  *
  * Every press keeps the selection: `onMouseDown` never moves the focus out of
  * the editor, which is the same rule the selection toolbar follows.
@@ -31,6 +32,7 @@ import {
     ContextMenuTrigger,
     MenuShortcut
 } from "@polaris/ui";
+import { useMenuPaste } from "@/lib/context-menu/use-menu-paste";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Bold,
@@ -209,12 +211,7 @@ export function EditorMenu({
     const list = opened?.list ?? null;
     const marks = opened !== null && opened.selection.from !== opened.selection.to;
 
-    /**
-     * What the clipboard holds, read when the menu opens and never before: a page
-     * that polls the clipboard is a page asking for a permission it has no use
-     * for. Null is "not read yet", "" is empty or refused.
-     */
-    const [pending, setPending] = useState<string | null>(null);
+    const menuPaste = useMenuPaste();
     const keys = modifierKey();
 
     /**
@@ -247,7 +244,6 @@ export function EditorMenu({
         <ContextMenu
             onOpenChange={(open) => {
                 if (!open) {
-                    setPending(null);
                     setOpened(null);
                     return;
                 }
@@ -256,10 +252,6 @@ export function EditorMenu({
                     selection: spanAt(editor, from, to),
                     list: listAction ? selectedListItems(editor) : null
                 });
-                void navigator.clipboard
-                    ?.readText()
-                    .then((text) => setPending(text))
-                    .catch(() => setPending(""));
             }}
         >
             <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
@@ -293,16 +285,27 @@ export function EditorMenu({
                     onSelect={() => void put(opened?.selection.text ?? "")}
                 />
                 <Item
-                    label={pending === "" ? t("editor.nothingToPaste") : t("editor.paste")}
+                    label={t("editor.paste")}
                     keys={`${keys}+V`}
-                    disabled={!pending}
+                    disabled={!!menuPaste.blockedHint}
                     icon={<ClipboardPaste className="size-3.5" />}
                     onSelect={() => {
-                        if (!pending) return;
-                        if (onPaste) onPaste(pending);
-                        else editor.chain().focus().insertContent(pending).run();
+                        const span = opened?.selection ?? null;
+                        void menuPaste.paste(editor.view.dom, {
+                            // Back over the span the menu was opened on, as the keys would paste.
+                            restore: () => {
+                                const chain = editor.chain().focus();
+                                if (span && stillReads(editor, span)) chain.setTextSelection({ from: span.from, to: span.to });
+                                chain.run();
+                            },
+                            typeText: (text) =>
+                                onPaste ? onPaste(text) : editor.chain().focus().insertContent(text).run()
+                        });
                     }}
                 />
+                {menuPaste.blockedHint ? (
+                    <p className="px-2 pb-1 text-xs text-muted-foreground">{menuPaste.blockedHint}</p>
+                ) : null}
                 <ContextMenuSeparator />
 
                 {marks ? (

@@ -7,6 +7,7 @@
  */
 
 import * as core from "@polaris/core";
+import * as editing from "@/lib/context-menu/editing";
 import { ReferenceScope } from "./references";
 import {
     ClipboardPaste,
@@ -183,12 +184,9 @@ export function CanvasEditor({
 
     const paste = async (at: { x: number; y: number }) => {
         let text = pageClipboard;
-        try {
-            const read = await navigator.clipboard.readText();
-            if (core.parseFragment(read)) text = read;
-        } catch {
-            // No permission to read: whatever this page copied still pastes.
-        }
+        // No permission to read: whatever this page copied still pastes.
+        const read = await editing.readClipboard();
+        if (read.ok && core.parseFragment(read.contents.text)) text = read.contents.text;
         const fragment = text ? core.parseFragment(text) : null;
         if (!fragment || fragment.nodes.length + fragment.notes.length === 0)
             return void toast.show({ title: t("canvas.nothingToPaste") });

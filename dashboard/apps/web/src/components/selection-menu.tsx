@@ -13,7 +13,6 @@
 
 import {
     AppWindow,
-    ClipboardPaste,
     Copy,
     Scissors,
     ExternalLink,
@@ -42,7 +41,9 @@ import {
 import { openSearch } from "@/lib/search/open-search";
 import * as selectionMenu from "@/lib/selection-menu";
 import * as contextMenu from "@/lib/context-menu/target";
-import { canEdit, copyText, deleteSelection, insertText, isTextField } from "@/lib/context-menu/editing";
+import { PasteItems } from "@/components/context-menu-paste-items";
+import { useMenuPaste } from "@/lib/context-menu/use-menu-paste";
+import { canEdit, copyText, deleteSelection, isTextField } from "@/lib/context-menu/editing";
 import { usePolar } from "@/components/polar/polar-panel";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { TextTranslationOffer } from "@/lib/app-extensions/types";
@@ -52,7 +53,6 @@ import {
     type SelectionToTranslate
 } from "@/components/text-translation/selection-translation";
 
-type PasteState = "granted" | "prompt" | "denied" | "unsupported";
 
 interface OpenMenu {
     readonly x: number;
@@ -62,30 +62,6 @@ interface OpenMenu {
     readonly fieldRange: readonly [number, number] | null;
     /** What was selected anywhere else, likewise. */
     readonly range: Range | null;
-}
-
-/** Whether this browser will let the page read the clipboard: granted, or it
- *  will ask. Browsers that cannot be asked about it are asked by trying. */
-function usePasteState(): PasteState {
-    const [state, setState] = useState<PasteState>("unsupported");
-    useEffect(() => {
-        if (typeof navigator === "undefined" || !navigator.clipboard?.readText) {
-            setState("denied");
-            return;
-        }
-        let status: PermissionStatus | null = null;
-        const read = () => status && setState(status.state as PasteState);
-        navigator.permissions
-            ?.query({ name: "clipboard-read" as PermissionName })
-            .then((answer) => {
-                status = answer;
-                read();
-                answer.addEventListener("change", read);
-            })
-            .catch(() => setState("unsupported"));
-        return () => status?.removeEventListener("change", read);
-    }, []);
-    return state;
 }
 
 /** Puts back the selection the menu was opened on, in the field or the page. */
@@ -145,7 +121,7 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
     const t = useTranslations("common");
     const toast = useToast();
     const polar = usePolar();
-    const paste = usePasteState();
+    const menuPaste = useMenuPaste();
     const translates = useTextTranslator() !== null;
     const [menu, setMenu] = useState<OpenMenu | null>(null);
     /** A right-click on a link with nothing selected under it. */
@@ -268,7 +244,6 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
     }, [copy]);
 
     const editable = canEdit(menu?.found.field ?? null);
-    const canPaste = paste !== "denied" && editable;
 
     const cutHere = async () => {
         if (!menu?.found.field) return;
@@ -282,18 +257,9 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
         deleteSelection(opened.found.field!);
     };
 
-    const pasteHere = async () => {
-        if (!menu?.found.field) return;
+    const pasteHere = async (plain: boolean) => {
         const opened = menu;
-        let text: string;
-        try {
-            text = await navigator.clipboard.readText();
-        } catch {
-            toast.show({ title: t("selectionMenu.pasteFailed") });
-            return;
-        }
-        restore(opened);
-        insertText(opened.found.field!, text);
+        if (opened?.found.field) await menuPaste.paste(opened.found.field, { plain, restore: () => restore(opened) });
     };
 
     return (
@@ -335,12 +301,12 @@ function SelectionMenuFor({ children }: { children: ReactNode }) {
                             {t("selectionMenu.copy")}
                             <MenuShortcut keys="Mod+C" />
                         </DropdownMenuItem>
-                        {canPaste ? (
-                            <DropdownMenuItem onSelect={() => void pasteHere()}>
-                                <ClipboardPaste />
-                                {t("selectionMenu.paste")}
-                                <MenuShortcut keys="Mod+V" />
-                            </DropdownMenuItem>
+                        {editable ? (
+                            <PasteItems
+                                menuPaste={menuPaste}
+                                rich={!isTextField(menu.found.field ?? null)}
+                                onPaste={(plain) => void pasteHere(plain)}
+                            />
                         ) : null}
                         {/* Text in a sandboxed frame cannot be reselected from here. */}
                         {menu.range || menu.found.field ? (

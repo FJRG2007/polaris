@@ -337,7 +337,6 @@
         },
         "placeholder": "Write something",
         "cut": "Cut",
-        "nothingToPaste": "Nothing to paste",
         "paste": "Paste",
         "bold": "Bold",
         "italic": "Italic",

@@ -14,6 +14,7 @@
  */
 
 import Link from "next/link";
+import { useMenuPaste } from "@/lib/context-menu/use-menu-paste";
 import type { DriveEntry, ListingFailure } from "./types";
 import { originalFolder, type TrashRow } from "./trash/trash-listing";
 import { FolderTree } from "./folder-tree";
@@ -496,6 +497,7 @@ export function FilesView({
     const tc = useTranslations("common");
     const tFiles = useTranslations("components");
     const toast = useToast();
+    const menuPaste = useMenuPaste((title) => toast.show({ title }));
     const inTrash = trash !== undefined;
     const [picking, setPicking] = useState(false);
     const [query, setQuery] = useState("");
@@ -1057,6 +1059,13 @@ export function FilesView({
     // on the system clipboard, the browser's paste keys paste the explorer's own
     // clipboard instead. Stands down where the shortcuts above do, and where the
     // person may not write.
+    /** The background menu's Paste with nothing in the explorer's clipboard: the
+     *  upload Ctrl+V does with a copied picture. */
+    async function pastePictures() {
+        const files = await menuPaste.pictures();
+        if (files && abilities.write && !inTrash) onUpload(pastedItems(files, t("filesView.pastedImage"), new Date()));
+    }
+
     useEffect(() => {
         function onPaste(event: ClipboardEvent) {
             const fromKeys = pasteFromKeys.current;
@@ -3674,7 +3683,17 @@ export function FilesView({
                                           })
                                         : t("filesView.menu.paste")}
                                 </ContextMenuItem>
-                            ) : null}
+                            ) : (
+                                // What the paste keys do here with nothing cut or
+                                // copied in the explorer: upload a copied picture.
+                                <ContextMenuItem
+                                    disabled={!abilities.write || uploading || !!menuPaste.blockedHint}
+                                    onSelect={() => void pastePictures()}
+                                >
+                                    <ClipboardPaste className="size-4" />
+                                    {t("filesView.menu.paste")}
+                                </ContextMenuItem>
+                            )}
                         </ContextMenuContent>
                     )}
                 </ContextMenu>
