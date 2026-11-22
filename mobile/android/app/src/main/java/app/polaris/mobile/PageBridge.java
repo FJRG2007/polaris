@@ -105,7 +105,19 @@ final class PageBridge {
      *  from the next time the person leaves the app (SeasonIcon). */
     @JavascriptInterface
     public void setSeasonIcon(String season) {
-        if (season != null && season.length() <= 32) SeasonIcon.remember(activity, season);
+        if (season == null || season.length() > 32) return;
+        SeasonIcon.remember(activity, season);
+        // A page from before the official flag: its season counts as this server's own.
+        SeasonIcon.report(activity, ServerStore.origin(activity), season, false);
+    }
+
+    /** The same, with whether the season is Polaris's own calendar's, kept per server so that several servers settle
+     *  on one icon instead of taking turns (SeasonIcon.wantedAcross). The server is the one this app has on screen,
+     *  not one the page names. */
+    @JavascriptInterface
+    public void reportSeasonIcon(String season, boolean official) {
+        if (season == null || season.length() > 32) return;
+        SeasonIcon.report(activity, ServerStore.origin(activity), season, official);
     }
 
     /** A link the page opens outside itself. Only the web and mail leave: any other scheme would launch whatever app

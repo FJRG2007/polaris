@@ -19,6 +19,12 @@ import android.os.Looper;
  * plain one keeps the name `.MainActivity` the launcher entry always had, so home-screen icons placed before this
  * existed still point at it.
  *
+ * The app can be signed in to several Polaris servers, each with its own calendar, and the icon is one. Each server's
+ * last word is kept apart (by origin) and they are settled the way `appIconSeason` in @polaris/core settles them: a
+ * season of Polaris's own calendar wins, then the first server in origin order that has a season of its own - so the
+ * icon never takes turns with the server on screen. The page works out the official flag; this only mirrors the
+ * merge, and a test holds the two to the same cases.
+ *
  * Switching entries is done only once the person has left the app, never while it is on screen or in a call:
  * - Some launchers and OEM builds restart the app when its launcher entry changes, even with DONT_KILL_APP.
  * - The entry being switched on is enabled before the old one is disabled, so there is never a moment with no
@@ -29,6 +35,8 @@ final class SeasonIcon {
     private static final String PREFS = "season_icon";
     private static final String WANTED = "season";
     private static final String TOLD_AT = "toldAt";
+    /** One line per server: origin, season ("" for none), 1 when official, when it said so. */
+    private static final String HOSTS = "hosts";
     /** A season nobody has repeated for this long (an older Polaris opened since) falls back to the plain icon. */
     private static final long STALE_MS = 14L * 24 * 60 * 60 * 1000;
     /** Long enough for the screen opened next, if it is one of the app's own, to be on screen. */
@@ -61,6 +69,52 @@ final class SeasonIcon {
         prefs(context).edit().putString(WANTED, known).putLong(TOLD_AT, System.currentTimeMillis()).apply();
     }
 
+    /** One server's season, kept beside the others' for the next time the person leaves the app. */
+    static synchronized void report(Context context, String origin, String season, boolean official) {
+        if (origin == null || origin.isEmpty() || origin.contains("\t") || origin.contains("\n")) return;
+        SharedPreferences prefs = prefs(context);
+        String next = withReport(prefs.getString(HOSTS, ""), origin, season, official, System.currentTimeMillis());
+        prefs.edit().putString(HOSTS, next).apply();
+    }
+
+    /** The stored lines with `origin`'s replaced by this report. */
+    static String withReport(String stored, String origin, String season, boolean official, long now) {
+        String known = PLAIN.equals(entryFor(season)) ? "" : season;
+        StringBuilder out = new StringBuilder();
+        for (String line : stored.split("\n")) {
+            String[] parts = line.split("\t", -1);
+            if (parts.length != 4 || parts[0].equals(origin)) continue;
+            out.append(line).append('\n');
+        }
+        return out.append(origin).append('\t').append(known).append('\t').append(official ? "1" : "0")
+                .append('\t').append(now).toString();
+    }
+
+    /**
+     * The entry every server's report settles on: an official season if any fresh report names one, else the first
+     * fresh server in origin order that has a season. Null when no server has reported this way (an older Polaris
+     * only), so the single last word is used instead.
+     */
+    static String wantedAcross(String stored, long now) {
+        java.util.TreeMap<String, String[]> fresh = new java.util.TreeMap<>();
+        for (String line : stored.split("\n")) {
+            String[] parts = line.split("\t", -1);
+            if (parts.length != 4) continue;
+            long toldAt;
+            try {
+                toldAt = Long.parseLong(parts[3]);
+            } catch (NumberFormatException bad) {
+                continue;
+            }
+            if (now - toldAt > STALE_MS || now < toldAt) continue;
+            fresh.put(parts[0], parts);
+        }
+        if (fresh.isEmpty()) return null;
+        for (String[] parts : fresh.values()) if ("1".equals(parts[2]) && !parts[1].isEmpty()) return entryFor(parts[1]);
+        for (String[] parts : fresh.values()) if (!parts[1].isEmpty()) return entryFor(parts[1]);
+        return PLAIN;
+    }
+
     /** The entry that should be on now, from what the page said last and when. */
     static String wanted(String season, long toldAt, long now) {
         if (now - toldAt > STALE_MS || now < toldAt) return PLAIN;
@@ -74,7 +128,9 @@ final class SeasonIcon {
             try {
                 if (onScreenOrInCall(app)) return;
                 SharedPreferences prefs = prefs(app);
-                apply(app, wanted(prefs.getString(WANTED, ""), prefs.getLong(TOLD_AT, 0), System.currentTimeMillis()));
+                long now = System.currentTimeMillis();
+                String across = wantedAcross(prefs.getString(HOSTS, ""), now);
+                apply(app, across != null ? across : wanted(prefs.getString(WANTED, ""), prefs.getLong(TOLD_AT, 0), now));
             } catch (RuntimeException failed) {
                 restorePlain(app);
             }
