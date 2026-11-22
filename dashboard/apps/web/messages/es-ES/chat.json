@@ -1231,20 +1231,31 @@
         "newChannel": "Nuevo canal",
         "thisSpace": "este espacio",
         "whatKindOfChannel": "Qué tipo de canal",
-        "text": "Texto",
-        "aConversationPeopleReadBack": "Una conversación que se relee",
-        "voice": "Voz",
-        "aRoomPeopleWalkInto": "Una sala donde entrar a hablar",
         "channelName": "Nombre",
         "whatItIsFor": "Para qué sirve",
         "whatItIsForOptional": "Para qué sirve (opcional)",
         "aVoiceChannelHasA": "Un canal de voz también tiene conversación, para los enlaces y notas de lo que se habla. Entrar en la llamada es pulsar un botón, no algo que pasa al abrirlo.",
         "private": "Privado",
-        "onlyThePeopleAddedTo": "Solo lo ven las personas añadidas, incluso dentro de este espacio.",
+        "onlyThePeopleAddedTo": "Solo lo ven las personas, equipos y roles que elijas.",
         "cancel": "Cancelar",
         "inSpace": "En {name}.",
         "createVoice": "Crear canal de voz",
-        "createText": "Crear canal"
+        "createText": "Crear canal",
+        "channelType": "Tipo de canal",
+        "types": {
+            "text": {
+                "name": "Texto",
+                "hint": "Mensajes, imágenes, enlaces e hilos"
+            },
+            "voice": {
+                "name": "Voz",
+                "hint": "Hablad y compartid pantalla juntos"
+            },
+            "announcement": {
+                "name": "Anuncios",
+                "hint": "Solo publican administradores; el resto lee"
+            }
+        }
     },
     "combine": {
         "useMyOwnAudio": "Usar mi audio",

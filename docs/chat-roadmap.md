@@ -357,3 +357,30 @@ Only space channels lack it, which is the retention row in section 2.
 Not verified against an official page: the exact format of WhatsApp's username
 key (reports disagree), and whether hidden locked chats stay hidden on linked
 devices.
+
+## 7. Discord channel types parity (ledger, 2026-11-22)
+
+What Discord's Create Channel dialog offers in a server, and what Polaris has in a space. Discord's own list of channel types: text, voice, category, announcement, stage, forum and media, plus threads inside them and direct/group messages outside servers [D1]. User features only.
+
+| # | Discord | How it behaves there | Polaris | Missing | Plan | Size |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | Create Channel dialog | Type picked from cards (icon, name, one line), name field with the type's icon, Private switch [D2] | **Done (2026-11-22).** `new-channel-dialog.tsx`: radio cards for Text, Voice and Announcement, the type's icon in the name field, Private switch | Forum and Stage cards, once those types exist | Add a card per type as each lands (`CHAT_CHANNEL_CREATE_TYPES` in `packages/core/src/schemas/chat.ts`) | S |
+| 2 | Text (#) | Messages, files, threads | **Done.** `kind = "text"` | - | Unchanged | - |
+| 3 | Voice | A room people walk into; text chat beside it; user limit | **Done.** `kind = "voice"`, walk-in join, `userLimit` | - | Unchanged | - |
+| 4 | Private channel | Only selected members and roles can see it; chosen at creation [D2] | **Done.** `ChatChannel.private`; members are picked in the channel, and teams and roles reach it through access grants (`chat.channel` in `lib/access/sharing-service.ts`) | Picking members and roles inside the Create dialog itself (today: after creating, in the channel's settings) | Add the people/roles picker to the dialog when Private is on | S |
+| 5 | Category | Headings that group channels; collapse; sync permissions [D3] | **Done.** `ChatCategory`, drag to reorder, create a channel under a heading | Permission sync from a category to its channels | Category-level access grant inherited by its channels | M |
+| 6 | Announcement | Only allowed roles post; other servers **follow** it into one of their channels; a message is **published** to every follower (crosspost) [D4] | **Partial (2026-11-22).** A Create Channel type: a text channel with `membersMaySend` off (`core.isAnnouncementChannel`), the same column as the "Announcement channel" switch, so every channel made with the switch already is one; megaphone icon in the rail and header. Members read and react, administrators post (`sendClosed()`) | Follow into another space's channel; Publish a message to followers | `ChatChannelFollow` (source channel, target channel, who followed); Follow from the channel header listing channels the follower administers; a Publish action on administrators' messages copying it, with a "from #channel in Space" origin line, to every following channel | L |
+| 7 | Forum | Posts are threads with a title and a first message; list with tags, sort by latest activity or creation date, search, posting guidelines, required tags, moderator-only tags, default reaction [D5] | **Missing.** Threads exist inside text channels | The whole type | `kind = "forum"`: the channel view is the list of its threads (`parentId` roots) with title; `ChatForumTag` per channel and tags on the root message; guidelines and `requireTag` on the channel; sort and search on the list; the Create card | L |
+| 8 | Media | A forum whose posts are pictures and videos, drawn as a gallery [D6] | **Missing** | The whole type | Forum with a gallery layout and an attachment required on the first message | S on top of Forum |
+| 9 | Stage | Speakers and an audience; audience is listen-only and raises a hand to speak; moderators invite to speak and move speakers back; a topic for the live stage [D7] | **Missing.** Calls have a stage *layout* (`call-stage.tsx`) and raised hands (`call-hands-panel.tsx`), not a Stage channel | The whole type | `kind = "stage"` on the voice-room machinery: audience joins with publish permission off in the LiveKit token, request to speak reuses raised hands, a moderator's "Invite to speak"/"Move to audience" updates the participant's publish permission, topic shown over the room; the Create card | L |
+| 10 | Directory (student hubs) | Lists servers of a hub [D1] | Not applicable: spaces are found through the space list and invites | - | None | - |
+
+Sources:
+
+- D1. Discord developer docs, Channel resource, channel types - https://discord.com/developers/docs/resources/channel
+- D2. Discord support, Channels FAQ (creating channels, private channels) (support.discord.com)
+- D3. Discord support, Channel categories (support.discord.com)
+- D4. Discord support, Announcement channels (support.discord.com)
+- D5. Discord support, Forum channels FAQ (support.discord.com)
+- D6. Discord support, Media channel (support.discord.com)
+- D7. Discord support, Stage channels FAQ (support.discord.com)

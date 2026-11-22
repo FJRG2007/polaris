@@ -1231,20 +1231,31 @@
         "newChannel": "New channel",
         "thisSpace": "this space",
         "whatKindOfChannel": "What kind of channel",
-        "text": "Text",
-        "aConversationPeopleReadBack": "A conversation people read back",
-        "voice": "Voice",
-        "aRoomPeopleWalkInto": "A room people walk into and talk in",
         "channelName": "Channel name",
         "whatItIsFor": "What it is for",
         "whatItIsForOptional": "What it is for (optional)",
         "aVoiceChannelHasA": "A voice channel has a conversation too, for the links and notes that go with what is being said. Joining the call is a press, not a consequence of opening it.",
         "private": "Private",
-        "onlyThePeopleAddedTo": "Only the people added to it can see it, even inside this space.",
+        "onlyThePeopleAddedTo": "Only the people, teams and roles you choose can see it.",
         "cancel": "Cancel",
         "inSpace": "In {name}.",
         "createVoice": "Create voice channel",
-        "createText": "Create channel"
+        "createText": "Create channel",
+        "channelType": "Channel type",
+        "types": {
+            "text": {
+                "name": "Text",
+                "hint": "Messages, pictures, links and threads"
+            },
+            "voice": {
+                "name": "Voice",
+                "hint": "Talk and share your screen together"
+            },
+            "announcement": {
+                "name": "Announcement",
+                "hint": "Only administrators post; members read and react"
+            }
+        }
     },
     "combine": {
         "useMyOwnAudio": "Use my own audio",

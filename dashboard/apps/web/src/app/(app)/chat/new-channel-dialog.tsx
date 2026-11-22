@@ -7,6 +7,10 @@
  * because "Release Planning" becoming `release-planning` is a surprise the first
  * time and an annoyance every time after. Showing it removes both: what you see
  * is what the channel will be called.
+ *
+ * The type is picked from cards the way Discord's Create Channel does it: an
+ * icon, a name and one line on what the room is for, with the same icon in
+ * front of the name field so the choice stays visible while typing.
  */
 
 import * as core from "@polaris/core";
@@ -16,10 +20,11 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { createChannelAction } from "./actions";
-import { Hash, Loader2, Volume2 } from "lucide-react";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
+import { Hash, Loader2, Lock, Megaphone, Volume2, type LucideIcon } from "lucide-react";
 import {
     Button,
+    cn,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -27,9 +32,15 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    SegmentedControl,
     Switch
 } from "@polaris/ui";
+
+/** Each type's icon, shared by its card and the name field. */
+const TYPE_ICONS: Record<core.ChatChannelCreateType, LucideIcon> = {
+    text: Hash,
+    voice: Volume2,
+    announcement: Megaphone
+};
 
 export function NewChannelDialog({
     space,
@@ -48,12 +59,14 @@ export function NewChannelDialog({
     const { refresh } = useChat();
     const [name, setName] = useState("");
     const [topic, setTopic] = useState("");
-    const [kind, setKind] = useState<core.ChatSpaceChannelKind>("text");
+    const [type, setType] = useState<core.ChatChannelCreateType>("text");
     const [privateChannel, setPrivateChannel] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
     const stored = useMemo(() => core.normalizeChannelName(name), [name]);
+    // The sidebar draws a private text room with a lock, so the field does too.
+    const NameIcon = privateChannel && type === "text" ? Lock : TYPE_ICONS[type];
 
     const create = async () => {
         if (!space) return;
@@ -65,7 +78,8 @@ export function NewChannelDialog({
                     spaceId: space.id,
                     name,
                     topic,
-                    kind,
+                    kind: type === "voice" ? "voice" : "text",
+                    announcement: type === "announcement",
                     categoryId,
                     private: privateChannel
                 }),
@@ -75,7 +89,7 @@ export function NewChannelDialog({
         if (result?.error || !result?.id) return;
         setName("");
         setTopic("");
-        setKind("text");
+        setType("text");
         setPrivateChannel(false);
         onOpenChange(false);
         refresh();
@@ -91,50 +105,75 @@ export function NewChannelDialog({
                 </DialogHeader>
 
                 <div className="flex flex-col gap-3">
-                    <SegmentedControl
-                        aria-label={t("newChannel.whatKindOfChannel")}
-                        value={kind}
-                        onValueChange={setKind}
-                        options={[
-                            {
-                                value: "text",
-                                label: (
-                                    <span className="flex items-center gap-1.5">
-                                        <Hash className="size-3.5" />
-                                        {t("newChannel.text")}
-                                    </span>
-                                ),
-                                title: t("newChannel.aConversationPeopleReadBack")
-                            },
-                            {
-                                value: "voice",
-                                label: (
-                                    <span className="flex items-center gap-1.5">
-                                        <Volume2 className="size-3.5" />
-                                        {t("newChannel.voice")}
-                                    </span>
-                                ),
-                                title: t("newChannel.aRoomPeopleWalkInto")
-                            }
-                        ]}
-                    />
+                    <div className="flex flex-col gap-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">{t("newChannel.channelType")}</p>
+                        <div
+                            role="radiogroup"
+                            aria-label={t("newChannel.whatKindOfChannel")}
+                            className="flex flex-col gap-1.5"
+                        >
+                            {core.CHAT_CHANNEL_CREATE_TYPES.map((option) => {
+                                const Icon = TYPE_ICONS[option];
+                                const chosen = type === option;
+                                return (
+                                    <button
+                                        key={option}
+                                        type="button"
+                                        role="radio"
+                                        aria-checked={chosen}
+                                        onClick={() => setType(option)}
+                                        className={cn(
+                                            "flex min-w-0 items-center gap-3 rounded-md border px-3 py-2 text-start transition-colors",
+                                            chosen ? "border-primary bg-primary/10" : "border-border hover:bg-card-hover"
+                                        )}
+                                    >
+                                        <Icon aria-hidden className="size-5 shrink-0 text-muted-foreground" />
+                                        <span className="flex min-w-0 flex-1 flex-col">
+                                            <span className="truncate text-sm font-medium">
+                                                {t(`newChannel.types.${option}.name`)}
+                                            </span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {t(`newChannel.types.${option}.hint`)}
+                                            </span>
+                                        </span>
+                                        <span
+                                            aria-hidden
+                                            className={cn(
+                                                "size-3.5 shrink-0 rounded-full border",
+                                                chosen
+                                                    ? "border-primary bg-primary shadow-[inset_0_0_0_2px_var(--color-background,white)]"
+                                                    : "border-border-strong"
+                                            )}
+                                        />
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
 
                     <div className="flex flex-col gap-1">
-                        <Input
-                            value={name}
-                            autoFocus
-                            aria-label={t("newChannel.channelName")}
-                            placeholder="release-planning"
-                            maxLength={80}
-                            onChange={(event) => setName(event.target.value)}
-                            onKeyDown={(event) => {
-                                if (event.key === "Enter" && stored && !busy) void create();
-                            }}
-                        />
+                        <div className="relative">
+                            <NameIcon
+                                aria-hidden
+                                className="pointer-events-none absolute start-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                            />
+                            <Input
+                                value={name}
+                                autoFocus
+                                className="ps-8"
+                                aria-label={t("newChannel.channelName")}
+                                placeholder="release-planning"
+                                maxLength={80}
+                                onChange={(event) => setName(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter" && stored && !busy) void create();
+                                }}
+                            />
+                        </div>
                         {stored && stored !== name && (
-                            <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Hash className="size-3" />
-                                {stored}
+                            <p className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                                <NameIcon className="size-3 shrink-0" />
+                                <span className="truncate" title={stored}>{stored}</span>
                             </p>
                         )}
                     </div>
@@ -147,7 +186,7 @@ export function NewChannelDialog({
                         onChange={(event) => setTopic(event.target.value)}
                     />
 
-                    {kind === "voice" && (
+                    {type === "voice" && (
                         <p className="text-xs text-muted-foreground">
                             {t("newChannel.aVoiceChannelHasA")}
                         </p>
@@ -155,7 +194,7 @@ export function NewChannelDialog({
 
                     <label className="flex items-start gap-3 rounded-md border border-border px-3 py-2">
                         <Switch checked={privateChannel} onChange={setPrivateChannel} />
-                        <span className="flex flex-col gap-0.5">
+                        <span className="flex min-w-0 flex-col gap-0.5">
                             <span className="text-sm font-medium">{t("newChannel.private")}</span>
                             <span className="text-xs text-muted-foreground">
                                 {t("newChannel.onlyThePeopleAddedTo")}
@@ -176,7 +215,7 @@ export function NewChannelDialog({
                     </Button>
                     <Button size="sm" disabled={busy || !stored} onClick={() => void create()}>
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        {kind === "voice" ? t("newChannel.createVoice") : t("newChannel.createText")}
+                        {type === "voice" ? t("newChannel.createVoice") : t("newChannel.createText")}
                     </Button>
                 </DialogFooter>
             </DialogContent>

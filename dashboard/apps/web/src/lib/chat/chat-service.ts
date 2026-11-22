@@ -1222,6 +1222,9 @@ export async function createChannel(
             topic: input.topic,
             private: input.private,
             kind: input.kind,
+            // An announcement channel is the "Announcement channel" switch
+            // already on: only the space's administrators post in it.
+            ...(input.announcement && input.kind === "text" ? { membersMaySend: false } : {}),
             categoryId: input.categoryId,
             createdById: actor.id,
             // A private channel with nobody in it is a channel its creator

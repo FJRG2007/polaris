@@ -97,6 +97,7 @@ import {
     Lock,
     LogOut,
     Mail,
+    Megaphone,
     MessageSquarePlus,
     Music2,
     Pencil,
@@ -1245,6 +1246,8 @@ function ChannelRows({
                             icon={
                                 channel.kind === "voice" ? (
                                     <Volume2 className="size-3.5 shrink-0 text-muted-foreground" />
+                                ) : core.isAnnouncementChannel(channel) ? (
+                                    <Megaphone className="size-3.5 shrink-0 text-muted-foreground" />
                                 ) : channel.private ? (
                                     <Lock className="size-3.5 shrink-0 text-muted-foreground" />
                                 ) : (

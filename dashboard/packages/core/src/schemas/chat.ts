@@ -50,6 +50,29 @@ export const CHAT_SPACE_CHANNEL_KINDS = ["text", "voice"] as const;
 
 export type ChatSpaceChannelKind = (typeof CHAT_SPACE_CHANNEL_KINDS)[number];
 
+/**
+ * The types the Create Channel dialog offers, in its order.
+ *
+ * `announcement` is not a stored kind: it is a text channel with
+ * `membersMaySend` off, which is what the "Announcement channel" switch in a
+ * channel's settings has always written. Reading the type off that one column
+ * means every channel made with the switch is already an announcement channel,
+ * and the type and the switch can never disagree.
+ */
+export const CHAT_CHANNEL_CREATE_TYPES = ["text", "voice", "announcement"] as const;
+
+export type ChatChannelCreateType = (typeof CHAT_CHANNEL_CREATE_TYPES)[number];
+
+/** Whether a space's channel is an announcement channel: a text room only its
+ *  administrators post in. A group with the same switch off is still a group. */
+export function isAnnouncementChannel(channel: {
+    readonly spaceId: string | null;
+    readonly kind: string;
+    readonly membersMaySend: boolean;
+}): boolean {
+    return channel.spaceId !== null && channel.kind === "text" && !channel.membersMaySend;
+}
+
 export type ChatChannelKind = (typeof CHAT_CHANNEL_KINDS)[number];
 
 /**
@@ -255,8 +278,14 @@ export const chatChannelCreateSchema = z.object({
     /** A channel only the people put in it can see. */
     private: z.boolean().default(false),
     kind: z.enum(CHAT_SPACE_CHANNEL_KINDS).default("text"),
+    /** An announcement channel: a text channel only its administrators post
+     *  in (`membersMaySend` off). Absent is an ordinary channel. */
+    announcement: z.boolean().optional(),
     /** The heading it sits under, or null for the ones above the first one. */
     categoryId: z.string().uuid().nullable().default(null)
+}).refine((input) => !(input.announcement && input.kind !== "text"), {
+    message: "Only a text channel can be an announcement channel",
+    path: ["announcement"]
 });
 
 export type ChatChannelCreateInput = z.infer<typeof chatChannelCreateSchema>;

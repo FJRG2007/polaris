@@ -12,6 +12,7 @@
  * place already on screen is furniture.
  */
 
+import * as core from "@polaris/core";
 import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
@@ -56,6 +57,7 @@ import {
     Link2,
     LogOut,
     Lock,
+    Megaphone,
     MoreHorizontal,
     Pencil,
     Phone,
@@ -222,7 +224,15 @@ export function ChannelHeader({
             }
           : null;
 
-    const Icon = channel.private ? Lock : named ? Hash : Users;
+    // The same order as the rail's row: an announcement channel keeps its
+    // megaphone even when private.
+    const Icon = core.isAnnouncementChannel(channel)
+        ? Megaphone
+        : channel.private
+          ? Lock
+          : named
+            ? Hash
+            : Users;
 
     /**
      * Run one of these actions and say what happened.
