@@ -23,13 +23,18 @@ export const DropdownMenuSeparatorRoot = RadixMenu.Separator;
 
 export const DropdownMenuContent = forwardRef<
     ElementRef<typeof RadixMenu.Content>,
-    ComponentPropsWithoutRef<typeof RadixMenu.Content>
+    ComponentPropsWithoutRef<typeof RadixMenu.Content> & {
+        /** Where the menu is portalled: the page by default. An element shown
+         *  full screen hides everything outside it, so a menu opened inside
+         *  one has to be portalled into it to be seen. */
+        container?: HTMLElement | null;
+    }
 >(
     (
-        { className, sideOffset = 6, collisionPadding = MENU_GUTTER, onFocus, onKeyDown, ...props },
+        { className, sideOffset = 6, collisionPadding = MENU_GUTTER, onFocus, onKeyDown, container, ...props },
         ref
     ) => (
-        <RadixMenu.Portal>
+        <RadixMenu.Portal container={container ?? undefined}>
             <RadixMenu.Content
                 ref={ref}
                 sideOffset={sideOffset}

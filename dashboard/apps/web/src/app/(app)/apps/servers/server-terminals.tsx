@@ -11,10 +11,11 @@
  * nobody ever sees a session they did not open.
  */
 
-import { Pencil, Plus, X } from "lucide-react";
+import { Expand, Maximize2, Minimize2, Pencil, Plus, Shrink, X } from "lucide-react";
 import { Button, Input, Skeleton, cn } from "@polaris/ui";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { toggleFullscreen, useFullscreenElement } from "@/lib/use-terminal-layout";
 import { TerminalPanel, type FindServerResult } from "../deploy/terminal-panel";
 
 interface Session {
@@ -47,8 +48,14 @@ export function ServerTerminals({
     asRoot,
     login,
     address,
+    machine,
+    maximize,
     findServer
 }: {
+    /** The server's name, as Polar is told when asked about a terminal. */
+    machine?: string;
+    /** Filling the window, owned by the dialog that sizes itself to it. */
+    maximize?: { on: boolean; set: (on: boolean) => void };
     hostId: string;
     asRoot: boolean;
     /** The account a non-root shell signs in as. */
@@ -68,6 +75,18 @@ export function ServerTerminals({
     const [renaming, setRenaming] = useState<{ id: string; value: string } | null>(null);
     const [closing, setClosing] = useState<string | null>(null);
     const mounted = useRef(true);
+    const rootRef = useRef<HTMLDivElement>(null);
+    // Where the server was found after it stopped answering at `address`,
+    // shown until the screen catches up with the move.
+    const [movedTo, setMovedTo] = useState<string | null>(null);
+    const shownAddress = movedTo ?? address;
+    const fullscreen = useFullscreenElement();
+    const [canFullscreen, setCanFullscreen] = useState(false);
+    useEffect(() => setCanFullscreen(document.fullscreenEnabled === true), []);
+    const dialogOf = (): Element | null =>
+        rootRef.current?.closest("[role=dialog]") ?? rootRef.current;
+    const isFullscreen = fullscreen !== null && fullscreen === dialogOf();
+    const filled = Boolean(maximize?.on) || isFullscreen;
     // Read through a ref so a new translator identity never refetches the list.
     const tRef = useRef(t);
     tRef.current = t;
@@ -194,7 +213,7 @@ export function ServerTerminals({
     const panelRoot = active === PENDING ? pendingRoot : activeSession?.mode === "ssh-root";
 
     return (
-        <div className="flex min-w-0 flex-col gap-2">
+        <div ref={rootRef} className={cn("flex min-w-0 flex-col gap-2", filled && "min-h-0 flex-1")}>
             <div className="flex min-w-0 items-center gap-1">
                 <div
                     className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
@@ -325,14 +344,55 @@ export function ServerTerminals({
                             : (keys[activeSession!.id] ?? activeSession!.id)
                     }
                     target={{ kind: "host", hostId, asRoot: panelRoot }}
-                    label={`${panelRoot ? "root" : login}@${address}`}
+                    label={`${panelRoot ? "root" : login}@${shownAddress}`}
+                    polarPlace={
+                        machine
+                            ? `${machine} (${panelRoot ? "root" : login}@${shownAddress})`
+                            : undefined
+                    }
+                    onMoved={setMovedTo}
+                    fill={filled}
+                    menuContainer={isFullscreen ? (fullscreen as HTMLElement) : null}
+                    toolbar={
+                        <>
+                            {maximize ? (
+                                <Button
+                                    size="icon-xs"
+                                    variant="ghost"
+                                    aria-pressed={maximize.on}
+                                    aria-label={t(maximize.on ? "terminal.toolbar.restore" : "terminal.toolbar.maximize")}
+                                    title={t(maximize.on ? "terminal.toolbar.restore" : "terminal.toolbar.maximize")}
+                                    onClick={() => maximize.set(!maximize.on)}
+                                >
+                                    {maximize.on ? <Minimize2 /> : <Maximize2 />}
+                                </Button>
+                            ) : null}
+                            {canFullscreen ? (
+                                <Button
+                                    size="icon-xs"
+                                    variant="ghost"
+                                    aria-pressed={isFullscreen}
+                                    aria-label={t(isFullscreen ? "terminal.toolbar.exitFullscreen" : "terminal.toolbar.fullscreen")}
+                                    title={t(isFullscreen ? "terminal.toolbar.exitFullscreen" : "terminal.toolbar.fullscreen")}
+                                    onClick={() => void toggleFullscreen(dialogOf())}
+                                >
+                                    {isFullscreen ? <Shrink /> : <Expand />}
+                                </Button>
+                            ) : null}
+                        </>
+                    }
                     resumeId={active === PENDING ? undefined : activeSession!.id}
                     onSession={onSession}
                     onClosed={onClosed}
                     findServer={findServer}
                 />
             ) : listing ? (
-                <div className="flex h-80 flex-col items-center justify-center gap-3 rounded-md border border-dashed text-center text-xs text-muted-foreground">
+                <div
+                    className={cn(
+                        "flex flex-col items-center justify-center gap-3 rounded-md border border-dashed text-center text-xs text-muted-foreground",
+                        filled ? "min-h-40 flex-1" : "h-80"
+                    )}
+                >
                     <p className="max-w-sm px-4">
                         {atCap
                             ? t("terminal.sessions.limit", { cap: listing.cap })
@@ -345,7 +405,7 @@ export function ServerTerminals({
                     )}
                 </div>
             ) : (
-                <Skeleton className="h-80 w-full" />
+                <Skeleton className={cn("w-full", filled ? "min-h-40 flex-1" : "h-80")} />
             )}
 
             {listing ? (

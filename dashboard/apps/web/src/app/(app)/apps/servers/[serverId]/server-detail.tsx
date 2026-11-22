@@ -14,6 +14,7 @@
  * so, rather than hanging on a shell that will not connect.
  */
 
+import { MAXIMIZED_DIALOG, useTerminalLayout } from "@/lib/use-terminal-layout";
 import Link from "next/link";
 import { useState } from "react";
 import { EdgePanel } from "../edge-panel";
@@ -110,6 +111,7 @@ export function ServerDetail({
     const tc = useTranslations("components");
     const router = useRouter();
     const findServer = useFindServer();
+    const terminalLayout = useTerminalLayout();
     const query = useSearchParams();
     const [tab, setTab] = useState<TabId>(() => tabFromQuery(query.get("tab")) ?? "overview");
     const [shellOpen, setShellOpen] = useState(false);
@@ -412,7 +414,7 @@ export function ServerDetail({
             {/* Mounted only while open, so closing it tears the SSH session down
                 rather than leaving one attached in the background. */}
             <Dialog open={shellOpen} onOpenChange={setShellOpen}>
-                <DialogContent className="max-w-3xl">
+                <DialogContent className={terminalLayout.layout.maximized ? MAXIMIZED_DIALOG : "max-w-3xl"}>
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             {server.name}
@@ -439,6 +441,8 @@ export function ServerDetail({
                             asRoot={asRoot}
                             login={server.detail}
                             address={server.address}
+                            machine={server.name}
+                            maximize={{ on: terminalLayout.layout.maximized, set: (on) => terminalLayout.change({ maximized: on }) }}
                             findServer={() => findServer(server.hostId ?? server.id)}
                         />
                     ) : null}

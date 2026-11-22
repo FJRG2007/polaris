@@ -138,7 +138,9 @@
             "connected": "conectado",
             "disconnected": "desconectado",
             "couldNotConnect": "no se pudo conectar",
-            "couldNotAuthorize": "no se pudo autorizar el terminal"
+            "couldNotAuthorize": "no se pudo autorizar el terminal",
+            "looking": "buscándolo...",
+            "connectingTo": "encontrado en {address}, conectando..."
         },
         "refused": "El servidor rechazó la sesión: {reason}.",
         "untrusted": "{surface, select, app {La app no quiso abrir la conexión. Un terminal necesita que el certificado de esta dirección sea de confianza, y aceptar el aviso en la página no basta. <download>Descarga el certificado de Polaris</download> y añádelo a las raíces de confianza de este dispositivo; después recarga.} other {El navegador no quiso abrir la conexión. Un terminal necesita que el certificado de esta dirección sea de confianza, y aceptar el aviso en la página no basta. <download>Descarga el certificado de Polaris</download> y añádelo a las raíces de confianza de este dispositivo; después recarga.}}",
@@ -177,7 +179,7 @@
             "keepsRunning": "Las terminales siguen en marcha al cerrar esto y terminan tras {minutes} min sin nadie."
         },
         "keys": {
-            "bar": "Teclas que le faltan al móvil",
+            "bar": "Teclas extra",
             "esc": "Esc",
             "escName": "Escape",
             "tab": "Tab",
@@ -187,7 +189,43 @@
             "up": "Arriba",
             "down": "Abajo",
             "left": "Izquierda",
-            "right": "Derecha"
+            "right": "Derecha",
+            "alt": "Alt",
+            "altName": "Alt, para la siguiente",
+            "pipe": "Pleca",
+            "tilde": "Tilde",
+            "slash": "Barra",
+            "dash": "Guion",
+            "ctrlC": "Interrumpir (Ctrl+C)",
+            "ctrlD": "Fin de entrada (Ctrl+D)",
+            "ctrlL": "Limpiar pantalla (Ctrl+L)"
+        },
+        "searching": "{label} no respondió. Buscándolo en esta red...",
+        "toolbar": {
+            "askPolar": "Preguntar a Polar por este terminal",
+            "typeHere": "Abrir el teclado",
+            "showKeys": "Ver teclas extra",
+            "hideKeys": "Quitar teclas extra",
+            "maximize": "Llenar la ventana",
+            "restore": "Volver al tamaño normal",
+            "fullscreen": "Pantalla total",
+            "exitFullscreen": "Dejar pantalla total"
+        },
+        "menu": {
+            "copy": "Copiar",
+            "paste": "Pegar",
+            "selectAll": "Elegir todo",
+            "clear": "Limpiar",
+            "askPolar": "Preguntar a Polar por la salida",
+            "askPolarSelection": "Pregunta a Polar por esto",
+            "copied": "Copiado",
+            "copyFailed": "No se pudo copiar",
+            "pasteBlocked": "El navegador no dejó leer el portapapeles. Pulsa Ctrl+V en el terminal."
+        },
+        "polar": {
+            "aboutSelection": "Esto es de mi terminal en {place}. ¿Qué significa y qué debo hacer?",
+            "aboutOutput": "Esta es la última salida de mi terminal en {place}. ¿Qué significa y qué debo hacer?",
+            "aboutNothing": "Estoy en un terminal en {place}. Ayúdame con él."
         }
     },
     "storage": {

@@ -16,6 +16,7 @@
  * and time out.
  */
 
+import { MAXIMIZED_DIALOG, useTerminalLayout } from "@/lib/use-terminal-layout";
 import Link from "next/link";
 import { HostDialog } from "./host-dialog";
 import { useRouter } from "next/navigation";
@@ -801,6 +802,7 @@ function StatusCell({ kind, status }: { kind: ServerRow["kind"]; status: ServerS
 function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: () => void }) {
     const t = useTranslations("servers");
     const findServer = useFindServer();
+    const terminalLayout = useTerminalLayout();
     const [asRoot, setAsRoot] = useState(false);
 
     // A different server may not offer root at all; starting each one as the login
@@ -811,7 +813,7 @@ function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: (
 
     return (
         <Dialog open={server !== null} onOpenChange={(next) => !next && onClose()}>
-            <DialogContent className="max-w-3xl">
+            <DialogContent className={terminalLayout.layout.maximized ? MAXIMIZED_DIALOG : "max-w-3xl"}>
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         {server?.name}
@@ -847,6 +849,8 @@ function ShellDialog({ server, onClose }: { server: ServerRow | null; onClose: (
                         asRoot={asRoot}
                         login={server.detail}
                         address={server.address}
+                        machine={server.name}
+                        maximize={{ on: terminalLayout.layout.maximized, set: (on) => terminalLayout.change({ maximized: on }) }}
                         findServer={() => findServer(server.hostId ?? server.id)}
                     />
                 ) : null}

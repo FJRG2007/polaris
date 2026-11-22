@@ -270,6 +270,12 @@ export function usePolarAllowed(): boolean {
     return useContext(PolarContext)?.allowed ?? false;
 }
 
+/** Polar, where a component may also render outside the provider (a terminal
+ *  shown in an embedded surface): null there instead of a thrown error. */
+export function usePolarOptional(): PolarState | null {
+    return useContext(PolarContext);
+}
+
 export function usePolar(): PolarState {
     const state = useContext(PolarContext);
     if (!state) throw new Error("usePolar outside PolarProvider");
