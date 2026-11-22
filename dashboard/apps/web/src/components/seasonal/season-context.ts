@@ -15,6 +15,15 @@ export function useDecorationSeason(): core.Season | null {
     return useContext(SeasonContext);
 }
 
+/** This deployment's calendar as an icon shared with other hosts reads it
+ *  (`appIconSeason` in core): null when the operator turned seasons off. An
+ *  admin's preview is not in it - that is this session's alone. */
+export const HostCalendarContext = createContext<core.SeasonCalendar | null>(null);
+
+export function useHostCalendar(): core.SeasonCalendar | null {
+    return useContext(HostCalendarContext);
+}
+
 /** The season this session is previewing, as the frame drew it. `undefined`
  *  outside a frame, so a reader can tell "no frame" from "no preview". */
 export const PreviewContext = createContext<core.Season | null | undefined>(undefined);

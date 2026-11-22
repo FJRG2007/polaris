@@ -22,7 +22,7 @@ export const SERVER_ICON_FILES = [
     { path: "/polaris-mark-512.png", mimeType: "image/png", sizes: ["512x512"] }
 ] as const;
 
-/** The mark as an SVG document, from the same geometry as app/icon.svg. */
+/** The mark as an SVG document, from the same geometry as public/icon.svg. */
 function markSvg(): string {
     const box = `width="${MARK_SIZE}" height="${MARK_SIZE}"`;
     return [

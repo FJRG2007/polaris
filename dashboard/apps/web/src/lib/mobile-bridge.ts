@@ -44,6 +44,10 @@ interface PolarisMobileBridge {
     /** The season the page decorates with ("" for none): the app's launcher
      *  icon wears it. Absent from an app older than the feature. */
     setSeasonIcon?(season: string): void;
+    /** The same, with whether the season is Polaris's own calendar's: the app
+     *  keeps one per server and settles them by `appIconSeason`'s rule, so two
+     *  servers never take turns on the icon. Absent from an older app. */
+    reportSeasonIcon?(season: string, official: boolean): void;
 }
 
 /**
@@ -51,11 +55,11 @@ interface PolarisMobileBridge {
  * launcher icon in it; null asks for the plain icon. Does nothing in a browser
  * or in an app too old to, which keeps its plain icon.
  */
-export function phoneSeasonIcon(season: string | null): void {
+export function phoneSeasonIcon(season: string | null, official = false): void {
     const app = bridge();
-    if (typeof app?.setSeasonIcon !== "function") return;
     try {
-        app.setSeasonIcon(season ?? "");
+        if (typeof app?.reportSeasonIcon === "function") app.reportSeasonIcon(season ?? "", official);
+        else if (typeof app?.setSeasonIcon === "function") app.setSeasonIcon(season ?? "");
     } catch {
         // The app keeps the icon it has.
     }

@@ -32,7 +32,13 @@ import * as core from "@polaris/core";
 import { useEffect, useState, useTransition } from "react";
 import { Eye, Ghost, PartyPopper, Snowflake, Sparkles, type LucideIcon } from "lucide-react";
 import { stopSeasonPreviewAction } from "@/app/(app)/account/preferences/seasonal-actions";
-import { PreviewContext, SeasonContext, useDecorationSeason, usePreviewSeason } from "./season-context";
+import {
+    HostCalendarContext,
+    PreviewContext,
+    SeasonContext,
+    useDecorationSeason,
+    usePreviewSeason
+} from "./season-context";
 
 /** How often the date is looked at again, for a tab left open across midnight. */
 const RECHECK_MS = 30 * 60_000;
@@ -107,12 +113,14 @@ export function SeasonalFrame({
 
     return (
         <PreviewContext.Provider value={preview}>
-            <SeasonContext.Provider value={decoration}>
-                {children}
-                {preview ? <DriftOnce key={preview} season={preview} always /> : null}
-                {!preview && decoration ? <DriftOnce key={decoration} season={decoration} /> : null}
-                {preview ? <PreviewBar season={preview} /> : null}
-            </SeasonContext.Provider>
+            <HostCalendarContext.Provider value={allowed ? calendar : null}>
+                <SeasonContext.Provider value={decoration}>
+                    {children}
+                    {preview ? <DriftOnce key={preview} season={preview} always /> : null}
+                    {!preview && decoration ? <DriftOnce key={decoration} season={decoration} /> : null}
+                    {preview ? <PreviewBar season={preview} /> : null}
+                </SeasonContext.Provider>
+            </HostCalendarContext.Provider>
         </PreviewContext.Provider>
     );
 }

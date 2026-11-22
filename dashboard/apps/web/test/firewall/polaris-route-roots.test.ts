@@ -20,7 +20,6 @@ const PUBLIC = join(WEB, "public");
 
 /** Metadata files Next serves at the root, by the name they are served as. */
 const METADATA: Record<string, string> = {
-    "icon.svg": "icon.svg",
     "manifest.ts": "manifest.webmanifest",
     "robots.ts": "robots.txt",
     "sitemap.ts": "sitemap.xml",

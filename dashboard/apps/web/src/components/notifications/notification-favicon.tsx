@@ -20,9 +20,12 @@
  *
  * In a season the icon also wears the season's accessory - the season the frame
  * decorates with, so the operator's switch and the reader's own calendar decide
- * it exactly as they decide the rest of the decoration. The desktop app gets the
- * same dressed mark for its window, taskbar, tray and Dock icon, and the phone
- * app is told the season for its launcher icon.
+ * it exactly as they decide the rest of the decoration. The desktop app's
+ * window, taskbar, tray and Dock icon and the phone app's launcher icon are
+ * shared with every other Polaris that app is signed in to, so for those the
+ * page reports this host's calendar (`app-icon-report`) and the app settles all
+ * of them by one rule - Polaris's own calendar first - rather than wearing
+ * whichever page spoke last.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -39,7 +42,8 @@ import {
     seasonalFavicon,
     type FaviconLink
 } from "@/lib/favicon";
-import { useDecorationSeason, usePreviewSeason } from "@/components/seasonal/season-context";
+import { useDecorationSeason, useHostCalendar } from "@/components/seasonal/season-context";
+import { appIconReport } from "@/lib/app-icon-report";
 import { phoneSeasonIcon } from "@/lib/mobile-bridge";
 import { useDesktopBridge } from "@/components/desktop-app";
 import { useClient } from "@/components/i18n/i18n-provider";
@@ -76,7 +80,7 @@ export function NotificationFavicon() {
     const desktop = useDesktopBridge();
     const client = useClient();
     const season = useDecorationSeason();
-    const preview = usePreviewSeason();
+    const hostCalendar = useHostCalendar();
 
     useEffect(() => {
         const read = () => setStyle(faviconStyle());
@@ -87,37 +91,67 @@ export function NotificationFavicon() {
     useEffect(() => {
         plain.current ??= currentFavicon();
         const badge = faviconBadge(style, waiting);
-        if (!badge) {
-            applyFavicon(season ? seasonalFavicon(season) : plain.current);
-            return;
+        let icon: FaviconLink | null;
+        if (!badge) icon = season ? seasonalFavicon(season) : plain.current;
+        else {
+            const badged = drawFavicon(badge, undefined, season);
+            icon = badged ? { href: badged, type: "image/png" } : null;
         }
-        const badged = drawFavicon(badge, undefined, season);
-        if (badged) applyFavicon({ href: badged, type: "image/png" });
+        if (!icon) return;
+        const wanted = icon;
+        applyFavicon(wanted);
+        // A navigation renders the page's metadata again, and with it the icon
+        // links the server sent - which put the plain or the server's icon back
+        // over this one until the next alert. Put it back whenever that happens.
+        const watcher = new MutationObserver(() => {
+            if (!showsFavicon(wanted)) applyFavicon(wanted);
+        });
+        watcher.observe(document.head, { subtree: true, childList: true, attributes: true, attributeFilter: ["href"] });
+        return () => watcher.disconnect();
     }, [style, waiting, season]);
 
-    // The desktop app's own icon, dressed for the season and put back after.
+    // The desktop app's own icon. It is shared with every other Polaris the app
+    // shows, so this host reports its calendar and the dressed marks the app
+    // may need, and the app decides across all of them. An app from before that
+    // takes the plain `{ png }` and gets the season this host alone would pick.
     useEffect(() => {
         const setAppIcon = desktop?.setAppIcon;
         if (!setAppIcon) return;
-        let png: string | null = null;
-        try {
-            png = season ? drawFavicon(null, 256, season) : null;
-        } catch {
-            // The plain icon, rather than none.
+        const report = appIconReport(hostCalendar, new Date());
+        const icons: Partial<Record<string, string>> = {};
+        for (const each of report.seasons) {
+            try {
+                const png = drawFavicon(null, 256, each);
+                if (png) icons[each] = png;
+            } catch {
+                // That season stays plain rather than failing the rest.
+            }
         }
-        void setAppIcon({ png }).catch(() => undefined);
-        return () => void setAppIcon({ png: null }).catch(() => undefined);
-    }, [desktop, season]);
+        const png = (report.season && icons[report.season]) || null;
+        const host = window.location.origin;
+        const plainOnly = () => void setAppIcon({ png }).catch(() => undefined);
+        void setAppIcon({ png, host, calendar: report.calendar, icons })
+            .then((taken) => (taken ? undefined : plainOnly()))
+            .catch(plainOnly);
+        return () => {
+            void setAppIcon({ png: null, host })
+                .then((taken) => (taken ? undefined : setAppIcon({ png: null })))
+                .catch(() => undefined);
+        };
+    }, [desktop, hostCalendar, season]);
 
-    // The phone app's launcher icon wears the season too, and keeps it after
-    // the page goes. Not an admin's preview, which is this session's alone;
-    // and only once the season has settled, since the frame reads the calendar
-    // a moment after the first paint and iOS shows an alert on every change.
+    // The phone app's launcher icon follows the same rule, and keeps it after
+    // the page goes. Only once the season has settled, since the frame reads
+    // the calendar a moment after the first paint and iOS shows an alert on
+    // every change. An admin's preview never reaches it: it is not in the
+    // host calendar.
     useEffect(() => {
-        if (preview) return;
-        const timer = window.setTimeout(() => phoneSeasonIcon(season), PHONE_ICON_SETTLE_MS);
+        const timer = window.setTimeout(() => {
+            const report = appIconReport(hostCalendar, new Date());
+            phoneSeasonIcon(report.season, report.official);
+        }, PHONE_ICON_SETTLE_MS);
         return () => window.clearTimeout(timer);
-    }, [season, preview]);
+    }, [hostCalendar, season]);
 
     // The desktop app has no tab: the same choice goes on its icon in the
     // taskbar or the Dock instead, and comes off when the page goes.
@@ -174,6 +208,12 @@ export function NotificationFavicon() {
     );
 
     return null;
+}
+
+/** Whether every icon link in the document already points at `icon`. */
+function showsFavicon(icon: FaviconLink): boolean {
+    const links = document.head.querySelectorAll<HTMLLinkElement>("link[rel~='icon']");
+    return links.length > 0 && Array.from(links).every((link) => link.getAttribute("href") === icon.href);
 }
 
 /** The Badging API of an installed web app: a number, 0 for a bare mark, or

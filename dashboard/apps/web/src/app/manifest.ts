@@ -8,18 +8,23 @@
  * updated separately; the native app in `desktop/` is the download for what a
  * browser window cannot do.
  *
- * The icons stay the plain mark in every season. The season is decided on the
- * reader's own calendar, and this file is built on the server and cached by the
- * browser and the system; an installed app's icon is not refreshed when it
- * changes. The tab, the desktop app and Polar wear the season instead.
+ * The icons wear the season on the server's date (`serverSeason`), at
+ * addresses that name it, so a changed season is a changed manifest. How far
+ * that reaches is the browser's call: Chrome on Android rebuilds the installed
+ * app's icon in the background a day or so later; Chrome on desktop does not
+ * apply icon changes to an installed app at all yet, and keeps the one it was
+ * installed with.
  *
  * The colours are the dark theme's background (`--background` in the design
  * tokens), the one a window opens on before the page has painted.
  */
 
 import type { MetadataRoute } from "next";
+import { serverSeason } from "@/lib/seasonal-service";
+import { seasonIconPng, seasonIconSvg } from "@/lib/season-icon";
 
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+    const season = await serverSeason().catch(() => null);
     return {
         id: "/",
         name: "Polaris",
@@ -32,10 +37,10 @@ export default function manifest(): MetadataRoute.Manifest {
         background_color: "#0b0c0e",
         theme_color: "#0b0c0e",
         icons: [
-            { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
-            { src: "/polaris-mark-128.png", sizes: "128x128", type: "image/png", purpose: "any" },
-            { src: "/polaris-mark-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-            { src: "/polaris-mark-512.png", sizes: "512x512", type: "image/png", purpose: "any" }
+            { src: seasonIconSvg(season), sizes: "any", type: "image/svg+xml", purpose: "any" },
+            { src: seasonIconPng(season, 128), sizes: "128x128", type: "image/png", purpose: "any" },
+            { src: seasonIconPng(season, 192), sizes: "192x192", type: "image/png", purpose: "any" },
+            { src: seasonIconPng(season, 512), sizes: "512x512", type: "image/png", purpose: "any" }
         ],
         // The same address the Mail settings register for mailto links, so an
         // installed Polaris is offered as the mail app too.

@@ -14,6 +14,8 @@ import { INPUT_MODALITY_SCRIPT } from "@/lib/input-modality";
 import { getClient, getLocale, getTranslations } from "@/lib/i18n/request";
 import { pickMessages } from "@/lib/i18n/translate";
 import { seasonPreviewFor } from "@/lib/seasonal-preview";
+import { serverSeason } from "@/lib/seasonal-service";
+import { seasonIconPng, seasonIconSvg } from "@/lib/season-icon";
 import { I18nProvider, LocaleSync } from "@/components/i18n/i18n-provider";
 import { ConnectionBanner } from "@/components/connection-banner";
 import { resolveTextSize, resolveTheme } from "@/lib/display-prefs-service";
@@ -40,9 +42,17 @@ export const viewport: Viewport = {
  *  not translated. */
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("common");
+    // The icon the tab shows before any script, and the one a phone puts on
+    // its home screen, in the season's dress; its address names the season,
+    // so a browser holding last season's icon fetches the new one.
+    const season = await serverSeason().catch(() => null);
     return {
         title: "Polaris", // i18n-ignore
         description: t("meta.description"),
+        icons: {
+            icon: [{ url: seasonIconSvg(season), type: "image/svg+xml", sizes: "any" }],
+            apple: [{ url: seasonIconPng(season, 180), sizes: "180x180", type: "image/png" }]
+        },
         ...(await defaultPreviewMetadata(t("meta.description"))),
         // Every page, public or not, stays out of search engines and their
         // caches; next.config's X-Robots-Tag says the same on every response.

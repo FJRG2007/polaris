@@ -24,7 +24,7 @@ const COLORS = {
     muted: "hsl(222, 10%, 66%)",
     primary: "hsl(258, 82%, 62%)",
     primarySoft: "hsl(258, 90%, 78%)",
-    /** The mark's own purple, as `app/icon.svg` paints it. */
+    /** The mark's own purple, as `public/icon.svg` paints it. */
     mark: "#7632EC"
 } as const;
 
@@ -53,7 +53,7 @@ function loadFonts(): Promise<Font[]> {
     return fonts;
 }
 
-/** The Polaris mark: the geometry of `app/icon.svg`, scaled. */
+/** The Polaris mark: the geometry of `public/icon.svg`, scaled. */
 function Mark({ size }: { size: number }) {
     return (
         <svg width={size} height={size} viewBox="0 0 32 32">

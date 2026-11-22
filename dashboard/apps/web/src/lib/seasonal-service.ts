@@ -41,6 +41,18 @@ export const seasonCalendar = cache(async (): Promise<core.SeasonCalendar> =>
     core.resolveSeasonCalendar(await seasonOverrides())
 );
 
+/**
+ * The season on the server's own date, for the icons a browser fetches by
+ * address before any script runs (the tab's first icon, the home-screen and
+ * installed-app icons). The page then decides on the reader's calendar, as it
+ * does for the rest of the decoration; the two differ at most for the hours
+ * between the server's midnight and the reader's.
+ */
+export const serverSeason = cache(async (): Promise<core.Season | null> => {
+    if (!(await seasonsAllowed())) return null;
+    return core.seasonOn(new Date(), await seasonCalendar());
+});
+
 /** How many times a save reads again after another admin's save landed first. */
 const SAVE_ATTEMPTS = 5;
 
