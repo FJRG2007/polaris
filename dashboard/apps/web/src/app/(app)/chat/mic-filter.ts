@@ -50,6 +50,7 @@ function suppressors() {
 /** The models want 48 kHz, which is what a call runs at anyway. Asked for
  *  explicitly so the graph is never built at a rate the model cannot use. */
 import { micGain } from "./mic-gain";
+import { isHandheld } from "./handheld";
 import { dbToGain, LEVELLER_START, rmsDb, stepLeveller } from "./mic-leveller";
 
 const SAMPLE_RATE = 48_000;
@@ -433,10 +434,34 @@ async function buildNode(
         // never had one.
     }
 
-    const better = await modelNode(context, "enhanced");
-    if (better.node) return better;
-    const light = await modelNode(context, "light");
-    return { ...light, problem: light.problem ?? problem };
+    const order = modelOrder(isHandheld());
+    let using: FilteredMic["using"] = order[order.length - 1]!;
+    for (const which of order) {
+        const tried = await modelNode(context, which);
+        if (tried.node) return tried;
+        using = which;
+        problem = tried.problem ?? problem;
+    }
+    return { node: null, dispose: () => {}, using, problem };
+}
+
+/**
+ * Which model to try first.
+ *
+ * GTCRN takes 768 samples at a time and the audio thread hands it 128, so every
+ * sixth render quantum carries the whole frame - resampling, transform and the
+ * network - in a slot 2.7 ms long. A computer has the headroom; a phone, whose
+ * browser does not run that thread at real-time priority, misses the slot and
+ * the voice comes out choppy. RNNoise works on 10 ms frames at a fraction of the
+ * cost, so it is the only model a phone runs - even when somebody chose the
+ * better one there, which the call menu then says. GTCRN is deliberately not a
+ * phone's fallback: a light model that will not start leaves the browser's own
+ * processing, which is a clean voice, where GTCRN would bring the cuts back.
+ *
+ * Pure so the rule can be asserted without an audio stack.
+ */
+export function modelOrder(handheld: boolean): readonly ("enhanced" | "light")[] {
+    return handheld ? ["light"] : ["enhanced", "light"];
 }
 
 /**

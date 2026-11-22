@@ -27,6 +27,7 @@
  */
 
 import { micDevice } from "./mic-device";
+import { isHandheld } from "./handheld";
 import { voiceSettings } from "./voice-settings";
 import type { MicFilter } from "./mic-filter";
 import { useCallback, useEffect, useState } from "react";
@@ -34,8 +35,23 @@ import type { NamespaceKey } from "@/lib/i18n/types";
 
 const KEY = "polaris.call.mic-cleanup";
 
-/** What somebody who has never touched it gets. */
+/** What somebody who has never touched it gets, on a computer. */
 export const CLEANUP_DEFAULT: MicFilter = "enhanced";
+
+/**
+ * What somebody who has never touched it gets on this device.
+ *
+ * A phone gets the browser's own processing and no model. The model runs on the
+ * audio thread, which a phone's browser does not give real-time priority, and
+ * the better of the two runs a whole 16 ms frame inside one 2.7 ms render
+ * quantum: on a phone that overruns, and what the other end hears is a voice cut
+ * into pieces - in a call and in a voice message alike. The phone's own
+ * canceller and suppressor are built for its microphone and cost the audio
+ * thread nothing. Choosing the model on a phone still works; see `mic-filter`.
+ */
+export function cleanupDefault(): MicFilter {
+    return isHandheld() ? "standard" : CLEANUP_DEFAULT;
+}
 
 /** Same-tab announcement, since the storage event only reaches other tabs. */
 const CHANGED = "polaris:call-mic-cleanup";
@@ -61,9 +77,9 @@ export function micCleanup(): MicFilter {
         const raw = window.localStorage.getItem(KEY);
         // Local storage is editable by whoever owns the browser, so anything
         // that is not one of the four is treated as unset.
-        return LEVELS.includes(raw as MicFilter) ? (raw as MicFilter) : CLEANUP_DEFAULT;
+        return LEVELS.includes(raw as MicFilter) ? (raw as MicFilter) : cleanupDefault();
     } catch {
-        return CLEANUP_DEFAULT;
+        return cleanupDefault();
     }
 }
 
