@@ -58,8 +58,11 @@ import {
     Search,
     Share2,
     Trash2,
-    Users
+    Users,
+    LayoutTemplate
 } from "lucide-react";
+import { TemplatePickerDialog } from "./note-templates";
+import type { NoteTemplateSummary } from "@/lib/notes/template-service";
 
 /** One shelf, as the page read it. */
 export interface ShelfData {
@@ -74,6 +77,20 @@ export interface ShelfData {
     } | null;
     readonly folders: readonly FolderSummary[];
     readonly notes: readonly NoteSummary[];
+    /** What a new note on this shelf can start from. */
+    readonly templates?: readonly NoteTemplateSummary[];
+}
+
+/** Where a new note goes. */
+interface NewNotePlace {
+    readonly spaceId: string | null;
+    readonly folderId: string | null;
+    readonly parentId?: string | null;
+}
+
+/** The templates of the shelf a new note is going onto. */
+function templatesOf(shelves: readonly ShelfData[], spaceId: string | null): readonly NoteTemplateSummary[] {
+    return shelves.find((shelf) => (shelf.space?.id ?? null) === spaceId)?.templates ?? [];
 }
 
 /** What is being dragged, as the drop targets need to know it. */
@@ -144,7 +161,7 @@ const shelfKey = (shelf: ShelfData) => shelf.space?.id ?? OWN;
 
 /** Whether a role may change what is on a shelf. The private one is always
  *  yours; a space's guests read and no more. */
-function canWrite(shelf: ShelfData): boolean {
+export function canWrite(shelf: ShelfData): boolean {
     return (
         !shelf.space ||
         shelf.space.role === "owner" ||
@@ -163,6 +180,7 @@ export function NoteTree({
     onNewNotebook,
     onPeople,
     onImport,
+    onTemplates,
     onMoveNote,
     onShareNote
 }: {
@@ -170,6 +188,7 @@ export function NoteTree({
     activeNoteId: string | null;
     onNewNotebook: () => void;
     onPeople: (spaceId: string) => void;
+    onTemplates: (spaceId: string | null) => void;
     onImport: (shelf: { spaceId: string | null; folderId: string | null }) => void;
     onMoveNote: (noteId: string) => void;
     onShareNote: (noteId: string) => void;
@@ -220,17 +239,29 @@ export function NoteTree({
 
     const open = (id: string) => router.push(`/notes?note=${id}`);
 
-    const create = async (where: {
-        spaceId: string | null;
-        folderId: string | null;
-        parentId?: string | null;
-    }) => {
+    const [picking, setPicking] = useState<NewNotePlace | null>(null);
+
+    const write = async (where: NewNotePlace, templateId: string | null) => {
         const result = await runAction(
-            () => actions.createNoteAction({ title: t("tree.untitled"), body: "", ...where }),
+            () =>
+                actions.createNoteAction({
+                    title: t("tree.untitled"),
+                    body: "",
+                    ...where,
+                    ...(templateId ? { templateId } : {})
+                }),
             setError
         );
+        setPicking(null);
         if (result?.id) open(result.id);
         else router.refresh();
+    };
+
+    /** A shelf with templates asks which to start from; one without writes a
+     *  blank note at once. */
+    const create = async (where: NewNotePlace) => {
+        if (templatesOf(shelves, where.spaceId).length > 0) setPicking(where);
+        else await write(where, null);
     };
 
     const addFolder = async (where: { spaceId: string | null; parentId: string | null }) => {
@@ -278,6 +309,15 @@ export function NoteTree({
         () => shelves.flatMap((shelf) => shelf.notes.map((note) => ({ ...note, shelf }))),
         [shelves]
     );
+    const picker = picking && (
+        <TemplatePickerDialog
+            open
+            onOpenChange={(next) => !next && setPicking(null)}
+            templates={templatesOf(shelves, picking.spaceId)}
+            onPick={(templateId) => write(picking, templateId)}
+        />
+    );
+
     if (term) {
         // Ranked rather than filtered: somebody looking for a note is typing a
         // title from memory, so the title counts for more than the excerpt, and
@@ -285,6 +325,7 @@ export function NoteTree({
         const hits = searchItems(everything, term, NOTE_FIELDS);
         return (
             <aside className="flex w-full flex-col gap-2 md:w-72 md:shrink-0">
+                {picker}
                 <TreeSearch
                     query={query}
                     onQuery={setQuery}
@@ -325,6 +366,7 @@ export function NoteTree({
 
     return (
         <aside className="flex w-full flex-col gap-3 md:w-72 md:shrink-0">
+            {picker}
             <TreeSearch
                 query={query}
                 onQuery={setQuery}
@@ -377,6 +419,7 @@ export function NoteTree({
                                     })
                                 }
                                 onPeople={() => shelf.space && onPeople(shelf.space.id)}
+                                onTemplates={() => onTemplates(shelf.space?.id ?? null)}
                                 onImport={() =>
                                     onImport({ spaceId: shelf.space?.id ?? null, folderId: null })
                                 }
@@ -598,6 +641,7 @@ function ShelfRow({
     onNewNote,
     onNewFolder,
     onPeople,
+    onTemplates,
     onImport,
     onExport,
     onDelete,
@@ -615,6 +659,7 @@ function ShelfRow({
     onNewNote: () => void;
     onNewFolder: () => void;
     onPeople: () => void;
+    onTemplates: () => void;
     onImport: () => void;
     onExport: () => void;
     onDelete: () => void;
@@ -706,6 +751,10 @@ function ShelfRow({
                         <ContextMenuItem onSelect={onImport}>
                             <Import className="size-3.5" />
                             {t("tree.import")}
+                        </ContextMenuItem>
+                        <ContextMenuItem onSelect={onTemplates}>
+                            <LayoutTemplate className="size-3.5" />
+                            {t("tree.templates")}
                         </ContextMenuItem>
                     </>
                 )}

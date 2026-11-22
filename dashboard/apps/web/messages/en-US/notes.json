@@ -32,7 +32,8 @@
         "moveTo": "Move to...",
         "shareLink": "Share by link...",
         "archive": "Archive",
-        "delete": "Delete"
+        "delete": "Delete",
+        "templates": "Templates"
     },
     "notebook": {
         "roles": {
@@ -136,7 +137,8 @@
         "settingsRead": "Those settings could not be read",
         "linkRead": "That link could not be read",
         "linkShow": "That link could not be shown",
-        "linkDown": "That link could not be taken down"
+        "linkDown": "That link could not be taken down",
+        "templateSave": "The template could not be saved."
     },
     "share": {
         "title": "Share this note",
@@ -174,5 +176,26 @@
         "description": "Notes you have put away. Nothing here is deleted. Putting one back returns it where it sat, or to the top level if that note is still archived.",
         "notesTitle": "Notes",
         "notesDescription": "Yours alone unless you put it in a notebook. Mention people and tasks the way you would anywhere else in Polaris."
+    },
+    "templates": {
+        "blank": "Blank note",
+        "pickTitle": "Start from a template",
+        "pickDescription": "The new note copies the template's title and text.",
+        "default": "Default",
+        "cancel": "Cancel",
+        "create": "Create note",
+        "saveTitle": "Use as template",
+        "saveDescription": "New notes in this notebook can start from this note's title and text.",
+        "name": "Template name",
+        "save": "Save template",
+        "useAsTemplate": "Use as template",
+        "manageTitle": "Templates in {name}",
+        "manageDescription": "The default is preselected when someone creates a note here.",
+        "empty": "No templates yet. Open a note and choose Use as template.",
+        "setDefault": "Make default",
+        "unsetDefault": "Stop being the default",
+        "delete": "Delete template",
+        "confirmDelete": "Delete",
+        "done": "Done"
     }
 }

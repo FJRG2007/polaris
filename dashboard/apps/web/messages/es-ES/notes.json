@@ -32,7 +32,8 @@
         "moveTo": "Mover a...",
         "shareLink": "Compartir enlace...",
         "archive": "Archivar",
-        "delete": "Borrar"
+        "delete": "Borrar",
+        "templates": "Plantillas"
     },
     "notebook": {
         "roles": {
@@ -136,7 +137,8 @@
         "settingsRead": "No se pudieron leer esos ajustes",
         "linkRead": "No se pudo leer el enlace",
         "linkShow": "No se pudo mostrar el enlace",
-        "linkDown": "No se pudo retirar el enlace"
+        "linkDown": "No se pudo retirar el enlace",
+        "templateSave": "No se pudo guardar la plantilla."
     },
     "share": {
         "title": "Compartir esta nota",
@@ -174,5 +176,26 @@
         "description": "Notas que has guardado. Aquí no se borra nada. Al recuperar una vuelve a donde estaba, o a la raíz si esa nota sigue archivada.",
         "notesTitle": "Notas",
         "notesDescription": "Solo tuyas salvo que las pongas en una libreta. Menciona a personas y tareas como en cualquier otra parte de Polaris."
+    },
+    "templates": {
+        "blank": "Nota en blanco",
+        "pickTitle": "Empezar desde una plantilla",
+        "pickDescription": "La nota nueva copia el título y el texto de la plantilla.",
+        "default": "Predeterminada",
+        "cancel": "Cancelar",
+        "create": "Crear nota",
+        "saveTitle": "Usar como plantilla",
+        "saveDescription": "Las notas nuevas de este cuaderno pueden empezar con el título y el texto de esta nota.",
+        "name": "Nombre de la plantilla",
+        "save": "Guardar plantilla",
+        "useAsTemplate": "Usar como plantilla",
+        "manageTitle": "Plantillas de {name}",
+        "manageDescription": "La predeterminada aparece preseleccionada al crear una nota aquí.",
+        "empty": "Aún no hay plantillas. Abre una nota y elige Usar como plantilla.",
+        "setDefault": "Hacer predeterminada",
+        "unsetDefault": "Quitar como predeterminada",
+        "delete": "Eliminar plantilla",
+        "confirmDelete": "Eliminar",
+        "done": "Listo"
     }
 }

@@ -374,6 +374,7 @@ model User {
     officeDocuments     OfficeDocument[]
     officeOpens         OfficeDocumentOpen[]
     noteSpaces          NoteSpace[]
+    noteTemplates       NoteTemplate[]
     noteSpaceMemberships NoteSpaceMember[]
     noteFolders         NoteFolder[]
     telemetryProjects   TelemetryProject[]
@@ -603,6 +604,28 @@ model NoteLink {
     @@index([targetId])
 }
 
+// A note to start from: a title and a body copied into a new note on the shelf
+// it belongs to. `spaceId` null is the owner's private shelf, readable by them
+// alone, the same rule a note follows. At most one per shelf is the default,
+// which the picker preselects; the service keeps that true.
+model NoteTemplate {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    ownerId   String   @db.Uuid
+    spaceId   String?  @db.Uuid
+    name      String
+    title     String   @default("Untitled")
+    body      String   @default("")
+    isDefault Boolean  @default(false)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    owner User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+    space NoteSpace? @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+    @@index([spaceId])
+    @@index([ownerId, spaceId])
+}
+
 // A shelf of notes that is not one person's.
 //
 // A note with no space is what notes have always been: private without
@@ -637,6 +660,7 @@ model NoteSpace {
     teamGrants NoteSpaceTeam[]
     folders    NoteFolder[]
     notes      Note[]
+    templates  NoteTemplate[]
 
     @@index([ownerId])
     @@index([orgId])

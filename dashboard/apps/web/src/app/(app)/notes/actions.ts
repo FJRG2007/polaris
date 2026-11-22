@@ -27,6 +27,7 @@ import { listAdministeredOrgs } from "@/lib/orgs/org-service";
 import { cookies } from "next/headers";
 import { loadEnv } from "@polaris/config";
 import * as share from "@/lib/notes/share-service";
+import * as templates from "@/lib/notes/template-service";
 import { clientIp, hashForLog } from "@/lib/request-context";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 
@@ -76,11 +77,64 @@ export async function createNoteAction(input: unknown): Promise<{ id?: string; e
             spaceId: parsed.data.spaceId ?? null,
             folderId: parsed.data.folderId ?? null
         });
-        const id = await notes.createNote(caller.id, parsed.data);
+        const start = parsed.data.templateId
+            ? await templates.templateForPlacement(
+                  caller,
+                  parsed.data.templateId,
+                  parsed.data.spaceId ?? null
+              )
+            : null;
+        const id = await notes.createNote(caller.id, { ...parsed.data, ...start });
         refresh();
         return { id };
     } catch (caught) {
         return failure(caught, (await getTranslations("notes"))("errors.noteSave"));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Templates
+// ---------------------------------------------------------------------------
+
+export async function templateFromNoteAction(input: unknown): Promise<{ id?: string; error?: string }> {
+    const caller = await actor();
+    const t = await getTranslations("notes");
+    const parsed = core.noteTemplateFromNoteSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? t("errors.templateSave") };
+    try {
+        const id = await templates.templateFromNote(caller, parsed.data);
+        refresh();
+        return { id };
+    } catch (caught) {
+        return failure(caught, t("errors.templateSave"));
+    }
+}
+
+export async function updateTemplateAction(input: unknown): Promise<{ error?: string }> {
+    const caller = await actor();
+    const t = await getTranslations("notes");
+    const parsed = core.noteTemplateUpdateSchema.safeParse(input);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? t("errors.templateSave") };
+    try {
+        await templates.updateTemplate(caller, parsed.data);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, t("errors.templateSave"));
+    }
+}
+
+export async function deleteTemplateAction(templateId: unknown): Promise<{ error?: string }> {
+    const caller = await actor();
+    const t = await getTranslations("notes");
+    const parsed = core.noteTemplateUpdateSchema.shape.templateId.safeParse(templateId);
+    if (!parsed.success) return { error: t("errors.templateSave") };
+    try {
+        await templates.deleteTemplate(caller, parsed.data);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, t("errors.templateSave"));
     }
 }
 

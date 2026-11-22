@@ -70,10 +70,32 @@ export const noteCreateSchema = z.object({
     /** The note this one goes under. Null, or absent, means the top level. */
     parentId: uuid.nullable().optional(),
     spaceId: uuid.nullable().optional(),
-    folderId: uuid.nullable().optional()
+    folderId: uuid.nullable().optional(),
+    /** A template on the same shelf to copy the title and text from. */
+    templateId: uuid.optional()
 });
 
 export type NoteCreateInput = z.infer<typeof noteCreateSchema>;
+
+/** The most templates one shelf keeps. A picker is read at a glance, and past
+ *  this the answer is a better template, not another one. */
+export const NOTE_TEMPLATES_MAX = 50;
+
+export const noteTemplateName = z.string().trim().min(1, "Give it a name").max(80);
+
+/** "Use this note as a template": its title and text, saved on its shelf. */
+export const noteTemplateFromNoteSchema = z.object({
+    noteId: uuid,
+    name: noteTemplateName
+});
+
+export const noteTemplateUpdateSchema = z.object({
+    templateId: uuid,
+    name: noteTemplateName.optional(),
+    isDefault: z.boolean().optional()
+});
+
+export type NoteTemplateUpdateInput = z.infer<typeof noteTemplateUpdateSchema>;
 
 export const noteUpdateSchema = z.object({
     noteId: uuid,

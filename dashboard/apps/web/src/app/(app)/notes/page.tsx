@@ -20,6 +20,7 @@ import { requirePermission } from "@/lib/session";
 import { NewNoteButton, NotesView } from "./notes-view";
 import { listShelves } from "@/lib/notes/shelf-service";
 import { listBacklinks } from "@/lib/notes/link-service";
+import { listTemplates } from "@/lib/notes/template-service";
 import { getNote, listNotes } from "@/lib/notes/note-service";
 
 export const dynamic = "force-dynamic";
@@ -35,15 +36,17 @@ export default async function NotesPage({
     const wanted = (await searchParams).note ?? null;
 
     const spaceIds = await access.shelfSpaceIds(actor);
-    const [shelves, note] = await Promise.all([
+    const [shelves, note, templates] = await Promise.all([
         listShelves(actor, spaceIds),
-        wanted ? openable(actor, wanted) : Promise.resolve(null)
+        wanted ? openable(actor, wanted) : Promise.resolve(null),
+        listTemplates(actor, spaceIds)
     ]);
 
     const withNotes = await Promise.all(
         shelves.map(async (shelf) => ({
             ...shelf,
-            notes: await listNotes({ userId: user.id, spaceId: shelf.space?.id ?? null })
+            notes: await listNotes({ userId: user.id, spaceId: shelf.space?.id ?? null }),
+            templates: templates.filter((template) => template.spaceId === (shelf.space?.id ?? null))
         }))
     );
 
@@ -56,7 +59,7 @@ export default async function NotesPage({
                     </h1>
                     <p className="text-sm text-muted-foreground">{t("archive.notesDescription")}</p>
                 </div>
-                <NewNoteButton />
+                <NewNoteButton templates={templates.filter((template) => template.spaceId === null)} />
             </div>
             <NotesView
                 shelves={withNotes}

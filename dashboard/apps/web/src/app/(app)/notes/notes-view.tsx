@@ -21,7 +21,9 @@ import { runAction } from "@/lib/run-action";
 import { NoteMoveDialog } from "./note-move-dialog";
 import { NoteShareDialog } from "./note-share-dialog";
 import { ShareDialog } from "@/components/access/share-dialog";
-import { NoteTree, type ShelfData } from "./note-tree";
+import { canWrite, NoteTree, type ShelfData } from "./note-tree";
+import { ManageTemplatesDialog, SaveAsTemplateDialog, TemplatePickerDialog } from "./note-templates";
+import type { NoteTemplateSummary } from "@/lib/notes/template-service";
 import { RelativeTime } from "@/components/relative-time";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Backlink } from "@/lib/notes/link-service";
@@ -32,6 +34,7 @@ import {
     Archive,
     ChevronRight,
     Download,
+    LayoutTemplate,
     Link2,
     Move,
     Pin,
@@ -71,6 +74,9 @@ export function NotesView({
     const [sharingPeople, setSharingPeople] = useState<string | null>(null);
     const [newNotebook, setNewNotebook] = useState(false);
     const [people, setPeople] = useState<string | null>(null);
+    // The shelf whose templates are being managed: a space id, "" for the private one.
+    const [managing, setManaging] = useState<string | null>(null);
+    const [savingTemplate, setSavingTemplate] = useState(false);
     const [importing, setImporting] = useState<{
         spaceId: string | null;
         folderId: string | null;
@@ -122,9 +128,10 @@ export function NotesView({
     const everything = useMemo(() => shelves.flatMap((shelf) => shelf.notes), [shelves]);
     const ancestors = useMemo(() => trail(everything, note?.id ?? null), [everything, note?.id]);
     const childCount = everything.filter((entry) => entry.parentId === note?.id).length;
-    const shelfName =
-        shelves.find((shelf) => (shelf.space?.id ?? null) === (note?.spaceId ?? null))?.space
-            ?.name ?? "My notes";
+    const noteShelf = shelves.find((shelf) => (shelf.space?.id ?? null) === (note?.spaceId ?? null));
+    const shelfName = noteShelf?.space?.name ?? "My notes";
+    const managedShelf =
+        managing === null ? null : shelves.find((shelf) => (shelf.space?.id ?? "") === managing);
 
     return (
         <div className="flex w-full flex-col gap-6 md:flex-row">
@@ -133,6 +140,7 @@ export function NotesView({
                 activeNoteId={note?.id ?? null}
                 onNewNotebook={() => setNewNotebook(true)}
                 onPeople={setPeople}
+                onTemplates={(spaceId) => setManaging(spaceId ?? "")}
                 onImport={(where) =>
                     setImporting({
                         ...where,
@@ -233,6 +241,17 @@ export function NotesView({
                                     className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                 >
                                     <Share2 className="size-4" />
+                                </button>
+                            )}
+                            {!shared && noteShelf && canWrite(noteShelf) && (
+                                <button
+                                    type="button"
+                                    aria-label={t("templates.useAsTemplate")}
+                                    title={t("templates.useAsTemplate")}
+                                    onClick={() => setSavingTemplate(true)}
+                                    className="mt-1 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                    <LayoutTemplate className="size-4" />
                                 </button>
                             )}
                             <button
@@ -390,6 +409,22 @@ export function NotesView({
             )}
             <NewNotebookDialog open={newNotebook} onOpenChange={setNewNotebook} />
             <NotebookPeopleDialog spaceId={people} onOpenChange={setPeople} />
+            {note && (
+                <SaveAsTemplateDialog
+                    open={savingTemplate}
+                    onOpenChange={setSavingTemplate}
+                    noteId={note.id}
+                    noteTitle={title || note.title}
+                />
+            )}
+            {managedShelf && (
+                <ManageTemplatesDialog
+                    open
+                    onOpenChange={(next) => !next && setManaging(null)}
+                    templates={managedShelf.templates ?? []}
+                    notebookName={managedShelf.space?.name ?? t("tree.myNotes")}
+                />
+            )}
             <ImportNotesDialog target={importing} onOpenChange={setImporting} />
         </div>
     );
@@ -440,22 +475,33 @@ function trail(
 
 /** The button the page header offers, kept out of the tree so the header can
  *  place one as well. */
-export function NewNoteButton() {
+export function NewNoteButton({ templates = [] }: { templates?: readonly NoteTemplateSummary[] }) {
     const t = useTranslations("notes");
     const router = useRouter();
     const [error, setError] = useState("");
+    const [picking, setPicking] = useState(false);
+    const write = async (templateId: string | null) => {
+        const result = await runAction(
+            () =>
+                actions.createNoteAction({
+                    title: t("tree.untitled"),
+                    body: "",
+                    ...(templateId ? { templateId } : {})
+                }),
+            setError
+        );
+        setPicking(false);
+        if (result?.id) router.push(`/notes?note=${result.id}`);
+        else router.refresh();
+    };
     return (
         <>
+            {picking && (
+                <TemplatePickerDialog open onOpenChange={setPicking} templates={templates} onPick={write} />
+            )}
             <Button
                 size="sm"
-                onClick={async () => {
-                    const result = await runAction(
-                        () => actions.createNoteAction({ title: t("tree.untitled"), body: "" }),
-                        setError
-                    );
-                    if (result?.id) router.push(`/notes?note=${result.id}`);
-                    else router.refresh();
-                }}
+                onClick={() => (templates.length > 0 ? setPicking(true) : void write(null))}
             >
                 <Plus className="size-4" />
                 {t("tree.newNote")}
