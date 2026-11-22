@@ -9,17 +9,21 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 const list = vi.hoisted(() => vi.fn());
 const read = vi.hoisted(() => vi.fn());
+const update = vi.hoisted(() => vi.fn());
 
 vi.mock("@/app/(app)/chat/forum-actions", () => ({
     listForumPostsAction: list,
-    readForumAction: read
+    readForumAction: read,
+    updateForumPostAction: update
 }));
+vi.mock("@/app/(app)/chat/chat-context", () => ({ useChat: () => ({ viewerId: "user-ada" }) }));
 vi.mock("@/app/(app)/chat/use-chat-stream", () => ({ useChatStream: () => undefined }));
 
 afterEach(() => {
     cleanup();
     list.mockReset();
     read.mockReset();
+    update.mockReset();
 });
 
 const root = {
@@ -129,5 +133,71 @@ describe("a forum's list", () => {
         fireEvent.change(input, { target: { files: [new File(["x"], "sunset.jpg", { type: "image/jpeg" })] } });
         expect(screen.getByText("sunset.jpg")).toBeTruthy();
         expect(post.hasAttribute("disabled")).toBe(false);
+    });
+});
+
+describe("editing a post after it was made", () => {
+    function setUpOwn(channelId: string, authorId: string) {
+        read.mockResolvedValue({
+            forum: {
+                guidelines: "",
+                requireTag: false,
+                tags: [
+                    { id: "0190a0a0-0000-7000-8000-0000000000d1", name: "Bug" },
+                    { id: "0190a0a0-0000-7000-8000-0000000000d2", name: "Idea" }
+                ],
+                mayManage: false
+            }
+        });
+        list.mockResolvedValue({
+            page: {
+                posts: [
+                    {
+                        id: "0190a0a0-0000-7000-8000-0000000000cc",
+                        title: "Crash on start",
+                        tagIds: ["0190a0a0-0000-7000-8000-0000000000d1"],
+                        createdAt: new Date(0).toISOString(),
+                        lastActivityAt: new Date(0).toISOString(),
+                        root: { ...root, authorId }
+                    }
+                ],
+                after: null
+            }
+        });
+        render(<ForumView channelId={channelId} canPost onOpenPost={vi.fn()} />, { wrapper: MessagesWrapper });
+    }
+
+    it("is not offered on somebody else's post", async () => {
+        setUpOwn("forum-edit-a", "user-grace");
+        expect(await screen.findByText("Crash on start")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Edit post" })).toBeNull();
+    });
+
+    it("shows the new title and tags at once and sends them", async () => {
+        update.mockResolvedValue({});
+        setUpOwn("forum-edit-b", "user-ada");
+        fireEvent.click(await screen.findByRole("button", { name: "Edit post" }));
+        const save = screen.getByRole("button", { name: "Save" });
+        expect(save.getAttribute("aria-disabled")).toBe("true");
+        fireEvent.change(screen.getByDisplayValue("Crash on start"), { target: { value: "Crash on launch" } });
+        fireEvent.click(screen.getByRole("button", { name: "Idea" }));
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        expect(await screen.findByText("Crash on launch")).toBeTruthy();
+        expect(update).toHaveBeenCalledWith({
+            postId: "0190a0a0-0000-7000-8000-0000000000cc",
+            title: "Crash on launch",
+            tagIds: ["0190a0a0-0000-7000-8000-0000000000d1", "0190a0a0-0000-7000-8000-0000000000d2"]
+        });
+    });
+
+    it("puts the old title back when the server refuses it", async () => {
+        update.mockResolvedValue({ error: "That post is not yours" });
+        setUpOwn("forum-edit-c", "user-ada");
+        fireEvent.click(await screen.findByRole("button", { name: "Edit post" }));
+        fireEvent.change(screen.getByDisplayValue("Crash on start"), { target: { value: "Renamed" } });
+        fireEvent.click(screen.getByRole("button", { name: "Save" }));
+        await waitFor(() => expect(update).toHaveBeenCalledTimes(1));
+        expect(await screen.findByText("Crash on start")).toBeTruthy();
+        expect(screen.queryByText("Renamed")).toBeNull();
     });
 });

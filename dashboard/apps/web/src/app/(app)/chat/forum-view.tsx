@@ -14,7 +14,7 @@
  */
 
 import * as core from "@polaris/core";
-import { ImagePlus, Loader2, MessageSquare, Play, Plus, Search, X } from "lucide-react";
+import { ImagePlus, Loader2, MessageSquare, Pencil, Play, Plus, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
     Badge,
@@ -30,14 +30,16 @@ import {
     Input,
     SegmentedControl,
     Skeleton,
-    Textarea
+    Textarea,
+    useToast
 } from "@polaris/ui";
+import { useChat } from "./chat-context";
 import { useChatStream } from "./use-chat-stream";
 import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { listForumPostsAction, readForumAction } from "./forum-actions";
+import { listForumPostsAction, readForumAction, updateForumPostAction } from "./forum-actions";
 import type { ChatForumPostView, ChatForumView } from "@/lib/chat/forum";
 
 interface Filter {
@@ -111,6 +113,9 @@ export function ForumView({
     const [loadingMore, setLoadingMore] = useState(false);
     const [composing, setComposing] = useState(false);
     const [pending, setPending] = useState<readonly string[]>([]);
+    const [editing, setEditing] = useState<ChatForumPostView | null>(null);
+    const { viewerId } = useChat();
+    const toast = useToast();
     const latest = useRef(key);
     latest.current = key;
 
@@ -150,6 +155,41 @@ export function ForumView({
         setForum(forums.get(channelId) ?? null);
         void loadForum();
     }, [channelId, loadForum]);
+
+    /** Put one post's title and tags in the list drawn now and the one kept. */
+    const drawPost = useCallback((next: ChatForumPostView) => {
+        setListing((current) => {
+            if (!current) return current;
+            const updated = {
+                ...current,
+                posts: current.posts.map((post) => (post.id === next.id ? next : post))
+            };
+            listings.set(latest.current, updated);
+            return updated;
+        });
+    }, []);
+
+    /**
+     * A post's new title and tags: drawn at once, put back as they were if the
+     * server refuses them, with its reason in a note.
+     */
+    const saveEdit = useCallback(
+        async (before: ChatForumPostView, title: string, tagIds: readonly string[]) => {
+            drawPost({ ...before, title, tagIds });
+            const result: { error?: string } = await updateForumPostAction({
+                postId: before.id,
+                title,
+                tagIds
+            }).catch(() => ({ error: "" }));
+            if (result.error === undefined) return;
+            drawPost(before);
+            toast.show({ title: t("forum.notSaved"), body: result.error || undefined });
+        },
+        [drawPost, t, toast]
+    );
+
+    const editable = (post: ChatForumPostView): boolean =>
+        Boolean(forum?.mayManage) || (post.root.authorId !== null && post.root.authorId === viewerId);
 
     useChatStream(
         useCallback(
@@ -295,20 +335,22 @@ export function ForumView({
                 ) : media ? (
                     <ul className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-4">
                         {listing.posts.map((post) => (
-                            <li key={post.id} className="min-w-0">
+                            <li key={post.id} className="relative min-w-0">
                                 <MediaTile post={post} onOpen={() => onOpenPost(post.root)} />
+                                {editable(post) && <EditButton onEdit={() => setEditing(post)} />}
                             </li>
                         ))}
                     </ul>
                 ) : (
                     <ul className="flex flex-col">
                         {listing.posts.map((post) => (
-                            <li key={post.id}>
+                            <li key={post.id} className="relative">
                                 <PostRow
                                     post={post}
                                     tagsById={tagsById}
                                     onOpen={() => onOpenPost(post.root)}
                                 />
+                                {editable(post) && <EditButton onEdit={() => setEditing(post)} />}
                             </li>
                         ))}
                     </ul>
@@ -322,6 +364,18 @@ export function ForumView({
                     </div>
                 )}
             </div>
+
+            {editing && forum && (
+                <EditPostDialog
+                    post={editing}
+                    forum={forum}
+                    onClose={() => setEditing(null)}
+                    onSave={(title, tagIds) => {
+                        setEditing(null);
+                        void saveEdit(editing, title, tagIds);
+                    }}
+                />
+            )}
 
             <NewPostDialog
                 open={composing}
@@ -339,6 +393,125 @@ export function ForumView({
                 }}
             />
         </div>
+    );
+}
+
+/** The pencil over a post, for its author and whoever runs the forum. */
+function EditButton({ onEdit }: { onEdit: () => void }) {
+    const t = useTranslations("chat");
+    return (
+        <button
+            type="button"
+            onClick={onEdit}
+            aria-label={t("forum.editPost")}
+            title={t("forum.editPost")}
+            className="absolute end-2 top-2 rounded-md bg-background/80 p-1.5 text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
+        >
+            <Pencil aria-hidden className="size-3.5 shrink-0" />
+        </button>
+    );
+}
+
+/**
+ * A post's title and tags, changed after it was made. Checked with the same
+ * schema the server checks the change with, so Save is only offered for one
+ * it will take - and only when something differs from what is there.
+ */
+function EditPostDialog({
+    post,
+    forum,
+    onClose,
+    onSave
+}: {
+    post: ChatForumPostView;
+    forum: ChatForumView;
+    onClose: () => void;
+    onSave: (title: string, tagIds: readonly string[]) => void;
+}) {
+    const t = useTranslations("chat");
+    const [title, setTitle] = useState(post.title);
+    // Only the forum's own tags: one deleted since is not offered back.
+    const [tagIds, setTagIds] = useState<readonly string[]>(() =>
+        post.tagIds.filter((id) => forum.tags.some((tag) => tag.id === id))
+    );
+    const trimmed = title.trim();
+    const valid = core.chatForumPostUpdateSchema.safeParse({
+        postId: post.id,
+        title: trimmed,
+        tagIds: [...tagIds]
+    }).success;
+    const needsTag = forum.requireTag && tagIds.length === 0;
+    const changed =
+        trimmed !== post.title ||
+        tagIds.length !== post.tagIds.length ||
+        tagIds.some((id) => !post.tagIds.includes(id));
+    const ready = valid && !needsTag && changed;
+
+    const toggle = (id: string) =>
+        setTagIds((current) =>
+            current.includes(id)
+                ? current.filter((entry) => entry !== id)
+                : current.length >= core.MAX_FORUM_POST_TAGS
+                  ? current
+                  : [...current, id]
+        );
+
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>{t("forum.editPost")}</DialogTitle>
+                    <DialogDescription>{t("forum.editPostHint")}</DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col gap-3">
+                    <label className="flex flex-col gap-1.5">
+                        <span className="text-xs font-medium text-muted-foreground">{`${t("forum.postTitle")} *`}</span>
+                        <Input
+                            value={title}
+                            maxLength={core.MAX_FORUM_TITLE}
+                            onChange={(event) => setTitle(event.target.value)}
+                        />
+                    </label>
+                    {forum.tags.length > 0 && (
+                        <div className="flex flex-col gap-1.5">
+                            <span className="text-xs font-medium text-muted-foreground">
+                                {forum.requireTag ? `${t("forum.tags")} *` : t("forum.tags")}
+                            </span>
+                            <div role="group" aria-label={t("forum.tags")} className="flex flex-wrap gap-1.5">
+                                {forum.tags.map((tag) => {
+                                    const on = tagIds.includes(tag.id);
+                                    return (
+                                        <button
+                                            key={tag.id}
+                                            type="button"
+                                            aria-pressed={on}
+                                            onClick={() => toggle(tag.id)}
+                                            className={cn(
+                                                "max-w-[12rem] truncate rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+                                                on
+                                                    ? "border-primary bg-primary/10"
+                                                    : "border-border text-muted-foreground hover:bg-card-hover"
+                                            )}
+                                        >
+                                            {tag.name}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                            {needsTag && <p className="text-xs text-muted-foreground">{t("forum.tagRequiredHint")}</p>}
+                        </div>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button variant="ghost" onClick={onClose}>
+                        {t("newChannel.cancel")}
+                    </Button>
+                    <Button onClick={() => ready && onSave(trimmed, tagIds)} aria-disabled={!ready} disabled={!ready}>
+                        {t("forum.save")}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 
