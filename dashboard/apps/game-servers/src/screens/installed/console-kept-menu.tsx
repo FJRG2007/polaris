@@ -42,12 +42,13 @@ import { useGameText } from "../game-text";
 import {
     MAX_SAVED_LABEL,
     commandPreview,
-    hasPauses,
     isSequence,
     keptCommandCount,
     placeholderRange,
+    scheduleProblem,
     type SavedCommand
 } from "../../lib/console-commands";
+import { MOST_SCHEDULED_WAIT_S } from "../../lib/console-schedule";
 import type { KeepDraft } from "./console-keep-dialog";
 
 /** The kept commands left after typing, in the order they were kept. Matched on
@@ -180,9 +181,9 @@ export function KeptCommandsMenu({
                                     <DropdownMenuItem onSelect={() => onEdit(entry)}>
                                         {t("console.edit")}
                                     </DropdownMenuItem>
-                                    {/* The sweep runs a schedule in one go; a pause is
-                                        only kept by the console. */}
-                                    {hasPauses(entry.command) ? (
+                                    {/* A scheduled run holds its pauses in the background,
+                                        up to a bound in all. */}
+                                    {scheduleProblem(entry.command) ? (
                                         <DropdownMenuItem
                                             disabled
                                             className="flex-col items-start gap-0"
@@ -191,7 +192,9 @@ export function KeptCommandsMenu({
                                                 <CalendarClock /> {t("consoleSchedule.scheduleIt")}
                                             </span>
                                             <span className="text-[0.6875rem] text-muted-foreground">
-                                                {t("console.pausesNoSchedule")}
+                                                {t("console.waitsTooLongToSchedule", {
+                                                    minutes: MOST_SCHEDULED_WAIT_S / 60
+                                                })}
                                             </span>
                                         </DropdownMenuItem>
                                     ) : (

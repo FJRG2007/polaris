@@ -20,6 +20,7 @@
 
 import { z } from "zod";
 import { gameMessage } from "./game-message";
+import type { QueueStep } from "./console-queue";
 import { readCustomVariables, type CustomVariable, type RunTarget } from "./console-vars";
 
 export type ScheduleRepeat =
@@ -27,7 +28,23 @@ export type ScheduleRepeat =
     | { readonly kind: "every"; readonly minutes: number }
     | { readonly kind: "times"; readonly minutes: number; readonly times: number };
 
-export type ScheduleOutcome = "ran" | "failed" | "skipped";
+/** `running` is a run with pauses still going: those are not run inside the
+ *  sweep (`console-run-service`), and its outcome is written when it ends. */
+export type ScheduleOutcome = "ran" | "failed" | "skipped" | "running";
+
+const OUTCOMES: readonly ScheduleOutcome[] = ["ran", "failed", "skipped", "running"];
+
+/**
+ * The most a scheduled run may pause in all, its `wait` lines added up. Its
+ * pauses run in the background, off the minute sweep, so this bounds how long
+ * one run can hold a server rather than how long the sweep waits. Longer than
+ * that is several schedules.
+ */
+export const MOST_SCHEDULED_WAIT_S = 600;
+
+/** How long after it started a run still shown as running has surely ended
+ *  without saying so - the dashboard restarted halfway through it. */
+const RUNNING_FOR_AT_MOST_MS = (MOST_SCHEDULED_WAIT_S + 300) * 1000;
 
 export interface ScheduleRun {
     readonly at: string;
@@ -251,13 +268,33 @@ function readTarget(raw: unknown): RunTarget | null {
     return typeof row.player === "string" ? { player: row.player } : null;
 }
 
+/** The last run as it should be shown: one still marked running long after any
+ *  run could have ended was cut short, and says so instead of running forever. */
+export function shownRun(run: ScheduleRun, now: Date): ScheduleRun {
+    if (run.outcome !== "running") return run;
+    const started = Date.parse(run.at);
+    return Number.isNaN(started) || now.getTime() - started > RUNNING_FOR_AT_MOST_MS
+        ? { ...run, outcome: "failed", detail: gameMessage("games", "consoleSchedule.interrupted") }
+        : run;
+}
+
+/** What a run's pauses add up to, in milliseconds. */
+export function totalWaitMs(steps: readonly QueueStep[]): number {
+    return steps.reduce((total, step) => total + (step.kind === "wait" ? step.ms : 0), 0);
+}
+
+/** What keeps a run with these steps off a schedule, as a carried message, or
+ *  null: its pauses add up to more than one scheduled run may wait. */
+export function scheduledWaitProblem(steps: readonly QueueStep[]): string | null {
+    return totalWaitMs(steps) > MOST_SCHEDULED_WAIT_S * 1000
+        ? gameMessage("games", "lib.scheduledWaitTooLong", { seconds: MOST_SCHEDULED_WAIT_S })
+        : null;
+}
+
 function readRun(raw: unknown): ScheduleRun | null {
     if (typeof raw !== "object" || raw === null) return null;
     const row = raw as Record<string, unknown>;
-    if (
-        typeof row.at !== "string" ||
-        !["ran", "failed", "skipped"].includes(row.outcome as string)
-    ) {
+    if (typeof row.at !== "string" || !OUTCOMES.includes(row.outcome as ScheduleOutcome)) {
         return null;
     }
     return {

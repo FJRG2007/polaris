@@ -152,25 +152,27 @@ describe("running a sequence", () => {
         expect(result.error).toMatch(/^Seconds: /);
     });
 
-    it("never schedules a sequence that pauses, and schedules one that does not", async () => {
+    it("schedules a sequence that pauses, up to a bound in all", async () => {
         kept = [
-            { id: ID, label: "Warn", command: "say a\nwait 3\nsay b" },
-            { id: "plain", label: "Both", command: "say a\nsay b" }
+            {
+                id: ID,
+                label: "Warn",
+                command: Array.from({ length: 6 }, (_, at) => `say ${at}\nwait 120`).join("\n")
+            },
+            { id: "plain", label: "Both", command: "wait 5\nsay a\nwait 3\nsay b" }
         ];
         const paused = await actions.scheduleKeptCommandAction({
             installedAppId: INSTALL,
             id: ID,
             repeat: { kind: "once" }
         });
-        expect(paused.error).toBe(
-            "A sequence with pauses runs only from the console, not on a schedule."
-        );
+        expect(paused.error).toBe("A scheduled run can pause 600 seconds in all.");
         const plain = await actions.scheduleKeptCommandAction({
             installedAppId: INSTALL,
             id: "plain",
             repeat: { kind: "once" }
         });
         expect(plain.error).toBeUndefined();
-        expect(added.map((one) => one.command)).toEqual(["say a\nsay b"]);
+        expect(added.map((one) => one.command)).toEqual(["wait 5\nsay a\nwait 3\nsay b"]);
     });
 });

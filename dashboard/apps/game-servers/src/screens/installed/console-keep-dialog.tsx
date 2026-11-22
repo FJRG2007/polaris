@@ -33,9 +33,11 @@ import {
     MAX_SAVED_LABEL,
     MAX_SAVED_SEQUENCE,
     isSequence,
+    joinStartDelay,
     keptCommandCount,
-    normalizeCommandText,
-    savedCommandProblem
+    savedCommandProblem,
+    splitStartDelay,
+    startDelayProblem
 } from "../../lib/console-commands";
 import * as vars from "../../lib/console-vars";
 
@@ -66,11 +68,22 @@ export function KeepCommandDialog({
 }) {
     const t = useGameText("games");
     const schemaText = useSchemaText();
-    const [draft, setDraft] = useState<KeepDraft>(initial);
+    // A leading `wait N` is the "Start after" field, and the box holds the rest
+    // (`splitStartDelay`); a command without one is carried in as it was.
+    const [opened] = useState(() => splitStartDelay(initial.command));
+    const [draft, setDraft] = useState<KeepDraft>(() =>
+        opened.delay ? { ...initial, command: opened.body } : initial
+    );
+    const [delay, setDelay] = useState(opened.delay);
     const field = useRef<HTMLTextAreaElement | null>(null);
-    // What is kept: every line trimmed and the empty ones dropped, as the server
-    // will store it, so what is checked here is what is checked there.
-    const command = useMemo(() => normalizeCommandText(draft.command), [draft.command]);
+    // What is kept: the delay's `wait` line, then every line trimmed and the
+    // empty ones dropped, as the server will store it, so what is checked here
+    // is what is checked there.
+    const delayProblem = useMemo(() => startDelayProblem(delay), [delay]);
+    const command = useMemo(
+        () => joinStartDelay(delayProblem ? "" : delay, draft.command),
+        [delay, delayProblem, draft.command]
+    );
     // A box of several lines puts the caret at its start; what was carried in
     // from the console is added to at its end. Placed once, when the box is
     // first attached - the dialog's portal mounts it after this renders.
@@ -125,7 +138,7 @@ export function KeepCommandDialog({
                 .custom.filter((one) => !normalized.some((declared) => declared.name === one.name)),
         [command, normalized]
     );
-    const ready = command.length > 0 && !problem && !unnamed && !pending;
+    const ready = command.length > 0 && !problem && !delayProblem && !unnamed && !pending;
 
     /** Put a `{name}` where the caret is, and leave the caret after it. */
     function insert(token: string): void {
@@ -170,7 +183,7 @@ export function KeepCommandDialog({
                                 ref={attach}
                                 autoFocus
                                 value={draft.command}
-                                rows={isSequence(command) ? 6 : 2}
+                                rows={isSequence(draft.command.trim()) ? 6 : 2}
                                 spellCheck={false}
                                 maxLength={MAX_SAVED_SEQUENCE}
                                 className="font-mono text-xs"
@@ -201,6 +214,30 @@ export function KeepCommandDialog({
                                     })}
                                 </span>
                             )}
+                        </label>
+                        <label className="flex flex-col gap-1">
+                            <span className="text-sm font-medium">{t("console.startAfter")}</span>
+                            <Input
+                                value={delay}
+                                inputMode="decimal"
+                                maxLength={8}
+                                className="max-w-32"
+                                placeholder="0"
+                                aria-invalid={delayProblem ? true : undefined}
+                                onChange={(event) => setDelay(event.target.value)}
+                            />
+                            <span
+                                role={delayProblem ? "alert" : undefined}
+                                className={
+                                    delayProblem
+                                        ? "text-xs text-danger"
+                                        : "text-xs text-muted-foreground"
+                                }
+                            >
+                                {delayProblem
+                                    ? schemaText(delayProblem)
+                                    : t("console.startAfterHint")}
+                            </span>
                         </label>
                         <label className="flex flex-col gap-1">
                             <span className="text-sm font-medium">{t("console.name")}</span>

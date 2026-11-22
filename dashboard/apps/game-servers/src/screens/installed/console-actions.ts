@@ -50,7 +50,7 @@ import { keptCommandSteps, keptRunProblem, runKeptCommand } from "../../lib/cons
 import {
     MAX_SAVED_LABEL,
     MAX_SAVED_SEQUENCE,
-    hasPauses,
+    scheduleProblem,
     normalizeCommandText,
     normalizeSavedCommand,
     savedCommandProblem,
@@ -359,10 +359,9 @@ export async function scheduleKeptCommandAction(
     try {
         const resolved = await keptRun(input);
         if ("error" in resolved) return { error: resolved.error };
-        // The sweep runs a schedule in one go; a pause is only kept by the console.
-        if (hasPauses(resolved.entry.command)) {
-            return { error: await messageText(gameMessage("games", "lib.pausesOnlyLive")) };
-        }
+        // Its pauses are held in the background when it fires, up to a bound.
+        const tooLong = scheduleProblem(resolved.entry.command);
+        if (tooLong) return { error: await messageText(tooLong) };
         const schedule: ConsoleSchedule = {
             id: randomUUID(),
             commandId: resolved.entry.id,

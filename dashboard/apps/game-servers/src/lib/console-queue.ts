@@ -38,7 +38,7 @@ export const MOST_QUEUED = 50;
 export const LONGEST_WAIT_S = 120;
 
 /** A pause, as it is written on its own line. */
-const WAIT = /^wait\s+(\d+(?:\.\d+)?)\s*s?$/i;
+export const WAIT = /^wait\s+(\d+(?:\.\d+)?)\s*s?$/i;
 
 export interface ParsedQueue {
     readonly steps: readonly QueueStep[];

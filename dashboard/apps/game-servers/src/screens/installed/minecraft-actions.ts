@@ -120,6 +120,8 @@ import {
     setPlayerExperience,
     withServerContainer
 } from "../../lib/minecraft/service";
+import { editionFor } from "../../lib/console-run-service";
+import { isRefusedReply } from "../../lib/minecraft/console-reply";
 import * as playerAccess from "../../lib/minecraft/player-access";
 import {
     createWorldBackup,
@@ -2498,7 +2500,7 @@ export async function deleteWorldAction(
 export async function sendConsoleCommandAction(
     installedAppId: string,
     line: string
-): Promise<{ output?: string; error?: string }> {
+): Promise<{ output?: string; error?: string; refused?: boolean }> {
     const parsed = consoleSchema.safeParse({ installedAppId, line });
     if (!parsed.success)
         return {
@@ -2515,7 +2517,9 @@ export async function sendConsoleCommandAction(
             "games.console",
             parsed.data.installedAppId
         );
-        return { output: await runConsoleCommand(user, access, parsed.data.line) };
+        const output = await runConsoleCommand(user, access, parsed.data.line);
+        // The game answers a line it would not run with text, not an error.
+        return isRefusedReply(editionFor(access), output) ? { output, refused: true } : { output };
     } catch (caught) {
         return {
             error:

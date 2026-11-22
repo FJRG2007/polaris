@@ -27,8 +27,16 @@
  */
 
 import { gameMessage } from "./game-message";
+import { scheduledWaitProblem } from "./console-schedule";
 import type { MinecraftEdition } from "./minecraft/service";
-import { MAX_CONSOLE_LINE, commandCount, parseQueue, type QueueStep } from "./console-queue";
+import {
+    LONGEST_WAIT_S,
+    MAX_CONSOLE_LINE,
+    WAIT,
+    commandCount,
+    parseQueue,
+    type QueueStep
+} from "./console-queue";
 import {
     hasVariables,
     needsAsking,
@@ -140,6 +148,52 @@ export function hasPauses(command: string): boolean {
     return (sequenceSteps(command) ?? []).some((step) => step.kind === "wait");
 }
 
+/** What keeps a kept command off a schedule, as a carried message, or null: its
+ *  pauses add up to more than one scheduled run may wait. */
+export function scheduleProblem(command: string): string | null {
+    const steps = sequenceSteps(command);
+    return steps ? scheduledWaitProblem(steps) : null;
+}
+
+/** What the "Start after" field takes: whole or decimal seconds, nothing else. */
+const DELAY_TEXT = /^\d+(?:\.\d+)?$/;
+
+/**
+ * A kept command split into the pause it starts with and the rest.
+ *
+ * "Start after" is not stored on its own: it is the command's first line when
+ * that line is `wait N`, which every runner already holds before the first
+ * command. So every command kept before the field existed reads back unchanged,
+ * and one that already started with a pause shows it in the field.
+ */
+export function splitStartDelay(command: string): { delay: string; body: string } {
+    const normalized = normalizeCommandText(command);
+    const [first = "", ...rest] = normalized.split("\n");
+    // A lone `wait N` is not a pause: a single line is sent to the server as is.
+    const pause = rest.length > 0 ? WAIT.exec(first) : null;
+    return pause ? { delay: pause[1]!, body: rest.join("\n") } : { delay: "", body: normalized };
+}
+
+/** What is wrong with the "Start after" field as typed, as a carried message, or
+ *  null: empty is no delay, otherwise 0 to the longest single wait. */
+export function startDelayProblem(delay: string): string | null {
+    const text = delay.trim();
+    if (text.length === 0) return null;
+    return DELAY_TEXT.test(text) && Number(text) <= LONGEST_WAIT_S
+        ? null
+        : gameMessage("games", "lib.startDelayRange", { seconds: LONGEST_WAIT_S });
+}
+
+/** The command to keep: the rest, after a `wait N` line when there is a delay.
+ *  Empty or zero adds nothing, and a delay with nothing after it is nothing:
+ *  a lone `wait N` would be kept as a line sent to the server. */
+export function joinStartDelay(delay: string, body: string): string {
+    const text = delay.trim();
+    const rest = normalizeCommandText(body);
+    if (rest.length === 0 || text.length === 0) return rest;
+    return DELAY_TEXT.test(text) && Number(text) === 0 ? rest : `wait ${text}\n${rest}`;
+}
+
 /** A kept command on one line, for the places that have room for one. */
 export function commandPreview(command: string): string {
     return command.split("\n").join(" | ");
@@ -195,7 +249,11 @@ export function normalizeSavedCommand(input: {
     if (customVariablesProblem(command, variables)) return null;
     return {
         id,
-        label: label.length > 0 ? label : command.split("\n")[0]!.slice(0, MAX_SAVED_LABEL),
+        // The first command, not the "Start after" pause in front of it.
+        label:
+            label.length > 0
+                ? label
+                : splitStartDelay(command).body.split("\n")[0]!.slice(0, MAX_SAVED_LABEL),
         command,
         ...(variables.length > 0 ? { variables } : {})
     };

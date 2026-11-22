@@ -19,6 +19,8 @@ import { gameMessage } from "./game-message";
 import { isSequence } from "./console-commands";
 import { liveContext } from "./minecraft/live-values";
 import { runConsoleCommand } from "./games-operations";
+import { pause } from "./console-repeat-jobs";
+import { isRefusedReply } from "./minecraft/console-reply";
 import { readPlayerValues } from "./minecraft/player-read";
 import { playerSelector } from "./minecraft/announcement";
 import { DEATH_PLACE_VARIABLES, variablesIn } from "./minecraft/text-vars";
@@ -44,6 +46,7 @@ import {
     CONSOLE_SCHEDULES_KEY,
     advance,
     readConsoleSchedules,
+    scheduledWaitProblem,
     type ConsoleSchedule,
     type ScheduleRun
 } from "./console-schedule";
@@ -68,7 +71,8 @@ export interface RunServer {
     };
 }
 
-function editionFor(server: RunServer) {
+/** The Minecraft edition a server runs, or null for every other game. */
+export function editionFor(server: RunServer) {
     return gameOfServer(server.install.catalogId)?.id === "minecraft"
         ? editionOf(server.install.catalogId)
         : null;
@@ -175,8 +179,9 @@ export async function keptCommandSteps(server: RunServer, run: KeptRun): Promise
 }
 
 /** The lines one run sends, with every variable filled in. Throws a carried
- *  message for a run that pauses: a pause only runs from the console, where it
- *  can be watched and stopped, never inside a request or the minute sweep. */
+ *  message for a run that pauses: a pause runs from the console, where it can
+ *  be watched and stopped, or in the background for a schedule (`fire`) -
+ *  never inside a request. */
 export async function keptCommandLines(server: RunServer, run: KeptRun): Promise<string[]> {
     const steps = await keptCommandSteps(server, run);
     if (steps.some((step) => step.kind === "wait")) {
@@ -191,16 +196,44 @@ export async function runKeptCommand(
     actorId: string,
     server: RunServer,
     run: KeptRun
-): Promise<{ line: string; output: string; failed: boolean }[]> {
+): Promise<KeptReply[]> {
     const lines = await keptCommandLines(server, run);
-    const replies: { line: string; output: string; failed: boolean }[] = [];
-    for (const line of lines) {
+    return sendSteps(
+        actorId,
+        server,
+        lines.map((line) => ({ kind: "command", line }))
+    );
+}
+
+/** What the server said to one line, and whether that was a refusal. */
+export interface KeptReply {
+    readonly line: string;
+    readonly output: string;
+    readonly failed: boolean;
+}
+
+/**
+ * Send a run's steps in order, holding each pause, and answer what the server
+ * said to every line. A line counts as failed when it never reached the game or
+ * when the game answered that it did not run it (`isRefusedReply`) - a refusal
+ * comes back as text, not as an error.
+ */
+async function sendSteps(
+    actorId: string,
+    server: RunServer,
+    steps: readonly QueueStep[]
+): Promise<KeptReply[]> {
+    const edition = editionFor(server);
+    const replies: KeptReply[] = [];
+    for (const step of steps) {
+        if (step.kind === "wait") {
+            await pause(step.ms, () => false);
+            continue;
+        }
+        const line = step.line;
         try {
-            replies.push({
-                line,
-                output: await runConsoleCommand({ id: actorId }, server, line),
-                failed: false
-            });
+            const output = await runConsoleCommand({ id: actorId }, server, line);
+            replies.push({ line, output, failed: isRefusedReply(edition, output) });
         } catch (caught) {
             replies.push({
                 line,
@@ -238,6 +271,7 @@ export async function runConsoleSchedules(
     if (!install) return 0;
 
     const moved = new Map<string, ConsoleSchedule>();
+    const afterWrite: (() => void)[] = [];
     let ran = 0;
     for (const schedule of readConsoleSchedules(readInstallConfig(install.config))) {
         const step = advance(schedule, now);
@@ -253,7 +287,7 @@ export async function runConsoleSchedules(
                       detail: gameMessage("games", "consoleSchedule.noAccess")
                   }
                 : answering
-                  ? await fire({ ownerId, install }, schedule, now)
+                  ? await fire({ ownerId, install }, schedule, now, afterWrite)
                   : {
                         at: now.toISOString(),
                         outcome: "skipped",
@@ -277,7 +311,27 @@ export async function runConsoleSchedules(
     await patchInstallConfig(installedAppId, {
         [CONSOLE_SCHEDULES_KEY]: list.map((entry) => moved.get(entry.id) ?? entry)
     }).catch(() => undefined);
+    for (const start of afterWrite) start();
     return ran;
+}
+
+/** Write how a run with pauses ended onto its schedule - only if the schedule
+ *  is still there and its last run is still this one. */
+async function settleScheduleRun(
+    installedAppId: string,
+    scheduleId: string,
+    run: ScheduleRun
+): Promise<void> {
+    const fresh = await prisma.installedApp
+        .findUnique({ where: { id: installedAppId }, select: { config: true } })
+        .catch(() => null);
+    const list = readConsoleSchedules(readInstallConfig(fresh?.config));
+    if (!list.some((entry) => entry.id === scheduleId && entry.last?.at === run.at)) return;
+    await patchInstallConfig(installedAppId, {
+        [CONSOLE_SCHEDULES_KEY]: list.map((entry) =>
+            entry.id === scheduleId && entry.last?.at === run.at ? { ...entry, last: run } : entry
+        )
+    });
 }
 
 /** Whether whoever set a schedule up still has the console on this server: a
@@ -297,15 +351,78 @@ export async function mayStillRun(userId: string, installedAppId: string): Promi
     }
 }
 
-async function fire(server: RunServer, schedule: ConsoleSchedule, now: Date): Promise<ScheduleRun> {
-    try {
-        const replies = await runKeptCommand(schedule.createdBy, server, schedule);
-        const failed = replies.find((reply) => reply.failed);
-        return {
+/** The schedules whose run with pauses is still going, by id: the next moment of
+ *  one is skipped rather than started on top of it. */
+const runningSchedules = new Set<string>();
+
+/** How a run went, from what the server said to each of its lines. */
+export function scheduleOutcome(at: Date, replies: readonly KeptReply[]): ScheduleRun {
+    const failed = replies.find((reply) => reply.failed);
+    return {
+        at: at.toISOString(),
+        outcome: failed ? "failed" : "ran",
+        detail: failed ? failed.output.slice(0, 200) : ""
+    };
+}
+
+/** Run a scheduled run with pauses off the sweep, and write how it ended. */
+function runInBackground(
+    server: RunServer,
+    schedule: ConsoleSchedule,
+    steps: readonly QueueStep[],
+    now: Date
+): void {
+    runningSchedules.add(schedule.id);
+    void sendSteps(schedule.createdBy, server, steps)
+        .then((replies) => scheduleOutcome(now, replies))
+        .catch((caught: unknown): ScheduleRun => ({
             at: now.toISOString(),
-            outcome: failed ? "failed" : "ran",
-            detail: failed ? failed.output.slice(0, 200) : ""
-        };
+            outcome: "failed",
+            detail:
+                caught instanceof Error
+                    ? caught.message.slice(0, 200)
+                    : gameMessage("games", "lib.stepFailed")
+        }))
+        .then((run) => settleScheduleRun(server.install.id, schedule.id, run))
+        .catch(() => undefined)
+        .finally(() => runningSchedules.delete(schedule.id));
+}
+
+/**
+ * Fire one schedule.
+ *
+ * A run without pauses is sent here and its outcome returned. A run with pauses
+ * - a `wait 5` between two lines, or the "Start after" one in front - is not
+ * waited out inside the sweep: one server's minute-long sequence would hold up
+ * every other server's schedules and stretch the pass past its lease. It is
+ * started in the background instead, bounded (`MOST_SCHEDULED_WAIT_S` in all,
+ * one at a time per schedule), shown as running, and its outcome written onto
+ * the schedule when it ends.
+ */
+async function fire(
+    server: RunServer,
+    schedule: ConsoleSchedule,
+    now: Date,
+    afterWrite: (() => void)[]
+): Promise<ScheduleRun> {
+    try {
+        const steps = await keptCommandSteps(server, schedule);
+        if (!steps.some((step) => step.kind === "wait")) {
+            return scheduleOutcome(now, await sendSteps(schedule.createdBy, server, steps));
+        }
+        const tooLong = scheduledWaitProblem(steps);
+        if (tooLong) return { at: now.toISOString(), outcome: "failed", detail: tooLong };
+        if (runningSchedules.has(schedule.id)) {
+            return {
+                at: now.toISOString(),
+                outcome: "skipped",
+                detail: gameMessage("games", "consoleSchedule.stillRunning")
+            };
+        }
+        // Started once the sweep has written "running", so a short run cannot
+        // finish first and have its outcome overwritten by it.
+        afterWrite.push(() => runInBackground(server, schedule, steps, now));
+        return { at: now.toISOString(), outcome: "running", detail: "" };
     } catch (caught) {
         return {
             at: now.toISOString(),

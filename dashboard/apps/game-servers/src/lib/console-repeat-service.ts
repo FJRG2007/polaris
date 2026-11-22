@@ -22,7 +22,8 @@ import { host } from "@polaris/app-host";
 import { gameMessage } from "./game-message";
 import type { QueueStep } from "./console-queue";
 import { runConsoleCommand } from "./games-operations";
-import { mayStillRun, type RunServer } from "./console-run-service";
+import { editionFor, mayStillRun, type RunServer } from "./console-run-service";
+import { isRefusedReply } from "./minecraft/console-reply";
 import { pause, startRepeat, type RunOutcome } from "./console-repeat-jobs";
 import { repeatGapMs, type ConsoleRepeatView, type RepeatPlan } from "./console-repeat";
 
@@ -96,7 +97,9 @@ export async function startConsoleRepeat(input: {
                 continue;
             }
             try {
-                await runConsoleCommand({ id: actor.id }, server, step.line);
+                const output = await runConsoleCommand({ id: actor.id }, server, step.line);
+                // A line the game would not run answers with text, not an error.
+                if (isRefusedReply(editionFor(server), output)) problem ??= output.slice(0, 200);
             } catch (caught) {
                 problem ??= problemOf(caught);
             }

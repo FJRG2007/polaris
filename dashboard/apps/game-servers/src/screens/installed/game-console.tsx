@@ -235,7 +235,8 @@ export function GameConsole({
     const repeatRunning = repeatList.some((one) => one.ended === null);
     /** The block being written in "Run several", or null while it is shut. */
     const [batch, setBatch] = useState<string | null>(null);
-    /** Where a running sequence is, or null when none is. */
+    /** Where a running sequence is, or null when none is. `waiting` is what is
+     *  left of the current pause, in milliseconds. */
     const [queue, setQueue] = useState<{ done: number; total: number; waiting: number } | null>(
         null
     );
@@ -364,11 +365,10 @@ export function GameConsole({
             setCaret(0);
             startTransition(async () => {
                 const result = await sendConsoleCommandAction(installedAppId, command);
-                const output = result.error ?? (result.output || "Done");
+                const output = result.error ?? (result.output || t("console.sentNoReply"));
+                const failed = Boolean(result.error) || result.refused === true;
                 setReplies((current) =>
-                    [...current, { command, output, failed: Boolean(result.error) }].slice(
-                        -KEPT_REPLIES
-                    )
+                    [...current, { command, output, failed }].slice(-KEPT_REPLIES)
                 );
                 // The command usually produced log output too; show it without
                 // waiting for the next poll.
@@ -408,11 +408,11 @@ export function GameConsole({
             for (const step of steps) {
                 if (stopQueue.current) break;
                 if (step.kind === "wait") {
-                    setQueue({ done, total, waiting: step.ms });
                     const until = Date.now() + step.ms;
                     // In slices, so Stop is answered within a moment rather than
-                    // at the end of a ten-second pause.
+                    // at the end of a ten-second pause, and the countdown moves.
                     while (!stopQueue.current && Date.now() < until) {
+                        setQueue({ done, total, waiting: until - Date.now() });
                         await new Promise((resolve) =>
                             setTimeout(resolve, Math.min(250, until - Date.now()))
                         );
@@ -426,6 +426,7 @@ export function GameConsole({
                         ({ error: t("console.theServerDidNotAnswer") }) as {
                             output?: string;
                             error?: string;
+                            refused?: boolean;
                         }
                 );
                 done += 1;
@@ -435,8 +436,8 @@ export function GameConsole({
                         ...current,
                         {
                             command: step.line,
-                            output: result.error ?? (result.output || "Done"),
-                            failed: Boolean(result.error)
+                            output: result.error ?? (result.output || t("console.sentNoReply")),
+                            failed: Boolean(result.error) || result.refused === true
                         }
                     ].slice(-KEPT_REPLIES)
                 );
@@ -561,7 +562,7 @@ export function GameConsole({
                         ...current,
                         ...sent.map((reply) => ({
                             command: reply.line,
-                            output: reply.output || "Done",
+                            output: reply.output || t("console.sentNoReply"),
                             failed: reply.failed
                         }))
                     ].slice(-KEPT_REPLIES)
@@ -1046,16 +1047,21 @@ export function GameConsole({
                         className="flex items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2 text-sm"
                     >
                         <span className="text-muted-foreground">
-                            {queue.waiting > 0
-                                ? t("console.waitingSent", {
-                                      seconds: Math.round(queue.waiting / 100) / 10,
-                                      done: queue.done,
-                                      total: queue.total
+                            {/* A pause before anything is sent is the "Start after" delay. */}
+                            {queue.waiting > 0 && queue.done === 0
+                                ? t("console.startingIn", {
+                                      seconds: Math.ceil(queue.waiting / 1000)
                                   })
-                                : t("console.sending", {
-                                      at: Math.min(queue.done + 1, queue.total),
-                                      total: queue.total
-                                  })}
+                                : queue.waiting > 0
+                                  ? t("console.waitingSent", {
+                                        seconds: Math.ceil(queue.waiting / 1000),
+                                        done: queue.done,
+                                        total: queue.total
+                                    })
+                                  : t("console.sending", {
+                                        at: Math.min(queue.done + 1, queue.total),
+                                        total: queue.total
+                                    })}
                         </span>
                         <Button
                             size="sm"

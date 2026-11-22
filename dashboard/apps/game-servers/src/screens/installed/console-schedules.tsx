@@ -10,7 +10,7 @@ import { cn } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { CalendarClock, Square, X } from "lucide-react";
 import { type GameText, useGameText, useSchemaText } from "../game-text";
-import { isActive, spanOf, type ConsoleSchedule } from "../../lib/console-schedule";
+import { isActive, shownRun, spanOf, type ConsoleSchedule } from "../../lib/console-schedule";
 
 /** A moment in this browser's words, the date left out when it is today. */
 function when(iso: string, locale: string): string {
@@ -82,7 +82,7 @@ export function ConsoleSchedules({
             <ul className="flex flex-col gap-1">
                 {schedules.map((schedule) => {
                     const active = isActive(schedule);
-                    const last = schedule.last;
+                    const last = schedule.last && shownRun(schedule.last, new Date());
                     const label = active
                         ? t("consoleSchedule.stop", { name: schedule.label })
                         : t("consoleSchedule.clear", { name: schedule.label });
@@ -113,10 +113,13 @@ export function ConsoleSchedules({
                                             last.outcome === "skipped" && "text-warning"
                                         )}
                                     >
-                                        {last.outcome === "ran"
-                                            ? t("consoleSchedule.ran", {
-                                                  time: when(last.at, locale)
-                                              })
+                                        {last.outcome === "ran" || last.outcome === "running"
+                                            ? t(
+                                                  last.outcome === "ran"
+                                                      ? "consoleSchedule.ran"
+                                                      : "consoleSchedule.running",
+                                                  { time: when(last.at, locale) }
+                                              )
                                             : t(
                                                   last.outcome === "failed"
                                                       ? "consoleSchedule.failed"

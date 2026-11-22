@@ -137,11 +137,11 @@ describe("a kept sequence", () => {
         command: "say Restarting\nwait 5\nstop"
     };
 
-    function renderSequence() {
+    function renderSequence(entry: SavedCommand = SEQUENCE) {
         const onSchedule = vi.fn();
         render(
             <KeptCommandsMenu
-                saved={[SEQUENCE]}
+                saved={[entry]}
                 canRun
                 canManage
                 onRun={vi.fn()}
@@ -163,15 +163,30 @@ describe("a kept sequence", () => {
         expect(screen.getByText("say Restarting | wait 5 | stop")).toBeTruthy();
     });
 
-    it("offers no schedule for one that pauses, and says why", async () => {
+    it("schedules one that pauses", async () => {
         const user = userEvent.setup();
         const onSchedule = renderSequence();
         await user.click(screen.getByRole("button", { name: /Kept commands/ }));
         screen.getByRole("menuitem", { name: "More for Restart" }).focus();
         await user.keyboard("{ArrowRight}");
         const schedule = await screen.findByRole("menuitem", { name: /Schedule/ });
+        expect(schedule.getAttribute("aria-disabled")).toBeNull();
+        await user.click(schedule);
+        expect(onSchedule).toHaveBeenCalledWith(SEQUENCE);
+    });
+
+    it("offers no schedule for one that pauses too long in all, and says why", async () => {
+        const user = userEvent.setup();
+        const onSchedule = renderSequence({
+            ...SEQUENCE,
+            command: Array.from({ length: 6 }, (_, at) => `say ${at}\nwait 120`).join("\n")
+        });
+        await user.click(screen.getByRole("button", { name: /Kept commands/ }));
+        screen.getByRole("menuitem", { name: "More for Restart" }).focus();
+        await user.keyboard("{ArrowRight}");
+        const schedule = await screen.findByRole("menuitem", { name: /Schedule/ });
         expect(schedule.getAttribute("aria-disabled")).toBe("true");
-        expect(schedule.textContent).toContain("With pauses it runs only from the console");
+        expect(schedule.textContent).toContain("Its pauses add up to more than 10 minutes");
         expect(onSchedule).not.toHaveBeenCalled();
     });
 });
