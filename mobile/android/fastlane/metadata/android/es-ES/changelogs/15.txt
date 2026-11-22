@@ -1,0 +1,1 @@
+El aviso que mantiene llegando los mensajes en segundo plano ahora dice para qué sirve, no hace ruido y se oculta con un toque. Con varios servidores Polaris, el icono sigue una sola temporada en vez de la del último abierto.
