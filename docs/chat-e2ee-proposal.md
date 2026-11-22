@@ -539,6 +539,7 @@ Una auditoría externa es opcional y se puede añadir en cualquier momento; no b
 | 8 | Solo apps verificadas | Ajuste de instancia (lo fija el administrador de Polaris) y de organización, apagado por defecto; una organización puede endurecer lo que impone la instancia, nunca relajarlo. Referente: Code Verify de Meta para WhatsApp Web; Signal no tiene cliente web por este motivo. Un navegador o sistema comprometido queda fuera del modelo, como en cualquier mensajero. |
 | 9 | Canales grandes tras migrar | Grupo creado vacío; cada dispositivo entra al abrir el canal por primera vez y envía su propia actualización. |
 | 10 | Fusión de duplicados en la migración | Solo dentro de la misma conversación o del mismo autor. |
+| 11 | Velocidad de carga (2026-11-22) | **Los mensajes cargan al instante, como hoy y como en Discord**, en la web también, en un navegador recién abierto y tras días sin entrar. Nada de la espera de WhatsApp Web, que tarda un minuto o más en sincronizar antes de mostrar el chat. Una conversación abierta pide solo la página visible, la descifra en el cliente y la pinta en el primer frame; lo antiguo llega al hacer scroll. Ninguna sincronización completa, reproducción del historial de claves ni índice de búsqueda bloquea la primera pintura. Es una puerta de lanzamiento medida: tiempo hasta ver los últimos mensajes de un canal en una sesión nueva, comparado con el chat sin cifrar. |
 
 ---
 
