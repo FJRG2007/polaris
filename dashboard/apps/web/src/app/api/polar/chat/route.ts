@@ -152,6 +152,9 @@ import {
 } from "@/lib/polar/shared";
 
 import { localFailureOf, subscriptionFailureOf } from "@/lib/polar/claude-subscription/model";
+import { serverBindingSchema } from "@/lib/polar/server-command";
+import { sessionCan } from "@/lib/session";
+import { polarServerTools, serverCommandApprovalFor } from "@/lib/polar/server-command-tools";
 
 export const dynamic = "force-dynamic";
 
@@ -192,7 +195,10 @@ const bodySchema = z.object({
     /** A skill being tried before it is added: honoured in a temporary chat only. */
     trialSkill: trialSkillSchema.nullable().default(null),
     /** A Code task answered by Polar itself: the repository it is about. */
-    code: polarCodeTaskSchema.nullable().default(null)
+    code: polarCodeTaskSchema.nullable().default(null),
+    /** The server the chat was asked from (its terminal's Ask Polar): what
+     *  server_run_command targets when the model names none. */
+    server: serverBindingSchema.nullable().default(null)
 });
 
 function refuse(code: string, status: number): NextResponse {
@@ -302,6 +308,11 @@ export async function POST(request: Request): Promise<Response> {
     const browserTools = polarBrowserTools(user.id);
     // Put to the person in the chat; offered to this turn only, never to a subagent.
     const askTools = polarAskTools();
+    // Commands on a server: registered always so an older turn validates,
+    // offered only where this person may open a terminal at all. Kept from
+    // subagents, which would run them out of the person's sight.
+    const mayRunCommands = await sessionCan(user, "deploy.manage").catch(() => false);
+    const serverTools = await polarServerTools(user, body.data.server);
     const checked = await safeValidateUIMessages({
         messages: body.data.messages,
         tools: {
@@ -313,6 +324,7 @@ export async function POST(request: Request): Promise<Response> {
             ...repoTools,
             ...browserTools,
             ...askTools,
+            ...serverTools,
             ...NATIVE_SEARCH_STAND_INS,
             ...polarWebTools("", ""),
             ...connectorSet.tools,
@@ -491,9 +503,10 @@ export async function POST(request: Request): Promise<Response> {
             ...(body.data.connectors ? connectorSet.approval : {}),
             ...(remembers ? MEMORY_APPROVAL : {}),
             ...(web ? WEB_APPROVAL : {}),
-            ...(web ? browserApprovalFor(user.id) : {})
+            ...(web ? browserApprovalFor(user.id) : {}),
+            ...(mayRunCommands ? serverCommandApprovalFor(body.data.server) : {})
         },
-        Object.keys(tools),
+        [...Object.keys(tools), ...(mayRunCommands ? Object.keys(serverTools) : [])],
         agentRules
     );
     const ownAgents = await listAgents(user.id).catch((error: unknown) => {
@@ -554,7 +567,9 @@ export async function POST(request: Request): Promise<Response> {
         // Skills are listed in the system prompt, so the tool that reads them goes with it.
         ...(USE_SKILL in skillTools ? [USE_SKILL] : []),
         ...(TASK_TOOL in taskTools ? [TASK_TOOL] : []),
-        ...Object.keys(askTools)
+        ...Object.keys(askTools),
+        // Sent while the chat is bound to a server; reached for by name after.
+        ...(mayRunCommands && body.data.server ? Object.keys(serverTools) : [])
     ];
     // The six browser_* tools `browser` replaced stay registered for old turns
     // but are never sent again.
@@ -570,7 +585,12 @@ export async function POST(request: Request): Promise<Response> {
             boundedLoad(found, used)
         ) as (keyof typeof tools & string)[];
     // A tool that throws is told apart from the provider failing (`tool-failure.ts`).
-    const turnTools = withTaggedToolErrors({ ...tools, ...taskTools, ...askTools });
+    const turnTools = withTaggedToolErrors({
+        ...tools,
+        ...taskTools,
+        ...askTools,
+        ...(mayRunCommands ? withAgentRules(serverTools, agentRules) : {})
+    });
 
     const parentFor = (index: number, list: readonly UIMessage[]): string | null =>
         index === list.length - 1 && list[index]?.role === "user"

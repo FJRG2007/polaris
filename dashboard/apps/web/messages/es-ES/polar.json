@@ -350,7 +350,12 @@
         "alwaysFailed": "No se guardó y no se ejecutó nada. Reinténtalo.",
         "siteAsk": "Polar quiere usar {site} en tu navegador.",
         "siteOnce": "Solo esta vez",
-        "siteAlways": "Siempre en {site}"
+        "siteAlways": "Siempre en {site}",
+        "serverAsk": "Polar quiere ejecutar esto en {server}:",
+        "serverAskRoot": "Polar quiere ejecutarlo como root en {server}:",
+        "serverCwd": "En {cwd}",
+        "serverAlways": "Siempre en este chat",
+        "serverAlwaysHint": "Ejecutar en {server} sin preguntar hasta que acabe este chat"
     },
     "page": {
         "title": "Polar"
@@ -2478,5 +2483,11 @@
         },
         "resets": "Libre",
         "error": "No se pudo cargar el uso de Code. Recarga la página."
+    },
+    "server": {
+        "bound": "Comandos en {server}",
+        "boundRoot": "Comandos como root en {server}",
+        "unbind": "Dejar de usar este servidor",
+        "step": "Ejecutar {command}"
     }
 }

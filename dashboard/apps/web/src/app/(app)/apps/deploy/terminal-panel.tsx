@@ -542,7 +542,13 @@ export function TerminalPanel({
                 ? t(excerpt.source === "selection" ? "terminal.polar.aboutSelection" : "terminal.polar.aboutOutput", {
                       place
                   })
-                : t("terminal.polar.aboutNothing", { place })
+                : t("terminal.polar.aboutNothing", { place }),
+            false,
+            // A server's shell binds the chat to that server and account, so
+            // a command Polar proposes goes there unless it names another.
+            target.kind === "host"
+                ? { id: target.hostId, root: target.asRoot === true, name: place }
+                : null
         );
     };
 

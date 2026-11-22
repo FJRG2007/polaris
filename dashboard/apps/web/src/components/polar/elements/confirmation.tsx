@@ -65,6 +65,8 @@ export function Confirmation({
     onReject,
     site,
     onAlwaysSite,
+    command,
+    onAlwaysServer,
     className
 }: {
     state: ToolState;
@@ -84,6 +86,11 @@ export function Confirmation({
      *  the site the way Claude in Chrome does: once, always, or not. */
     site?: string;
     onAlwaysSite?: () => void;
+    /** A server command: its exact text, where and as whom. Given with
+     *  `onAlwaysServer`, the card offers once, always for this server in this
+     *  chat, or not - never a stored grant. */
+    command?: { text: string; cwd: string | null; server: string; root: boolean };
+    onAlwaysServer?: () => void;
     className?: string;
 }) {
     const t = useTranslations("polar");
@@ -163,7 +170,23 @@ export function Confirmation({
                     {t("approval.siteAsk", { site })}
                 </p>
             ) : null}
-            {summary ? (
+            {command ? (
+                <div className="min-w-0 space-y-1">
+                    <p className="min-w-0 break-words text-xs text-muted-foreground">
+                        {t(command.root ? "approval.serverAskRoot" : "approval.serverAsk", {
+                            server: command.server
+                        })}
+                    </p>
+                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted px-2 py-1.5 font-mono text-xs text-foreground">
+                        {command.text}
+                    </pre>
+                    {command.cwd ? (
+                        <p className="min-w-0 break-all text-xs text-muted-foreground">
+                            {t("approval.serverCwd", { cwd: command.cwd })}
+                        </p>
+                    ) : null}
+                </div>
+            ) : summary ? (
                 <p className="min-w-0 break-words text-sm text-foreground">{summary}</p>
             ) : affects.length > 0 ? (
                 <p className="min-w-0 text-xs text-muted-foreground">
@@ -237,7 +260,19 @@ export function Confirmation({
                             <span className="truncate">{t("approval.siteAlways", { site })}</span>
                         </Button>
                     ) : null}
-                    {asking && read?.scope !== "none" ? (
+                    {command && onAlwaysServer ? (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="min-w-0 max-w-full"
+                            title={t("approval.serverAlwaysHint", { server: command.server })}
+                            onClick={onAlwaysServer}
+                        >
+                            <span className="truncate">{t("approval.serverAlways")}</span>
+                        </Button>
+                    ) : null}
+                    {asking && !command && read?.scope !== "none" ? (
                         <Button
                             type="button"
                             variant="outline"
@@ -255,7 +290,7 @@ export function Confirmation({
                         size="sm"
                         onClick={onApprove}
                     >
-                        {site && onAlwaysSite ? t("approval.siteOnce") : t("approval.run")}
+                        {(site && onAlwaysSite) || command ? t("approval.siteOnce") : t("approval.run")}
                     </Button>
                 </div>
             ) : null}

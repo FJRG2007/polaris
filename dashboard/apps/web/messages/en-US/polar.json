@@ -350,7 +350,12 @@
         "alwaysFailed": "Couldn't save that, so nothing ran. Try again.",
         "siteAsk": "Polar wants to use {site} in your browser.",
         "siteOnce": "Allow once",
-        "siteAlways": "Always for {site}"
+        "siteAlways": "Always for {site}",
+        "serverAsk": "Polar wants to run this on {server}:",
+        "serverAskRoot": "Polar wants to run this as root on {server}:",
+        "serverCwd": "In {cwd}",
+        "serverAlways": "Always in this chat",
+        "serverAlwaysHint": "Run commands on {server} without asking, until this chat ends"
     },
     "page": {
         "title": "Polar"
@@ -2478,5 +2483,11 @@
         },
         "resets": "Lifts",
         "error": "Couldn't load Code session usage. Reload the page to try again."
+    },
+    "server": {
+        "bound": "Commands run on {server}",
+        "boundRoot": "Commands run as root on {server}",
+        "unbind": "Stop using this server",
+        "step": "Run {command}"
     }
 }

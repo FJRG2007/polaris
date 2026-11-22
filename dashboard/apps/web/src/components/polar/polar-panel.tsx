@@ -13,6 +13,7 @@
  * one by one when the turn ends - stopping a turn keeps them.
  */
 
+import * as serverCommand from "@/lib/polar/server-command";
 import Link from "next/link";
 import { PolarAllowedContext } from "./polar-allowed";
 import { PolarFailureNotice } from "./polar-failure";
@@ -257,10 +258,21 @@ interface PolarState {
     /** Quotes `text` in the composer, types `draft` under it, and opens the
      *  panel. With `send`, the draft goes as if Enter had been pressed. Does
      *  nothing for an account Polar is not for. */
-    ask: (text: string, draft?: string, send?: boolean) => void;
+    ask: (text: string, draft?: string, send?: boolean, server?: PolarServerBinding | null) => void;
+    /** The server the chat was asked from (a terminal's Ask Polar): where
+     *  Polar's commands go when it names none. Cleared from its chip. */
+    server: PolarServerBinding | null;
+    setServer: (server: PolarServerBinding | null) => void;
     /** Whether the waiting draft is to be sent as soon as it is typed. */
     sendDrafted: boolean;
     takeAsked: () => void;
+}
+
+/** A server a chat is bound to, with the name its chip shows. */
+export interface PolarServerBinding {
+    id: string;
+    root: boolean;
+    name: string;
 }
 
 const PolarContext = createContext<PolarState | null>(null);
@@ -488,14 +500,17 @@ export function PolarProvider({
     const [asked, setAsked] = useState<string | null>(null);
     const [drafted, setDrafted] = useState<string | null>(null);
     const [sendDrafted, setSendDrafted] = useState(false);
+    const [server, setServer] = useState<PolarServerBinding | null>(null);
     const ask = useCallback(
-        (text: string, draft?: string, send = false) => {
+        (text: string, draft?: string, send = false, bound: PolarServerBinding | null = null) => {
             const quote = polarShared.selectionQuote(text);
             const typed = draft?.trim().slice(0, 2000) || null;
             if (!allowed || (!quote && !typed)) return;
             setAsked(quote);
             setDrafted(typed);
             setSendDrafted(send);
+            // Asked from somewhere else, the chat is no longer about that server.
+            setServer(bound);
             setOpen(true);
         },
         [allowed, setOpen]
@@ -539,9 +554,11 @@ export function PolarProvider({
             drafted,
             sendDrafted,
             ask,
+            server,
+            setServer,
             takeAsked
         }),
-        [allowed, open, setOpen, extra, asked, drafted, sendDrafted, ask, takeAsked]
+        [allowed, open, setOpen, extra, asked, drafted, sendDrafted, ask, server, takeAsked]
     );
     return (
         <PolarContext.Provider value={value}>
@@ -1039,7 +1056,8 @@ export function PolarChat({
         connectorsOn,
         trialSkill,
         codeTask,
-        agent
+        agent,
+        server: state?.server ?? null
     });
     live.current = {
         threadId,
@@ -1056,7 +1074,8 @@ export function PolarChat({
         connectorsOn,
         trialSkill,
         codeTask,
-        agent
+        agent,
+        server: state?.server ?? null
     };
 
     /** The page as it goes with the next turn: null with sharing off. */
@@ -1096,6 +1115,9 @@ export function PolarChat({
                             refine: refining,
                             code: live.current.codeTask,
                             agentId: live.current.agent?.id ?? null,
+                            server: live.current.server
+                                ? { id: live.current.server.id, root: live.current.server.root }
+                                : null,
                             parentId:
                                 messages.length > 1
                                     ? (messages[messages.length - 2]?.id ?? null)
@@ -2569,6 +2591,15 @@ export function PolarChat({
                                 onRemove={() => setCodeTask(null)}
                             />
                         ) : null}
+                        {state?.server ? (
+                            <Chip
+                                label={t(state.server.root ? "server.boundRoot" : "server.bound", {
+                                    server: state.server.name
+                                })}
+                                removeLabel={t("server.unbind")}
+                                onRemove={() => state.setServer(null)}
+                            />
+                        ) : null}
                         {quote ? (
                             <Chip
                                 label={`${t("reply.to")} "${quote}"`}
@@ -3341,6 +3372,8 @@ function MessageView({
     renderFailure: (failure: polarFailure.StoredFailure) => ReactNode;
 }) {
     const t = useTranslations("polar");
+    // The server the chat is bound to, for a command card to name it.
+    const polarState = useContext(PolarContext);
     const mine = message.role === "user";
     const from = mine ? "user" : "assistant";
     const meta = (message.metadata ?? {}) as {
@@ -3368,6 +3401,8 @@ function MessageView({
                   : name);
     // A web step names what it searched for or which site it read.
     const stepTitle = (name: string, input: unknown) => {
+        const run = serverCommand.serverCommandOf(name, input);
+        if (run) return t("server.step", { command: run.command.split("\n")[0]!.slice(0, 80) });
         const repo = repoStepOf(name, input);
         if (repo) {
             return repo.kind === "search"
@@ -3637,6 +3672,11 @@ function MessageView({
                                 onApprove={() => tool.approval && onApprove(tool.approval.id, true)}
                                 onReject={() => tool.approval && onApprove(tool.approval.id, false)}
                                 site={browserStepOf(name, tool.input)?.site || undefined}
+                                command={commandCardOf(name, tool.input, polarState?.server ?? null)}
+                                onAlwaysServer={() =>
+                                    tool.approval &&
+                                    onApprove(tool.approval.id, true, serverCommand.ALWAYS_SERVER_REASON)
+                                }
                                 onAlwaysSite={() =>
                                     tool.approval &&
                                     onApprove(tool.approval.id, true, ALWAYS_SITE_REASON)
@@ -3768,4 +3808,22 @@ function MessageView({
             ) : null}
         </Message>
     );
+}
+
+/** A server command as its card shows it: the exact text, where, and as whom. */
+function commandCardOf(
+    name: string,
+    input: unknown,
+    bound: PolarServerBinding | null
+): { text: string; cwd: string | null; server: string; root: boolean } | undefined {
+    const run = serverCommand.serverCommandOf(name, input);
+    if (!run) return undefined;
+    const serverId = run.serverId ?? bound?.id ?? "";
+    const onBound = bound !== null && bound.id === serverId;
+    return {
+        text: run.command,
+        cwd: run.cwd,
+        server: onBound ? bound.name : serverId,
+        root: run.root || (onBound && bound.root && !(input as { account?: unknown }).account)
+    };
 }
