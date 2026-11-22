@@ -11,8 +11,9 @@
  * it must not appear: the room is already there, in full.
  */
 
-import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, type ReactNode } from "react";
+import { bindRouter } from "@/lib/keep-call";
 import { CallBar, CallProvider } from "@/app/(app)/chat/call-session";
 import { DesktopSharePickerHost } from "@/app/(app)/chat/desktop-share-picker";
 
@@ -26,6 +27,10 @@ export function CallHolder({
     children: ReactNode;
 }) {
     const pathname = usePathname();
+    // The shell's router, for the screens and notices that move the page from
+    // outside React (`navigateInApp`): a client navigation keeps the call.
+    const router = useRouter();
+    useEffect(() => bindRouter((href) => router.push(href)), [router]);
     if (!hasChat) return <>{children}</>;
 
     // The room being looked at, in either of the two shapes one has: a

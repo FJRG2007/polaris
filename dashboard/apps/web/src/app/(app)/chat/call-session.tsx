@@ -33,6 +33,7 @@ import { playCallSound } from "@/lib/call-sounds";
 import { RecordingPanel } from "./recording-panel";
 import { usePresenceRefresh } from "@/components/presence-store";
 import { rememberCall, takeCallNote } from "./call-resume";
+import { setCallLive, useCallLinkGuard } from "@/lib/keep-call";
 import { handsQueueSummary, type HandInQueue } from "./call-signals";
 import { ControlHint } from "./control-hint";
 import { useRingBack } from "./ring-back";
@@ -91,6 +92,13 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
      */
     const inSession = useRef(false);
     inSession.current = session !== null;
+    // Whether a link or a screen leaving the page should keep this call: a
+    // screen outside the shell opens in a new tab, a plain link is routed.
+    useEffect(() => {
+        setCallLive(session !== null);
+    }, [session]);
+    useEffect(() => () => setCallLive(false), []);
+    useCallLinkGuard(session !== null);
     const leave = useCallback(() => {
         if (recorder.current.running) recorder.current.stop();
         if (inSession.current) playCallSound("hangUp");

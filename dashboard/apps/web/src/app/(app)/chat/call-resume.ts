@@ -37,6 +37,7 @@
  */
 
 import type { CallSession } from "./call-hold";
+import { takeCarry } from "@/lib/keep-call";
 
 const KEY = "polaris.call.resume";
 
@@ -78,6 +79,9 @@ export function rememberCall(
     if (typeof window === "undefined") return;
     try {
         if (reason === "leaving" && offeredNote()) return;
+        // A full load this tab asked for on purpose (`loadPage`): the call is
+        // walked back into wherever it lands, like a reload.
+        if (reason === "leaving" && takeCarry()) reason = "offered";
         const note: Note = { session, video, viewerId, reason, at: Date.now(), href: here() };
         window.sessionStorage.setItem(KEY, JSON.stringify(note));
     } catch {
