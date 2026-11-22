@@ -83,7 +83,7 @@ function tileColors(look: KeyLook, tone: KeyTone): { fill: string; glyph: string
     return { fill: CALL_TILE, glyph: "#FFFFFF" };
 }
 
-/** The Polaris mark, in its 32-unit box, as `src/app/icon.svg` draws it. */
+/** The Polaris mark, in its 32-unit box, as `apps/web/public/icon.svg` draws it. */
 const MARK_PATH = "M16 3Q17.6 12.6 29 16Q17.6 19.4 16 29Q14.4 19.4 3 16Q14.4 12.6 16 3Z";
 
 function renderTile(face: KeyFace, look: KeyLook): string {

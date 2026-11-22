@@ -844,7 +844,7 @@ for (const file of readdirSync(join(web, "public", "logos")))
         });
 // The dashboard's own mark, so a tab, a home screen and a shared link show the
 // same Polaris icon the product does.
-copyFileSync(join(web, "src", "app", "icon.svg"), join(siteDir, "public", "icon.svg"));
+copyFileSync(join(web, "public", "icon.svg"), join(siteDir, "public", "icon.svg"));
 for (const file of [
     "favicon.ico",
     "apple-touch-icon.png",
