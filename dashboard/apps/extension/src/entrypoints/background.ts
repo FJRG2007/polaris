@@ -68,6 +68,7 @@ import {
     symmetricKeyFromBytes
 } from "@polaris/vault-crypto";
 import * as servers from "@/lib/servers";
+import * as seasonIcon from "@/lib/season-icon";
 import * as selfUpdate from "@/lib/self-update";
 import {
     currentOrigin,
@@ -4477,6 +4478,24 @@ function closePanel(tab: { id?: number; windowId?: number }): void {
     }
 }
 
+/**
+ * The toolbar button in the season's dress (`lib/season-icon`), settled across
+ * every Polaris this browser knows. `browserAction` on Firefox's manifest v2.
+ */
+const refreshSeasonIcon = seasonIcon.createSeasonIcon({
+    origins: polarisOrigins,
+    fetch: (input, init) => fetch(input, init),
+    now: () => new Date(),
+    rasterize: seasonIcon.rasterize,
+    setIcon: async (details) => {
+        const api = browser as unknown as Record<
+            "action" | "browserAction",
+            { setIcon?: (details: seasonIcon.IconDetails) => Promise<void> } | undefined
+        >;
+        await (api.action ?? api.browserAction)?.setIcon?.(details);
+    }
+});
+
 /** Read what the decisions above are made from, and keep it current. */
 function followPolar(): void {
     const readOrigins = (): void =>
@@ -4800,7 +4819,18 @@ export default defineBackground(() => {
     // shortest period Chrome honours. It does nothing while Polar is off.
     browser.alarms.create(POLAR_BROWSER_ALARM, { periodInMinutes: 0.5 });
     void polarBrowser.loop();
+    // And the season on the toolbar button: asked now, whenever the servers
+    // change, and every few hours so the dress comes and goes with its dates.
+    browser.alarms.create(seasonIcon.SEASON_ICON_ALARM, {
+        periodInMinutes: seasonIcon.SEASON_ICON_EVERY_MINUTES
+    });
+    void refreshSeasonIcon();
+    watchPolarisOrigins(() => void refreshSeasonIcon());
     browser.alarms.onAlarm.addListener((alarm) => {
+        if (alarm.name === seasonIcon.SEASON_ICON_ALARM) {
+            void refreshSeasonIcon();
+            return;
+        }
         if (alarm.name === POLAR_BROWSER_ALARM) {
             void polarBrowser.loop();
             return;

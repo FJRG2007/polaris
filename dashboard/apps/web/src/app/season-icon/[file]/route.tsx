@@ -10,15 +10,16 @@ import { ImageResponse } from "next/og";
 import { parseSeasonIconFile } from "@/lib/season-icon";
 
 /** The address carries the season, so a day's cache never shows a stale dress
- *  for long and a new season is a new address anyway. */
-const CACHE = "public, max-age=86400";
+ *  for long and a new season is a new address anyway. Readable from any origin,
+ *  like the image it is: the browser extension draws it on its toolbar button. */
+const HEADERS = { "cache-control": "public, max-age=86400", "access-control-allow-origin": "*" };
 
 export async function GET(_request: Request, { params }: { params: Promise<{ file: string }> }) {
     const wanted = parseSeasonIconFile((await params).file);
     if (!wanted) return new Response(null, { status: 404 });
     if (wanted.size === null) {
         return new Response(core.seasonMarkSvg(wanted.season), {
-            headers: { "content-type": "image/svg+xml", "cache-control": CACHE }
+            headers: { ...HEADERS, "content-type": "image/svg+xml" }
         });
     }
     const side = wanted.size;
@@ -27,6 +28,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ fil
         <div style={{ display: "flex", width: side, height: side }}>
             <img alt="" width={side} height={side} src={`data:image/svg+xml;base64,${source}`} />
         </div>,
-        { width: side, height: side, headers: { "cache-control": CACHE } }
+        { width: side, height: side, headers: HEADERS }
     );
 }
