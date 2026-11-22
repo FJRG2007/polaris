@@ -2451,7 +2451,6 @@ export function FilesView({
                             </DropdownMenu>
                             {picking ? (
                                 <FilePickerDialog
-                                    initialTab="upload"
                                     title={t("filesView.uploadHere")}
                                     onPick={(picked) => void uploadPicked(picked)}
                                     onClose={() => setPicking(false)}

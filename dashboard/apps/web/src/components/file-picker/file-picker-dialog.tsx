@@ -117,14 +117,20 @@ function extensionsOf(entry: string): string[] {
     return exact ? [`.${exact[1]}`] : [];
 }
 
+/** Where the dialog opens: always on Upload, the reader's own machine, so no
+ *  screen opens it somewhere else. A screen with nowhere to put an upload
+ *  opens on recent files instead, since it has no Upload tab. */
+export function openingTab(storageOnly: boolean): FilePickerTab {
+    return storageOnly ? "recent" : "upload";
+}
+
 export function FilePickerDialog({
     onPick,
     onClose,
     accept,
     multiple = true,
     title,
-    storageOnly = false,
-    initialTab = "recent"
+    storageOnly = false
 }: {
     onPick: (files: PickedFile[]) => void;
     onClose: () => void;
@@ -137,13 +143,10 @@ export function FilePickerDialog({
     /** Offer only files already on a storage, for a screen that points at a
      *  file where it is and so has nowhere to put an upload. */
     storageOnly?: boolean;
-    /** Where it opens. Recent files suit a screen attaching something; a screen
-     *  that IS a storage opens on the reader's machine instead. */
-    initialTab?: FilePickerTab;
 }) {
     const t = useTranslations("components");
     const heading = title ?? t("files.title");
-    const [tab, setTab] = useState<FilePickerTab>(initialTab);
+    const [tab, setTab] = useState<FilePickerTab>(() => openingTab(storageOnly));
     const [sources, setSources] = useState<Source[]>([]);
     const [sourceId, setSourceId] = useState("");
     const [path, setPath] = useState("");

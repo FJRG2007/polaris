@@ -54,6 +54,8 @@ describe("the file picker's list and grid", () => {
         render(<FilePickerDialog onPick={() => {}} onClose={() => {}} />, {
             wrapper: MessagesWrapper
         });
+        // The picker opens on Upload; a storage file is one tab over.
+        await userEvent.click(screen.getByRole("button", { name: "Recent" }));
         await waitFor(() => expect(screen.getByText("Budget.xlsx")).toBeTruthy());
 
         const user = userEvent.setup();
@@ -92,6 +94,8 @@ describe("the file picker's list and grid", () => {
         render(<FilePickerDialog onPick={() => {}} onClose={() => {}} />, {
             wrapper: MessagesWrapper
         });
+        // The picker opens on Upload; a storage file is one tab over.
+        await userEvent.click(screen.getByRole("button", { name: "Recent" }));
         await waitFor(() => expect(screen.getByText("Budget.xlsx")).toBeTruthy());
         const user = userEvent.setup();
 
@@ -111,9 +115,10 @@ describe("the file picker's list and grid", () => {
 
     it("opens a folder from a grid tile", async () => {
         stubDrive();
-        render(<FilePickerDialog initialTab="mine" onPick={() => {}} onClose={() => {}} />, {
+        render(<FilePickerDialog onPick={() => {}} onClose={() => {}} />, {
             wrapper: MessagesWrapper
         });
+        await userEvent.click(screen.getByRole("button", { name: "My files" }));
         await waitFor(() => expect(screen.getByText("Reports")).toBeTruthy());
         const user = userEvent.setup();
         await user.click(screen.getByRole("button", { name: "Grid view" }));

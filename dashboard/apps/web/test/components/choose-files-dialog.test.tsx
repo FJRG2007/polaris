@@ -47,6 +47,8 @@ describe("the shared picker in place of a file input", () => {
         render(<FilePickerDialog accept="image/png" onPick={() => {}} onClose={() => {}} />, {
             wrapper: MessagesWrapper
         });
+        // The picker opens on Upload; a storage file is one tab over.
+        await userEvent.click(screen.getByRole("button", { name: "Recent" }));
         await waitFor(() => expect(screen.getByText("Skin.png")).toBeTruthy());
         expect(screen.queryByText("Photo.jpg")).toBeNull();
         expect(screen.queryByText("Theme.ogg")).toBeNull();
@@ -57,6 +59,8 @@ describe("the shared picker in place of a file input", () => {
         render(<FilePickerDialog accept="image/*" onPick={() => {}} onClose={() => {}} />, {
             wrapper: MessagesWrapper
         });
+        // The picker opens on Upload; a storage file is one tab over.
+        await userEvent.click(screen.getByRole("button", { name: "Recent" }));
         await waitFor(() => expect(screen.getByText("Photo.jpg")).toBeTruthy());
         expect(screen.getByText("Skin.png")).toBeTruthy();
         expect(screen.queryByText("Theme.ogg")).toBeNull();
@@ -98,6 +102,8 @@ describe("the shared picker in place of a file input", () => {
         render(<ChooseFilesDialog accept="image/png" onFiles={onFiles} onClose={onClose} />, {
             wrapper: MessagesWrapper
         });
+        // The picker opens on Upload; a storage file is one tab over.
+        await userEvent.click(screen.getByRole("button", { name: "Recent" }));
         await userEvent.click(await screen.findByText("Skin.png"));
         await userEvent.click(screen.getByRole("button", { name: "Attach" }));
         expect(await screen.findByText("Fetching the file")).toBeTruthy();
@@ -124,6 +130,8 @@ describe("the shared picker in place of a file input", () => {
             />,
             { wrapper: MessagesWrapper }
         );
+        // The picker opens on Upload; a storage file is one tab over.
+        await userEvent.click(screen.getByRole("button", { name: "Recent" }));
         await userEvent.click(await screen.findByText("Skin.png"));
         await userEvent.click(screen.getByRole("button", { name: "Attach" }));
         expect(onDrive).toHaveBeenCalledWith([
@@ -152,6 +160,8 @@ describe("the shared picker in place of a file input", () => {
         render(<ChooseFilesDialog onFiles={() => {}} onFailed={onFailed} onClose={() => {}} />, {
             wrapper: MessagesWrapper
         });
+        // The picker opens on Upload; a storage file is one tab over.
+        await userEvent.click(screen.getByRole("button", { name: "Recent" }));
         await userEvent.click(await screen.findByText("Skin.png"));
         await userEvent.click(screen.getByRole("button", { name: "Attach" }));
         await waitFor(() =>

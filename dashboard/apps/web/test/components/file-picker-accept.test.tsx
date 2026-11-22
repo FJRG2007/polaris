@@ -49,6 +49,8 @@ describe("choosing a file for a screen that takes some of them", () => {
         stubDrive();
         render(<FilePickerDialog accept=".xlsx,.csv" onPick={() => {}} onClose={() => {}} />, { wrapper: MessagesWrapper });
 
+        // The picker opens on Upload; a storage file is one tab over.
+        await userEvent.click(screen.getByRole("button", { name: "Recent" }));
         await waitFor(() => expect(screen.getByText("Budget.xlsx")).toBeTruthy());
         expect(screen.queryByText("Clip.mp4")).toBeNull();
         // A folder is not a file the screen would take or refuse: it is where
@@ -60,6 +62,8 @@ describe("choosing a file for a screen that takes some of them", () => {
         stubDrive();
         render(<FilePickerDialog onPick={() => {}} onClose={() => {}} />, { wrapper: MessagesWrapper });
 
+        // The picker opens on Upload; a storage file is one tab over.
+        await userEvent.click(screen.getByRole("button", { name: "Recent" }));
         await waitFor(() => expect(screen.getByText("Budget.xlsx")).toBeTruthy());
         expect(screen.getByText("Clip.mp4")).toBeTruthy();
     });

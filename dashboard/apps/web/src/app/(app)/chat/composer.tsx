@@ -2048,8 +2048,6 @@ export function Composer({
 
             {picking && (
                 <FilePickerDialog
-                    // Most of what is attached comes straight off the device.
-                    initialTab="upload"
                     title={t("composer.attachToThisMessage")}
                     onClose={() => setPicking(false)}
                     onPick={(picked) => void takePicked(picked)}
