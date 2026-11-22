@@ -22,6 +22,7 @@
  */
 
 import type { Translator } from "@polaris/core";
+import { createContext } from "react";
 import { gameCatalogs, type GameKey } from "../../../messages";
 import {
     ITEM_CATALOG_URL,
@@ -34,6 +35,12 @@ import {
     type ItemPicture
 } from "../../lib/minecraft/items";
 import { fresh } from "../../lib/fresh";
+
+/** Which server the panel is for, so the palette can add what that server's mods
+ *  carry and an icon can ask for a modded item's picture. Provided once by the
+ *  panel rather than threaded through every editor; without it there are the
+ *  vanilla items only. */
+export const ItemServer = createContext<string | null>(null);
 
 /** The words the line under the grid is written in. */
 type ModItemsText = Translator<GameKey<"games">>;

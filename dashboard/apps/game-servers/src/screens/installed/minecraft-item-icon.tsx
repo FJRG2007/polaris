@@ -20,9 +20,11 @@
 
 import { cn } from "@polaris/ui";
 import { Package } from "lucide-react";
-import { useState, useSyncExternalStore } from "react";
+import { useContext, useEffect, useState, useSyncExternalStore } from "react";
 import { itemIconUrl, pictureFit } from "../../lib/minecraft/items";
 import {
+    ItemServer,
+    loadModItems,
     modItemPictureFor,
     modItemsVersion,
     noModItems,
@@ -39,6 +41,15 @@ export function ItemIcon({ id, className }: { id: string; className?: string }) 
     useSyncExternalStore(subscribeModItems, modItemsVersion, noModItems);
 
     const picture = modItemPictureFor(id);
+    // A modded item's picture comes from that server's catalogue, which nothing
+    // else may have asked for yet - a player's inventory is drawn without the
+    // palette ever opening. The load is shared and cached per server, so a bag of
+    // forty modded slots is still one request.
+    const server = useContext(ItemServer);
+    const modded = isModded(id);
+    useEffect(() => {
+        if (server !== null && modded) void loadModItems(server);
+    }, [server, modded]);
     const url = picture?.url ?? itemIconUrl(id);
 
     if (url === null || failed === id) {
@@ -77,4 +88,10 @@ export function ItemIcon({ id, className }: { id: string; className?: string }) 
             />
         </span>
     );
+}
+
+/** An id from a namespace other than the game's own. */
+function isModded(id: string): boolean {
+    const colon = id.indexOf(":");
+    return colon > 0 && id.slice(0, colon) !== "minecraft";
 }

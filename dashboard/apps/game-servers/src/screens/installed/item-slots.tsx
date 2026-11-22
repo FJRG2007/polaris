@@ -28,10 +28,11 @@
 import { useGameText } from "../game-text";
 import { cn, Button, Input } from "@polaris/ui";
 import { ItemIcon } from "./minecraft-item-icon";
+import { ItemServer } from "./minecraft-mod-items";
 import { ItemPicker } from "./minecraft-item-picker";
 import { ArrowLeft, ArrowRight, Plus, X } from "lucide-react";
 import { DRAG_EFFECT_ALLOWED, SLOT_DROP_EFFECT } from "./minecraft-inventory";
-import { createContext, useContext, useEffect, useId, useRef, useState, type DragEvent } from "react";
+import { useContext, useEffect, useId, useRef, useState, type DragEvent } from "react";
 import {
     itemIconUrl,
     itemLabel,
@@ -47,10 +48,6 @@ export interface SlotItem {
     readonly count: number;
 }
 
-/** Which server the palette is for, so it can add what that server's mods carry.
- *  Provided once by the panel rather than threaded through every reward editor;
- *  without it the palette has the vanilla items only. */
-const ItemServer = createContext<string | null>(null);
 export const ItemServerProvider = ItemServer.Provider;
 
 /** The drag payload's type, so a slot can tell one of its own from a palette item
