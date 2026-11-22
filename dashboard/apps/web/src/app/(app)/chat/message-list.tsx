@@ -315,6 +315,9 @@ export interface MessageListProps {
     canModerate: boolean;
     /** Absent inside a thread, where a reply has nowhere further to go. */
     onOpenThread?: (message: ChatMessageView) => void;
+    /** Whether a thread may be opened under this message (`mayStartThread`).
+     *  Absent is everywhere. */
+    threadAllowed?: (message: ChatMessageView) => boolean;
     onReact: (messageId: string, emoji: string) => void;
     onStar: (message: ChatMessageView) => void;
     /** The messages pinned for everybody here, to mark them and to offer Unpin
@@ -379,6 +382,7 @@ export function MessageList({
     highlightId,
     onJumpTo,
     onOpenThread,
+    threadAllowed,
     onReact,
     onStar,
     pinnedIds,
@@ -567,7 +571,9 @@ export function MessageList({
                                 // edit. Deleting it takes it back.
                                 canPost={canPost && !inert}
                                 canModerate={canModerate && !inert}
-                                onOpenThread={inert ? undefined : onOpenThread}
+                                onOpenThread={
+                                    inert || threadAllowed?.(message) === false ? undefined : onOpenThread
+                                }
                                 onReact={react}
                                 onStar={onStar}
                                 pinned={pinnedIds?.has(message.id) ?? false}

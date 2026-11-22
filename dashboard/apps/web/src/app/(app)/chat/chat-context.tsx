@@ -121,6 +121,9 @@ interface ChatContextValue {
      *  defaults until the answer arrives, so the composer is never briefly
      *  stricter than the server. */
     readonly rulesFor: (channel: { spaceId: string | null; kind: string }) => core.ChatRules;
+    /** Whether an administrator allows new threads in direct messages and
+     *  groups. Off until the answer arrives, as the server's default is. */
+    readonly directThreads: boolean;
     /**
      * Why a call cannot be started, or null when one can.
      *
@@ -236,6 +239,7 @@ export function ChatProvider({
     const [kept, setKept] = useState(false);
     const [loadFailed, setLoadFailed] = useState(false);
     const [rules, setRules] = useState<Record<core.ChatRuleScope, core.ChatRules> | null>(null);
+    const [directThreads, setDirectThreads] = useState(false);
     const [spaces, setSpaces] = useState<readonly ChatSpaceView[]>([]);
     const [categories, setCategories] = useState<readonly ChatCategoryView[]>([]);
     const [blocked, setBlocked] = useState<ReadonlySet<string>>(() => new Set());
@@ -442,7 +446,10 @@ export function ChatProvider({
     useEffect(() => {
         void polls
             .chatRules()
-            .then((result) => setRules(result.rules))
+            .then((result) => {
+                setRules(result.rules);
+                setDirectThreads(result.directThreads === true);
+            })
             .catch(() => {
                 // Left null, which reads as the defaults. The server enforces
                 // the real ones either way; this only decides what the composer
@@ -541,6 +548,7 @@ export function ChatProvider({
             refreshChannels,
             patchChannel,
             rulesFor,
+            directThreads,
             callsOff,
             callsOutside
         }),
@@ -563,6 +571,7 @@ export function ChatProvider({
             refreshChannels,
             patchChannel,
             rulesFor,
+            directThreads,
             callsOff,
             callsOutside
         ]

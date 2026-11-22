@@ -12,16 +12,23 @@ import type { StartingRules } from "@/lib/chat/vanish";
 import { durationName } from "@/app/(app)/chat/vanish-controls";
 import { CHAT_PRIVACY_RULES, VANISH_DURATIONS, type ChatPrivacyRule, type DmRuleMode } from "@/lib/chat/vanish-rules";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { setDeleteChatLineAction, setDmRuleModeAction, setStartingRulesAction } from "./actions";
+import {
+    setDeleteChatLineAction,
+    setDirectThreadsAction,
+    setDmRuleModeAction,
+    setStartingRulesAction
+} from "./actions";
 import { Select, SegmentedControl, Switch, useOptimisticToggle } from "@polaris/ui";
 
 export function DirectRulesView({
     mode,
     line,
+    threads,
     starting
 }: {
     mode: DmRuleMode;
     line: boolean;
+    threads: boolean;
     starting: StartingRules;
 }) {
     const t = useTranslations("admin");
@@ -36,6 +43,14 @@ export function DirectRulesView({
         async (next) => {
             setError("");
             return (await runAction(() => setDeleteChatLineAction(next), setError)) ?? { error: true };
+        },
+        { onRefused: setError }
+    );
+    const [threadsOn, toggleThreads] = useOptimisticToggle(
+        threads,
+        async (next) => {
+            setError("");
+            return (await runAction(() => setDirectThreadsAction(next), setError)) ?? { error: true };
         },
         { onRefused: setError }
     );
@@ -130,6 +145,17 @@ export function DirectRulesView({
                     <p className="text-xs text-muted-foreground">{t("chat.directRules.line.hint")}</p>
                 </div>
                 <Switch checked={shown} onChange={toggle} aria-label={t("chat.directRules.line.label")} />
+            </div>
+            <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                    <p className="text-sm font-medium">{t("chat.directRules.threads.label")}</p>
+                    <p className="text-xs text-muted-foreground">{t("chat.directRules.threads.hint")}</p>
+                </div>
+                <Switch
+                    checked={threadsOn}
+                    onChange={toggleThreads}
+                    aria-label={t("chat.directRules.threads.label")}
+                />
             </div>
             <div className="flex flex-col gap-2">
                 <div>

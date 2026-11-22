@@ -105,6 +105,7 @@
         "removedFromMeeting": "You were removed from this meeting",
         "timedOut": "You have been timed out here. It ends in {wait}.",
         "onlyAdminsSend": "Only whoever runs this conversation can post in it",
+        "directThreadsOff": "Threads are off in direct messages and groups here",
         "privateChatNoForward": "Advanced chat privacy is on there, so its messages cannot be forwarded",
         "privateChatNoDownload": "Advanced chat privacy is on here, so files cannot be downloaded",
         "groupFull": "A group holds {count} people. Make a channel instead.",

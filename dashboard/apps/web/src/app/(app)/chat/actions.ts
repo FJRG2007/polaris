@@ -34,6 +34,7 @@ import * as webhooks from "@/lib/chat/webhooks";
 import { confirmAge } from "@/lib/chat/age-gate";
 import { MAX_REREAD } from "@/lib/chat/reread-limit";
 import { allChatRules } from "@/lib/chat/rules";
+import { directThreadsAllowed } from "@/lib/chat/dm-threads";
 import { requirePermission } from "@/lib/session";
 import { pressComponent } from "@/lib/chat/component-actions";
 import { dismissEphemeral } from "@/lib/chat/ephemeral";
@@ -535,9 +536,11 @@ export async function editHistoryAction(
  */
 export async function chatRulesAction(): Promise<{
     rules: Record<core.ChatRuleScope, core.ChatRules>;
+    directThreads: boolean;
 }> {
     await actor();
-    return { rules: await allChatRules() };
+    const [rules, directThreads] = await Promise.all([allChatRules(), directThreadsAllowed()]);
+    return { rules, directThreads };
 }
 
 export async function reactAction(input: unknown): Promise<{ on?: boolean; error?: string }> {

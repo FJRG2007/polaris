@@ -19,6 +19,7 @@ import { DirectRulesView } from "./direct-rules-view";
 import { ModerationPolicyView } from "./moderation-policy-view";
 import { moderationPolicy } from "@/lib/chat/moderation-policy";
 import { deleteChatLineShown, dmRuleMode, startingRules } from "@/lib/chat/vanish";
+import { directThreadsAllowed } from "@/lib/chat/dm-threads";
 
 /** The screens, by the path segment after `settings` ("" is the first). */
 export const CHAT_ADMIN_SCREENS = ["", "files", "organizations", "links", "calls"] as const;
@@ -39,6 +40,7 @@ export async function ChatAdminSettings({ screen }: { screen: ChatAdminScreen })
                 <DirectRulesView
                     mode={await dmRuleMode()}
                     line={await deleteChatLineShown()}
+                    threads={await directThreadsAllowed()}
                     starting={await startingRules()}
                 />
             ) : null}

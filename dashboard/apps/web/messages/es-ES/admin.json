@@ -371,6 +371,10 @@
                 "label": "Mostrar una línea al borrar un chat para ambos",
                 "hint": "Apagado: el chat se vacía sin dejar ninguna línea."
             },
+            "threads": {
+                "label": "Hilos en mensajes directos y grupos",
+                "hint": "Apagado: ahí no se abren hilos nuevos. Los que hay siguen."
+            },
             "starting": {
                 "title": "Los chats nuevos usan",
                 "hint": "Con qué empieza un mensaje directo o grupo nuevo. Quienes estén en el chat pueden cambiarlo después.",

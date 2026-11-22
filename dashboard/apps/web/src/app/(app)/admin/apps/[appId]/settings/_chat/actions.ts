@@ -25,6 +25,7 @@ import { syncCallServerRoute } from "@/lib/chat/call-edge";
 import { saveLinkSafetySettings } from "@/lib/chat/link-safety";
 import { isDmRuleMode, isVanishDuration } from "@/lib/chat/vanish-rules";
 import { setDeleteChatLineShown, setDmRuleMode, setStartingRules } from "@/lib/chat/vanish";
+import { setDirectThreadsAllowed } from "@/lib/chat/dm-threads";
 
 export async function setChatRulesAction(
     scope: unknown,
@@ -229,6 +230,23 @@ export async function setDeleteChatLineAction(shown: unknown): Promise<{ error?:
         targetType: "setting",
         targetId: "chat.deleteChatLine",
         metadata: { shown }
+    });
+    revalidatePath(CHAT_SETTINGS_PATH);
+    return {};
+}
+
+/** Whether new threads may be started in direct messages and groups. Threads
+ *  already there stay readable and answerable either way. */
+export async function setDirectThreadsAction(allowed: unknown): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    if (typeof allowed !== "boolean") return { error: (await getTranslations("admin"))("chat.directRules.invalid") };
+    await setDirectThreadsAllowed(allowed);
+    await recordAudit({
+        actorId: admin.id,
+        action: "chat.directThreads.set",
+        targetType: "setting",
+        targetId: "chat.directThreads",
+        metadata: { allowed }
     });
     revalidatePath(CHAT_SETTINGS_PATH);
     return {};

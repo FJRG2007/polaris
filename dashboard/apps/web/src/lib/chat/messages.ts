@@ -24,6 +24,8 @@ import { prisma, Prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
 import { rulesForChannel } from "./rules";
+import { mayStartThread } from "./thread-rules";
+import { directThreadsAllowed } from "./dm-threads";
 import { appCommandIn, commandIn } from "./chat-command";
 import { publishChatChange } from "./live";
 import { nicknamesFor } from "@/lib/contact-names";
@@ -629,13 +631,24 @@ async function sendUnguarded(
     if (input.parentId) {
         const parent = await prisma.chatMessage.findUnique({
             where: { id: input.parentId },
-            select: { channelId: true, parentId: true, deletedAt: true, audience: true }
+            select: { channelId: true, parentId: true, deletedAt: true, audience: true, replyCount: true }
         });
         // An ephemeral answer is one reader's: nobody starts a thread under it.
         if (!parent || parent.channelId !== input.channelId || isEphemeral(parent.audience)) {
             throw new ChatAccessError({ key: "errors.messageNotInConversation" });
         }
         if (parent.deletedAt) throw new ChatRuleError(GONE);
+        // A reply inside a thread, or under a message that already has replies,
+        // joins a thread that exists; only starting one is the switch's to refuse.
+        // The setting is read only where it can matter: a channel in a space
+        // always may.
+        if (
+            !parent.parentId &&
+            hasDirectRules(access) &&
+            !mayStartThread(access, await directThreadsAllowed(), parent.replyCount)
+        ) {
+            throw new ChatRuleError({ key: "errors.directThreadsOff" });
+        }
         // Threads are one level. A reply to a reply joins the same thread rather
         // than starting a second one nobody would find.
         input = { ...input, parentId: parent.parentId ?? input.parentId };

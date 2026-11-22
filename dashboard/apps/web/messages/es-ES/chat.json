@@ -105,6 +105,7 @@
         "removedFromMeeting": "Te han quitado de esta reunión",
         "timedOut": "Te han aislado aquí. Termina dentro de {wait}.",
         "onlyAdminsSend": "Solo quien lleva esta conversación puede escribir en ella",
+        "directThreadsOff": "Aquí los hilos están desactivados en directos y grupos",
         "privateChatNoForward": "Ahí está activa la privacidad avanzada, sus mensajes no se reenvían",
         "privateChatNoDownload": "Aquí está activa la privacidad avanzada, los archivos no se descargan",
         "groupFull": "Un grupo admite {count} personas. Crea un canal en su lugar.",

@@ -128,6 +128,7 @@ import * as chatCache from "@/lib/chat/offline/chat-cache";
 import * as outbox from "./outbox";
 import { prefetchMedia } from "./media-download";
 import { newClientKey, type OutboxEntry } from "@/lib/chat/offline/outbox";
+import { mayStartThread } from "@/lib/chat/thread-rules";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -228,7 +229,7 @@ export function ChannelView({
     const appCommands = useAppCommands();
     const router = useRouter();
     const params = useSearchParams();
-    const { viewerId, viewerName, channels, spaces, loaded, refresh, rulesFor, may, callsOff } =
+    const { viewerId, viewerName, channels, spaces, loaded, refresh, rulesFor, directThreads, may, callsOff } =
         useChat();
     const [unblocking, setUnblocking] = useState(false);
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
@@ -533,6 +534,15 @@ export function ChannelView({
     // has arrived there is no channel to ask about, and the defaults are the
     // permissive ones, so nothing is briefly refused that would be allowed.
     const rules = channel ? rulesFor(channel) : core.DEFAULT_CHAT_RULES;
+    // Threads in a direct message or group are the administrator's switch; the
+    // send path asks the same question.
+    const channelKind = channel?.kind ?? "";
+    const channelSpace = channel?.spaceId ?? null;
+    const threadAllowed = useCallback(
+        (message: ChatMessageView) =>
+            mayStartThread({ kind: channelKind, spaceId: channelSpace }, directThreads, message.replyCount),
+        [channelKind, channelSpace, directThreads]
+    );
     // Asked with the message on screen, or straight away with Shift held - the
     // line becomes a tombstone at once and comes back if the server refuses.
     const { request: deleteMessage, dialog: deleteDialog } = useMessageDelete({
@@ -2507,6 +2517,7 @@ export function ChannelView({
                         canModerate={canModerate}
                         highlightId={highlight}
                         onOpenThread={setThread}
+                        threadAllowed={threadAllowed}
                         onReact={react}
                         onStar={star}
                         pinnedIds={pins.ids}

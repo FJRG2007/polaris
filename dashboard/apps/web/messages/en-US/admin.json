@@ -371,6 +371,10 @@
                 "label": "Show a line when someone deletes a chat for both",
                 "hint": "Off: the chat is emptied with no line left in it."
             },
+            "threads": {
+                "label": "Threads in direct messages and groups",
+                "hint": "Off: no new threads there. Existing ones stay open."
+            },
             "starting": {
                 "title": "New chats start with",
                 "hint": "What a new direct message or group starts with. People in the chat can change it later.",
