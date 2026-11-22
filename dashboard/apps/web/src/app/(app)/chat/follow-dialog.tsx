@@ -94,7 +94,7 @@ export function FollowDialog({
                     <DialogTitle>{t("follow.title", { channel: sourceName })}</DialogTitle>
                     <DialogDescription>{t("follow.description")}</DialogDescription>
                 </DialogHeader>
-                <div className="flex max-h-80 min-h-0 flex-col gap-1 overflow-y-auto">
+                <div className="flex max-h-80 min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain">
                     {error ? (
                         <p className="text-sm text-destructive">{error}</p>
                     ) : targets === null ? (

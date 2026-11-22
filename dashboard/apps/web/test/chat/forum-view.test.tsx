@@ -18,6 +18,19 @@ vi.mock("@/app/(app)/chat/forum-actions", () => ({
 }));
 vi.mock("@/app/(app)/chat/chat-context", () => ({ useChat: () => ({ viewerId: "user-ada" }) }));
 vi.mock("@/app/(app)/chat/use-chat-stream", () => ({ useChatStream: () => undefined }));
+// The shared picker stands in as two buttons: one picks a text file, one a picture.
+vi.mock("@/components/file-picker/file-picker-dialog", () => ({
+    FilePickerDialog: ({ onPick, onClose }: { onPick: (files: unknown[]) => void; onClose: () => void }) => (
+        <div>
+            <button type="button" onClick={() => { onPick([{ kind: "upload", file: new File(["x"], "notes.txt", { type: "text/plain" }) }]); onClose(); }}>
+                pick notes
+            </button>
+            <button type="button" onClick={() => { onPick([{ kind: "upload", file: new File(["x"], "sunset.jpg", { type: "image/jpeg" }) }]); onClose(); }}>
+                pick sunset
+            </button>
+        </div>
+    )
+}));
 
 afterEach(() => {
     cleanup();
@@ -127,11 +140,14 @@ describe("a forum's list", () => {
         fireEvent.change(screen.getByRole("textbox", { name: "Title *" }), { target: { value: "Sunset" } });
         const post = screen.getByRole("button", { name: "Publish" });
         expect(post.hasAttribute("disabled")).toBe(true);
-        const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
-        fireEvent.change(input, { target: { files: [new File(["x"], "notes.txt", { type: "text/plain" })] } });
+        fireEvent.click(screen.getByRole("button", { name: "Add files" }));
+        fireEvent.click(await screen.findByRole("button", { name: "pick notes" }));
+        await waitFor(() => expect(screen.queryByRole("button", { name: "pick notes" })).toBeNull());
+        expect(screen.queryByText("notes.txt")).toBeNull();
         expect(post.hasAttribute("disabled")).toBe(true);
-        fireEvent.change(input, { target: { files: [new File(["x"], "sunset.jpg", { type: "image/jpeg" })] } });
-        expect(screen.getByText("sunset.jpg")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: "Add files" }));
+        fireEvent.click(await screen.findByRole("button", { name: "pick sunset" }));
+        expect(await screen.findByText("sunset.jpg")).toBeTruthy();
         expect(post.hasAttribute("disabled")).toBe(false);
     });
 });

@@ -39,6 +39,9 @@ import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { asFiles } from "@/components/file-picker/as-files";
+import type { PickedFile } from "@/components/file-picker/picked-file";
+import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
 import { listForumPostsAction, readForumAction, updateForumPostAction } from "./forum-actions";
 import type { ChatForumPostView, ChatForumView } from "@/lib/chat/forum";
 
@@ -628,17 +631,21 @@ function NewPostDialog({
     const [tagIds, setTagIds] = useState<readonly string[]>([]);
     const [files, setFiles] = useState<readonly File[]>([]);
     const [error, setError] = useState("");
-    const picker = useRef<HTMLInputElement>(null);
+    const tFiles = useTranslations("components");
+    const [picking, setPicking] = useState(false);
 
     const needsTag = Boolean(forum?.requireTag) && tagIds.length === 0;
     // A gallery post is what it shows: the words under it are optional.
     const hasMedia = files.some((file) => core.isPostMedia(file.type));
     const ready = title.trim().length > 0 && !needsTag && (media ? hasMedia : body.trim().length > 0);
 
-    const pick = (chosen: FileList | null) => {
-        const added = Array.from(chosen ?? []).filter((file) => core.isPostMedia(file.type));
+    // The shared picker, so a post takes a picture from the machine, a storage
+    // or an address like every other attach in Polaris, and opens on Upload.
+    const pick = async (picked: readonly PickedFile[]) => {
+        const { files: got, failed } = await asFiles(picked, { unreachable: tFiles("files.fetchFailed") });
+        if (failed.length > 0) setError(failed[0] ?? "");
+        const added = got.filter((file) => core.isPostMedia(file.type));
         setFiles((current) => [...current, ...added].slice(0, MAX_POST_MEDIA));
-        if (picker.current) picker.current.value = "";
     };
 
     const toggle = (id: string) =>
@@ -691,14 +698,14 @@ function NewPostDialog({
                     {media && (
                         <div className="flex flex-col gap-1.5">
                             <span className="text-xs font-medium text-muted-foreground">{t("forum.media")} *</span>
-                            <input
-                                ref={picker}
-                                type="file"
-                                accept="image/*,video/*"
-                                multiple
-                                hidden
-                                onChange={(event) => pick(event.target.files)}
-                            />
+                            {picking && (
+                                <FilePickerDialog
+                                    title={t("forum.addMedia")}
+                                    accept="image/*,video/*"
+                                    onClose={() => setPicking(false)}
+                                    onPick={(picked) => void pick(picked)}
+                                />
+                            )}
                             {files.length > 0 && (
                                 <ul className="flex flex-col gap-1">
                                     {files.map((file, index) => (
@@ -728,7 +735,7 @@ function NewPostDialog({
                                     variant="outline"
                                     size="sm"
                                     className="self-start"
-                                    onClick={() => picker.current?.click()}
+                                    onClick={() => setPicking(true)}
                                 >
                                     <ImagePlus className="size-4 shrink-0" />
                                     {t("forum.addMedia")}

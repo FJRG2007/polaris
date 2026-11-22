@@ -1696,7 +1696,8 @@ const CASES: Case[] = [
                 )
             ).meetingList(),
         action: "listMeetingsAction",
-        args: []
+        // The list's search and filters travel as a query; none were asked here.
+        args: [{}]
     },
     {
         name: "the call server's settings, asked again while it starts",
