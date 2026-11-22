@@ -27,6 +27,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
 import { randomInt } from "node:crypto";
 import { sendAuthEmail } from "@/lib/auth-mail";
+import { codeMessageFor } from "@/lib/code-message";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { hashSecret, setTotpUnclaimed, verifySecret } from "@polaris/auth";
@@ -71,19 +72,8 @@ export async function sendEnrollmentCode(userId: string): Promise<{ error?: stri
         data: { identifier: codeKey(userId), value: await hashSecret(auth, code), expiresAt }
     });
 
-    const text = [
-        `Your Polaris confirmation code is ${code}.`,
-        "",
-        `It expires in ${TWO_FACTOR_CODE_TTL_MINUTES} minutes and works once.`,
-        "It turns on two-step verification for your account. If you did not ask for it, change your password."
-    ].join("\n");
-    const html = [
-        `<p>Your Polaris confirmation code is <strong>${code}</strong>.</p>`,
-        `<p>It expires in ${TWO_FACTOR_CODE_TTL_MINUTES} minutes and works once.</p>`,
-        "<p>It turns on two-step verification for your account. If you did not ask for it, change your password.</p>"
-    ].join("");
-
-    const result = await sendAuthEmail({ to: user.email, subject: "Your Polaris confirmation code", text, html });
+    const { subject, text, html } = await codeMessageFor(userId, "enableTwoFactor", code);
+    const result = await sendAuthEmail({ to: user.email, subject, text, html });
     if (result.error) return { error: result.error };
     return { sentTo: user.email };
 }

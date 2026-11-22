@@ -22,11 +22,12 @@ import { deliverCode, describeTwoFactorMethods } from "@/lib/two-factor-delivery
 import { issueStepUpCode, verifyAccountPassword, verifyStepUpCode, verifyTotpForSession } from "@polaris/auth";
 import {
     STEP_UP_PROOF_LABELS,
-    TWO_FACTOR_CODE_TTL_MINUTES,
     type StepUpProof,
     type StepUpProofInput,
     type TwoFactorDeliveryMethod
 } from "@polaris/core";
+import { codeMessageFor } from "@/lib/code-message";
+import { TWO_FACTOR_RESEND_SECONDS } from "@/lib/two-factor-resend";
 import { readerWords } from "@/lib/i18n/reader-words";
 
 /** Wrong proofs one account may offer, and over what span. Tighter than a
@@ -95,27 +96,20 @@ export async function sendStepUpCode(
         return { error: (await readerWords("accountSecurity"))("known.notAWayToConfirm") };
     }
 
+    // One code per method per resend wait, checked before a code is issued so a
+    // refused press leaves the one already sent working.
+    const wait = await rateLimit(`step-up-wait:${userId}:${method}`, 1, TWO_FACTOR_RESEND_SECONDS * 1000);
+    if (!wait.ok) {
+        return { error: (await readerWords("auth"))("twoFactor.waitBeforeAnother", { seconds: Math.ceil(wait.retryAfterMs / 1000) }) };
+    }
     const throttle = await rateLimit(`step-up-send:${userId}`, PROOF_LIMIT, PROOF_WINDOW_MS);
     if (!throttle.ok) {
         return { error: (await readerWords("accountSecurity"))("errors.tooManyCodes", { minutes: minutes(throttle.retryAfterMs) }) };
     }
 
     const code = await issueStepUpCode(auth, userId, purpose);
-    const result = await deliverCode(userId, method, {
-        subject: "Your Polaris confirmation code",
-        code,
-        text: [
-            `Your Polaris confirmation code is ${code}.`,
-            "",
-            `It expires in ${TWO_FACTOR_CODE_TTL_MINUTES} minutes and works once, for this one action.`,
-            "If you did not ask to confirm anything, somebody else is using your session - change your password."
-        ].join("\n"),
-        html: [
-            `<p>Your Polaris confirmation code is <strong>${code}</strong>.</p>`,
-            `<p>It expires in ${TWO_FACTOR_CODE_TTL_MINUTES} minutes and works once, for this one action.</p>`,
-            "<p>If you did not ask to confirm anything, somebody else is using your session - change your password.</p>"
-        ].join("")
-    });
+    const message = await codeMessageFor(userId, "stepUp", code);
+    const result = await deliverCode(userId, method, { ...message, code });
     await recordAudit({
         actorId: userId,
         action: result.error ? "account.step-up.code-failed" : "account.step-up.code-sent",

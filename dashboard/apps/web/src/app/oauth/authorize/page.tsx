@@ -50,7 +50,7 @@ type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 async function ConsentError({ reason }: { reason: UnsafeReason | "viewingAs" | "tooMany" }) {
     const t = await getTranslations("mcp");
     return (
-        <main className="grid min-h-dvh place-items-center safe-p-4">
+        <main className="grid min-h-dvh grid-cols-[minmax(0,1fr)] place-items-center safe-p-4">
             <Card className="w-full max-w-sm">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />

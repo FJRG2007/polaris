@@ -20,7 +20,9 @@ import { WhatsAppLogo } from "./whatsapp-logo";
 import { TelegramLogo } from "./telegram-logo";
 import type { ChallengeOptions } from "@/lib/two-factor-delivery";
 import { PhoneApproval } from "./phone-approval";
-import { useCallback, useEffect, useState, type ComponentType, type FormEvent } from "react";
+import { useCallback, useState, type ComponentType, type FormEvent } from "react";
+import { useCodeSending } from "@/components/use-code-sending";
+import { TWO_FACTOR_RESEND_SECONDS } from "@/lib/two-factor-resend";
 import {
     Button,
     Card,
@@ -48,10 +50,6 @@ const METHOD_ICON: Record<TwoFactorMethod, ComponentType<{ className?: string }>
     telegram: TelegramLogo
 };
 
-/** How long the resend button stays quiet, so a code that is simply slow does not
- *  get asked for four more times before the first one lands. */
-const RESEND_COOLDOWN_SECONDS = 30;
-
 export function TwoFactorView({
     options,
     phoneApproval,
@@ -69,37 +67,37 @@ export function TwoFactorView({
     const [backup, setBackup] = useState(false);
     const [code, setCode] = useState("");
     const [trustDevice, setTrustDevice] = useState(false);
-    const [sent, setSent] = useState<string | null>(null);
-    const [cooldown, setCooldown] = useState(0);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        if (cooldown <= 0) return;
-        const timer = setTimeout(() => setCooldown((value) => value - 1), 1000);
-        return () => clearTimeout(timer);
-    }, [cooldown]);
-
-    /** Only the sent-code methods need a round trip before the field is useful. */
+    /** Only the sent-code methods need a round trip before the field is useful;
+     *  an authenticator or a backup code never sends anything. */
     const needsSending = !backup && method !== "totp";
     const entry = options.methods.find((option) => option.method === method);
 
-    async function send() {
-        setPending(true);
-        setError(null);
-        const { error: sendError } = await authClient.twoFactor.sendOtp({
-            fetchOptions: { headers: { [TWO_FACTOR_METHOD_HEADER]: method } }
-        });
-        setPending(false);
-        if (sendError) {
-            setError(t("twoFactor.sendFailed"));
-            return;
+    // Sent by itself on entering a method that delivers, once; the button is the
+    // resend, quiet for the wait (components/use-code-sending.ts).
+    const sending = useCodeSending({
+        scope: needsSending ? `sign-in:${method}` : null,
+        auto: true,
+        send: async () => {
+            const { error: sendError } = await authClient.twoFactor.sendOtp({
+                fetchOptions: { headers: { [TWO_FACTOR_METHOD_HEADER]: method } }
+            });
+            if (!sendError) return {};
+            if (sendError.status === 429) {
+                const wait = Number((sendError as { retryAfterSeconds?: unknown }).retryAfterSeconds);
+                return { retryAfterSeconds: Number.isFinite(wait) && wait > 0 ? wait : TWO_FACTOR_RESEND_SECONDS };
+            }
+            return { error: t("twoFactor.sendFailed") };
         }
-        setCooldown(RESEND_COOLDOWN_SECONDS);
-        setSent(
-            entry?.target ? t("twoFactor.sentTo", { target: entry.target }) : t("twoFactor.sent")
-        );
-    }
+    });
+    const sent = sending.sent
+        ? entry?.target
+            ? t("twoFactor.sentTo", { target: entry.target })
+            : t("twoFactor.sent")
+        : null;
+    const shownError = error ?? sending.error;
 
     async function onSubmit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -133,12 +131,11 @@ export function TwoFactorView({
         setMethod(next);
         setBackup(false);
         setCode("");
-        setSent(null);
         setError(null);
     }
 
     return (
-        <main className="grid min-h-dvh place-items-center safe-p-4">
+        <main className="grid min-h-dvh grid-cols-[minmax(0,1fr)] place-items-center safe-p-4">
             <Card className="w-full max-w-sm">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
@@ -191,14 +188,16 @@ export function TwoFactorView({
                             <Button
                                 type="button"
                                 variant="outline"
-                                disabled={pending || cooldown > 0}
-                                onClick={() => void send()}
+                                disabled={pending || sending.sending || sending.cooldown > 0}
+                                onClick={sending.resend}
                             >
-                                {cooldown > 0
-                                    ? t("twoFactor.sendAgainIn", { seconds: cooldown })
-                                    : sent
-                                      ? t("twoFactor.sendAgain")
-                                      : t("twoFactor.sendCode")}
+                                {sending.sending
+                                    ? t("twoFactor.sending")
+                                    : sending.cooldown > 0
+                                      ? t("twoFactor.sendAgainIn", { seconds: sending.cooldown })
+                                      : sent
+                                        ? t("twoFactor.sendAgain")
+                                        : t("twoFactor.sendCode")}
                             </Button>
                         ) : null}
                         {sent ? <p className="text-sm text-success">{sent}</p> : null}
@@ -239,7 +238,7 @@ export function TwoFactorView({
                                 {t("twoFactor.trustDevice")}
                             </label>
                         )}
-                        {error ? <p className="text-sm text-danger">{error}</p> : null}
+                        {shownError ? <p className="text-sm text-danger">{shownError}</p> : null}
                         <Button
                             type="submit"
                             disabled={pending || (backup ? code.trim() === "" : !isWholeCode(code))}
@@ -254,7 +253,6 @@ export function TwoFactorView({
                         onClick={() => {
                             setBackup(!backup);
                             setCode("");
-                            setSent(null);
                             setError(null);
                         }}
                     >

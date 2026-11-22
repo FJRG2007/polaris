@@ -223,7 +223,7 @@ export async function backfillPasskeyOrigin(credentialId: string, origin: Device
 function twoFactorPlugin(options: AuthOptions): BetterAuthPlugin {
     const send = options.sendTwoFactorCode;
     if (!send) return describeTrustedDevices(gateOtherSignIns(twoFactor({ issuer: "Polaris" })));
-    return describeTrustedDevices(
+    return gateCodeSends(options, describeTrustedDevices(
         gateOtherSignIns(
             twoFactor({
                 issuer: "Polaris",
@@ -236,7 +236,7 @@ function twoFactorPlugin(options: AuthOptions): BetterAuthPlugin {
                     storeOTP: "hashed",
                     sendOTP: async ({ user, otp }, ctx) => {
                         const requested = ctx?.headers?.get(TWO_FACTOR_METHOD_HEADER) ?? null;
-                        const result = await send({ userId: user.id, requested, code: otp });
+                        const result = await send({ userId: user.id, requested, code: otp, headers: ctx?.headers ?? undefined });
                         // better-auth answers send-otp the same way whether or not
                         // this callback managed anything, so a failure is only ever
                         // recorded here. Telling the caller would say which methods
@@ -247,7 +247,44 @@ function twoFactorPlugin(options: AuthOptions): BetterAuthPlugin {
                 }
             })
         )
-    );
+    ));
+}
+
+/** The path a sent second-factor code is asked for on. */
+const SEND_OTP_PATH = "/two-factor/send-otp";
+
+/**
+ * Refuse a code request before better-auth acts on it.
+ *
+ * better-auth writes the new code before it calls `sendOTP`, so a request turned
+ * away there has already replaced the code the person is holding with one that
+ * never left. Throttling has to happen here instead, where a refusal leaves the
+ * code already sent working.
+ */
+function gateCodeSends(options: AuthOptions, plugin: BetterAuthPlugin): BetterAuthPlugin {
+    const gate = options.gateTwoFactorSend;
+    if (!gate) return plugin;
+    return {
+        ...plugin,
+        hooks: {
+            ...plugin.hooks,
+            before: [
+                ...(plugin.hooks?.before ?? []),
+                {
+                    matcher: (context) => context.path === SEND_OTP_PATH,
+                    handler: createAuthMiddleware(async (ctx) => {
+                        const refusal = await gate({ headers: ctx.headers ?? new Headers() });
+                        if (refusal) {
+                            throw new APIError("TOO_MANY_REQUESTS", {
+                                message: refusal.message,
+                                retryAfterSeconds: refusal.retryAfterSeconds
+                            });
+                        }
+                    })
+                }
+            ]
+        }
+    };
 }
 
 /** What every Polaris cookie is named under. Also the value handed to better-auth
@@ -715,7 +752,17 @@ export interface AuthOptions {
         userId: string;
         requested: string | null;
         code: string;
+        /** The request that asked for it, for the message to say where from. */
+        headers?: Headers;
     }) => Promise<{ error?: string }>;
+    /**
+     * Whether a second-factor code may be asked for right now. Runs before
+     * better-auth issues one, so a refusal leaves the code already sent working.
+     * Returns null to allow, or what to tell the person and how long to wait.
+     */
+    readonly gateTwoFactorSend?: (input: {
+        headers: Headers;
+    }) => Promise<{ message: string; retryAfterSeconds: number } | null>;
 }
 
 /** The addresses fixed at start-up: the published one and the local-network names

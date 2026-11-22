@@ -138,7 +138,7 @@ export function AcceptInviteForm({
     }
 
     return (
-        <main className="grid min-h-dvh place-items-center safe-p-4">
+        <main className="grid min-h-dvh grid-cols-[minmax(0,1fr)] place-items-center safe-p-4">
             <Card className="w-full max-w-sm">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />

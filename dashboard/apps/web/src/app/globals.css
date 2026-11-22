@@ -1332,3 +1332,26 @@ dialog.pdfSlick-dialog .dialogButton {
         background-color: rgb(139 92 246 / 0.08);
     }
 }
+
+/*
+ * A phone zooms the page into any field whose text is under 16px the moment it is
+ * focused (Safari on iOS) and stays zoomed, so the screen then pans in every
+ * direction - the code box on the sign-in steps was the one reported. On a touch
+ * screen a field drawn small is drawn at 16px instead, which stops the zoom
+ * without taking pinch zoom away from anybody. Fields already larger keep theirs.
+ */
+@media (pointer: coarse) {
+    :is(input, textarea, select):is(
+            [class*="text-xs"],
+            [class*="text-sm"],
+            [class*="text-[0."],
+            [class*="text-[10px]"],
+            [class*="text-[11px]"],
+            [class*="text-[12px]"],
+            [class*="text-[13px]"],
+            [class*="text-[14px]"],
+            [class*="text-[15px]"]
+        ) {
+        font-size: max(1rem, 16px);
+    }
+}

@@ -377,5 +377,30 @@
             "askBody": "{device}, from {ip}",
             "askBodyUnknown": "A new sign-in to your account"
         }
+    },
+    "codeMessage": {
+        "subject": {
+            "signIn": "{code} is your Polaris sign-in code",
+            "addAccount": "{code} is your Polaris code to add your account",
+            "stepUp": "{code} is your Polaris confirmation code",
+            "enableTwoFactor": "{code} is your Polaris code to turn on two-step verification"
+        },
+        "headline": {
+            "signIn": "{code} is your Polaris sign-in code for {host}.",
+            "addAccount": "{code} is your Polaris code to add your account to a browser on {host}.",
+            "stepUp": "{code} is your Polaris code to confirm an action on {host}.",
+            "enableTwoFactor": "{code} is your Polaris code to turn on two-step verification on {host}."
+        },
+        "headlineNoHost": {
+            "signIn": "{code} is your Polaris sign-in code.",
+            "addAccount": "{code} is your Polaris code to add your account to a browser.",
+            "stepUp": "{code} is your Polaris code to confirm an action.",
+            "enableTwoFactor": "{code} is your Polaris code to turn on two-step verification."
+        },
+        "requestedFrom": "Requested from {from}.",
+        "expires": "It expires in {minutes} minutes and works once.",
+        "neverShare": "Never share this code. Polaris will never ask you for it, and anyone who does is trying to get into your account.",
+        "notYou": "Not you? Ignore this message and change your password.",
+        "notYouSession": "Not you? Someone may be using your session: change your password and sign out other sessions."
     }
 }

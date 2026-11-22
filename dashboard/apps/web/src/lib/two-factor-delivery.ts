@@ -26,13 +26,16 @@ import {
     maskEmail,
     maskPhone,
     SECOND_FACTOR_BY_DELIVERY,
-    TWO_FACTOR_CODE_TTL_MINUTES,
+    originIp,
     TWO_FACTOR_DELIVERY_METHODS,
     TWO_FACTOR_METHODS,
     type TwoFactorDeliveryMethod,
     type TwoFactorMethod
 } from "@polaris/core";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { codeMessageFor, isAddingAccount } from "@/lib/code-message";
+import { pendingTwoFactorUserId } from "@/lib/two-factor-challenge";
+import { TWO_FACTOR_RESEND_SECONDS } from "@/lib/two-factor-resend";
 import { acceptedMethods } from "@/lib/two-factor-policy";
 import { loadTwoFactorPolicy } from "@/lib/two-factor-policy-store";
 
@@ -40,6 +43,38 @@ import { loadTwoFactorPolicy } from "@/lib/two-factor-policy-store";
  *  a message that never arrived, tight enough that the mailbox is not a target. */
 const SEND_LIMIT = 5;
 const SEND_WINDOW_MS = 15 * 60 * 1000;
+
+/** How many codes one address may ask for across every account, over the same
+ *  span - somebody cycling through accounts from one place. */
+const IP_SEND_LIMIT = 20;
+
+/**
+ * Whether a sign-in code may be asked for right now, decided before better-auth
+ * issues one (packages/auth `gateCodeSends`), so a refusal leaves the code the
+ * person already holds working. One code per account per resend wait, the
+ * per-account window above, and a per-address window across accounts.
+ */
+export async function gateTwoFactorSend(input: {
+    headers: Headers;
+}): Promise<{ message: string; retryAfterSeconds: number } | null> {
+    const userId = await pendingTwoFactorUserId().catch(() => null);
+    const ip = originIp(input.headers);
+    const checks = [
+        ...(userId
+            ? [
+                  rateLimit(`2fa-code-wait:${userId}`, 1, TWO_FACTOR_RESEND_SECONDS * 1000),
+                  rateLimit(`2fa-code-gate:${userId}`, SEND_LIMIT, SEND_WINDOW_MS)
+              ]
+            : []),
+        ...(ip ? [rateLimit(`2fa-code-ip:${ip}`, IP_SEND_LIMIT, SEND_WINDOW_MS)] : [])
+    ];
+    const results = await Promise.all(checks);
+    const blocked = results.filter((result) => !result.ok);
+    if (blocked.length === 0) return null;
+    const seconds = Math.max(1, Math.ceil(Math.max(...blocked.map((result) => result.retryAfterMs)) / 1000));
+    const t = await readerWords("auth");
+    return { message: t("twoFactor.waitBeforeAnother", { seconds }), retryAfterSeconds: seconds };
+}
 
 /** What one method can do for one account right now. */
 export interface TwoFactorMethodStatus {
@@ -239,21 +274,6 @@ export async function deliverCode(
         : sendByChannel(method, destination, message.text, message.code);
 }
 
-function messageBody(code: string): { text: string; html: string } {
-    const text = [
-        `Your Polaris sign-in code is ${code}.`,
-        "",
-        `It expires in ${TWO_FACTOR_CODE_TTL_MINUTES} minutes and works once.`,
-        "If you did not try to sign in, change your password - somebody else knows it."
-    ].join("\n");
-    const html = [
-        `<p>Your Polaris sign-in code is <strong>${code}</strong>.</p>`,
-        `<p>It expires in ${TWO_FACTOR_CODE_TTL_MINUTES} minutes and works once.</p>`,
-        "<p>If you did not try to sign in, change your password - somebody else knows it.</p>"
-    ].join("");
-    return { text, html };
-}
-
 /**
  * Send one second-factor code.
  *
@@ -270,6 +290,8 @@ export async function sendTwoFactorCode(input: {
     userId: string;
     requested: string | null;
     code: string;
+    /** The request that asked for it - the send may run after it has ended. */
+    headers?: Headers;
 }): Promise<{ error?: string }> {
     const { userId, code } = input;
     const throttle = await rateLimit(`2fa-code:${userId}`, SEND_LIMIT, SEND_WINDOW_MS);
@@ -298,10 +320,11 @@ export async function sendTwoFactorCode(input: {
     // uses the real address instead of the masked one shown on screen.
     if (!destination) return { error: (await readerWords("api"))("refusals.twoFactor.methodUnusable") };
 
-    const { text, html } = messageBody(code);
+    const purpose = isAddingAccount(input.headers) ? "addAccount" : "signIn";
+    const { subject, text, html } = await codeMessageFor(userId, purpose, code, input.headers);
     const result =
         chosen === "email"
-            ? await sendAuthEmail({ to: destination.address, subject: "Your Polaris sign-in code", text, html })
+            ? await sendAuthEmail({ to: destination.address, subject, text, html })
             : await sendByChannel(chosen, destination, text, code);
 
     // Which channel carried the code is only known here - the request that checks

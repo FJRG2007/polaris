@@ -64,6 +64,10 @@ const requestAuth = createRequestAuth({
         const { sendTwoFactorCode } = await import("./two-factor-delivery");
         return sendTwoFactorCode(input);
     },
+    gateTwoFactorSend: async (input) => {
+        const { gateTwoFactorSend } = await import("./two-factor-delivery");
+        return gateTwoFactorSend(input);
+    },
     // A sign-in is the evidence a reputation provider's verdict lacked: somebody with
     // an account is on that address. Lazily imported like the rest - the firewall
     // service reaches the database and the edge snapshot.

@@ -377,5 +377,30 @@
             "askBody": "{device}, desde {ip}",
             "askBodyUnknown": "Un nuevo acceso a tu cuenta"
         }
+    },
+    "codeMessage": {
+        "subject": {
+            "signIn": "{code} es tu código de inicio de sesión de Polaris",
+            "addAccount": "{code} es tu código de Polaris para añadir tu cuenta",
+            "stepUp": "{code} es tu código de confirmación de Polaris",
+            "enableTwoFactor": "{code} es tu código de Polaris para activar la verificación en dos pasos"
+        },
+        "headline": {
+            "signIn": "{code} es tu código de inicio de sesión de Polaris para {host}.",
+            "addAccount": "{code} es tu código de Polaris para añadir tu cuenta a un navegador en {host}.",
+            "stepUp": "{code} es tu código de Polaris para confirmar una acción en {host}.",
+            "enableTwoFactor": "{code} es tu código de Polaris para activar la verificación en dos pasos en {host}."
+        },
+        "headlineNoHost": {
+            "signIn": "{code} es tu código de inicio de sesión de Polaris.",
+            "addAccount": "{code} es tu código de Polaris para añadir tu cuenta a un navegador.",
+            "stepUp": "{code} es tu código de Polaris para confirmar una acción.",
+            "enableTwoFactor": "{code} es tu código de Polaris para activar la verificación en dos pasos."
+        },
+        "requestedFrom": "Solicitado desde {from}.",
+        "expires": "Caduca en {minutes} minutos y solo sirve una vez.",
+        "neverShare": "No compartas este código. Polaris nunca te lo pedirá; quien te lo pida intenta entrar en tu cuenta.",
+        "notYou": "¿No has sido tú? Ignora este mensaje y cambia tu contraseña.",
+        "notYouSession": "¿No has sido tú? Alguien podría estar usando tu sesión: cambia tu contraseña y cierra las demás sesiones."
     }
 }

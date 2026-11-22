@@ -54,7 +54,7 @@ export function AppUnlockView({
     }
 
     return (
-        <main className="grid min-h-[60dvh] place-items-center p-4">
+        <main className="grid min-h-[60dvh] grid-cols-[minmax(0,1fr)] place-items-center p-4">
             <Card className="w-full max-w-sm">
                 <CardHeader className="items-center gap-2">
                     <Lock className="size-6 shrink-0 text-muted-foreground" aria-hidden="true" />

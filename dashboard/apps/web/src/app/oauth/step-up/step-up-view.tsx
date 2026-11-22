@@ -16,6 +16,7 @@ import type { StepUpReason } from "@/lib/two-factor-policy";
 import { CodeInput, isWholeCode } from "@/components/code-input";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useState, type ComponentType, type FormEvent } from "react";
+import { useCodeSending } from "@/components/use-code-sending";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PhoneInput, PolarisMark } from "@polaris/ui";
 import {
     answerStepUpQuestionsAction,
@@ -56,7 +57,6 @@ export function StepUpView({
     const [code, setCode] = useState("");
     const [phone, setPhone] = useState("");
     const [answers, setAnswers] = useState<string[]>(questions.map(() => ""));
-    const [sent, setSent] = useState(false);
     const [pending, setPending] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -78,18 +78,24 @@ export function StepUpView({
     function choose(next: TwoFactorMethod) {
         setMethod(next);
         setCode("");
-        setSent(false);
         setError(null);
     }
 
-    async function send() {
-        if (!method || method === "totp") return;
-        const result = await run(() => sendStepUpFactorCodeAction({ method, phone: needsPhone ? phone : undefined }));
-        if (!result.error && !result.complete) {
-            setSent(true);
-            if (needsPhone) router.refresh();
+    // Sent by itself on entering a method that delivers, unless a number has to
+    // be typed first; the button is the resend (components/use-code-sending.ts).
+    const sending = useCodeSending({
+        scope: needsSending && method ? `step-up:${method}` : null,
+        auto: !needsPhone,
+        send: async () => {
+            if (!method || method === "totp") return { error: "" };
+            const typedPhone = needsPhone;
+            const result = await run(() => sendStepUpFactorCodeAction({ method, phone: typedPhone ? phone : undefined }));
+            if (result.error || result.complete) return { error: "" };
+            if (typedPhone) router.refresh();
+            return {};
         }
-    }
+    });
+    const sent = sending.sent;
 
     async function verify(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -97,7 +103,6 @@ export function StepUpView({
         const result = await run(() => proveStepUpFactorAction({ method, code }));
         if (!result.error && !result.complete) {
             setCode("");
-            setSent(false);
             router.refresh();
         }
     }
@@ -118,7 +123,7 @@ export function StepUpView({
     const [backupHint, setBackupHint] = useState(false);
 
     return (
-        <main className="grid min-h-dvh place-items-center safe-p-4">
+        <main className="grid min-h-dvh grid-cols-[minmax(0,1fr)] place-items-center safe-p-4">
             <Card className="w-full max-w-sm">
                 <CardHeader className="items-center text-center">
                     <PolarisMark className="mb-1" />
@@ -197,10 +202,16 @@ export function StepUpView({
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    disabled={pending || (needsPhone && phone.trim().length < 6)}
-                                    onClick={() => void send()}
+                                    disabled={pending || sending.cooldown > 0 || (needsPhone && phone.trim().length < 6)}
+                                    onClick={sending.resend}
                                 >
-                                    {sent ? t("twoFactor.sendAgain") : t("twoFactor.sendCode")}
+                                    {sending.sending
+                                        ? t("twoFactor.sending")
+                                        : sending.cooldown > 0
+                                          ? t("twoFactor.sendAgainIn", { seconds: sending.cooldown })
+                                          : sent
+                                            ? t("twoFactor.sendAgain")
+                                            : t("twoFactor.sendCode")}
                                 </Button>
                             ) : null}
                             {sent ? <p className="text-sm text-success">{t("twoFactor.sent")}</p> : null}
