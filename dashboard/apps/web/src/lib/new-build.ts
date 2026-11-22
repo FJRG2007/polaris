@@ -27,6 +27,11 @@ let served: string | null = null;
  *  build has a stale bundle whatever any later answer says. */
 let moved = false;
 
+/** Set once a call has been refused for holding this build's ids or chunks: the
+ *  reader pressed something and it did nothing, so the update is wanted now,
+ *  not at the next quiet moment. */
+let refused = false;
+
 const listeners = new Set<() => void>();
 
 /** Told to the store by the shell, from the server that rendered the page. */
@@ -36,6 +41,11 @@ export function rememberServedBuild(stamp: string | null): void {
 
 export function newBuildReady(): boolean {
     return moved;
+}
+
+/** Whether something already failed for want of the new build. */
+export function staleFailureSeen(): boolean {
+    return refused;
 }
 
 export function subscribeToBuild(listener: () => void): () => void {
@@ -58,7 +68,7 @@ export function subscribeToBuild(listener: () => void): () => void {
 export function watchForStaleFailures(): () => void {
     const onRejection = (event: PromiseRejectionEvent) => {
         const reason = event.reason as { name?: string; message?: string } | null;
-        if (isStaleBuildError(reason)) void checkForNewBuild();
+        if (isStaleBuildError(reason)) void checkForNewBuild({ failed: true });
     };
     window.addEventListener("unhandledrejection", onRejection);
     return () => window.removeEventListener("unhandledrejection", onRejection);
@@ -74,7 +84,11 @@ let asking: Promise<boolean> | null = null;
  * timer and behind other people's errors, and a check that cannot reach the
  * server must never be the reason a banner appears.
  */
-export async function checkForNewBuild(): Promise<boolean> {
+export async function checkForNewBuild(options: { failed?: boolean } = {}): Promise<boolean> {
+    if (options.failed && !refused) {
+        refused = true;
+        if (moved) for (const listener of listeners) listener();
+    }
     if (moved || served === null) return moved;
     asking ??= (async () => {
         try {

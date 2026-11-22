@@ -47,7 +47,7 @@ import * as tile from "@/components/attachment-tile";
 import { ScheduleDialog } from "./schedule-dialog";
 import { PollDialog, type PollDraft } from "./poll-dialog";
 import { canRecordClip } from "./clip-recorder";
-import { holdReload } from "@/lib/reload-safety";
+import { holdReload, RELOAD_KEEPS_ATTRIBUTE } from "@/lib/reload-safety";
 import { isWatchableVideo, typeOfFile } from "@/lib/mime";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1350,6 +1350,9 @@ export function Composer({
         <div
             ref={box}
             data-chat-composer=""
+            // Every keystroke is already the draft, so a reload for an update
+            // costs nothing typed here - except an edit, which has no draft.
+            {...(draftKey && !editing ? { [RELOAD_KEEPS_ATTRIBUTE]: "" } : {})}
             // The dictation key, while the focus is in this box: two boxes on
             // screen (a thread beside its channel) must not both start.
             onKeyDown={(event) => {

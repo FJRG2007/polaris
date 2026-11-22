@@ -3,8 +3,8 @@
 /**
  * A tab taking an update by itself.
  *
- * Pinned: it reloads only when that costs nothing - in the background, after a
- * while untouched - and never in
+ * Pinned: it reloads only when that costs nothing and nobody is looking - in
+ * the background, or the moment the page comes back - and never in
  * a call, while something is in progress, twice in a row, or before a new build
  * has actually been seen.
  */
@@ -14,9 +14,11 @@ import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let ready = true;
+let refused = false;
 vi.mock("@/lib/new-build", () => ({
     checkForNewBuild: async () => ready,
     newBuildReady: () => ready,
+    staleFailureSeen: () => refused,
     rememberServedBuild: () => undefined,
     subscribeToBuild: () => () => undefined,
     watchForStaleFailures: () => () => undefined
@@ -26,7 +28,11 @@ vi.mock("@/app/(app)/chat/call-hold", () => ({ useHeldCall: () => held }));
 vi.mock("@/app/(app)/chat/call-resume", () => ({ rememberCall: () => undefined }));
 let safe = true;
 const reloadNow = vi.fn();
-vi.mock("@/lib/reload-safety", () => ({ safeToReload: () => safe, reloadNow }));
+vi.mock("@/lib/reload-safety", () => ({
+    safeToReload: () => safe,
+    reloadNow,
+    restoreAfterReload: () => () => undefined
+}));
 
 const { NewBuildBanner } = await import("@/components/new-build-banner");
 
@@ -37,8 +43,14 @@ function goToBackground(): void {
     act(() => void document.dispatchEvent(new Event("visibilitychange")));
 }
 
+function comeBack(): void {
+    visibility = "visible";
+    act(() => void document.dispatchEvent(new Event("visibilitychange")));
+}
+
 beforeEach(() => {
     ready = true;
+    refused = false;
     held = null;
     safe = true;
     visibility = "visible";
@@ -74,14 +86,10 @@ describe("taking an update by itself", () => {
         expect(reloadNow).toHaveBeenCalledTimes(1);
     });
 
-    it("reloads after a while untouched, and a touch starts the wait again", () => {
+    it("never reloads a page in sight, however long it sits untouched", () => {
         render(withMessages(<NewBuildBanner served="b1" />));
-        act(() => void vi.advanceTimersByTime(90_000));
-        act(() => void window.dispatchEvent(new Event("keydown")));
-        act(() => void vi.advanceTimersByTime(90_000));
+        act(() => void vi.advanceTimersByTime(60 * 60_000));
         expect(reloadNow).not.toHaveBeenCalled();
-        act(() => void vi.advanceTimersByTime(60_000));
-        expect(reloadNow).toHaveBeenCalledTimes(1);
     });
 
     it("never interrupts a call", () => {
@@ -116,5 +124,60 @@ describe("taking an update by itself", () => {
         goToBackground();
         act(() => void vi.advanceTimersByTime(10 * 60_000));
         expect(reloadNow).not.toHaveBeenCalled();
+    });
+
+    it("reloads the moment the page comes back if the update arrived while away", async () => {
+        ready = false;
+        render(withMessages(<NewBuildBanner served="b1" />));
+        goToBackground();
+        await act(async () => undefined);
+        expect(reloadNow).not.toHaveBeenCalled();
+        ready = true;
+        comeBack();
+        expect(reloadNow).toHaveBeenCalledTimes(1);
+    });
+
+    it("leaves a page already pressed after coming back to the quiet moments", async () => {
+        ready = false;
+        render(withMessages(<NewBuildBanner served="b1" />));
+        goToBackground();
+        await act(async () => undefined);
+        visibility = "visible";
+        act(() => void document.dispatchEvent(new Event("visibilitychange")));
+        act(() => void window.dispatchEvent(new Event("pointerdown")));
+        ready = true;
+        await act(async () => undefined);
+        expect(reloadNow).not.toHaveBeenCalled();
+    });
+
+    it("offers rather than reloads in front of somebody once a click failed for it", () => {
+        refused = true;
+        const { container } = render(withMessages(<NewBuildBanner served="b1" />));
+        expect(reloadNow).not.toHaveBeenCalled();
+        expect(container.querySelector('[role="status"]')).not.toBeNull();
+    });
+});
+
+describe("the card", () => {
+    it("stays away while the update can still be taken quietly", () => {
+        const { container } = render(withMessages(<NewBuildBanner served="b1" />));
+        expect(container.querySelector('[role="status"]')).toBeNull();
+    });
+
+    it("appears only once the update was needed and could not be taken", () => {
+        safe = false;
+        const { container } = render(withMessages(<NewBuildBanner served="b1" />));
+        expect(container.querySelector('[role="status"]')).toBeNull();
+        goToBackground();
+        expect(container.querySelector('[role="status"]')).not.toBeNull();
+        expect(reloadNow).not.toHaveBeenCalled();
+    });
+
+    it("appears for a call rather than ending it", () => {
+        held = { session: { meetingId: "m1" } };
+        refused = true;
+        const { container } = render(withMessages(<NewBuildBanner served="b1" />));
+        expect(reloadNow).not.toHaveBeenCalled();
+        expect(container.querySelector('[role="status"]')).not.toBeNull();
     });
 });

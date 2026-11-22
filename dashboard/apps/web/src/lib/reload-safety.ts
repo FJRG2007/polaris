@@ -8,13 +8,18 @@
  * same address on the new build and never sees a refused click. When any of it
  * is not, the tab keeps offering instead.
  *
- * Two sources, because neither sees everything:
+ * Three sources, because none sees everything:
  *
  * - Holds: the screens that know they are busy say so (a recording, a file
  *   staged or on its way, an unsaved edit, a key not yet copied).
- * - What is on the page: focus inside a text field, a file on the move, a video
- *   or sound playing - each somebody in the middle of something, whether or not
- *   the screen has told anybody.
+ * - The page itself (`lib/work-in-progress`): any field changed and not saved,
+ *   focused or not, an open dialog, a save or server action still on its way.
+ *   No screen has to report these, so none can forget to.
+ * - A file on the move, a video or sound playing.
+ *
+ * Focus alone is not work: an empty box the cursor sits in loses nothing. And
+ * whatever is unsaved is also written down when the page goes away and put back
+ * after it (`saveUnsavedFields`), so even a reload nobody chose loses nothing.
  *
  * The page's `beforeunload` guards are not probed by dispatching that event:
  * every listener would run, and some leave the page in their own way (a call
@@ -22,6 +27,9 @@
  */
 
 import { isUnderWay, transfersNow } from "@/components/transfers/transfer-store";
+import * as work from "@/lib/work-in-progress";
+
+export { RELOAD_KEEPS_ATTRIBUTE } from "@/lib/work-in-progress";
 
 let holds = 0;
 
@@ -37,44 +45,103 @@ export function holdReload(): () => void {
     };
 }
 
-/** Inputs that are pressed rather than typed into: focus on one means nothing. */
-const NOT_TYPED = new Set([
-    "button",
-    "checkbox",
-    "radio",
-    "range",
-    "reset",
-    "submit",
-    "color",
-    "file",
-    "image"
-]);
-
-/** An element that takes typing - the one place focus means "busy". */
-function isEditable(element: Element | null): boolean {
-    if (!element) return false;
-    if (element instanceof HTMLTextAreaElement) return !element.readOnly && !element.disabled;
-    if (element instanceof HTMLInputElement) {
-        if (NOT_TYPED.has(element.type)) return false;
-        return !element.readOnly && !element.disabled;
-    }
-    return element instanceof HTMLElement && element.isContentEditable;
-}
-
 function isPlaying(media: Element): boolean {
     return media instanceof HTMLMediaElement && !media.paused && !media.ended;
 }
 
 export function safeToReload(): boolean {
     if (holds > 0) return false;
-    if (isEditable(document.activeElement)) return false;
+    if (work.dirtyFields().length > 0 || work.dialogOpen() || work.writesUnderWay()) return false;
     if (transfersNow().some(isUnderWay)) return false;
     // Somebody watching or listening is looking, even with no hand on the page.
     return ![...document.querySelectorAll("video, audio")].some((media) => isPlaying(media));
 }
 
+/** What `reloadNow` writes down for the page that replaces this one. Session
+ *  storage: it is this tab's, survives the reload and dies with the tab. */
+const SNAPSHOT_KEY = "polaris.reloadSnapshot";
+
+/** Older than this, a snapshot belongs to some other visit and is ignored. */
+const SNAPSHOT_TTL_MS = 60_000;
+
+/** How long the new page is watched for a scroller to appear:
+ *  a screen that loads its data after the shell draws them late. */
+const RESTORE_WINDOW_MS = 8_000;
+
+/** Scrolled areas worth putting back besides the window: the shell's main
+ *  column and any screen that names its own scroller. */
+const SCROLLERS = "main, [data-reload-scroll]";
+
+interface ReloadSnapshot {
+    readonly url: string;
+    readonly at: number;
+    readonly scroll: readonly { readonly selector: string; readonly top: number }[];
+}
+
+function scrollerKey(element: Element, index: number): string {
+    const named = element.getAttribute("data-reload-scroll");
+    return named ? `[data-reload-scroll="${CSS.escape(named)}"]` : `main:nth-of-type(${index + 1})`;
+}
+
+/** Read the scroll positions a reload of this tab would put back. Exported for the test. */
+export function takeSnapshot(): ReloadSnapshot {
+    const scroll = [{ selector: ":root", top: window.scrollY }];
+    document.querySelectorAll(SCROLLERS).forEach((element, index) => {
+        if (element.scrollTop > 0) scroll.push({ selector: scrollerKey(element, index), top: element.scrollTop });
+    });
+    return { url: location.pathname + location.search, at: Date.now(), scroll };
+}
+
+/**
+ * Put back what the page before this one wrote down: the scroll positions,
+ * once each exists, and every unsaved field (`lib/work-in-progress`). Also
+ * starts watching this page's own work in progress.
+ * Nothing happens on a visit that did not come from that reload.
+ */
+export function restoreAfterReload(): () => void {
+    work.watchWorkInProgress();
+    const stopFields = work.restoreUnsavedFields();
+    let snapshot: ReloadSnapshot | null = null;
+    try {
+        const raw = window.sessionStorage.getItem(SNAPSHOT_KEY);
+        window.sessionStorage.removeItem(SNAPSHOT_KEY);
+        snapshot = raw ? (JSON.parse(raw) as ReloadSnapshot) : null;
+    } catch {
+        return stopFields;
+    }
+    if (!snapshot || typeof snapshot.at !== "number" || Date.now() - snapshot.at > SNAPSHOT_TTL_MS) return stopFields;
+    if (snapshot.url !== location.pathname + location.search) return stopFields;
+    const scroll = Array.isArray(snapshot.scroll) ? [...snapshot.scroll] : [];
+    const started = Date.now();
+    const settle = (): boolean => {
+        for (let index = scroll.length - 1; index >= 0; index--) {
+            const { selector, top } = scroll[index]!;
+            const element = selector === ":root" ? document.scrollingElement : document.querySelector(selector);
+            if (!element || element.scrollHeight - element.clientHeight < top) continue;
+            element.scrollTop = top;
+            scroll.splice(index, 1);
+        }
+        return scroll.length === 0;
+    };
+    if (settle()) return stopFields;
+    const timer = setInterval(() => {
+        if (settle() || Date.now() - started > RESTORE_WINDOW_MS) clearInterval(timer);
+    }, 200);
+    return () => {
+        clearInterval(timer);
+        stopFields();
+    };
+}
+
 /** The reload itself, kept here so there is one place that leaves the page (and
- *  one place a test stands in for). */
+ *  one place a test stands in for). Writes down what the next page puts back. */
 export function reloadNow(): void {
+    work.saveUnsavedFields();
+    try {
+        window.sessionStorage.setItem(SNAPSHOT_KEY, JSON.stringify(takeSnapshot()));
+    } catch {
+        // Nowhere to write it: the reload still happens, and safeToReload has
+        // already refused it for anything typed that would be lost.
+    }
     window.location.reload();
 }

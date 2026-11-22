@@ -3,8 +3,8 @@
 /**
  * When a reload would cost somebody something.
  *
- * Pinned: a hold, focus in a text field, a transfer under way and media playing
- * each make it unsafe; buttons and checkboxes do not, and asking never runs the
+ * Pinned: a hold, an unsaved field, a transfer under way and media playing
+ * each make it unsafe; focus alone does not; buttons and checkboxes do not, and asking never runs the
  * page's own unload listeners.
  */
 
@@ -16,11 +16,18 @@ vi.mock("@/components/transfers/transfer-store", () => ({
     isUnderWay: () => underWay
 }));
 
-const { holdReload, safeToReload } = await import("@/lib/reload-safety");
+const { holdReload, restoreAfterReload, safeToReload } = await import("@/lib/reload-safety");
+const work = await import("@/lib/work-in-progress");
+
+// What the shell does on every page.
+restoreAfterReload();
 
 afterEach(() => {
     underWay = false;
     document.body.innerHTML = "";
+    window.sessionStorage.clear();
+    work.resetWorkInProgress();
+    vi.useRealTimers();
 });
 
 describe("whether the tab can reload by itself", () => {
@@ -39,18 +46,16 @@ describe("whether the tab can reload by itself", () => {
         expect(safeToReload()).toBe(true);
     });
 
-    it("waits while somebody is typing, but not on a focused button or checkbox", () => {
+    it("waits for an unsaved field, but not for focus alone", () => {
         const field = document.createElement("textarea");
-        const box = document.createElement("input");
-        box.type = "checkbox";
         const button = document.createElement("button");
-        document.body.append(field, box, button);
+        document.body.append(field, button);
         field.focus();
-        expect(safeToReload()).toBe(false);
-        box.focus();
         expect(safeToReload()).toBe(true);
+        field.value = "half a sentence";
+        field.dispatchEvent(new Event("input", { bubbles: true }));
         button.focus();
-        expect(safeToReload()).toBe(true);
+        expect(safeToReload()).toBe(false);
     });
 
     it("waits while a file is moving", () => {

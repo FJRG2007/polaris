@@ -9,6 +9,7 @@
  */
 
 import { checkForNewBuild } from "@/lib/new-build";
+import { isStaleBuildError } from "@/lib/stale-build";
 import { noteRequestFailure } from "@/lib/reachability";
 
 /** What the caller sees instead of a crash. Next hides the server's real message in
@@ -38,7 +39,7 @@ export async function runAction<T>(call: () => Promise<T>, onFailure: (message: 
         // this tab is holding action ids from a build that has been replaced. Asked
         // rather than assumed, and not awaited: the caller gets its answer now, and
         // if the deployment really has moved on the banner says so a moment later.
-        void checkForNewBuild();
+        void checkForNewBuild({ failed: isStaleBuildError(caught as { name?: string; message?: string } | null) });
         // Or Polaris is not answering at all, which the connection banner says.
         noteRequestFailure(caught);
         onFailure(failed);
