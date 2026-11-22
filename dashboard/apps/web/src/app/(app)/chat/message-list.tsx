@@ -520,6 +520,10 @@ export function MessageList({
                     const previous = index > 0 ? messages[index - 1] : undefined;
                     const newDay = !previous || !sameDay(previous.createdAt, message.createdAt);
                     const grouped = sharesBlock(previous, message);
+                    // The next message joins this one's block and draws the
+                    // block's tick, so this one does not.
+                    const next = messages[index + 1];
+                    const continued = next !== undefined && sharesBlock(message, next) && drawsTicks(next);
                     // A message with files on its way, drawn as a row of its own
                     // until it lands - and then the landed one, under the same
                     // key, so React keeps every element it drew rather than
@@ -555,6 +559,7 @@ export function MessageList({
                                 message={message}
                                 liveTranslation={liveTranslation}
                                 grouped={grouped}
+                                continued={continued}
                                 mine={message.authorId === viewerId}
                                 viewerId={viewerId}
                                 onMention={onMention}
@@ -667,6 +672,15 @@ function sharesBlock(
         sameDay(previous.createdAt, next.createdAt) &&
         withinWindow(previous.createdAt, next.createdAt)
     );
+}
+
+/**
+ * Whether a message has a place for ticks at all. A game invite draws a card and
+ * a notice draws a line, neither with ticks under it, so one that ends a block
+ * must not take the tick away from the message above it.
+ */
+function drawsTicks(message: ChatMessageView): boolean {
+    return message.kind !== "system" && !message.deleted && !gameInviteIn(message.body);
 }
 
 /**
@@ -802,6 +816,7 @@ function useMessageKeys({
 function Message({
     message,
     grouped,
+    continued,
     mine,
     canPost,
     canModerate,
@@ -838,6 +853,8 @@ function Message({
     /** What this message was drawn as while it went, when it was sent from here. */
     landed?: Landed;
     grouped: boolean;
+    /** The next message joins this one's block: its tick is drawn there. */
+    continued: boolean;
     mine: boolean;
     canPost: boolean;
     canModerate: boolean;
@@ -1235,11 +1252,13 @@ function Message({
                                         flaggedLinks={message.flaggedLinks}
                                     />
                                 </TranslatableText>
-                                {/* Under every message of the reader's own, as WhatsApp
-                            draws them: a run of five can be at different stages -
-                            the first read, the last still on its way - and the
-                            tick under the newest says nothing about the others. */}
-                                {message.receipt && (
+                                {/* Once per block, under its last message, as Instagram
+                            draws them: the newest one read means the ones above
+                            it were read too, so a tick under each line repeats
+                            the same news. Each message's own stage stays one
+                            press away in its information dialog, and the clock
+                            of one still going is drawn wherever it is. */}
+                                {message.receipt && !continued && (
                                     <Ticks
                                         receipt={message.receipt}
                                         onOpen={() => onExplain(message)}

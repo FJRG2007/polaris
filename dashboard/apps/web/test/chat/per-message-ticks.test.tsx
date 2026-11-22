@@ -1,17 +1,13 @@
 // @vitest-environment jsdom
 
 /**
- * Every message of the reader's own carries its own tick, as WhatsApp draws
- * them: a run of three can be at three stages. And the two client rules behind
- * the second tick: which conversations a frame says a message landed in, and
- * which rows of the list a delivery can move.
+ * The two client rules behind the second tick: which conversations a frame says
+ * a message landed in, and which rows of the list a delivery can move. Where the
+ * ticks are drawn is `message-ticks/once-per-block`.
  */
 
-import { MessagesWrapper } from "../setup/i18n";
-import type { ChatMessageView } from "@/lib/chat/messages";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
-import { ShortcutsProvider, ToastProvider } from "@polaris/ui";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/(app)/chat/actions", () => ({
@@ -50,7 +46,6 @@ vi.mock("@/app/(app)/chat/lock-dialogs", () => ({
     ChatLockProvider: ({ children }: { children: unknown }) => children
 }));
 
-const { MessageList } = await import("@/app/(app)/chat/message-list");
 const { deliveryMayMove } = await import("@/app/(app)/chat/chat-shell");
 const { arrivedIn } = await import("@/components/chat-unread");
 
@@ -63,59 +58,6 @@ beforeAll(() => {
     Element.prototype.scrollIntoView ??= () => {};
 });
 afterEach(cleanup);
-
-function message(id: string, receipt: ChatMessageView["receipt"], seconds: number): ChatMessageView {
-    return {
-        id,
-        channelId: "c1",
-        authorId: "ada",
-        authorName: "ada",
-        kind: "text",
-        body: `message ${id}`,
-        parentId: null,
-        replyCount: 0,
-        lastReplyAt: null,
-        edited: false,
-        deleted: false,
-        reactions: [],
-        attachments: [],
-        quote: null,
-        starred: false,
-        references: [],
-        forwardable: true,
-        link: null,
-        preview: null,
-        previewPending: false,
-        receipt,
-        createdAt: new Date(1_700_000_000_000 + seconds * 1000).toISOString()
-    } as unknown as ChatMessageView;
-}
-
-describe("the ticks under a run of the reader's own messages", () => {
-    it("are drawn under every one, each at its own stage", () => {
-        render(
-            <ShortcutsProvider overrides={{}}>
-                <ToastProvider>
-                    <MessageList
-                        messages={[message("m1", "read", 0), message("m2", "delivered", 5), message("m3", "sent", 10)]}
-                        viewerId="ada"
-                        canPost
-                        canModerate={false}
-                        onReact={() => undefined}
-                        onStar={() => undefined}
-                        onForward={() => undefined}
-                        onEdit={() => undefined}
-                        onDelete={() => undefined}
-                    />
-                </ToastProvider>
-            </ShortcutsProvider>,
-            { wrapper: MessagesWrapper }
-        );
-        expect(screen.getByRole("button", { name: /^Read\. Open message information/ })).toBeTruthy();
-        expect(screen.getByRole("button", { name: /^Delivered\. Open message information/ })).toBeTruthy();
-        expect(screen.getByRole("button", { name: /^Sent\. Open message information/ })).toBeTruthy();
-    });
-});
 
 describe("which conversations a frame says a message landed in", () => {
     it("is the arrivals, falling back to every conversation named by an older server", () => {
