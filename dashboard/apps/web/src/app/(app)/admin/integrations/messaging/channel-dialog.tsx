@@ -23,6 +23,7 @@ import {
 } from "@polaris/ui";
 import { useConfirm } from "@/components/confirm-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { TelegramBotProfile } from "./telegram-bot-profile";
 import { EmailProviderSelect } from "../email/email-provider-select";
 import type { MessagingChannelView } from "@/lib/messaging/channel-admin";
 import {
@@ -77,6 +78,8 @@ export function MessagingChannelDialog({
     const [qrChannel, setQrChannel] = useState<string | null>(null);
     const [qr, setQr] = useState<string | null>(null);
     const [qrStatus, setQrStatus] = useState("connecting");
+    // A Telegram bot just connected: offer to brand it before closing.
+    const [branding, setBranding] = useState<string | null>(null);
     const [busy, startBusy] = useTransition();
 
     const options = useMemo(
@@ -151,6 +154,10 @@ export function MessagingChannelDialog({
                 return;
             }
             onSaved();
+            if (row.platform === "telegram" && result.channel.status === "connected") {
+                setBranding(result.channel.id);
+                return;
+            }
             onClose();
         });
     }
@@ -188,17 +195,25 @@ export function MessagingChannelDialog({
             <DialogContent className="max-w-lg">
                 <DialogHeader>
                     <DialogTitle>
-                        {qrChannel
+                        {branding
+                            ? t("messaging.botProfile.offerTitle")
+                            : qrChannel
                             ? t("messaging.qr.title")
                             : editing
                               ? t("messaging.manage.title", { name: channel.name })
                               : t("messaging.add.title")}
                     </DialogTitle>
                     <DialogDescription>
-                        {qrChannel ? t("messaging.qr.steps") : t("messaging.add.description")}
+                        {branding
+                            ? t("messaging.botProfile.offerDescription")
+                            : qrChannel
+                              ? t("messaging.qr.steps")
+                              : t("messaging.add.description")}
                     </DialogDescription>
                 </DialogHeader>
-                {qrChannel ? (
+                {branding ? (
+                    <TelegramBotProfile channelId={branding} />
+                ) : qrChannel ? (
                     <div className="flex flex-col items-center gap-3 py-2">
                         {qr ? (
                             // A data-URL QR; next/image does not handle these.
@@ -237,6 +252,9 @@ export function MessagingChannelDialog({
                         <label className="flex flex-col gap-1 text-sm">
                             <span className="font-medium">{t("messaging.add.name")}</span>
                             <Input value={name} maxLength={64} onChange={(event) => setName(event.target.value)} />
+                            {row.platform === "telegram" ? (
+                                <span className="text-xs text-muted-foreground">{t("messaging.add.nameHint")}</span>
+                            ) : null}
                         </label>
                         {row.qr ? null : (
                             <label className="flex flex-col gap-1 text-sm">
@@ -272,11 +290,12 @@ export function MessagingChannelDialog({
                                 {t(row.id === "whatsapp-twilio" ? "messaging.add.twilioTemplateHint" : "messaging.add.templateHint")}
                             </p>
                         ) : null}
+                        {editing && row.platform === "telegram" ? <TelegramBotProfile channelId={channel.id} /> : null}
                     </div>
                 )}
                 {error ? <p className="text-sm text-danger">{error}</p> : null}
                 <div className="flex items-center justify-between gap-2">
-                    {editing && !qrChannel ? (
+                    {editing && !qrChannel && !branding ? (
                         <div className="flex gap-1">
                             <Button
                                 type="button"
@@ -306,9 +325,13 @@ export function MessagingChannelDialog({
                     )}
                     <div className="flex gap-2">
                         <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
-                            {qrChannel || editing ? t("messaging.add.close") : tc("actions.cancel")}
+                            {branding
+                                ? t("messaging.botProfile.done")
+                                : qrChannel || editing
+                                  ? t("messaging.add.close")
+                                  : tc("actions.cancel")}
                         </Button>
-                        {qrChannel ? null : (
+                        {qrChannel || branding ? null : (
                             <Button type="button" onClick={save} disabled={busy || missing || unchanged}>
                                 {busy && <Loader2 className="size-4 animate-spin" />}
                                 {editing ? tc("actions.save") : t("messaging.add.connect")}

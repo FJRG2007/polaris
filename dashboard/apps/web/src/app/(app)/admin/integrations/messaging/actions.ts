@@ -18,10 +18,24 @@ import {
     deleteMessagingChannel,
     messagingChannelState,
     reconnectMessagingChannel,
+    telegramBotToken,
     updateMessagingChannel,
     type MessagingChannelLiveState,
     type MessagingChannelView
 } from "@/lib/messaging/channel-admin";
+import {
+    applyCustomProfile,
+    applyPolarisBranding,
+    BOT_DESCRIPTION_MAX,
+    BOT_NAME_MAX,
+    BOT_SHORT_DESCRIPTION_MAX,
+    readBotProfile,
+    TelegramCallError,
+    type BotProfile,
+    type BotProfileField,
+    type FieldResult,
+    type TelegramFailure
+} from "@/lib/messaging/telegram-bot-profile";
 
 const PATH = "/admin/integrations/messaging";
 
@@ -179,4 +193,102 @@ export async function setCodeSenderAction(input: unknown): Promise<{ error?: str
     });
     revalidatePath(PATH);
     return {};
+}
+
+export interface BotProfileFieldOutcome {
+    field: BotProfileField;
+    ok: boolean;
+    error?: string;
+}
+
+const botProfileSchema = z.discriminatedUnion("mode", [
+    z.object({ channelId: z.string().uuid(), mode: z.literal("polaris") }),
+    z.object({
+        channelId: z.string().uuid(),
+        mode: z.literal("custom"),
+        name: z.string().trim().min(1).max(BOT_NAME_MAX).optional(),
+        description: z.string().trim().max(BOT_DESCRIPTION_MAX).optional(),
+        shortDescription: z.string().trim().max(BOT_SHORT_DESCRIPTION_MAX).optional()
+    })
+]);
+
+type AdminWords = Awaited<ReturnType<typeof getTranslations<"admin">>>;
+
+/** Telegram's refusal in words the admin can act on. */
+function failureWords(t: AdminWords, failure: TelegramFailure): string {
+    switch (failure.kind) {
+        case "rateLimited":
+            if (failure.retryAfter < 60) return t("messaging.botProfile.errors.waitSeconds", { count: failure.retryAfter });
+            if (failure.retryAfter < 3600) {
+                return t("messaging.botProfile.errors.waitMinutes", { count: Math.ceil(failure.retryAfter / 60) });
+            }
+            return t("messaging.botProfile.errors.waitHours", { count: Math.ceil(failure.retryAfter / 3600) });
+        case "tokenRefused":
+            return t("messaging.botProfile.errors.tokenRefused");
+        case "unreachable":
+            return t("messaging.botProfile.errors.unreachable");
+        default:
+            return failure.description
+                ? t("messaging.botProfile.errors.refused", { reason: failure.description })
+                : t("messaging.botProfile.errors.unreachable");
+    }
+}
+
+/** The Telegram bot's own name, description and picture state, read live. */
+export async function telegramBotProfileAction(channelId: unknown): Promise<{ profile?: BotProfile; error?: string }> {
+    await requireAdmin();
+    const parsed = idSchema.safeParse(channelId);
+    if (!parsed.success) return { error: await checkForm() };
+    const t = await getTranslations("admin");
+    try {
+        const token = await telegramBotToken(parsed.data);
+        if (!token) return { error: t("messaging.botProfile.errors.noToken") };
+        return { profile: await readBotProfile(token) };
+    } catch (caught) {
+        if (caught instanceof TelegramCallError) return { error: failureWords(t, caught.failure) };
+        return { error: t("messaging.botProfile.errors.unreachable") };
+    }
+}
+
+/** Brand the bot as Polaris, or write custom values; each field answers on its own. */
+export async function applyTelegramBotProfileAction(
+    input: unknown
+): Promise<{ results?: BotProfileFieldOutcome[]; profile?: BotProfile; error?: string }> {
+    const admin = await requireAdmin();
+    const parsed = botProfileSchema.safeParse(input);
+    if (!parsed.success) return { error: await checkForm() };
+    const t = await getTranslations("admin");
+    const { channelId, mode } = parsed.data;
+    let token: string | null;
+    try {
+        token = await telegramBotToken(channelId);
+    } catch {
+        return { error: t("messaging.errors.unknownChannel") };
+    }
+    if (!token) return { error: t("messaging.botProfile.errors.noToken") };
+    let outcome: FieldResult[];
+    if (parsed.data.mode === "polaris") {
+        outcome = await applyPolarisBranding(token);
+    } else {
+        const { name, description, shortDescription } = parsed.data;
+        const values = { name, description, shortDescription };
+        if (Object.values(values).every((value) => value === undefined)) return { error: await checkForm() };
+        outcome = await applyCustomProfile(token, values);
+    }
+    await recordAudit({
+        actorId: admin.id,
+        action: "messaging.bot-profile.updated",
+        targetType: "channel",
+        targetId: channelId,
+        metadata: {
+            mode,
+            updated: outcome.filter((result) => result.ok).map((result) => result.field),
+            failed: outcome.filter((result) => !result.ok).map((result) => result.field)
+        }
+    });
+    const results = outcome.map((result) =>
+        result.ok ? { field: result.field, ok: true } : { field: result.field, ok: false, error: failureWords(t, result.failure) }
+    );
+    const profile = await readBotProfile(token).catch(() => undefined);
+    return { results, ...(profile ? { profile } : {}) };
 }

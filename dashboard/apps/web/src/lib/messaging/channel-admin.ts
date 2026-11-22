@@ -182,6 +182,14 @@ export async function updateMessagingChannel(
     return { status: channel.status };
 }
 
+/** A Telegram channel's bot token, for calls the bot makes about itself. Null
+ *  when the channel is not a Telegram bot or holds no token. Server-side only. */
+export async function telegramBotToken(channelId: string): Promise<string | null> {
+    const channel = await findChannel(channelId);
+    if (channel.platform !== "telegram") return null;
+    return connectRequestFor(channel).token ?? null;
+}
+
 /** Disconnect and forget a channel. */
 export async function deleteMessagingChannel(channelId: string): Promise<void> {
     const channel = await findChannel(channelId);

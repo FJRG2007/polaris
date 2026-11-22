@@ -1648,7 +1648,8 @@
             "connect": "Connect",
             "close": "Close",
             "templateHint": "WhatsApp only lets a business start a chat with an approved template, so codes need an authentication template's name and language.",
-            "twilioTemplateHint": "WhatsApp only lets a business start a chat with an approved template, so codes need your authentication template's Content SID."
+            "twilioTemplateHint": "WhatsApp only lets a business start a chat with an approved template, so codes need your authentication template's Content SID.",
+            "nameHint": "Only shown in Polaris. The bot's Telegram name is set in Bot profile."
         },
         "secret": {
             "botToken": "Bot token",
@@ -1671,6 +1672,36 @@
             "reconnect": "Reconnect",
             "removeTitle": "Remove {name}?",
             "removeDescription": "Alerts and codes sent through it stop."
+        },
+        "botProfile": {
+            "title": "Bot profile",
+            "description": "What people see on Telegram.",
+            "username": "Username",
+            "name": "Name on Telegram",
+            "botDescription": "Description",
+            "descriptionHint": "Shown in an empty chat with the bot.",
+            "shortDescription": "Short description",
+            "shortDescriptionHint": "Shown on the bot's profile and in shared links.",
+            "picture": "Picture",
+            "pictureSet": "Set",
+            "pictureNone": "None",
+            "usePolaris": "Use Polaris branding",
+            "usePolarisHint": "Sets the Polaris name and picture, and descriptions in English and Spanish.",
+            "save": "Save to Telegram",
+            "updated": "Changed",
+            "offerTitle": "Brand your bot",
+            "offerDescription": "Give the bot the Polaris name and picture on Telegram. You can change them later.",
+            "done": "Done",
+            "retry": "Try again",
+            "errors": {
+                "waitSeconds": "{count, plural, one {Telegram asks to wait # second before changing this again.} other {Telegram asks to wait # seconds before changing this again.}}",
+                "waitMinutes": "{count, plural, one {Telegram asks to wait # minute before changing this again.} other {Telegram asks to wait # minutes before changing this again.}}",
+                "waitHours": "{count, plural, one {Telegram asks to wait # hour before changing this again.} other {Telegram asks to wait # hours before changing this again.}}",
+                "tokenRefused": "Telegram refused the bot token. Paste a new one and save.",
+                "unreachable": "Telegram did not answer. Try again in a moment.",
+                "refused": "Telegram said: {reason}",
+                "noToken": "This channel has no bot token saved."
+            }
         },
         "qr": {
             "title": "Link WhatsApp Web",
