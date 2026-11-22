@@ -69,6 +69,7 @@ import { callConversationMembers } from "@/lib/chat/meetings";
 import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
 import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
 import type {
+    ChatAroundPage,
     ChatMessageView,
     ChatNewerPage,
     ChatPage,
@@ -161,6 +162,30 @@ export async function readSinceAction(
     const unlock = proofSchema.safeParse(proof);
     const result = await guard(() =>
         messages.readSince(me, channelId, afterId, unlock.success ? unlock.data : null)
+    );
+    return result.error ? { error: result.error } : { page: result.value };
+}
+
+const aroundSchema = z.object({
+    channelId: z.string().trim().min(1).max(64),
+    messageId: z.string().trim().min(1).max(64),
+    proof: proofSchema
+});
+
+/** The window centred on one message, for a link to it - or why there is none. */
+export async function readAroundAction(
+    input: unknown
+): Promise<{ page?: ChatAroundPage; error?: string }> {
+    const me = await actor();
+    const parsed = aroundSchema.safeParse(input);
+    if (!parsed.success) return { page: { found: false, reason: "missing" } };
+    const result = await guard(() =>
+        messages.readAround(
+            me,
+            parsed.data.channelId,
+            parsed.data.messageId,
+            parsed.data.proof ?? null
+        )
     );
     return result.error ? { error: result.error } : { page: result.value };
 }

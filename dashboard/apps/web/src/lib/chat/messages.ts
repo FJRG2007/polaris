@@ -84,7 +84,7 @@ import { spokenEditWindow, spokenWait } from "./durations";
 import { ageClearedWhere, requireAgeCleared } from "./age-gate";
 import { MAX_REREAD } from "./reread-limit";
 import * as history from "./history-visibility";
-import { isEphemeral } from "./ephemeral";
+import { isEphemeral, seenByClause } from "./ephemeral";
 import { webhookFace } from "./webhook-face";
 import { chatPrivacyIn, chatPrivacyOf, expiryForChannel } from "./vanish";
 import { hasDirectRules } from "./vanish-rules";
@@ -492,6 +492,97 @@ export async function readSince(
     return {
         messages: await decorateMessages(actor, page),
         newerThan: rows.length > PAGE ? (page[page.length - 1]?.id ?? null) : null
+    };
+}
+
+/** Why a link to a message has nothing to land on. `reply` is not a refusal:
+ *  the message lives under the root of a thread, which is where it opens. */
+export type ChatMissingReason = "reply" | "deleted" | "unreadable" | "missing";
+
+/** The window around one message, or why there is none. */
+export type ChatAroundPage =
+    | {
+          readonly found: true;
+          readonly messages: readonly ChatMessageView[];
+          /** The same cursors as `ChatPage.olderThan` and `ChatNewerPage.newerThan`. */
+          readonly olderThan: string | null;
+          readonly newerThan: string | null;
+      }
+    | { readonly found: false; readonly reason: ChatMissingReason };
+
+/** How many messages either side of the target the window around it holds. */
+const AROUND = PAGE / 2;
+
+/**
+ * The page of a channel centred on one message, for a link that points at it.
+ *
+ * However old the message is, this is one bounded read either side of it rather
+ * than a walk back through every page in between - which is what made a link to
+ * last year's message answer that it could not be reached. The cursors it hands
+ * back are the ones the list already scrolls by, so the screen carries on in
+ * both directions from wherever it landed.
+ *
+ * The same checks as the page read, asked first: nothing about a message is
+ * told to somebody who cannot open the conversation it would be in. After that
+ * the answer says why there is no message to land on, so the screen can say it
+ * in words: deleted, from before this reader could read along, or not there.
+ */
+export async function readAround(
+    actor: ChatActor,
+    channelId: string,
+    messageId: string,
+    proof?: string | null
+): Promise<ChatAroundPage> {
+    try {
+        await requireChannel(actor, channelId);
+    } catch (error) {
+        if (error instanceof ChatAccessError) return { found: false, reason: "unreadable" };
+        throw error;
+    }
+    await requireAgeCleared(actor, channelId);
+    await requireUnlocked(actor, channelId, proof);
+
+    // Asked inside this conversation only, so an id from elsewhere says nothing
+    // about where it does live.
+    const target = await prisma.chatMessage.findFirst({
+        where: { id: messageId, channelId, AND: [seenByClause(actor.id)] },
+        select: { id: true, parentId: true, createdAt: true, expiresAt: true }
+    });
+    if (!target) return { found: false, reason: "missing" };
+    const floor = await history.readableSince(actor, channelId);
+    if (floor && target.createdAt.getTime() < floor.getTime()) return { found: false, reason: "unreadable" };
+    if (target.expiresAt && target.expiresAt.getTime() <= Date.now()) return { found: false, reason: "deleted" };
+    const hidden = await prisma.chatMessage.findFirst({
+        where: { id: messageId, hiddenFor: { some: { userId: actor.id } } },
+        select: { id: true }
+    });
+    if (hidden) return { found: false, reason: "deleted" };
+    if (target.parentId) return { found: false, reason: "reply" };
+
+    const readable = history.sinceClause(floor, actor.id);
+    const [above, below, own] = await Promise.all([
+        prisma.chatMessage.findMany({
+            where: { channelId, parentId: null, createdAt: { lt: target.createdAt }, AND: [readable] },
+            orderBy: { createdAt: "desc" },
+            take: AROUND + 1,
+            select: MESSAGE_SELECT
+        }),
+        prisma.chatMessage.findMany({
+            where: { channelId, parentId: null, createdAt: { gt: target.createdAt }, AND: [readable] },
+            orderBy: { createdAt: "asc" },
+            take: AROUND + 1,
+            select: MESSAGE_SELECT
+        }),
+        prisma.chatMessage.findUnique({ where: { id: messageId }, select: MESSAGE_SELECT })
+    ]);
+    if (!own) return { found: false, reason: "deleted" };
+    const older = above.slice(0, AROUND).reverse();
+    const newer = below.slice(0, AROUND);
+    return {
+        found: true,
+        messages: await decorateMessages(actor, [...older, own, ...newer]),
+        olderThan: above.length > AROUND ? (older[0]?.id ?? null) : null,
+        newerThan: below.length > AROUND ? (newer[newer.length - 1]?.id ?? null) : null
     };
 }
 

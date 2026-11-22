@@ -33,6 +33,12 @@ const all = Array.from({ length: 130 }, (_, index) => ({
 
 const byId = new Map(all.map((row) => [row.id, row]));
 
+/** Rows outside the channel's own list: a reply, a message that disappeared. */
+const hidden = new Map([
+    ["reply", { ...all[10]!, id: "reply", parentId: "m010" }],
+    ["vanished", { ...all[10]!, id: "vanished", expiresAt: new Date(1) }]
+]);
+
 /** Just the parts of the query these two functions use. The decoration pass
  *  asks for quoted messages by id with no order and no limit, so both are
  *  optional here. */
@@ -64,7 +70,13 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         chatMessage: {
             findMany: async (args: Parameters<typeof findMany>[0]) => findMany(args),
-            findFirst: async ({ where }: { where: { id: string } }) => byId.get(where.id) ?? null
+            findFirst: async ({ where }: { where: { id: string; channelId?: string; hiddenFor?: unknown } }) => {
+                // Nobody here has deleted anything for themselves.
+                if (where.hiddenFor) return null;
+                const row = byId.get(where.id) ?? hidden.get(where.id) ?? null;
+                return row && (!where.channelId || row.channelId === where.channelId) ? row : null;
+            },
+            findUnique: async ({ where }: { where: { id: string } }) => byId.get(where.id) ?? null
         },
         chatReaction: { findMany: async () => [] },
         chatAttachment: { findMany: async () => [] },
@@ -118,7 +130,7 @@ vi.mock("@/lib/chat/link-preview", () => ({
     unfurl: async () => undefined
 }));
 
-const { readChannel, readSince } = await import("@/lib/chat/messages");
+const { readAround, readChannel, readSince } = await import("@/lib/chat/messages");
 
 const actor = { id: "ada" };
 
@@ -178,5 +190,46 @@ describe("downwards, back out of it", () => {
         const page = await readSince(actor, "c1", "deleted");
         expect(page.messages).toEqual([]);
         expect(page.newerThan).toBe("deleted");
+    });
+});
+
+describe("around one message, for a link to it", () => {
+    it("centres the window on a message from long ago, in one read", async () => {
+        const page = await readAround(actor, "c1", "m040");
+        if (!page.found) throw new Error("expected a window");
+        expect(page.messages).toHaveLength(51);
+        expect(page.messages[0]?.id).toBe("m015");
+        expect(page.messages[25]?.id).toBe("m040");
+        expect(page.messages[50]?.id).toBe("m065");
+        // Cursors the list already scrolls by, in both directions.
+        expect(page.olderThan).toBe("m015");
+        expect(page.newerThan).toBe("m065");
+    });
+
+    it("reaches the live end without a cursor below", async () => {
+        const page = await readAround(actor, "c1", "m120");
+        if (!page.found) throw new Error("expected a window");
+        expect(page.messages[page.messages.length - 1]?.id).toBe("m129");
+        expect(page.newerThan).toBeNull();
+    });
+
+    it("reaches the top without a cursor above", async () => {
+        const page = await readAround(actor, "c1", "m003");
+        if (!page.found) throw new Error("expected a window");
+        expect(page.messages[0]?.id).toBe("m000");
+        expect(page.olderThan).toBeNull();
+    });
+
+    it("says a reply lives in its thread", async () => {
+        expect(await readAround(actor, "c1", "reply")).toEqual({ found: false, reason: "reply" });
+    });
+
+    it("says a message that disappeared was deleted", async () => {
+        expect(await readAround(actor, "c1", "vanished")).toEqual({ found: false, reason: "deleted" });
+    });
+
+    it("says a message that is not in this conversation is not there", async () => {
+        expect(await readAround(actor, "c1", "nowhere")).toEqual({ found: false, reason: "missing" });
+        expect(await readAround(actor, "c2", "m040")).toEqual({ found: false, reason: "missing" });
     });
 });

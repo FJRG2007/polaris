@@ -32,6 +32,7 @@ import { Composer } from "./composer";
 import { CallRoom } from "./call-room";
 import { SidePane } from "./side-pane";
 import { threadRootFor } from "./links";
+import { jumpToMessage, type FoundWindow, type JumpOutcome } from "./jump";
 import { useChat } from "./chat-context";
 import * as calls from "./meeting-actions";
 import * as callRequests from "./call-requests";
@@ -156,10 +157,12 @@ interface Typist {
     readonly at: number;
 }
 
-/** How many pages back a jump to a search hit will walk. Fifty messages a page,
- *  so this reaches a long way without letting one click pull a year of a busy
- *  channel into the browser. */
-const JUMP_PAGES = 20;
+/** What the reader is told when a link has no message to land on, by reason. */
+const JUMP_MISSING = {
+    deleted: "channelView.jumpDeleted",
+    unreadable: "channelView.jumpUnreadable",
+    missing: "channelView.jumpMissing"
+} as const satisfies Record<Extract<JumpOutcome, { kind: "missing" }>["reason"], string>;
 
 /** How long the message a search led to stays lit. */
 const HIGHLIGHT_MS = 2500;
@@ -649,9 +652,14 @@ export function ChannelView({
         setMessages(next);
     }, []);
 
+    /** The newest read of the live end, settled or not. A jump waits on it:
+     *  until it is in, the window is this device's copy, which predates the
+     *  message a notice is about. */
+    const newestRead = useRef<Promise<void>>(Promise.resolve());
+
     /** Back to the live end of the conversation: the newest page and nothing
      *  else. What opening a channel does. */
-    const load = useCallback(async () => {
+    const readNewest = useCallback(async () => {
         const result = await actions.readChannelAction(
             channelId,
             undefined,
@@ -685,6 +693,12 @@ export function ChannelView({
         setNewerThan(null);
         settle(page);
     }, [channelId, settle, show]);
+
+    const load = useCallback((): Promise<void> => {
+        const run = readNewest();
+        newestRead.current = run;
+        return run;
+    }, [readNewest]);
 
     // What this device kept of the conversation, drawn while the server is
     // asked - and all there is to read when there is no network. Never for one
@@ -1074,32 +1088,73 @@ export function ChannelView({
     );
 
     /**
-     * Scroll to a message, fetching backwards until it is there.
+     * The window swapped for the one around a message a link points at: the
+     * target, half a page either side, and the cursors to carry on from in both
+     * directions - the history above it as the reader scrolls up, the rest of
+     * the conversation below it as they scroll down, and the jump to the present
+     * for as long as there is more below.
+     */
+    const showAround = useCallback(
+        (around: FoundWindow) => {
+            following.current = false;
+            settling.current = 0;
+            anchor.current = null;
+            setUnseen(0);
+            olderThanRef.current = around.olderThan;
+            newerThanRef.current = around.newerThan;
+            setOlderThan(around.olderThan);
+            setNewerThan(around.newerThan);
+            show(around.messages);
+            settle(around.messages);
+        },
+        [settle, show]
+    );
+
+    // The sentence a jump last put up, so landing somewhere afterwards takes
+    // that one down and leaves any other alone.
+    const jumpError = useRef("");
+
+    /**
+     * Scroll to a message, however far back it is.
      *
-     * A search hit is usually older than the screenful the channel opened on, so
-     * "scroll to it" means "load until it exists". Bounded, because a hit from
-     * two years ago would otherwise walk the whole conversation into the browser
-     * one page at a time.
-     *
-     * Each pass waits for a frame before it looks. A page that has just been
-     * fetched is state until React has drawn it, and this used to look before
-     * that: the walk stopped the moment a fetch said there was nothing further
-     * above, without ever searching the page it had just brought in. Which is
-     * how a link to a message sitting on screen answered that it was further
-     * back than this could reach.
+     * Waits for the server's window first: the screen opens on what this device
+     * kept, which is older than the message a notice was just about, and looking
+     * there told the reader a message was out of reach a moment before it was
+     * drawn under the error. A message the window does not hold is read with
+     * the page around it in one request - no walk back through every page in
+     * between - and the only failure shown is the server's own reason.
      */
     const jumpTo = useCallback(
         async (messageId: string) => {
-            for (let attempt = 0; attempt < JUMP_PAGES; attempt += 1) {
-                await drawn();
-                if (landOn(messageId)) return;
-                if (!olderThanRef.current) break;
-                await loadOlder();
+            const outcome = await jumpToMessage(messageId, {
+                fresh: () => newestRead.current,
+                drawn,
+                landOn,
+                readAround: (target) =>
+                    actions
+                        .readAroundAction({
+                            channelId,
+                            messageId: target,
+                            proof: unlockProofFor(channelId)
+                        })
+                        .catch(() => ({ error: "" })),
+                showWindow: showAround,
+                openThread: openThreadOf
+            });
+            if (outcome.kind === "landed" || outcome.kind === "thread") {
+                const shown = jumpError.current;
+                jumpError.current = "";
+                if (shown) setError((current) => (current === shown ? "" : current));
+                return;
             }
-            if (await openThreadOf(messageId)) return;
-            setError("That message is further back than this can reach.");
+            const text =
+                outcome.kind === "failed"
+                    ? outcome.error || t("channelView.jumpFailed")
+                    : t(JUMP_MISSING[outcome.reason]);
+            jumpError.current = text;
+            setError(text);
         },
-        [landOn, loadOlder, openThreadOf]
+        [channelId, landOn, openThreadOf, showAround, t]
     );
 
     /**
@@ -1183,8 +1238,8 @@ export function ChannelView({
     }, [messages, replyingTo]);
 
     // A link straight to a message. Waits for the first page rather than racing
-    // it: the message may well be on it, and walking backwards from an empty
-    // list would ask for pages that are already on the way.
+    // it: the message may well be on it, and the jump itself waits on the
+    // server's page too, since what is drawn first is this device's copy.
     //
     // And waits for the channel, which arrives from the rail's own fetch. Until
     // it does this screen is a skeleton with no list in it, so a jump that
