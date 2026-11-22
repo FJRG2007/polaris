@@ -97,6 +97,10 @@ export interface ExtensionSessionView {
     readonly pinToAddress: boolean | null;
     /** What the account's rule says for it, which is what null means. */
     readonly pinnedByRule: boolean;
+    /** The browser session that approved it - a tab the extension opened in
+     *  its own browser - so the sessions screen can place it beside that
+     *  browser (`groupByDevice`). Null when nobody recorded one. */
+    readonly approvedBySessionId: string | null;
 }
 
 /** The connection behind a token on a request. */
@@ -454,6 +458,7 @@ export async function listExtensionSessions(userId: string): Promise<ExtensionSe
             createdAt: true,
             lastSeenAt: true,
             pinToAddress: true,
+            approvedBySessionId: true,
             _count: { select: { vaultDevices: true } }
         }
     });
@@ -477,6 +482,7 @@ export async function listExtensionSessions(userId: string): Promise<ExtensionSe
             lastSeenAt: row.lastSeenAt.toISOString(),
             vaultClients: row._count.vaultDevices,
             pinToAddress: row.pinToAddress ?? null,
+            approvedBySessionId: row.approvedBySessionId,
             pinnedByRule: isPinned(
                 { os: client.os, pinToAddress: null },
                 security?.pinSessionsToAddress

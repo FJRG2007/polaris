@@ -23,9 +23,10 @@ import { newDeviceRefusal } from "@/lib/device-grace";
 import { getTranslations } from "@/lib/i18n/request";
 import { localized } from "../security/action-messages";
 import { revokeTrustedDevice, revokeTrustedDevices } from "@polaris/auth";
+import { DEVICE_GROUP_KEY_PATTERN } from "@/lib/device-sessions/device-groups";
 import {
     blockDevice,
-    DEVICE_KEY_PATTERN,
+    resolveDeviceGroup,
     signOutDevice,
     unblockDevice
 } from "@/lib/device-sessions/device-block";
@@ -366,23 +367,25 @@ export async function pinDeviceSessionAction(
     return {};
 }
 
-/** A device as the sessions screen names it: its per-account key, and the name
- *  and system shown on its row, kept for the audit and the blocked list. */
+/** A device as the sessions screen names it: its group key, and the name and
+ *  system shown on its header, kept for the audit and the blocked list. */
 const deviceGroupSchema = z.object({
-    key: z.string().regex(DEVICE_KEY_PATTERN),
+    key: z.string().regex(DEVICE_GROUP_KEY_PATTERN),
     label: z.string().trim().min(1).max(120),
     os: z.string().trim().min(1).max(80).nullable().default(null)
 });
 
 /** Sign out every session and app on one device. The reader's own session is
- *  spared; the key only ever matches the caller's own rows. */
+ *  spared; the group is read again from the caller's own rows. */
 export async function signOutDeviceGroupAction(device: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
     const parsed = deviceGroupSchema.safeParse(device);
     if (!parsed.success) return refuse("errors.unknownDevice");
-    await signOutDevice(user.id, parsed.data.key, user.sessionId, parsed.data.label);
+    const found = await resolveDeviceGroup(user.id, user.sessionId, parsed.data.key);
+    if (!found) return refuse("errors.unknownDevice");
+    await signOutDevice(user.id, found.targets, user.sessionId, parsed.data.label);
     revalidatePath("/account/sessions");
     return {};
 }
@@ -390,7 +393,8 @@ export async function signOutDeviceGroupAction(device: unknown): Promise<{ error
 /**
  * Block a device: everything on it is signed out and it cannot sign in again
  * until it is unblocked. The device in hand is refused - it would end the page
- * the press was made on and leave nothing to undo it from.
+ * the press was made on and leave nothing to undo it from - and so is one with
+ * no device key, which nothing could hold a block against.
  */
 export async function blockDeviceAction(device: unknown): Promise<{ error?: string }> {
     const user = await requireUser();
@@ -398,22 +402,19 @@ export async function blockDeviceAction(device: unknown): Promise<{ error?: stri
     if (blocked) return localized({ error: blocked });
     const parsed = deviceGroupSchema.safeParse(device);
     if (!parsed.success) return refuse("errors.unknownDevice");
+    const found = await resolveDeviceGroup(user.id, user.sessionId, parsed.data.key);
+    if (!found || found.group.deviceKeys.length === 0) return refuse("errors.unknownDevice");
     const here = await prisma.sessionState.findUnique({
         where: { sessionId: user.sessionId },
         select: { deviceKey: true }
     });
-    if (here?.deviceKey === parsed.data.key) return refuse("errors.blockOwnDevice");
-    await blockDevice(
-        user.id,
-        parsed.data.key,
-        user.sessionId,
-        parsed.data.label,
-        parsed.data.os
-    );
+    if (found.group.here || (here?.deviceKey && found.group.deviceKeys.includes(here.deviceKey))) {
+        return refuse("errors.blockOwnDevice");
+    }
+    await blockDevice(user.id, found.targets, user.sessionId, parsed.data.label, parsed.data.os);
     revalidatePath("/account/sessions");
     return {};
 }
-
 /** Lift a block. Scoped to the caller, so another account's id matches nothing. */
 export async function unblockDeviceAction(id: unknown): Promise<{ error?: string }> {
     const user = await requireUser();

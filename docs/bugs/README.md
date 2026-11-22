@@ -27,3 +27,4 @@ Security findings are not kept here; they live in
 | BUG-0014 | Signing in on the web jumps to the desktop app halfway through | Auth | Fixed, watching | dashboard/apps/web/src/components/open-in-app.tsx | 2026-11-22 |
 | BUG-0015 | Moving to some screens, links or notices in Polaris ends the call | Calls | Fixed, watching | dashboard/apps/web/src/lib/keep-call.ts | 2026-11-22 |
 | BUG-0016 | Polar's side panel still opens an old chat instead of a new one | Polar | Fixed, watching | dashboard/apps/web/src/lib/polar/open-chat.ts | 2026-11-22 |
+| BUG-0017 | Active sessions on the same computer are not grouped under it | Sessions | Fixed, watching | dashboard/apps/web/src/lib/device-sessions/device-groups.ts | 2026-11-22 |

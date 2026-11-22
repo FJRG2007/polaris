@@ -91,7 +91,9 @@ export function DeviceGroupRow({
                             <LogOut className="size-4" />
                         </Button>
                     ) : null}
-                    {onBlock ? (
+                    {/* A block is held against a device key; a device placed
+                        only by its name or its browser has none to hold. */}
+                    {onBlock && group.deviceKeys.length > 0 ? (
                         <Button
                             variant="ghost"
                             size="icon"

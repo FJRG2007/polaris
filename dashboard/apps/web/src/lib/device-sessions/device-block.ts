@@ -23,7 +23,11 @@
 import { prisma } from "@polaris/db";
 import { recordAudit } from "@/lib/audit-service";
 import { DEVICE_KINDS } from "@/lib/device-sessions/kinds";
+import { listUserSessions } from "@/lib/session-directory";
+import { listDeviceSessions } from "@/lib/device-sessions/sessions";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
+import { listExtensionSessions, revokeExtensionSession } from "@/lib/extension/sessions";
+import { deviceMembers, groupByDevice, type DeviceGroup } from "@/lib/device-sessions/device-groups";
 
 export { DEVICE_KEY_PATTERN } from "@/lib/device-sessions/device-key";
 
@@ -45,31 +49,92 @@ export async function listBlockedDevices(userId: string): Promise<BlockedDeviceV
     return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }));
 }
 
+/** What one device has open, by kind: what signing it out reaches. */
+export interface DeviceTargets {
+    /** Every device key on it. Anything else claiming one of them - a row past
+     *  the screen's page - is reached too. */
+    readonly deviceKeys: readonly string[];
+    readonly sessionIds: readonly string[];
+    readonly deviceSessionIds: readonly string[];
+    readonly extensionIds: readonly string[];
+}
+
 /**
- * End every session and device sign-in that claims this device. The reader's
- * own session is spared, so the press never signs out the page it was made on;
- * blocking refuses the device the reader is on before it gets here.
+ * One device as the sessions screen groups it, read again on the server from
+ * the account's own rows - so a press names a group, and what it reaches is
+ * decided here, by the same `groupByDevice` the screen drew, never by a list
+ * the browser sent. Null when no such device is there any more.
+ */
+export async function resolveDeviceGroup(
+    userId: string,
+    currentSessionId: string,
+    key: string
+): Promise<{ group: DeviceGroup; targets: DeviceTargets } | null> {
+    const [sessions, deviceSessions, extensions] = await Promise.all([
+        listUserSessions(userId, currentSessionId),
+        listDeviceSessions(userId),
+        listExtensionSessions(userId)
+    ]);
+    const group = groupByDevice(deviceMembers({ sessions, deviceSessions, extensions })).find(
+        (candidate) => candidate.key === key
+    );
+    if (!group) return null;
+    const members = new Set(group.memberIds);
+    const ids = (rows: readonly { readonly id: string }[]) =>
+        rows.filter((row) => members.has(row.id)).map((row) => row.id);
+    return {
+        group,
+        targets: {
+            deviceKeys: group.deviceKeys,
+            sessionIds: ids(sessions),
+            deviceSessionIds: ids(deviceSessions),
+            extensionIds: ids(extensions)
+        }
+    };
+}
+
+/**
+ * End everything open on one device: its sessions, its device sign-ins and its
+ * extension connections. The reader's own session is spared, so the press never
+ * signs out the page it was made on; blocking refuses the device the reader is
+ * on before it gets here. Every write is scoped to the owner.
  */
 export async function signOutDevice(
     userId: string,
-    deviceKey: string,
+    targets: DeviceTargets,
     currentSessionId: string,
     label: string,
     now = new Date()
 ): Promise<number> {
-    const states = await prisma.sessionState.findMany({
-        where: { userId, deviceKey, sessionId: { not: currentSessionId } },
-        select: { sessionId: true },
-        take: 500
-    });
-    const sessions = await prisma.session.deleteMany({
-        where: { userId, id: { in: states.map((state) => state.sessionId) } }
-    });
-    const keys = await prisma.apiKey.updateMany({
-        where: { userId, clientDeviceKey: deviceKey, kind: { in: DEVICE_KINDS }, revokedAt: null },
-        data: { revokedAt: now }
-    });
-    const count = sessions.count + keys.count;
+    const keys = [...targets.deviceKeys];
+    const states = keys.length
+        ? await prisma.sessionState.findMany({
+              where: { userId, deviceKey: { in: keys }, sessionId: { not: currentSessionId } },
+              select: { sessionId: true },
+              take: 500
+          })
+        : [];
+    const sessionIds = [
+        ...new Set([...targets.sessionIds, ...states.map((state) => state.sessionId)])
+    ].filter((id) => id !== currentSessionId);
+    const sessions = sessionIds.length
+        ? await prisma.session.deleteMany({ where: { userId, id: { in: sessionIds } } })
+        : { count: 0 };
+    const signIns = [
+        ...(keys.length ? [{ clientDeviceKey: { in: keys } }] : []),
+        ...(targets.deviceSessionIds.length ? [{ id: { in: [...targets.deviceSessionIds] } }] : [])
+    ];
+    const apps = signIns.length
+        ? await prisma.apiKey.updateMany({
+              where: { userId, kind: { in: DEVICE_KINDS }, revokedAt: null, OR: signIns },
+              data: { revokedAt: now }
+          })
+        : { count: 0 };
+    let connections = 0;
+    for (const id of targets.extensionIds) {
+        if ((await revokeExtensionSession(userId, id, now)).revoked) connections += 1;
+    }
+    const count = sessions.count + apps.count + connections;
     if (count > 0) {
         await recordAudit({
             actorId: userId,
@@ -81,21 +146,23 @@ export async function signOutDevice(
     return count;
 }
 
-/** Block a device and end everything it has open. Idempotent. */
+/** Block every key a device claimed and end everything it has open. Idempotent. */
 export async function blockDevice(
     userId: string,
-    deviceKey: string,
+    targets: DeviceTargets,
     currentSessionId: string,
     label: string,
     os: string | null
 ): Promise<number> {
-    await prisma.blockedDevice.upsert({
-        where: { userId_deviceKey: { userId, deviceKey } },
-        create: { userId, deviceKey, label, os },
-        update: {}
-    });
+    for (const deviceKey of targets.deviceKeys) {
+        await prisma.blockedDevice.upsert({
+            where: { userId_deviceKey: { userId, deviceKey } },
+            create: { userId, deviceKey, label, os },
+            update: {}
+        });
+    }
     await recordAudit({ actorId: userId, action: "account.device.blocked", metadata: { device: label } });
-    return signOutDevice(userId, deviceKey, currentSessionId, label);
+    return signOutDevice(userId, targets, currentSessionId, label);
 }
 
 /** Lift a block. Scoped to the owner, so another account's id changes nothing. */

@@ -58,7 +58,7 @@ describe("readDeviceId / readDeviceName", () => {
 });
 
 describe("groupByDevice", () => {
-    it("groups only rows that share a reported key, never by name", () => {
+    it("groups rows that share a reported key or a reported computer name", () => {
         const groups = groupByDevice([
             {
                 id: "desktop",
@@ -69,8 +69,8 @@ describe("groupByDevice", () => {
                 current: true
             },
             { id: "cli", deviceKey: KEY_A, name: "DRAGON", os: "Windows", lastSeenAt: "2026-11-21T11:00:00.000Z" },
-            // Same name, no key: an old client or a browser. Left on its own.
-            { id: "brave", deviceKey: null, name: "DRAGON", os: "Windows", lastSeenAt: "2026-11-21T12:00:00.000Z" },
+            // Same reported name, no key: a terminal from before the key. Joins.
+            { id: "old-cli", deviceKey: null, name: "DRAGON", os: "Windows", lastSeenAt: "2026-11-21T12:00:00.000Z" },
             { id: "laptop", deviceKey: KEY_B, name: null, os: "Unknown OS", lastSeenAt: null }
         ]);
         expect(groups).toHaveLength(2);
@@ -79,11 +79,11 @@ describe("groupByDevice", () => {
             name: "DRAGON",
             os: "Windows",
             here: true,
-            lastSeenAt: "2026-11-21T11:00:00.000Z",
-            memberIds: ["desktop", "cli"]
+            lastSeenAt: "2026-11-21T12:00:00.000Z",
+            memberIds: ["desktop", "cli", "old-cli"]
         });
         expect(groups[1]).toMatchObject({ key: KEY_B, name: null, os: null, here: false });
-        expect(groups.flatMap((group) => group.memberIds)).not.toContain("brave");
+        expect(groups[1]!.memberIds).toEqual(["laptop"]);
     });
 
     it("leaves every row of an account with no reporting client ungrouped", () => {

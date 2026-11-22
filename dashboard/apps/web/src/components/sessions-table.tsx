@@ -20,7 +20,7 @@
 import Link from "next/link";
 import { Fragment, useState, type ReactNode } from "react";
 import { DeviceGroupRow } from "@/components/device-group-row";
-import { groupByDevice, type DeviceGroup } from "@/lib/device-sessions/device-groups";
+import { deviceMembers, groupByDevice, type DeviceGroup } from "@/lib/device-sessions/device-groups";
 import { Badge, Button, cn } from "@polaris/ui";
 import type { DeviceSessionView } from "@/lib/device-sessions/sessions";
 import { RelativeTime } from "@/components/relative-time";
@@ -296,23 +296,7 @@ export function SessionsTable({
             hostname: device.hostname
         }))
     ]);
-    const groups = groupByDevice([
-        ...sessions.map((session) => ({
-            id: session.id,
-            deviceKey: session.deviceKey,
-            name: session.deviceName,
-            os: session.os,
-            lastSeenAt: session.lastSeenAt,
-            current: session.current
-        })),
-        ...deviceSessions.map((device) => ({
-            id: device.id,
-            deviceKey: device.deviceKey,
-            name: device.hostname,
-            os: device.os,
-            lastSeenAt: device.lastUsedAt ?? device.createdAt
-        }))
-    ]);
+    const groups = groupByDevice(deviceMembers({ sessions, deviceSessions, extensions }));
     const grouped = new Set(groups.flatMap((group) => group.memberIds));
     function toggle(key: string) {
         setCollapsed((was) => {
@@ -321,6 +305,120 @@ export function SessionsTable({
             else next.add(key);
             return next;
         });
+    }
+    function renderExtension(extension: ExtensionSessionView) {
+        return (
+                    <tr
+                        key={`extension-${extension.id}`}
+                        className={cn(
+                            "border-t border-border",
+                            busyId === extension.id && "opacity-60"
+                        )}
+                    >
+                        <td className="w-full max-w-0 px-3 py-2">
+                            <div className="flex items-center gap-3">
+                                <BrowserMark browser={extension.browser} />
+                                <div className="min-w-0">
+                                    <p className="flex flex-wrap items-center gap-1.5">
+                                        <span className="min-w-0 truncate font-medium">
+                                            {extension.browser}
+                                        </span>
+                                        <span className="min-w-0 truncate text-muted-foreground">
+                                            {extension.os}
+                                        </span>
+                                        <Badge variant="neutral">
+                                            {t("sessionsTable.extension")}
+                                        </Badge>
+                                        <MachineBadge machine={machines.get(extension.id)} />
+                                        {inUseNow(extension, now) ? <ActiveNowBadge /> : null}
+                                        {(extension.pinToAddress ?? extension.pinnedByRule) ? (
+                                            <Badge
+                                                title={t("sessionsTable.extensionLockedHint")}
+                                            >
+                                                {t("sessionsTable.addressLocked")}
+                                            </Badge>
+                                        ) : null}
+                                    </p>
+                                    <p
+                                        className={cn(
+                                            "truncate text-xs text-muted-foreground",
+                                            !compact && "lg:hidden"
+                                        )}
+                                    >
+                                        {t.rich("sessionsTable.whereAndWhen", {
+                                            where:
+                                                extension.ip ??
+                                                t("sessionsTable.addressNotRecorded"),
+                                            time: timeTag(extension.lastSeenAt)
+                                        })}
+                                    </p>
+                                </div>
+                            </div>
+                        </td>
+                        {compact ? null : (
+                            <>
+                                <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell">
+                                    {t("sessionsTable.extension")}
+                                </td>
+                                <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell">
+                                    <ClientCell
+                                        mark={<SystemMark os={extension.os} />}
+                                        name={extension.os}
+                                        version={null}
+                                    />
+                                </td>
+                                <td className="hidden whitespace-nowrap px-3 py-2 text-xs lg:table-cell">
+                                    <DeviceAddress
+                                        address={{ ip: extension.ip, publicIp: null }}
+                                    />
+                                </td>
+                                <td className="hidden max-w-[12rem] px-3 py-2 text-xs xl:table-cell">
+                                    <HostName host={extension.host} />
+                                </td>
+                                <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                    <LastActive iso={extension.lastSeenAt} />
+                                </td>
+                            </>
+                        )}
+                        <td className="px-3 py-2">
+                            <div className="flex justify-end gap-1">
+                                {activityHref ? (
+                                    <ActivityLink
+                                        href={activityHref(extension)}
+                                        device={t("sessionsTable.extensionNamed", {
+                                            browser: extension.browser
+                                        })}
+                                    />
+                                ) : null}
+                                {onPinExtension ? (
+                                    <PinButton
+                                        label={t("sessionsTable.extensionNamed", {
+                                            browser: extension.browser
+                                        })}
+                                        pinToAddress={extension.pinToAddress}
+                                        pinnedByRule={extension.pinnedByRule}
+                                        busy={busyId !== null}
+                                        onPin={(pinned) => onPinExtension(extension, pinned)}
+                                    />
+                                ) : null}
+                                {onDisconnect ? (
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        title={t("sessionsTable.disconnect")}
+                                        aria-label={t("sessionsTable.disconnectNamed", {
+                                            browser: extension.browser
+                                        })}
+                                        disabled={busyId !== null}
+                                        onClick={() => onDisconnect(extension)}
+                                    >
+                                        <LogOut className="size-4" />
+                                    </Button>
+                                ) : null}
+                            </div>
+                        </td>
+                    </tr>
+        );
     }
     function renderSession(session: SessionView) {
         return (
@@ -569,6 +667,11 @@ export function SessionsTable({
                                                 onPin={onPinDevice}
                                             />
                                         ) : null}
+                                        {open
+                                            ? extensionRows
+                                                  .filter((extension) => members.has(extension.id))
+                                                  .map(renderExtension)
+                                            : null}
                                     </Fragment>
                                 );
                             })}
@@ -580,118 +683,9 @@ export function SessionsTable({
                     {/* The extensions, between the browsers and the apps: each is
                         a connection Polaris made and watches, so it carries the same
                         columns a session does and the same way of ending it. */}
-                    {extensionRows.map((extension) => (
-                        <tr
-                            key={`extension-${extension.id}`}
-                            className={cn(
-                                "border-t border-border",
-                                busyId === extension.id && "opacity-60"
-                            )}
-                        >
-                            <td className="w-full max-w-0 px-3 py-2">
-                                <div className="flex items-center gap-3">
-                                    <BrowserMark browser={extension.browser} />
-                                    <div className="min-w-0">
-                                        <p className="flex flex-wrap items-center gap-1.5">
-                                            <span className="min-w-0 truncate font-medium">
-                                                {extension.browser}
-                                            </span>
-                                            <span className="min-w-0 truncate text-muted-foreground">
-                                                {extension.os}
-                                            </span>
-                                            <Badge variant="neutral">
-                                                {t("sessionsTable.extension")}
-                                            </Badge>
-                                            <MachineBadge machine={machines.get(extension.id)} />
-                                            {inUseNow(extension, now) ? <ActiveNowBadge /> : null}
-                                            {(extension.pinToAddress ?? extension.pinnedByRule) ? (
-                                                <Badge
-                                                    title={t("sessionsTable.extensionLockedHint")}
-                                                >
-                                                    {t("sessionsTable.addressLocked")}
-                                                </Badge>
-                                            ) : null}
-                                        </p>
-                                        <p
-                                            className={cn(
-                                                "truncate text-xs text-muted-foreground",
-                                                !compact && "lg:hidden"
-                                            )}
-                                        >
-                                            {t.rich("sessionsTable.whereAndWhen", {
-                                                where:
-                                                    extension.ip ??
-                                                    t("sessionsTable.addressNotRecorded"),
-                                                time: timeTag(extension.lastSeenAt)
-                                            })}
-                                        </p>
-                                    </div>
-                                </div>
-                            </td>
-                            {compact ? null : (
-                                <>
-                                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell">
-                                        {t("sessionsTable.extension")}
-                                    </td>
-                                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs md:table-cell">
-                                        <ClientCell
-                                            mark={<SystemMark os={extension.os} />}
-                                            name={extension.os}
-                                            version={null}
-                                        />
-                                    </td>
-                                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs lg:table-cell">
-                                        <DeviceAddress
-                                            address={{ ip: extension.ip, publicIp: null }}
-                                        />
-                                    </td>
-                                    <td className="hidden max-w-[12rem] px-3 py-2 text-xs xl:table-cell">
-                                        <HostName host={extension.host} />
-                                    </td>
-                                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
-                                        <LastActive iso={extension.lastSeenAt} />
-                                    </td>
-                                </>
-                            )}
-                            <td className="px-3 py-2">
-                                <div className="flex justify-end gap-1">
-                                    {activityHref ? (
-                                        <ActivityLink
-                                            href={activityHref(extension)}
-                                            device={t("sessionsTable.extensionNamed", {
-                                                browser: extension.browser
-                                            })}
-                                        />
-                                    ) : null}
-                                    {onPinExtension ? (
-                                        <PinButton
-                                            label={t("sessionsTable.extensionNamed", {
-                                                browser: extension.browser
-                                            })}
-                                            pinToAddress={extension.pinToAddress}
-                                            pinnedByRule={extension.pinnedByRule}
-                                            busy={busyId !== null}
-                                            onPin={(pinned) => onPinExtension(extension, pinned)}
-                                        />
-                                    ) : null}
-                                    {onDisconnect ? (
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            title={t("sessionsTable.disconnect")}
-                                            aria-label={t("sessionsTable.disconnectNamed", {
-                                                browser: extension.browser
-                                            })}
-                                            disabled={busyId !== null}
-                                            onClick={() => onDisconnect(extension)}
-                                        >
-                                            <LogOut className="size-4" />
-                                        </Button>
-                                    ) : null}
-                                </div>
-                            </td>
-                        </tr>
-                    ))}
+                    {extensionRows
+                        .filter((extension) => !grouped.has(extension.id))
+                        .map(renderExtension)}
                     <DeviceSessionRows
                         sessions={deviceSessions.filter((device) => !grouped.has(device.id))}
                         machines={machines}
