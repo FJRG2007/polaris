@@ -23,6 +23,9 @@ import type { MetadataRoute } from "next";
 import { serverSeason } from "@/lib/seasonal-service";
 import { seasonIconPng, seasonIconSvg } from "@/lib/season-icon";
 
+/** Read on every request: built once, it would keep the season the build ran in. */
+export const dynamic = "force-dynamic";
+
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
     const season = await serverSeason().catch(() => null);
     return {
