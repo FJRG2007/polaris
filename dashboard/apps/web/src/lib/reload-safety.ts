@@ -85,7 +85,7 @@ function scrollerKey(element: Element, index: number): string {
 
 /** Read the scroll positions a reload of this tab would put back. Exported for the test. */
 export function takeSnapshot(): ReloadSnapshot {
-    const scroll = [{ selector: ":root", top: window.scrollY }];
+    const scroll = [{ selector: ":root", top: document.documentElement.scrollTop }];
     document.querySelectorAll(SCROLLERS).forEach((element, index) => {
         if (element.scrollTop > 0) scroll.push({ selector: scrollerKey(element, index), top: element.scrollTop });
     });

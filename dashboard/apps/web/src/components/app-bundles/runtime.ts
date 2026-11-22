@@ -18,6 +18,7 @@ import * as core from "@polaris/core";
 import * as nextLink from "next/link";
 import * as nextImage from "next/image";
 import * as zoom from "@polaris/ui/zoom";
+import * as useZoomPan from "@polaris/ui/use-zoom-pan";
 import * as automation from "@polaris/ui/automation";
 import * as automationRules from "@polaris/ui/automation-rules";
 import * as automationAdd from "@polaris/ui/automation-add";
@@ -40,6 +41,7 @@ const MODULES: Record<string, object> = {
     "@polaris/core/catalog-search": catalogSearch,
     "@polaris/ui": ui,
     "@polaris/ui/zoom": zoom,
+    "@polaris/ui/use-zoom-pan": useZoomPan,
     // The automation editor Places draws its automations with, and the
     // dashboard draws Mail's filters with: one copy, the page's.
     "@polaris/ui/automation": automation,
