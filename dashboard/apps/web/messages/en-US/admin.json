@@ -872,6 +872,18 @@
                     "ipv6": "Visitors with IPv6 can still reach the domain; choose a path below for everyone else."
                 }
             },
+            "starlink": {
+                "title": "This line is Starlink, and it restarts to install its updates.",
+                "why": "The dish and the Starlink router each drop the line for about a minute. Only the Starlink app can choose when.",
+                "show": "Keep the restarts out of the day",
+                "hide": "Hide the steps",
+                "steps": {
+                    "open": "In the Starlink app, open Settings, then Software updates.",
+                    "window": "Pick the window closest to {time}, the hour this server is least used.",
+                    "defer": "Turn on deferring updates, so one can wait up to three days for that window instead of installing on arrival.",
+                    "router": "The Starlink router has no window of its own and can still restart for an update at another hour."
+                }
+            },
             "works": {
                 "on": "Working now through {path}",
                 "none": "Nothing reaches this server from outside right now",

@@ -14,7 +14,7 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 import { getRouterWanIp } from "@/lib/host-address";
 import { stunMappedIp } from "@/lib/network/stun";
 import { detectLocalEnvironment } from "@/lib/network-service";
-import { detectCgnat, INBOUND_KEY, readReach, type InboundReach } from "./inbound";
+import { detectCgnat, INBOUND_KEY, isStarlinkPtr, readReach, type InboundReach } from "./inbound";
 
 const PTR_KEY = "network.publicIpPtr";
 const PTR_TIMEOUT_MS = 3_000;
@@ -100,7 +100,8 @@ export async function refreshInboundReach(input: ReachInput): Promise<InboundRea
             (sameIp && (input.ipv6 === undefined || input.ipv6 === previous?.ipv6)
                 ? (previous?.ipv6Inbound ?? null)
                 : null),
-        uplinkChangedAt
+        uplinkChangedAt,
+        starlink: isStarlinkPtr(ptr)
     };
     await setSetting(INBOUND_KEY, JSON.stringify(reach));
     // The uplink moved (a failover to the other line) or the verdict flipped:

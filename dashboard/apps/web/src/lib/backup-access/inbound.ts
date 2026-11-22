@@ -23,6 +23,11 @@ export const INBOUND_KEY = "network.inboundReach";
 /** Reverse names Starlink gives its customer addresses (`customer.<pop>.pop.starlinkisp.net`). */
 const STARLINK_PTR = /(^|\.)starlinkisp\.net\.?$/i;
 
+/** Whether any of these reverse names is one Starlink gives its customers. */
+export function isStarlinkPtr(names: readonly string[]): boolean {
+    return names.some((name) => STARLINK_PTR.test(name));
+}
+
 export const CGNAT_REASONS = [
     "carrier-address",
     "router-wan",
@@ -62,7 +67,9 @@ export const inboundReachSchema = z.object({
     ipv6: z.string().nullable().default(null),
     ipv6Inbound: z.boolean().nullable().default(null),
     /** The uplink changed (a new public address) since the last check. */
-    uplinkChangedAt: z.string().nullable().default(null)
+    uplinkChangedAt: z.string().nullable().default(null),
+    /** The public address is Starlink's, whatever the verdict about visitors. */
+    starlink: z.boolean().default(false)
 });
 export type InboundReach = z.infer<typeof inboundReachSchema>;
 
@@ -85,7 +92,7 @@ export interface CgnatVerdict {
  * out, is enough to stop treating the address as a way in.
  */
 export function detectCgnat(evidence: InboundEvidence): CgnatVerdict {
-    const starlink = evidence.ptr.some((name) => STARLINK_PTR.test(name));
+    const starlink = isStarlinkPtr(evidence.ptr);
     const inboundProven =
         evidence.outside === "up" || (evidence.outside === null && evidence.hairpin && !starlink);
     const found = (reason: CgnatReason, certain: boolean): CgnatVerdict => ({

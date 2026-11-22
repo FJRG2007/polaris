@@ -131,6 +131,7 @@ import {
 import { combineVerdicts, outsideScript, readOutside, type OutsideAnswer } from "./outside-check";
 import { CLOUDFLARED_IMAGE } from "@/lib/tunnel-images";
 import { BACKUP_TUNNEL_PROJECT } from "@/lib/polaris-parts";
+import { quietHour } from "@/lib/update-changelog";
 
 const TTL_KEY = "backupAccess.ttl";
 const RELAY_KEY = "backupAccess.relay";
@@ -326,6 +327,16 @@ export interface BackupView {
         readonly published: string | null;
         readonly problem: "no-cloudflare" | "failed" | null;
     };
+    /** On a Starlink line, a moment at the hour this deployment is least used, so
+     *  the screen can name it in the reader's own time; null on any other line. */
+    readonly starlinkQuietAt: string | null;
+}
+
+/** Today at this server-time hour: only its time of day is meant. */
+function atServerHour(hour: number): string {
+    const at = new Date();
+    at.setHours(hour, 0, 0, 0);
+    return at.toISOString();
 }
 
 export async function backupView(): Promise<BackupView> {
@@ -353,6 +364,11 @@ export async function backupView(): Promise<BackupView> {
             readAaaa().catch(() => null)
         ]);
     const cgnat = reach?.cgnat ?? false;
+    const starlinkQuietAt = reach?.starlink
+        ? await quietHour()
+              .then(atServerHour)
+              .catch(() => null)
+        : null;
     return {
         configured: Boolean(zones?.baseDomain),
         config,
@@ -388,7 +404,8 @@ export async function backupView(): Promise<BackupView> {
             inbound: reach?.ipv6Inbound ?? null,
             published: aaaa?.published ?? null,
             problem: aaaa?.problem ?? null
-        }
+        },
+        starlinkQuietAt
     };
 }
 

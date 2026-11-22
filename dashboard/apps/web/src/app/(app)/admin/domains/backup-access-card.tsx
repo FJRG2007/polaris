@@ -20,6 +20,7 @@ import {
     updateRelayEdgeAction
 } from "./actions";
 import { RelayFirewallGuide } from "./relay-firewall-guide";
+import { StarlinkUpdateGuide } from "./starlink-update-guide";
 import { TAILSCALE_CONNECT_ID } from "./tailscale-card";
 import { PageSection } from "@/components/page-section";
 import { RelativeTime } from "@/components/relative-time";
@@ -546,6 +547,7 @@ function LineReach({ view }: { view: BackupView }) {
                 ) : null}
                 <Ipv6Line view={view} />
             </div>
+            <StarlinkUpdateGuide view={view} />
         </div>
     );
 }

@@ -39,7 +39,7 @@ beforeEach(() => {
 describe("refreshInboundReach", () => {
     it("stores the verdict and re-detects the environment on a first sighting", async () => {
         const reach = await refreshInboundReach({ publicIp: FIBRE, outside: "up", hairpin: false });
-        expect(reach).toMatchObject({ publicIp: FIBRE, cgnat: false, inboundProven: true });
+        expect(reach).toMatchObject({ publicIp: FIBRE, cgnat: false, inboundProven: true, starlink: false });
         expect(stored()).toMatchObject({ publicIp: FIBRE, uplinkChangedAt: null });
         expect(redetected).toHaveBeenCalledWith(true);
     });
@@ -53,7 +53,8 @@ describe("refreshInboundReach", () => {
             outside: null,
             hairpin: false
         });
-        expect(reach).toMatchObject({ cgnat: false, inboundProven: true });
+        // A Starlink plan with a public address still restarts for its updates.
+        expect(reach).toMatchObject({ cgnat: false, inboundProven: true, starlink: true });
         expect(redetected).not.toHaveBeenCalled();
     });
 

@@ -872,6 +872,18 @@
                     "ipv6": "Quien tenga IPv6 aún llega al dominio; elige una vía abajo para el resto."
                 }
             },
+            "starlink": {
+                "title": "Esta línea es Starlink, y se reinicia para instalar sus actualizaciones.",
+                "why": "La antena y el router de Starlink cortan la línea cerca de un minuto. Solo la app de Starlink elige cuándo.",
+                "show": "Sacar los reinicios de las horas de uso",
+                "hide": "Ocultar los pasos",
+                "steps": {
+                    "open": "En la app de Starlink, abre Ajustes y luego Actualizaciones de software.",
+                    "window": "Elige la ventana más cercana a las {time}, la hora en que menos se usa este servidor.",
+                    "defer": "Activa el aplazamiento, para que una actualización espere hasta tres días a esa ventana en vez de instalarse al llegar.",
+                    "router": "El router de Starlink no tiene ventana propia y puede reiniciarse por una actualización a otra hora."
+                }
+            },
             "works": {
                 "on": "Funcionando ahora por {path}",
                 "none": "Ahora mismo nada llega a este servidor desde fuera",

@@ -30,6 +30,7 @@ const reach = (over: Partial<InboundReach> = {}): InboundReach => ({
     ipv6: null,
     ipv6Inbound: null,
     uplinkChangedAt: null,
+    starlink: true,
     ...over
 });
 
@@ -351,5 +352,19 @@ describe("readReach", () => {
         expect(inbound.readReach(JSON.stringify(reach()))?.cgnat).toBe(true);
         expect(inbound.readReach("{")).toBeNull();
         expect(inbound.readReach(null)).toBeNull();
+    });
+    it("reads a verdict stored before the Starlink flag as another line", () => {
+        const { starlink: _, ...older } = reach();
+        expect(inbound.readReach(JSON.stringify(older))?.starlink).toBe(false);
+    });
+});
+
+describe("isStarlinkPtr", () => {
+    it("knows Starlink's customer names and nothing that only resembles them", () => {
+        expect(inbound.isStarlinkPtr(["customer.mdrdesp1.pop.starlinkisp.net."])).toBe(true);
+        expect(inbound.isStarlinkPtr(["static.example.net", "customer.x.pop.starlinkisp.net"])).toBe(true);
+        expect(inbound.isStarlinkPtr(["starlinkisp.net.example.com"])).toBe(false);
+        expect(inbound.isStarlinkPtr(["notstarlinkisp.net"])).toBe(false);
+        expect(inbound.isStarlinkPtr([])).toBe(false);
     });
 });
