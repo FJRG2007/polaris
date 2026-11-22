@@ -330,7 +330,10 @@
             "checklist": "Tareas",
             "quote": "Cita",
             "code": "Código",
-            "divider": "Separador"
+            "divider": "Separador",
+            "math": "Fórmula",
+            "diagram": "Diagrama",
+            "contents": "Índice"
         },
         "placeholder": "Escribe algo",
         "cut": "Cortar",
@@ -446,7 +449,18 @@
                 "lightGray": "Gris claro",
                 "white": "Blanco"
             }
-        }
+        },
+        "tableOfContents": "Índice",
+        "tableOfContentsEmpty": "Aquí verás los títulos que añadas.",
+        "untitledHeading": "Título sin texto",
+        "diagramError": "Este diagrama tiene un error.",
+        "diagramLoading": "Dibujando el diagrama...",
+        "mathLanguage": "Fórmula",
+        "diagramLanguage": "Diagrama",
+        "showSource": "Código",
+        "showDrawing": "Vista",
+        "foldSection": "Plegar sección",
+        "unfoldSection": "Desplegar sección"
     },
     "picker": {
         "remove": "Quitar a {name}",

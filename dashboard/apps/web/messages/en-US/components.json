@@ -330,7 +330,10 @@
             "checklist": "Checklist",
             "quote": "Quote",
             "code": "Code",
-            "divider": "Divider"
+            "divider": "Divider",
+            "math": "Math",
+            "diagram": "Diagram",
+            "contents": "Table of contents"
         },
         "placeholder": "Write something",
         "cut": "Cut",
@@ -446,7 +449,18 @@
                 "lightGray": "Light gray",
                 "white": "White"
             }
-        }
+        },
+        "tableOfContents": "Contents",
+        "tableOfContentsEmpty": "Headings you add are listed here.",
+        "untitledHeading": "Untitled heading",
+        "diagramError": "This diagram has a mistake in it.",
+        "diagramLoading": "Drawing the diagram...",
+        "mathLanguage": "Math",
+        "diagramLanguage": "Diagram",
+        "showSource": "Source",
+        "showDrawing": "Preview",
+        "foldSection": "Fold section",
+        "unfoldSection": "Unfold section"
     },
     "picker": {
         "remove": "Remove {name}",

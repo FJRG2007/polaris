@@ -25,6 +25,7 @@ import type { Editor, Range } from "@tiptap/core";
 import type { SuggestionProps } from "@tiptap/suggestion";
 import { forwardRef, useEffect, useId, useImperativeHandle, useState } from "react";
 import { stepPickable, SuggestionList } from "./suggestion-list";
+import { TABLE_OF_CONTENTS } from "./markdown";
 import { BLOCK_MENU_KEY, mountPopup, POPUP_LAYER_CLASS, type SuggestionHandle } from "./suggestion";
 import {
     Code2,
@@ -34,10 +35,13 @@ import {
     List,
     ListOrdered,
     ListTodo,
+    ListTree,
     Minus,
     Quote,
+    Sigma,
     Terminal,
-    Type
+    Type,
+    Workflow
 } from "lucide-react";
 
 export interface BlockCommand {
@@ -61,7 +65,10 @@ export type BlockId =
     | "checklist"
     | "quote"
     | "code"
-    | "divider";
+    | "divider"
+    | "math"
+    | "diagram"
+    | "contents";
 
 const BLOCKS: readonly (Omit<BlockCommand, "label"> & { readonly id: BlockId })[] = [
     {
@@ -126,6 +133,27 @@ const BLOCKS: readonly (Omit<BlockCommand, "label"> & { readonly id: BlockId })[
         keywords: "rule separator hr line",
         icon: Minus,
         run: (editor, range) => editor.chain().focus().deleteRange(range).setHorizontalRule().run()
+    },
+    {
+        id: "math",
+        keywords: "formula equation latex katex",
+        icon: Sigma,
+        run: (editor, range) =>
+            editor.chain().focus().deleteRange(range).setCodeBlock({ language: "math" }).run()
+    },
+    {
+        id: "diagram",
+        keywords: "mermaid flowchart chart graph sequence",
+        icon: Workflow,
+        run: (editor, range) =>
+            editor.chain().focus().deleteRange(range).setCodeBlock({ language: "mermaid" }).run()
+    },
+    {
+        id: "contents",
+        keywords: "toc outline index headings",
+        icon: ListTree,
+        run: (editor, range) =>
+            editor.chain().focus().deleteRange(range).insertContent({ type: TABLE_OF_CONTENTS }).run()
     }
 ];
 

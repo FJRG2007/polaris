@@ -327,6 +327,7 @@ export function NotesView({
                             disabled={shared === "view"}
                             placeholder={t("view.editorPlaceholder")}
                             className="min-h-[24rem] flex-1"
+                            foldableHeadings
                         />
 
                         <NoteBacklinks backlinks={backlinks} />

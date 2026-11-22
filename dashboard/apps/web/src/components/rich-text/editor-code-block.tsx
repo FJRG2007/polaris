@@ -30,6 +30,8 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 import type { EditorState, Transaction } from "@tiptap/pm/state";
 import { CODE_LANGUAGES, languageForToken } from "@/lib/code-language";
 import { ensureGrammar, highlightIfReady } from "@/lib/code-highlight";
+import { renderedFence } from "./outline";
+import { FenceRender } from "./document-blocks";
 import {
     NodeViewContent,
     NodeViewWrapper,
@@ -164,7 +166,11 @@ function CodeBlockShell({ node, updateAttributes, editor }: NodeViewProps) {
     // A fence tag is whatever was typed - "sh", "golang", "c++" - so the picker
     // shows the grammar it resolves to rather than the word, and an unknown one
     // reads as plain text instead of as a missing option.
-    const value = useMemo(() => (token ? (languageForToken(token)?.id ?? "") : ""), [token]);
+    const fence = renderedFence(token);
+    const value = useMemo(
+        () => fence ?? (token ? (languageForToken(token)?.id ?? "") : ""),
+        [fence, token]
+    );
 
     return (
         <NodeViewWrapper
@@ -182,12 +188,22 @@ function CodeBlockShell({ node, updateAttributes, editor }: NodeViewProps) {
                     onValueChange={(next) => updateAttributes({ language: next || null })}
                     className="h-6 w-40 border-none bg-transparent px-1 text-[0.625rem] uppercase tracking-[0.06em]"
                     contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
-                    options={[{ value: "", label: t("editor.plainText") }, ...LANGUAGES]}
+                    options={[
+                        { value: "", label: t("editor.plainText") },
+                        { value: "math", label: t("editor.mathLanguage") },
+                        { value: "mermaid", label: t("editor.diagramLanguage") },
+                        ...LANGUAGES
+                    ]}
                 />
             </div>
             <pre data-code="" className="overflow-x-auto p-3 font-mono text-xs leading-relaxed">
                 <NodeViewContent<"code"> as="code" className="hljs bg-transparent p-0" />
             </pre>
+            {fence && (
+                <div contentEditable={false} className="border-t border-border bg-background p-3">
+                    <FenceRender code={node.textContent} fence={fence} />
+                </div>
+            )}
         </NodeViewWrapper>
     );
 }

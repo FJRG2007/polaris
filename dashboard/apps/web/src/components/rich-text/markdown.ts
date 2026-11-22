@@ -39,6 +39,23 @@ export const MARKDOWN_BLOCK = "markdownBlock";
 /** The inline node behind a mention and a Polaris chip. */
 export const REFERENCE = "reference";
 
+/**
+ * A formula inside a sentence, written `` $`a^2 + b^2`$ ``.
+ *
+ * The backticks are the point: a bare `$...$` would turn every message that
+ * mentions two prices into an equation, while a code span between dollar signs
+ * is something nobody writes by accident - and it is the spelling GitLab reads,
+ * so a note pasted in from there keeps its formulas. A formula on its own lines
+ * is a ```math fence, which is a code block and needs no node of its own.
+ */
+export const INLINE_MATH = "inlineMath";
+
+/** The table of contents block, written as a line of its own: `[TOC]`. */
+export const TABLE_OF_CONTENTS = "tableOfContents";
+
+/** The line a table of contents is stored as. */
+export const TABLE_OF_CONTENTS_LINE = "[TOC]";
+
 // ---------------------------------------------------------------------------
 // Markdown -> document
 // ---------------------------------------------------------------------------
@@ -97,6 +114,9 @@ function block(token: Token, origin: string | null): JSONContent | null {
         }
         case "paragraph": {
             const paragraph = token as Tokens.Paragraph;
+            if (paragraph.raw.trim().toUpperCase() === TABLE_OF_CONTENTS_LINE) {
+                return { type: TABLE_OF_CONTENTS };
+            }
             return { type: "paragraph", content: inline(paragraph.tokens, origin) };
         }
         case "text": {
@@ -205,8 +225,39 @@ function listBody(item: Tokens.ListItem, origin: string | null): JSONContent[] {
 
 function inline(tokens: readonly Token[], origin: string | null): JSONContent[] {
     const out: JSONContent[] = [];
-    for (const token of tokens) out.push(...inlineNodes(token, origin));
+    for (const token of withInlineMath(tokens)) out.push(...inlineNodes(token, origin));
     return out;
+}
+
+/**
+ * The tokens with every `` $`...`$ `` folded into one formula token.
+ *
+ * The lexer reads one as text ending in a dollar sign, a code span, and text
+ * starting with one. Only plain text counts on either side: an escaped `\$`
+ * arrives as an `escape` token, which is somebody saying they meant the
+ * character.
+ */
+function withInlineMath(tokens: readonly Token[]): Token[] {
+    const list = [...tokens];
+    for (let index = 1; index < list.length - 1; index++) {
+        const before = list[index - 1]!;
+        const code = list[index]!;
+        const after = list[index + 1]!;
+        if (code.type !== "codespan" || before.type !== "text" || after.type !== "text") continue;
+        if (!before.raw.endsWith("$") || !after.raw.startsWith("$")) continue;
+        list[index - 1] = plainToken(before.raw.slice(0, -1));
+        list[index] = {
+            type: INLINE_MATH,
+            raw: `$${code.raw}$`,
+            text: decodeEntities((code as Tokens.Codespan).text)
+        };
+        list[index + 1] = plainToken(after.raw.slice(1));
+    }
+    return list;
+}
+
+function plainToken(raw: string): Token {
+    return { type: "text", raw, text: raw } as Tokens.Text;
 }
 
 function inlineNodes(token: Token, origin: string | null): JSONContent[] {
@@ -228,6 +279,8 @@ function inlineNodes(token: Token, origin: string | null): JSONContent[] {
             return withMark(textNode((token as Tokens.Codespan).text), { type: "code" });
         case "br":
             return [{ type: "hardBreak" }];
+        case INLINE_MATH:
+            return [{ type: INLINE_MATH, attrs: { latex: String((token as Tokens.Generic).text) } }];
         case "image": {
             const image = token as Tokens.Image;
             return [
@@ -394,7 +447,13 @@ export function isBlankMarkdown(markdown: string): boolean {
     const solid = (node: JSONContent): boolean => {
         if (node.type === "text") return (node.text ?? "").trim().length > 0;
         if (node.type === "hardBreak") return false;
-        if (node.type === "image" || node.type === REFERENCE || node.type === CUSTOM_EMOJI_NODE)
+        if (
+            node.type === "image" ||
+            node.type === REFERENCE ||
+            node.type === CUSTOM_EMOJI_NODE ||
+            node.type === INLINE_MATH ||
+            node.type === TABLE_OF_CONTENTS
+        )
             return true;
         if (node.type === "horizontalRule" || node.type === "codeBlock") return true;
         if (node.type === MARKDOWN_BLOCK) return (node.content ?? []).length > 0;
@@ -457,6 +516,8 @@ function renderBlock(node: JSONContent): string {
             return renderList(node, (_index, item) => (item.attrs?.checked ? "- [x] " : "- [ ] "));
         case MARKDOWN_BLOCK:
             return plainText(node);
+        case TABLE_OF_CONTENTS:
+            return TABLE_OF_CONTENTS_LINE;
         default:
             return node.content ? renderBlocks(node.content) : "";
     }
@@ -506,6 +567,7 @@ function renderInline(nodes: readonly JSONContent[] | undefined): string {
 
 function renderInlineNode(node: JSONContent): string {
     if (node.type === "hardBreak") return "\\\n";
+    if (node.type === INLINE_MATH) return `$${codeSpan(String(node.attrs?.latex ?? ""))}$`;
     if (node.type === "image") {
         const attrs = node.attrs ?? {};
         const title = typeof attrs.title === "string" && attrs.title ? ` "${attrs.title}"` : "";
@@ -567,6 +629,18 @@ function applyMark(
         default:
             return text;
     }
+}
+
+/**
+ * Text as a code span, fenced with one more backtick than the longest run
+ * inside it, and padded where it starts or ends with one, so a formula holding
+ * a backtick is read back whole.
+ */
+function codeSpan(text: string): string {
+    const longest = Math.max(0, ...(text.match(/`+/g) ?? []).map((run) => run.length));
+    const fence = "`".repeat(longest + 1);
+    const pad = text.startsWith("`") || text.endsWith("`") ? " " : "";
+    return `${fence}${pad}${text}${pad}${fence}`;
 }
 
 /** Escapes what would otherwise be read back as formatting. */

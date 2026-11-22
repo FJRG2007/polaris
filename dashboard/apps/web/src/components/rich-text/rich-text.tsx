@@ -15,6 +15,8 @@
 import Link from "next/link";
 import { cn } from "@polaris/ui";
 import { CodeBlock } from "./code-block";
+import { outlineOf, renderedFence, type OutlineEntry } from "./outline";
+import { Formula, OutlineList, RenderedFenceBlock } from "./document-blocks";
 import { RICH_TEXT_PROSE } from "./prose";
 import { Chip, TaskBox } from "./rich-text-client";
 import { PolarMention } from "@/components/polar/polar-bot";
@@ -34,7 +36,9 @@ import {
     REFERENCE,
     markdownToDoc,
     READER_TABLE,
+    INLINE_MATH,
     MARKDOWN_BLOCK,
+    TABLE_OF_CONTENTS,
     splitChannelMentions,
     splitPolarMentions
 } from "./markdown";
@@ -127,7 +131,7 @@ export function RichText({
         : null;
     return (
         <div className={cn(RICH_TEXT_PROSE, className, jumbo && "text-[2.75rem] leading-[1.15]")}>
-            {blocks(doc.content, { set: customEmoji, jumbo, flagged, remoteImages })}
+            {blocks(doc.content, { set: customEmoji, jumbo, flagged, remoteImages, ...outlineScope(doc) })}
         </div>
     );
 }
@@ -144,6 +148,19 @@ interface EmojiScope {
     readonly flagged: ReadonlyMap<string, string> | null;
     /** Pictures from another site load inline; false makes them links. */
     readonly remoteImages: boolean;
+    /** The document's headings, for a table of contents. */
+    readonly outline?: readonly OutlineEntry[];
+    /** Each top-level heading's anchor, by the node itself. */
+    readonly anchors?: ReadonlyMap<JSONContent, string>;
+}
+
+/** The outline a document's table of contents lists, and the anchors its
+ *  headings carry so the list can link to them. */
+function outlineScope(doc: JSONContent): Pick<EmojiScope, "outline" | "anchors"> {
+    const top = doc.content ?? [];
+    if (!top.some((node) => node.type === TABLE_OF_CONTENTS)) return {};
+    const outline = outlineOf(top);
+    return { outline, anchors: new Map(outline.map((entry) => [top[entry.index]!, entry.id])) };
 }
 
 /** A link a reputation service flagged, as far as drawing it goes. */
@@ -239,7 +256,7 @@ function Block({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
         case "heading": {
             const level = Number(node.attrs?.level ?? 1);
             const Tag = (level === 1 ? "h1" : level === 2 ? "h2" : "h3") as "h1" | "h2" | "h3";
-            return <Tag>{inline(node.content, scope)}</Tag>;
+            return <Tag id={scope.anchors?.get(node)}>{inline(node.content, scope)}</Tag>;
         }
         case "paragraph":
             return <p>{inline(node.content, scope)}</p>;
@@ -257,13 +274,20 @@ function Block({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
             // The same attribute the editor's own list carries, so one rule in
             // the shared type styles reaches both.
             return <ul data-type="taskList">{taskItems(node.content, scope)}</ul>;
-        case "codeBlock":
+        case TABLE_OF_CONTENTS:
+            return <OutlineList outline={scope.outline ?? []} />;
+        case "codeBlock": {
+            const fence = renderedFence(
+                typeof node.attrs?.language === "string" ? node.attrs.language : null
+            );
+            if (fence) return <RenderedFenceBlock code={text(node)} fence={fence} />;
             return (
                 <CodeBlock
                     code={text(node)}
                     language={typeof node.attrs?.language === "string" ? node.attrs.language : null}
                 />
             );
+        }
         case MARKDOWN_BLOCK:
             // Markdown the schema has no node for - a table, a piece of raw HTML
             // - shown as the source it is. No language to declare and nothing to
@@ -383,6 +407,7 @@ function Inline({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
     if (node.type === "hardBreak") return <br />;
     if (node.type === "image") return <Media node={node} scope={scope} />;
     if (node.type === REFERENCE) return <Chip node={node} />;
+    if (node.type === INLINE_MATH) return <Formula latex={String(node.attrs?.latex ?? "")} />;
     if (node.type !== "text") return <>{inline(node.content, scope)}</>;
 
     // `@everyone` and `@here` are stored as the text somebody typed - there is

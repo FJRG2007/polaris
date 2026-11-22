@@ -19,6 +19,7 @@ import * as md from "./markdown";
 import * as refs from "./references";
 import { BlockMenu, type SlashCommand } from "./block-menu";
 import { baseExtensions } from "./schema";
+import { FoldableHeadings } from "./document-nodes";
 import { RICH_TEXT_PROSE } from "./prose";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -204,6 +205,8 @@ export interface RichTextEditorProps {
     /** Marks the field invalid for assistive technology, like `aria-invalid`. */
     invalid?: boolean;
     className?: string;
+    /** Headings fold their section away, for a long document read in place. */
+    foldableHeadings?: boolean;
 }
 
 /**
@@ -266,7 +269,8 @@ export function RichTextEditor({
     after = null,
     ariaLabel,
     invalid = false,
-    className
+    className,
+    foldableHeadings = false
 }: RichTextEditorProps) {
     // Held in a ref rather than in the dependency list: the editor is built once
     // and these change with every render of the parent.
@@ -339,9 +343,16 @@ export function RichTextEditor({
                 mentionsIn !== null || polarMentions,
                 (id) => words.current(`editor.mentions.${id}`)
             ),
-            ...(writesEmoji ? [CustomEmojiNode, emojiExtension(() => customEmoji.current)] : [])
+            ...(writesEmoji ? [CustomEmojiNode, emojiExtension(() => customEmoji.current)] : []),
+            ...(foldableHeadings
+                ? [
+                      FoldableHeadings.configure({
+                          say: () => (key) => words.current(`editor.${key}Section`)
+                      })
+                  ]
+                : [])
         ],
-        [hint, search, mentionsIn, polarMentions, roomMentions, writesEmoji]
+        [hint, search, mentionsIn, polarMentions, roomMentions, writesEmoji, foldableHeadings]
     );
 
     /** A document with the space's emoji drawn as pictures, where this box

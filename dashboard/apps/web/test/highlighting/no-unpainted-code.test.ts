@@ -27,6 +27,7 @@ const PLAIN_PRE: Record<string, string> = {
     "apps/web/src/app/(app)/apps/databases/workbench.tsx": "a stored value that is not JSON",
     "apps/web/src/app/(app)/apps/deploy/cron-panel.tsx": "a cron run's output",
     "apps/web/src/app/(app)/apps/deploy/settings/automations-section.tsx": "a step's output",
+    "apps/web/src/components/rich-text/document-blocks.tsx": "LaTeX or Mermaid source, shown while its drawing loads or on request; neither has a grammar",
     "apps/web/src/components/rules/condition-builder.tsx": "a rule expression (firewall, account access rules); no grammar exists for it",
     "apps/web/src/app/(app)/apps/firewall/managed-rule-page.tsx": "a firewall expression; no grammar exists for it",
     "apps/web/src/app/(app)/apps/servers/edge-panel.tsx": "an edge repair log",
