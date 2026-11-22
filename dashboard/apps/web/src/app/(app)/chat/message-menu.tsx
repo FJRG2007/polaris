@@ -200,12 +200,125 @@ const PRESET_LABELS = {
     nextMonday: "messageMenu.nextMonday"
 } as const satisfies Record<ReminderPreset, string>;
 
+/**
+ * The right-click menu and the long-press sheet of one message.
+ *
+ * A channel draws hundreds of these, and a row that is only scrolled past must
+ * cost no more than its trigger: the actions, their hooks and the reminder
+ * dialog are built by `MessageMenuBody`, which is mounted the first time this
+ * row's menu or sheet opens and kept after, so a reminder dialog opened from it
+ * outlives the menu. Opening it is one row's render, not a rebuild of every
+ * row's thirty actions on every render of the list.
+ *
+ * Not modal, as a desktop context menu is not: the page is not locked and
+ * hidden from assistive technology behind it, which on a long conversation was
+ * a walk over the whole document on every open. The menu still takes the focus,
+ * is walked with the arrows and closed with Escape or a press outside.
+ */
 export function MessageMenu({
     actions,
     children
 }: {
     actions: MessageActions;
     children: ReactNode;
+}) {
+    const baseUrl = useAppUrl();
+    /**
+     * What the pointer was over when the menu was opened.
+     *
+     * Two halves, and the second one is not optional. The ref records the
+     * gesture, on the press as well as on the context-menu event, because a long
+     * press on a touch screen opens this without a context-menu event ever
+     * happening - and a ref costs no render on a press that opens nothing.
+     *
+     * But the menu's items are React elements, built when this row last
+     * rendered, not when the menu opens. Reading the ref straight into the
+     * markup meant the items were always one gesture behind: the first
+     * right-click on a picture recorded it and drew a menu with no picture
+     * section. So opening the menu settles what was under the pointer into
+     * state, which is the render the items are built in.
+     */
+    const pointed = useRef<MessageTarget>(NOTHING);
+    const [at, setAt] = useState<MessageTarget>(NOTHING);
+    /** Whether the menu has been opened on this row yet - see above. */
+    const [armed, setArmed] = useState(false);
+    /** A finger rather than a mouse: the hold opens a sheet instead of the menu. */
+    const touch = useTouchScreen();
+    const [sheetOpen, setSheetOpen] = useState(false);
+    const longPress = useLongPress((target, row) => {
+        pointed.current = messageTarget(target, row, baseUrl);
+        setAt(pointed.current);
+        setArmed(true);
+        setSheetOpen(true);
+    });
+    /** Records what was pressed; opening settles it into state. */
+    const point = (target: Element | null, row: Element) => {
+        pointed.current = messageTarget(target, row, baseUrl);
+    };
+    const body = armed && (
+        <MessageMenuBody
+            actions={actions}
+            at={at}
+            touch={touch}
+            sheetOpen={sheetOpen}
+            onSheetOpenChange={setSheetOpen}
+        />
+    );
+
+    if (touch)
+        // On a touch screen the hold opens the sheet; the right-click menu,
+        // which would open a desktop dropdown under the finger, is not mounted
+        // at all.
+        return (
+            <>
+                <div
+                    className="contents"
+                    {...longPress}
+                >
+                    {isValidElement<{ "data-state"?: string }>(children)
+                        ? cloneElement(children, { "data-state": sheetOpen ? "open" : "closed" })
+                        : children}
+                </div>
+                {body}
+            </>
+        );
+    return (
+        <ContextMenu
+            modal={false}
+            // Radix runs the trigger's own handler before it opens, so by the
+            // time this fires the gesture has already been read. Both updates
+            // land in one render, which is the one the items are built in.
+            onOpenChange={(open) => {
+                if (!open) return;
+                setAt(pointed.current);
+                setArmed(true);
+            }}
+        >
+            <ContextMenuTrigger
+                asChild
+                onPointerDown={(event) => point(event.target as Element | null, event.currentTarget)}
+                onContextMenu={(event) => point(event.target as Element | null, event.currentTarget)}
+            >
+                {children}
+            </ContextMenuTrigger>
+            {body}
+        </ContextMenu>
+    );
+}
+
+/** The actions of one message, built only once its menu or sheet has opened. */
+function MessageMenuBody({
+    actions,
+    at,
+    touch,
+    sheetOpen,
+    onSheetOpenChange
+}: {
+    actions: MessageActions;
+    at: MessageTarget;
+    touch: boolean;
+    sheetOpen: boolean;
+    onSheetOpenChange: (open: boolean) => void;
 }) {
     const t = useTranslations("chat");
     const { message, mine, canPost, canModerate } = actions;
@@ -221,34 +334,6 @@ export function MessageMenu({
     /** Which recording is being converted, so its menu cannot be pressed twice
      *  while a few seconds of encoding are going on. */
     const [saving, setSaving] = useState<string | null>(null);
-    /**
-     * What the pointer was over when the menu was opened.
-     *
-     * Two halves, and the second one is not optional. The ref records the
-     * gesture, on the press as well as on the context-menu event, because a long
-     * press on a touch screen opens this without a context-menu event ever
-     * happening - and a ref costs no render on a press that opens nothing.
-     *
-     * But the menu's items are React elements, built when this row last
-     * rendered, not when the menu opens. Reading the ref straight into the
-     * markup meant the items were always one gesture behind: the first
-     * right-click on a picture recorded it and drew a menu with no picture
-     * section, and it only appeared once something else re-rendered the row -
-     * opening the picture in the viewer, which is exactly what people did, after
-     * which the menu looked right for ever and the bug looked like it had never
-     * been there. So opening the menu settles what was under the pointer into
-     * state, which is the render the items are built in.
-     */
-    const pointed = useRef<MessageTarget>(NOTHING);
-    const [at, setAt] = useState<MessageTarget>(NOTHING);
-    /** A finger rather than a mouse: the hold opens a sheet instead of the menu. */
-    const touch = useTouchScreen();
-    const [sheetOpen, setSheetOpen] = useState(false);
-    const longPress = useLongPress((target, row) => {
-        pointed.current = messageTarget(target, row, baseUrl);
-        setAt(pointed.current);
-        setSheetOpen(true);
-    });
     const link = at.link;
     const picture = at.image;
     const clip = at.video;
@@ -337,11 +422,6 @@ export function MessageMenu({
         setSaving(null);
         toast.dismiss(note);
         if (failure) toast.show({ title: failure });
-    };
-
-    /** Settles what was pressed into state, the render the items are built in. */
-    const point = (target: Element | null, row: Element) => {
-        pointed.current = messageTarget(target, row, baseUrl);
     };
 
     // ------------------------------------------------------------------
@@ -711,52 +791,19 @@ export function MessageMenu({
     return (
         <>
             {touch ? (
-                // On a touch screen the hold opens the sheet; the right-click
-                // menu, which would open a desktop dropdown under the finger, is
-                // not mounted at all.
-                <div
-                    className="contents"
-                    {...longPress}
-                >
-                    {isValidElement<{ "data-state"?: string }>(children)
-                        ? cloneElement(children, { "data-state": sheetOpen ? "open" : "closed" })
-                        : children}
-                </div>
-            ) : (
-                <ContextMenu
-                    // Radix runs the trigger's own handler before it opens, so by the
-                    // time this fires the gesture has already been read. Both updates
-                    // land in one render, which is the one the items are built in.
-                    onOpenChange={(open) => {
-                        if (open) setAt(pointed.current);
-                    }}
-                >
-                    <ContextMenuTrigger
-                        asChild
-                        onPointerDown={(event) =>
-                            point(event.target as Element | null, event.currentTarget)
-                        }
-                        onContextMenu={(event) =>
-                            point(event.target as Element | null, event.currentTarget)
-                        }
-                    >
-                        {children}
-                    </ContextMenuTrigger>
-                    {/* Focus is not handed back to the message row on the way out: Reply
-                        and Edit put the caret in the composer, and the hand-back landed
-                        a beat later and took it straight out again. */}
-                    <ContextMenuContent className="w-56" onCloseAutoFocus={keepFocusOnClose}>
-                        <DesktopMenu model={model} emojiSet={actions.emoji?.set ?? null} />
-                    </ContextMenuContent>
-                </ContextMenu>
-            )}
-            {touch && (
                 <MessageSheet
                     open={sheetOpen}
-                    onOpenChange={setSheetOpen}
+                    onOpenChange={onSheetOpenChange}
                     model={model}
                     emojiSet={actions.emoji?.set ?? null}
                 />
+            ) : (
+                // Focus is not handed back to the message row on the way out:
+                // Reply and Edit put the caret in the composer, and the hand-back
+                // landed a beat later and took it straight out again.
+                <ContextMenuContent className="w-56" onCloseAutoFocus={keepFocusOnClose}>
+                    <DesktopMenu model={model} emojiSet={actions.emoji?.set ?? null} />
+                </ContextMenuContent>
             )}
             {/* Outside the menu, which is gone by the time a date is typed. */}
             <ScheduleDialog

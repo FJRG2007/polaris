@@ -11,3 +11,15 @@
  */
 export const FLOATING_MOTION =
     "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=closed]:duration-fast data-[side=bottom]:slide-in-from-top-1 data-[side=top]:slide-in-from-bottom-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1";
+
+/**
+ * How a menu opened at the pointer arrives: at once, and leaves like any other.
+ *
+ * A right-click menu has no control it grew out of, so there is no side for it
+ * to come in from, and a fade from nothing over the design system's duration is
+ * a menu that is visibly late - the operating system's own appears in the frame
+ * after the click. It still fades out, faster, like every floating surface; its
+ * submenus keep `FLOATING_MOTION`, because those do open from an item.
+ */
+export const POINTER_MENU_MOTION =
+    "data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-fast";

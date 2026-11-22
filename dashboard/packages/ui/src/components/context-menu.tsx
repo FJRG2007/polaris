@@ -7,7 +7,7 @@
  */
 
 import { cn } from "../lib/cn";
-import { FLOATING_MOTION } from "../lib/motion";
+import { FLOATING_MOTION, POINTER_MENU_MOTION } from "../lib/motion";
 import { ChevronRight } from "lucide-react";
 import { useSettledHover } from "../lib/menu-hover";
 import * as fit from "../lib/submenu-fit";
@@ -102,7 +102,7 @@ export const ContextMenuContent = forwardRef<
                 collisionPadding={collisionPadding}
                 className={cn(
                     "z-50 max-h-[--radix-context-menu-content-available-height] min-w-[min(11rem,calc(100vw-2rem))] max-w-[--radix-context-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover",
-                    FLOATING_MOTION,
+                    POINTER_MENU_MOTION,
                     className
                 )}
                 {...props}
