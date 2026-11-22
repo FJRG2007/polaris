@@ -66,6 +66,13 @@ describe("when a load is handed over", () => {
         expect(arrivedFromOutside({ ...base, referrer: "", path: "/login?next=/chat" })).toBe(false);
         expect(arrivedFromOutside({ ...base, referrer: "", path: "/api/files/1" })).toBe(false);
     });
+
+    it("is never the app a sign-in moved on to without a page load", () => {
+        // The visit started at the sign-in screen; the router has since moved it.
+        expect(arrivedFromOutside({ ...base, referrer: "", landing: "/oauth/login?redirect=%2Fvault" })).toBe(false);
+        expect(arrivedFromOutside({ ...base, referrer: "", landing: "/oauth/2fa" })).toBe(false);
+        expect(arrivedFromOutside({ ...base, referrer: "", landing: "/chat/general" })).toBe(true);
+    });
 });
 
 describe("the link", () => {

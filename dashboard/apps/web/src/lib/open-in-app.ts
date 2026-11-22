@@ -10,7 +10,7 @@
  * names the page (`polaris://open?server=&path=`, read by both apps the same
  * way), and the app opens it only for a Polaris it already has, or after a yes.
  *
- * Pure, so every rule here is asserted without a browser.
+ * Pure but for `holdForSignIn`, so every rule here is asserted without a browser.
  */
 
 import { clientFromUserAgent } from "@polaris/core";
@@ -50,23 +50,46 @@ export function arrivedFromOutside({
     referrer,
     origin,
     path,
+    landing,
     navigation,
     tried
 }: {
     referrer: string;
     origin: string;
     path: string;
+    /** The path this document was loaded on, when it differs from `path`: a
+     *  sign-in screen moves on to the app without a page load, so `path` is
+     *  already the app's while the visit itself started at signing in. */
+    landing?: string;
     /** The browser's navigation type for this load. */
     navigation: string;
     /** Whether this tab already tried once. */
     tried: boolean;
 }): boolean {
     if (tried || navigation !== "navigate" || NEVER.test(path)) return false;
+    if (landing !== undefined && NEVER.test(landing)) return false;
     if (!referrer) return true;
     try {
         return new URL(referrer).origin !== origin;
     } catch {
         return true;
+    }
+}
+
+/** The tab's own record of having tried, or of a sign-in started in it. */
+export const TRIED_KEY = "polaris.openInApp.tried";
+
+/**
+ * Note that this tab is signing in, so the app the sign-in lands on is not
+ * handed to an app: a flow started in the browser finishes there. Kept by the
+ * tab across a provider's own screens, which come back from another site and
+ * would otherwise read as a link followed from outside.
+ */
+export function holdForSignIn(): void {
+    try {
+        window.sessionStorage.setItem(TRIED_KEY, "1");
+    } catch {
+        // No storage: the handoff never runs either (`components/open-in-app`).
     }
 }
 
