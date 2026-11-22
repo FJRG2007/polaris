@@ -23,7 +23,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
 /** Each offered mute, by its length in minutes. */
-const MUTE_KEYS: Readonly<Record<number, NamespaceKey<"chat">>> = {
+export const MUTE_KEYS: Readonly<Record<number, NamespaceKey<"chat">>> = {
     15: "muteMenu.durations.m15",
     60: "muteMenu.durations.h1",
     180: "muteMenu.durations.h3",

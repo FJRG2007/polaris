@@ -2716,7 +2716,21 @@
         "people": "{count, plural, one {# persona} other {# personas}}",
         "video": "Vídeo",
         "search": "Buscar",
-        "shared": "Compartido"
+        "shared": "Compartido",
+        "title": "Detalles",
+        "back": "Atrás",
+        "close": "Cerrar detalles",
+        "mute": "Silenciar avisos",
+        "muteOff": "No",
+        "muteAlways": "Siempre",
+        "muteUntil": "Hasta {time}",
+        "pinChat": "Fijar chat",
+        "privacy": "Privacidad",
+        "seeAll": "Ver los {count}",
+        "block": "Bloquear a {name}",
+        "unblock": "Desbloquear a {name}",
+        "notSaved": "Ese cambio no se guardó",
+        "width": "Ancho de detalles"
     },
     "location": {
         "title": "Enviar ubicación",

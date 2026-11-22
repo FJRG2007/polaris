@@ -56,6 +56,7 @@ import { useWideScreen } from "./use-wide-screen";
 import { DirectProfile } from "./direct-profile";
 import { ForwardDialog } from "./forward-dialog";
 import { CALL_CHAT_PANE } from "./use-chat-pane";
+import { usePhone } from "@/components/use-phone";
 import { useChatStream, type ChatFrame } from "./use-chat-stream";
 import { useVoiceSettings } from "./voice-settings";
 import { useCloseOnEscape } from "./close-on-escape";
@@ -216,6 +217,10 @@ function readingOlder(element: HTMLElement): boolean {
  *  while everything late finishes arriving. */
 const SETTLE_MS = 1200;
 
+/** The conversation's info beside it - a little wider than the profile it
+ *  replaces, since its rows carry a value on the right. */
+const INFO_PANE = { min: 280, max: 520, fallback: 340 };
+
 export function ChannelView({
     channelId,
     messageId = null
@@ -258,6 +263,13 @@ export function ChannelView({
         has?: SharedKind;
     }>({ term: "", token: 0 });
     const members = useMembersPanel();
+    // The conversation's info, beside it on a computer - see `ChannelHeader`,
+    // which draws the page into `infoSlot`. On a phone it is a page of its own.
+    const [infoOpen, setInfoOpen] = useState(false);
+    const [infoSlot, setInfoSlot] = useState<HTMLElement | null>(null);
+    const phone = usePhone();
+    // Another conversation opens with its messages, not the last one's info.
+    useEffect(() => setInfoOpen(false), [channelId]);
     const [highlight, setHighlight] = useState<string | null>(null);
     // The same, for a message a link led to that turned out to be a reply: it is
     // pointed at inside the thread panel rather than in the channel.
@@ -2948,6 +2960,8 @@ export function ChannelView({
     // line, ringing or not - and the corner card rings again.
     const stageOwns = stage !== "none" && live !== null && !hidden;
 
+    // Not beside a voice room, whose row already holds the call and its chat.
+    const infoBeside = infoOpen && !phone && !thread && !searching && !voiceRoom;
     const view = (
         <div
             className={cn(
@@ -2982,8 +2996,24 @@ export function ChannelView({
                     // column beside a direct message is for. Not in a voice
                     // room: the call already shows who is in it, and the chat
                     // beside it is too narrow to share with a roster.
-                    onMembers={voiceRoom ? undefined : members.toggle}
-                    membersOpen={members.open && !thread && !searching}
+                    onMembers={
+                        voiceRoom
+                            ? undefined
+                            : () => {
+                                  // The info stands where the roster goes:
+                                  // asking for the roster puts it away.
+                                  if (infoBeside) {
+                                      setInfoOpen(false);
+                                      members.setOpen(true);
+                                  } else members.toggle();
+                              }
+                    }
+                    membersOpen={members.open && !thread && !searching && !infoBeside}
+                    info={
+                        voiceRoom
+                            ? undefined
+                            : { open: infoOpen, onOpenChange: setInfoOpen, slot: infoSlot }
+                    }
                     vanish={
                         direct && vanish.rules
                             ? {
@@ -3249,7 +3279,16 @@ export function ChannelView({
             {/* One side panel at a time on the right, and the roster is the one
                 that yields: a thread and a search are things somebody is doing,
                 the roster is something that is there. */}
-            {channel.kind === "dm" && !thread && !searching && (
+            {/* The conversation's info, drawn into this slot by the header.
+                It stands where the roster goes, and yields to a thread or a
+                search the same way. */}
+            {infoBeside && (
+                <SidePane pane="info" bounds={INFO_PANE} label={t("info.width")}>
+                    <div ref={setInfoSlot} className="flex min-h-0 flex-1 flex-col" />
+                </SidePane>
+            )}
+
+            {channel.kind === "dm" && !thread && !searching && !infoBeside && (
                 <DirectProfile
                     person={channel.others[0] ?? null}
                     channel={channel}
@@ -3262,7 +3301,7 @@ export function ChannelView({
                 />
             )}
 
-            {channel.kind !== "dm" && !voiceRoom && !thread && !searching && (
+            {channel.kind !== "dm" && !voiceRoom && !thread && !searching && !infoBeside && (
                 <ChannelMembers
                     channel={channel}
                     open={members.open}

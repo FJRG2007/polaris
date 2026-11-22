@@ -18,6 +18,7 @@ import * as actions from "./actions";
 import { EditGroupDialog } from "./edit-group-dialog";
 import { useChat } from "./chat-context";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { Avatar } from "@/components/avatar";
@@ -101,6 +102,7 @@ export function ChannelHeader({
     membersOpen = false,
     searchInPanel = false,
     onShared,
+    info: infoControl,
     vanish
 }: {
     channel: ChatChannelView;
@@ -131,6 +133,15 @@ export function ChannelHeader({
     /** The panel on the right is open as a column and carries the search box
      *  at its top, the way Discord draws it, so the bar leaves it out. */
     searchInPanel?: boolean;
+    /** The info page, held by the conversation so that beside the chat it can
+     *  be drawn as a panel of the row - into `slot`, which the conversation
+     *  puts where its side panels go. Without it the page is this header's own
+     *  and only a phone opens it. */
+    info?: {
+        readonly open: boolean;
+        readonly onOpenChange: (open: boolean) => void;
+        readonly slot: HTMLElement | null;
+    };
     /** A direct conversation's disappearing timer and deleting it, as its
      *  rules allow. Absent where it has none - a space's channel. */
     vanish?: {
@@ -163,10 +174,13 @@ export function ChannelHeader({
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [leaving, setLeaving] = useState(false);
     const [error, setError] = useState("");
-    // On a phone the name at the top opens the conversation's info page, the
-    // way WhatsApp's does, instead of leaving it all to the three dots.
+    // The name at the top opens the conversation's info, the way WhatsApp's
+    // does: the whole screen on a phone, a panel beside the chat on a computer.
     const phone = usePhone();
-    const [info, setInfo] = useState(false);
+    const [ownInfo, setOwnInfo] = useState(false);
+    const info = infoControl?.open ?? ownInfo;
+    const setInfo = infoControl?.onOpenChange ?? setOwnInfo;
+    const infoSlot = phone ? null : (infoControl?.slot ?? null);
 
     const named = channel.spaceId !== null;
     // A group belongs to everybody in it: any of them can walk out, and add
@@ -246,17 +260,19 @@ export function ChannelHeader({
                 {/* A named channel is its hash; a conversation is who is in
                     it - one face for a direct message, the group's picture or
                     the faces of its people for a group. */}
-                {/* On a phone the face and the name are one button: the
-                    conversation's info page. */}
+                {/* The face and the name are one button: the conversation's
+                    info - a page on a phone, a panel beside the chat on a
+                    computer. */}
                 <HeaderTitle
-                    phone={phone}
+                    openable={phone || infoControl !== undefined}
+                    expanded={info}
                     label={t("info.open", { name: channel.name })}
                     onOpen={() => setInfo(true)}
                 >
                     {named ? (
                         <Icon className="size-4 shrink-0 text-muted-foreground" />
                     ) : face ? (
-                        <Avatar openable={!phone} person={face} size={20} />
+                        <Avatar openable={!phone && infoControl === undefined} person={face} size={20} />
                     ) : (
                         <ChatAvatar
                             kind="channel"
@@ -694,11 +710,13 @@ export function ChannelHeader({
                 </p>
             )}
 
-            {phone ? (
+            {phone || infoSlot ? (
+                <InfoPlace slot={infoSlot}>
                 <ConversationInfo
                     channel={channel}
                     open={info}
                     onOpenChange={setInfo}
+                    layout={phone ? "page" : "panel"}
                     privacy={group ? undefined : vanish?.privacy}
                     entries={{
                         onStartCall: startable ? onStartCall : undefined,
@@ -706,10 +724,6 @@ export function ChannelHeader({
                         onPins,
                         onMembers,
                         onShared,
-                        onMute: (minutes) =>
-                            void act(() => actions.setMutedAction(channel.id, minutes)),
-                        onMuteMentions: (on) =>
-                            act(() => actions.setMuteMentionsAction(channel.id, on)),
                         addPeople: adder
                             ? { reason: adder.reason, onSelect: () => setAdding(true) }
                             : undefined,
@@ -732,9 +746,29 @@ export function ChannelHeader({
                             named && channel.mayAdminister
                                 ? () => setConfirmDelete(true)
                                 : undefined,
+                        onCopyLink: () => void copyText(channelLink(baseUrl, channel.id)),
+                        onTranslation: translator ? () => setTranslating(true) : undefined,
+                        archive:
+                            named && channel.mayAdminister
+                                ? {
+                                      archived: channel.archived,
+                                      onSelect: () =>
+                                          void act(() =>
+                                              actions.updateChannelAction({
+                                                  channelId: channel.id,
+                                                  archived: !channel.archived
+                                              })
+                                          )
+                                  }
+                                : undefined,
+                        vanish: vanish
+                            ? { rules: vanish.rules, onTimer: vanish.onTimer }
+                            : undefined,
+                        onReport: () => setReportingChat(true),
                         onDeleteChat: vanish?.onDeleteChat
                     }}
                 />
+                </InfoPlace>
             ) : null}
 
             <ReportDialog
@@ -828,26 +862,32 @@ export function ChannelHeader({
     );
 }
 
-/** The face and the name at the top: a button to the info page on a phone,
- *  where the avatar gives up opening the profile for it, and as drawn elsewhere. */
+/** The face and the name at the top: a button to the info page wherever there
+ *  is one to open, the avatar giving up opening the profile card for it. */
 function HeaderTitle({
-    phone,
+    openable,
+    expanded,
     label,
     onOpen,
     children
 }: {
-    phone: boolean;
+    openable: boolean;
+    expanded: boolean;
     label: string;
     onOpen: () => void;
     children: React.ReactNode;
 }) {
-    if (!phone) return <>{children}</>;
+    if (!openable) return <>{children}</>;
     return (
         <button
             type="button"
             onClick={onOpen}
             aria-label={label}
-            className={cn("flex min-w-0 items-center gap-2 rounded text-start", TOUCH_TARGET)}
+            aria-expanded={expanded}
+            className={cn(
+                "flex min-w-0 items-center gap-2 rounded px-1 text-start transition-colors hover:bg-muted",
+                TOUCH_TARGET
+            )}
         >
             {children}
         </button>
@@ -1002,4 +1042,10 @@ function HeaderSearch({
             </button>
         </>
     );
+}
+
+/** Where the info page goes: in place on a phone, where it is a dialog of its
+ *  own, and into the conversation's side-panel slot on a computer. */
+function InfoPlace({ slot, children }: { slot: HTMLElement | null; children: React.ReactNode }) {
+    return slot ? createPortal(children, slot) : <>{children}</>;
 }

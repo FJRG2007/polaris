@@ -81,6 +81,11 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
 }));
 
 vi.mock("@/components/activity-card", () => ({ ActivityLine: () => null }));
+// The info page's block row reaches the account actions, which need a server.
+vi.mock("@/app/(app)/account/privacy/actions", () => ({
+    blockPersonAction: async () => ({}),
+    unblockPersonAction: async () => ({})
+}));
 // Its block-after-report step reaches the account actions, which need a server.
 vi.mock("@/app/(app)/chat/report-dialog", () => ({ ReportDialog: () => null }));
 vi.mock("@/app/(app)/chat/game-link-badge", () => ({ GameLinkChips: () => null }));

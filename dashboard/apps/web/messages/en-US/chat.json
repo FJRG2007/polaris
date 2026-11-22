@@ -2716,7 +2716,21 @@
         "people": "{count, plural, one {# person} other {# people}}",
         "video": "Video",
         "search": "Search",
-        "shared": "Shared here"
+        "shared": "Shared here",
+        "title": "Details",
+        "back": "Back",
+        "close": "Close details",
+        "mute": "Mute notifications",
+        "muteOff": "Off",
+        "muteAlways": "Always",
+        "muteUntil": "Until {time}",
+        "pinChat": "Pin chat",
+        "privacy": "Privacy",
+        "seeAll": "See all {count}",
+        "block": "Block {name}",
+        "unblock": "Unblock {name}",
+        "notSaved": "That change was not saved",
+        "width": "Details width"
     },
     "location": {
         "title": "Share location",

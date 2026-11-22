@@ -23,7 +23,7 @@ import type { MenuParts } from "./mute-menu";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
 /** Each level's name, in the reader's language. */
-const LEVEL_KEYS: Readonly<Record<core.ChatChannelNotifyLevel, NamespaceKey<"chat">>> = {
+export const LEVEL_KEYS: Readonly<Record<core.ChatChannelNotifyLevel, NamespaceKey<"chat">>> = {
     [core.CHAT_NOTIFY_INHERIT]: "notifyMenu.levels.inherit",
     all: "notifyMenu.levels.all",
     mentions: "notifyMenu.levels.mentions",
