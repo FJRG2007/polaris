@@ -35,6 +35,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { pollWhileVisible } from "@polaris/ui";
+import { ConversationList } from "@/lib/chat/conversation-list";
 import * as polls from "./chat-reads";
 
 /**
@@ -195,6 +196,11 @@ function waitToRetry(failures: number, signal: AbortSignal): Promise<void> {
  *  one request rather than one per message. */
 export const CHANNELS_SETTLE_MS = 300;
 
+/** How long a tab has to have been hidden before coming back reads the lists
+ *  again. Long enough that switching windows costs nothing, short enough that
+ *  a phone whose screen went off always catches up. */
+export const RESYNC_AFTER_HIDDEN_MS = 5000;
+
 export function ChatProvider({
     viewerId,
     viewerName,
@@ -211,13 +217,20 @@ export function ChatProvider({
     children: ReactNode;
 }) {
     const router = useRouter();
+    // The rows live in `list`, which knows which answer is newest and which of
+    // this reader's writes are still pending; the state is only what it draws.
+    const list = useRef<ConversationList | null>(null);
+    list.current ??= new ConversationList();
     const [channels, setChannels] = useState<readonly ChatChannelView[]>([]);
-    const patchChannel = useCallback(
-        (channelId: string, patch: Partial<ChatChannelView>) =>
-            setChannels((current) =>
-                current.map((entry) => (entry.id === channelId ? { ...entry, ...patch } : entry))
-            ),
-        []
+    const redraw = useCallback(() => setChannels(list.current!.rows), []);
+    /** An answer to the read holding `ticket`, drawn unless a newer one already is. */
+    const receiveChannels = useCallback(
+        (rows: readonly ChatChannelView[], ticket: number): boolean => {
+            if (!list.current!.receive(rows, ticket)) return false;
+            redraw();
+            return true;
+        },
+        [redraw]
     );
     const [loaded, setLoaded] = useState(false);
     const [kept, setKept] = useState(false);
@@ -267,18 +280,18 @@ export function ChatProvider({
         }
         const current = new AbortController();
         attempt.current = current;
-        const apply = (result: ChatLists) => {
+        const apply = (result: ChatLists, ticket: number) => {
             // A part that could not be read comes back null and leaves the
             // previous one on screen, which is more use than an empty rail
             // and a red line.
-            if (result.channels) setChannels(result.channels);
+            const fresh = result.channels ? receiveChannels(result.channels, ticket) : false;
             if (result.spaces) setSpaces(result.spaces);
             if (result.categories) setCategories(result.categories);
             if (result.blocked) setBlocked(new Set(result.blocked));
             if (result.friends) setFriends(new Set(result.friends));
-            if (result.channels && result.spaces && result.categories) {
+            if (fresh && result.spaces && result.categories) {
                 keepLists({
-                    channels: result.channels,
+                    channels: list.current!.server,
                     spaces: result.spaces,
                     categories: result.categories
                 });
@@ -291,6 +304,9 @@ export function ChatProvider({
             while (!current.signal.aborted) {
                 askAgain.current = false;
                 try {
+                    // Taken as the read is sent, so an answer is ranked by when
+                    // it was asked for and a slow one never undoes a newer one.
+                    const ticket = list.current!.ask();
                     const lists = await fetchChatLists(current.signal);
                     if (current.signal.aborted) return;
                     if (!lists) {
@@ -299,7 +315,7 @@ export function ChatProvider({
                         router.refresh();
                         break;
                     }
-                    apply(lists);
+                    apply(lists, ticket);
                     failures = 0;
                     if (!askAgain.current) break;
                 } catch {
@@ -317,25 +333,35 @@ export function ChatProvider({
             }
             if (attempt.current === current) attempt.current = null;
         })();
-    }, [keepLists, router]);
+    }, [keepLists, receiveChannels, router]);
 
     const channelsTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const refreshChannels = useCallback(() => {
         if (channelsTimer.current) return;
         channelsTimer.current = setTimeout(() => {
             channelsTimer.current = null;
+            const ticket = list.current!.ask();
             void listChannelsAction()
                 .then((result) => {
-                    setChannels(result.channels);
+                    if (!receiveChannels(result.channels, ticket)) return;
                     if (keptLists.current) {
-                        keepLists({ ...keptLists.current, channels: result.channels });
+                        keepLists({ ...keptLists.current, channels: list.current!.server });
                     }
                 })
                 .catch(() => {
                     // The previous list stays, as it does for a full refresh.
                 });
         }, CHANNELS_SETTLE_MS);
-    }, [keepLists]);
+    }, [keepLists, receiveChannels]);
+
+    // Drawn over the rows until the next answer replaces them.
+    const patchChannel = useCallback(
+        (channelId: string, patch: Partial<ChatChannelView>) =>
+            setChannels((current) =>
+                current.map((entry) => (entry.id === channelId ? { ...entry, ...patch } : entry))
+            ),
+        []
+    );
 
     useEffect(
         () => () => {
@@ -352,7 +378,8 @@ export function ChatProvider({
         keptLists.current = lists;
         chatStore.setOwner(viewerId);
         const draw = (kept: KeptLists) => {
-            setChannels(kept.channels);
+            list.current!.seed(kept.channels);
+            redraw();
             setSpaces(kept.spaces);
             setCategories(kept.categories);
             setKept(true);
@@ -369,12 +396,43 @@ export function ChatProvider({
         return () => {
             cancelled = true;
         };
-    }, [viewerId]);
+    }, [viewerId, redraw]);
     useEffect(() => {
         refresh();
         return () => {
             attempt.current?.abort();
             attempt.current = null;
+        };
+    }, [refresh]);
+
+    // Back from the background: everything is read again. A phone puts a tab
+    // to sleep and drops its stream, and whatever was said meanwhile reached
+    // nobody here - the list stayed in the order it had when the screen went
+    // off, beside rows that the next message did move, until a reload. A short
+    // look away is not a gap worth a request; the stream had it.
+    useEffect(() => {
+        let hiddenAt = document.visibilityState === "hidden" ? Date.now() : null;
+        const onVisibility = (): void => {
+            if (document.visibilityState === "hidden") {
+                hiddenAt ??= Date.now();
+                return;
+            }
+            const away = hiddenAt === null ? 0 : Date.now() - hiddenAt;
+            hiddenAt = null;
+            if (away >= RESYNC_AFTER_HIDDEN_MS) refresh();
+        };
+        // Restored from the back-forward cache, or the network came back: the
+        // stream was gone for however long that was.
+        const onPageShow = (event: PageTransitionEvent): void => {
+            if (event.persisted) refresh();
+        };
+        document.addEventListener("visibilitychange", onVisibility);
+        window.addEventListener("pageshow", onPageShow);
+        window.addEventListener("online", refresh);
+        return () => {
+            document.removeEventListener("visibilitychange", onVisibility);
+            window.removeEventListener("pageshow", onPageShow);
+            window.removeEventListener("online", refresh);
         };
     }, [refresh]);
 

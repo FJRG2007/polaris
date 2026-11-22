@@ -64,7 +64,9 @@ const SILENCE_MS = 35000;
 
 const relaySchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("frame"), data: z.string() }),
-    z.object({ kind: z.literal("beat") })
+    z.object({ kind: z.literal("beat") }),
+    // The holder's connection dropped and came back: frames were lost between.
+    z.object({ kind: z.literal("reopen") })
 ]);
 
 type Relay = z.infer<typeof relaySchema>;
@@ -87,6 +89,7 @@ type Relay = z.infer<typeof relaySchema>;
  */
 interface SharedConnection {
     readonly listeners: Set<(frame: SharedFrame) => void>;
+    readonly reopenListeners: Set<() => void>;
     readonly stop: () => void;
 }
 
@@ -100,22 +103,36 @@ const inThisTab = new Map<string, SharedConnection>();
 export function subscribeSharedStream(
     path: string,
     scope: string,
-    onFrame: (frame: SharedFrame) => void
+    onFrame: (frame: SharedFrame) => void,
+    /** The stream came back after a gap - a dropped connection reopened, or a
+     *  silent holder replaced - so whatever was sent meanwhile never arrived.
+     *  What a subscriber that keeps state off the frames reads everything
+     *  again on. */
+    onReopen?: () => void
 ): () => void {
     const name = `${PREFIX}${scope}:${path}`;
     let shared = inThisTab.get(name);
     if (!shared) {
         const listeners = new Set<(frame: SharedFrame) => void>();
+        const reopenListeners = new Set<() => void>();
         // A copy, so a listener that unsubscribes while being handed a frame does
         // not change the set being walked.
-        const stop = followStream(path, name, (frame) => {
-            for (const listener of [...listeners]) listener(frame);
-        });
-        shared = { listeners, stop };
+        const stop = followStream(
+            path,
+            name,
+            (frame) => {
+                for (const listener of [...listeners]) listener(frame);
+            },
+            () => {
+                for (const listener of [...reopenListeners]) listener();
+            }
+        );
+        shared = { listeners, reopenListeners, stop };
         inThisTab.set(name, shared);
     }
     const held = shared;
     held.listeners.add(onFrame);
+    if (onReopen) held.reopenListeners.add(onReopen);
 
     let done = false;
     return () => {
@@ -124,6 +141,7 @@ export function subscribeSharedStream(
         if (done) return;
         done = true;
         held.listeners.delete(onFrame);
+        if (onReopen) held.reopenListeners.delete(onReopen);
         if (held.listeners.size > 0) return;
         if (inThisTab.get(name) === held) inThisTab.delete(name);
         held.stop();
@@ -135,7 +153,8 @@ export function subscribeSharedStream(
 function followStream(
     path: string,
     name: string,
-    onFrame: (frame: SharedFrame) => void
+    onFrame: (frame: SharedFrame) => void,
+    onReopen: () => void
 ): () => void {
     const channel = openChannel(name);
     const locks = lockManager();
@@ -147,6 +166,10 @@ function followStream(
     let beat: ReturnType<typeof setInterval> | null = null;
     let watchdog: ReturnType<typeof setTimeout> | null = null;
     let release: (() => void) | null = null;
+    /** Whether this tab has been on the stream at all yet - its own connection
+     *  opened, or a frame or heartbeat relayed. An opening after that is a
+     *  reopening: there was a stretch with nobody listening. */
+    let followed = false;
 
     /** Open a connection of this tab's own. Idempotent: the holder calls it on
      *  election and a tab that gave up waiting calls it on its own. */
@@ -154,6 +177,14 @@ function followStream(
         if (stopped || source) return;
         clearWatchdog();
         const opened = new EventSource(path);
+        opened.onopen = () => {
+            if (stopped) return;
+            if (followed) {
+                if (holder) channel?.postMessage({ kind: "reopen" } satisfies Relay);
+                onReopen();
+            }
+            followed = true;
+        };
         opened.onmessage = (event) => {
             if (stopped) return;
             if (holder) channel?.postMessage({ kind: "frame", data: event.data } satisfies Relay);
@@ -191,6 +222,11 @@ function followStream(
             const relay = relaySchema.safeParse(event.data);
             if (!relay.success) return;
             armWatchdog();
+            if (relay.data.kind === "reopen") {
+                onReopen();
+                return;
+            }
+            followed = true;
             if (relay.data.kind === "frame") onFrame({ data: relay.data.data, owner: false });
         };
     }

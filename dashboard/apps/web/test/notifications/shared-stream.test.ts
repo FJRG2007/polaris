@@ -22,10 +22,16 @@ class FakeEventSource {
     static opened: FakeEventSource[] = [];
     onmessage: ((event: { data: string }) => void) | null = null;
     onerror: (() => void) | null = null;
+    onopen: (() => void) | null = null;
     closed = false;
 
     constructor(readonly url: string) {
         FakeEventSource.opened.push(this);
+    }
+
+    /** The connection (re)established - the first time, or after a drop. */
+    open(): void {
+        this.onopen?.();
     }
 
     /** The connection dropping, which the browser reports and then retries. */
@@ -170,6 +176,61 @@ describe("a dropped connection", () => {
         stops = [];
         source.fail();
         expect(trouble).not.toHaveBeenCalled();
+    });
+});
+
+describe("coming back after a gap", () => {
+    /** Subscribes in this tab and counts the reopenings it is told about. */
+    function reopens(subscribe = subscribeSharedStream): { count: number } {
+        const seen = { count: 0 };
+        stops.push(
+            subscribe(PATH, "user-1", () => undefined, () => {
+                seen.count += 1;
+            })
+        );
+        return seen;
+    }
+
+    it("says nothing about the first opening", async () => {
+        const seen = reopens();
+        await settle();
+        live()[0].open();
+        expect(seen.count).toBe(0);
+    });
+
+    it("says so when a dropped connection opens again", async () => {
+        const seen = reopens();
+        await settle();
+        const source = live()[0];
+        source.open();
+        source.fail();
+        source.open();
+        expect(seen.count).toBe(1);
+    });
+
+    it("tells the other tabs too, which lost the same frames", async () => {
+        vi.resetModules();
+        const elsewhere = await import("@/lib/shared-stream");
+        const first = reopens();
+        const other = reopens(elsewhere.subscribeSharedStream);
+        await settle();
+        const source = live()[0];
+        source.open();
+        source.fail();
+        source.open();
+        expect(first.count).toBe(1);
+        expect(other.count).toBe(1);
+    });
+
+    it("stops telling a subscriber that left", async () => {
+        const seen = reopens();
+        here();
+        await settle();
+        stops.shift()?.();
+        const source = live()[0];
+        source.open();
+        source.open();
+        expect(seen.count).toBe(0);
     });
 });
 

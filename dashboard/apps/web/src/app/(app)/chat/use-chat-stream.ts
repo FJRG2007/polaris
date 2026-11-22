@@ -127,10 +127,17 @@ export interface FrameContext {
  * re-subscribing on every render - a subscription that tore down and reopened
  * per keystroke would spend its life reconnecting.
  */
-export function useChatStream(onFrame: (frame: ChatFrame, context: FrameContext) => void): void {
+export function useChatStream(
+    onFrame: (frame: ChatFrame, context: FrameContext) => void,
+    /** The stream came back after a gap, so frames were lost - see
+     *  `subscribeSharedStream`. */
+    onReopen?: () => void
+): void {
     const scope = useSessionScope();
     const handler = useRef(onFrame);
     handler.current = onFrame;
+    const reopened = useRef(onReopen);
+    reopened.current = onReopen;
 
     useEffect(() => {
         return subscribeSharedStream(STREAM_PATH, scope, (event) => {
@@ -142,6 +149,6 @@ export function useChatStream(onFrame: (frame: ChatFrame, context: FrameContext)
             }
             const frame = frameSchema.safeParse(parsed);
             if (frame.success) handler.current(frame.data, { owner: event.owner });
-        });
+        }, () => reopened.current?.());
     }, [scope]);
 }

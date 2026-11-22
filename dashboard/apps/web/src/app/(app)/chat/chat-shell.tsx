@@ -209,7 +209,11 @@ function ChatColumns({ children }: { children: ReactNode }) {
                     refreshChannels();
             },
             [refresh, refreshChannels, viewerId]
-        )
+        ),
+        // The connection dropped and came back - a phone waking up, a network
+        // that blinked. Every frame in between is gone, so the list is read
+        // again rather than left in the order it had before the gap.
+        refresh
     );
 
     return (

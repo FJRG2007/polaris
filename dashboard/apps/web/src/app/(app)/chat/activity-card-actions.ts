@@ -29,6 +29,7 @@ import { callActivityGames } from "@/lib/app-extensions/registry";
 import { openDirect, listChannels } from "@/lib/chat/chat-service";
 import { lockState } from "@/lib/chat/chat-lock";
 import { onShelf } from "./lock-shelf";
+import * as conversationList from "@/lib/chat/conversation-list";
 
 /** The most faces a card draws. */
 const CARD_FACES = 8;
@@ -144,7 +145,7 @@ export async function gameInviteTargets(): Promise<readonly InviteTarget[]> {
                     channel.kind === "dm" ||
                     channel.kind === "group")
         )
-        .sort((left, right) => (right.lastMessageAt ?? "").localeCompare(left.lastMessageAt ?? ""))
+        .sort(conversationList.byActivity)
         .slice(0, 100)
         .map((channel) => ({
             id: channel.id,

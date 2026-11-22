@@ -46,6 +46,7 @@ import type { MenuParts } from "./mute-menu";
 import { spaceEmojiHref } from "./space-emoji";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
 import { ShareDialog } from "@/components/access/share-dialog";
+import * as conversationList from "@/lib/chat/conversation-list";
 import {
     Ban,
     Hash,
@@ -156,9 +157,7 @@ export function ServerRail({
             // A space has an order somebody arranged; the people you talk to have
             // none but "who spoke last", which is what the list beside this shows.
             (spaceId === null
-                ? [...inSpace].sort((left, right) =>
-                      (right.lastMessageAt ?? "").localeCompare(left.lastMessageAt ?? "")
-                  )[0]
+                ? [...inSpace].sort(conversationList.byActivity)[0]
                 : inSpace[0]);
         router.push(target ? `/chat/c/${target.id}` : "/chat");
     };

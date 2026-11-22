@@ -56,6 +56,7 @@ import { ConversationPeek } from "./conversation-peek";
 import { TOUCH_TARGET, usePhone } from "@/components/use-phone";
 import { LeaveDialog } from "./leave-dialog";
 import { runAction } from "@/lib/run-action";
+import * as conversationList from "@/lib/chat/conversation-list";
 import { NicknameDialog } from "./nickname-dialog";
 import { useRemoveFriend } from "./remove-friend";
 import { DuplicateChannelDialog } from "./duplicate-channel-dialog";
@@ -370,11 +371,8 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                         (shelf !== "all" || channel.spaceId === null) &&
                         onShelf(channel, shelf, hideLocked)
                 )
-                .sort(
-                    (left, right) =>
-                        Number(right.pinned) - Number(left.pinned) ||
-                        (right.lastMessageAt ?? "").localeCompare(left.lastMessageAt ?? "")
-                ),
+                // By what each row shows - see `activityAt`.
+                .sort(conversationList.byPinThenActivity),
         [channels, shelf, hideLocked]
     );
     const hiddenCount = useMemo(
