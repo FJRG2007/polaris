@@ -36,6 +36,7 @@ import { channelLink, copyText } from "./links";
 import { openSearch } from "@/lib/search/open-search";
 import { useAppUrl } from "@/components/app-url";
 import { ChatAvatar } from "@/components/chat-avatar";
+import { conversationFace } from "./conversation-face";
 import { NewDirectDialog } from "./new-direct-dialog";
 import * as core from "@polaris/core";
 import { LiveBadge, VoiceStateIcons } from "./call-roster";
@@ -262,6 +263,7 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
         loaded,
         kept,
         loadFailed,
+        viewerId,
         viewerName
     } = useChat();
     const params = useParams<{ channelId?: string; spaceId?: string }>();
@@ -737,7 +739,12 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                                           : t("sidebar.nobodyYet")}
                                 </p>
                             ) : (
-                                directs.map((channel) => (
+                                directs.map((channel) => {
+                                    const face = conversationFace(channel, {
+                                        id: viewerId,
+                                        name: viewerName
+                                    });
+                                    return (
                                     <Row
                                         key={channel.id}
                                         channel={channel}
@@ -758,7 +765,7 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                                                 : null
                                         }
                                         icon={
-                                            channel.others.length === 1 && channel.others[0] ? (
+                                            face ? (
                                                 // Twenty rather than eighteen, which
                                                 // is the size below which a face goes
                                                 // without its presence dot - so this
@@ -769,14 +776,14 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                                                     small={
                                                         <Avatar
                                                             decorated
-                                                            person={channel.others[0]}
+                                                            person={face}
                                                             size={detailed ? 40 : 24}
                                                         />
                                                     }
                                                     large={
                                                         <Avatar
                                                             decorated
-                                                            person={channel.others[0]}
+                                                            person={face}
                                                             size={40}
                                                         />
                                                     }
@@ -810,7 +817,8 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                                             )
                                         }
                                     />
-                                ))
+                                    );
+                                })
                             )}
                         </div>
                         {/* Under the list rather than above it: it is an

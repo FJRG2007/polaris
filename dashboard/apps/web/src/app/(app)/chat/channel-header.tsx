@@ -32,6 +32,7 @@ import { channelLink, copyText } from "./links";
 import { useAppUrl } from "@/components/app-url";
 import { AddPeopleDialog } from "./add-people-dialog";
 import { ChatAvatar } from "@/components/chat-avatar";
+import { conversationFace } from "./conversation-face";
 import { NotifyOptions } from "./notify-menu";
 import { GameLinkChips } from "./game-link-badge";
 import { MuteOptions, type MenuParts } from "./mute-menu";
@@ -147,7 +148,8 @@ export function ChannelHeader({
     const t = useTranslations("chat");
     const router = useRouter();
     const baseUrl = useAppUrl();
-    const { may, callsOff, callsOutside } = useChat();
+    const { may, callsOff, callsOutside, viewerName } = useChat();
+    const face = conversationFace(channel, { id: viewerId, name: viewerName });
     const mayCall = may.call;
     const [adding, setAdding] = useState(false);
     const [renaming, setRenaming] = useState(false);
@@ -253,8 +255,8 @@ export function ChannelHeader({
                 >
                     {named ? (
                         <Icon className="size-4 shrink-0 text-muted-foreground" />
-                    ) : channel.others.length === 1 && channel.others[0] ? (
-                        <Avatar openable={!phone} person={channel.others[0]} size={20} />
+                    ) : face ? (
+                        <Avatar openable={!phone} person={face} size={20} />
                     ) : (
                         <ChatAvatar
                             kind="channel"

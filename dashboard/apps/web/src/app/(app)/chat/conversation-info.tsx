@@ -16,6 +16,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Avatar } from "@/components/avatar";
 import { ChatAvatar } from "@/components/chat-avatar";
+import { useChat } from "./chat-context";
+import { conversationFace } from "./conversation-face";
 import { PersonName } from "@/components/person-name";
 import { MuteOptions, type MenuParts } from "./mute-menu";
 import type { ChatChannelView } from "@/lib/chat/chat-service";
@@ -94,6 +96,9 @@ export function ConversationInfo({
     const t = useTranslations("chat");
     const direct = channel.kind === "dm" && channel.others.length === 1;
     const person = direct ? (channel.others[0] ?? null) : null;
+    const { viewerId, viewerName } = useChat();
+    // A group with one other person in it is still drawn as the group here.
+    const face = direct ? person : channel.self ? conversationFace(channel, { id: viewerId, name: viewerName }) : null;
     /** Close first, then act: the next dialog never opens over this one. */
     const then =
         (run: () => void): (() => void) =>
@@ -110,8 +115,8 @@ export function ConversationInfo({
                         <span className="flex size-20 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                             <Hash className="size-8 shrink-0" />
                         </span>
-                    ) : person ? (
-                        <Avatar person={person} size={80} />
+                    ) : face ? (
+                        <Avatar person={face} size={80} />
                     ) : (
                         <ChatAvatar
                             kind="channel"
