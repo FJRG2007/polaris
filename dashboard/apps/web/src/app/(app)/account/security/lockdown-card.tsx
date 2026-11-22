@@ -220,14 +220,18 @@ function LockdownDialog({
         onDone(asking === "disabled" || asking === "deleting");
     }
 
-    // A whole code confirms on its own, as in every other confirmation that asks
-    // for one (components/step-up-dialog.tsx); a password waits for the button.
+    // A whole code confirms on its own for locking the account down or lifting
+    // it, as in every other confirmation that asks for one
+    // (components/step-up-dialog.tsx); a password waits for the button. Closing
+    // the account never goes on a typed code alone: it is the one answer here
+    // that cannot be taken back, so it waits for the button whatever the proof.
     // Each typed code is a new proof object, so a refused one is not resent.
     const confirmNow = useRef(confirm);
     confirmNow.current = confirm;
+    const confirmsOnCode = asking === "lockdown" || asking === "lift";
     useEffect(() => {
-        if (proof && proof.proof !== "password") void confirmNow.current();
-    }, [proof]);
+        if (confirmsOnCode && proof && proof.proof !== "password") void confirmNow.current();
+    }, [proof, confirmsOnCode]);
 
     return (
         <Dialog
