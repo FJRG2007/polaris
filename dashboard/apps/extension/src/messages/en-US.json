@@ -448,7 +448,28 @@
         "offSites": "Switched off on",
         "noOffSites": "No site is switched off.",
         "turnBackOn": "Turn back on",
-        "turnBackOnFor": "Turn Polaris back on for {host}"
+        "turnBackOnFor": "Turn Polaris back on for {host}",
+        "launcher": "Search on any site",
+        "launcherOn": "Search on sites",
+        "launcherOnHint": "Your keys open Polaris search over the page.",
+        "launcherOffHint": "The keys do nothing on other sites.",
+        "launcherKeys": "Keys",
+        "launcherRecord": "Press the new keys",
+        "launcherKeyRefused": "Use Alt or Ctrl with a key.",
+        "launcherAddKey": "Add keys",
+        "launcherRemoveKey": "Remove {keys}",
+        "launcherMode": "Where",
+        "launcherAll": "All sites",
+        "launcherOnly": "Only these",
+        "launcherAllHint": "Everywhere except the sites below.",
+        "launcherOnlyHint": "Only on the sites below.",
+        "launcherSites": "Sites",
+        "launcherSiteAdd": "Add",
+        "launcherSitePlaceholder": "example.com",
+        "launcherSiteInvalid": "Type a site like example.com.",
+        "launcherNoSites": "No sites yet.",
+        "launcherRemoveSite": "Remove {site}",
+        "launcherDesktop": "Polaris Desktop keeps Alt+Space while it runs."
     },
     "vpn": {
         "title": "VPN",
@@ -524,5 +545,12 @@
             "policyTitle": "The proxy is set by your administrator",
             "policyHint": "A policy on this browser fixes its proxy, so the VPN cannot use it. Ask whoever manages it."
         }
+    },
+    "launcher": {
+        "placeholder": "Search Polaris",
+        "empty": "Nothing in Polaris matches that.",
+        "openPolaris": "Open Polaris",
+        "signIn": "Sign in to Polaris to search it",
+        "unreachable": "Polaris is not answering. Try again soon."
     }
 }

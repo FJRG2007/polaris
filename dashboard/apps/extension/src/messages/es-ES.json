@@ -448,7 +448,28 @@
         "offSites": "Desactivado en",
         "noOffSites": "Ninguna web está desactivada.",
         "turnBackOn": "Reactivar",
-        "turnBackOnFor": "Volver a activar Polaris en {host}"
+        "turnBackOnFor": "Volver a activar Polaris en {host}",
+        "launcher": "Buscar en cualquier web",
+        "launcherOn": "Buscar en webs",
+        "launcherOnHint": "Tus teclas abren la búsqueda sobre la página.",
+        "launcherOffHint": "Las teclas no hacen nada en otras webs.",
+        "launcherKeys": "Teclas",
+        "launcherRecord": "Pulsa las teclas",
+        "launcherKeyRefused": "Usa Alt o Ctrl con una tecla.",
+        "launcherAddKey": "Añadir",
+        "launcherRemoveKey": "Quitar {keys}",
+        "launcherMode": "Dónde",
+        "launcherAll": "Todas las webs",
+        "launcherOnly": "Solo estas",
+        "launcherAllHint": "En todas salvo las de abajo.",
+        "launcherOnlyHint": "Solo en las webs de abajo.",
+        "launcherSites": "Webs",
+        "launcherSiteAdd": "Añadir",
+        "launcherSitePlaceholder": "ejemplo.com",
+        "launcherSiteInvalid": "Escribe una web como ejemplo.com.",
+        "launcherNoSites": "Aún no hay webs.",
+        "launcherRemoveSite": "Quitar {site}",
+        "launcherDesktop": "Polaris Desktop usa Alt+Space si está abierto."
     },
     "vpn": {
         "title": "VPN",
@@ -524,5 +545,12 @@
             "policyTitle": "El proxy lo fija tu administrador",
             "policyHint": "Una directiva del navegador fija su proxy, así que la VPN no puede usarlo. Pregunta a quien lo gestiona."
         }
+    },
+    "launcher": {
+        "placeholder": "Buscar en Polaris",
+        "empty": "Nada en Polaris coincide.",
+        "openPolaris": "Abrir Polaris",
+        "signIn": "Entra en Polaris para buscar",
+        "unreachable": "Polaris no responde. Prueba pronto."
     }
 }

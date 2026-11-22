@@ -70,8 +70,11 @@ describe("the frame", () => {
     });
 
     it("adds nothing a web page may ask the worker for", () => {
-        // The page is read by the panel itself; no message reads a tab.
-        expect([...FROM_PAGE].filter((kind) => kind !== "polarBrowserStop")).toHaveLength(15);
+        // The page is read by the panel itself; no message reads a tab. The two
+        // launcher messages are the on-page search, not the panel.
+        expect(
+            [...FROM_PAGE].filter((kind) => kind !== "polarBrowserStop" && !kind.startsWith("launcher"))
+        ).toHaveLength(15);
     });
 });
 

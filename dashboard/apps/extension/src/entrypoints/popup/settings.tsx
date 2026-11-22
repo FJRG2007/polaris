@@ -12,6 +12,9 @@
 import { useWords } from "./words";
 import * as polar from "@/lib/polar-panel";
 import * as filling from "@/lib/page-filling";
+import * as launcherStore from "@/lib/launcher-settings";
+import * as launcherRules from "@polaris/core/launcher";
+import { bindingOfEvent } from "@polaris/core";
 import { askBackground } from "@/lib/messages";
 import { useEffect, useState } from "react";
 import type { WordKey, Words } from "@/lib/words";
@@ -307,6 +310,135 @@ export function PageFillingSheet({
     );
 }
 
+/** The launcher on other sites: on or off, its keys, and where it runs. */
+export function LauncherSheet({
+    settings,
+    onSave,
+    t
+}: {
+    settings: launcherRules.LauncherSettings;
+    onSave: (next: launcherRules.LauncherSettings) => void;
+    t: Words;
+}): React.JSX.Element {
+    const [recording, setRecording] = useState(false);
+    const [refused, setRefused] = useState(false);
+    const [site, setSite] = useState("");
+    const typed = launcherRules.normalizeLauncherSite(site);
+    const record = (event: React.KeyboardEvent): void => {
+        if (event.key === "Escape") return setRecording(false);
+        if (event.key === "Tab") return;
+        event.preventDefault();
+        const binding = bindingOfEvent(event);
+        if (!binding) return;
+        if (!launcherRules.isLauncherBinding(binding)) return setRefused(true);
+        setRefused(false);
+        setRecording(false);
+        if (!settings.shortcuts.includes(binding))
+            onSave({ ...settings, shortcuts: [...settings.shortcuts, binding].slice(-launcherRules.MAX_LAUNCHER_SHORTCUTS) });
+    };
+    const addSite = (): void => {
+        if (!typed || settings.sites.includes(typed)) return setSite("");
+        onSave({ ...settings, sites: [...settings.sites, typed] });
+        setSite("");
+    };
+    return (
+        <>
+            <Choice
+                label={t("settings.launcherOn")}
+                value={settings.enabled ? "on" : "off"}
+                options={[
+                    { value: "on", label: t("settings.on") },
+                    { value: "off", label: t("settings.off") }
+                ]}
+                hint={t(settings.enabled ? "settings.launcherOnHint" : "settings.launcherOffHint")}
+                onChange={(value) => onSave({ ...settings, enabled: value === "on" })}
+            />
+            <div className="setting">
+                <span className="strong small">{t("settings.launcherKeys")}</span>
+                <ul className="sheet-box">
+                    {settings.shortcuts.map((binding) => (
+                        <li key={binding} className="sheet-row" data-launcher-key={binding}>
+                            <KeyCaps binding={binding} />
+                            {settings.shortcuts.length > 1 ? (
+                                <button
+                                    className="ghost"
+                                    aria-label={t("settings.launcherRemoveKey", { keys: binding })}
+                                    onClick={() => onSave({ ...settings, shortcuts: settings.shortcuts.filter((one) => one !== binding) })}
+                                >
+                                    ×
+                                </button>
+                            ) : null}
+                        </li>
+                    ))}
+                </ul>
+                <button
+                    className="ghost"
+                    data-launcher-record
+                    onClick={() => setRecording(true)}
+                    onKeyDown={recording ? record : undefined}
+                    onBlur={() => setRecording(false)}
+                >
+                    {recording ? t("settings.launcherRecord") : t("settings.launcherAddKey")}
+                </button>
+                {refused ? <p className="problem">{t("settings.launcherKeyRefused")}</p> : null}
+                <p className="muted small">{t("settings.launcherDesktop")}</p>
+            </div>
+            <Choice
+                label={t("settings.launcherMode")}
+                value={settings.mode}
+                options={[
+                    { value: "all", label: t("settings.launcherAll") },
+                    { value: "only", label: t("settings.launcherOnly") }
+                ]}
+                hint={t(settings.mode === "all" ? "settings.launcherAllHint" : "settings.launcherOnlyHint")}
+                onChange={(mode) => onSave({ ...settings, mode })}
+            />
+            <div className="setting">
+                <span className="strong small">{t("settings.launcherSites")}</span>
+                {settings.sites.length === 0 ? (
+                    <p className="muted small">{t("settings.launcherNoSites")}</p>
+                ) : (
+                    <ul className="sheet-box">
+                        {settings.sites.map((host) => (
+                            <li key={host} className="sheet-row" data-launcher-site={host}>
+                                <span className="sheet-name" title={host}>
+                                    {host}
+                                </span>
+                                <button
+                                    className="ghost"
+                                    aria-label={t("settings.launcherRemoveSite", { site: host })}
+                                    onClick={() => onSave({ ...settings, sites: settings.sites.filter((one) => one !== host) })}
+                                >
+                                    ×
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                <form
+                    className="sheet-row"
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        addSite();
+                    }}
+                >
+                    <input
+                        value={site}
+                        placeholder={t("settings.launcherSitePlaceholder")}
+                        aria-label={t("settings.launcherSites")}
+                        aria-invalid={site.trim() !== "" && !typed}
+                        onChange={(event) => setSite(event.target.value)}
+                    />
+                    <button type="submit" disabled={!typed}>
+                        {t("settings.launcherSiteAdd")}
+                    </button>
+                </form>
+                {site.trim() !== "" && !typed ? <p className="problem">{t("settings.launcherSiteInvalid")}</p> : null}
+            </div>
+        </>
+    );
+}
+
 const firefoxBrowser = (): boolean => polar.isFirefox(browser);
 
 export function Settings({
@@ -326,6 +458,7 @@ export function Settings({
     const [chatScope, setChatScope] = useState<polar.ChatScope>("shared");
     const [pages, setPages] = useState<filling.PageFilling | null>(null);
     const [pagesNote, setPagesNote] = useState<string | null>(null);
+    const [launcher, setLauncher] = useState<launcherRules.LauncherSettings | null>(null);
     const firefox = firefoxBrowser();
     // Manifest v2 has no `scripting`, so Firefox draws nothing inside pages to
     // switch off.
@@ -350,6 +483,10 @@ export function Settings({
             .readPageFilling(browser)
             .then(setPages)
             .catch(() => setPages({ on: true, blocked: [] }));
+        void launcherStore
+            .readLauncher(browser)
+            .then(setLauncher)
+            .catch(() => setLauncher(launcherRules.readLauncherSettings(undefined)));
         // Back from the browser's shortcuts screen is a focus: read the truth again.
         window.addEventListener("focus", read);
         return () => window.removeEventListener("focus", read);
@@ -414,6 +551,13 @@ export function Settings({
             .catch(() => setPages(before));
     };
 
+    const saveLauncher = (next: launcherRules.LauncherSettings): void => {
+        if (!launcher) return;
+        const before = launcher;
+        setLauncher(next);
+        void launcherStore.saveLauncher(browser, next).catch(() => setLauncher(before));
+    };
+
     const hintKey: WordKey = firefox ? "settings.shortcutsFirefox" : "settings.shortcutsChromium";
     return (
         <main className="settings">
@@ -447,6 +591,15 @@ export function Settings({
                             onUnblock={unblock}
                             t={t}
                         />
+                    )}
+                </SettingsSection>
+            ) : null}
+            {inlinePossible ? (
+                <SettingsSection id="settings-launcher" title={t("settings.launcher")}>
+                    {launcher === null ? (
+                        <div className="sheet-box skeleton" aria-hidden="true" />
+                    ) : (
+                        <LauncherSheet settings={launcher} onSave={saveLauncher} t={t} />
                     )}
                 </SettingsSection>
             ) : null}

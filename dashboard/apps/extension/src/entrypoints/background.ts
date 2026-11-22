@@ -45,6 +45,7 @@ import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
 import * as update from "@/lib/update";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { BLOCKED_HOSTS_KEY, PAGE_FILLING_KEY } from "@/lib/page-filling";
+import * as launcherStore from "@/lib/launcher-settings";
 import { DEFAULT_TIMEOUT_MS, deadlineFrom, hasExpired, readTimeout } from "@/lib/lock";
 import {
     MENU,
@@ -2125,6 +2126,7 @@ async function bringServer(origin: string): Promise<void> {
     // Polaris's own pages are kept out of the inline script, and which pages
     // those are has just changed.
     void syncAutofill();
+    void syncLauncher();
 }
 
 /**
@@ -2164,6 +2166,7 @@ async function removeServer(origin: string): Promise<void> {
         if (other && (await holdsOrigin(other.origin))) await rememberOrigin(other.origin);
     }
     void syncAutofill();
+    void syncLauncher();
 }
 
 async function status(): Promise<messages.VaultStatus> {
@@ -3339,6 +3342,8 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
             page &&
             !ours &&
             request.kind !== "polarBrowserStop" &&
+            request.kind !== "launcherIndex" &&
+            request.kind !== "launcherOpen" &&
             (!(await PAGE_FILLING.getValue()) || !(await LINK_VAULT.getValue()))
         ) {
             return request.kind === "blocked"
@@ -3346,6 +3351,18 @@ browser.runtime.onMessage.addListener((raw, sender, sendResponse): boolean => {
                 : { ok: false, error: await say("errors.offForSite") };
         }
         switch (request.kind) {
+            case "launcherIndex":
+                return launcherEntries();
+
+            case "launcherOpen": {
+                const home = await currentOrigin();
+                const origin = home ? readOrigin(home) : null;
+                if (!origin || typeof request.href !== "string" || !launcherPath(request.href))
+                    return { ok: false, error: await say("launcher.unreachable") };
+                await browser.tabs.create({ url: `${origin}${request.href}` });
+                return { ok: true };
+            }
+
             case "status":
                 // Asked at most once a minute, and never awaited: the popup draws
                 // from what is held, and a connection that ended a moment ago
@@ -4521,6 +4538,7 @@ function followPolar(): void {
         vaultAllowed = next;
         void rebuildMenus();
         void syncAutofill();
+        void syncLauncher();
         if (!next) void closeForbiddenVault();
     };
     void LINK_VAULT.getValue().then(followVault);
@@ -4761,6 +4779,87 @@ async function syncAutofill(): Promise<void> {
         .catch(() => undefined);
 }
 
+/** The id the on-page launcher is registered under. */
+const LAUNCHER_ID = "polaris-launcher";
+
+/**
+ * Keep the on-page launcher (`src/entrypoints/launcher.ts`) registered where its
+ * settings say: every page this extension may reach, minus the Polaris instance
+ * and the skipped sites, or only the kept ones. Off registers nothing. Firefox
+ * has no runtime registration under manifest v2, as for filling.
+ */
+async function syncLauncher(): Promise<void> {
+    if (!browser.scripting?.registerContentScripts) return;
+    const [held, home, settings] = await Promise.all([
+        browser.permissions.getAll().catch(() => ({ origins: [] as string[] })),
+        currentOrigin(),
+        launcherStore.readLauncher(browser).catch(() => null)
+    ]);
+    await browser.scripting.unregisterContentScripts({ ids: [LAUNCHER_ID] }).catch(() => undefined);
+    if (!settings) return;
+    const homeOrigin = home ? readOrigin(home) : null;
+    const { matches, excludeMatches } = launcherStore.launcherPatterns(held.origins ?? [], settings, homeOrigin);
+    if (matches.length === 0) return;
+    await browser.scripting
+        .registerContentScripts([
+            {
+                id: LAUNCHER_ID,
+                js: ["launcher.js"],
+                matches,
+                ...(excludeMatches.length > 0 ? { excludeMatches } : {}),
+                runAt: "document_idle",
+                persistAcrossSessions: true
+            }
+        ])
+        .catch(() => undefined);
+}
+
+/** The launcher's index, kept briefly so opening it in one tab after another
+ *  does not ask the instance every time. */
+let launcherIndex: { origin: string; at: number; entries: messages.LauncherEntry[] } | null = null;
+const LAUNCHER_INDEX_TTL_MS = 30_000;
+
+/** A path on the instance, and nothing that could leave it ("//host", "javascript:"). */
+function launcherPath(href: string): boolean {
+    return /^\/(?![/\\])/.test(href) && !/[\u0000-\u001f]/.test(href);
+}
+
+/** What the on-page launcher lists: the dashboard palette's own index for this
+ *  browser's Polaris session, with "Open Polaris" first. */
+async function launcherEntries(): Promise<messages.Reply> {
+    const home = await currentOrigin();
+    const origin = home ? readOrigin(home) : null;
+    if (!origin) return { ok: false, error: await say("launcher.unreachable") };
+    const words = { placeholder: await say("launcher.placeholder"), empty: await say("launcher.empty") };
+    const first: messages.LauncherEntry = { label: await say("launcher.openPolaris"), context: "", href: "/" };
+    const fresh = launcherIndex && launcherIndex.origin === origin && Date.now() - launcherIndex.at < LAUNCHER_INDEX_TTL_MS;
+    if (fresh && launcherIndex) return { ok: true, launcher: { entries: [first, ...launcherIndex.entries], words } };
+    try {
+        // The browser's own Polaris session, as the dashboard's palette asks: the
+        // extension's account key reaches the vault only.
+        const reply = await fetch(`${origin}/api/search`, {
+            signal: AbortSignal.timeout(10_000),
+            credentials: "include",
+            cache: "no-store"
+        });
+        if (reply.status === 401) {
+            const signIn: messages.LauncherEntry = { label: await say("launcher.signIn"), context: "", href: "/" };
+            return { ok: true, launcher: { entries: [signIn], words } };
+        }
+        if (!reply.ok) return { ok: false, error: await say("launcher.unreachable") };
+        const body = (await reply.json()) as { resources?: unknown };
+        const text = (value: unknown, max: number): string => (typeof value === "string" ? value.slice(0, max) : "");
+        const entries = (Array.isArray(body.resources) ? body.resources : [])
+            .map((raw) => (typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {}))
+            .map((raw) => ({ label: text(raw.label, 200), context: text(raw.context, 200), href: text(raw.href, 2048) }))
+            .filter((entry) => entry.label !== "" && launcherPath(entry.href));
+        launcherIndex = { origin, at: Date.now(), entries };
+        return { ok: true, launcher: { entries: [first, ...entries], words } };
+    } catch {
+        return { ok: false, error: await say("launcher.unreachable") };
+    }
+}
+
 export default defineBackground(() => {
     // The hosts list brought up to date with what this browser already holds -
     // the address in front written onto it for an install from before the list.
@@ -4772,7 +4871,13 @@ export default defineBackground(() => {
     // and on every change because the browser's own extension settings page can
     // give and take access without this extension being asked.
     void syncAutofill();
+    void syncLauncher();
     browser.permissions.onAdded.addListener(() => void syncAutofill());
+    browser.permissions.onAdded.addListener(() => void syncLauncher());
+    browser.permissions.onRemoved.addListener(() => void syncLauncher());
+    browser.storage.onChanged.addListener((changes, area) => {
+        if (area === "local" && changes[launcherStore.LAUNCHER_KEY.slice("local:".length)]) void syncLauncher();
+    });
     browser.permissions.onRemoved.addListener(() => void syncAutofill());
 
     // Registered here rather than beside the others above, and not by preference:

@@ -538,7 +538,26 @@ export type Request =
      * the vault to lock. Only from a press in the popup: it restarts the
      * extension, which signs out of the vault the way a browser restart does.
      */
-    | { readonly kind: "restartNow" };
+    | { readonly kind: "restartNow" }
+    /** The on-page launcher's index: what the dashboard's palette lists for
+     *  this account, and the launcher's few sentences. */
+    | { readonly kind: "launcherIndex" }
+    /** Open a launcher entry: a Polaris path, in a new tab on the instance. */
+    | { readonly kind: "launcherOpen"; readonly href: string };
+
+/** One thing the on-page launcher can open. */
+export interface LauncherEntry {
+    readonly label: string;
+    readonly context: string;
+    /** A path on the Polaris instance, starting with one "/". */
+    readonly href: string;
+}
+
+/** The launcher's sentences, sent with its index so the page script carries no catalog. */
+export interface LauncherWords {
+    readonly placeholder: string;
+    readonly empty: string;
+}
 
 /** Hosts a list added, unnamed rows it gave a name, and rows left out because
  *  the list was full. */
@@ -549,6 +568,10 @@ export interface HostImport {
 }
 
 export type Reply =
+    | {
+          readonly ok: true;
+          readonly launcher: { readonly entries: readonly LauncherEntry[]; readonly words: LauncherWords };
+      }
     | { readonly ok: true; readonly status: VaultStatus }
     | {
           readonly ok: true;
@@ -679,7 +702,12 @@ export const FROM_PAGE: ReadonlySet<Request["kind"]> = new Set([
     "captured",
     "pendingCapture",
     "saveCaptured",
-    "dismissCapture"
+    "dismissCapture",
+    // The launcher's index lists names of the account's own projects, servers
+    // and apps - what its palette shows - drawn in a closed shadow root and only
+    // after a trusted key press. Opening takes a Polaris path and nothing else.
+    "launcherIndex",
+    "launcherOpen"
 ] satisfies Request["kind"][]);
 
 /**
