@@ -471,6 +471,13 @@ const nextConfig = {
         // path to every browser (scripts/portable-import-meta.mjs), and the
         // postbuild check fails the build if any path still gets through.
         if (!isServer) config.plugins.push(new PortableImportMetaUrl(workspaceRoot, webpack));
+        // mlkem (chat encryption) falls back to `import("node:crypto")` when the
+        // global Web Crypto is missing. A tab always has it, but webpack cannot
+        // read a `node:` URL for the browser and fails the whole build on it.
+        if (!isServer) {
+            const browserCrypto = join(dirname(fileURLToPath(import.meta.url)), "scripts", "browser-node-crypto.mjs");
+            config.plugins.push(new webpack.NormalModuleReplacementPlugin(/^node:crypto$/, (resource) => { resource.request = browserCrypto; }));
+        }
         // The production compile cache is carried from one CI build to the next
         // (dashboard-ci.yml), and webpack keeps an entry it has not used for 60
         // days by default. Minified chunks are stored by their content hash, so
