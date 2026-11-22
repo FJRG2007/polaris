@@ -78,7 +78,7 @@
         "high": "Alta",
         "highHint": "Sombras suaves, reflejos y rayos de luz",
         "ultra": "Ultra",
-        "ultraHint": "Imagen más nítida y desenfoque de movimiento",
+        "ultraHint": "Más nitidez y desenfoque de movimiento",
         "restart": "Al cambiarla, la ciudad se reinicia donde estás."
     },
     "modes": {
@@ -265,7 +265,7 @@
         "wanted": "Nivel de búsqueda {level} de 5",
         "weapons": {
             "pistol": "Pistola",
-            "smg": "Subfusil",
+            "smg": "SMG",
             "rifle": "Fusil",
             "shotgun": "Escopeta"
         }

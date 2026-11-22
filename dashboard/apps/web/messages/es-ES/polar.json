@@ -354,6 +354,7 @@
         "serverAsk": "Polar quiere ejecutar esto en {server}:",
         "serverAskRoot": "Polar quiere ejecutarlo como root en {server}:",
         "serverCwd": "En {cwd}",
+        "serverCommand": "El comando",
         "serverAlways": "Siempre en este chat",
         "serverAlwaysHint": "Ejecutar en {server} sin preguntar hasta que acabe este chat"
     },

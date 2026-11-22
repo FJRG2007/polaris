@@ -3,7 +3,7 @@
  * that every level costs at least as much as the one below it.
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as quality from "../../../arcade/game/new-york/engine/quality.js";
 
@@ -38,6 +38,17 @@ describe("gpuQuality", () => {
 });
 
 describe("deviceQuality", () => {
+    // A desktop with room to spare. Left to the machine running the suite, the
+    // answer was whatever its cores and memory were: a four-core CI runner is a
+    // medium device, so every desktop case read medium there.
+    beforeEach(() => {
+        vi.stubGlobal("navigator", { hardwareConcurrency: 8, deviceMemory: 8 });
+        vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
     it("reads the WebGPU adapter's name", () => {
         expect(quality.deviceQuality(webgpu({ vendor: "intel", description: "Intel(R) UHD Graphics 770" }))).toBe("medium");
         expect(quality.deviceQuality(webgpu({ vendor: "nvidia", description: "NVIDIA GeForce RTX 4090" }))).toBe("ultra");

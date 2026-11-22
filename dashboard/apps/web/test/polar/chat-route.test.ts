@@ -93,6 +93,13 @@ vi.mock("@/lib/polar/custom-tools/runtime", () => ({
     polarCustomTools: async () => ({ tools: {}, approval: {}, described: {} })
 }));
 vi.mock("@/lib/polar/custom-tools/plugins", () => ({ dispatchPluginEvent: async () => 0 }));
+// Running commands on a server needs deploy.manage; nobody here has it, and the
+// tools behind it open SSH, so neither half is reached for real.
+vi.mock("@/lib/session", () => ({ sessionCan: async () => false }));
+vi.mock("@/lib/polar/server-command-tools", () => ({
+    polarServerTools: async () => ({}),
+    serverCommandApprovalFor: () => ({})
+}));
 vi.mock("@/lib/polar/connectors/store", () => ({
     ownConnectors: async () => state.connectors,
     connectorPolicy: async () => ({ who: "everyone", hosts: [], privateNetwork: false }),

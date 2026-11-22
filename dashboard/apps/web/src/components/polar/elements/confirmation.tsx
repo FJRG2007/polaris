@@ -17,7 +17,7 @@
  */
 
 import { Button, cn } from "@polaris/ui";
-import { JsonView } from "@/components/json-view";
+import { CodeView, JsonView } from "@/components/json-view";
 import { useEffect, useState, type ReactNode } from "react";
 import { Check, ShieldAlert, UserRound, X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -177,9 +177,12 @@ export function Confirmation({
                             server: command.server
                         })}
                     </p>
-                    <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted px-2 py-1.5 font-mono text-xs text-foreground">
-                        {command.text}
-                    </pre>
+                    <CodeView
+                        value={command.text}
+                        language="bash"
+                        label={t("approval.serverCommand")}
+                        className="max-h-48 text-xs"
+                    />
                     {command.cwd ? (
                         <p className="min-w-0 break-all text-xs text-muted-foreground">
                             {t("approval.serverCwd", { cwd: command.cwd })}
