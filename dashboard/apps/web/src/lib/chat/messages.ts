@@ -105,6 +105,10 @@ export interface ChatMessageView {
      *  webhooks, rather than by a person - drawn with an APP badge, as Discord
      *  does, because the name on it is whatever the sender chose. */
     readonly fromWebhook?: boolean;
+    /** A copy published from an announcement channel this one follows. */
+    readonly published?: boolean;
+    /** Where that copy came from, for its link back to the original. */
+    readonly publishedFrom?: { readonly channelId: string; readonly messageId: string };
     /** The picture a webhook message is drawn with - see `webhookFace`. */
     readonly webhookAvatar?: string;
     /** Written by an assistant answering a mention - "polar" - and drawn with
@@ -2284,6 +2288,8 @@ export const MESSAGE_SELECT = {
     authorLabel: true,
     authorAvatarUrl: true,
     agent: true,
+    publishedFromId: true,
+    publishedFromChannelId: true,
     translation: true,
     components: true,
     audience: true
@@ -2317,6 +2323,9 @@ interface Row {
     authorAvatarUrl?: string | null;
     /** The assistant that wrote it, for one answering a mention. */
     agent?: string | null;
+    /** Copied from an announcement channel it follows - see `follows.ts`. */
+    publishedFromId?: string | null;
+    publishedFromChannelId?: string | null;
     /** `{ from, to, original }` when it was sent translated - see
      *  `core.readSentTranslation`. Optional for the same reason as above. */
     translation?: unknown;
@@ -2695,6 +2704,14 @@ export async function decorateMessages(
             // under is the whole of who wrote it.
             authorName: authorNameOf(row, names),
             ...(row.webhookId ? { fromWebhook: true } : {}),
+            ...(row.publishedFromId
+                ? {
+                      published: true,
+                      ...(row.publishedFromChannelId
+                          ? { publishedFrom: { channelId: row.publishedFromChannelId, messageId: row.publishedFromId } }
+                          : {})
+                  }
+                : {}),
             ...faceOf(webhookFace(row, hookFaces)),
             ...(row.agent ? { fromAgent: row.agent } : {}),
             ...componentsView(row),

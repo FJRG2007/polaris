@@ -31,6 +31,7 @@ import * as locations from "@/lib/chat/locations";
 import * as pins from "@/lib/chat/pins";
 import * as reminders from "@/lib/chat/reminders";
 import * as webhooks from "@/lib/chat/webhooks";
+import * as follows from "@/lib/chat/follows";
 import { confirmAge } from "@/lib/chat/age-gate";
 import { MAX_REREAD } from "@/lib/chat/reread-limit";
 import { allChatRules } from "@/lib/chat/rules";
@@ -2217,4 +2218,46 @@ export async function nearbyPlacesAction(
     if (!(await rateLimit(`chat-places:${me.id}`, 20, 60_000)).ok) return { error: t("errors.placesBusy") };
     const found = await locations.nearbyPlaces(parsed.data, (await getLocale()).slice(0, 2));
     return found ? { places: found } : { error: t("errors.placesUnavailable") };
+}
+
+/** Copy one announcement to every channel that follows its own. */
+export async function publishMessageAction(
+    input: unknown
+): Promise<{ result?: follows.ChatPublishResult; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatPublishSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.follow.notPublishable") };
+    const result = await guardChat(() => follows.publish(me, parsed.data));
+    return result.error ? { error: result.error } : { result: result.value };
+}
+
+/** The channels this announcement channel may be followed into, and following or unfollowing one. */
+async function followRefused(): Promise<{ error: string }> {
+    return { error: (await getTranslations("chat"))("errors.follow.badTarget") };
+}
+
+export async function followTargetsAction(
+    sourceChannelId: unknown
+): Promise<{ targets?: follows.ChatFollowTarget[]; error?: string }> {
+    const me = await actor();
+    const id = z.string().uuid().safeParse(sourceChannelId);
+    if (!id.success) return followRefused();
+    const result = await guardChat(() => follows.followTargets(me, id.data));
+    return result.error ? { error: result.error } : { targets: result.value };
+}
+
+export async function followChannelAction(input: unknown): Promise<{ followId?: string; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatChannelFollowSchema.safeParse(input);
+    if (!parsed.success) return followRefused();
+    const result = await guardChat(() => follows.follow(me, parsed.data));
+    return result.error ? { error: result.error } : { followId: result.value };
+}
+
+export async function unfollowChannelAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = core.chatChannelFollowSchema.safeParse(input);
+    if (!parsed.success) return followRefused();
+    const result = await guardChat(() => follows.unfollow(me, parsed.data));
+    return result.error ? { error: result.error } : {};
 }

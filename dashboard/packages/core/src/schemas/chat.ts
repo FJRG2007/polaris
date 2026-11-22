@@ -313,6 +313,28 @@ export function isPostMedia(contentType: string): boolean {
     return contentType.startsWith("image/") || contentType.startsWith("video/");
 }
 
+/**
+ * How many channels may follow one announcement channel. Publishing copies a
+ * message into each of them inside the request, so the number is what bounds
+ * that fan-out.
+ */
+export const MAX_CHANNEL_FOLLOWERS = 200;
+
+/** Follow an announcement channel into a channel the follower administers. */
+export const chatChannelFollowSchema = z.object({
+    sourceChannelId: z.string().uuid(),
+    targetChannelId: z.string().uuid()
+});
+
+export type ChatChannelFollowInput = z.infer<typeof chatChannelFollowSchema>;
+
+/** Copy one of an announcement channel's messages to every follower. */
+export const chatPublishSchema = z.object({
+    messageId: z.string().uuid()
+});
+
+export type ChatPublishInput = z.infer<typeof chatPublishSchema>;
+
 /** The longest a forum post's title may be, and a tag's name. */
 export const MAX_FORUM_TITLE = 100;
 export const MAX_FORUM_TAG = 20;

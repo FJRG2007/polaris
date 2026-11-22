@@ -21,7 +21,8 @@
 
 import * as core from "@polaris/core";
 import { isPlayable } from "./voice-recorder";
-import { setReminderAction } from "./actions";
+import { publishMessageAction, setReminderAction } from "./actions";
+import { PublishContext } from "./publish-context";
 import { ScheduleDialog } from "./schedule-dialog";
 import type { SpaceEmojiScope } from "./space-emoji";
 import { EmojiFace, type CustomEmojiSet } from "@/components/rich-text/custom-emoji";
@@ -37,6 +38,7 @@ import {
     cloneElement,
     Fragment,
     isValidElement,
+    useContext,
     useRef,
     useState,
     useSyncExternalStore,
@@ -71,6 +73,7 @@ import {
     Flag,
     CornerUpLeft,
     Forward,
+    Megaphone,
     Info,
     Languages,
     Link2,
@@ -338,6 +341,21 @@ function MessageMenuBody({
     const picture = at.image;
     const clip = at.video;
     const announce = (words: string) => toast.show({ title: words });
+    const publishable = useContext(PublishContext);
+    /** Copy it to every channel that follows this one, and say how many it reached. */
+    const publish = async () => {
+        try {
+            const outcome = await publishMessageAction({ messageId: message.id });
+            if (outcome.error) announce(outcome.error);
+            else if (outcome.result && outcome.result.delivered + outcome.result.already === 0) {
+                announce(t("follow.noFollowers"));
+            } else if (outcome.result) {
+                announce(t("follow.publishedTo", { count: outcome.result.delivered + outcome.result.already }));
+            }
+        } catch {
+            announce(t("follow.failed"));
+        }
+    };
     /**
      * The attachment under the pointer, when it was on one.
      *
@@ -578,6 +596,15 @@ function MessageMenuBody({
                                   icon: Forward,
                                   label: t("messageMenu.forward"),
                                   run: () => actions.onForward?.(message)
+                              },
+                          publishable &&
+                              !notice &&
+                              !message.published &&
+                              !message.deleted && {
+                                  key: "publish",
+                                  icon: Megaphone,
+                                  label: t("follow.publish"),
+                                  run: () => void publish()
                               },
                           actions.onOpenThread &&
                               !notice && {

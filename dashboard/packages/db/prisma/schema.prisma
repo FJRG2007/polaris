@@ -10821,6 +10821,9 @@ model ChatChannel {
     ruleProposals ChatRuleProposal[]
     forumTags     ChatForumTag[]
     forumPosts    ChatForumPost[]
+    // An announcement channel's followers, and the channels this one follows.
+    followers     ChatChannelFollow[] @relation("ChatFollowSource")
+    following     ChatChannelFollow[] @relation("ChatFollowTarget")
 
     @@index([spaceId, order])
     @@index([categoryId, order])
@@ -11128,6 +11131,13 @@ model ChatMessage {
     keptExpiresAt DateTime?
     // Whether its author lets anybody keep it. On unless they said no.
     keepable    Boolean   @default(true)
+    // A copy an announcement channel published into a follower: the message it
+    // was copied from. With `channelId` it is unique, so publishing the same
+    // message twice delivers it once. Not a relation: the copy outlives the
+    // original, as a delivered announcement does.
+    publishedFromId String? @db.Uuid
+    // The channel that message is in, so the copy links back to it.
+    publishedFromChannelId String? @db.Uuid
     createdAt   DateTime  @default(now())
 
     channel     ChatChannel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
@@ -11161,6 +11171,23 @@ model ChatMessage {
     @@index([authorId])
     // The disappearing-message sweep, oldest first.
     @@index([expiresAt])
+    @@unique([channelId, publishedFromId])
+}
+
+// One channel following an announcement channel: what the source publishes
+// is copied into the target (`lib/chat/follows.ts`).
+model ChatChannelFollow {
+    id              String   @id @default(uuid(7)) @db.Uuid
+    sourceChannelId String   @db.Uuid
+    targetChannelId String   @db.Uuid
+    createdById     String?  @db.Uuid
+    createdAt       DateTime @default(now())
+
+    source ChatChannel @relation("ChatFollowSource", fields: [sourceChannelId], references: [id], onDelete: Cascade)
+    target ChatChannel @relation("ChatFollowTarget", fields: [targetChannelId], references: [id], onDelete: Cascade)
+
+    @@unique([sourceChannelId, targetChannelId])
+    @@index([targetChannelId])
 }
 
 // A message one reader deleted for themselves. Everybody else still sees it.

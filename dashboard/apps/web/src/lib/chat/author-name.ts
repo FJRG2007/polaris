@@ -16,11 +16,13 @@ export interface AuthoredRow {
     readonly authorLabel?: string | null;
     readonly webhookId?: string | null;
     readonly agent?: string | null;
+    /** Set on a copy an announcement channel published: signed with its origin. */
+    readonly publishedFromId?: string | null;
 }
 
 export function authorNameOf(row: AuthoredRow, names: ReadonlyMap<string, string>): string | null {
     if (row.authorId) return names.get(row.authorId) ?? null;
-    if (row.webhookId || row.agent) return row.authorLabel ?? null;
+    if (row.webhookId || row.agent || row.publishedFromId) return row.authorLabel ?? null;
     return null;
 }
 
@@ -29,5 +31,6 @@ export const AUTHOR_SELECT = {
     authorId: true,
     authorLabel: true,
     webhookId: true,
-    agent: true
+    agent: true,
+    publishedFromId: true
 } as const;

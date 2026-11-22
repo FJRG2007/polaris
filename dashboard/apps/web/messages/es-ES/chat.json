@@ -294,6 +294,13 @@
             "tagGone": "Esta etiqueta ya no está.",
             "tagName": "Una etiqueta tiene de 1 a 20 caracteres.",
             "guidelinesTooLong": "Las normas tienen hasta 2000 caracteres."
+        },
+        "follow": {
+            "notAnnouncement": "Solo se puede seguir un canal de anuncios.",
+            "badTarget": "Elige un canal de texto de un espacio que administres.",
+            "tooMany": "Este canal ya tiene el máximo de seguidores.",
+            "notPublishable": "Solo se publica un mensaje del propio canal con texto.",
+            "filesNotPublished": "Aún no se pueden publicar mensajes con archivos."
         }
     },
     "media": {
@@ -2943,5 +2950,21 @@
         "deleteTag": "Borrar {name}",
         "newTag": "Añadir",
         "addTag": "Añadir"
+    },
+    "follow": {
+        "menu": "Seguir",
+        "title": "Seguir #{channel}",
+        "description": "Lo que publique este canal se copiará en el canal que elijas.",
+        "empty": "No administras ningún canal de texto donde seguirlo.",
+        "loadFailed": "No se han podido cargar tus canales. Inténtalo de nuevo.",
+        "failed": "No ha funcionado. Inténtalo de nuevo.",
+        "follow": "Seguir",
+        "unfollow": "Quitar",
+        "followed": "Siguiendo en #{channel}.",
+        "publish": "Publicar",
+        "publishedTo": "{count, plural, one {Publicado en # canal.} other {Publicado en # canales.}}",
+        "noFollowers": "Ningún canal sigue a este todavía.",
+        "publishedTag": "Seguido",
+        "publishedHint": "Publicado desde un canal de anuncios que este sigue. Abrir el original."
     }
 }

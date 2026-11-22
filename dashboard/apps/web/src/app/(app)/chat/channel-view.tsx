@@ -102,6 +102,7 @@ import {
 import { AlertCircle, ArrowDown, Loader2, MessageCircle, Mic, ShieldCheck, Video, Volume2 } from "lucide-react";
 import { keepReading, readingPosition, type ReadingPosition } from "./reading-position";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { PublishContext } from "./publish-context";
 import { LocationDialog } from "./location-dialog";
 import * as vanishActions from "./vanish-actions";
 import type { VanishDuration } from "@/lib/chat/vanish-rules";
@@ -2702,6 +2703,7 @@ export function ChannelView({
                         />
                     </div>
                 ) : (
+                    <PublishContext.Provider value={Boolean(channel && canModerate && core.isAnnouncementChannel(channel))}>
                     <MessageList
                         emoji={emojiScope}
                         messages={rows}
@@ -2742,6 +2744,7 @@ export function ChannelView({
                             }))
                         }
                     />
+                    </PublishContext.Provider>
                 )}
 
                 {/* The way back, for somebody who has read a long way up.

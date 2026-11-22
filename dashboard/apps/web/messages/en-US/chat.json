@@ -294,6 +294,13 @@
             "tagGone": "This tag is no longer here.",
             "tagName": "A tag name is 1 to 20 characters.",
             "guidelinesTooLong": "Guidelines are up to 2000 characters."
+        },
+        "follow": {
+            "notAnnouncement": "Only an announcement channel can be followed.",
+            "badTarget": "Pick a text channel in a space you administer.",
+            "tooMany": "This channel has as many followers as it can have.",
+            "notPublishable": "Only a message of the channel itself, with words in it, can be published.",
+            "filesNotPublished": "Messages with files cannot be published yet."
         }
     },
     "media": {
@@ -2943,5 +2950,21 @@
         "deleteTag": "Delete {name}",
         "newTag": "Add tag",
         "addTag": "Add tag"
+    },
+    "follow": {
+        "menu": "Follow",
+        "title": "Follow #{channel}",
+        "description": "What this channel publishes will be copied into the channel you pick.",
+        "empty": "You do not administer any text channel to follow it into.",
+        "loadFailed": "Your channels could not be loaded. Try again.",
+        "failed": "That did not work. Try again.",
+        "follow": "Follow",
+        "unfollow": "Unfollow",
+        "followed": "Following in #{channel}.",
+        "publish": "Publish",
+        "publishedTo": "{count, plural, one {Published to # channel.} other {Published to # channels.}}",
+        "noFollowers": "No channel follows this one yet.",
+        "publishedTag": "Followed",
+        "publishedHint": "Published from an announcement channel this one follows. Open the original."
     }
 }

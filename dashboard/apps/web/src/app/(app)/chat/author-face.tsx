@@ -10,7 +10,9 @@
  * the initials of a name nobody has and no tag at all.
  */
 
+import Link from "next/link";
 import { Blocks } from "lucide-react";
+import { messageLink } from "./links";
 import { POLARIS_APPS } from "@/lib/apps";
 import { WebhookFace } from "./webhook-face";
 import { Avatar } from "@/components/avatar";
@@ -28,7 +30,7 @@ export function AppAgentFace({ agent }: { agent: string }) {
     );
 }
 
-type Authored = Pick<ChatMessageView, "authorId" | "fromAgent" | "fromWebhook" | "webhookAvatar">;
+type Authored = Pick<ChatMessageView, "authorId" | "fromAgent" | "fromWebhook" | "webhookAvatar" | "published" | "publishedFrom">;
 
 /** Whoever wrote the message, as a 28px face. */
 export function AuthorFace({ message, name }: { message: Authored; name: string }) {
@@ -42,6 +44,24 @@ export function AuthorFace({ message, name }: { message: Authored; name: string 
 export function AuthorTag({ message }: { message: Authored }) {
     const t = useTranslations("chat");
     if (message.fromAgent === "polar") return <PolarBadge />;
+    if (message.published) {
+        const tag = "shrink-0 self-center rounded bg-primary px-1 text-[0.625rem] font-semibold uppercase leading-4 text-primary-foreground";
+        // A link back to the original, where the reader may open it; the
+        // message route says why when they cannot.
+        return message.publishedFrom ? (
+            <Link
+                className={`${tag} hover:underline`}
+                href={messageLink("", message.publishedFrom.channelId, message.publishedFrom.messageId)}
+                title={t("follow.publishedHint")}
+            >
+                {t("follow.publishedTag")}
+            </Link>
+        ) : (
+            <span className={tag} title={t("follow.publishedHint")}>
+                {t("follow.publishedTag")}
+            </span>
+        );
+    }
     if (!message.fromWebhook && !message.fromAgent) return null;
     return (
         <span

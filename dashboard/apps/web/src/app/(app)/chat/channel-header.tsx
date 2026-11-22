@@ -33,6 +33,7 @@ import { useTextTranslator } from "@/components/text-translation/provider";
 import { channelLink, copyText } from "./links";
 import { useAppUrl } from "@/components/app-url";
 import { AddPeopleDialog } from "./add-people-dialog";
+import { FollowDialog } from "./follow-dialog";
 import { ChatAvatar } from "@/components/chat-avatar";
 import { conversationFace } from "./conversation-face";
 import { NotifyOptions } from "./notify-menu";
@@ -169,6 +170,8 @@ export function ChannelHeader({
     const face = conversationFace(channel, { id: viewerId, name: viewerName });
     const mayCall = may.call;
     const [adding, setAdding] = useState(false);
+    /** The Follow dialog of an announcement channel. */
+    const [following, setFollowing] = useState(false);
     const [renaming, setRenaming] = useState(false);
     const [settings, setSettings] = useState(false);
     const [naming, setNaming] = useState(false);
@@ -717,6 +720,12 @@ export function ChannelHeader({
                                     {t("channelHeader.pinnedMessages")}
                                 </DropdownMenuItem>
                             )}
+                            {core.isAnnouncementChannel(channel) && (
+                                <DropdownMenuItem onSelect={() => setFollowing(true)}>
+                                    <Megaphone className="size-3.5" />
+                                    {t("follow.menu")}
+                                </DropdownMenuItem>
+                            )}
                             {adder && (
                                 <DropdownMenuItem
                                     className="sm:hidden"
@@ -872,6 +881,15 @@ export function ChannelHeader({
                     onOpenChange={setSettings}
                     onChanged={onChanged}
                     privacy={vanish?.privacy}
+                />
+            )}
+
+            {core.isAnnouncementChannel(channel) && (
+                <FollowDialog
+                    open={following}
+                    onOpenChange={setFollowing}
+                    sourceChannelId={channel.id}
+                    sourceName={channel.name}
                 />
             )}
 
