@@ -179,29 +179,36 @@ body {
 
 /*
  * Syntax highlighting palette. highlight.js only emits class names, never
- * colors, so the theme lives here instead of in one of its stylesheets: these
- * hues are the Polaris tokens, and they follow the light/dark switch like
- * everything else. Muted and desaturated on purpose - a file preview is read,
- * not decorated.
+ * colors, so the theme lives here instead of in one of its stylesheets, and it
+ * follows the light/dark switch like everything else. Muted on purpose - a file
+ * preview is read, not decorated.
+ *
+ * No hue here sits in the accent's violet-to-magenta band (roughly 250-345).
+ * Violet is spent in four places (the active rail row, the primary action,
+ * focus, a selected check) and code is not one of them: keywords were lilac
+ * and properties pink, so every `def`, `import`, `true` and `self` in a chat
+ * message, a Drive preview or a JSON view was painted in the brand colour.
+ * Keywords take a coral and properties a sand instead, the way GitHub's Primer
+ * themes draw them. test/design/syntax-palette.test.ts holds the band.
  */
 :root {
     --code-comment: 222 9% 48%;
-    --code-keyword: 285 78% 76%;
+    --code-keyword: 4 76% 72%;
     --code-string: 152 50% 60%;
     --code-number: 32 88% 68%;
     --code-function: 212 90% 74%;
     --code-type: 190 66% 68%;
-    --code-attr: 330 72% 74%;
+    --code-attr: 42 52% 70%;
 }
 
 :root.light {
     --code-comment: 225 8% 46%;
-    --code-keyword: 285 64% 44%;
+    --code-keyword: 356 58% 46%;
     --code-string: 152 58% 30%;
-    --code-number: 26 82% 40%;
+    --code-number: 26 82% 36%;
     --code-function: 214 78% 44%;
-    --code-type: 191 72% 32%;
-    --code-attr: 330 62% 44%;
+    --code-type: 191 72% 28%;
+    --code-attr: 38 62% 32%;
 }
 
 /* The same palette for a machine set to light, which is what `system` follows.
@@ -211,12 +218,12 @@ body {
 @media (prefers-color-scheme: light) {
     :root.system {
         --code-comment: 225 8% 46%;
-        --code-keyword: 285 64% 44%;
+        --code-keyword: 356 58% 46%;
         --code-string: 152 58% 30%;
-        --code-number: 26 82% 40%;
+        --code-number: 26 82% 36%;
         --code-function: 214 78% 44%;
-        --code-type: 191 72% 32%;
-        --code-attr: 330 62% 44%;
+        --code-type: 191 72% 28%;
+        --code-attr: 38 62% 32%;
     }
 }
 

@@ -171,7 +171,7 @@ export function useCodeRun(code: string, kind: RunKind | null): CodeRun {
     return { state, active, frame, start, stop, clear };
 }
 
-const BUTTON = "inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-[0.6875rem] text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+const BUTTON = "inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-[0.6875rem] text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground";
 
 /** Run, or Preview for a page; Stop while it runs or a preview is open. */
 export function RunButton({ run, kind }: { run: CodeRun; kind: RunKind }) {
