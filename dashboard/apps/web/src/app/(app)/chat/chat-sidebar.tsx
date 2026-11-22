@@ -696,12 +696,28 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                     href="/chat/meetings"
                     className={cn(
                         // On a phone the meetings are the Calls tab.
-                        "mb-3 flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover max-sm:hidden",
+                        "flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover max-sm:hidden",
                         meetings ? "bg-card-hover text-foreground" : "text-muted-foreground"
                     )}
                 >
                     <Video className="size-3.5 shrink-0" />
                     <span>{t("sidebar.meetings")}</span>
+                </IntentLink>
+
+                {/* This reader's own Chat settings, for everybody: what the
+                    operator sets for the whole instance is under Polaris apps,
+                    and nothing here reaches anybody else. */}
+                <IntentLink
+                    href="/chat/settings"
+                    className={cn(
+                        "mb-3 flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover max-md:min-h-11",
+                        here === "/chat/settings"
+                            ? "bg-card-hover text-foreground"
+                            : "text-muted-foreground"
+                    )}
+                >
+                    <Settings2 className="size-3.5 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">{t("sidebar.chatSettings")}</span>
                 </IntentLink>
 
                 {error && (

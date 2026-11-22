@@ -31,6 +31,11 @@ vi.mock("@/app/(app)/chat/swipe-reply", async (importOriginal) => {
     };
 });
 
+vi.mock("@/app/(app)/chat/preference-actions", () => ({
+    chatPreferencesAction: () => new Promise(() => undefined),
+    setCaptionPositionAction: async () => ({ error: "unused" })
+}));
+
 vi.mock("@/app/(app)/chat/actions", () => ({
     saveMediaAction: async () => ({}),
     unsaveMediaAction: async () => ({}),

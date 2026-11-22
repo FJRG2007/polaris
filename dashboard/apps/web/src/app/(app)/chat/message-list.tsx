@@ -89,6 +89,8 @@ import { VideoPreview } from "@/components/video-preview";
 import { isPlayable, isVoiceMessage } from "./voice-recorder";
 import { AttachmentViewer, previewableAs, type ViewedFile } from "./attachment-viewer";
 import { attachmentImageUrl, messageGallery } from "./message-gallery";
+import { useChatPreferences } from "./chat-preferences";
+import { captionGoesBelow } from "@/lib/chat/preference-schema";
 import { usePersonPress } from "@/components/person-press";
 import { NoticeText } from "./notice-line";
 import { useSwipeReply } from "./swipe-reply";
@@ -1012,6 +1014,7 @@ const Message = memo(function Message({
         liveTranslation &&
         translatesIncoming(message, viewerId, liveTranslation, translator.target)
     );
+    const { captionPosition } = useChatPreferences(viewerId);
 
     // Something Polaris said rather than somebody: joined, left, was added, a
     // call ended. Drawn in the same row as a message - the hover, the bar, the
@@ -1030,6 +1033,8 @@ const Message = memo(function Message({
     // An invite to a game server, sent by whoever added this player: drawn as
     // the server's card in that person's own row, in place of its words.
     const invite = notice || message.deleted ? null : gameInviteIn(message.body);
+    const captionBelow =
+        !notice && !invite && !message.deleted && captionGoesBelow(captionPosition, message);
 
     // Somebody this reader has blocked. Folded away rather than dropped: a
     // conversation with gaps in it reads as messages that failed to load, and
@@ -1051,6 +1056,62 @@ const Message = memo(function Message({
             </p>
         );
     }
+
+    // The words of the message, drawn above its pictures or, for a reader who
+    // chose WhatsApp's way in Chat settings, under them.
+    const bodyText = (
+        <div className={cn("text-sm", captionBelow && "mt-1")}>
+            <TranslatableText id={message.id} body={message.body} live={live}>
+                <RichText
+                    value={message.body}
+                    origin={baseUrl}
+                    references={referenced(message)}
+                    customEmoji={emojiSet}
+                    jumboEmoji
+                    flaggedLinks={message.flaggedLinks}
+                />
+            </TranslatableText>
+            {/* Once per block, under its last message, as Instagram
+        draws them: the newest one read means the ones above
+        it were read too, so a tick under each line repeats
+        the same news. Each message's own stage stays one
+        press away in its information dialog, and the clock
+        of one still going is drawn wherever it is. */}
+            {message.receipt && !continued && (
+                <Ticks
+                    receipt={message.receipt}
+                    onOpen={() => onExplain(message)}
+                />
+            )}
+            {message.id.startsWith("outbox:") && (
+                <span
+                    role="img"
+                    title={t("messageList.receipt.pending")}
+                    aria-label={t("messageList.receipt.pending")}
+                    className="ms-1 inline-flex align-middle text-foreground-subtle"
+                >
+                    <WaitingClock className="size-3" />
+                </span>
+            )}
+            {message.edited && (
+                // A button, not a label: "(edited)" that cannot be
+                // opened asks the room to take the change on trust.
+                <button
+                    type="button"
+                    onClick={() => setShowingHistory(true)}
+                    title={t("messageList.seeWhatItSaidBefore")}
+                    className="ms-1 rounded text-[0.6875rem] text-foreground-subtle underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
+                >
+                    (edited)
+                </button>
+            )}
+            <TranslationNote
+                id={message.id}
+                body={message.body}
+                translated={message.translated}
+            />
+        </div>
+    );
 
     return (
         // Clipped sideways only, so a line pulled to the right never gives the
@@ -1304,58 +1365,8 @@ const Message = memo(function Message({
                                 message={message}
                                 mine={message.authorId === viewerId}
                             />
-                        ) : (
-                            <div className="text-sm">
-                                <TranslatableText id={message.id} body={message.body} live={live}>
-                                    <RichText
-                                        value={message.body}
-                                        origin={baseUrl}
-                                        references={referenced(message)}
-                                        customEmoji={emojiSet}
-                                        jumboEmoji
-                                        flaggedLinks={message.flaggedLinks}
-                                    />
-                                </TranslatableText>
-                                {/* Once per block, under its last message, as Instagram
-                            draws them: the newest one read means the ones above
-                            it were read too, so a tick under each line repeats
-                            the same news. Each message's own stage stays one
-                            press away in its information dialog, and the clock
-                            of one still going is drawn wherever it is. */}
-                                {message.receipt && !continued && (
-                                    <Ticks
-                                        receipt={message.receipt}
-                                        onOpen={() => onExplain(message)}
-                                    />
-                                )}
-                                {message.id.startsWith("outbox:") && (
-                                    <span
-                                        role="img"
-                                        title={t("messageList.receipt.pending")}
-                                        aria-label={t("messageList.receipt.pending")}
-                                        className="ms-1 inline-flex align-middle text-foreground-subtle"
-                                    >
-                                        <WaitingClock className="size-3" />
-                                    </span>
-                                )}
-                                {message.edited && (
-                                    // A button, not a label: "(edited)" that cannot be
-                                    // opened asks the room to take the change on trust.
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowingHistory(true)}
-                                        title={t("messageList.seeWhatItSaidBefore")}
-                                        className="ms-1 rounded text-[0.6875rem] text-foreground-subtle underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
-                                    >
-                                        (edited)
-                                    </button>
-                                )}
-                                <TranslationNote
-                                    id={message.id}
-                                    body={message.body}
-                                    translated={message.translated}
-                                />
-                            </div>
+                        ) : captionBelow ? null : (
+                            bodyText
                         )}
 
                         {/* Under the question rather than in place of it: the
@@ -1625,6 +1636,7 @@ const Message = memo(function Message({
                                 })}
                             </ul>
                         )}
+                        {captionBelow && bodyText}
                         {sending && <OutgoingFailure one={sending} />}
 
                         {message.reactions.length > 0 && (

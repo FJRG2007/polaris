@@ -798,7 +798,8 @@
         "emoji": "Emoji",
         "soundboard": "Soundboard",
         "joinRequests": "Join requests",
-        "selfName": "{name} (you)"
+        "selfName": "{name} (you)",
+        "chatSettings": "Chat settings"
     },
     "channelView": {
         "loadingMessages": "Loading messages",
@@ -3026,5 +3027,20 @@
         "noFollowers": "No channel follows this one yet.",
         "publishedTag": "Followed",
         "publishedHint": "Published from an announcement channel this one follows. Open the original."
+    },
+    "chatSettings": {
+        "title": "Chat settings",
+        "intro": "How Chat looks and behaves for you. Nobody else sees these choices.",
+        "back": "Back to conversations",
+        "captionPosition": "Text with photos",
+        "captionPositionHint": "Where a message's text goes when it comes with photos or videos.",
+        "captionAbove": "Above the photos",
+        "captionBelow": "Below the photos",
+        "saveFailed": "Couldn't save that. Try again.",
+        "whoCanMessage": "Who can reach you",
+        "whoCanMessageHint": "Messages, calls, last seen and blocked people.",
+        "notifications": "Notifications",
+        "notificationsHint": "Alerts, push notifications and quiet hours.",
+        "open": "Open"
     }
 }

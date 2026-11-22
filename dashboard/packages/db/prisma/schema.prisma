@@ -461,6 +461,7 @@ model User {
     calendarProposals    CalendarProposal[]
     calendarPreference   CalendarPreference?
     drivePreference      DrivePreference?
+    chatPreference       ChatPreference?
     crmCompanies            CrmCompany[]     @relation("CrmCompanyShelf")
     crmAccountsOwned        CrmCompany[]     @relation("CrmCompanyAccountOwner")
     crmCompaniesCreated     CrmCompany[]     @relation("CrmCompanyCreatedBy")
@@ -15735,6 +15736,17 @@ model CalendarLease {
 
 // One person's calendar settings, a JSON document read through a schema.
 model CalendarPreference {
+    userId    String   @id @db.Uuid
+    value     String   @default("{}")
+    updatedAt DateTime @updatedAt
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// One person's Chat settings, a JSON document read through a schema
+// (`lib/chat/preferences`): how Chat draws things for them, never what anybody
+// else sees.
+model ChatPreference {
     userId    String   @id @db.Uuid
     value     String   @default("{}")
     updatedAt DateTime @updatedAt

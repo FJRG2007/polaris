@@ -798,7 +798,8 @@
         "emoji": "Emoji",
         "soundboard": "Botonera",
         "joinRequests": "Solicitudes",
-        "selfName": "{name} (tú)"
+        "selfName": "{name} (tú)",
+        "chatSettings": "Ajustes del chat"
     },
     "channelView": {
         "loadingMessages": "Cargando mensajes",
@@ -3026,5 +3027,20 @@
         "noFollowers": "Ningún canal sigue a este todavía.",
         "publishedTag": "Seguido",
         "publishedHint": "Publicado desde un canal de anuncios que este sigue. Abrir el original."
+    },
+    "chatSettings": {
+        "title": "Ajustes del chat",
+        "intro": "Cómo se ve y funciona Chat para ti. Nadie más ve estas opciones.",
+        "back": "Volver a las conversaciones",
+        "captionPosition": "Texto con fotos",
+        "captionPositionHint": "Dónde va el texto de un mensaje cuando llega con fotos o vídeos.",
+        "captionAbove": "Encima de las fotos",
+        "captionBelow": "Debajo de las fotos",
+        "saveFailed": "No se pudo guardar. Inténtalo de nuevo.",
+        "whoCanMessage": "Quién te contacta",
+        "whoCanMessageHint": "Mensajes, llamadas, última conexión y bloqueos.",
+        "notifications": "Notificaciones",
+        "notificationsHint": "Avisos, notificaciones push y horas de silencio.",
+        "open": "Abrir"
     }
 }
