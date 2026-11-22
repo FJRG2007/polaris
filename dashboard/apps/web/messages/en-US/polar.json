@@ -407,8 +407,31 @@
     },
     "suggestions": {
         "page": "What's on this page?",
-        "summary": "Summarize what changed today",
-        "tools": "What can you do here?"
+        "tools": "What can you do here?",
+        "explain": "Explain something to me simply",
+        "draft": "Help me write a message",
+        "brainstorm": "Brainstorm ideas with me",
+        "summarizeText": "Summarize a text I paste",
+        "decide": "Help me weigh a decision",
+        "planDay": "Help me plan my day",
+        "focus": "What should I focus on now?",
+        "wrapUp": "Help me wrap up the day",
+        "tomorrow": "Help me plan tomorrow",
+        "planWeek": "Help me plan the week",
+        "weekReview": "Help me review my week",
+        "holidayMessage": "Write a holiday message",
+        "yearReview": "Help me look back on the year",
+        "yearGoals": "Help me set goals for the year",
+        "unreadMail": "Summarize my unread mail",
+        "calendarToday": "What's on my calendar today?",
+        "catchUpChats": "Catch me up on my chats",
+        "findFile": "Find a file I worked on",
+        "myTasks": "What's on my task list?",
+        "deployments": "How are my deployments doing?",
+        "homeStatus": "Is everything okay at home?",
+        "gameServers": "How are my game servers doing?",
+        "weather": "What's the weather this week?",
+        "weekendPlan": "Plan something for the weekend"
     },
     "welcome": "How can I help?",
     "voice": {
@@ -1568,9 +1591,10 @@
         "skill": {
             "label": "Skill",
             "none": "none",
-            "pick": "Start with one of your skills",
+            "pick": "Start this task by following one of your skills",
+            "intro": "A skill is a set of instructions you saved for one kind of task. Pick one and the agent follows it from its first step.",
             "search": "Find a skill",
-            "empty": "No skills yet",
+            "empty": "No skills yet. Write or import one and it shows up here.",
             "noMatch": "No skill matches",
             "manage": "Manage skills",
             "clear": "Remove the skill"
@@ -1931,6 +1955,14 @@
             "open": "Open a shell beside the agent",
             "close": "Close shell {number}",
             "full": "Up to {count} shells at once. Close one to open another."
+        },
+        "prompts": {
+            "explainRepo": "Explain how this project is organized",
+            "fixBug": "Find a bug and fix it",
+            "addTests": "Add tests where there are none",
+            "reviewChanges": "Review the latest changes",
+            "updateDeps": "Update outdated dependencies",
+            "cleanUp": "Clean up code nobody uses"
         }
     },
     "compare": {
@@ -2351,7 +2383,6 @@
         "default": "Default",
         "title": "Effort",
         "think": "Think",
-        "thinkHint": "Think before answering, for harder problems",
         "failed": "The agent did not take the new effort.",
         "levels": {
             "low": "Fast",
@@ -2359,7 +2390,11 @@
             "high": "Deep",
             "xhigh": "Extra deep",
             "max": "Max"
-        }
+        },
+        "intro": "Higher effort means more thorough answers, but takes longer and uses your limits faster.",
+        "recommended": "Recommended",
+        "moreUsage": "Much more usage",
+        "thinkOff": "Don't think"
     },
     "board": {
         "title": "Board",
@@ -2490,5 +2525,63 @@
         "boundRoot": "Commands run as root on {server}",
         "unbind": "Stop using this server",
         "step": "Run {command}"
+    },
+    "greetings": {
+        "any": {
+            "plain1": "How can I help?",
+            "plain2": "What are we working on?",
+            "plain3": "What's on your mind?",
+            "plain4": "Where should we start?",
+            "plain5": "What can I take off your plate?",
+            "named1": "How can I help, {name}?",
+            "named2": "What's on your mind, {name}?",
+            "named3": "Good to see you, {name}"
+        },
+        "night": {
+            "plain1": "Up late? How can I help?",
+            "plain2": "Still at it? I'm here.",
+            "named1": "Burning the midnight oil, {name}?"
+        },
+        "morning": {
+            "plain1": "Good morning",
+            "plain2": "Morning. What's first?",
+            "named1": "Good morning, {name}",
+            "named2": "Morning, {name}. What's first?"
+        },
+        "afternoon": {
+            "plain1": "Good afternoon",
+            "plain2": "Afternoon. What's next?",
+            "named1": "Good afternoon, {name}"
+        },
+        "evening": {
+            "plain1": "Good evening",
+            "plain2": "Evening. What's left for today?",
+            "named1": "Good evening, {name}",
+            "named2": "Evening, {name}. What's left?"
+        },
+        "monday": {
+            "plain1": "New week. Where do we start?",
+            "named1": "New week, {name}. Where to start?"
+        },
+        "friday": {
+            "plain1": "Friday at last. What's left?",
+            "named1": "Happy Friday, {name}"
+        },
+        "weekend": {
+            "plain1": "Working on the weekend? I'm here.",
+            "named1": "Happy weekend, {name}"
+        },
+        "christmas": {
+            "plain1": "Merry Christmas. How can I help?",
+            "named1": "Merry Christmas, {name}"
+        },
+        "newYearsEve": {
+            "plain1": "Last day of the year. What's left?",
+            "named1": "Last day of the year, {name}"
+        },
+        "newYear": {
+            "plain1": "Happy New Year. What's first?",
+            "named1": "Happy New Year, {name}"
+        }
     }
 }

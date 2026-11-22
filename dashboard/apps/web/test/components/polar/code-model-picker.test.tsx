@@ -118,4 +118,34 @@ describe("Code's model picker", () => {
         await user.click(typed[0]!);
         expect(onChange).toHaveBeenCalledWith({ source: `account:${PLAN}`, provider: "anthropic", model: "claude-next-9" });
     });
+
+    it("chooses the effort inside the same menu, with no button of its own", async () => {
+        const user = userEvent.setup();
+        const onEffort = vi.fn();
+        const effort = {
+            levels: ["low", "medium", "high", "max"],
+            value: "medium",
+            onChange: onEffort,
+            labelOf: (level: string) => level.toUpperCase()
+        };
+        render(
+            <CodeModelPicker
+                sources={sources}
+                value={null}
+                onChange={() => undefined}
+                automatic
+                disabled={false}
+                effort={effort}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        expect(screen.queryByRole("button", { name: /Effort/ })).toBeNull();
+        await user.click(screen.getByRole("button", { name: /Model/ }));
+        await user.click(await screen.findByRole("menuitem", { name: /Effort/ }));
+        expect(screen.getByRole("menu").textContent).toContain("Higher effort");
+        const steps = screen.getAllByRole("menuitemradio");
+        expect(steps.map((step) => step.getAttribute("aria-checked"))).toEqual(["false", "true", "false", "false"]);
+        await user.click(screen.getByRole("menuitemradio", { name: /HIGH/ }));
+        expect(onEffort).toHaveBeenCalledWith("high");
+    });
 });

@@ -10,6 +10,7 @@
 import type { ReactNode } from "react";
 import { ToastProvider } from "@polaris/ui";
 import { MessagesWrapper } from "../setup/i18n";
+import polarMessages from "../../messages/en-US/polar.json";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
@@ -258,7 +259,11 @@ describe("the /polar sidebar", () => {
 
     it("welcomes an empty conversation in the middle of the page", async () => {
         mountPage();
-        expect(await screen.findByRole("heading", { name: "How can I help?" })).toBeTruthy();
+        // The greeting is built for the reader's hour and day, so any of its
+        // templates may be the one on screen.
+        const greetings: string[] = Object.values(polarMessages.greetings).flatMap((group) => Object.values(group));
+        const heading = await screen.findByRole("heading", { level: 1 });
+        expect(greetings).toContain(heading.textContent);
         expect(screen.getByLabelText("Message Polar")).toBeTruthy();
     });
 });

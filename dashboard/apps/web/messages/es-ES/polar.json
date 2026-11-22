@@ -407,8 +407,31 @@
     },
     "suggestions": {
         "page": "¿Qué hay en esta página?",
-        "summary": "Resume qué ha cambiado hoy",
-        "tools": "¿Qué puedes hacer aquí?"
+        "tools": "¿Qué puedes hacer aquí?",
+        "explain": "Explícame algo de forma sencilla",
+        "draft": "Ayúdame a escribir un mensaje",
+        "brainstorm": "Dame ideas sobre algo",
+        "summarizeText": "Resume un texto que pegue",
+        "decide": "Ayúdame a tomar una decisión",
+        "planDay": "Ayúdame a planear el día",
+        "focus": "¿En qué me centro ahora?",
+        "wrapUp": "Ayúdame a cerrar el día",
+        "tomorrow": "Ayúdame a planear mañana",
+        "planWeek": "Ayúdame a planear la semana",
+        "weekReview": "Ayúdame a repasar la semana",
+        "holidayMessage": "Escribe una felicitación",
+        "yearReview": "Ayúdame a repasar el año",
+        "yearGoals": "Ayúdame a fijar metas del año",
+        "unreadMail": "Resume mi correo sin leer",
+        "calendarToday": "¿Qué tengo hoy en el calendario?",
+        "catchUpChats": "Ponme al día de mis chats",
+        "findFile": "Busca un archivo que usé",
+        "myTasks": "¿Qué tengo en mis tareas?",
+        "deployments": "¿Cómo van mis despliegues?",
+        "homeStatus": "¿Va todo bien en casa?",
+        "gameServers": "¿Cómo van mis servidores de juego?",
+        "weather": "¿Qué tiempo hará esta semana?",
+        "weekendPlan": "Planea algo para el finde"
     },
     "welcome": "¿En qué te ayudo?",
     "voice": {
@@ -1568,9 +1591,10 @@
         "skill": {
             "label": "Skill",
             "none": "ninguna",
-            "pick": "Empezar con una de tus skills",
+            "pick": "Empezar esta tarea siguiendo una de tus skills",
+            "intro": "Una skill son instrucciones que guardaste para un tipo de tarea. Elige una y el agente la sigue desde el primer paso.",
             "search": "Buscar skill",
-            "empty": "Aún no hay skills",
+            "empty": "Aún no hay skills. Escribe o importa una y aparecerá aquí.",
             "noMatch": "Sin coincidencias",
             "manage": "Gestionar skills",
             "clear": "Quitar la skill"
@@ -1931,6 +1955,14 @@
             "open": "Abrir un shell junto al agente",
             "close": "Cerrar el shell {number}",
             "full": "Hasta {count} shells a la vez. Cierra uno para abrir otro."
+        },
+        "prompts": {
+            "explainRepo": "Explica cómo está organizado el proyecto",
+            "fixBug": "Busca un fallo y arréglalo",
+            "addTests": "Añade tests donde no hay",
+            "reviewChanges": "Revisa los últimos cambios",
+            "updateDeps": "Actualiza dependencias viejas",
+            "cleanUp": "Limpia código que nadie usa"
         }
     },
     "compare": {
@@ -2351,7 +2383,6 @@
         "default": "Estándar",
         "title": "Esfuerzo",
         "think": "Pensar",
-        "thinkHint": "Piensa antes de responder, para problemas difíciles",
         "failed": "El agente no aceptó el nuevo esfuerzo.",
         "levels": {
             "low": "Rápido",
@@ -2359,7 +2390,11 @@
             "high": "A fondo",
             "xhigh": "Muy profundo",
             "max": "Máximo"
-        }
+        },
+        "intro": "Más esfuerzo da respuestas más completas, pero tarda más y gasta tus límites antes.",
+        "recommended": "Recomendado",
+        "moreUsage": "Mucho más uso",
+        "thinkOff": "Sin pensar"
     },
     "board": {
         "title": "Tablero",
@@ -2490,5 +2525,63 @@
         "boundRoot": "Comandos como root en {server}",
         "unbind": "Dejar de usar este servidor",
         "step": "Ejecutar {command}"
+    },
+    "greetings": {
+        "any": {
+            "plain1": "¿En qué te ayudo?",
+            "plain2": "¿En qué trabajamos?",
+            "plain3": "¿Qué tienes en mente?",
+            "plain4": "¿Por dónde empezamos?",
+            "plain5": "¿Qué te quito de encima?",
+            "named1": "¿En qué te ayudo, {name}?",
+            "named2": "¿Qué tienes en mente, {name}?",
+            "named3": "Me alegra verte, {name}"
+        },
+        "night": {
+            "plain1": "¿Trasnochando? ¿En qué te ayudo?",
+            "plain2": "¿Sigues con ello? Aquí estoy.",
+            "named1": "¿Trasnochando, {name}?"
+        },
+        "morning": {
+            "plain1": "Buenos días",
+            "plain2": "Buenos días. ¿Qué va primero?",
+            "named1": "Buenos días, {name}",
+            "named2": "Buenos días, {name}. ¿Qué va primero?"
+        },
+        "afternoon": {
+            "plain1": "Buenas tardes",
+            "plain2": "Buenas tardes. ¿Qué sigue?",
+            "named1": "Buenas tardes, {name}"
+        },
+        "evening": {
+            "plain1": "Buenas noches",
+            "plain2": "Buenas noches. ¿Qué queda hoy?",
+            "named1": "Buenas noches, {name}",
+            "named2": "Buenas noches, {name}. ¿Qué queda?"
+        },
+        "monday": {
+            "plain1": "Semana nueva. ¿Por dónde empezamos?",
+            "named1": "Semana nueva, {name}. ¿Por dónde?"
+        },
+        "friday": {
+            "plain1": "Por fin viernes. ¿Qué queda?",
+            "named1": "Feliz viernes, {name}"
+        },
+        "weekend": {
+            "plain1": "¿Trabajando en finde? Aquí estoy.",
+            "named1": "Feliz fin de semana, {name}"
+        },
+        "christmas": {
+            "plain1": "Feliz Navidad. ¿En qué te ayudo?",
+            "named1": "Feliz Navidad, {name}"
+        },
+        "newYearsEve": {
+            "plain1": "Último día del año. ¿Qué queda?",
+            "named1": "Último día del año, {name}"
+        },
+        "newYear": {
+            "plain1": "Feliz año nuevo. ¿Qué va primero?",
+            "named1": "Feliz año nuevo, {name}"
+        }
     }
 }

@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * ModelSelector: provider and model, and who pays. How hard it thinks is the
- * effort pill beside it (`effort-pill.tsx`).
+ * ModelSelector: provider and model, who pays, and how hard it thinks (an
+ * Effort submenu, for a model that offers one).
  *
  * Ported from AI Elements (github.com/vercel/ai-elements,
  * packages/elements/src/model-selector.tsx at ca8be60), Apache-2.0 - see the
@@ -29,6 +29,9 @@ import {
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
+    DropdownMenuSub,
+    DropdownMenuSubContent,
+    DropdownMenuSubTrigger,
     DropdownMenuTrigger,
     MenuSearch
 } from "@polaris/ui";
@@ -189,6 +192,59 @@ function Mark({ on }: { on: boolean }) {
     );
 }
 
+/** How hard the picked model thinks, offered inside the picker as a submenu
+ *  (as Claude's own model menu does) instead of as a second button. */
+export interface ModelEffort<T extends string = string> {
+    /** The steps the picked model offers, ascending. */
+    readonly levels: readonly T[];
+    readonly value: T | null;
+    readonly onChange: (level: T) => void;
+    readonly labelOf: (level: T) => string;
+    /** The step suggested for most work, badged as such. */
+    readonly recommended?: T;
+}
+
+function EffortSubmenu<T extends string>({ effort }: { effort: ModelEffort<T> }) {
+    const t = useTranslations("polar");
+    const top = effort.levels.length > 2 ? effort.levels.at(-1) : undefined;
+    const current = effort.value === null ? t("effort.default") : effort.labelOf(effort.value);
+    return (
+        <DropdownMenuSub>
+            <DropdownMenuSubTrigger>
+                <span className="min-w-0 flex-1 truncate">{t("effort.title")}</span>
+                <span className="min-w-0 truncate text-xs text-muted-foreground" title={current}>
+                    {current}
+                </span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-64 max-w-[calc(100vw-2rem)]">
+                <p className="px-2 pt-1.5 pb-2 text-xs text-muted-foreground">{t("effort.intro")}</p>
+                {effort.levels.map((level) => (
+                    <DropdownMenuItem
+                        key={level}
+                        role="menuitemradio"
+                        aria-checked={level === effort.value}
+                        onSelect={() => effort.onChange(level)}
+                    >
+                        <span className="min-w-0 truncate" title={effort.labelOf(level)}>
+                            {effort.labelOf(level)}
+                        </span>
+                        {level === effort.recommended ? (
+                            <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                                {t("effort.recommended")}
+                            </span>
+                        ) : level === top ? (
+                            <span className="shrink-0 rounded bg-warning/10 px-1.5 py-0.5 text-[10px] text-warning">
+                                {t("effort.moreUsage")}
+                            </span>
+                        ) : null}
+                        <Mark on={level === effort.value} />
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuSubContent>
+        </DropdownMenuSub>
+    );
+}
+
 export function ModelSelector({
     providers: given,
     choice,
@@ -198,7 +254,8 @@ export function ModelSelector({
     forCode = false,
     triggerClassName,
     triggerLabel,
-    triggerContent
+    triggerContent,
+    effort = null
 }: {
     providers: ModelSelectorProvider[];
     choice: ModelChoice | null;
@@ -216,6 +273,8 @@ export function ModelSelector({
     /** What the button says instead of the chosen model ("Change"), for a
      *  picker beside a row that already names the model. */
     triggerContent?: ReactNode;
+    /** The picked model's effort steps; none for a model that does not reason. */
+    effort?: ModelEffort | null;
 }) {
     const t = useTranslations("polar");
     const { prefs, setOrder } = usePickerPrefs();
@@ -421,6 +480,12 @@ export function ModelSelector({
                         ))}
                     </div>
                 ))}
+                {effort && !searching && !ordering ? (
+                    <>
+                        <DropdownMenuSeparator />
+                        <EffortSubmenu effort={effort} />
+                    </>
+                ) : null}
                 {more && !ordering ? (
                     <MoreModels
                         onMore={() => setLimit((current) => current + MODELS_PAGE)}

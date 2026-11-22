@@ -18,8 +18,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { PolarCodeBranches, PolarCodeComputer } from "@/lib/polar/code";
 import { readPoll } from "@/lib/poll-fetch";
 import { desktopBridge } from "@/lib/desktop-bridge";
-import { MODEL_TRIGGER } from "@/components/polar/elements/model-selector";
-import { EffortPill } from "@/components/polar/elements/effort-pill";
+import { MODEL_TRIGGER, type ModelEffort } from "@/components/polar/elements/model-selector";
 import * as core from "@polaris/core";
 import * as acpProviders from "@/lib/agents/acp/providers";
 import {
@@ -590,31 +589,22 @@ export function readCodeEffort(stored: string | null): core.AgentEffortLevel | n
     return core.isAgentEffortLevel(stored) ? stored : null;
 }
 
-/** The effort pill for a coding tool with an effort flag; nothing for one
- *  without (`AgentCli.effort`). */
-export function CodeEffortPill({
-    cli,
-    value,
-    onChange,
-    disabled = false
-}: {
-    cli: string;
-    value: core.AgentEffortLevel | null;
-    onChange: (level: core.AgentEffortLevel) => void;
-    disabled?: boolean;
-}) {
-    const t = useTranslations("polar");
+/** The effort steps a coding tool offers, for the model menu; null for a tool
+ *  without an effort flag (`AgentCli.effort`). */
+export function codeEffort(
+    cli: string,
+    value: core.AgentEffortLevel | null,
+    onChange: (level: core.AgentEffortLevel) => void,
+    t: ReturnType<typeof useTranslations>
+): ModelEffort | null {
     const levels = core.agentEffortLevels(cli);
     if (levels.length === 0) return null;
-    return (
-        <EffortPill
-            levels={levels}
-            value={value}
-            onChange={onChange}
-            labelOf={(level) => t(`effort.levels.${level}`)}
-            disabled={disabled}
-        />
-    );
+    return {
+        levels,
+        value,
+        onChange: (level) => onChange(level as core.AgentEffortLevel),
+        labelOf: (level) => t(`effort.levels.${level as core.AgentEffortLevel}`)
+    };
 }
 
 /** Where the picked place is kept (a computer's or server's id, or empty for
@@ -1146,6 +1136,9 @@ export function CodeSkillChip({
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className={CHIP_MENU}>
+                    <p className="px-2 pt-1.5 pb-2 text-xs text-muted-foreground">
+                        {t("code.skill.intro")}
+                    </p>
                     {skills.length > 6 ? (
                         <MenuSearch
                             value={query}

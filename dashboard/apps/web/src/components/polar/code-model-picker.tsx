@@ -13,7 +13,7 @@ import Fuse from "fuse.js";
 import * as core from "@polaris/core";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownUp, Check, History, KeyRound, Shuffle } from "lucide-react";
+import { ArrowDownUp, Check, ChevronLeft, ChevronRight, History, KeyRound, Shuffle } from "lucide-react";
 import { cn, MenuSearch } from "@polaris/ui";
 import {
     SheetMenu,
@@ -39,7 +39,8 @@ import {
     firstModels,
     MODEL_TRIGGER,
     MODELS_PAGE,
-    MoreModels
+    MoreModels,
+    type ModelEffort
 } from "@/components/polar/elements/model-selector";
 import { SourceOrderList } from "@/components/polar/elements/source-order";
 import { usePickerPrefs } from "@/components/polar/elements/use-picker-prefs";
@@ -97,6 +98,51 @@ const takesTyped = (source: CodeSource) =>
 const same = (pick: CodePick | null, source: string, model: string | null) =>
     pick?.source === source && pick.model === model;
 
+/** The effort steps, drawn inside the model menu with a way back to the list. */
+function EffortSteps({ effort, onBack }: { effort: ModelEffort; onBack: () => void }) {
+    const t = useTranslations("polar");
+    const top = effort.levels.length > 2 ? effort.levels.at(-1) : undefined;
+    return (
+        <>
+            <SheetMenuItem
+                onSelect={(event) => {
+                    event.preventDefault();
+                    onBack();
+                }}
+            >
+                <ChevronLeft className="size-3.5 shrink-0" aria-hidden />
+                <span className="min-w-0 truncate">{t("effort.title")}</span>
+            </SheetMenuItem>
+            <p className="px-2 pt-1 pb-2 text-xs text-muted-foreground">{t("effort.intro")}</p>
+            {effort.levels.map((level) => (
+                <SheetMenuItem
+                    key={level}
+                    role="menuitemradio"
+                    aria-checked={level === effort.value}
+                    onSelect={() => effort.onChange(level)}
+                >
+                    <span className="min-w-0 truncate" title={effort.labelOf(level)}>
+                        {effort.labelOf(level)}
+                    </span>
+                    {level === effort.recommended ? (
+                        <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                            {t("effort.recommended")}
+                        </span>
+                    ) : level === top ? (
+                        <span className="shrink-0 rounded bg-warning/10 px-1.5 py-0.5 text-[10px] text-warning">
+                            {t("effort.moreUsage")}
+                        </span>
+                    ) : null}
+                    <Check
+                        aria-hidden
+                        className={level === effort.value ? "ms-auto size-3.5 shrink-0 text-primary" : "ms-auto size-3.5 shrink-0 opacity-0"}
+                    />
+                </SheetMenuItem>
+            ))}
+        </>
+    );
+}
+
 export function CodeModelPicker({
     sources,
     value,
@@ -104,7 +150,8 @@ export function CodeModelPicker({
     automatic,
     disabled,
     open,
-    onOpenChange
+    onOpenChange,
+    effort = null
 }: {
     /** Null while they are on their way. */
     sources: readonly CodeSource[] | null;
@@ -116,9 +163,15 @@ export function CodeModelPicker({
     /** Held by the caller when given, so a "/model" can open it. */
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
+    /** The picked tool's effort steps, chosen inside this menu; none when it
+     *  takes no effort level. */
+    effort?: ModelEffort | null;
 }) {
     const t = useTranslations("polar");
     const { prefs, setOrder, failed } = usePickerPrefs();
+    // The effort steps drawn in place of the list, the way a submenu opens,
+    // which works the same in a dropdown and in a phone sheet.
+    const [choosingEffort, setChoosingEffort] = useState(false);
     const [query, setQuery] = useState("");
     const [ordering, setOrdering] = useState(false);
     const [limit, setLimit] = useState(MODELS_PAGE);
@@ -195,6 +248,7 @@ export function CodeModelPicker({
                 if (next) return;
                 setQuery("");
                 setOrdering(false);
+                setChoosingEffort(false);
                 setLimit(MODELS_PAGE);
             }}
         >
@@ -224,7 +278,9 @@ export function CodeModelPicker({
                     setQuery("");
                 }}
             >
-                {ordering ? (
+                {effort && choosingEffort ? (
+                    <EffortSteps effort={effort} onBack={() => setChoosingEffort(false)} />
+                ) : ordering ? (
                     <>
                         <SheetMenuLabel>{t("picker.order")}</SheetMenuLabel>
                         <SourceOrderList
@@ -370,6 +426,20 @@ export function CodeModelPicker({
                         {searching ? null : (
                             <>
                                 <SheetMenuSeparator />
+                                {effort ? (
+                                    <SheetMenuItem
+                                        onSelect={(event) => {
+                                            event.preventDefault();
+                                            setChoosingEffort(true);
+                                        }}
+                                    >
+                                        <span className="min-w-0 flex-1 truncate">{t("effort.title")}</span>
+                                        <span className="min-w-0 truncate text-xs text-muted-foreground">
+                                            {effort.value === null ? t("effort.default") : effort.labelOf(effort.value)}
+                                        </span>
+                                        <ChevronRight className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                                    </SheetMenuItem>
+                                ) : null}
                                 {ordered.length > 1 ? (
                                     <SheetMenuItem
                                         onSelect={(event) => {

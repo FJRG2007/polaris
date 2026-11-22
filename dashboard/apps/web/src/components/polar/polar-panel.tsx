@@ -150,6 +150,8 @@ import { PolarAvatar, usePolarOnline } from "@/components/polar/motion/polar-ava
 import { ThinkingOrb } from "@/components/polar/motion/thinking-orb";
 import { orbForActivity, orbForTool } from "@/components/polar/motion/orb-activity";
 import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion";
+import { usePhraseMoment } from "@/components/polar/use-phrase-moment";
+import * as greeting from "@/lib/polar/greeting";
 import { WebSources } from "@/components/polar/elements/sources";
 import { citeSources, isWebTool, sourcesOf, webCallsOf, webStepOf } from "@/lib/polar/web-sources";
 import { answered, answeredNothing } from "@/lib/polar/unanswered";
@@ -174,7 +176,6 @@ import {
     ModelSelector,
     type ModelSelectorProvider
 } from "@/components/polar/elements/model-selector";
-import { EffortPill } from "@/components/polar/elements/effort-pill";
 import {
     clampIntelligence,
     effortControl,
@@ -696,7 +697,14 @@ function textOf(message: UIMessage): string {
         .trim();
 }
 
-type ToolDescription = { title: string; writes: boolean; destructive: boolean; connector?: string };
+type ToolDescription = {
+    title: string;
+    writes: boolean;
+    destructive: boolean;
+    connector?: string;
+    /** The app it belongs to (`lib/mcp/scope-table.ts`). */
+    category?: string;
+};
 type StoredMessage = UIMessage & { parentId: string | null };
 
 const COMMANDS = polarShared.POLAR_BUILTIN_COMMANDS;
@@ -825,10 +833,13 @@ export function PolarChat({
     fullPage = false,
     site,
     chatScope = null,
-    onConversation
+    onConversation,
+    userName = null
 }: {
     onClose?: () => void;
     fullPage?: boolean;
+    /** The reader's name, for a greeting that uses it; none leaves those out. */
+    userName?: string | null;
     /** A conversation of its own to come back to - the extension's panel, one
      *  per tab - instead of the one every Polar here shares. */
     chatScope?: string | null;
@@ -894,6 +905,7 @@ export function PolarChat({
     /** A Code task's first message, sent once the new conversation is on screen. */
     const codeOpening = useRef<string | null>(null);
     const [input, setInput] = useState("");
+    const moment = usePhraseMoment();
     const [quote, setQuote] = useState<string | null>(null);
     // Elements picked in a page an answer previews, carried ahead of the next
     // message the way a quote is.
@@ -2344,23 +2356,34 @@ export function PolarChat({
     // otherwise move them - ending that call mid-answer and starting another
     // that never says the answer.
     const welcome = fullPage && !noKeys && chat.messages.length === 0 && !inCall;
+    // Built from templates for the reader's own hour, day and what they can
+    // reach (`lib/polar/greeting.ts`); the server's render keeps the plain ones.
+    const reach = greeting.reachOf(tools, Boolean(pageOn && context));
+    const promptKeys = moment
+        ? greeting.pickChatPrompts({ ...moment, reach })
+        : [...(reach.page ? ["page"] : []), "tools", "explain"];
+    const greetingNow = moment ? greeting.pickGreeting({ ...moment, name: userName }) : null;
     const suggestions = (
         <Suggestions>
-            {(["page", "summary", "tools"] as const)
-                .filter((key) => key !== "page" || (pageOn && context))
-                .map((key) => (
-                    <Suggestion
-                        key={key}
-                        suggestion={t(`suggestions.${key}`)}
-                        onClick={(text) => {
-                            setInput(text);
-                            textarea.current?.focus();
-                        }}
-                    />
-                ))}
+            {promptKeys.map((key) => (
+                <Suggestion
+                    key={key}
+                    suggestion={t(`suggestions.${key}` as "suggestions.tools")}
+                    onClick={(text) => {
+                        setInput(text);
+                        textarea.current?.focus();
+                    }}
+                />
+            ))}
         </Suggestions>
     );
     const chatMode = code.mode === "chat";
+    // On a new conversation, Chat and Code type into one draft: the mode can be
+    // switched after writing without losing what was written.
+    const sharedDraft = useMemo(
+        () => (chat.messages.length === 0 && !inCode ? { value: input, set: setInput } : null),
+        [chat.messages.length, inCode, input]
+    );
     /** A new conversation on the side on screen: a chat, or a Code task. */
     const startNewHere = () => {
         if (chatMode) return startNew();
@@ -2648,16 +2671,21 @@ export function PolarChat({
                             onChoice={pickModel}
                             open={modelOpen}
                             onOpenChange={setModelOpen}
+                            effort={
+                                choice && effort.kind !== "none"
+                                    ? {
+                                          levels: effort.kind === "ladder" ? effort.levels : TOGGLE_LEVELS,
+                                          value: clampIntelligence(choice.intelligence, effort),
+                                          onChange: (level) => pickEffort(level as Intelligence),
+                                          labelOf: (level) =>
+                                              effort.kind === "toggle"
+                                                  ? t(level === "fast" ? "effort.thinkOff" : "effort.think")
+                                                  : t(`intelligence.${level as Intelligence}`),
+                                          recommended: effort.kind === "ladder" && effort.levels.includes("balanced") ? "balanced" : undefined
+                                      }
+                                    : null
+                            }
                         />
-                        {choice && effort.kind !== "none" ? (
-                            <EffortPill
-                                toggle={effort.kind === "toggle"}
-                                levels={effort.kind === "ladder" ? effort.levels : TOGGLE_LEVELS}
-                                value={clampIntelligence(choice.intelligence, effort)}
-                                onChange={pickEffort}
-                                labelOf={(level) => t(`intelligence.${level}`)}
-                            />
-                        ) : null}
                         {welcome && !temporary ? (
                             <polarCompare.AskSeveral
                                 providers={providers ?? []}
@@ -2936,6 +2964,7 @@ export function PolarChat({
                         <PolarCodeView
                             code={code}
                             fullPage={fullPage}
+                            draft={sharedDraft}
                             avatar={<PolarAvatar state={avatarState} size={64} />}
                             voiceKit={voiceKit}
                             providers={providers}
@@ -2973,7 +3002,13 @@ export function PolarChat({
                     ) : welcome ? (
                         <PolarWelcome
                             avatar={<PolarAvatar state={avatarState} size={64} />}
-                            title={temporary ? t("temporary.title") : t("welcome")}
+                            title={
+                                temporary
+                                    ? t("temporary.title")
+                                    : greetingNow
+                                      ? t(`greetings.${greetingNow.key}` as "greetings.any.plain1", greetingNow.values)
+                                      : t("welcome")
+                            }
                             description={temporary ? t("temporary.body") : undefined}
                         >
                             {queueView}

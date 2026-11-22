@@ -60,6 +60,9 @@ import { useDisplayFormat } from "@/components/display-format";
 import { Button, cn, CopyIcon, SegmentedControl, useCopied, useToast } from "@polaris/ui";
 import { ConversationEmptyState } from "@/components/polar/elements/conversation";
 import { PolarThreadFrame, PolarWelcome } from "@/components/polar/polar-layout";
+import { Suggestion, Suggestions } from "@/components/polar/elements/suggestion";
+import { usePhraseMoment } from "@/components/polar/use-phrase-moment";
+import * as greeting from "@/lib/polar/greeting";
 import {
     Message,
     MessageAction,
@@ -76,8 +79,10 @@ import {
     useRef,
     useState,
     useTransition,
+    type Dispatch,
     type ReactNode,
-    type RefObject
+    type RefObject,
+    type SetStateAction
 } from "react";
 import type { GithubAppGap } from "@/lib/github-app-reach";
 import type { VoiceNotice } from "@/components/polar/polar-voice";
@@ -120,7 +125,7 @@ import {
     CodeSessionBar,
     NO_REPO,
     CODE_EFFORT_KEY,
-    CodeEffortPill,
+    codeEffort,
     PERMISSION_MODE_KEY,
     SURFACE_KEY,
     CODE_PLACE_KEY,
@@ -687,9 +692,17 @@ function useCodeChoices(canStart: boolean) {
  * Where the task works is a chip under the composer; the history is the
  * sidebar's, beside the chats.
  */
+/** A draft both of Polar's composers write: what is typed on a new
+ *  conversation stays when Chat and Code are switched. */
+export interface PolarSharedDraft {
+    readonly value: string;
+    readonly set: Dispatch<SetStateAction<string>>;
+}
+
 export function PolarCodeView({
     code,
     fullPage,
+    draft = null,
     avatar,
     voiceKit,
     providers,
@@ -699,6 +712,8 @@ export function PolarCodeView({
 }: {
     code: PolarCodeState;
     fullPage: boolean;
+    /** Chat's draft, written here too while both sides are a new conversation. */
+    draft?: PolarSharedDraft | null;
     /** Polar's avatar at the welcome's size, as Chat draws it. */
     avatar: ReactNode;
     /** Chat's microphone, so dictation works here exactly as it does there. */
@@ -737,6 +752,12 @@ export function PolarCodeView({
         </div>
     );
     const picks = useCodeChoices(canStart);
+    // The new task's words: Chat's draft while both are a new conversation,
+    // else this view's own, so a suggested prompt can fill either.
+    const [ownDraft, setOwnDraft] = useState("");
+    const typed: PolarSharedDraft = draft ?? { value: ownDraft, set: setOwnDraft };
+    const moment = usePhraseMoment();
+    const promptKeys = greeting.pickCodePrompts({ seed: moment?.seed ?? 0 });
     const [baseRef, setBaseRef] = useState("");
     // The words a task was started with, for the session they started: they are
     // stored on it only once the agent is up, and until then its thread would
@@ -779,6 +800,7 @@ export function PolarCodeView({
 
     const composer = (
         <CodeStart
+            draft={typed}
             keysRoot={keysRoot}
             fullPage={fullPage}
             canStart={canStart}
@@ -810,6 +832,17 @@ export function PolarCodeView({
         return frame(
             <PolarWelcome avatar={avatar} title={t("code.heading")}>
                 {composer}
+                {canStart ? (
+                    <Suggestions>
+                        {promptKeys.map((key) => (
+                            <Suggestion
+                                key={key}
+                                suggestion={t(`code.prompts.${key}` as "code.prompts.fixBug")}
+                                onClick={(text) => typed.set(text)}
+                            />
+                        ))}
+                    </Suggestions>
+                ) : null}
             </PolarWelcome>
         );
     return frame(
@@ -935,6 +968,7 @@ function narrowProviders(
 
 /** A new task: Chat's composer, with one model picker where Chat has its own. */
 function CodeStart({
+    draft,
     keysRoot,
     fullPage,
     canStart,
@@ -977,13 +1011,18 @@ function CodeStart({
     onStarted: (id: string, text: string) => void;
     onPolarTask: (task: PolarTask) => void;
     onHistory: () => void;
+    draft: PolarSharedDraft | null;
     /** The Code view, where its keys are listened for. */
     keysRoot: RefObject<HTMLDivElement | null>;
     fullPage: boolean;
 }) {
     const t = useTranslations("polar");
     const inputId = useId();
-    const [prompt, setPrompt] = useState("");
+    // Chat's draft when there is one to share, so text typed before switching
+    // between Chat and Code is still there after.
+    const [ownPrompt, setOwnPrompt] = useState("");
+    const prompt = draft ? draft.value : ownPrompt;
+    const setPrompt = draft ? draft.set : setOwnPrompt;
     const [modelOpen, setModelOpen] = useState(false);
     useCodeKeys(keysRoot, fullPage, {
         "code.focusComposer": () => focusInput(inputId),
@@ -1312,20 +1351,13 @@ function CodeStart({
                                 disabled={busy || pending}
                                 open={modelOpen}
                                 onOpenChange={setModelOpen}
+                                effort={tool ? codeEffort(tool, effort, chooseEffort, t) : null}
                             />
                             {tool && runOn ? (
                                 <CodeEnginePill
                                     source={runOn}
                                     value={engineOverride}
                                     onChange={setEngine}
-                                    disabled={busy || pending}
-                                />
-                            ) : null}
-                            {tool ? (
-                                <CodeEffortPill
-                                    cli={tool}
-                                    value={effort}
-                                    onChange={chooseEffort}
                                     disabled={busy || pending}
                                 />
                             ) : null}
@@ -2150,14 +2182,7 @@ function CodeThread({
                                     disabled={busy}
                                     open={modelOpen}
                                     onOpenChange={setModelOpen}
-                                />
-                            ) : null}
-                            {liveEffort && cli ? (
-                                <CodeEffortPill
-                                    cli={cli}
-                                    value={view?.effort ?? null}
-                                    onChange={changeEffort}
-                                    disabled={busy}
+                                    effort={liveEffort && cli ? codeEffort(cli, view?.effort ?? null, changeEffort, t) : null}
                                 />
                             ) : null}
                             {liveMode ? (

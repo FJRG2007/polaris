@@ -170,7 +170,6 @@ describe("Code's composer is Chat's", () => {
             "Microphone and model",
             "Write something to improve it",
             "Model, intelligence and key",
-            "Effort: Balanced",
             "Voice mode"
         ]);
 
@@ -186,8 +185,6 @@ describe("Code's composer is Chat's", () => {
             PICKED,
             // The engine for this task: the person's setting unless picked here.
             "Engine: Your setting",
-            // Claude Code takes an effort level, the CLI's own default until one is picked.
-            "Effort: Default",
             // A Claude source runs on Claude Code, whose questions are answered here.
             "Permissions: Full access",
             "Conversation: Terminal",

@@ -17,7 +17,7 @@ export default async function PolarPage() {
     if (!(await polarAccessFor(user.id)).use) redirect(await homePathForUser(user));
     return (
         <div className={cn(PAGE_BLEED, "flex bg-card")}>
-            <PolarChat fullPage />
+            <PolarChat fullPage userName={user.name} />
         </div>
     );
 }
