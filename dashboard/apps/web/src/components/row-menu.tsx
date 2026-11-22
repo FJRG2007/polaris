@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * What can be done with one container, reached two ways: the three dots at the
- * end of its row and a right-click anywhere on it. Both draw the same list, built
- * once here, so the two can never offer different things.
+ * What can be done with one row of a table, reached two ways: the three dots at
+ * the end of the row and a right-click anywhere on it. Both draw the same list,
+ * built once here, so the two can never offer different things. Lifted out of
+ * the containers list so every table offers its actions the same way.
  */
 
 import Link from "next/link";
@@ -34,7 +35,7 @@ export interface RowAction {
     onSelect?: () => void;
     disabled?: boolean;
     danger?: boolean;
-    /** Drawn after a separator: the options that change the container. */
+    /** Drawn after a separator: the options that change the row's subject. */
     manage?: boolean;
 }
 
@@ -76,7 +77,7 @@ export function RowActionsMenu({
     label,
     actions
 }: {
-    /** The container's name, heading the menu. */
+    /** The row's name, heading the menu. */
     title: string;
     /** What the trigger is called to a screen reader. */
     label: string;

@@ -598,15 +598,11 @@
         "invite": "Invitar",
         "renameOrReschedule": "Renombrar o cambiar fecha",
         "renameOrRescheduleThisMeeting": "Renombrar o cambiar la fecha de la reunión",
-        "end": "Acabar",
         "waitingForTheHostTo": "Esperando a que el anfitrión te deje pasar.",
         "nobodyIsInHereYet": "Aún no hay nadie aquí.",
         "waitingToBeLetIn": "Esperando para entrar",
         "join": "Entrar",
         "meetingChatWidth": "Ancho del chat",
-        "endThisMeeting": "¿Terminar esta reunión?",
-        "everybodyInItIsDropped": "Todos los que están dentro salen, y el enlace deja de abrir nada.",
-        "endMeeting": "Terminar",
         "hosting": "Anfitrión",
         "letPeopleInYourself": "Dejar pasar tú mismo",
         "anybodyOnTheLinkWaits": "Quien entre con el enlace espera hasta que le dejes pasar.",
@@ -623,8 +619,7 @@
         "removeNamed": "Quitar a {name}",
         "removeQuestion": "¿Quitar a {name}?",
         "removeConfirm": "¿Quitar a <strong>{name}</strong>?",
-        "thisMeeting": "esta reunión",
-        "endQuestion": "¿Terminar <strong>{name}</strong>?"
+        "thisMeeting": "esta reunión"
     },
     "messageList": {
         "download": "Descargar",
@@ -904,7 +899,53 @@
         "create": "Crear",
         "present": "{count, plural, one {Hay 1 persona} other {Hay {count} personas}}",
         "renameNamed": "Renombrar o cambiar la fecha de {name}",
-        "name": "Nombre"
+        "name": "Nombre",
+        "searchMeetings": "Buscar reuniones",
+        "whenFilter": "Qué reuniones",
+        "whenUpcoming": "Próximas",
+        "whenPast": "Pasadas",
+        "whenAll": "Todas",
+        "scopeFilter": "De quién",
+        "scopeAll": "Todas las que veo",
+        "scopeMine": "Mías",
+        "colHost": "Organiza",
+        "colActions": "Acciones",
+        "colStatus": "Estado",
+        "stateLive": "En curso",
+        "stateUpcoming": "Programada",
+        "stateOpen": "Sala abierta",
+        "statePast": "Ya pasó",
+        "noSetTime": "Sin hora",
+        "wasDue": "Era para el {when}",
+        "start": "Iniciar",
+        "open": "Abrir",
+        "linkCopied": "Enlace copiado",
+        "invitationCopied": "Invitación copiada",
+        "actionsFor": "Acciones de {name}",
+        "nothingMatches": "Sin resultados",
+        "tryAnotherSearch": "Prueba con otro nombre o filtro.",
+        "nothingComingUp": "Nada próximo",
+        "noPastMeetings": "Ninguna pasada",
+        "pastMeetingsLandHere": "Aquí aparecen las reuniones cuya hora pasó sin nadie dentro.",
+        "couldNotLoad": "No se pudieron cargar las reuniones.",
+        "tryAgain": "Reintentar",
+        "removal": {
+            "end": {
+                "action": "Terminar",
+                "title": "¿Terminar {name} para todos?",
+                "body": "Todos los que están dentro salen, y el enlace deja de abrir nada."
+            },
+            "cancel": {
+                "action": "Cancelar reunión",
+                "title": "¿Cancelar {name}?",
+                "body": "Desaparece de la lista de todos, y el enlace deja de abrir nada."
+            },
+            "delete": {
+                "action": "Eliminar reunión",
+                "title": "¿Eliminar {name}?",
+                "body": "Desaparece de la lista de todos, y el enlace deja de abrir nada."
+            }
+        }
     },
     "emojiPicker": {
         "emojiGifsAndStickers": "Emoji, GIF y stickers",

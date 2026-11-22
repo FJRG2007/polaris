@@ -195,3 +195,17 @@ describe("joining a meeting", () => {
         expect(seat.admission).toBe("admitted");
     });
 });
+
+describe("closing a meeting from the list", () => {
+    it("is refused to anybody but the host, and closes nothing", async () => {
+        meeting.invited = ["grace"];
+        await expect(meetings.endMeeting({ id: "grace" }, "m1")).rejects.toThrow();
+        expect(closed).toEqual([]);
+        expect(meeting.endedAt).toBeNull();
+    });
+
+    it("closes it for the host", async () => {
+        await meetings.endMeeting({ id: "ada" }, "m1");
+        expect(closed).toEqual(["m1"]);
+    });
+});

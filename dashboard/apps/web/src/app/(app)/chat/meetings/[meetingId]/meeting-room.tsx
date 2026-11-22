@@ -36,6 +36,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useDisplayFormat } from "@/components/display-format";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MeetingDetailsDialog } from "../meeting-details-dialog";
+import { useRemovalWords } from "../meeting-removal";
+import { meetingState, removalFor } from "@/lib/chat/meeting-list";
 import { useLobbyAdmission } from "@/app/(app)/chat/use-lobby-admission";
 import { InvitationsDialog, useInvitationEdits } from "../invitations-dialog";
 import {
@@ -78,6 +80,7 @@ import { CopyInvitationButton, InvitedPeople, JoinCodeBadge } from "../meeting-i
 
 export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewerId: string }) {
     const t = useTranslations("chat");
+    const removalWords = useRemovalWords();
     const router = useRouter();
     const params = useSearchParams();
     const baseUrl = useAppUrl();
@@ -192,6 +195,15 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
     const admitted = (call.meeting?.participants ?? []).filter(
         (person) => person.admission === "admitted"
     );
+    /** Closing it is ending it only once somebody is in it: before that it is
+     *  cancelling the diary entry, or deleting a room nobody used. */
+    const removal = removalFor(
+        meetingState({
+            present: Math.max(admitted.length, about?.present ?? 0),
+            scheduledAt: about?.scheduledAt ?? null
+        })
+    );
+    const closing = removalWords(removal, about?.title ?? t("meetingRoom.thisMeeting"));
 
     /** The two doors, set from the "more" menu. */
     const setOptions = async (options: { approveGuests?: boolean; requireAccount?: boolean }) => {
@@ -337,7 +349,7 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                             )}
                             <Button size="xs" variant="danger" onClick={() => setEnding(true)}>
                                 <LogOut className="size-3.5" />
-                                {t("meetingRoom.end")}
+                                {closing.action}
                             </Button>
                         </>
                     )}
@@ -485,17 +497,9 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                 name={about?.title ?? t("meetingRoom.thisMeeting")}
                 kind="meeting"
                 requireTyping={false}
-                title={t("meetingRoom.endThisMeeting")}
-                question={t.rich("meetingRoom.endQuestion", {
-                    name: about?.title ?? t("meetingRoom.thisMeeting"),
-                    strong: (chunks) => (
-                        <span key="name" className="font-medium text-foreground">
-                            {chunks}
-                        </span>
-                    )
-                })}
-                description={t("meetingRoom.everybodyInItIsDropped")}
-                confirmLabel={t("meetingRoom.endMeeting")}
+                title={closing.title}
+                question={closing.body}
+                confirmLabel={closing.action}
                 onConfirm={async () => {
                     setEnding(false);
                     const result = await runAction(() => endMeetingAction(meetingId), setError);

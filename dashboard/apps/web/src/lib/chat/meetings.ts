@@ -32,6 +32,12 @@ import { announcesCalls, callEndedBody } from "./notice-text";
 import { UNRESTRICTED, type SeatRestriction } from "./voice-moderation";
 import { MAX_MEETING_TITLE, MAX_SCHEDULE_AHEAD_MS } from "./meeting-limits";
 import {
+    mayManageMeeting,
+    meetingListOrder,
+    meetingListWhere,
+    type MeetingListQuery
+} from "./meeting-list";
+import {
     JOIN_CODE_ALPHABET,
     JOIN_CODE_LENGTH,
     MOST_EMAILS,
@@ -1984,14 +1990,19 @@ export async function joinOnLink(
  * would be a list of who is talking to whom - a meeting is a room, not a
  * directory.
  */
-export async function listMeetings(actor: ChatActor): Promise<MeetingSummary[]> {
+export async function listMeetings(
+    actor: ChatActor,
+    query: MeetingListQuery = {}
+): Promise<MeetingSummary[]> {
+    const now = new Date();
+    const live = {
+        leftAt: null,
+        admission: "admitted",
+        lastSeenAt: { gte: new Date(now.getTime() - PARTICIPANT_TTL_MS) }
+    } satisfies Prisma.MeetingParticipantWhereInput;
     const rows = await prisma.meeting.findMany({
-        where: {
-            channelId: null,
-            endedAt: null,
-            OR: [{ hostId: actor.id }, { invites: { some: { userId: actor.id } } }]
-        },
-        orderBy: [{ scheduledAt: "asc" }, { createdAt: "desc" }],
+        where: meetingListWhere(actor.id, query, now, live),
+        orderBy: meetingListOrder(query),
         take: MOST_MEETINGS,
         select: {
             id: true,
@@ -2006,11 +2017,7 @@ export async function listMeetings(actor: ChatActor): Promise<MeetingSummary[]> 
             invites: { select: { userId: true } },
             emailInvites: { orderBy: { createdAt: "asc" }, select: { email: true } },
             participants: {
-                where: {
-                    leftAt: null,
-                    admission: "admitted",
-                    lastSeenAt: { gte: new Date(Date.now() - PARTICIPANT_TTL_MS) }
-                },
+                where: live,
                 orderBy: { joinedAt: "asc" },
                 select: PRESENCE_FIELDS
             }
@@ -2302,7 +2309,7 @@ async function requireHost(
         select: { hostId: true, title: true, endedAt: true, requireAccount: true }
     });
     if (!meeting || meeting.endedAt) throw new ChatAccessError({ key: "errors.meetingEnded" });
-    if (meeting.hostId !== actor.id) {
+    if (!mayManageMeeting(meeting.hostId, actor.id)) {
         throw new ChatAccessError({ key: "errors.meetingHostOnly" });
     }
     return { title: meeting.title, hostId: meeting.hostId, requireAccount: meeting.requireAccount };

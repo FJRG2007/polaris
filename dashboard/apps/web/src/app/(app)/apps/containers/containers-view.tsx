@@ -26,7 +26,7 @@ import { containerMachineId, machineHref } from "@/lib/machines/machine-links";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useLiveResource } from "@/components/use-live-resource";
 import { useDebounced } from "@/app/(app)/telemetry/use-debounced";
-import { RowActionsMenu, RowContextMenu, type RowAction } from "./container-row-menu";
+import { RowActionsMenu, RowContextMenu, type RowAction } from "@/components/row-menu";
 import {
     DEFAULT_DIRECTION,
     type ConsumptionOrder,

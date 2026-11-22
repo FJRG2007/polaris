@@ -598,15 +598,11 @@
         "invite": "Invite",
         "renameOrReschedule": "Rename or reschedule",
         "renameOrRescheduleThisMeeting": "Rename or reschedule this meeting",
-        "end": "End",
         "waitingForTheHostTo": "Waiting for the host to let you in.",
         "nobodyIsInHereYet": "Nobody is in here yet.",
         "waitingToBeLetIn": "Waiting to be let in",
         "join": "Join",
         "meetingChatWidth": "Meeting chat width",
-        "endThisMeeting": "End this meeting?",
-        "everybodyInItIsDropped": "Everybody in it is dropped, and the link stops opening anything.",
-        "endMeeting": "End meeting",
         "hosting": "Hosting",
         "letPeopleInYourself": "Let people in yourself",
         "anybodyOnTheLinkWaits": "Anybody on the link waits until you admit them.",
@@ -623,8 +619,7 @@
         "removeNamed": "Remove {name}",
         "removeQuestion": "Remove {name}?",
         "removeConfirm": "Delete <strong>{name}</strong>?",
-        "thisMeeting": "this meeting",
-        "endQuestion": "Delete <strong>{name}</strong>?"
+        "thisMeeting": "this meeting"
     },
     "messageList": {
         "download": "Download",
@@ -904,7 +899,53 @@
         "create": "Create",
         "present": "{count, plural, one {1 person is in it} other {{count} people are in it}}",
         "renameNamed": "Rename or reschedule {name}",
-        "name": "Name"
+        "name": "Name",
+        "searchMeetings": "Search meetings",
+        "whenFilter": "Which meetings",
+        "whenUpcoming": "Upcoming",
+        "whenPast": "Past",
+        "whenAll": "All",
+        "scopeFilter": "Whose meetings",
+        "scopeAll": "All I can see",
+        "scopeMine": "Mine",
+        "colHost": "Hosted by",
+        "colActions": "Actions",
+        "colStatus": "Status",
+        "stateLive": "Happening now",
+        "stateUpcoming": "Scheduled",
+        "stateOpen": "Open room",
+        "statePast": "Time passed",
+        "noSetTime": "No set time",
+        "wasDue": "Was due {when}",
+        "start": "Start",
+        "open": "Open",
+        "linkCopied": "Link copied",
+        "invitationCopied": "Invitation copied",
+        "actionsFor": "Actions for {name}",
+        "nothingMatches": "Nothing matches",
+        "tryAnotherSearch": "Try another name or filter.",
+        "nothingComingUp": "Nothing coming up",
+        "noPastMeetings": "No past meetings",
+        "pastMeetingsLandHere": "Meetings whose time has passed with nobody in them land here.",
+        "couldNotLoad": "The meetings could not be loaded.",
+        "tryAgain": "Try again",
+        "removal": {
+            "end": {
+                "action": "End meeting",
+                "title": "End {name} for everybody?",
+                "body": "Everybody in it is dropped, and the link stops opening anything."
+            },
+            "cancel": {
+                "action": "Cancel meeting",
+                "title": "Cancel {name}?",
+                "body": "It leaves everybody's list, and the link stops opening anything."
+            },
+            "delete": {
+                "action": "Delete meeting",
+                "title": "Delete {name}?",
+                "body": "It leaves everybody's list, and the link stops opening anything."
+            }
+        }
     },
     "emojiPicker": {
         "emojiGifsAndStickers": "Emoji, GIFs and stickers",

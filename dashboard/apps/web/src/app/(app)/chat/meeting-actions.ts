@@ -39,6 +39,7 @@ import { createNotification } from "@/lib/notification-service";
 import { callModerationSchema } from "@/lib/chat/voice-moderation";
 import type { MeetingView, VoicePresence } from "@/lib/chat/meetings";
 import { MAX_MEETING_LINE, MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
+import { meetingListQuerySchema } from "@/lib/chat/meeting-list";
 import {
     MOST_EMAILS,
     MOST_INVITED,
@@ -575,9 +576,16 @@ async function tellInvited(
 }
 
 /** The meetings this account is hosting or has been asked to. */
-export async function listMeetingsAction(): Promise<{ meetings: meetings.MeetingSummary[] }> {
+export async function listMeetingsAction(
+    input: unknown = {}
+): Promise<{ meetings: meetings.MeetingSummary[] }> {
     const user = await requirePermission("chat.use");
-    return { meetings: await meetings.listMeetings({ id: user.id }) };
+    // A query that does not parse reads as no query, rather than as an error a
+    // list on a timer would have nowhere to show.
+    const query = meetingListQuerySchema.safeParse(input);
+    return {
+        meetings: await meetings.listMeetings({ id: user.id }, query.success ? query.data : {})
+    };
 }
 
 /**

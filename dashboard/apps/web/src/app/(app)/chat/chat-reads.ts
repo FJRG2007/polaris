@@ -119,9 +119,9 @@ export const chatProfile = (
         signal
     );
 
-export const meetingList = (signal?: AbortSignal) =>
+export const meetingList = (signal?: AbortSignal, query: Record<string, string> = {}) =>
     readPoll<Answer<typeof meetingActionsModule.listMeetingsAction>>(
         "/api/chat/meeting-list",
-        {},
+        query,
         signal
     );
