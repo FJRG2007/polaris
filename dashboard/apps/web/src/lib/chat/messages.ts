@@ -58,6 +58,7 @@ import { requireNotSpam, requireRoomMentionAllowed } from "./spam-guard";
 import { allowedBy, maySee, receiptsAmong } from "@/lib/privacy-service";
 import * as groupReceipts from "./group-receipts";
 import * as delivered from "./delivered";
+import * as order from "./search";
 import { channelMentions, isBlankMarkdown } from "@/components/rich-text/markdown";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
 import { confineCustomEmoji, reactionEmoji } from "./custom-emoji";
@@ -389,18 +390,20 @@ export async function readChannel(
     const cursor = before
         ? await prisma.chatMessage.findFirst({
               where: { id: before, channelId },
-              select: { createdAt: true }
+              select: { createdAt: true, id: true }
           })
         : null;
 
+    // Ordered by the id after the instant, and walked past both, so two
+    // messages sent in one millisecond on either side of a page edge are each
+    // drawn once rather than one of them skipped.
     const rows = await prisma.chatMessage.findMany({
         where: {
             channelId,
             parentId: null,
-            ...(cursor ? { createdAt: { lt: cursor.createdAt } } : {}),
-            AND: [history.sinceClause(floor, actor.id)]
+            AND: [history.sinceClause(floor, actor.id), ...(cursor ? [order.olderThan(cursor)] : [])]
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
         take: PAGE + 1,
         select: MESSAGE_SELECT
     });
@@ -475,7 +478,7 @@ export async function readSince(
     const cursor = afterId
         ? await prisma.chatMessage.findFirst({
               where: { id: afterId, channelId },
-              select: { createdAt: true }
+              select: { createdAt: true, id: true }
           })
         : null;
     if (afterId && !cursor) return { messages: [], newerThan: afterId };
@@ -485,10 +488,9 @@ export async function readSince(
         where: {
             channelId,
             parentId: null,
-            ...(cursor ? { createdAt: { gt: cursor.createdAt } } : {}),
-            AND: [history.sinceClause(floor, actor.id)]
+            AND: [history.sinceClause(floor, actor.id), ...(cursor ? [order.newerThan(cursor)] : [])]
         },
-        orderBy: { createdAt: "asc" },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         take: PAGE + 1,
         select: MESSAGE_SELECT
     });
@@ -567,14 +569,14 @@ export async function readAround(
     const readable = history.sinceClause(floor, actor.id);
     const [above, below, own] = await Promise.all([
         prisma.chatMessage.findMany({
-            where: { channelId, parentId: null, createdAt: { lt: target.createdAt }, AND: [readable] },
-            orderBy: { createdAt: "desc" },
+            where: { channelId, parentId: null, AND: [readable, order.olderThan(target)] },
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
             take: AROUND + 1,
             select: MESSAGE_SELECT
         }),
         prisma.chatMessage.findMany({
-            where: { channelId, parentId: null, createdAt: { gt: target.createdAt }, AND: [readable] },
-            orderBy: { createdAt: "asc" },
+            where: { channelId, parentId: null, AND: [readable, order.newerThan(target)] },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
             take: AROUND + 1,
             select: MESSAGE_SELECT
         }),

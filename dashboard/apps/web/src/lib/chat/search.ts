@@ -129,12 +129,27 @@ export interface SharedCursor {
     readonly id: string;
 }
 
-/** Strictly after `cursor` in newest-first order: (createdAt, id) < cursor. */
+/** Strictly after `cursor` in newest-first order: (createdAt, id) < cursor.
+ *  The `lte` is implied by the OR; it is there so the database starts its
+ *  index range at the cursor instead of filtering down to it from the newest. */
 export function olderThan(cursor: SharedCursor) {
     return {
+        createdAt: { lte: cursor.createdAt },
         OR: [
             { createdAt: { lt: cursor.createdAt } },
             { createdAt: cursor.createdAt, id: { lt: cursor.id } }
+        ]
+    };
+}
+
+/** The mirror of `olderThan`: strictly after `cursor` in oldest-first order,
+ *  (createdAt, id) > cursor. */
+export function newerThan(cursor: SharedCursor) {
+    return {
+        createdAt: { gte: cursor.createdAt },
+        OR: [
+            { createdAt: { gt: cursor.createdAt } },
+            { createdAt: cursor.createdAt, id: { gt: cursor.id } }
         ]
     };
 }

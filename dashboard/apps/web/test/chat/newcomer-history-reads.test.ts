@@ -7,6 +7,7 @@
  * that; with it on (the default), everything.
  */
 
+import { inOrder, leading } from "./tuple-order";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const joined = new Date("2026-10-10T00:00:00Z");
@@ -61,7 +62,7 @@ function passes(clause: Clause, createdAt: Date): boolean {
 
 /** The parts of a message query these readers use, answered the way the
  *  database would. */
-function findMany(args: { where: Where; orderBy?: { createdAt: "asc" | "desc" }; take?: number }) {
+function findMany(args: { where: Where; orderBy?: unknown; take?: number }) {
     const { where } = args;
     let rows = all.filter((message) => {
         if (where.id && !where.id.in.includes(message.id)) return false;
@@ -76,9 +77,11 @@ function findMany(args: { where: Where; orderBy?: { createdAt: "asc" | "desc" };
         ) {
             return false;
         }
-        return (where.AND ?? []).every((clause) => passes(clause, message.createdAt));
+        return (where.AND ?? []).every(
+            (clause) => passes(clause, message.createdAt) && inOrder(clause, message)
+        );
     });
-    if (args.orderBy?.createdAt === "desc") rows = [...rows].reverse();
+    if (leading(args.orderBy) === "desc") rows = [...rows].reverse();
     return args.take === undefined ? rows : rows.slice(0, args.take);
 }
 

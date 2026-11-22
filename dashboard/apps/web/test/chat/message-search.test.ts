@@ -79,7 +79,9 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { searchMessages, olderThan, encodeSharedCursor, decodeSharedCursor } = await import("@/lib/chat/search");
+const { searchMessages, olderThan, newerThan, encodeSharedCursor, decodeSharedCursor } = await import(
+    "@/lib/chat/search"
+);
 const core = await import("@polaris/core");
 
 const actor = { id: "ada" };
@@ -273,5 +275,92 @@ describe("the gallery's pages", () => {
         expect(sent.where.AND).toContainEqual(olderThan(before));
         expect(sent.orderBy).toEqual([{ createdAt: "desc" }, { id: "desc" }]);
         expect(sent.take).toBe(60);
+    });
+});
+
+describe("a conversation's pages either side of a millisecond", () => {
+    type Row = { createdAt: Date; id: string };
+    type Bound = { lt?: Date; lte?: Date; gt?: Date; gte?: Date };
+    type Clause = ReturnType<typeof olderThan> | ReturnType<typeof newerThan>;
+    const at = (ms: number) => new Date(Date.UTC(2026, 10, 2, 10, 0, 0, ms));
+    const id = (n: number) => `00000000-0000-4000-8000-0000000000${String(n).padStart(2, "0")}`;
+
+    /** What the database does with one condition on the instant. */
+    function within(value: Date, bound: Bound | Date): boolean {
+        if (bound instanceof Date) return value.getTime() === bound.getTime();
+        const t = value.getTime();
+        if (bound.lt && !(t < bound.lt.getTime())) return false;
+        if (bound.lte && !(t <= bound.lte.getTime())) return false;
+        if (bound.gt && !(t > bound.gt.getTime())) return false;
+        if (bound.gte && !(t >= bound.gte.getTime())) return false;
+        return true;
+    }
+
+    /** The whole clause, range bound and tie-break together. */
+    function matches(row: Row, clause: Clause): boolean {
+        if (!within(row.createdAt, clause.createdAt)) return false;
+        return clause.OR.some((branch) => {
+            if (!within(row.createdAt, branch.createdAt)) return false;
+            if (!("id" in branch)) return true;
+            const idBound = branch.id as { lt?: string; gt?: string };
+            return idBound.lt !== undefined ? row.id < idBound.lt : row.id > (idBound.gt ?? "");
+        });
+    }
+
+    const byTime = (a: Row, b: Row) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1);
+    // Oldest first. Three messages share 5 ms and two share 4 ms.
+    const rows: Row[] = [
+        { createdAt: at(3), id: id(1) },
+        { createdAt: at(4), id: id(5) },
+        { createdAt: at(4), id: id(6) },
+        { createdAt: at(5), id: id(7) },
+        { createdAt: at(5), id: id(8) },
+        { createdAt: at(5), id: id(9) },
+        { createdAt: at(6), id: id(10) }
+    ].sort(byTime);
+
+    it("walks upwards across a shared millisecond, each message once", () => {
+        const seen: string[] = [];
+        let cursor: Row | null = null;
+        for (let guard = 0; guard < 10; guard++) {
+            const from = cursor;
+            const page = [...rows]
+                .reverse()
+                .filter((row) => !from || matches(row, olderThan(from)))
+                .slice(0, 2);
+            seen.push(...page.map((row) => row.id));
+            cursor = page.at(-1) ?? null;
+            if (page.length < 2) break;
+        }
+        expect(seen).toEqual([...rows].reverse().map((row) => row.id));
+    });
+
+    it("walks downwards across a shared millisecond, each message once", () => {
+        const seen: string[] = [];
+        let cursor: Row | null = null;
+        for (let guard = 0; guard < 10; guard++) {
+            const from = cursor;
+            const page = rows.filter((row) => !from || matches(row, newerThan(from))).slice(0, 2);
+            seen.push(...page.map((row) => row.id));
+            cursor = page.at(-1) ?? null;
+            if (page.length < 2) break;
+        }
+        expect(seen).toEqual(rows.map((row) => row.id));
+    });
+
+    it("centres on a message whose millisecond it shares, leaving none out and none twice", () => {
+        const target = rows.find((row) => row.id === id(8));
+        if (!target) throw new Error("fixture");
+        const above = rows.filter((row) => matches(row, olderThan(target)));
+        const below = rows.filter((row) => matches(row, newerThan(target)));
+        expect(above.map((row) => row.id)).toEqual([id(1), id(5), id(6), id(7)]);
+        expect(below.map((row) => row.id)).toEqual([id(9), id(10)]);
+        expect([...above, target, ...below]).toEqual(rows);
+    });
+
+    it("bounds the range at the cursor so an index scan starts there", () => {
+        const cursor = { createdAt: at(5), id: id(8) };
+        expect(olderThan(cursor).createdAt).toEqual({ lte: cursor.createdAt });
+        expect(newerThan(cursor).createdAt).toEqual({ gte: cursor.createdAt });
     });
 });

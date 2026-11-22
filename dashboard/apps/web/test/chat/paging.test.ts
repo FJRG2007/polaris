@@ -12,6 +12,7 @@
  * and a timestamp cursor would step over one of them.
  */
 
+import { inOrder, leading } from "./tuple-order";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** Fifty is the page; these are ordered oldest first, as the channel is. */
@@ -43,19 +44,20 @@ const hidden = new Map([
  *  asks for quoted messages by id with no order and no limit, so both are
  *  optional here. */
 function findMany(args: {
-    where: { createdAt?: { lt?: Date; gt?: Date }; id?: { in: string[] } };
-    orderBy?: { createdAt: "asc" | "desc" };
+    where: { createdAt?: { lt?: Date; gt?: Date }; id?: { in: string[] }; AND?: unknown[] };
+    orderBy?: unknown;
     take?: number;
 }) {
     const from = args.where.createdAt;
     const wanted = args.where.id?.in;
     let rows = all.filter((row) => {
         if (wanted) return wanted.includes(row.id);
+        if (!(args.where.AND ?? []).every((clause) => inOrder(clause, row))) return false;
         if (from?.lt) return row.createdAt < from.lt;
         if (from?.gt) return row.createdAt > from.gt;
         return true;
     });
-    if (args.orderBy?.createdAt === "desc") rows = [...rows].reverse();
+    if (leading(args.orderBy) === "desc") rows = [...rows].reverse();
     return args.take === undefined ? rows : rows.slice(0, args.take);
 }
 
