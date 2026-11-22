@@ -1383,7 +1383,13 @@ export function ChannelView({
         if (typists.length === 0) return;
         const timer = setInterval(() => {
             const cutoff = Date.now() - TYPING_TTL_MS;
-            setTypists((current) => current.filter((entry) => entry.at > cutoff));
+            // The same list when nobody expired: a new one every second would
+            // redraw this whole screen for as long as somebody kept typing.
+            setTypists((current) =>
+                current.every((entry) => entry.at > cutoff)
+                    ? current
+                    : current.filter((entry) => entry.at > cutoff)
+            );
         }, 1000);
         return () => clearInterval(timer);
     }, [typists.length]);

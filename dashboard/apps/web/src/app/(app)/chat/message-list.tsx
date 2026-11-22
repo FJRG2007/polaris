@@ -51,6 +51,7 @@ import { useOpenDirect } from "./use-open-direct";
 import { MemberMenu, type MenuPerson } from "./member-menu";
 import {
     createContext,
+    memo,
     useCallback,
     useContext,
     useEffect,
@@ -302,6 +303,40 @@ function quickEmoji(
     return chosen;
 }
 
+/**
+ * A handler that keeps one identity for as long as it is given at all.
+ *
+ * The screen that owns the list makes most of its callbacks anew on every
+ * render, and it renders on every typing frame and presence change. Handed
+ * straight down, each of those made every message a changed row, and two hundred
+ * messages drawn again each second is what froze the conversation on a slow
+ * phone. Read through a ref, the latest handler is always the one called, and a
+ * row only redraws when what it shows changed. Absent stays absent: a missing
+ * handler is what leaves its control undrawn.
+ */
+function useSteady<Args extends unknown[], Result>(
+    handler: ((...args: Args) => Result) | undefined
+): ((...args: Args) => Result) | undefined {
+    const latest = useRef(handler);
+    latest.current = handler;
+    const steady = useCallback((...args: Args) => latest.current!(...args), []);
+    return handler ? steady : undefined;
+}
+
+/** The same value as last time when it says the same thing, so a fresh copy of
+ *  an unchanged setting does not count as a change to every row. */
+function useSame<Value>(value: Value): Value {
+    const kept = useRef(value);
+    if (kept.current !== value && JSON.stringify(kept.current) !== JSON.stringify(value)) {
+        kept.current = value;
+    }
+    return kept.current;
+}
+
+function sameList(left: readonly string[], right: readonly string[]): boolean {
+    return left.length === right.length && left.every((entry, index) => entry === right[index]);
+}
+
 export interface MessageListProps {
     messages: readonly ChatMessageView[];
     /** Cover every picture, video and link card until it is pressed - the
@@ -380,25 +415,27 @@ export function MessageList({
     canPost,
     canModerate,
     highlightId,
-    onJumpTo,
-    onOpenThread,
     threadAllowed,
-    onReact,
-    onStar,
     pinnedIds,
-    onPin,
-    onMarkUnread,
-    onReply,
-    onReplyPrivately,
-    onForward,
-    onEdit,
     onDelete,
-    onMention,
     emoji = null,
     coverMedia = false,
-    liveTranslation,
-    outgoing
+    outgoing,
+    ...given
 }: MessageListProps) {
+    // Every handler a row receives, held to one identity - see `useSteady`.
+    const onOpenThread = useSteady(given.onOpenThread);
+    const onReact = useSteady(given.onReact)!;
+    const onStar = useSteady(given.onStar)!;
+    const onPin = useSteady(given.onPin);
+    const onMarkUnread = useSteady(given.onMarkUnread);
+    const onJumpTo = useSteady(given.onJumpTo);
+    const onReply = useSteady(given.onReply);
+    const onReplyPrivately = useSteady(given.onReplyPrivately);
+    const onForward = useSteady(given.onForward);
+    const onEdit = useSteady(given.onEdit);
+    const onMention = useSteady(given.onMention);
+    const liveTranslation = useSame(given.liveTranslation);
     // A message still on its way is nothing a key can reply to, edit or delete.
     const keyed = useMemo(
         () => messages.filter((message) => !isOutgoingRow(message.id) && !isDraftRow(message.id)),
@@ -409,7 +446,22 @@ export function MessageList({
         () => new Map((outgoing ?? []).map((one) => [outgoingRowId(one.id), one])),
         [outgoing]
     );
-    const { refresh } = useChat();
+    const { refresh, channels } = useChat();
+    /** The direct messages among the conversations, read here once rather than
+     *  by every row: a row reading the whole rail redrew whenever any
+     *  conversation anywhere had something new. */
+    const directIds = useMemo(
+        () => new Set(channels.filter((entry) => entry.kind === "dm").map((entry) => entry.id)),
+        [channels]
+    );
+    /** Delete, or stop a message still on its way, or nothing for Polar's answer
+     *  while it is written - one handler for every row, so a row in flight does
+     *  not hand its neighbours a new one on each render. */
+    const remove = useSteady<Parameters<DeleteMessage>, void>((message, immediately) => {
+        const going = sendingById.get(message.id);
+        if (going) stopOutgoing(going.id);
+        else if (!isDraftRow(message.id)) onDelete(message, immediately);
+    })!;
 
     // The picture being looked at, held here rather than in each message: one
     // viewer is open at a time, and it is drawn over the whole conversation.
@@ -443,7 +495,13 @@ export function MessageList({
      * sent from the picker is at the front of the row on the next message.
      */
     const [recent, setRecent] = useState<readonly string[]>([]);
-    useEffect(() => setRecent(recentEmoji()), []);
+    // Kept when it says the same thing: a new list of the same faces would
+    // otherwise redraw every message for nothing.
+    const reread = useCallback(() => {
+        const next = recentEmoji();
+        setRecent((current) => (sameList(current, next) ? current : next));
+    }, []);
+    useEffect(reread, [reread]);
     // Four, for the menu; the hover bar shows the first three of them.
     const quick = useMemo(() => quickEmoji(recent, emoji, MENU_QUICK_COUNT), [recent, emoji]);
 
@@ -453,19 +511,20 @@ export function MessageList({
     const react = useCallback(
         (messageId: string, emoji: string) => {
             rememberEmoji(emoji);
-            setRecent(recentEmoji());
+            reread();
             onReact(messageId, emoji);
         },
-        [onReact]
+        [onReact, reread]
     );
 
     const toast = useToast();
     /** A refusal from a name's menu has nowhere in the stream to sit, so it is
      *  said over the conversation. The empty string is the hook clearing a
      *  previous failure and has nothing to say. */
-    const say = (message: string) => {
+    const say = useSteady((message: string) => {
         if (message) toast.show({ title: message });
-    };
+    })!;
+    const report = useCallback((target: ChatMessageView) => setReporting(target.id), []);
 
     /**
      * Who is sitting in each voice room this conversation points at.
@@ -561,13 +620,14 @@ export function MessageList({
                                 grouped={grouped}
                                 continued={continued}
                                 mine={message.authorId === viewerId}
+                                inDirect={directIds.has(message.channelId)}
                                 viewerId={viewerId}
                                 onMention={onMention}
                                 onNickname={setNaming}
                                 onError={say}
                                 onOpenImage={setViewing}
                                 onOpenFile={setReading}
-                                onReport={(target) => setReporting(target.id)}
+                                onReport={report}
                                 onExplain={setExplaining}
                                 sending={sending}
                                 landed={landed}
@@ -590,9 +650,7 @@ export function MessageList({
                                 onReplyPrivately={inert ? undefined : onReplyPrivately}
                                 onForward={inert ? undefined : onForward}
                                 onEdit={inert ? undefined : onEdit}
-                                onDelete={
-                                    sending ? () => stopOutgoing(sending.id) : drafting ? () => undefined : onDelete
-                                }
+                                onDelete={remove}
                             />
                         </li>
                     );
@@ -813,11 +871,17 @@ function useMessageKeys({
     }, []);
 }
 
-function Message({
+/**
+ * One line of the conversation, drawn again only when something it shows
+ * changed. The list renders on every typing frame and presence change; this is
+ * what keeps those from redrawing every message - see `useSteady`.
+ */
+const Message = memo(function Message({
     message,
     grouped,
     continued,
     mine,
+    inDirect,
     canPost,
     canModerate,
     onOpenThread,
@@ -856,6 +920,9 @@ function Message({
     /** The next message joins this one's block: its tick is drawn there. */
     continued: boolean;
     mine: boolean;
+    /** In a direct message, where "opened" on a view-once file can only mean
+     *  the one other person. */
+    inDirect: boolean;
     canPost: boolean;
     canModerate: boolean;
     onOpenThread?: (message: ChatMessageView) => void;
@@ -901,9 +968,6 @@ function Message({
 }) {
     const t = useTranslations("chat");
     const format = useDisplayFormat();
-    const { channels } = useChat();
-    // One other person: "opened" on a view-once file can only mean them.
-    const inDirect = channels.find((entry) => entry.id === message.channelId)?.kind === "dm";
     const emojiSet = emoji?.set ?? null;
     const baseUrl = useAppUrl();
     const [showingHistory, setShowingHistory] = useState(false);
@@ -1795,7 +1859,7 @@ function Message({
             </MessageMenu>
         </div>
     );
-}
+});
 
 /**
  * Whether a message is pinned for the room and whether this reader starred it:
