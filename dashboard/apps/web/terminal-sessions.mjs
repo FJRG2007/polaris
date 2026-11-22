@@ -264,6 +264,13 @@ export function createSessionRegistry(options = {}) {
         },
 
         /** Every account holding a session, for the periodic standing check. */
+        /** Ends every session - the process is stopping. */
+        endAll(code = 1001, reason = "session ended") {
+            const all = [...sessions.values()];
+            for (const session of all) end(session, code, reason);
+            return all.length;
+        },
+
         userIds() {
             return [...new Set([...sessions.values()].map((s) => s.userId))];
         },
@@ -323,7 +330,14 @@ export async function attachServerShell(sessions, openSshSession, ticket, ws) {
         if (!opened) return;
         // The socket may have gone while the server was dialled; the cap is
         // checked again because another tab may have opened one meanwhile.
-        if (ws.readyState !== ws.OPEN || !sessions.canOpen(ticket.userId, ticket.sessionCap)) {
+        // The browser left while the shell was opening: end it now, or it
+        // would sit detached, unseen and counted against the cap, until the
+        // idle limit.
+        if (ws.readyState !== ws.OPEN) {
+            opened.close();
+            return;
+        }
+        if (!sessions.canOpen(ticket.userId, ticket.sessionCap)) {
             opened.close();
             ws.close(4005, "session limit reached");
             return;

@@ -65,6 +65,18 @@ const sessions = createSessionRegistry({
 });
 setInterval(() => sessions.sweep(), 60_000).unref();
 
+// An update stops this process. Ending every shell first closes each SSH
+// connection properly, so the server hangs its shell up at once rather than
+// when its TCP keepalive notices, and every open browser is told the terminal
+// ended instead of seeing a bare drop.
+for (const signal of ["SIGTERM", "SIGINT"]) {
+    process.once(signal, () => {
+        sessions.endAll(1001, "session ended");
+        for (const ws of liveTerminals.keys()) ws.close(1001, "session ended");
+        setTimeout(() => process.exit(0), 500).unref();
+    });
+}
+
 /**
  * The container and agent terminals open right now, by the account that opened
  * them. Server shells are in `sessions`; these end with their socket, so they
@@ -180,6 +192,13 @@ wss.on("connection", async (ws, req) => {
                   ? await openContainerSession(ticket, ws, false, SHELL_BESIDE_AGENT)
                   : await openContainerSession(ticket, ws, ticket.mode === "agent");
     if (!session) return;
+    // The browser left while the shell was opening (a closed dialog, a
+    // reload): its close already fired, so nothing below would ever end this
+    // one - end it here instead of leaving an exec running with no viewer.
+    if (ws.readyState !== ws.OPEN) {
+        session.close();
+        return;
+    }
     liveTerminals.set(ws, ticket.userId);
 
     session.stream.on("data", (chunk) => sendPaced(ws, session.stream, chunk));
@@ -447,8 +466,9 @@ async function openSshSession(ticket, ws) {
         ws.close(4004, "server unavailable");
         return null;
     }
+    let client;
     try {
-        const client = await openSshClient({
+        client = await openSshClient({
             host: target.host,
             port: target.port,
             username: target.username,
@@ -478,6 +498,13 @@ async function openSshSession(ticket, ws) {
             }
         };
     } catch (error) {
+        // Signed in but no shell (sudo refused, channel limit): the connection
+        // itself is still up, and nothing else would ever end it.
+        try {
+            client?.end();
+        } catch {
+            // Already gone.
+        }
         console.error(`polaris ws: ssh failed for ${target.host}:`, error?.message ?? error);
         // The reason is a word the panel turns into a sentence, never the error
         // itself, which names addresses and internals. The upgrade has already

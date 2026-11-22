@@ -152,6 +152,22 @@ describe("attachServerShell", () => {
         await attachServerShell(registry, slow, ticket(), ws);
         expect(shells[0].closed).toBe(true);
         expect(registry.count("u1")).toBe(0);
+        // Nobody is there to read a reason, least of all a wrong one.
+        expect(ws.closes).toEqual([]);
+    });
+
+    it("ends every session, attached or not, when the process stops", async () => {
+        const registry = createSessionRegistry();
+        const { shells, open } = opener();
+        const attached = new FakeSocket();
+        await attachServerShell(registry, open, ticket(), attached);
+        const left = new FakeSocket();
+        await attachServerShell(registry, open, ticket({ userId: "u2" }), left);
+        left.emit("close");
+        expect(registry.endAll()).toBe(2);
+        expect(shells.every((shell) => shell.closed)).toBe(true);
+        expect(registry.size()).toBe(0);
+        expect(attached.closes).toEqual([[1001, "session ended"]]);
     });
 });
 
