@@ -61,6 +61,9 @@ export interface EdgePageAction {
 export interface EdgePageInput {
     /** Browser tab title. */
     readonly title: string;
+    /** The page's language and direction; English, left to right, when absent. */
+    readonly lang?: string;
+    readonly dir?: "ltr" | "rtl";
     /** The uppercase chip above the heading. */
     readonly badge: string;
     /** Red for a refusal, grey for a name with nothing behind it. */
@@ -105,7 +108,7 @@ export function edgePage(input: EdgePageInput): string {
         .map((fact) => `<span>${fact.label} <code>${fact.value}</code></span>`)
         .join("\n");
     return `<!doctype html>
-<html lang="en">
+<html lang="${/^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(input.lang ?? "") ? input.lang : "en"}" dir="${input.dir === "rtl" ? "rtl" : "ltr"}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

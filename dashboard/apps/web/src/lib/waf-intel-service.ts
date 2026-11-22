@@ -30,6 +30,7 @@ import { readCriminalIpConfig } from "@/lib/integrations/criminalip-rules";
 import {
     buildWafIntel,
     isCarrierGradeNat,
+    wafIntelCause,
     type WafIntelEntry,
     type WafIntelReason
 } from "@polaris/core";
@@ -515,16 +516,20 @@ export async function publishWafIntel(): Promise<void> {
 
     const bans = await prisma.wafBan.findMany({
         where: { OR: [{ until: null }, { until: { gt: new Date(now) } }] },
-        select: { ip: true, reason: true, note: true, until: true, challenge: true }
+        select: { ip: true, reason: true, source: true, note: true, until: true, challenge: true }
     });
     for (const ban of bans) {
+        // Worked out on every publish rather than stored, so a ban recorded before
+        // the block page could name its cause gets one on the next snapshot.
+        const cause = wafIntelCause(ban);
         entries.push([
             ban.ip,
             {
                 reason: (ban.reason as WafIntelReason) ?? "ban",
                 until: ban.until ? ban.until.getTime() : null,
                 ...(ban.note ? { note: ban.note } : {}),
-                ...(ban.challenge ? { challenge: true } : {})
+                ...(ban.challenge ? { challenge: true } : {}),
+                ...(cause ? { cause } : {})
             }
         ]);
     }

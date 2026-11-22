@@ -391,6 +391,12 @@ export const wafCustomRuleSchema = z
     .object({
         /** Names the rule in the list and in the block reason; not an identifier. */
         name: z.string().trim().min(1).max(80),
+        /**
+         * What a visitor this rule blocks is told, in the owner's words. Optional:
+         * without one the block page says the generic sentence, which names no rule.
+         * Only a `block` reads it; kept across action changes like `skip`.
+         */
+        message: z.string().trim().max(200).optional(),
         enabled: z.boolean().default(true),
         action: z.enum(WAF_RULE_ACTIONS),
         /**

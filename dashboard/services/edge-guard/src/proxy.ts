@@ -236,10 +236,22 @@ export function createProxyServer(config: () => GuardConfig): Server {
         };
         const decision = evaluate(guardRequest, cfg);
         if (decision.status === 403) {
+            // The same answer the forwardAuth path gives, with the same facts: a proxied
+            // route used to drop what decided, so its blocks could not be looked up and
+            // never said how a ban lifts.
             sendBlocked(res, {
                 host: header(req, "x-forwarded-host") ?? header(req, "host"),
                 ip: clientIp(header(req, "x-forwarded-for")),
-                accept: header(req, "accept")
+                accept: header(req, "accept"),
+                reason: decision.reason,
+                uri: url,
+                method: req.method,
+                userAgent: header(req, "user-agent"),
+                release: decision.release,
+                acceptLanguage: header(req, "accept-language"),
+                cause: decision.cause,
+                message: decision.message,
+                until: decision.until
             });
             return;
         }

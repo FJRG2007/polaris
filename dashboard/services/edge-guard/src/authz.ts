@@ -54,6 +54,9 @@ import {
     isStaticAssetPath,
     reputationSparesPath,
     signInLiftsBan,
+    type WafBlockCause,
+    type WafCustomRule,
+    type WafIntelEntry,
     type WafIntelIndex,
     type WafRequestFacts
 } from "@polaris/core";
@@ -149,6 +152,13 @@ export type GuardDecision =
     | {
           readonly status: 403;
           readonly reason: string;
+          /** What the visitor is told, as a code (`waf-block-cause.ts`). Absent is
+           *  the generic sentence, which is what every block not listed there gets. */
+          readonly cause?: WafBlockCause;
+          /** The operator's own words, for a `custom` cause. */
+          readonly message?: string;
+          /** When a timed ban lifts, epoch ms, for the page to state. */
+          readonly until?: number | null;
           /** For a ban the visitor can get out of: when it lifts by itself (epoch
            *  ms), and where to sign in to lift it now. Absent for every other block. */
           readonly release?: { readonly until: number | null; readonly signIn: string | null };
@@ -289,6 +299,29 @@ function buildCookie(name: string, value: string, secure: boolean, maxAge: numbe
     return attrs.join("; ");
 }
 
+/**
+ * What a visitor may be told about an address-intelligence hit. A manual entry is the
+ * operator's own decision and is said to be one; a Tor exit is always a Tor exit; a
+ * reputation entry only when Polaris named what the provider found (Tor, a VPN, a
+ * datacenter); a timed jail ban is a timed ban, and the rate-limit one says so. A
+ * permanent automatic ban - a credential probe - stays generic.
+ */
+function intelCause(hit: WafIntelEntry): WafBlockCause {
+    if (hit.reason === "manual") return "ip_banned";
+    if (hit.reason === "tor") return "tor";
+    if (hit.cause) return hit.cause;
+    if (hit.reason === "ban" && hit.until !== null) return "temporary_ban";
+    return "firewall";
+}
+
+/** The refusal for a custom rule: its own message when the operator wrote one. */
+function ruleBlock(rule: WafCustomRule): GuardDecision {
+    const message = rule.message?.trim();
+    return message
+        ? { status: 403, reason: `rule: ${rule.name}`, cause: "custom", message }
+        : { status: 403, reason: `rule: ${rule.name}` };
+}
+
 /** Decide whether to allow, block, or redirect a forwarded request. */
 export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
     const proto = req.forwardedProto || "https";
@@ -326,6 +359,8 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
             return {
                 status: 403,
                 reason: `intel: ${hit.reason}${hit.note ? ` (${hit.note})` : ""}`,
+                cause: intelCause(hit),
+                until: hit.until,
                 ...(liftable
                     ? {
                           release: {
@@ -362,8 +397,7 @@ export function evaluate(req: GuardRequest, cfg: GuardConfig): GuardDecision {
 
         const own = evaluateWafRules(rule.rules, facts);
         skipped = own.skipped;
-        if (own.verdict?.action === "block")
-            return { status: 403, reason: `rule: ${own.verdict.rule.name}` };
+        if (own.verdict?.action === "block") return ruleBlock(own.verdict.rule);
         if (own.verdict?.action === "allow") return { status: 200 };
 
         // The packs, unless a rule above stepped over them. They are only ever `block`

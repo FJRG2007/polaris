@@ -153,6 +153,7 @@ export * from "./waf-analytics.js";
 export * from "./edge-page.js";
 export * from "./vacant-page.js";
 export * from "./waf-block-page.js";
+export * from "./waf-block-cause.js";
 export * from "./signin-unavailable-page.js";
 export * from "./waf-challenge-page.js";
 export * from "./tasks.js";

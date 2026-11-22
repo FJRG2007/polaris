@@ -505,7 +505,45 @@ describe("evaluate - address intelligence", () => {
             { forwardedFor: "198.51.100.4" },
             withIntel([["198.51.100.4", tor]])
         );
-        expect(decision).toMatchObject({ status: 403, reason: "intel: tor" });
+        expect(decision).toMatchObject({ status: 403, reason: "intel: tor", cause: "tor" });
+    });
+
+    it.each([
+        [{ reason: "manual", until: null, note: "scraper" }, "ip_banned"],
+        [{ reason: "reputation", until: null, note: "VPN", cause: "anonymizer" }, "anonymizer"],
+        [{ reason: "reputation", until: null, note: "Hosting", cause: "hosting" }, "hosting"],
+        [{ reason: "reputation", until: null, note: "Known scanner" }, "firewall"],
+        [{ reason: "ban", until: NOW * 1000 + 60_000, note: "flood", cause: "rate_limited" }, "rate_limited"],
+        [{ reason: "ban", until: NOW * 1000 + 60_000, note: "404 flood" }, "temporary_ban"],
+        [{ reason: "ban", until: null, note: "Reading for credentials: .env" }, "firewall"]
+    ] as [WafIntelEntry, string][])("tells the visitor %j as %s", (entry, cause) => {
+        const decision = evaluate({ forwardedFor: "198.51.100.9" }, withIntel([["198.51.100.9", entry]]));
+        expect(decision).toMatchObject({ status: 403, cause });
+    });
+
+    it("carries a custom rule's message, and says nothing for a rule without one", () => {
+        const rule = (message?: string) =>
+            encodeGuardRule({
+                deny: [],
+                requireLogin: false,
+                rules: [
+                    {
+                        name: "partners",
+                        ...(message ? { message } : {}),
+                        enabled: true,
+                        action: "block",
+                        conditions: [{ field: "path", operator: "starts_with", values: ["/p"] }]
+                    }
+                ]
+            });
+        expect(evaluate({ wafHeader: rule("Ask ops."), forwardedUri: "/p" }, cfg)).toMatchObject({
+            status: 403,
+            cause: "custom",
+            message: "Ask ops."
+        });
+        const silent = evaluate({ wafHeader: rule(), forwardedUri: "/p" }, cfg);
+        expect(silent).toMatchObject({ status: 403 });
+        expect(silent).not.toHaveProperty("cause");
     });
 
     it("stops blocking once the ban lapses", () => {

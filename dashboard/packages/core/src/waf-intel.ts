@@ -25,6 +25,7 @@
  */
 
 import { ipAllowed } from "./cidr.js";
+import { WAF_INTEL_CAUSES, type WafIntelCause } from "./waf-block-cause.js";
 
 /** Bumped when the shape changes incompatibly. A guard that does not recognise the
  *  version ignores the file rather than guessing at it. */
@@ -49,6 +50,13 @@ export interface WafIntelEntry {
      * and blocks, which is what every guard did before.
      */
     readonly challenge?: boolean;
+    /**
+     * What the block page may tell the visitor about this entry - a Tor exit, a VPN,
+     * a datacenter, a rate limit - decided by Polaris when it writes the snapshot
+     * (`wafIntelCause`). Absent is the generic sentence, and a guard that predates
+     * this drops it and says the generic sentence too.
+     */
+    readonly cause?: WafIntelCause;
 }
 
 export interface WafIntelSnapshot {
@@ -178,7 +186,8 @@ function asEntry(value: unknown): WafIntelEntry | null {
         reason: raw.reason as WafIntelReason,
         until,
         ...(typeof raw.note === "string" ? { note: raw.note } : {}),
-        ...(raw.challenge === true ? { challenge: true } : {})
+        ...(raw.challenge === true ? { challenge: true } : {}),
+        ...((WAF_INTEL_CAUSES as readonly unknown[]).includes(raw.cause) ? { cause: raw.cause } : {})
     };
 }
 

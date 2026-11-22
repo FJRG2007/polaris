@@ -145,7 +145,11 @@ export function createGuardServer(config: () => GuardConfig): Server {
                 uri: header(req, "x-forwarded-uri"),
                 method: header(req, "x-forwarded-method"),
                 userAgent: header(req, "user-agent"),
-                release: decision.release
+                release: decision.release,
+                acceptLanguage: header(req, "accept-language"),
+                cause: decision.cause,
+                message: decision.message,
+                until: decision.until
             });
             return;
         }

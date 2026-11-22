@@ -58,12 +58,61 @@ describe("a blocked request", () => {
     });
 
     it("comes back as text for a client that did not ask for a page", async () => {
-        const response = await check({ ...DENIED, accept: "application/json" });
+        const response = await check({ ...DENIED, accept: "*/*" });
         const body = await response.text();
 
         expect(response.status).toBe(403);
+        expect(response.headers.get("content-type")).toContain("text/plain");
         expect(body).toContain("Reference ID:");
+        expect(body).toContain("Reason: firewall");
         expect(body).not.toContain("<html");
+    });
+
+    it("comes back as data, with a stable reason code, for a client that asked for JSON", async () => {
+        const response = await check({ ...DENIED, accept: "application/json" });
+
+        expect(response.status).toBe(403);
+        expect(response.headers.get("content-type")).toContain("application/json");
+        const body = await response.json();
+        expect(body).toMatchObject({ error: "blocked", reason: "firewall", ip: "203.0.113.5" });
+        expect(body.reference).toMatch(/^[0-9a-f-]{36}$/);
+        expect(JSON.stringify(body)).not.toContain("denied ip");
+    });
+
+    it("speaks the visitor's language", async () => {
+        const response = await check({ ...DENIED, accept: "text/html", "accept-language": "es-ES,es;q=0.9" });
+        const body = await response.text();
+
+        expect(response.headers.get("content-language")).toBe("es-ES");
+        expect(body).toContain('lang="es-ES"');
+        expect(body).toContain("se te ha bloqueado");
+    });
+
+    it("shows a custom rule's own message, and only that", async () => {
+        const response = await check({
+            "x-forwarded-for": "203.0.113.5",
+            "x-forwarded-host": "app.example.com",
+            "x-forwarded-uri": "/partners",
+            accept: "application/json",
+            "x-polaris-waf": encodeGuardRule({
+                deny: [],
+                requireLogin: false,
+                rules: [
+                    {
+                        name: "partners only",
+                        message: "Partners only - write to ops for access.",
+                        enabled: true,
+                        action: "block",
+                        conditions: [{ field: "path", operator: "starts_with", values: ["/partners"] }]
+                    }
+                ]
+            })
+        });
+        const body = await response.json();
+
+        expect(response.status).toBe(403);
+        expect(body).toMatchObject({ reason: "custom", message: "Partners only - write to ops for access." });
+        expect(JSON.stringify(body)).not.toContain("partners only");
     });
 
     it("never says which rule matched", async () => {
@@ -133,13 +182,14 @@ describe("looking a block up by its reference", () => {
 
     it("answers Polaris with what the block was", async () => {
         const blocked = await check({ ...DENIED, accept: "application/json" });
-        const reference = /Reference ID: (\S+)/.exec(await blocked.text())?.[1] ?? "";
+        const reference = ((await blocked.json()) as { reference: string }).reference;
         const response = await lookup(reference, wafBlockLookupToken(cfg.secret));
         expect(response.status).toBe(200);
         expect(await response.json()).toMatchObject({
             reference,
             ip: "203.0.113.5",
-            host: "app.example.com"
+            host: "app.example.com",
+            cause: "firewall"
         });
     });
 

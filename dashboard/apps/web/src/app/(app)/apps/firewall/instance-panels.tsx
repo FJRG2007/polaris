@@ -664,6 +664,9 @@ function BlockLookupPanel({
     const rows: [string, ReactNode][] = block
         ? [
               [t("lookup.reason"), block.reason],
+              // What the block page said, so the operator answering a visitor sees
+              // the same cause the visitor quoted. Absent from an older edge.
+              [t("lookup.told"), block.cause ? t(`lookup.causes.${block.cause}`) : null],
               [
                   t("lookup.address"),
                   block.ip ? (

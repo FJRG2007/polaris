@@ -19,7 +19,7 @@ import { randomUUID } from "node:crypto";
 import { loadEnv } from "@polaris/config";
 import { resolveSession } from "@/lib/session";
 import { guardSession } from "@/lib/session-guard";
-import { wafBlockPage } from "@polaris/core";
+import { wafBlockLocale, wafBlockPage } from "@polaris/core";
 import { resolveWaf } from "@/lib/waf-service";
 import { clientIp } from "@/lib/request-context";
 import { principalsOfUser } from "@polaris/auth";
@@ -119,18 +119,22 @@ export async function GET(request: Request): Promise<Response> {
         // The same page the guard serves, because it is the same visitor and the same
         // refusal - only this one can say what it was about, since the account is signed
         // in and already knows who it is.
+        const { locale, dir } = wafBlockLocale(request.headers.get("accept-language"));
         const page = wafBlockPage({
             reference: randomUUID(),
             host: appOrigin.host,
             ip: await clientIp(),
-            explanation:
-                verdict === "refused"
-                    ? "Your account has been blocked from this service."
-                    : "Your account does not have access to this service."
+            cause: verdict === "refused" ? "account_refused" : "account_not_admitted",
+            locale,
+            dir
         });
         return new Response(page, {
             status: 403,
-            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" }
+            headers: {
+                "content-type": "text/html; charset=utf-8",
+                "content-language": locale,
+                "cache-control": "no-store"
+            }
         });
     }
 

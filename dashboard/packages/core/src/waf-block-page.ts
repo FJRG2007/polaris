@@ -14,9 +14,10 @@
  *
  * What the guard's page deliberately does not say is WHICH rule matched. The reason
  * travels with the decision, for the operator; on the page it would let anyone map the
- * ruleset by probing it until the wording changed. `explanation` exists for the case
- * where the block CAN safely say more - a signed-in account refused by name already
- * knows who it is.
+ * ruleset by probing it until the wording changed. `cause` is what the page CAN say:
+ * a property of the visitor's connection (Tor, a VPN, a datacenter, a rate limit), a
+ * signed-in account refused by name, or the operator's own message on a rule - see
+ * `waf-block-cause.ts` for where that line is drawn and why.
  *
  * The reference is the caller's to generate, and today nothing generates one that
  * outlives the response: it gives a visitor something to quote and the page the shape it
@@ -24,6 +25,16 @@
  */
 
 import { edgePage, edgeText } from "./edge-page.js";
+import type { Locale, TextDirection } from "./i18n/locales.js";
+import {
+    fillBlockCopy,
+    wafBlockAdvice,
+    wafBlockChangeable,
+    wafBlockCopy,
+    wafBlockSentence,
+    wafBlockStatesUntil,
+    type WafBlockCause
+} from "./waf-block-cause.js";
 
 /** What the page says about the request it refused. */
 export interface WafBlockPageInput {
@@ -33,7 +44,17 @@ export interface WafBlockPageInput {
     readonly host?: string;
     /** The address the firewall judged (leftmost X-Forwarded-For). */
     readonly ip?: string | null;
-    /** Replaces the default "why", for a block whose reason is safe to state. */
+    /** Why, as a code: decides the sentence and the advice (`waf-block-cause.ts`).
+     *  Absent is the generic sentence, which describes the class of blocks only. */
+    readonly cause?: WafBlockCause;
+    /** The operator's words for a `custom` cause. Escaped and capped here. */
+    readonly message?: string;
+    /** When a timed block lifts (epoch ms), for a cause that states it. */
+    readonly until?: number | null;
+    /** The language to speak, from the visitor's Accept-Language; English if absent. */
+    readonly locale?: Locale;
+    readonly dir?: TextDirection;
+    /** @deprecated Pass `cause`. Replaces the generic "why" when no cause is given. */
     readonly explanation?: string;
     /** For an automatic ban the visitor can get out of: when it lifts by itself
      *  (epoch ms, or null for never) and where to sign in to lift it now. Says how,
@@ -93,59 +114,76 @@ const RETRY_SCRIPT = `(function () {
   tick();
 })();`;
 
-/** The sentence for a ban that lifts, with the time it does. */
-function releaseText(release: NonNullable<WafBlockPageInput["release"]>): string {
-    const parts = ["This address was blocked automatically for what was sent from it."];
-    if (release.until !== null && Number.isFinite(release.until)) {
-        const iso = new Date(release.until).toISOString();
-        parts.push(
-            `It is unblocked by itself at <time id="edge-until" datetime="${iso}">${iso.replace("T", " ").slice(0, 16)} UTC</time>.`
-        );
-    }
-    if (release.signIn) parts.push("If you have an account here, sign in and it is unblocked now.");
-    return parts.join(" ");
+/** A time as the page shows it: an ISO stamp the page's script rewrites into the
+ *  reader's own clock, readable as UTC until it does. */
+function timeElement(until: number): string {
+    const iso = new Date(until).toISOString();
+    return `<time id="edge-until" datetime="${iso}">${iso.replace("T", " ").slice(0, 16)} UTC</time>`;
 }
 
-/** The default "why", which describes the class of blocks rather than the rule. */
-const DEFAULT_EXPLANATION =
-    "This site runs a firewall. Something about this request matched a rule that blocks it, either where it came from or what it carried.";
+/** The "what can I do" paragraph: the advice for the cause, when a timed block lifts,
+ *  and that signing in lifts it, in that order. */
+function adviceText(input: WafBlockPageInput, cause: WafBlockCause, locale: Locale | undefined): string {
+    const copy = wafBlockCopy(locale);
+    const until = input.until ?? input.release?.until ?? null;
+    const parts: string[] = [];
+    if (wafBlockStatesUntil(cause) && until !== null && Number.isFinite(until)) {
+        const template = cause === "rate_limited" ? copy.tryAt : copy.liftsAt;
+        parts.push(fillBlockCopy(template, { at: timeElement(until) }));
+    }
+    if (input.release?.signIn) parts.push(copy.signInLifts);
+    parts.push(parts.length > 0 && !wafBlockChangeable(cause) ? copy.otherwise : wafBlockAdvice(cause, locale));
+    return parts.join(" ");
+}
 
 /** A shield, drawn as the contents of a stroked 24x24 viewBox. */
 const SHIELD =
     '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/>';
 
+/**
+ * The cause a page states. An explicit `cause` wins; `explanation` is the older way
+ * of saying the same thing and is kept for callers that still pass it; a ban with a
+ * release and nothing else is the automatic, timed one it always meant.
+ */
+function causeOf(input: WafBlockPageInput): WafBlockCause {
+    if (input.cause) return input.cause;
+    if (input.release) return "temporary_ban";
+    return "firewall";
+}
+
 /** Render the block page for one refused request. */
 export function wafBlockPage(input: WafBlockPageInput): string {
+    const locale = input.locale;
+    const copy = wafBlockCopy(locale);
+    const cause = causeOf(input);
+    const why =
+        !input.cause && input.explanation
+            ? edgeText(input.explanation, copy.causes.firewall, 400)
+            : edgeText(wafBlockSentence({ cause, message: input.message }, locale), copy.causes.firewall, 400);
     return edgePage({
-        title: "Blocked",
-        badge: "Blocked",
+        lang: locale ?? "en-US",
+        dir: input.dir ?? "ltr",
+        title: copy.title,
+        badge: copy.title,
         tone: "danger",
         icon: SHIELD,
-        heading: "Sorry, you have been blocked",
-        lead: `You are unable to access ${edgeText(input.host, "this site")}.`,
+        heading: copy.heading,
+        lead: fillBlockCopy(copy.lead, { host: edgeText(input.host, copy.thisSite) }),
         sections: [
-            {
-                heading: "Why have I been blocked?",
-                body: edgeText(input.explanation, DEFAULT_EXPLANATION, 400)
-            },
-            {
-                heading: "What can I do about it?",
-                body: input.release
-                    ? `${releaseText(input.release)} Otherwise contact the site owner and quote the reference below.`
-                    : "If the site is yours, review its firewall rules. Otherwise contact the site owner and quote the reference below."
-            }
+            { heading: copy.why, body: why },
+            { heading: copy.whatToDo, body: adviceText(input, cause, locale) }
         ],
         actions: [
             ...(input.release?.signIn
-                ? [{ label: "Sign in", href: edgeText(input.release.signIn, "", 400), primary: true }]
+                ? [{ label: copy.signIn, href: edgeText(input.release.signIn, "", 400), primary: true }]
                 : []),
-            ...(input.retryNonce ? [{ label: "Try again", id: "edge-retry" }] : [])
+            ...(input.retryNonce ? [{ label: copy.tryAgain, id: "edge-retry" }] : [])
         ],
         facts: [
-            { label: "Reference ID", value: edgeText(input.reference, "unavailable", 64) },
-            { label: "Your IP", value: edgeText(input.ip, "") }
+            { label: copy.reference, value: edgeText(input.reference, copy.unavailable, 64) },
+            { label: copy.yourIp, value: edgeText(input.ip, "") }
         ],
-        note: "Protected by Polaris",
+        note: copy.protectedBy,
         ...(input.retryNonce ? { script: { nonce: input.retryNonce, source: RETRY_SCRIPT } } : {})
     });
 }

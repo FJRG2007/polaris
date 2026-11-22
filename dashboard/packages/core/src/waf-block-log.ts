@@ -15,6 +15,7 @@
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { isWafBlockCause, type WafBlockCause } from "./waf-block-cause.js";
 
 /** Where the guard answers a lookup: this, then the reference. */
 export const WAF_BLOCK_LOOKUP_PATH = "/v1/blocks/";
@@ -27,6 +28,9 @@ export interface WafBlockRecord {
     readonly reference: string;
     /** What decided, in the guard's words - the rule's name, the ban, the signature. */
     readonly reason: string;
+    /** What the visitor was told, as the code the block answered with. Absent on a
+     *  guard that predates causes, which only ever said the generic sentence. */
+    readonly cause?: WafBlockCause;
     readonly ip: string | null;
     readonly host: string | null;
     readonly uri: string | null;
@@ -103,6 +107,7 @@ export function parseWafBlockRecord(value: unknown): WafBlockRecord | null {
     return {
         reference,
         reason: text(raw.reason, 400) ?? "unknown",
+        ...(isWafBlockCause(raw.cause) ? { cause: raw.cause } : {}),
         ip: text(raw.ip, 64),
         host: text(raw.host, 255),
         uri: text(raw.uri, 2048),

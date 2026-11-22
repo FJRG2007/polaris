@@ -172,6 +172,26 @@ export function RuleEditor({
                     </p>
                 </div>
 
+                {/* Only a block shows a visitor anything. Kept across action changes,
+                    like the skip choice below. */}
+                {rule.action === "block" ? (
+                    <div className="flex min-w-0 flex-col gap-1.5 border-t border-border pt-3">
+                        <span className="text-xs font-medium text-muted-foreground">
+                            {t("editor.message")}
+                        </span>
+                        <Input
+                            value={rule.message ?? ""}
+                            maxLength={200}
+                            aria-label={t("editor.message")}
+                            className="max-w-xl"
+                            onChange={(event) =>
+                                setRule({ ...rule, message: event.target.value || undefined })
+                            }
+                        />
+                        <p className="text-xs text-muted-foreground">{t("editor.messageHint")}</p>
+                    </div>
+                ) : null}
+
                 {/* Only under the action that gives them meaning. The choice is kept
                     either way, so switching to block and back comes back to what was
                     picked rather than to nothing. */}
@@ -294,7 +314,12 @@ export function RuleEditor({
                     type="button"
                     disabled={blocked !== null || unchanged}
                     title={blocked ?? undefined}
-                    onClick={() => onSave({ ...rule, name: rule.name.trim() }, position)}
+                    onClick={() =>
+                        onSave(
+                            { ...rule, name: rule.name.trim(), message: rule.message?.trim() || undefined },
+                            position
+                        )
+                    }
                 >
                     {tcommon("actions.save")}
                 </Button>
