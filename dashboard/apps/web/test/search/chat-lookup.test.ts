@@ -19,7 +19,13 @@ const userHasManage = vi.fn();
 const searchMentions = vi.fn();
 
 vi.mock("@/lib/chat/chat-service", () => ({ listChannels, listSpaces }));
-vi.mock("@/lib/chat/access", () => ({ searchForConversation }));
+const selfMatching = vi.fn();
+const findUser = vi.fn();
+vi.mock("@/lib/chat/access", () => ({ searchForConversation, selfMatching }));
+vi.mock("@polaris/db", async (importOriginal) => ({
+    ...(await importOriginal<Record<string, unknown>>()),
+    prisma: { user: { findUnique: findUser } }
+}));
 vi.mock("@/lib/chat/search", () => ({ searchMessages }));
 const lockState = vi.fn();
 vi.mock("@/lib/chat/chat-lock", () => ({ lockState }));
@@ -51,6 +57,8 @@ beforeEach(() => {
     vi.clearAllMocks();
     userHasManage.mockResolvedValue(true);
     lockState.mockResolvedValue({ hasCode: false, hideLocked: false });
+    selfMatching.mockResolvedValue(null);
+    findUser.mockResolvedValue({ name: "Fran", username: "fran" });
     listSpaces.mockResolvedValue([{ id: "s1", name: "Studio" }]);
     listChannels.mockResolvedValue([
         channel({
@@ -189,5 +197,29 @@ describe("hidden and locked conversations", () => {
         ]);
         lockState.mockResolvedValue({ hasCode: true, hideLocked: true });
         expect(await lookup(user, { scope: "chats", query: "" })).toEqual([]);
+    });
+});
+
+describe("the conversation with yourself", () => {
+    it("is found by your own name and opens through the address that makes it", async () => {
+        selfMatching.mockResolvedValue({ id: user.id, name: "Fran" });
+        const [hit] = await lookup(user, { scope: "contacts", query: "fran" });
+        expect(hit).toMatchObject({ id: user.id, href: `/chat/with/${user.id}` });
+        expect(hit!.label).toContain("Fran");
+        expect(hit!.label).not.toBe("Fran");
+    });
+
+    it("goes by your name, not a stand-in, and is listed once when you are also found", async () => {
+        listChannels.mockResolvedValue([
+            channel({ id: "me", kind: "dm", name: "Just you", self: true, lastMessageAt: "2026-09-03T10:00:00Z" })
+        ]);
+        const [chat] = await lookup(user, { scope: "chats", query: "fran" });
+        expect(chat).toMatchObject({ id: "me", href: "/chat/c/me" });
+        expect(chat!.label).toContain("Fran");
+        expect(chat).not.toHaveProperty("self");
+
+        selfMatching.mockResolvedValue({ id: user.id, name: "Fran" });
+        const all = await lookup(user, { scope: "chat", query: "fran" });
+        expect(all.filter((hit) => hit.label.includes("Fran")).map((hit) => hit.id)).toEqual([user.id]);
     });
 });
