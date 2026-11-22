@@ -153,18 +153,18 @@ export async function changePolarDisplay(key: PolarDisplayKey, value: boolean): 
     return false;
 }
 
-/** The suggestion switch lives with the helper model (`polar-helper-settings.tsx`). */
-type DisplayRow = Exclude<PolarDisplayKey, "suggestions">;
+/** The suggestion switch lives with the helper model (`polar-helper-settings.tsx`),
+ *  and which chat opens with "When Polar opens" (`polar-open-settings.tsx`). */
+type DisplayRow = Exclude<PolarDisplayKey, "suggestions" | "reopenLastChat">;
 
 const ROWS: readonly {
     key: DisplayRow;
-    hint?: "settings.display.autoCompactHint" | "settings.display.reopenLastChatHint";
+    hint?: "settings.display.autoCompactHint";
 }[] = [
     { key: "showTokens" },
     { key: "showCost" },
     { key: "showContextBar" },
-    { key: "autoCompact", hint: "settings.display.autoCompactHint" },
-    { key: "reopenLastChat", hint: "settings.display.reopenLastChatHint" }
+    { key: "autoCompact", hint: "settings.display.autoCompactHint" }
 ];
 
 /** A theme's colors in a row of dots, painted by the theme itself. */

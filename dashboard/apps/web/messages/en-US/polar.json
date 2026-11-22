@@ -551,16 +551,23 @@
                 "failed": "The chat could not be imported. Try again."
             }
         },
+        "opening": {
+            "nav": "Opening and display",
+            "title": "When Polar opens",
+            "intro": "In the side panel, the extension and the Polar page. Earlier chats stay in your history.",
+            "label": "Start with",
+            "new": "A new chat",
+            "last": "The last chat",
+            "failed": "Couldn't save that setting. Try again."
+        },
         "display": {
             "title": "Chat display",
-            "intro": "What your chats show, when they compact, and which one opens.",
+            "intro": "What your chats show and when they compact.",
             "showTokens": "Tokens under answers",
             "showCost": "Estimated cost",
             "showContextBar": "Context usage bar",
             "autoCompact": "Compact automatically",
             "autoCompactHint": "Near the model's limit, older messages are summarized before sending.",
-            "reopenLastChat": "Reopen the last chat",
-            "reopenLastChatHint": "Off, Polar opens on a new chat.",
             "failed": "Couldn't save that setting. Try again."
         },
         "helper": {

@@ -158,6 +158,7 @@ import { formOf, formRepliesIn, formReplyText, isFormPart, type FormValues } fro
 import { PolarFormView } from "@/components/polar/polar-form";
 import { withoutPseudoToolCalls } from "@/lib/polar/pseudo-tools";
 import { repoStepOf } from "@/lib/polar/code-host";
+import { chatOnOpen } from "@/lib/polar/open-chat";
 import {
     noBrowserIn,
     browserStepOf,
@@ -398,19 +399,39 @@ function keepScope(key: string): void {
     writeStored(SCOPES_KEY, JSON.stringify(next));
 }
 let reloadSeen = false;
-/** Whether this is the first chat since the browser reloaded the page, not a visit
- *  or a later opening of Polar on the same page. */
+/** Whether the browser reloaded this very address (not another page of the
+ *  dashboard, then moved here). */
+function pageReloaded(): boolean {
+    const entry = performance.getEntriesByType?.("navigation")[0] as
+        PerformanceNavigationTiming | undefined;
+    if (entry?.type !== "reload") return false;
+    try {
+        return new URL(entry.name, window.location.href).pathname === window.location.pathname;
+    } catch {
+        return false;
+    }
+}
+/** Whether this is the first chat since the browser reloaded the page it is
+ *  on, not a visit or a later opening of Polar on the same page. */
 function reloaded(): boolean {
     if (reloadSeen) return false;
     reloadSeen = true;
-    const entry = performance.getEntriesByType?.("navigation")[0] as
-        PerformanceNavigationTiming | undefined;
-    return entry?.type === "reload";
+    return pageReloaded();
+}
+/** The side panel was open when the page reloaded: its first chat is the same
+ *  view coming back, not Polar being opened. Set once, taken once. */
+let panelCameBack = false;
+function takePanelCameBack(): boolean {
+    const was = panelCameBack;
+    panelCameBack = false;
+    return was;
 }
 
-/** Treat the next chat as the first since the page loaded. Tests only. */
-export function resetReloadForTests(): void {
+/** Treat the next chat as the first since the page loaded; `panelOpen` is the
+ *  side panel kept open across that load, as `PolarProvider` reads it. Tests only. */
+export function resetReloadForTests({ panelOpen = false }: { panelOpen?: boolean } = {}): void {
     reloadSeen = false;
+    panelCameBack = panelOpen && pageReloaded();
 }
 const MIN_WIDTH = 320;
 const MAX_WIDTH = 720;
@@ -427,7 +448,13 @@ export function PolarProvider({
     const [extra, setExtra] = useState<ExtraContext | null>(null);
     /** When this page's own Ctrl+J last toggled the panel. */
     const lastKey = useRef(0);
-    useEffect(() => setOpenState(readStored(OPEN_KEY) === "1"), []);
+    useEffect(() => {
+        const wasOpen = readStored(OPEN_KEY) === "1";
+        // Only a panel actually on screen at that reload: /polar has none.
+        panelCameBack =
+            wasOpen && allowed && !onPolarPage(window.location.pathname) && pageReloaded();
+        setOpenState(wasOpen);
+    }, []);
     const setOpen = useCallback((next: boolean) => {
         setOpenState(next);
         writeStored(OPEN_KEY, next ? "1" : "0");
@@ -1445,10 +1472,9 @@ export function PolarChat({
     // chat picked beside the settings) opens once, and the address goes back
     // to plain /polar; `new` starts one, in the project it names if any, and
     // `session` opens a Code session (`new` for a new task).
-    // Otherwise a reload, or Polar opened again in the same tab, stays on the
-    // chat it was on, and a new visit starts a new chat unless the person asked
-    // for the last one back; a scoped chat (a document's own) always comes
-    // back, since it belongs to that place.
+    // Otherwise opening Polar starts a new chat unless the person chose to
+    // continue the last one (`chatOnOpen`); a reload of the view Polar was open
+    // in, and the extension's per-tab panel moving between tabs, keep theirs.
     useEffect(() => {
         const params = fullPage ? new URLSearchParams(window.location.search) : null;
         const named = params?.get("thread") ?? null;
@@ -1491,11 +1517,17 @@ export function PolarChat({
             setReopened(true);
             return;
         }
-        const keep = chatScope || reloaded() || polarDisplayStore.get().reopenLastChat;
-        // The setting decides how a new visit starts. Within this tab - the panel
-        // closed and opened again, /polar left and come back to - Polar stays on
-        // the chat it was last in, unless a new one was asked for (kept empty).
-        const reopen = named ?? (keep ? rememberedThread(threadKey) : readStored(threadKey, "session"));
+        const continueLast = polarDisplayStore.get().reopenLastChat;
+        const cameBack = fullPage ? reloaded() : takePanelCameBack();
+        const reopen =
+            named ??
+            chatOnOpen({
+                continueLast,
+                cameBack,
+                perTab: Boolean(chatScope),
+                tabThread: readStored(threadKey, "session"),
+                lastThread: readStored(threadKey)
+            });
         if (reopen) {
             void openThread(reopen, named !== null || session === null).finally(() =>
                 setReopened(true)
@@ -1503,7 +1535,7 @@ export function PolarChat({
             return;
         }
         setReopened(true);
-        if (named || keep) return;
+        if (named || continueLast || cameBack) return;
         // This device's copy of the setting may be behind the account's.
         const first = threadId;
         let gone = false;

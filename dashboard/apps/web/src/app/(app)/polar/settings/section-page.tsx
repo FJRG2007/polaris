@@ -41,6 +41,7 @@ import { agentEnginesFor } from "@/lib/polar/agents/composer-agents";
 import { polarModelOptions } from "@/lib/polar/models";
 import { connectorPolicy, listConnectorViews } from "@/lib/polar/connectors/store";
 import { DisplaySettings } from "@/components/polar/polar-display";
+import { OpeningSettings } from "@/components/polar/polar-open-settings";
 import { PolarHelperSettings } from "@/components/polar/polar-helper-settings";
 import { SessionEngineSettings } from "@/components/polar/session-engine";
 import { polarPreferences } from "@/lib/polar/preferences";
@@ -63,7 +64,7 @@ export async function sectionMetadata(id: PolarSettingsSection): Promise<Metadat
         agents: t("settings.nav.agents"),
         permissions: t("settings.nav.permissions"),
         browser: t("settings.browserSites.title"),
-        display: t("settings.display.title"),
+        display: t("settings.opening.nav"),
         extras: t("settings.helper.title"),
         writing: t("settings.writing.title"),
         routing: t("settings.nav.routing"),
@@ -304,7 +305,12 @@ export async function SettingsSectionPage({
                 </Suspense>
             );
         case "display":
-            return <DisplaySettings />;
+            return (
+                <div className="flex flex-col gap-6">
+                    <OpeningSettings />
+                    <DisplaySettings />
+                </div>
+            );
         case "extras":
             return <PolarHelperSettings />;
         case "writing":

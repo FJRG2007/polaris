@@ -114,10 +114,11 @@ describe("opening a stored chat", () => {
     it("opens nothing when the remembered chat answers with something else", async () => {
         // A chat remembered from before a reload, whose address answers with no chat.
         const stored = new Map([["polar.thread", "t-gone"]]);
-        resetReloadForTests();
-        vi.spyOn(performance, "getEntriesByType").mockReturnValue([
-            { type: "reload" } as unknown as PerformanceEntry
+        vi.spyOn(performance, "getEntriesByType").mockImplementation(() => [
+            { type: "reload", name: window.location.href } as unknown as PerformanceEntry
         ]);
+        // The side panel was open when the page reloaded.
+        resetReloadForTests({ panelOpen: true });
         vi.stubGlobal("localStorage", {
             getItem: (key: string) => stored.get(key) ?? null,
             setItem: (key: string, value: string) => void stored.set(key, value),

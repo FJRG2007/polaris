@@ -1,7 +1,7 @@
 ---
 id: BUG-0007
 title: Polar's side panel opens on the old chat, then on an empty one when opened again
-status: fixed-watching
+status: regressed
 area: polar / side panel
 location: dashboard/apps/web/src/components/polar/polar-panel.tsx
 related:
@@ -10,6 +10,12 @@ reported: 2026-11-21
 fixed: 2026-11-21
 fix_commit: "fix(polar): Polar opened again in the same tab stays on the chat it was last in"
 ---
+
+## Regressed
+
+This fix made the old chat come back on every opening within a tab, which
+is what was reported again as BUG-0016. The cause and the fix that replaced
+this one are there.
 
 ## What was seen
 

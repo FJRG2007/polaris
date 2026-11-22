@@ -85,7 +85,7 @@ function SettingsNav({
         agents: t("settings.nav.agents"),
         permissions: t("settings.nav.permissions"),
         browser: t("settings.browserSites.title"),
-        display: t("settings.display.title"),
+        display: t("settings.opening.nav"),
         extras: t("settings.helper.title"),
         writing: t("settings.writing.title"),
         routing: t("settings.nav.routing"),

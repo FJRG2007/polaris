@@ -272,6 +272,8 @@ describe("a question sent from outside the composer", () => {
             setItem: (key: string, value: string) => void stored.set(key, value),
             removeItem: (key: string) => void stored.delete(key)
         });
+        // The extension's per-tab chat, from this same opening of its panel.
+        window.sessionStorage.setItem(scopedThreadKey("doc"), "t-old");
         storedThread = { id: "t-old", projectId: null, messages: [], queue: [], choice: null };
         const thread = holdFetch("/api/polar/threads/t-old", () =>
             Response.json({ thread: storedThread })
@@ -742,12 +744,14 @@ describe("the queue", () => {
     });
 });
 
-/** This page load as the browser reports it: a reload, or a visit. */
-function loadedBy(type: "reload" | "navigate") {
-    resetReloadForTests();
-    return vi
+/** This page load as the browser reports it: a reload, or a visit; `panelOpen`
+ *  is the side panel left open across it. */
+function loadedBy(type: "reload" | "navigate", panelOpen = false) {
+    const spy = vi
         .spyOn(performance, "getEntriesByType")
-        .mockReturnValue([{ type } as unknown as PerformanceEntry]);
+        .mockReturnValue([{ type, name: window.location.href } as unknown as PerformanceEntry]);
+    resetReloadForTests({ panelOpen });
+    return spy;
 }
 
 describe("the open conversation after a reload", () => {
@@ -760,7 +764,7 @@ describe("the open conversation after a reload", () => {
             removeItem: (key: string) => void kept.delete(key),
             clear: () => kept.clear()
         });
-        loadedBy("reload");
+        loadedBy("reload", true);
     });
     afterEach(() => vi.restoreAllMocks());
 
@@ -859,11 +863,31 @@ describe("opening Polar again", () => {
         await waitFor(() => expect(opened()).toBe(true));
     });
 
-    // Opened again after a reload, see panel-reopen.test.tsx.
-    it("comes back to the chat this tab was in, with the setting off", async () => {
+    // BUG-0016: closed and opened again in the same tab, the panel brought back
+    // the chat it was last in although the setting said a new chat.
+    it("starts on a new chat in a tab that was already in one, with the setting off", async () => {
         window.sessionStorage.setItem("polar.thread", "t-old");
         mount();
+        await ready();
+        expect(opened()).toBe(false);
+    });
+
+    it("brings this tab's own chat back for a person who asked for the last one", async () => {
+        window.sessionStorage.setItem("polar.thread", "t-old");
+        window.localStorage.setItem("polar.thread", "t-elsewhere");
+        polarDisplayStore.set({ ...polarDisplayStore.get(), reopenLastChat: true });
+        mount();
         await waitFor(() => expect(opened()).toBe(true));
+    });
+
+    // BUG-0007/BUG-0016: the first opening after a reload, with the panel closed
+    // when the page reloaded, is an opening like any other.
+    it("starts on a new chat when opened after a reload that found it closed", async () => {
+        loadedBy("reload", false);
+        window.sessionStorage.setItem("polar.thread", "t-old");
+        mount();
+        await ready();
+        expect(opened()).toBe(false);
     });
 
     it("stays on a new chat this tab asked for, whatever the setting", async () => {
