@@ -31,6 +31,7 @@ const NOT_TOKEN_PATHS = new Map<string, string>([
     ["edge", "the edge's sign-in check, called by Traefik rather than a browser"],
     ["o", "an organization's public page, by its public slug"],
     ["oauth", "sign-in screens"],
+    ["season-icon", "the tab and app icon for the current season, the same file for everybody"],
     ["status", "a public status page, by its public slug"],
     ["u", "a public profile, by its username"],
     ["wall", "a wall panel for somebody signed in, by its id; the lent link is /k/"]
