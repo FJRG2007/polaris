@@ -38,6 +38,7 @@ const VOICE = "0193aaaa-1111-4222-8333-444444444444";
 const SECRET = "0193cccc-2222-4333-8444-555555555555";
 const ROOM = "0193dddd-3333-4444-8555-666666666666";
 const SAID = "0193bbbb-5555-4666-8777-888888888888";
+const SELF = "0193eeee-4444-4555-8666-777777777777";
 
 let reachable = new Set<string>();
 
@@ -51,6 +52,14 @@ const channels: ChannelRow[] = [
         spaceId: "s1",
         space: { name: "Testing" },
         members: []
+    },
+    {
+        id: SELF,
+        name: "",
+        kind: "dm",
+        spaceId: null,
+        space: null,
+        members: [{ userId: "ada", user: { name: "Ada Lovelace" } }]
     }
 ];
 
@@ -88,6 +97,7 @@ vi.mock("@polaris/db", () => ({
                 messages.filter((message) => where.id.in.includes(message.id))
         },
         user: {
+            findUnique: async () => ({ name: "Ada Lovelace", username: "ada" }),
             findMany: async ({ where }: { where: { id: { in: string[] } } }) =>
                 [{ id: "grace", name: "Grace Hopper" }].filter((person) =>
                     where.id.in.includes(person.id)
@@ -101,7 +111,7 @@ const { chatReferencesIn, resolveChatReferences } = await import("@/lib/chat/ref
 const ada = { id: "ada" };
 
 beforeEach(() => {
-    reachable = new Set([VOICE, ROOM]);
+    reachable = new Set([VOICE, ROOM, SELF]);
     messages[0]!.deletedAt = null;
 });
 
@@ -113,6 +123,11 @@ describe("a conversation somebody pasted", () => {
         expect(found?.reachable).toBe(true);
         expect(found?.name).toBe("Standup");
         expect(found?.channelKind).toBe("voice");
+    });
+
+    it("is named for its reader when it is the conversation with yourself", async () => {
+        const found = (await resolveChatReferences(ada, [`channel/${SELF}`])).get(`channel/${SELF}`);
+        expect(found?.name).toBe("Ada Lovelace (you)");
     });
 
     it("comes back carrying nothing at all when the reader is not", async () => {

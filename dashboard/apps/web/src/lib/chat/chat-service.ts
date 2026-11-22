@@ -27,6 +27,7 @@ import { postNotice, postSpaceNotice } from "./notices";
 import { groupRefusals, refuseGroupStrangers } from "./group-reach";
 import { landsInRequests } from "./message-requests";
 import { inviteToGroup } from "./group-invites";
+import { selfConversationName } from "./self-name";
 import { blockedBetween, blockedBy } from "@/lib/blocks";
 import { discardSpaceEmoji } from "./custom-emoji";
 import { currentChatOrgId, orgChatPeople, readableChatScopes } from "./isolation";
@@ -988,6 +989,16 @@ export async function listChannels(
         }
     }
 
+    // The conversation with yourself is named for you, in your language - read
+    // only when the list holds one, or a room nobody else is left in.
+    const lonely = channels.some(
+        (channel) =>
+            !channel.spaceId &&
+            !channel.name &&
+            channel.members.every((member) => member.userId === actor.id)
+    );
+    const selfName = lonely ? await selfConversationName(actor.id) : "";
+
     return channels.map((channel) => {
         const others = channel.members
             .filter((member) => member.userId !== actor.id)
@@ -1020,7 +1031,7 @@ export async function listChannels(
             self: channel.kind === "dm" && channel.dmKey === core.dmKeyFor([actor.id], channel.orgId),
             // A group that has been named keeps it; one that has not is called
             // after the people in it, which is what it is.
-            name: channel.spaceId ? channel.name : channel.name || directName(others),
+            name: channel.spaceId ? channel.name : channel.name || directName(others, selfName),
             topic: channel.topic,
             private: channel.private,
             archived: channel.archived,
@@ -2690,8 +2701,8 @@ async function blockedIds(userId: string): Promise<string[]> {
 /** What a direct message is called: the people in it. Empty when the only other
  *  person deleted their account, which leaves a real conversation with a real
  *  history and nobody at the other end - so it says that rather than nothing. */
-function directName(others: readonly { name: string }[]): string {
-    if (others.length === 0) return "Just you";
+function directName(others: readonly { name: string }[], selfName: string): string {
+    if (others.length === 0) return selfName;
     return others.map((other) => other.name).join(", ");
 }
 

@@ -28,6 +28,7 @@
 
 import { AUTHOR_SELECT, authorNameOf } from "./author-name";
 import { prisma } from "@polaris/db";
+import { selfConversationName } from "./self-name";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { ageClearedWhere } from "./age-gate";
 import { reachableChannelIds, type ChatActor } from "./access";
@@ -266,6 +267,12 @@ export async function resolveChatReferences(
     ]);
 
     const byId = new Map(channels.map((channel) => [channel.id, channel]));
+    // The conversation with yourself is named for you, in your language - read
+    // only when a room on this page has nobody else in it.
+    const lonely = channels.some(
+        (channel) => !channel.name && channel.members.every((member) => member.userId === actor.id)
+    );
+    const selfName = lonely ? await selfConversationName(actor.id) : "";
     const authorNames = new Map(authors.map((author) => [author.id, author.name]));
     const resolved = new Map<string, ChatReferenceView>();
 
@@ -281,7 +288,7 @@ export async function resolveChatReferences(
             reachable: true,
             // A direct message and a group have no name of their own - they are
             // called after who is in them, the same way the rail draws them.
-            name: channel.name || nameOfRoom(channel.members, actor.id),
+            name: channel.name || nameOfRoom(channel.members, actor.id, selfName),
             spaceId: channel.spaceId ?? "",
             spaceName: channel.space?.name ?? "",
             channelKind: channel.kind,
@@ -307,7 +314,7 @@ export async function resolveChatReferences(
             kind: "message",
             id,
             reachable: true,
-            name: channel ? channel.name || nameOfRoom(channel.members, actor.id) : "",
+            name: channel ? channel.name || nameOfRoom(channel.members, actor.id, selfName) : "",
             spaceId: channel?.spaceId ?? "",
             spaceName: channel?.space?.name ?? "",
             channelKind: channel?.kind ?? "",
@@ -349,10 +356,11 @@ export async function resolveChatReferences(
  *  the row it points at. */
 function nameOfRoom(
     members: readonly { userId: string; user: { name: string } }[],
-    readerId: string
+    readerId: string,
+    selfName: string
 ): string {
     const others = members
         .filter((member) => member.userId !== readerId)
         .map((member) => member.user.name);
-    return others.length > 0 ? others.join(", ") : "Just you";
+    return others.length > 0 ? others.join(", ") : selfName;
 }
