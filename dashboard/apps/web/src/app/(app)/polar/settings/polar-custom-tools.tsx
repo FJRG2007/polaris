@@ -250,6 +250,7 @@ export function PolarCustomTools({ tools: initialTools, plugins: initialPlugins,
 
             <ToolDialog
                 editing={editing}
+                tools={tools}
                 onClose={() => setEditing(null)}
                 onSaved={(saved) =>
                     setTools((current) =>
@@ -283,10 +284,14 @@ export function PolarCustomTools({ tools: initialTools, plugins: initialPlugins,
 
 function ToolDialog({
     editing,
+    tools,
     onClose,
     onSaved
 }: {
     editing: StoredTool | "new" | null;
+    /** Every tool already loaded, so a name in use is said while it is typed
+     *  instead of after Save. The server still refuses a clash on its own. */
+    tools: readonly StoredTool[];
     onClose: () => void;
     onSaved: (tool: StoredTool) => void;
 }) {
@@ -303,10 +308,11 @@ function ToolDialog({
     }
     const parsed = useMemo(() => parseDraft(draft, current?.enabled ?? true), [draft, current]);
     const issues = new Set(parsed.success ? [] : parsed.error.issues.map((issue) => String(issue.path[0] ?? "")));
+    const nameTaken = shared.nameInUse(draft.name, tools, current?.id ?? null);
     const unchanged = JSON.stringify(draft) === JSON.stringify(draftOf(current));
     const set = <K extends keyof ToolDraft>(key: K, value: ToolDraft[K]) => setDraft((before) => ({ ...before, [key]: value }));
     const save = () => {
-        if (!parsed.success) return;
+        if (!parsed.success || nameTaken) return;
         startTransition(async () => {
             const result = await actions.saveCustomTool(current?.id ?? null, parsed.data);
             if (!result.ok) return setError(result.error);
@@ -323,7 +329,7 @@ function ToolDialog({
                     <DialogDescription>{t("settings.customTools.sandboxHint")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-4">
-                    <Field label={`${t("settings.customTools.fields.name")} *`} error={flag("name", draft.name !== "")}>
+                    <Field label={`${t("settings.customTools.fields.name")} *`} error={nameTaken ? t("settings.customTools.errors.taken") : flag("name", draft.name !== "")}>
                         <Input value={draft.name} onChange={(event) => set("name", event.target.value)} placeholder="run_tests" />
                     </Field>
                     <Field label={`${t("settings.customTools.fields.description")} *`} error={flag("description", draft.description !== "")}>
@@ -365,7 +371,7 @@ function ToolDialog({
                     <Button variant="ghost" onClick={onClose} disabled={pending}>
                         {t("settings.customTools.cancel")}
                     </Button>
-                    <Button onClick={save} aria-disabled={!parsed.success || unchanged || pending} disabled={!parsed.success || unchanged || pending}>
+                    <Button onClick={save} aria-disabled={!parsed.success || nameTaken || unchanged || pending} disabled={!parsed.success || nameTaken || unchanged || pending}>
                         {t("settings.customTools.save")}
                     </Button>
                 </DialogFooter>

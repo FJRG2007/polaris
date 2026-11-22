@@ -123,6 +123,17 @@ export function turnToolName(name: string): string {
     return `${TOOL_PREFIX}${name}`;
 }
 
+/** Whether another of the reader's tools already carries this name, compared the
+ *  way it is stored (trimmed, lowercase), so a form can say so while it is typed. */
+export function nameInUse(
+    name: string,
+    tools: readonly { readonly id: string; readonly name: string }[],
+    ownId: string | null
+): boolean {
+    const wanted = name.trim().toLowerCase();
+    return wanted !== "" && tools.some((tool) => tool.id !== ownId && tool.name === wanted);
+}
+
 /** The base64 of some text, in a form a single-quoted shell word holds as-is. */
 function base64(text: string): string {
     return Buffer.from(text, "utf8").toString("base64");
