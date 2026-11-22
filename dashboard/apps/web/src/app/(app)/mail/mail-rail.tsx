@@ -35,6 +35,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { MailFolderView } from "@/lib/mailbox/views";
 import { refusedMailboxHref } from "@/lib/mailbox/refusals";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useFetchOnIntent } from "@/components/intent-link";
 import { deleteFolderAction, renameFolderAction, setFolderColorAction } from "./actions";
 import {
     cn,
@@ -581,28 +582,6 @@ function RenameFolderDialog({ folder, onClose }: { folder: MailFolderView; onClo
 
 /** Whether a merged view is the one being looked at. The inbox is the only one
  *  whose href is a prefix of the others, so it is matched exactly. */
-/**
- * Fetch the screen behind a rail entry while the pointer is on its way to it.
- *
- * A list route renders nothing but its frame - the rows are the browser's - yet
- * pressing one still waited on the server for that frame before anything moved.
- * Asked for on a hover or on focus, the press finds it already in the router and
- * the list changes in the same frame, drawn from what this device kept of it
- * while the request behind it runs. Only on intent: every entry in view asking
- * at once would be a render of every folder on each visit to Mail. The router
- * keeps one answer per address, so passing back and forth asks once.
- */
-function useFetchOnIntent(): (href: string) => { onPointerEnter: () => void; onFocus: () => void } {
-    const router = useRouter();
-    return useCallback(
-        (href: string) => ({
-            onPointerEnter: () => router.prefetch(href),
-            onFocus: () => router.prefetch(href)
-        }),
-        [router]
-    );
-}
-
 function isActive(pathname: string, search: URLSearchParams, href: string): boolean {
     void search;
     return href === "/mail"

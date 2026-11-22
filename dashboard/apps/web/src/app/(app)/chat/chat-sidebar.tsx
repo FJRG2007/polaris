@@ -21,7 +21,7 @@
  * is asking, which is not "how many" but "is anyone I want to talk to in there".
  */
 
-import Link from "next/link";
+import { IntentLink } from "@/components/intent-link";
 import { TypingWatch, useTypingIn, type ListTypist } from "./typing-everywhere";
 import * as actions from "./actions";
 import * as readMarks from "@/lib/chat/read-marks";
@@ -278,13 +278,17 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
     const here = usePathname();
     // How many message requests wait, read once the rail is up and again on
     // returning from the requests page - the link says so before it is opened.
+    // Keyed on being on that page, not on the address: every conversation
+    // opened used to ask again, one server action per click.
     const [requests, setRequests] = useState(0);
+    const onRequests = here.startsWith("/chat/requests");
     useEffect(() => {
+        if (onRequests) return;
         actions.messageRequestCountAction().then(
             (result) => setRequests(result.count),
             () => setRequests(0)
         );
-    }, [here]);
+    }, [onRequests]);
     const meetings = here.startsWith("/chat/meetings");
 
     const [folded, setFolded] = useState<readonly string[]>([]);
@@ -649,7 +653,7 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                     drawn only while some wait, or while their page is open so
                     the place you are on stays marked. */}
                 {requests > 0 || here === "/chat/requests" ? (
-                    <Link
+                    <IntentLink
                         href="/chat/requests"
                         className={cn(
                             "flex items-center gap-2 rounded-md px-2 py-1 text-sm transition-colors hover:bg-card-hover",
@@ -667,7 +671,7 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                                 {requests}
                             </span>
                         ) : null}
-                    </Link>
+                    </IntentLink>
                 ) : null}
 
                 <LockShelfEntries
@@ -681,7 +685,7 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                     creating a meeting takes a grant, being invited to one does
                     not, and somebody who has been invited needs the list far
                     more than the person who made it. */}
-                <Link
+                <IntentLink
                     href="/chat/meetings"
                     className={cn(
                         // On a phone the meetings are the Calls tab.
@@ -691,7 +695,7 @@ function ChatSidebarList({ onListView }: { onListView?: (view: ChatListView) => 
                 >
                     <Video className="size-3.5 shrink-0" />
                     <span>{t("sidebar.meetings")}</span>
-                </Link>
+                </IntentLink>
 
                 {error && (
                     <p role="alert" className="px-1 pb-2 text-xs text-danger">
@@ -1512,7 +1516,7 @@ function Row({
     const said = typing ?? presence;
     const row = (
         <PersonRow
-            as={Link}
+            as={IntentLink}
             personId={personId}
             href={href}
             // Held back until this is the row under the pointer or the
@@ -1638,7 +1642,7 @@ function Row({
     const body = settingsHref ? (
         <div className="group/row relative">
             {row}
-            <Link
+            <IntentLink
                 href={settingsHref}
                 aria-label={t("sidebar.editChannelNamed", { name: label })}
                 title={t("sidebar.editChannel")}
@@ -1648,7 +1652,7 @@ function Row({
                 )}
             >
                 <Settings2 className="size-3.5 shrink-0" />
-            </Link>
+            </IntentLink>
         </div>
     ) : (
         row

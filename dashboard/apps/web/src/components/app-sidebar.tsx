@@ -28,7 +28,7 @@
  * whole screen rather than a column beside the page.
  */
 
-import Link from "next/link";
+import { IntentLink } from "@/components/intent-link";
 import { AppLogo, cn } from "@polaris/ui";
 import * as nav from "@/lib/apps";
 import { railApps } from "@/lib/app-launcher";
@@ -165,10 +165,10 @@ export function AppSidebar({
             <nav className="flex min-w-0 flex-col gap-5">
                 {subapp && showParent ? (
                     <SheetGroup>
-                        <Link href={subapp.parent.href} className={SHEET_ROW}>
+                        <IntentLink href={subapp.parent.href} className={SHEET_ROW}>
                             <ChevronLeft className="size-5 shrink-0 text-muted-foreground rtl:rotate-180" />
                             <SheetRowLabel>{label(subapp.parent.label)}</SheetRowLabel>
-                        </Link>
+                        </IntentLink>
                     </SheetGroup>
                 ) : null}
                 {groups.map((group) => (
@@ -217,7 +217,7 @@ export function AppSidebar({
     return (
         <nav className="flex flex-col gap-1">
             {subapp && showParent ? (
-                <Link
+                <IntentLink
                     href={subapp.parent.href}
                     className="mb-1 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
@@ -225,7 +225,7 @@ export function AppSidebar({
                     <span className="min-w-0 truncate" title={label(subapp.parent.label)}>
                         {label(subapp.parent.label)}
                     </span>
-                </Link>
+                </IntentLink>
             ) : null}
             {groups.map((group, index) => (
                 <div key={group.label} className={cn("flex flex-col gap-0.5", index > 0 && "mt-4")}>
@@ -363,7 +363,7 @@ function RailLink({
     // and an accent icon. Everything else is a hover away and stays neutral, so
     // where you are is readable at a glance rather than hunted for.
     const link = (
-        <Link
+        <IntentLink
             href={href}
             aria-current={active ? "page" : undefined}
             className={cn(
@@ -411,7 +411,7 @@ function RailLink({
             {sheet ? (
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground rtl:rotate-180" />
             ) : null}
-        </Link>
+        </IntentLink>
     );
     const row = markRead ? (
         <div className="group/rail relative min-w-0">
