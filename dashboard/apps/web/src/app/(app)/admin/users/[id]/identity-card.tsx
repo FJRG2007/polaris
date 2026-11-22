@@ -21,7 +21,7 @@ import { prisma } from "@polaris/db";
 import { Avatar } from "@/components/avatar";
 import { RelativeTime } from "@/components/relative-time";
 import { Badge, Card, CardBody } from "@polaris/ui";
-import { CONNECTION_PROVIDERS } from "@polaris/core";
+import { composePersonName, CONNECTION_PROVIDERS } from "@polaris/core";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 
@@ -54,6 +54,7 @@ export async function IdentityCard({ userId }: { userId: string }) {
                 name: true,
                 firstName: true,
                 lastName: true,
+                secondLastName: true,
                 username: true,
                 email: true,
                 emailVerified: true,
@@ -85,7 +86,7 @@ export async function IdentityCard({ userId }: { userId: string }) {
     ]);
     if (!user) return null;
 
-    const fullName = [user.firstName, user.lastName].filter(Boolean).join(" ");
+    const fullName = composePersonName(user.firstName, user.lastName, user.secondLastName);
     // An organization somebody owns but is not a member of would otherwise be
     // missing from a card whose whole job is to say where they belong.
     const orgs = [

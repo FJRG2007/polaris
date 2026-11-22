@@ -907,7 +907,8 @@
             "title": "Your name",
             "description": "Held on the account. Not what other people see, unless you say so in Privacy.",
             "first": "First name",
-            "last": "Last name"
+            "last": "Last name",
+            "secondLast": "Second last name (optional)"
         }
     },
     "devices": {

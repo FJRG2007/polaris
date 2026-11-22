@@ -75,6 +75,11 @@ model User {
     // what somebody is actually called.
     firstName     String?
     lastName      String?
+    // The second surname Spanish and Portuguese names carry, so "Romero
+    // González" is two surnames rather than one squeezed into `lastName`, which
+    // stays the first. Optional and null on every account that predates it:
+    // nothing here splits a stored surname, because "de la Fuente" is one.
+    secondLastName String?
     email         String   @unique
     // Unique handle; sign-in accepts either this or the email.
     username      String?  @unique

@@ -28,7 +28,7 @@ export default async function AccountDetailsPage() {
     const [user, emails, mail, phone, whatsappChannel] = await Promise.all([
         prisma.user.findUnique({
             where: { id: session.id },
-            select: { firstName: true, lastName: true }
+            select: { firstName: true, lastName: true, secondLastName: true }
         }),
         listUserEmails(session.id),
         getAuthMailStatus(),
@@ -50,6 +50,7 @@ export default async function AccountDetailsPage() {
             <AccountView
                 firstName={user?.firstName ?? ""}
                 lastName={user?.lastName ?? ""}
+                secondLastName={user?.secondLastName ?? ""}
                 emails={emails}
                 mailReady={mail.channelId !== null}
                 phone={phone}

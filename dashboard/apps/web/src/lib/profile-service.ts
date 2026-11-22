@@ -418,6 +418,7 @@ export async function publicProfile(
             username: true,
             firstName: true,
             lastName: true,
+            secondLastName: true,
             email: true,
             company: true,
             profileCompanies: true,
@@ -528,6 +529,7 @@ async function draw(
         username: string | null;
         firstName: string | null;
         lastName: string | null;
+        secondLastName: string | null;
         email: string;
         company: string | null;
         profileCompanies: string | null;
@@ -562,7 +564,7 @@ async function draw(
               })
             : [];
 
-    const full = [user.firstName ?? "", user.lastName ?? ""].join(" ").trim();
+    const full = core.composePersonName(user.firstName, user.lastName, user.secondLastName);
     const [counts, standing, mutual, style] = await Promise.all([
         followCounts(user.id),
         standingOf(user.id, viewer, own),

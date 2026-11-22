@@ -68,6 +68,7 @@ export async function updateUserProfile(
         name?: string;
         firstName?: string | null;
         lastName?: string | null;
+        secondLastName?: string | null;
         username?: string | null;
         company?: string | null;
         description?: string | null;
@@ -78,6 +79,7 @@ export async function updateUserProfile(
         name?: string;
         firstName?: string | null;
         lastName?: string | null;
+        secondLastName?: string | null;
         username?: string | null;
         usernameChangedAt?: Date;
         company?: string | null;
@@ -91,7 +93,7 @@ export async function updateUserProfile(
             return { error: parsed.error.issues[0]?.message ?? "Check the display name." };
         data.name = parsed.data;
     }
-    for (const half of ["firstName", "lastName"] as const) {
+    for (const half of ["firstName", "lastName", "secondLastName"] as const) {
         const value = input[half];
         if (value === undefined) continue;
         const parsed = nameHalfField.safeParse(value ?? "");

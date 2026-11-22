@@ -171,6 +171,16 @@ describe("identityFromAccount", () => {
         expect(out).toMatchObject({ firstName: "Augusta Ada", lastName: "King" });
     });
 
+    it("folds a second surname into the identity's one surname field", () => {
+        const out = identityFromAccount({
+            ...base,
+            firstName: "Javier",
+            lastName: "Romero",
+            secondLastName: "González"
+        });
+        expect(out).toMatchObject({ firstName: "Javier", lastName: "Romero González" });
+    });
+
     it("splits a display name at its first space otherwise", () => {
         const out = identityFromAccount({ ...base, name: "  Ada  Byron Lovelace " });
         expect(out).toMatchObject({ firstName: "Ada", lastName: "Byron Lovelace" });

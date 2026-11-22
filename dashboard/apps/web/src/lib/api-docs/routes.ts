@@ -188,6 +188,7 @@ export const DOCUMENTED_ROUTES: readonly DocumentedRoute[] = [
                         name: z.string().nullable(),
                         firstName: z.string().nullable(),
                         lastName: z.string().nullable(),
+                        secondLastName: z.string().nullable(),
                         email: z.string(),
                         username: z.string().nullable()
                     }),

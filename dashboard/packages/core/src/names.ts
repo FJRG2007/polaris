@@ -32,3 +32,23 @@ export function capitalizeWords(value: string): string {
 export function normalizePersonName(value: string): string {
     return capitalizeWords(value.trim().replace(/\s+/g, " "));
 }
+
+/**
+ * A person's whole name out of the parts an account stores: the given name, the
+ * surname, and the second surname that Spanish and Portuguese names carry.
+ *
+ * Every part is optional and a missing or blank one is skipped, so an account
+ * that only ever filled in the first two reads exactly as it did before the
+ * third existed. Each part is trimmed but otherwise left as stored - the parts
+ * were normalized when they were saved.
+ */
+export function composePersonName(
+    firstName: string | null | undefined,
+    lastName: string | null | undefined,
+    secondLastName?: string | null
+): string {
+    return [firstName, lastName, secondLastName]
+        .map((part) => part?.trim() ?? "")
+        .filter((part) => part.length > 0)
+        .join(" ");
+}

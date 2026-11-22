@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { capitalizeWords, normalizePersonName } from "../src/names";
+import { capitalizeWords, composePersonName, normalizePersonName } from "../src/names";
 
 describe("capitalizing as somebody types", () => {
     it("never changes the length of what was typed", () => {
@@ -70,5 +70,29 @@ describe("tidying the name once they leave the field", () => {
 
     it("turns a field of spaces into an empty one", () => {
         expect(normalizePersonName("   ")).toBe("");
+    });
+});
+
+describe("composing a whole name", () => {
+    it("joins the given name, the surname and the second surname", () => {
+        expect(composePersonName("Javier", "Romero", "González")).toBe("Javier Romero González");
+    });
+
+    it("reads as before when there is no second surname", () => {
+        expect(composePersonName("Ada", "Lovelace")).toBe("Ada Lovelace");
+        expect(composePersonName("Ada", "Lovelace", null)).toBe("Ada Lovelace");
+        expect(composePersonName("Ada", "Lovelace", "  ")).toBe("Ada Lovelace");
+    });
+
+    it("skips any missing part without leaving a double space", () => {
+        expect(composePersonName(null, "Romero", "González")).toBe("Romero González");
+        expect(composePersonName("Javier", null, "González")).toBe("Javier González");
+        expect(composePersonName(null, undefined, null)).toBe("");
+    });
+
+    it("keeps a compound surname whole", () => {
+        expect(composePersonName("Ana", "de la Fuente", "García-Pelayo")).toBe(
+            "Ana de la Fuente García-Pelayo"
+        );
     });
 });

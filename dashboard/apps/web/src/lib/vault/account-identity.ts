@@ -9,6 +9,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 
 /** The fields an identity can be started from. Empty strings where Polaris has
  *  nothing, because the form draws every field either way. */
@@ -28,6 +29,8 @@ export interface AccountFacts {
     name: string;
     firstName: string | null;
     lastName: string | null;
+    /** Folded into the identity's one surname field, which is how a form asks. */
+    secondLastName?: string | null;
     email: string;
     username: string | null;
     company: string | null;
@@ -44,7 +47,9 @@ export interface AccountFacts {
  */
 export function identityFromAccount(facts: AccountFacts): AccountIdentity {
     const [given = "", ...rest] = facts.name.trim().split(/\s+/);
-    const halves = Boolean(facts.firstName?.trim() || facts.lastName?.trim());
+    const halves = Boolean(
+        facts.firstName?.trim() || facts.lastName?.trim() || facts.secondLastName?.trim()
+    );
     const seen = new Set<string>();
     const emails: string[] = [];
     for (const raw of [facts.email, ...facts.emails]) {
@@ -55,7 +60,9 @@ export function identityFromAccount(facts: AccountFacts): AccountIdentity {
     }
     return {
         firstName: (halves ? (facts.firstName ?? "") : given).trim(),
-        lastName: (halves ? (facts.lastName ?? "") : rest.join(" ")).trim(),
+        lastName: halves
+            ? core.composePersonName(null, facts.lastName, facts.secondLastName)
+            : rest.join(" ").trim(),
         company: facts.company?.trim() ?? "",
         phone: facts.phone?.trim() ?? "",
         username: facts.username?.trim() ?? "",
@@ -71,6 +78,7 @@ export async function accountIdentity(userId: string): Promise<AccountIdentity |
             name: true,
             firstName: true,
             lastName: true,
+            secondLastName: true,
             email: true,
             username: true,
             company: true

@@ -26,6 +26,7 @@ export const GET = withKeyUsage(async (request: Request): Promise<Response> => {
             name: true,
             firstName: true,
             lastName: true,
+            secondLastName: true,
             email: true,
             username: true
         }

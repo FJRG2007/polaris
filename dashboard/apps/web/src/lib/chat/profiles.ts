@@ -30,6 +30,7 @@
  * Server-only.
  */
 
+import * as core from "@polaris/core";
 import { prisma, VISIBLE_USER } from "@polaris/db";
 import { maySee } from "@/lib/privacy-service";
 import { blockedBetween } from "@/lib/blocks";
@@ -155,6 +156,7 @@ export async function chatProfile(
                 name: true,
                 firstName: true,
                 lastName: true,
+                secondLastName: true,
                 username: true,
                 description: true,
                 headline: true,
@@ -224,7 +226,7 @@ export async function chatProfile(
     return {
         name: person.name,
         fullName: mayReadName
-            ? [person.firstName, person.lastName].filter(Boolean).join(" ").trim()
+            ? core.composePersonName(person.firstName, person.lastName, person.secondLastName)
             : "",
         username: person.username ?? "",
         description: person.description.trim(),

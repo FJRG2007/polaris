@@ -907,7 +907,8 @@
             "title": "Tu nombre",
             "description": "Se guarda en la cuenta. No es lo que ven los demás, salvo que lo digas en Privacidad.",
             "first": "Nombre",
-            "last": "Apellidos"
+            "last": "Primer apellido",
+            "secondLast": "Segundo apellido (opcional)"
         }
     },
     "devices": {

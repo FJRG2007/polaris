@@ -51,16 +51,18 @@ function typedName(event: ChangeEvent<HTMLInputElement>): string {
 interface Named {
     firstName: string;
     lastName: string;
+    secondLastName: string;
 }
 
 /** Compare the way the server stores it, so trailing space is not a change. */
 function normalize(named: Named): string {
-    return [named.firstName.trim(), named.lastName.trim()].join("\n");
+    return [named.firstName.trim(), named.lastName.trim(), named.secondLastName.trim()].join("\n");
 }
 
 export function AccountView({
     firstName,
     lastName,
+    secondLastName,
     emails,
     mailReady,
     phone,
@@ -68,6 +70,7 @@ export function AccountView({
 }: {
     firstName: string;
     lastName: string;
+    secondLastName: string;
     emails: UserEmailView[];
     /** Whether an email channel is configured, which decides whether an address
      *  can be verified at all. */
@@ -80,7 +83,7 @@ export function AccountView({
     const t = useTranslations("account");
     const tc = useTranslations("common");
 
-    const stored: Named = { firstName, lastName };
+    const stored: Named = { firstName, lastName, secondLastName };
     const [named, setNamed] = useState<Named>(stored);
     const [saved, setSaved] = useState<Named>(stored);
     const [busy, setBusy] = useState(false);
@@ -92,11 +95,12 @@ export function AccountView({
         event.preventDefault();
         setBusy(true);
         setResult(null);
-        // Only the two fields this screen owns, so saving here cannot write back
+        // Only the name fields this screen owns, so saving here cannot write back
         // a display name the profile screen has changed since this page loaded.
         const answer = await updateProfileAction({
             firstName: named.firstName,
-            lastName: named.lastName
+            lastName: named.lastName,
+            secondLastName: named.secondLastName
         });
         setBusy(false);
         setResult(answer.error ? answer : { ok: t("details.accountUpdated") });
@@ -114,7 +118,7 @@ export function AccountView({
             >
                 <form onSubmit={onSubmit} className="flex flex-col gap-3">
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <label className="flex flex-col gap-1 text-sm">
+                        <label className="flex flex-col gap-1 text-sm sm:col-span-2">
                             {t("details.name.first")}
                             <Input
                                 value={named.firstName}
@@ -157,6 +161,25 @@ export function AccountView({
                                     setNamed((current) => ({
                                         ...current,
                                         lastName: normalizePersonName(current.lastName)
+                                    }))
+                                }
+                            />
+                        </label>
+                        <label className="flex flex-col gap-1 text-sm">
+                            {t("details.name.secondLast")}
+                            <Input
+                                value={named.secondLastName}
+                                autoComplete="off"
+                                autoCapitalize="words"
+                                autoCorrect="off"
+                                spellCheck={false}
+                                onChange={(event) =>
+                                    setNamed({ ...named, secondLastName: typedName(event) })
+                                }
+                                onBlur={() =>
+                                    setNamed((current) => ({
+                                        ...current,
+                                        secondLastName: normalizePersonName(current.secondLastName)
                                     }))
                                 }
                             />
