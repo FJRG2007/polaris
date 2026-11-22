@@ -12,6 +12,7 @@ import { installVpnAppAction } from "./actions";
 import { Button, EmptyState } from "@polaris/ui";
 import { Loader2, Waypoints } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { loadPage } from "@/lib/keep-call";
 
 const LISTING = "/admin/apps?app=vpn";
 
@@ -29,7 +30,7 @@ export function VpnInstallState({ canInstall }: { canInstall: boolean }) {
                 return;
             }
             // A full load: the rail and the search above this page gain the app too.
-            window.location.assign("/vpn");
+            loadPage("/vpn");
         });
     }
 

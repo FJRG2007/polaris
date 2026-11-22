@@ -12,6 +12,7 @@ import { useState, useTransition } from "react";
 import { Button, EmptyState } from "@polaris/ui";
 import { installDnsBlockerAppAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { loadPage } from "@/lib/keep-call";
 
 const LISTING = "/admin/apps?app=dns-blocker";
 
@@ -29,7 +30,7 @@ export function DnsBlockerInstallState() {
                 return;
             }
             // A full load: the rail and the search above this page gain the app too.
-            window.location.assign("/network-filter");
+            loadPage("/network-filter");
         });
     }
 

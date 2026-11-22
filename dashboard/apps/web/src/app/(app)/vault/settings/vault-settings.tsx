@@ -30,6 +30,7 @@ import {
     deleteAccountVaultAction,
     setUnlockTimeoutAction
 } from "../vault-actions";
+import { loadPage } from "@/lib/keep-call";
 
 const MIN_LENGTH = 12;
 
@@ -172,7 +173,8 @@ export function VaultSettings() {
                 setError(result.error);
                 return;
             }
-            window.location.href = "/vault";
+            // A full load: the unlocked vault this tab holds in memory is gone.
+            loadPage("/vault");
         } finally {
             setPending(null);
         }

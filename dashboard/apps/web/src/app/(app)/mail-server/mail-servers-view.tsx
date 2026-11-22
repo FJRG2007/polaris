@@ -39,6 +39,7 @@ import {
     Input,
     Skeleton
 } from "@polaris/ui";
+import { loadPage } from "@/lib/keep-call";
 
 export function MailServersView({ canUninstall }: { canUninstall: boolean }) {
     const t = useTranslations("mailServer");
@@ -155,7 +156,7 @@ function UninstallDialog({
                 return;
             }
             // A full load: the rail and the search drop the app as well.
-            window.location.assign("/mail-server");
+            loadPage("/mail-server");
         });
     }
 

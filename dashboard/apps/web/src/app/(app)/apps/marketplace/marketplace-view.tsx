@@ -74,6 +74,7 @@ import {
 import { ServerPicker } from "@/components/server-picker";
 import { LOCAL_SERVER_OPTION } from "@/lib/server-options-schema";
 import { installAppAction, type StorageConnectionOption } from "./actions";
+import { loadPage } from "@/lib/keep-call";
 import {
     AppPreview,
     BuiltInMark,
@@ -423,7 +424,7 @@ export function useOneClickInstall(): {
                 // An app that opens somewhere of its own usually adds itself to the
                 // switcher or a rail, and those are drawn by the layout - which a
                 // client navigation keeps. A full load brings them along.
-                if (app.opensAt) window.location.assign(app.opensAt);
+                if (app.opensAt) loadPage(app.opensAt);
                 else router.push(`/apps/installed/${result.installedAppId}`);
             })
             .catch(() => {

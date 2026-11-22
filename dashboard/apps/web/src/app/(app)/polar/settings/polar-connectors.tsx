@@ -39,6 +39,7 @@ import {
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ConnectorCatalog } from "./connector-catalog";
 import type { ConnectorView } from "@/lib/polar/connectors/store";
+import { leavePage } from "@/lib/keep-call";
 
 type Policy = ConnectorView["tools"][number]["policy"];
 type Auth = ConnectorView["auth"];
@@ -229,7 +230,9 @@ export function PolarConnectors({
         setSignedInNow(false);
         setBusy(row.id);
         setWaiting({ id: row.id, since: Date.now() });
-        window.location.assign(`/api/polar/connectors/${row.id}/sign-in`);
+        // In a new tab while a call is on: the provider's sign-in is a round
+        // trip of minutes, and the wait below hears when it is done.
+        leavePage(`/api/polar/connectors/${row.id}/sign-in`);
     }
 
     async function remove(row: ConnectorView) {

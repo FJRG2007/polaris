@@ -16,6 +16,7 @@ import { useState, useTransition } from "react";
 import { Button, EmptyState } from "@polaris/ui";
 import { installMailServerAppAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { loadPage } from "@/lib/keep-call";
 
 /** Where the app sits in the marketplace; the marketplace opens on it. */
 const MAIL_SERVER_LISTING = "/admin/apps?app=mail-server";
@@ -42,7 +43,7 @@ export function MailServerInstallState({
             }
             // A full load rather than a refresh: the rail and the search are
             // drawn by the layout above this page, and they gain the app too.
-            window.location.assign("/mail-server");
+            loadPage("/mail-server");
         });
     }
 

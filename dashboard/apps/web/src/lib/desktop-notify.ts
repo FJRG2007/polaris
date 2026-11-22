@@ -30,6 +30,7 @@ import { desktopBridge } from "@/lib/desktop-bridge";
 import { inPhoneApp } from "@/lib/mobile-bridge";
 import { attending } from "@/components/use-attention";
 import { browserNoticePayload, desktopNoticePayload } from "@/lib/notice-payload";
+import { navigateInApp } from "@/lib/keep-call";
 
 /**
  * The notices this device has drawn and not yet withdrawn, by tag.
@@ -129,7 +130,7 @@ export function listenToWorker(): void {
         if (said?.kind !== "polaris-notice-open" || typeof said.href !== "string") return;
         // A path on this Polaris, never an address somewhere else.
         if (said.href.startsWith("/") && !said.href.startsWith("//"))
-            window.location.assign(said.href);
+            navigateInApp(said.href);
     });
     navigator.serviceWorker.startMessages();
 }
@@ -353,7 +354,8 @@ export async function notifyDesktop(input: {
         });
         notice.onclick = () => {
             window.focus();
-            if (input.href) window.location.assign(input.href);
+            // Through the router: pressing a notice mid-call must not end it.
+            if (input.href) navigateInApp(input.href);
             notice.close();
         };
         const handle = {

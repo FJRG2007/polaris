@@ -40,6 +40,7 @@ import {
     type DeviceAccounts,
     type DeviceAccountView
 } from "@/app/device-account-actions";
+import { leavePage } from "@/lib/keep-call";
 
 /** Where "add an account" sends the browser: the sign-in page, told not to send
  *  an already signed-in visitor straight back. */
@@ -139,7 +140,9 @@ function useDeviceAccounts(enabled: boolean) {
                 return;
             }
             const back = `${window.location.pathname}${window.location.search}`;
-            window.location.assign(`${ADD_ACCOUNT_PATH}&back=${encodeURIComponent(back)}`);
+            // In a new tab while a call is on, so signing in somebody else does
+            // not hang up the call this tab is in.
+            leavePage(`${ADD_ACCOUNT_PATH}&back=${encodeURIComponent(back)}`);
         });
     }
 

@@ -25,3 +25,4 @@ Security findings are not kept here; they live in
 | BUG-0012 | The conversation with yourself shows initials instead of your picture | Chat | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/conversation-face.ts | 2026-11-22 |
 | BUG-0013 | Unlock with passkey fails in the desktop app and never starts on its own | Vault | Fixed, watching | dashboard/apps/web/src/lib/vault/passkey-client.ts | 2026-11-22 |
 | BUG-0014 | Signing in on the web jumps to the desktop app halfway through | Auth | Fixed, watching | dashboard/apps/web/src/components/open-in-app.tsx | 2026-11-22 |
+| BUG-0015 | Moving to some screens, links or notices in Polaris ends the call | Calls | Fixed, watching | dashboard/apps/web/src/lib/keep-call.ts | 2026-11-22 |

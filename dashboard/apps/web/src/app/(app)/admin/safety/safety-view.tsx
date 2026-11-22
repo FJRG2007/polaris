@@ -26,6 +26,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { ReportContextList } from "@/components/report-context-list";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Badge, Button, Card, CardBody, Input, Select } from "@polaris/ui";
+import { navigateInApp } from "@/lib/keep-call";
 
 const FILTERS = ["open", "resolved", "dismissed", "all"] as const;
 
@@ -53,7 +54,7 @@ export function SafetyView({
                             label: t(`safety.filters.${filter}`)
                         }))}
                         onValueChange={(value) => {
-                            window.location.href = `/admin/safety?status=${value}`;
+                            navigateInApp(`/admin/safety?status=${value}`);
                         }}
                     />
                 </div>
