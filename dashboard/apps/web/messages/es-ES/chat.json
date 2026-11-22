@@ -2569,7 +2569,8 @@
         "accept": "Aceptar",
         "decline": "Rechazar",
         "previewsOff": "Quitar vistas previas",
-        "previewsOn": "Ver vistas previas"
+        "previewsOn": "Ver vistas previas",
+        "linkPreviews": "Vistas previas"
     },
     "streamQuality": {
         "custom": "Personal",
@@ -2730,7 +2731,11 @@
         "block": "Bloquear a {name}",
         "unblock": "Desbloquear a {name}",
         "notSaved": "Ese cambio no se guardó",
-        "width": "Ancho de detalles"
+        "width": "Ancho de detalles",
+        "media": "Fotos y vídeos",
+        "mediaSeeAll": "Ver todo",
+        "mediaFailed": "No se cargaron las fotos",
+        "mediaRetry": "Reintentar"
     },
     "location": {
         "title": "Enviar ubicación",

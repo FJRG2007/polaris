@@ -362,6 +362,69 @@ export async function searchMessagesAction(
     return { hits: await searchMessages(me, parsed.data, unlock.success ? unlock.data : null) };
 }
 
+/** One tile of the info page's gallery: a picture or a video someone sent here. */
+export interface SharedMediaItem {
+    readonly id: string;
+    readonly messageId: string;
+    readonly forwardable: boolean;
+    readonly name: string;
+    readonly video: boolean;
+    readonly durationMs: number | null;
+    readonly hasPoster: boolean;
+    readonly thumbhash: string | null;
+    readonly sentAt: string;
+}
+
+/** Messages per page of the gallery: a few screens of tiles three abreast. */
+const SHARED_MEDIA_PAGE = 60;
+
+const sharedMediaSchema = z.object({
+    channelId: z.string().uuid(),
+    before: z.string().datetime().nullable().default(null)
+});
+
+/**
+ * The pictures and videos sent in one conversation, newest first, a page at a
+ * time. A covered one is left out: a tile would uncover it without anybody
+ * choosing to. `next` is where the following page starts, null at the end.
+ */
+export async function listSharedMediaAction(
+    input: unknown,
+    proof?: string | null
+): Promise<{ items: readonly SharedMediaItem[]; next: string | null }> {
+    const me = await actor();
+    const parsed = sharedMediaSchema.safeParse(input);
+    if (!parsed.success) return { items: [], next: null };
+    const unlock = proofSchema.safeParse(proof);
+    const query = core.chatSearchSchema.parse({ channelId: parsed.data.channelId });
+    const hits = await searchMessages(me, query, unlock.success ? unlock.data : null, {
+        media: true,
+        before: parsed.data.before ? new Date(parsed.data.before) : null,
+        take: SHARED_MEDIA_PAGE
+    });
+    const items = hits.flatMap(({ message }) =>
+        message.attachments
+            .filter((file) => file.inline && !file.spoiler)
+            .filter((file) => /^(image|video)\//.test(file.contentType))
+            .map((file) => ({
+                id: file.id,
+                messageId: message.id,
+                forwardable: message.forwardable,
+                name: file.name,
+                video: file.contentType.startsWith("video/"),
+                durationMs: file.durationMs,
+                hasPoster: file.hasPoster,
+                thumbhash: file.thumbhash,
+                sentAt: message.createdAt
+            }))
+    );
+    const last = hits.at(-1);
+    return {
+        items,
+        next: hits.length === SHARED_MEDIA_PAGE && last ? last.message.createdAt : null
+    };
+}
+
 export async function listMembersAction(
     channelId: string
 ): Promise<{ members?: ChatMemberView[]; error?: string }> {

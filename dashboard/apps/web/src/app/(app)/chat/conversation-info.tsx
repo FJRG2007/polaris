@@ -31,6 +31,7 @@ import { PersonName } from "@/components/person-name";
 import { LEVEL_KEYS } from "./notify-menu";
 import { MUTE_KEYS } from "./mute-menu";
 import { durationName } from "./vanish-controls";
+import { SharedMediaAll, SharedMediaPreview, useSharedMedia } from "./shared-media";
 import { useDisplayFormat } from "@/components/display-format";
 import { VANISH_DURATIONS, type VanishDuration } from "@/lib/chat/vanish-rules";
 import type { DirectRulesView } from "@/lib/chat/vanish";
@@ -51,9 +52,9 @@ import {
     File,
     Flag,
     Hash,
-    Image as ImageIcon,
     Languages,
     Link2,
+    Link2Off,
     LogOut,
     Pencil,
     Phone,
@@ -94,10 +95,13 @@ export interface ConversationInfoEntries {
     readonly channelSettingsHref?: string;
     /** Archiving a channel, for whoever runs it. */
     readonly archive?: { readonly archived: boolean; readonly onSelect: () => void };
-    /** A direct conversation's disappearing timer, where this reader may set it. */
+    /** A direct conversation's disappearing timer, whether it may be deleted
+     *  for everybody and its link previews, where this reader may set them. */
     readonly vanish?: {
         readonly rules: DirectRulesView;
         readonly onTimer: (seconds: VanishDuration) => void;
+        readonly onAllowDelete?: (allowed: boolean) => void;
+        readonly onLinkPreviews?: (on: boolean) => void;
     };
     readonly onReport?: () => void;
     readonly onLeave?: () => void;
@@ -109,7 +113,7 @@ export interface ConversationInfoEntries {
 export type InfoLayout = "page" | "panel";
 
 /** The chooser standing in for the page, or the page itself. */
-type View = "main" | "mute" | "notify" | "vanish" | "privacy";
+type View = "main" | "mute" | "notify" | "vanish" | "privacy" | "media";
 
 export function ConversationInfo({
     channel,
@@ -123,7 +127,7 @@ export function ConversationInfo({
     open: boolean;
     onOpenChange: (open: boolean) => void;
     entries: ConversationInfoEntries;
-    /** A one-to-one conversation's privacy rules. A group's are in its settings. */
+    /** The conversation's privacy rules: read receipts, typing, the timer. */
     privacy?: ReactNode;
     layout?: InfoLayout;
 }) {
@@ -242,6 +246,7 @@ function InfoBody({
         : [...core.CHAT_NOTIFY_LEVELS];
 
     const vanishRules = entries.vanish?.rules ?? null;
+    const media = useSharedMedia(channel.id);
     const shell = (title: string, body: ReactNode) => (
         <InfoFrame
             layout={layout}
@@ -259,7 +264,7 @@ function InfoBody({
             t("info.mute"),
             <>
                 {channel.muted && channel.mutedUntil ? (
-                    <p className="px-4 pt-3 text-xs text-muted-foreground">{muteValue}</p>
+                    <p className="px-3 pt-3 text-xs text-muted-foreground">{muteValue}</p>
                 ) : null}
                 <div role="radiogroup" aria-label={t("info.mute")} className="flex flex-col py-1">
                     <Choice checked={current === null} onSelect={() => mute(null)}>
@@ -326,7 +331,7 @@ function InfoBody({
             t("vanish.timer"),
             <>
                 {vanishRules.proposes ? (
-                    <p className="px-4 pt-3 text-xs text-muted-foreground">{t("vanish.proposeHint")}</p>
+                    <p className="px-3 pt-3 text-xs text-muted-foreground">{t("vanish.proposeHint")}</p>
                 ) : null}
                 <div role="radiogroup" aria-label={t("vanish.timer")} className="flex flex-col py-1">
                     {VANISH_DURATIONS.map((seconds) => (
@@ -342,12 +347,28 @@ function InfoBody({
                         </Choice>
                     ))}
                 </div>
+                {/* Only where changes are agreed between the two: elsewhere
+                    deleting for everybody follows each person's own setting. */}
+                {vanishRules.mode === "agreement" && entries.vanish.onAllowDelete ? (
+                    <div className="border-t border-border py-1">
+                        <SwitchRow
+                            icon={<Trash2 />}
+                            label={t("vanish.allowDeleteForAll")}
+                            checked={vanishRules.deleteForAll}
+                            onChange={entries.vanish.onAllowDelete}
+                        />
+                    </div>
+                ) : null}
             </>
         );
     }
 
+    if (view === "media") {
+        return shell(t("info.media"), <SharedMediaAll media={media} wide={layout === "page"} />);
+    }
+
     if (view === "privacy" && privacy) {
-        return shell(t("info.privacy"), <div className="px-4 py-3">{privacy}</div>);
+        return shell(t("info.privacy"), <div className="flex flex-col gap-3 px-3 py-3">{privacy}</div>);
     }
 
     const members = channel.kind === "group" ? channel.others : [];
@@ -355,37 +376,37 @@ function InfoBody({
     return shell(
         t("info.title"),
         <>
-            <div className="flex flex-col items-center gap-2 px-4 pt-6 pb-4 text-center">
+            <div className="flex flex-col items-center gap-1.5 px-3 pt-5 pb-3 text-center">
                 {channel.spaceId !== null ? (
-                    <span className="flex size-20 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                        <Hash className="size-8 shrink-0" />
+                    <span className="flex size-16 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                        <Hash className="size-6 shrink-0" />
                     </span>
                 ) : face ? (
-                    <Avatar person={face} size={80} />
+                    <Avatar person={face} size={64} />
                 ) : (
                     <ChatAvatar
                         kind="channel"
                         id={channel.id}
                         name={channel.name}
                         members={channel.others}
-                        size={80}
+                        size={64}
                     />
                 )}
-                <h2 className="w-full min-w-0 truncate text-lg font-semibold" title={channel.name}>
+                <h2 className="w-full min-w-0 truncate text-[0.9375rem] font-semibold" title={channel.name}>
                     <PersonName id={person?.id ?? null} name={channel.name} />
                 </h2>
                 {channel.topic ? (
-                    <p className="line-clamp-3 w-full break-words text-sm text-muted-foreground">
+                    <p className="line-clamp-3 w-full break-words text-xs text-muted-foreground">
                         {channel.topic}
                     </p>
                 ) : !direct && channel.spaceId === null ? (
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-xs text-muted-foreground">
                         {t("info.people", { count: channel.others.length + 1 })}
                     </p>
                 ) : null}
             </div>
 
-            <div className="flex flex-wrap justify-center gap-2 px-4 pb-4">
+            <div className="flex flex-wrap justify-center gap-2 px-3 pb-3">
                 {entries.onStartCall && (
                     <QuickAction
                         label={t("channelHeader.startACall")}
@@ -406,12 +427,10 @@ function InfoBody({
                 )}
             </div>
 
+            <SharedMediaPreview media={media} onSeeAll={() => setView("media")} />
+
             {entries.onShared && (
                 <Group label={t("info.shared")}>
-                    <InfoRow onClick={then(() => entries.onShared?.("image"), true)}>
-                        <ImageIcon />
-                        {t("search.attachments.image")}
-                    </InfoRow>
                     <InfoRow onClick={then(() => entries.onShared?.("file"), true)}>
                         <File />
                         {t("search.attachments.file")}
@@ -436,7 +455,7 @@ function InfoBody({
                 )}
                 {members.slice(0, MEMBERS_SHOWN).map((member) => (
                     <div key={member.id} className={cn(ROW, "hover:bg-transparent")}>
-                        <Avatar person={member} size={28} />
+                        <Avatar person={member} size={24} />
                         <span className="min-w-0 flex-1 truncate" title={member.name}>
                             <PersonName id={member.id} name={member.name} />
                         </span>
@@ -496,6 +515,14 @@ function InfoBody({
                         label={t("info.privacy")}
                         value=""
                         onClick={() => setView("privacy")}
+                    />
+                ) : null}
+                {vanishRules?.mayChange && entries.vanish?.onLinkPreviews ? (
+                    <SwitchRow
+                        icon={<Link2Off />}
+                        label={t("chatPrivacy.linkPreviews")}
+                        checked={vanishRules.linkPreviews}
+                        onChange={entries.vanish.onLinkPreviews}
                     />
                 ) : null}
                 {entries.onTranslation && (
@@ -685,7 +712,9 @@ function Group({ label, danger = false, children }: { label?: string; danger?: b
     return (
         <section data-info-group={danger ? "danger" : undefined} className="flex flex-col border-t border-border py-1">
             {label ? (
-                <h3 className="px-4 pt-2 pb-1 text-xs font-medium text-muted-foreground">{label}</h3>
+                <h3 className="px-3 pt-2 pb-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {label}
+                </h3>
             ) : null}
             {children}
         </section>
@@ -693,7 +722,7 @@ function Group({ label, danger = false, children }: { label?: string; danger?: b
 }
 
 const ROW =
-    "flex min-h-12 w-full min-w-0 items-center gap-3 px-4 text-start text-sm transition-colors hover:bg-card-hover [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground";
+    "flex min-h-9 w-full min-w-0 items-center gap-2.5 px-3 py-1.5 text-start text-[0.8125rem] transition-colors hover:bg-card-hover [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-muted-foreground [@media(pointer:coarse)]:min-h-11";
 
 function InfoRow({
     onClick,
@@ -722,7 +751,7 @@ function InfoRow({
             )}
         >
             {hint ? (
-                <span className="flex min-w-0 flex-1 items-center gap-3 [&>svg]:size-5 [&>svg]:shrink-0">
+                <span className="flex min-w-0 flex-1 items-center gap-2.5 [&>svg]:size-4 [&>svg]:shrink-0">
                     {children}
                     <span className="min-w-0 flex-1 truncate text-end text-xs" title={hint}>
                         {hint}
@@ -758,7 +787,7 @@ function SettingRow({
                     {value}
                 </span>
             ) : null}
-            <ChevronRight className="size-4 shrink-0 text-foreground-subtle rtl:rotate-180" />
+            <ChevronRight className="size-3.5 shrink-0 text-foreground-subtle rtl:rotate-180" />
         </button>
     );
 }
@@ -801,11 +830,11 @@ function Choice({
             <span
                 aria-hidden
                 className={cn(
-                    "flex size-5 shrink-0 items-center justify-center rounded-full border",
+                    "flex size-4 shrink-0 items-center justify-center rounded-full border",
                     checked ? "border-primary bg-primary text-primary-foreground" : "border-border"
                 )}
             >
-                {checked ? <Check className="size-3 shrink-0" /> : null}
+                {checked ? <Check className="size-2.5 shrink-0" /> : null}
             </span>
             <span className="min-w-0 flex-1 truncate">{children}</span>
         </button>
@@ -841,7 +870,7 @@ function QuickAction({
         <button
             type="button"
             onClick={onClick}
-            className="flex min-h-16 w-20 min-w-0 flex-col items-center justify-center gap-1 rounded-xl border border-border text-xs text-foreground transition-colors hover:bg-card-hover [&_svg]:size-5 [&_svg]:shrink-0"
+            className="flex min-h-14 w-[4.5rem] min-w-0 flex-col items-center justify-center gap-1 rounded-lg border border-border text-[0.6875rem] text-foreground transition-colors hover:bg-card-hover [&_svg]:size-4 [&_svg]:shrink-0"
         >
             {children}
             <span className="max-w-full truncate px-1" title={label}>

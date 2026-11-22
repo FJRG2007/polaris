@@ -37,7 +37,11 @@ export async function searchMessages(
     input: core.ChatSearchInput,
     /** The unlock proof for `input.channelId`, when it is behind the reader's
      *  chat lock. */
-    proof?: string | null
+    proof?: string | null,
+    /** One page of what was shared, older than `before` - the info page's
+     *  gallery, walked back a page at a time through the same reach, lock and
+     *  history rules the search answers to. */
+    page?: SharedPage
 ): Promise<readonly ChatSearchHit[]> {
     if (core.chatSearchIsEmpty(input) && !input.channelId) return [];
 
@@ -74,13 +78,14 @@ export async function searchMessages(
             kind: "text",
             ...(input.term ? { body: { contains: input.term, mode: "insensitive" as const } } : {}),
             ...(input.authorId ? { authorId: input.authorId } : {}),
-            ...attachmentClause(input.has),
+            ...(page?.media ? MEDIA_CLAUSE : attachmentClause(input.has)),
             ...dayClause(input.after, input.before),
+            ...(page?.before ? { createdAt: { lt: page.before } } : {}),
             // Nothing from before this reader joined where that is hidden.
             AND: [history.readableWhere(floors, actor.id)]
         },
         orderBy: { createdAt: "desc" },
-        take: core.CHAT_SEARCH_LIMIT,
+        take: page?.take ?? core.CHAT_SEARCH_LIMIT,
         select: SEARCH_SELECT
     });
     if (rows.length === 0) return [];
@@ -109,6 +114,22 @@ export async function searchMessages(
         };
     });
 }
+
+/** A page of the gallery: how many messages, and older than which instant. */
+export interface SharedPage {
+    readonly media: true;
+    readonly before: Date | null;
+    readonly take: number;
+}
+
+/** A picture or a video, the two things the gallery draws as a tile. */
+const MEDIA_CLAUSE = {
+    attachments: {
+        some: {
+            OR: [{ contentType: { startsWith: "image/" } }, { contentType: { startsWith: "video/" } }]
+        }
+    }
+};
 
 /** What the message has to be carrying. */
 function attachmentClause(has: core.ChatSearchAttachment) {

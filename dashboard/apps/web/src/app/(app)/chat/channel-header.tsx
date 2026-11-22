@@ -45,12 +45,13 @@ import type { ChatChannelView } from "@/lib/chat/chat-service";
 import * as conversationList from "@/lib/chat/conversation-list";
 import type { DirectRulesView } from "@/lib/chat/vanish";
 import type { VanishDuration } from "@/lib/chat/vanish-rules";
-import { VanishBadge, VanishMenu } from "./vanish-controls";
+import { VanishBadge } from "./vanish-controls";
 import type { ChatRulesChange } from "./chat-privacy-section";
 import {
     ArrowLeft,
     Hash,
     House,
+    Info,
     Languages,
     Link2,
     LogOut,
@@ -499,6 +500,18 @@ export function ChannelHeader({
                             </button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                            {/* Everything about the conversation - its timer,
+                                read receipts, typing, link previews, deleting
+                                it - is set on its details, not in this menu. */}
+                            {(phone || infoControl) && (
+                                <>
+                                    <DropdownMenuItem onSelect={() => setInfo(true)}>
+                                        <Info className="size-3.5" />
+                                        {t("info.title")}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                </>
+                            )}
                             {/* Every conversation has an address, whether it is
                                 a channel, a group or one person - they are one
                                 kind of thing with one id. */}
@@ -642,16 +655,6 @@ export function ChannelHeader({
                                 <Flag className="size-3.5" />
                                 {t("channelHeader.reportConversation")}
                             </DropdownMenuItem>
-                            {vanish && (
-                                <VanishMenu
-                                    rules={vanish.rules}
-                                    onTimer={vanish.onTimer}
-                                    onAllowDelete={vanish.onAllowDelete}
-                                    onRules={vanish.onRules}
-                                    onLinkPreviews={vanish.onLinkPreviews}
-                                    onDeleteChat={vanish.onDeleteChat}
-                                />
-                            )}
                             {/* The row above, on a phone, where it does not fit
                                 beside the name. Hidden at `sm` and up, where
                                 every one of these is a button of its own. */}
@@ -739,7 +742,7 @@ export function ChannelHeader({
                     open={info}
                     onOpenChange={setInfo}
                     layout={phone ? "page" : "panel"}
-                    privacy={group ? undefined : vanish?.privacy}
+                    privacy={vanish?.privacy}
                     entries={{
                         onStartCall: startable ? onStartCall : undefined,
                         onSearch: onSearch ? () => onSearch("") : undefined,
@@ -784,7 +787,12 @@ export function ChannelHeader({
                                   }
                                 : undefined,
                         vanish: vanish
-                            ? { rules: vanish.rules, onTimer: vanish.onTimer }
+                            ? {
+                                  rules: vanish.rules,
+                                  onTimer: vanish.onTimer,
+                                  onAllowDelete: vanish.onAllowDelete,
+                                  onLinkPreviews: vanish.onLinkPreviews
+                              }
                             : undefined,
                         onReport: () => setReportingChat(true),
                         onDeleteChat: vanish?.onDeleteChat

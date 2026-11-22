@@ -59,6 +59,8 @@ const undone: string[] = [];
 const shown: { title: string; body?: string }[] = [];
 let muteCalls: unknown[][] = [];
 let muteAnswer: { error?: string } = {};
+let mediaPages: unknown[] = [];
+let mediaAnswer: { items: unknown[]; next: string | null } = { items: [], next: null };
 
 vi.mock("@/app/(app)/chat/actions", () => ({
     setMutedAction: async (...args: unknown[]) => {
@@ -76,7 +78,11 @@ vi.mock("@/app/(app)/chat/actions", () => ({
     leaveChannelAction: async () => ({}),
     updateChannelAction: async () => ({}),
     deleteChannelAction: async () => ({}),
-    renameGroupAction: async () => ({})
+    renameGroupAction: async () => ({}),
+    listSharedMediaAction: async (input: unknown) => {
+        mediaPages.push(input);
+        return mediaAnswer;
+    }
 }));
 
 vi.mock("@/app/(app)/account/privacy/actions", () => ({
@@ -146,6 +152,8 @@ beforeEach(() => {
     shown.length = 0;
     muteCalls = [];
     muteAnswer = {};
+    mediaPages = [];
+    mediaAnswer = { items: [], next: null };
 });
 
 afterEach(cleanup);
@@ -241,6 +249,88 @@ describe("what cannot be undone", () => {
     });
 });
 
+const RULES = {
+    mode: "agreement",
+    mayChange: true,
+    proposes: true,
+    vanishAfter: 0,
+    deleteForAll: false,
+    linkPreviews: true,
+    receipts: "on",
+    typing: "on",
+    proposal: null
+};
+
+function tile(id: string, extra: Record<string, unknown> = {}) {
+    return {
+        id,
+        messageId: `m-${id}`,
+        forwardable: true,
+        name: `${id}.jpg`,
+        video: false,
+        durationMs: null,
+        hasPoster: false,
+        thumbhash: null,
+        sentAt: "2026-11-02T10:00:00.000Z",
+        ...extra
+    };
+}
+
+describe("what was shared", () => {
+    it("draws the pictures and videos as square tiles, a video marked with its length", async () => {
+        mediaAnswer = {
+            items: [tile("a"), tile("b", { video: true, durationMs: 75_000, hasPoster: true })],
+            next: null
+        };
+        info(DIRECT);
+        const picture = await screen.findByRole("button", { name: "a.jpg" });
+        expect(picture.className).toContain("aspect-square");
+        expect(picture.querySelector("img")?.getAttribute("loading")).toBe("lazy");
+        expect(picture.querySelector("img")?.className).toContain("object-cover");
+        const video = screen.getByRole("link", { name: /b\.jpg/ });
+        expect(video.querySelector("img")?.getAttribute("src")).toContain("?poster=1");
+        expect(video.textContent).toMatch(/1:15/);
+        expect(mediaPages).toEqual([{ channelId: "d1", before: null }]);
+    });
+
+    it("leaves the section out when nothing was shared", async () => {
+        info(DIRECT);
+        await waitFor(() => expect(mediaPages).toHaveLength(1));
+        expect(screen.queryByText("Photos and videos")).toBeNull();
+    });
+
+    it("opens the whole gallery in the page's place, under a heading per month", async () => {
+        mediaAnswer = { items: [tile("a")], next: null };
+        info(DIRECT);
+        await userEvent.click(await screen.findByRole("button", { name: "See all" }));
+        expect(screen.getByRole("button", { name: "Back" })).toBeTruthy();
+        expect(screen.getByText(/November 2026/i)).toBeTruthy();
+        expect(screen.getByRole("button", { name: "a.jpg" })).toBeTruthy();
+    });
+});
+
+describe("the conversation's rules", () => {
+    it("turns link previews off from a switch on the page", async () => {
+        const previews: boolean[] = [];
+        info(DIRECT, {
+            vanish: { rules: RULES, onTimer: () => undefined, onLinkPreviews: (on: boolean) => previews.push(on) }
+        });
+        const toggle = screen.getByRole("switch", { name: "Link previews" });
+        await userEvent.click(toggle);
+        expect(previews).toEqual([false]);
+    });
+
+    it("offers deleting for everybody beside the timer, where it is agreed", async () => {
+        const allowed: boolean[] = [];
+        info(DIRECT, {
+            vanish: { rules: RULES, onTimer: () => undefined, onAllowDelete: (on: boolean) => allowed.push(on) }
+        });
+        await userEvent.click(screen.getByRole("button", { name: /Disappearing messages/ }));
+        await userEvent.click(screen.getByRole("switch", { name: "Allow deleting the chat for everyone" }));
+        expect(allowed).toEqual([true]);
+    });
+});
+
 describe("on a computer", () => {
     function Conversation() {
         const [open, setOpen] = useState(false);
@@ -275,5 +365,16 @@ describe("on a computer", () => {
 
         await userEvent.click(within(side).getByRole("button", { name: "Close details" }));
         expect(screen.queryByTestId("side")).toBeNull();
+    });
+
+    it("opens the details from the conversation's menu, which holds none of its rules", async () => {
+        render(<Conversation />, { wrapper: MessagesWrapper });
+        await userEvent.click(screen.getByRole("button", { name: "More for this conversation" }));
+        const menu = await screen.findByRole("menu");
+        expect(within(menu).queryByText("Read receipts")).toBeNull();
+        expect(within(menu).queryByText("Delete chat")).toBeNull();
+        await userEvent.click(within(menu).getByRole("menuitem", { name: "Details" }));
+        const side = await screen.findByTestId("side");
+        await waitFor(() => expect(side.querySelector("[data-info-layout='panel']")).not.toBeNull());
     });
 });

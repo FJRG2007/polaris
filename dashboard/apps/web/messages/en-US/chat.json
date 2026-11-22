@@ -2569,7 +2569,8 @@
         "accept": "Accept",
         "decline": "Decline",
         "previewsOff": "Turn link previews off",
-        "previewsOn": "Turn link previews on"
+        "previewsOn": "Turn link previews on",
+        "linkPreviews": "Link previews"
     },
     "streamQuality": {
         "custom": "Custom",
@@ -2730,7 +2731,11 @@
         "block": "Block {name}",
         "unblock": "Unblock {name}",
         "notSaved": "That change was not saved",
-        "width": "Details width"
+        "width": "Details width",
+        "media": "Photos and videos",
+        "mediaSeeAll": "See all",
+        "mediaFailed": "Photos and videos did not load",
+        "mediaRetry": "Try again"
     },
     "location": {
         "title": "Share location",
