@@ -721,7 +721,7 @@ function ConnectorDetail({
         ? tp(`settings.connectorCatalog.entries.${item.entry.id}` as never)
         : t("polarConnectors.directory.customHint");
     return (
-        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-5">
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain p-5">
             <DialogHeader>
                 <div className="flex min-w-0 items-center gap-3 pe-8">
                     <EntryMark item={item} size="lg" />
