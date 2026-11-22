@@ -20,6 +20,7 @@
     "web/account:apiKeys.scopes.groups.storage (es-ES)",
     "web/account:apiKeys.scopes.groups.tools (es-ES)",
     "web/account:appearance.decorations.cat (es-ES)",
+    "web/account:details.name.last (es-ES)",
     "web/accountOrgs:teams.create.title (es-ES)",
     "web/accountOrgs:teams.new (es-ES)",
     "web/accountPrivacy:blocked.unblock (es-ES)",
