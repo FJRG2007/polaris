@@ -209,7 +209,8 @@
             "maximize": "Fill the window",
             "restore": "Back to normal size",
             "fullscreen": "Full screen",
-            "exitFullscreen": "Leave full screen"
+            "exitFullscreen": "Leave full screen",
+            "find": "Find in output"
         },
         "menu": {
             "copy": "Copy",
@@ -220,12 +221,24 @@
             "askPolarSelection": "Ask Polar about this",
             "copied": "Copied",
             "copyFailed": "Could not copy",
-            "pasteBlocked": "The browser blocked reading the clipboard. Press Ctrl+V in the terminal instead."
+            "pasteBlocked": "The browser blocked reading the clipboard. Press Ctrl+V in the terminal instead.",
+            "find": "Find"
         },
         "polar": {
             "aboutSelection": "This is from my terminal on {place}. What does it mean, and what should I do?",
             "aboutOutput": "This is the latest output of my terminal on {place}. What does it mean, and what should I do?",
             "aboutNothing": "I am in a terminal on {place}. Help me with it."
+        },
+        "find": {
+            "label": "Find in terminal",
+            "placeholder": "Find",
+            "matchCase": "Match case",
+            "previous": "Previous match",
+            "next": "Next match",
+            "close": "Close find",
+            "count": "{current} of {total}",
+            "none": "No matches",
+            "tooMany": "Over {limit}"
         }
     },
     "storage": {

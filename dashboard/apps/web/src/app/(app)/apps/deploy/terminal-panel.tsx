@@ -44,6 +44,7 @@ import {
 import { SELECTION_QUOTE_MAX } from "@/lib/polar/shared";
 import type { LocalPath } from "@/lib/server-local-path";
 import { useTerminalLayout } from "@/lib/use-terminal-layout";
+import { FIND_HIGHLIGHT_LIMIT, TerminalFindBar, type TerminalSearch } from "./terminal-find-bar";
 import { contextMenuNotice } from "@/lib/context-menu/target";
 import { usePolarOptional } from "@/components/polar/polar-panel";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -231,6 +232,12 @@ function bufferLines(term: Terminal): string[] {
     return lines;
 }
 
+/** Ctrl+Shift+F (Cmd+Shift+F on a Mac): open the find bar. Plain Ctrl+F stays
+ *  with the shell, where it is a key readline and editors use. */
+export function isFindShortcut(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "shiftKey" | "altKey">): boolean {
+    return (event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey && event.key.toLowerCase() === "f";
+}
+
 /** Whether this is a touch screen, kept current. */
 function useCoarsePointer(): boolean {
     const [coarse, setCoarse] = useState(false);
@@ -311,6 +318,14 @@ export function TerminalPanel({
     const heldRef = useRef({ ctrl: false, alt: false });
     const [held, setHeld] = useState({ ctrl: false, alt: false });
     const [menu, setMenu] = useState<MenuAt | null>(null);
+    // Find in the output (terminal-find-bar.tsx); the addon is the terminal's,
+    // so it comes and goes with the session.
+    const [search, setSearch] = useState<TerminalSearch | null>(null);
+    const [finding, setFinding] = useState(false);
+    // Read by the menu's close, which must leave the keyboard in the find bar
+    // it just opened rather than take it back to the terminal.
+    const findingRef = useRef(false);
+    findingRef.current = finding;
     // The object identity of `target` would restart the session on every parent
     // render; its contents are what actually decide the connection.
     const key =
@@ -341,9 +356,10 @@ export function TerminalPanel({
         );
 
         async function start(): Promise<void> {
-            const [{ Terminal: XTerm }, { FitAddon }] = await Promise.all([
+            const [{ Terminal: XTerm }, { FitAddon }, { SearchAddon }] = await Promise.all([
                 import("@xterm/xterm"),
-                import("@xterm/addon-fit")
+                import("@xterm/addon-fit"),
+                import("@xterm/addon-search")
             ]);
             const mount = mountRef.current;
             if (disposed || !mount) return;
@@ -351,11 +367,18 @@ export function TerminalPanel({
             const term = new XTerm({
                 fontSize: 13,
                 cursorBlink: true,
-                theme: { background: "#0b0e14" }
+                theme: { background: "#0b0e14" },
+                // The search addon draws its match highlights as decorations,
+                // which xterm only offers behind this flag.
+                allowProposedApi: true
             });
             undo.push(() => term.dispose());
             const fit = new FitAddon();
             term.loadAddon(fit);
+            const finder = new SearchAddon({ highlightLimit: FIND_HIGHLIGHT_LIMIT });
+            term.loadAddon(finder);
+            setSearch(finder);
+            undo.push(() => setSearch(null));
             term.open(mount);
             const refit = (): void => {
                 try {
@@ -372,6 +395,13 @@ export function TerminalPanel({
             // shell asked for it - with no clipboard permission to ask for.
             const mac = isMacPlatform(navigator.platform ?? "");
             term.attachCustomKeyEventHandler((event) => {
+                if (isFindShortcut(event)) {
+                    if (event.type === "keydown") {
+                        event.preventDefault();
+                        setFinding(true);
+                    }
+                    return false;
+                }
                 const action = clipboardShortcut(event, term.hasSelection(), mac);
                 if (action === "paste") return false;
                 if (action !== "copy") return true;
@@ -511,6 +541,11 @@ export function TerminalPanel({
 
     const focus = (): void => live.current?.term.focus();
 
+    const closeFind = (): void => {
+        setFinding(false);
+        focus();
+    };
+
     const copySelection = async (text: string): Promise<void> => {
         if (!text) return;
         contextMenuNotice(t((await copyText(text)) ? "terminal.menu.copied" : "terminal.menu.copyFailed"));
@@ -594,6 +629,16 @@ export function TerminalPanel({
                     <Button
                         size="icon-xs"
                         variant="ghost"
+                        aria-pressed={finding}
+                        aria-label={t("terminal.toolbar.find")}
+                        title={t("terminal.toolbar.find")}
+                        onClick={() => (finding ? closeFind() : setFinding(true))}
+                    >
+                        <Search />
+                    </Button>
+                    <Button
+                        size="icon-xs"
+                        variant="ghost"
                         aria-pressed={keysShown}
                         aria-label={t(keysShown ? "terminal.toolbar.hideKeys" : "terminal.toolbar.showKeys")}
                         title={t(keysShown ? "terminal.toolbar.hideKeys" : "terminal.toolbar.showKeys")}
@@ -604,6 +649,7 @@ export function TerminalPanel({
                     {toolbar}
                 </div>
             </div>
+            {finding ? <TerminalFindBar search={search} onClose={closeFind} /> : null}
             <div
                 ref={mountRef}
                 className={`${fill ? "min-h-40 flex-1" : height} w-full min-w-0 overflow-hidden rounded-md bg-[#0b0e14] p-2`}
@@ -634,9 +680,10 @@ export function TerminalPanel({
                         container={menuContainer}
                         data-terminal-menu
                         onCloseAutoFocus={(event) => {
-                            // Back to the terminal, not to the invisible anchor.
+                            // Back to the terminal, not to the invisible anchor -
+                            // unless the menu just opened the find bar.
                             event.preventDefault();
-                            focus();
+                            if (!findingRef.current) focus();
                         }}
                     >
                         <DropdownMenuItem
@@ -651,6 +698,16 @@ export function TerminalPanel({
                             <ClipboardPaste />
                             {t("terminal.menu.paste")}
                             <MenuShortcut keys="Mod+V" />
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                            onSelect={() => {
+                                findingRef.current = true;
+                                setFinding(true);
+                            }}
+                        >
+                            <Search />
+                            {t("terminal.menu.find")}
+                            <MenuShortcut keys="Mod+Shift+F" />
                         </DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => live.current?.term.selectAll()}>
                             <TextSelect />

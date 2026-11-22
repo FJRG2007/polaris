@@ -88,6 +88,7 @@
         "@univerjs/presets": "0.25.1",
         "@whiskeysockets/baileys": "7.0.0-rc14",
         "@xterm/addon-fit": "0.10.0",
+        "@xterm/addon-search": "0.15.0",
         "@xterm/xterm": "5.5.0",
         "acme-client": "5.4.0",
         "ai": "7.0.143",

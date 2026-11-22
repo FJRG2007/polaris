@@ -209,7 +209,8 @@
             "maximize": "Llenar la ventana",
             "restore": "Volver al tamaño normal",
             "fullscreen": "Pantalla total",
-            "exitFullscreen": "Dejar pantalla total"
+            "exitFullscreen": "Dejar pantalla total",
+            "find": "Buscar en salida"
         },
         "menu": {
             "copy": "Copiar",
@@ -220,12 +221,24 @@
             "askPolarSelection": "Pregunta a Polar por esto",
             "copied": "Copiado",
             "copyFailed": "No se pudo copiar",
-            "pasteBlocked": "El navegador no dejó leer el portapapeles. Pulsa Ctrl+V en el terminal."
+            "pasteBlocked": "El navegador no dejó leer el portapapeles. Pulsa Ctrl+V en el terminal.",
+            "find": "Buscar"
         },
         "polar": {
             "aboutSelection": "Esto es de mi terminal en {place}. ¿Qué significa y qué debo hacer?",
             "aboutOutput": "Esta es la última salida de mi terminal en {place}. ¿Qué significa y qué debo hacer?",
             "aboutNothing": "Estoy en un terminal en {place}. Ayúdame con él."
+        },
+        "find": {
+            "label": "Buscar en terminal",
+            "placeholder": "Buscar",
+            "matchCase": "Mayúsculas",
+            "previous": "Anterior",
+            "next": "Siguiente",
+            "close": "Cerrar",
+            "count": "{current} de {total}",
+            "none": "Sin resultado",
+            "tooMany": "Más de {limit}"
         }
     },
     "storage": {
