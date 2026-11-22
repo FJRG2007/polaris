@@ -1,22 +1,17 @@
 "use client";
 
 /**
- * The connector marketplace: the official servers in `catalog.ts`, searchable,
- * each with its vendor's mark, and a Connect dialog that asks only what that
- * entry needs before it goes through the same create path as a custom
- * connector (and on to OAuth where the entry signs in that way).
+ * Connecting a catalog entry: a dialog that asks only what that entry needs
+ * before it goes through the same create path as a custom connector (and on
+ * to OAuth where the entry signs in that way).
  *
- * An entry the administrator's host list refuses is shown as unavailable with
- * that reason; the server refuses it again whatever the page says.
+ * The administrator's host list is checked here so the dialog can say so; the
+ * server refuses it again whatever the page says.
  */
 
 import { useState, type FormEvent } from "react";
-import { ExternalLink, Plug, Plus } from "lucide-react";
 import {
-    Badge,
     Button,
-    Card,
-    CardBody,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -30,175 +25,11 @@ import { hostAllowed } from "@/lib/polar/connectors/shared";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ConnectorView } from "@/lib/polar/connectors/store";
 import { ConnectorLogo } from "@/components/polar/connector-marks";
-import {
-    CONNECTOR_CATALOG,
-    catalogUrl,
-    entryForUrl,
-    shopDomainSchema,
-    type AvailableEntry,
-    type CatalogEntry
-} from "@/lib/polar/connectors/catalog";
+import { catalogUrl, shopDomainSchema, type AvailableEntry } from "@/lib/polar/connectors/catalog";
 
 type Method = "oauth" | "key";
 
-/** Why an entry cannot be connected here, or null when it can. */
-function blockedReason(entry: CatalogEntry, hosts: readonly string[]): "host" | null {
-    if (entry.field) return null;
-    return hostAllowed(entry.endpoint, hosts) ? null : "host";
-}
-
-export function ConnectorCatalog({
-    rows,
-    hosts,
-    send,
-    errorText,
-    onAdded,
-    onCustom
-}: {
-    rows: readonly ConnectorView[];
-    hosts: readonly string[];
-    send: (path: string, init: RequestInit) => Promise<{ ok: boolean; body: any }>;
-    errorText: (code: unknown) => string;
-    onAdded: (view: ConnectorView) => void;
-    onCustom: () => void;
-}) {
-    const t = useTranslations("polar");
-    const [query, setQuery] = useState("");
-    const [connecting, setConnecting] = useState<AvailableEntry | null>(null);
-    const wanted = query.trim().toLowerCase();
-    const shown = CONNECTOR_CATALOG.filter((entry) =>
-        `${entry.name} ${entry.vendor} ${entry.category}`.toLowerCase().includes(wanted)
-    );
-    const connected = new Set(
-        rows.map((row) => entryForUrl(row.url)?.id).filter((id): id is string => Boolean(id))
-    );
-
-    return (
-        <section className="flex flex-col gap-3">
-            <div className="min-w-0">
-                <h2 className="text-sm font-semibold">{t("settings.connectorCatalog.title")}</h2>
-                <p className="text-sm text-muted-foreground">
-                    {t("settings.connectorCatalog.intro")}
-                </p>
-            </div>
-            <Input
-                type="search"
-                value={query}
-                aria-label={t("settings.connectorCatalog.search")}
-                placeholder={t("settings.connectorCatalog.search")}
-                onChange={(event) => setQuery(event.target.value)}
-            />
-            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {shown.map((entry) => {
-                    const blocked = blockedReason(entry, hosts);
-                    const isConnected = connected.has(entry.id);
-                    return (
-                        <li key={entry.id} className="min-w-0">
-                            <Card className="h-full">
-                                <CardBody className="flex h-full flex-col gap-3">
-                                    <div className="flex min-w-0 items-start gap-3">
-                                        <ConnectorLogo
-                                            logo={entry.logo}
-                                            name={entry.vendor}
-                                            className="mt-0.5 size-6"
-                                        />
-                                        <div className="min-w-0 flex-1">
-                                            <p
-                                                className="truncate text-sm font-medium"
-                                                title={entry.name}
-                                            >
-                                                {entry.name}
-                                            </p>
-                                            <p className="truncate text-xs text-foreground-subtle">
-                                                {entry.vendor}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <p className="flex-1 text-xs text-muted-foreground">
-                                        {t(`settings.connectorCatalog.entries.${entry.id}` as never)}
-                                    </p>
-                                    {blocked === "host" ? (
-                                        <p className="text-xs text-warning-ink">
-                                            {t("settings.connectorCatalog.hostBlocked")}
-                                        </p>
-                                    ) : null}
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        {isConnected ? (
-                                            <Badge variant="success">
-                                                {t("settings.connectorCatalog.connected")}
-                                            </Badge>
-                                        ) : blocked ? (
-                                            <Badge variant="neutral">
-                                                {t("settings.connectorCatalog.unavailable")}
-                                            </Badge>
-                                        ) : (
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                onClick={() => setConnecting(entry)}
-                                            >
-                                                <Plug className="h-3.5 w-3.5 shrink-0" />
-                                                {t("settings.connectorCatalog.connect")}
-                                            </Button>
-                                        )}
-                                        <a
-                                                href={entry.docs}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                                            >
-                                                {t("settings.connectorCatalog.docs")}
-                                                <ExternalLink className="size-3 shrink-0" />
-                                            </a>
-                                    </div>
-                                </CardBody>
-                            </Card>
-                        </li>
-                    );
-                })}
-                {/* Any server by its address, whatever the search. */}
-                    <li className="min-w-0">
-                        <Card className="h-full">
-                            <CardBody className="flex h-full flex-col gap-3">
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium">
-                                        {t("settings.connectorCatalog.custom")}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {t("settings.connectorCatalog.customHint")}
-                                    </p>
-                                </div>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    className="self-start"
-                                    onClick={onCustom}
-                                >
-                                    <Plus className="h-3.5 w-3.5 shrink-0" />
-                                    {t("settings.connectorCatalog.connect")}
-                                </Button>
-                            </CardBody>
-                        </Card>
-                    </li>
-                
-            </ul>
-            <ConnectDialog
-                entry={connecting}
-                hosts={hosts}
-                send={send}
-                errorText={errorText}
-                onClose={() => setConnecting(null)}
-                onAdded={(view) => {
-                    setConnecting(null);
-                    onAdded(view);
-                }}
-            />
-        </section>
-    );
-}
-
-function ConnectDialog({
+export function ConnectDialog({
     entry,
     hosts,
     send,

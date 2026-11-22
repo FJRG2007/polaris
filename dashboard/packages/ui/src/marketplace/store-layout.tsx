@@ -28,7 +28,7 @@ export interface StoreFilterOption<T extends string> {
     readonly label: string;
 }
 
-/** The search box and sort above the category buttons. */
+/** The search box and sort above the category buttons; a list with one order passes no sort. */
 export function StoreFilters<S extends string, C extends string>({
     query,
     onQueryChange,
@@ -42,14 +42,14 @@ export function StoreFilters<S extends string, C extends string>({
 }: {
     query: string;
     onQueryChange: (query: string) => void;
-    sort: S;
-    onSortChange: (sort: S) => void;
-    sorts: readonly StoreFilterOption<S>[];
+    sort?: S;
+    onSortChange?: (sort: S) => void;
+    sorts?: readonly StoreFilterOption<S>[];
     category: C;
     onCategoryChange: (category: C) => void;
     /** Every category button, "All" first. */
     categories: readonly StoreFilterOption<C>[];
-    words: { search: string; sortLabel: string; categories: string };
+    words: { search: string; sortLabel?: string; categories: string };
 }) {
     return (
         <div className="flex min-w-0 flex-col gap-3">
@@ -64,13 +64,15 @@ export function StoreFilters<S extends string, C extends string>({
                         className="ps-8"
                     />
                 </div>
-                <Select
-                    value={sort}
-                    onValueChange={(value) => onSortChange(value as S)}
-                    aria-label={words.sortLabel}
-                    className="w-44"
-                    options={sorts.map((entry) => ({ value: entry.value, label: entry.label }))}
-                />
+                {sorts && sort !== undefined ? (
+                    <Select
+                        value={sort}
+                        onValueChange={(value) => onSortChange?.(value as S)}
+                        aria-label={words.sortLabel}
+                        className="w-44"
+                        options={sorts.map((entry) => ({ value: entry.value, label: entry.label }))}
+                    />
+                ) : null}
             </div>
             <div
                 role="group"

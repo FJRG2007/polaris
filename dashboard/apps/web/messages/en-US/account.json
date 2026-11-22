@@ -2035,7 +2035,50 @@
             "signInFailed": "Sign-in didn't finish. Try Sign in again."
         },
         "search": "Search connectors",
-        "noMatch": "No connector matches."
+        "noMatch": "No connector matches.",
+        "directory": {
+            "viewsLabel": "Show",
+            "views": {
+                "all": "All ({count})",
+                "connected": "Connected ({count})",
+                "attention": "Needs attention ({count})"
+            },
+            "categoriesLabel": "Categories",
+            "categories": {
+                "all": "All",
+                "payments": "Payments",
+                "finance": "Finance",
+                "developer": "Developer",
+                "commerce": "Commerce",
+                "travel": "Travel",
+                "marketing": "Marketing",
+                "custom": "Custom"
+            },
+            "state": {
+                "connected": "Connected",
+                "attention": "Needs attention",
+                "available": "Connect",
+                "unavailable": "Not available"
+            },
+            "custom": "Custom",
+            "customHint": "A server you added by its address.",
+            "connect": "Connect",
+            "connectLabel": "Connect {name}",
+            "connectAnother": "Connect another store",
+            "connection": "Connection",
+            "reconnect": "Sign in again",
+            "disconnect": "Disconnect",
+            "tools": "Tools ({count})",
+            "noConnected": "Nothing connected yet",
+            "noConnectedHint": "Pick a server from All and connect it.",
+            "browseAll": "Browse all",
+            "allWorking": "Every connector is working.",
+            "noMatchHint": "Not listed? Any MCP server can be added by its address.",
+            "addByUrl": "Add by address",
+            "loadFailed": "Couldn't load the connectors.",
+            "retry": "Try again",
+            "showMore": "Show more"
+        }
     },
     "streamdeck": {
         "page": {

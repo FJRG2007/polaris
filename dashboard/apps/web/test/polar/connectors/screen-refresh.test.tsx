@@ -47,10 +47,13 @@ function serverSays(...answers: unknown[]) {
     return fetch;
 }
 
+/** Draws the screen with Stripe's detail open, where its sign-in lives. */
 function draw() {
-    return render(<PolarConnectors initial={[STRIPE as never]} returned={null} />, {
+    const drawn = render(<PolarConnectors initial={[STRIPE as never]} returned={null} />, {
         wrapper: MessagesWrapper
     });
+    fireEvent.click(screen.getByRole("button", { name: /^Stripe/ }));
+    return drawn;
 }
 
 describe("a sign-in that finished elsewhere", () => {

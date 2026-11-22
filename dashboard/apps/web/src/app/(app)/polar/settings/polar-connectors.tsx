@@ -1,29 +1,36 @@
 "use client";
 
 /**
- * Connectors on Polar permissions: the MCP servers this person connected,
- * each with its tools and what Polar may do with each one.
+ * Connectors on Polar settings: one directory of MCP servers, the way Claude's
+ * and ChatGPT's connector directories and the Polaris app store are drawn -
+ * every server exactly once, the catalog and the servers this person added by
+ * their address together, each with where it stands (Connected, Needs
+ * attention, Connect). "Connected" is a view of that list, never a second one.
+ * Pressing an entry opens its detail: its tools and what Polar may do with each
+ * one, the connection test, sign in again, and disconnect.
+ *
+ * The directory is searched and paged by `/api/polar/connectors/directory`;
+ * the first page is drawn here from the same pure function, so the list is on
+ * screen at first paint, and a search narrows what is already shown while the
+ * server answers.
  *
  * Every change is optimistic and put back when the server refuses it. The
  * server answers a connector without its secret (`ConnectorView`), so nothing
- * typed into the token fields ever comes back to the page. A new one is added
- * from a dialog, as ChatGPT and Claude do, rather than a form on the page.
+ * typed into the token fields ever comes back to the page.
  *
  * A sign-in may finish somewhere this page cannot see - the desktop app of an
  * older release hands the provider's page to the system browser, and another
- * tab may finish one - so the list is read again from the server while one is
- * waiting, whenever the window comes back into view, and when another tab of
- * this screen says a sign-in came back.
+ * tab may finish one - so the connections are read again from the server while
+ * one is waiting, whenever the window comes back into view, and when another
+ * tab of this screen says a sign-in came back.
  */
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { Plug, RefreshCw, Trash2, LogIn, ChevronDown } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { ChevronDown, ExternalLink, LogIn, Plug, Plus, RefreshCw, Trash2 } from "lucide-react";
 import {
     Badge,
     Button,
-    Card,
-    CardBody,
     ConfirmDeleteDialog,
     Dialog,
     DialogContent,
@@ -31,19 +38,28 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
+    EmptyState,
     Input,
     SegmentedControl,
+    SheetContent,
+    Skeleton,
     Switch,
     cn
 } from "@polaris/ui";
+import { StoreFilters } from "@polaris/ui/store-layout";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { ConnectorCatalog } from "./connector-catalog";
+import { ConnectDialog } from "./connector-catalog";
 import type { ConnectorView } from "@/lib/polar/connectors/store";
+import { ConnectorLogo } from "@/components/polar/connector-marks";
 import { leavePage } from "@/lib/keep-call";
+import * as directory from "@/lib/polar/connectors/directory";
+import { catalogEntry, entryForUrl, type AvailableEntry } from "@/lib/polar/connectors/catalog";
 
 type Policy = ConnectorView["tools"][number]["policy"];
 type Auth = ConnectorView["auth"];
 type Transport = ConnectorView["transport"];
+type Query = directory.DirectoryQuery;
+type Page = directory.DirectoryPage & { query: Query };
 
 const AUTHS: Auth[] = ["none", "bearer", "oauth"];
 const TRANSPORTS: Transport[] = ["http", "sse"];
@@ -90,19 +106,35 @@ async function send(path: string, init: RequestInit): Promise<{ ok: boolean; bod
     return { ok: response.ok, body };
 }
 
-/** A list this long is easier to search than to scroll. */
-const SEARCH_FROM = 6;
-
 /** How often, and for how long, a sign-in that left this page is checked on. */
 const WAIT_EVERY_MS = 3_000;
 const WAIT_MOST_MS = 120_000;
 /** Where a tab of this screen says a sign-in came back. */
 const CHANNEL = "polar-connectors";
+/** How long typing settles before the server is asked. */
+const SEARCH_DELAY_MS = 200;
+const START: Query = { q: "", category: "all", view: "all" };
+const NO_HOSTS: readonly string[] = [];
+
+const sameQuery = (a: Query, b: Query) =>
+    a.q.trim() === b.q.trim() && a.category === b.category && a.view === b.view;
+
+/** The directory entry a connection belongs to. */
+function keyFor(row: Pick<ConnectorView, "id" | "url">): string {
+    const entry = entryForUrl(row.url);
+    return entry ? `catalog:${entry.id}` : `custom:${row.id}`;
+}
+
+/** A directory entry with its catalog listing and its connections as they are now. */
+interface Shown extends directory.DirectoryItem {
+    entry: AvailableEntry | null;
+    connections: ConnectorView[];
+}
 
 export function PolarConnectors({
     initial,
     returned,
-    hosts = []
+    hosts = NO_HOSTS
 }: {
     initial: ConnectorView[];
     /** The administrator's host allowlist; empty allows every host. */
@@ -112,24 +144,98 @@ export function PolarConnectors({
 }) {
     const t = useTranslations("account");
     const [rows, setRows] = useState(initial);
-    const [query, setQuery] = useState("");
-    const searchable = rows.length > SEARCH_FROM;
-    const wanted = searchable ? query.trim().toLowerCase() : "";
-    const shown = rows.filter((row) => row.name.toLowerCase().includes(wanted));
+    const [filters, setFilters] = useState<Query>(START);
+    const [page, setPage] = useState<Page>(() => ({
+        ...directory.pageDirectory(directory.buildDirectory(initial, hosts), START),
+        query: START
+    }));
+    const [loading, setLoading] = useState(false);
+    const [loadFailed, setLoadFailed] = useState(false);
     const [adding, setAdding] = useState(false);
+    const [connecting, setConnecting] = useState<AvailableEntry | null>(null);
+    const [detail, setDetail] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(
         returned === "failed" ? t("polarConnectors.errors.signInFailed") : null
     );
     const [busy, setBusy] = useState<string | null>(null);
     const [removing, setRemoving] = useState<ConnectorView | null>(null);
-    const [open, setOpen] = useState<string | null>(null);
     const [signedInNow, setSignedInNow] = useState(false);
     /** The connector a sign-in left this page for, and since when. */
     const [waiting, setWaiting] = useState<{ id: string; since: number } | null>(null);
     const waitingRef = useRef(waiting);
     waitingRef.current = waiting;
+    const filtersRef = useRef(filters);
+    filtersRef.current = filters;
+    /** The newest directory request; an older answer is dropped. */
+    const request = useRef(0);
+    const loadingRef = useRef(false);
 
-    /** The list as the server has it now; the server decides what is signed in. */
+    /** One page of the directory from the server, with the connections as they are now. */
+    const load = useCallback(async (query: Query, cursor: number) => {
+        const id = ++request.current;
+        loadingRef.current = true;
+        setLoading(true);
+        const params = new URLSearchParams({
+            q: query.q.trim(),
+            category: query.category,
+            view: query.view,
+            cursor: String(cursor)
+        });
+        const answer = await send(`/api/polar/connectors/directory?${params}`, { method: "GET" });
+        if (id !== request.current) return;
+        loadingRef.current = false;
+        setLoading(false);
+        if (!answer.ok || !Array.isArray(answer.body.items)) {
+            setLoadFailed(true);
+            return;
+        }
+        setLoadFailed(false);
+        const body = answer.body as directory.DirectoryPage & { connectors?: ConnectorView[] };
+        if (Array.isArray(body.connectors)) setRows(body.connectors);
+        setPage((current) => {
+            const items =
+                cursor > 0 && sameQuery(current.query, query)
+                    ? [
+                          ...current.items,
+                          ...body.items.filter(
+                              (item) => !current.items.some((held) => held.key === item.key)
+                          )
+                      ]
+                    : body.items;
+            return { items, next: body.next, total: body.total, counts: body.counts, query };
+        });
+    }, []);
+
+    // The first page is already drawn; a changed search or filter asks again.
+    const firstFilters = useRef(true);
+    useEffect(() => {
+        if (firstFilters.current) {
+            firstFilters.current = false;
+            return;
+        }
+        const timer = window.setTimeout(
+            () => void load(filters, 0),
+            filters.q.trim() ? SEARCH_DELAY_MS : 0
+        );
+        return () => window.clearTimeout(timer);
+    }, [filters, load]);
+
+    /** The directory as these connections make it, kept on the current search. */
+    const rebuild = useCallback(
+        (next: ConnectorView[]) =>
+            setPage((current) => ({
+                ...directory.pageDirectory(
+                    directory.buildDirectory(next, hosts),
+                    filtersRef.current,
+                    0,
+                    Math.max(current.items.length, directory.DIRECTORY_PAGE_SIZE)
+                ),
+                query: filtersRef.current
+            })),
+        [hosts]
+    );
+
+    /** The connections as the server has them now; the server decides what is signed in. */
     const reload = useCallback(async () => {
         const answer = await send("/api/polar/connectors", { method: "GET" });
         if (!answer.ok || !Array.isArray(answer.body.connectors)) return;
@@ -191,6 +297,8 @@ export function PolarConnectors({
 
     const say = (code: unknown) =>
         setError(t(`polarConnectors.errors.${isErrorCode(code) ? code : "failed"}`));
+    const errorText = (code: unknown) =>
+        t(`polarConnectors.errors.${isErrorCode(code) ? code : "failed"}`);
     const replace = (view: ConnectorView) =>
         setRows((current) => current.map((row) => (row.id === view.id ? view : row)));
 
@@ -213,17 +321,16 @@ export function PolarConnectors({
         setBusy(row.id);
         const answer = await send(`/api/polar/connectors/${row.id}/test`, { method: "POST" });
         setBusy(null);
-        if (answer.ok) {
-            replace(answer.body.connector);
-            setOpen(row.id);
-        } else say(answer.body.error);
+        if (answer.ok) replace(answer.body.connector);
+        else say(answer.body.error);
     }
 
     /**
      * Sends the window to the sign-in route, which forwards it to the
      * provider: a round trip the desktop app keeps in its own window. Should
      * the page stay - the provider opened somewhere else - it waits for the
-     * server to say the connector is signed in.
+     * server to say the connector is signed in. The same route signs a
+     * connector in again once its sign-in ran out.
      */
     function signIn(row: ConnectorView) {
         setError(null);
@@ -235,21 +342,80 @@ export function PolarConnectors({
         leavePage(`/api/polar/connectors/${row.id}/sign-in`);
     }
 
+    /** A connection just made: in the list at once, its detail open. */
+    function adopt(view: ConnectorView) {
+        setError(null);
+        const next = [...rows.filter((row) => row.id !== view.id), view];
+        setRows(next);
+        rebuild(next);
+        setDetail(keyFor(view));
+        if (view.auth === "oauth" && !view.signedIn) signIn(view);
+    }
+
     async function remove(row: ConnectorView) {
         setError(null);
         setRemoving(null);
-        setRows((current) => current.filter((entry) => entry.id !== row.id));
+        const next = rows.filter((entry) => entry.id !== row.id);
+        setRows(next);
+        rebuild(next);
         const answer = await send(`/api/polar/connectors/${row.id}`, { method: "DELETE" });
         if (!answer.ok && answer.body.error !== "not_found") {
             setRows((current) => [...current, row]);
+            rebuild([...next, row]);
             say(answer.body.error);
         }
     }
 
+    const join = useCallback(
+        (item: directory.DirectoryItem, byId: Map<string, ConnectorView>): Shown => {
+            const connections = item.connectionIds
+                .map((id) => byId.get(id))
+                .filter((row): row is ConnectorView => Boolean(row));
+            return {
+                ...item,
+                entry: catalogEntry(item.entryId),
+                connections,
+                state: directory.stateOf(connections, item.state === "unavailable")
+            };
+        },
+        []
+    );
+    const byId = useMemo(() => new Map(rows.map((row) => [row.id, row])), [rows]);
+    const full = useMemo(() => directory.buildDirectory(rows, hosts), [rows, hosts]);
+    const counts = useMemo(() => directory.directoryCounts(full), [full]);
+    const settled = sameQuery(page.query, filters);
+    // While the server answers a new search, what is shown narrows at once.
+    const shown = (settled ? page.items : directory.queryDirectory(page.items, filters))
+        .map((item) => join(item, byId))
+        .filter((item) => item.kind === "catalog" || item.connections.length > 0);
+    const opened = useMemo(() => {
+        const item = detail ? full.find((entry) => entry.key === detail) : null;
+        return item ? join(item, byId) : null;
+    }, [detail, full, byId, join]);
+    const canMore = settled && page.next !== null;
+
+    const more = useCallback(() => {
+        if (loadingRef.current || page.next === null) return;
+        void load(page.query, page.next);
+    }, [load, page]);
+    const sentinel = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const node = sentinel.current;
+        if (!node || !canMore || typeof IntersectionObserver === "undefined") return;
+        const observer = new IntersectionObserver(
+            (entries) => entries.some((entry) => entry.isIntersecting) && more(),
+            { rootMargin: "400px" }
+        );
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, [canMore, more]);
+
+    const setQuery = (q: string) => setFilters((current) => ({ ...current, q }));
+
     return (
-        <section className="flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+        <section className="flex min-w-0 flex-col gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1 basis-64">
                     <h2 className="text-sm font-semibold">{t("polarConnectors.title")}</h2>
                     <p className="text-sm text-muted-foreground">{t("polarConnectors.intro")}</p>
                     <p className="text-xs text-foreground-subtle">
@@ -259,18 +425,16 @@ export function PolarConnectors({
                         </Link>
                     </p>
                 </div>
-                {rows.length > 0 ? (
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0"
-                        onClick={() => setAdding(true)}
-                    >
-                        <Plug className="h-3.5 w-3.5 shrink-0" />
-                        {t("polarConnectors.add")}
-                    </Button>
-                ) : null}
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => setAdding(true)}
+                >
+                    <Plus className="h-3.5 w-3.5 shrink-0" />
+                    {t("polarConnectors.add")}
+                </Button>
             </div>
             {waiting ? (
                 <p role="status" className="text-sm text-muted-foreground">
@@ -286,217 +450,151 @@ export function PolarConnectors({
                     {error}
                 </p>
             ) : null}
-            <AddConnector
-                open={adding}
-                onOpenChange={setAdding}
-                onAdded={(view) => {
-                    setError(null);
-                    setQuery("");
-                    setRows((current) => [...current, view]);
-                    setAdding(false);
-                    setOpen(view.id);
-                    if (view.auth === "oauth" && !view.signedIn) signIn(view);
+            <div className="min-w-0 overflow-x-auto">
+                <SegmentedControl<directory.DirectoryView>
+                    size="sm"
+                    value={filters.view}
+                    aria-label={t("polarConnectors.directory.viewsLabel")}
+                    options={directory.DIRECTORY_VIEWS.map((value) => ({
+                        value,
+                        label: t(`polarConnectors.directory.views.${value}`, {
+                            count: counts[value]
+                        })
+                    }))}
+                    onValueChange={(view) => setFilters((current) => ({ ...current, view }))}
+                />
+            </div>
+            <StoreFilters<string, directory.DirectoryCategory | "all">
+                query={filters.q}
+                onQueryChange={setQuery}
+                category={filters.category}
+                onCategoryChange={(category) =>
+                    setFilters((current) => ({ ...current, category }))
+                }
+                categories={(["all", ...directory.DIRECTORY_CATEGORIES] as const).map((value) => ({
+                    value,
+                    label: t(`polarConnectors.directory.categories.${value}`)
+                }))}
+                words={{
+                    search: t("polarConnectors.search"),
+                    categories: t("polarConnectors.directory.categoriesLabel")
                 }}
             />
-            {rows.length === 0 ? (
-                <Card>
-                    <CardBody className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-                        <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-                            {t("polarConnectors.empty")}
-                        </p>
-                        <Button
-                            type="button"
-                            size="sm"
-                            className="shrink-0"
-                            onClick={() => setAdding(true)}
-                        >
-                            <Plug className="h-3.5 w-3.5 shrink-0" />
-                            {t("polarConnectors.add")}
-                        </Button>
-                    </CardBody>
-                </Card>
+            {loadFailed && shown.length > 0 ? (
+                <p role="alert" className="flex flex-wrap items-center gap-2 text-sm text-danger">
+                    {t("polarConnectors.directory.loadFailed")}
+                    <Button type="button" size="sm" variant="ghost" onClick={() => void load(filters, 0)}>
+                        {t("polarConnectors.directory.retry")}
+                    </Button>
+                </p>
             ) : null}
-            {searchable ? (
-                <Input
-                    type="search"
-                    value={query}
-                    aria-label={t("polarConnectors.search")}
-                    placeholder={t("polarConnectors.search")}
-                    onChange={(event) => setQuery(event.target.value)}
-                />
-            ) : null}
-            {rows.length > 0 && shown.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t("polarConnectors.noMatch")}</p>
-            ) : null}
-            {shown.map((row) => (
-                <Card key={row.id}>
-                    <CardBody className="flex flex-col gap-3">
-                        <div className="flex items-center gap-3">
-                            <button
-                                type="button"
-                                className="flex min-w-0 flex-1 items-center gap-2 text-start"
-                                aria-expanded={open === row.id}
-                                onClick={() => setOpen(open === row.id ? null : row.id)}
-                            >
-                                <ChevronDown
-                                    className={cn(
-                                        "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-                                        open === row.id ? "" : "-rotate-90"
-                                    )}
-                                />
-                                <span className="min-w-0">
-                                    <span
-                                        className="block truncate text-sm font-medium"
-                                        title={row.name}
-                                    >
-                                        {row.name}
-                                    </span>
-                                    <span
-                                        className="block truncate text-xs text-muted-foreground"
-                                        title={row.url}
-                                    >
-                                        {row.url}
-                                    </span>
-                                </span>
-                            </button>
-                            <StatusBadge row={row} />
-                            <Switch
-                                checked={row.enabled}
-                                aria-label={t("polarConnectors.enabled", { name: row.name })}
-                                onChange={(enabled) =>
-                                    void patch(row, { ...row, enabled }, { enabled })
-                                }
-                            />
-                        </div>
-                        {row.status === "error" ? (
-                            <p role="status" className="text-xs text-danger">
-                                {t(
-                                    `polarConnectors.errors.${isErrorCode(row.lastError) ? row.lastError : "failed"}`
-                                )}
-                            </p>
-                        ) : null}
-                        <div className="flex flex-wrap items-center gap-2">
-                            {row.auth === "oauth" && (!row.signedIn || row.status === "sign_in") ? (
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    disabled={busy === row.id}
-                                    onClick={() => signIn(row)}
-                                >
-                                    <LogIn className="h-3.5 w-3.5 shrink-0" />
-                                    {t("polarConnectors.signIn")}
-                                </Button>
-                            ) : null}
+            {shown.length === 0 ? (
+                !settled && loading ? (
+                    <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3" aria-hidden="true">
+                        {Array.from({ length: 6 }, (_, index) => (
+                            <li key={index} className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5">
+                                <Skeleton className="size-9 shrink-0 rounded-md" />
+                                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                                    <Skeleton className="h-3.5 w-2/3" />
+                                    <Skeleton className="h-3 w-1/3" />
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                ) : !settled && loadFailed ? (
+                    <EmptyState
+                        title={t("polarConnectors.directory.loadFailed")}
+                        action={
+                            <Button type="button" size="sm" onClick={() => void load(filters, 0)}>
+                                {t("polarConnectors.directory.retry")}
+                            </Button>
+                        }
+                    />
+                ) : filters.view === "connected" && !filters.q.trim() && filters.category === "all" ? (
+                    <EmptyState
+                        icon={<Plug className="size-5 text-muted-foreground" />}
+                        title={t("polarConnectors.directory.noConnected")}
+                        description={t("polarConnectors.directory.noConnectedHint")}
+                        action={
                             <Button
                                 type="button"
                                 size="sm"
-                                variant="outline"
-                                disabled={busy === row.id}
-                                onClick={() => void test(row)}
+                                onClick={() => setFilters((current) => ({ ...current, view: "all" }))}
                             >
-                                <RefreshCw
-                                    className={cn(
-                                        "h-3.5 w-3.5 shrink-0",
-                                        busy === row.id && "animate-spin"
-                                    )}
-                                />
-                                {t("polarConnectors.test")}
+                                {t("polarConnectors.directory.browseAll")}
                             </Button>
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                aria-label={t("polarConnectors.removeLabel", { name: row.name })}
-                                title={t("polarConnectors.removeLabel", { name: row.name })}
-                                onClick={() => setRemoving(row)}
-                            >
-                                <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                        }
+                    />
+                ) : filters.view === "attention" && !filters.q.trim() && filters.category === "all" ? (
+                    <EmptyState title={t("polarConnectors.directory.allWorking")} />
+                ) : (
+                    <EmptyState
+                        title={t("polarConnectors.noMatch")}
+                        description={t("polarConnectors.directory.noMatchHint")}
+                        action={
+                            <Button type="button" size="sm" variant="outline" onClick={() => setAdding(true)}>
+                                {t("polarConnectors.directory.addByUrl")}
                             </Button>
-                        </div>
-                        {open === row.id ? (
-                            row.tools.length === 0 ? (
-                                <p className="text-xs text-muted-foreground">
-                                    {t("polarConnectors.noTools")}
-                                </p>
-                            ) : (
-                                <ul className="flex flex-col divide-y divide-border">
-                                    {row.tools.map((tool) => (
-                                        <li
-                                            key={tool.name}
-                                            className="flex flex-col gap-2 py-2 sm:flex-row sm:items-center"
-                                        >
-                                            <div className="min-w-0 flex-1">
-                                                <p className="flex items-center gap-2 text-sm">
-                                                    <span className="truncate" title={tool.name}>
-                                                        {tool.title}
-                                                    </span>
-                                                    {!tool.readOnly ? (
-                                                        <Badge
-                                                            variant={
-                                                                tool.destructive
-                                                                    ? "warning"
-                                                                    : "neutral"
-                                                            }
-                                                        >
-                                                            {t("polarConnectors.writes")}
-                                                        </Badge>
-                                                    ) : null}
-                                                </p>
-                                                {tool.description ? (
-                                                    <p
-                                                        className="line-clamp-2 text-xs text-muted-foreground"
-                                                        title={tool.description}
-                                                    >
-                                                        {tool.description}
-                                                    </p>
-                                                ) : null}
-                                            </div>
-                                            <SegmentedControl<Policy>
-                                                size="sm"
-                                                value={tool.policy}
-                                                aria-label={t("polarConnectors.policyLabel", {
-                                                    tool: tool.title
-                                                })}
-                                                options={POLICIES.map((value) => ({
-                                                    value,
-                                                    label: t(`polarConnectors.policy.${value}`)
-                                                }))}
-                                                onValueChange={(policy) =>
-                                                    void patch(
-                                                        row,
-                                                        {
-                                                            ...row,
-                                                            tools: row.tools.map((entry) =>
-                                                                entry.name === tool.name
-                                                                    ? { ...entry, policy }
-                                                                    : entry
-                                                            )
-                                                        },
-                                                        { tool: { name: tool.name, policy } }
-                                                    )
-                                                }
-                                            />
-                                        </li>
-                                    ))}
-                                </ul>
-                            )
-                        ) : null}
-                    </CardBody>
-                </Card>
-            ))}
-            <ConnectorCatalog
-                rows={rows}
+                        }
+                    />
+                )
+            ) : (
+                <ul
+                    className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3"
+                    aria-busy={loading || undefined}
+                    aria-label={t("polarConnectors.title")}
+                >
+                    {shown.map((item) => (
+                        <DirectoryCard
+                            key={item.key}
+                            item={item}
+                            onOpen={() => setDetail(item.key)}
+                            onConnect={() => item.entry && setConnecting(item.entry)}
+                        />
+                    ))}
+                </ul>
+            )}
+            {canMore ? (
+                <div ref={sentinel} className="flex justify-center">
+                    <Button type="button" size="sm" variant="ghost" disabled={loading} onClick={more}>
+                        {t("polarConnectors.directory.showMore")}
+                    </Button>
+                </div>
+            ) : null}
+            <Dialog open={opened !== null} onOpenChange={(next) => !next && setDetail(null)}>
+                {opened ? (
+                    <SheetContent className="sm:w-[30rem]">
+                        <ConnectorDetail
+                            item={opened}
+                            busy={busy}
+                            onConnect={() => {
+                                setDetail(null);
+                                if (opened.entry) setConnecting(opened.entry);
+                            }}
+                            onSignIn={signIn}
+                            onTest={(row) => void test(row)}
+                            onPatch={(row, optimistic, body) => void patch(row, optimistic, body)}
+                            onRemove={(row) => {
+                                setDetail(null);
+                                setRemoving(row);
+                            }}
+                        />
+                    </SheetContent>
+                ) : null}
+            </Dialog>
+            <AddConnector open={adding} onOpenChange={setAdding} onAdded={(view) => {
+                setAdding(false);
+                adopt(view);
+            }} />
+            <ConnectDialog
+                entry={connecting}
                 hosts={hosts}
                 send={send}
-                errorText={(code) =>
-                    t(`polarConnectors.errors.${isErrorCode(code) ? code : "failed"}`)
-                }
-                onCustom={() => setAdding(true)}
+                errorText={errorText}
+                onClose={() => setConnecting(null)}
                 onAdded={(view) => {
-                    setError(null);
-                    setRows((current) => [...current, view]);
-                    setOpen(view.id);
-                    if (view.auth === "oauth" && !view.signedIn) signIn(view);
+                    setConnecting(null);
+                    adopt(view);
                 }}
             />
             <ConfirmDeleteDialog
@@ -507,6 +605,308 @@ export function PolarConnectors({
                 description={t("polarConnectors.removeHint")}
                 onConfirm={() => removing && void remove(removing)}
             />
+        </section>
+    );
+}
+
+/** An entry's mark: the vendor's, or a plug for a server added by its address. */
+function EntryMark({ item, size = "md" }: { item: Shown; size?: "md" | "lg" }) {
+    return (
+        <span
+            className={cn(
+                "grid shrink-0 place-items-center rounded-md border border-border bg-surface text-foreground",
+                size === "lg" ? "size-11" : "size-9"
+            )}
+        >
+            {item.entry ? (
+                <ConnectorLogo
+                    logo={item.entry.logo}
+                    name={item.entry.vendor}
+                    className={size === "lg" ? "size-6" : "size-5"}
+                />
+            ) : (
+                <Plug className={cn("text-muted-foreground", size === "lg" ? "size-5" : "size-4")} />
+            )}
+        </span>
+    );
+}
+
+function StateBadge({ state }: { state: directory.DirectoryState }) {
+    const t = useTranslations("account");
+    const variant =
+        state === "connected" ? "success" : state === "attention" ? "warning" : "neutral";
+    return (
+        <Badge variant={variant} className="shrink-0">
+            {t(`polarConnectors.directory.state.${state}`)}
+        </Badge>
+    );
+}
+
+function useSubtitle(item: Shown): string {
+    const t = useTranslations("account");
+    return item.kind === "custom"
+        ? `${t("polarConnectors.directory.custom")} · ${item.vendor}`
+        : `${item.vendor} · ${t(`polarConnectors.directory.categories.${item.category}`)}`;
+}
+
+function DirectoryCard({
+    item,
+    onOpen,
+    onConnect
+}: {
+    item: Shown;
+    onOpen: () => void;
+    onConnect: () => void;
+}) {
+    const t = useTranslations("account");
+    const subtitle = useSubtitle(item);
+    return (
+        <li className="min-w-0">
+            <div className="flex h-full min-w-0 items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 transition-colors hover:bg-muted/40">
+                <button
+                    type="button"
+                    className="flex min-w-0 flex-1 items-center gap-3 text-start"
+                    onClick={onOpen}
+                >
+                    <EntryMark item={item} />
+                    <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium" title={item.name}>
+                            {item.name}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground" title={subtitle}>
+                            {subtitle}
+                        </span>
+                    </span>
+                </button>
+                {item.state === "available" && item.entry ? (
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        aria-label={t("polarConnectors.directory.connectLabel", { name: item.name })}
+                        onClick={onConnect}
+                    >
+                        {t("polarConnectors.directory.connect")}
+                    </Button>
+                ) : item.state !== "available" ? (
+                    <StateBadge state={item.state} />
+                ) : null}
+            </div>
+        </li>
+    );
+}
+
+function ConnectorDetail({
+    item,
+    busy,
+    onConnect,
+    onSignIn,
+    onTest,
+    onPatch,
+    onRemove
+}: {
+    item: Shown;
+    busy: string | null;
+    onConnect: () => void;
+    onSignIn: (row: ConnectorView) => void;
+    onTest: (row: ConnectorView) => void;
+    onPatch: (row: ConnectorView, optimistic: ConnectorView, body: unknown) => void;
+    onRemove: (row: ConnectorView) => void;
+}) {
+    const t = useTranslations("account");
+    const tp = useTranslations("polar");
+    const subtitle = useSubtitle(item);
+    const description = item.entry
+        ? tp(`settings.connectorCatalog.entries.${item.entry.id}` as never)
+        : t("polarConnectors.directory.customHint");
+    return (
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-5">
+            <DialogHeader>
+                <div className="flex min-w-0 items-center gap-3 pe-8">
+                    <EntryMark item={item} size="lg" />
+                    <div className="min-w-0 flex-1">
+                        <DialogTitle className="truncate" title={item.name}>
+                            {item.name}
+                        </DialogTitle>
+                        <p className="truncate text-xs text-muted-foreground" title={subtitle}>
+                            {subtitle}
+                        </p>
+                    </div>
+                </div>
+                <DialogDescription>{description}</DialogDescription>
+            </DialogHeader>
+            <div className="flex flex-wrap items-center gap-2">
+                {item.state !== "available" ? <StateBadge state={item.state} /> : null}
+                {item.entry ? (
+                    <a
+                        href={item.entry.docs}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                    >
+                        {tp("settings.connectorCatalog.docs")}
+                        <ExternalLink className="size-3 shrink-0" />
+                    </a>
+                ) : null}
+            </div>
+            {item.state === "unavailable" ? (
+                <p className="text-sm text-warning-ink">{tp("settings.connectorCatalog.hostBlocked")}</p>
+            ) : null}
+            {item.connections.length === 0 && item.entry && item.state === "available" ? (
+                <Button type="button" className="self-start" onClick={onConnect}>
+                    <Plug className="h-3.5 w-3.5 shrink-0" />
+                    {t("polarConnectors.directory.connect")}
+                </Button>
+            ) : null}
+            {item.connections.map((row) => (
+                <ConnectionSection
+                    key={row.id}
+                    row={row}
+                    showUrl={item.kind === "custom" || item.connections.length > 1 || Boolean(item.entry?.field)}
+                    busy={busy === row.id}
+                    onSignIn={() => onSignIn(row)}
+                    onTest={() => onTest(row)}
+                    onPatch={(optimistic, body) => onPatch(row, optimistic, body)}
+                    onRemove={() => onRemove(row)}
+                />
+            ))}
+            {item.entry?.field && item.connections.length > 0 ? (
+                <Button type="button" variant="outline" className="self-start" onClick={onConnect}>
+                    <Plus className="h-3.5 w-3.5 shrink-0" />
+                    {t("polarConnectors.directory.connectAnother")}
+                </Button>
+            ) : null}
+        </div>
+    );
+}
+
+function ConnectionSection({
+    row,
+    showUrl,
+    busy,
+    onSignIn,
+    onTest,
+    onPatch,
+    onRemove
+}: {
+    row: ConnectorView;
+    showUrl: boolean;
+    busy: boolean;
+    onSignIn: () => void;
+    onTest: () => void;
+    onPatch: (optimistic: ConnectorView, body: unknown) => void;
+    onRemove: () => void;
+}) {
+    const t = useTranslations("account");
+    const needsSignIn = row.auth === "oauth" && (!row.signedIn || row.status === "sign_in");
+    return (
+        <section className="flex min-w-0 flex-col gap-3 border-t border-border pt-4">
+            <div className="flex min-w-0 items-center gap-3">
+                <div className="min-w-0 flex-1">
+                    {showUrl ? (
+                        <p className="truncate text-sm" title={row.url}>
+                            {row.url}
+                        </p>
+                    ) : (
+                        <p className="text-sm font-medium">{t("polarConnectors.directory.connection")}</p>
+                    )}
+                </div>
+                <StatusBadge row={row} />
+                <Switch
+                    checked={row.enabled}
+                    aria-label={t("polarConnectors.enabled", { name: row.name })}
+                    onChange={(enabled) => onPatch({ ...row, enabled }, { enabled })}
+                />
+            </div>
+            {row.status === "error" ? (
+                <p role="status" className="text-xs text-danger">
+                    {t(`polarConnectors.errors.${isErrorCode(row.lastError) ? row.lastError : "failed"}`)}
+                </p>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+                {needsSignIn ? (
+                    <Button type="button" size="sm" disabled={busy} onClick={onSignIn}>
+                        <LogIn className="h-3.5 w-3.5 shrink-0" />
+                        {t("polarConnectors.signIn")}
+                    </Button>
+                ) : null}
+                <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onTest}>
+                    <RefreshCw className={cn("h-3.5 w-3.5 shrink-0", busy && "animate-spin")} />
+                    {t("polarConnectors.test")}
+                </Button>
+                {row.auth === "oauth" && !needsSignIn ? (
+                    <Button type="button" size="sm" variant="outline" disabled={busy} onClick={onSignIn}>
+                        <LogIn className="h-3.5 w-3.5 shrink-0" />
+                        {t("polarConnectors.directory.reconnect")}
+                    </Button>
+                ) : null}
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    aria-label={t("polarConnectors.removeLabel", { name: row.name })}
+                    onClick={onRemove}
+                >
+                    <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                    {t("polarConnectors.directory.disconnect")}
+                </Button>
+            </div>
+            <div className="flex min-w-0 flex-col gap-1">
+                <h3 className="text-xs font-medium text-muted-foreground">
+                    {t("polarConnectors.directory.tools", { count: row.tools.length })}
+                </h3>
+                {row.tools.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">{t("polarConnectors.noTools")}</p>
+                ) : (
+                    <ul className="flex flex-col divide-y divide-border">
+                        {row.tools.map((tool) => (
+                            <li key={tool.name} className="flex flex-col gap-2 py-2">
+                                <div className="min-w-0">
+                                    <p className="flex min-w-0 items-center gap-2 text-sm">
+                                        <span className="truncate" title={tool.name}>
+                                            {tool.title}
+                                        </span>
+                                        {!tool.readOnly ? (
+                                            <Badge variant={tool.destructive ? "warning" : "neutral"}>
+                                                {t("polarConnectors.writes")}
+                                            </Badge>
+                                        ) : null}
+                                    </p>
+                                    {tool.description ? (
+                                        <p
+                                            className="line-clamp-2 text-xs text-muted-foreground"
+                                            title={tool.description}
+                                        >
+                                            {tool.description}
+                                        </p>
+                                    ) : null}
+                                </div>
+                                <SegmentedControl<Policy>
+                                    size="sm"
+                                    value={tool.policy}
+                                    aria-label={t("polarConnectors.policyLabel", { tool: tool.title })}
+                                    options={POLICIES.map((value) => ({
+                                        value,
+                                        label: t(`polarConnectors.policy.${value}`)
+                                    }))}
+                                    onValueChange={(policy) =>
+                                        onPatch(
+                                            {
+                                                ...row,
+                                                tools: row.tools.map((entry) =>
+                                                    entry.name === tool.name ? { ...entry, policy } : entry
+                                                )
+                                            },
+                                            { tool: { name: tool.name, policy } }
+                                        )
+                                    }
+                                />
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
         </section>
     );
 }

@@ -2035,7 +2035,50 @@
             "signInFailed": "No se completó el acceso. Pulsa Entrar otra vez."
         },
         "search": "Buscar conectores",
-        "noMatch": "Ningún conector coincide."
+        "noMatch": "Ningún conector coincide.",
+        "directory": {
+            "viewsLabel": "Mostrar",
+            "views": {
+                "all": "Todos ({count})",
+                "connected": "Conectados ({count})",
+                "attention": "Requieren atención ({count})"
+            },
+            "categoriesLabel": "Categorías",
+            "categories": {
+                "all": "Todas",
+                "payments": "Pagos",
+                "finance": "Finanzas",
+                "developer": "Desarrollo",
+                "commerce": "Comercio",
+                "travel": "Viajes",
+                "marketing": "Marketing",
+                "custom": "Propios"
+            },
+            "state": {
+                "connected": "Conectado",
+                "attention": "Requiere atención",
+                "available": "Conectar",
+                "unavailable": "No disponible"
+            },
+            "custom": "Propio",
+            "customHint": "Un servidor que añadiste por su URL.",
+            "connect": "Conectar",
+            "connectLabel": "Conectar {name}",
+            "connectAnother": "Conectar otra tienda",
+            "connection": "Conexión",
+            "reconnect": "Entrar de nuevo",
+            "disconnect": "Desconectar",
+            "tools": "Herramientas ({count})",
+            "noConnected": "Aún no hay nada conectado",
+            "noConnectedHint": "Elige un servidor en Todos y conéctalo.",
+            "browseAll": "Ver todos",
+            "allWorking": "Todos los conectores funcionan.",
+            "noMatchHint": "¿No aparece? Añade cualquier servidor MCP por su URL.",
+            "addByUrl": "Añadir por URL",
+            "loadFailed": "No se pudieron cargar los conectores.",
+            "retry": "Reintentar",
+            "showMore": "Ver más"
+        }
     },
     "streamdeck": {
         "page": {
