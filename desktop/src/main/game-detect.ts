@@ -54,6 +54,9 @@ export type Seen = string | RunningProcess;
 export interface StoreGame {
     readonly name: string;
     readonly folder: string;
+    /** The store's own id for it (`steam:252950`, `gog:1207658924`), which is
+     *  all the dashboard is told so it can fetch the store's own art itself. */
+    readonly store?: string;
 }
 
 /** The game running now, as it is reported. */
@@ -62,6 +65,9 @@ export interface RunningGame {
     readonly name: string;
     /** When this app first saw it, as an ISO moment. */
     readonly startedAt: string;
+    /** The store's id for it, when it was started from a store game's folder.
+     *  An identity only: no picture ever leaves this computer. */
+    readonly store?: string;
 }
 
 /** A program's own name, lowercased, without its folder - the dashboard's key. */
@@ -153,7 +159,7 @@ const HELPER = /crash|report|unins|redist|setup|prereq|easyanticheat|battleye|be
  */
 export function storeGameFolders(games: readonly StoreGame[]): StoreGame[] {
     return games
-        .map((game) => ({ name: game.name.trim(), folder: folderKey(game.folder) }))
+        .map((game) => ({ name: game.name.trim(), folder: folderKey(game.folder), ...(game.store ? { store: game.store } : {}) }))
         .filter((game) => game.name !== "" && /^[a-z]:\\./.test(game.folder) && !SHARED_FOLDERS.has(game.folder.split("\\").at(-1) ?? ""))
         .sort((a, b) => b.folder.length - a.folder.length);
 }
@@ -179,21 +185,31 @@ export function matchGame(
     custom: readonly CustomGame[] = [],
     known: readonly KnownGame[] = KNOWN_GAMES,
     folders: readonly StoreGame[] = []
-): { key: string; name: string } | null {
+): { key: string; name: string; store?: string } | null {
     const seen = [...running].map((entry): RunningProcess => (typeof entry === "string" ? { name: entry } : entry));
     const names = new Set(seen.map((entry) => programKey(entry.name)));
+    // A game known by name is still a store's game when it was started from
+    // that store's folder, and the store's id is what its art is found by.
+    const storeOf = (key: string): { store?: string } => {
+        for (const entry of seen) {
+            if (!entry.path || programKey(entry.name) !== key) continue;
+            const store = storeGameOf(entry.path, folders)?.store;
+            if (store) return { store };
+        }
+        return {};
+    };
     for (const game of custom) {
         const key = programKey(game.executable);
-        if (names.has(key)) return { key, name: game.name };
+        if (names.has(key)) return { key, name: game.name, ...storeOf(key) };
     }
     for (const game of known) {
         const program = game.programs.find((entry) => names.has(entry));
-        if (program) return { key: program, name: game.name };
+        if (program) return { key: program, name: game.name, ...storeOf(program) };
     }
     if (folders.length === 0) return null;
     for (const entry of seen) {
         const game = entry.path ? storeGameOf(entry.path, folders) : null;
-        if (game) return { key: programKey(entry.name), name: game.name };
+        if (game) return { key: programKey(entry.name), name: game.name, ...(game.store ? { store: game.store } : {}) };
     }
     return null;
 }
@@ -464,7 +480,7 @@ export class GameWatcher {
         }
         const found = matchGame(programs, this.custom, KNOWN_GAMES, this.storeFolders());
         this.followFront(programs, found?.key ?? null);
-        const same = found && this.current && found.key === this.current.key && found.name === this.current.name;
+        const same = found && this.current && found.key === this.current.key && found.name === this.current.name && found.store === this.current.store;
         if (same) {
             if (now - this.said >= REPEAT_MS) this.say(this.current, now);
             return;

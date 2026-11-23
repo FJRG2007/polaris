@@ -40,6 +40,9 @@ export interface StoreApp {
     readonly icon?: string;
     /** The game's own install folder, so a program running from inside it is known as this game. */
     readonly folder?: string;
+    /** The store's own id for the game (`steam:252950`, `epic:<namespace>:<catalog item>`),
+     *  reported beside a running game so the dashboard can find the store's art. */
+    readonly store?: string;
 }
 
 /** The largest store file read: a manifest is a few KB, a library list a few more. */
@@ -288,6 +291,7 @@ export async function epicGames(programData: string): Promise<StoreApp[]> {
             label: manifest.DisplayName ?? basename(manifest.InstallLocation),
             path: `epic:${manifest.AppName}`,
             launch: { kind: "uri", uri },
+            store: `epic:${manifest.CatalogNamespace}:${manifest.CatalogItemId}`,
             ...(exe ? { icon: exe } : {}),
             // An engine (`UE_5.3`) is not a game somebody is playing.
             ...(/^UE_/i.test(manifest.AppName) ? {} : { folder: manifest.InstallLocation })
@@ -354,6 +358,7 @@ export async function steamGames(programFilesX86: string | undefined): Promise<S
                     label: title.data,
                     path: `steam:${id}`,
                     launch: { kind: "uri", uri: `steam://rungameid/${id}` },
+                    store: `steam:${id}`,
                     ...((await exists(icon)) ? { icon } : {}),
                     ...(home ? { folder: home } : {})
                 });
@@ -415,7 +420,7 @@ export async function gogGames(): Promise<StoreApp[]> {
         if (!exe || !cwd) continue;
         const title = info?.name ?? entry?.values.get("displayname");
         if (!title) continue;
-        out.push({ label: title, path: `gog:${id}`, launch: { kind: "exe", path: exe, cwd }, icon: exe, folder: dir });
+        out.push({ label: title, path: `gog:${id}`, launch: { kind: "exe", path: exe, cwd }, icon: exe, folder: dir, store: `gog:${id}` });
     }
     return out;
 }
@@ -436,7 +441,7 @@ export async function ubisoftGames(): Promise<StoreApp[]> {
             const dir = found.values.get("installdir")?.replace(/\//g, "\\").replace(/\\+$/, "");
             if (!id || !dir || !folder.safeParse(dir).success || out.some((app) => app.path === `ubisoft:${id}`)) continue;
             if (!(await exists(dir))) continue;
-            out.push({ label: basename(dir), path: `ubisoft:${id}`, launch: { kind: "uri", uri: `uplay://launch/${id}` }, folder: dir });
+            out.push({ label: basename(dir), path: `ubisoft:${id}`, launch: { kind: "uri", uri: `uplay://launch/${id}` }, folder: dir, store: `ubisoft:${id}` });
             if (out.length >= MAX_PER_STORE) return out;
         }
     }

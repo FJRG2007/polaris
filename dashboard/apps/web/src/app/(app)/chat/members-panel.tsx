@@ -46,7 +46,7 @@ import {
 import { NicknameDialog } from "./nickname-dialog";
 import { nameplateCss } from "@/lib/profile-style-css";
 import { useKnownPresence, usePresence } from "@/components/presence-store";
-import { presenceLine } from "@/components/activity-card";
+import { ActivityMark, presenceActivity, presenceLine } from "@/components/activity-card";
 import { useDisplayFormat } from "@/components/display-format";
 import { MemberMenu, type MenuPerson } from "./member-menu";
 import { useWideScreen, WIDE_ENOUGH } from "./use-wide-screen";
@@ -413,6 +413,8 @@ export function MemberRow({
     // Being in a voice room wins over all of it while it lasts: it is the one
     // thing on this list somebody can act on by walking in.
     const under = presenceLine(where, tc, format) || role;
+    // The game's picture in front of "Playing <game>"; never in front of a role.
+    const doing = presenceActivity(where);
     const inVoice = voice ? t("members.inVoiceIn", { channel: voice.channelName }) : "";
     // Asked from the same store the face asked, so it is one request for the
     // panel rather than one per member.
@@ -501,10 +503,11 @@ export function MemberRow({
                         ) : (
                             under && (
                                 <span
-                                    className="block truncate text-[0.6875rem] text-muted-foreground"
+                                    className="flex min-w-0 items-center gap-1 text-[0.6875rem] text-muted-foreground"
                                     title={under}
                                 >
-                                    {under}
+                                    {doing ? <ActivityMark activity={doing} /> : null}
+                                    <span className="min-w-0 truncate">{under}</span>
                                 </span>
                             )
                         )}

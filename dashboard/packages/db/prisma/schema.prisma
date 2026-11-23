@@ -12285,6 +12285,28 @@ model UserActivity {
     @@index([expiresAt])
 }
 
+// A game's picture, fetched by the server from the store that sells it (Steam,
+// GOG) by the store's id, re-encoded and kept here for everybody: one fetch per
+// game per server, and no reader's browser ever asks the store. A computer only
+// ever says which game it is; no picture is taken from one.
+model GameArt {
+    // `steam:252950`, `gog:1207658924` (`gameStoreRefSchema`).
+    ref       String   @id
+    // A 128px square WebP. Null when the store had no picture, so it is not
+    // asked again until `fetchedAt` is old enough.
+    image     Bytes?
+    fetchedAt DateTime
+}
+
+// Which store game a program is, as the first desktop app that knew said, so a
+// game reported by an older app without a store id still gets its picture.
+model GameArtKey {
+    // The program, as `gameKeyOf` writes it.
+    key       String   @id
+    ref       String
+    createdAt DateTime @default(now())
+}
+
 // An application somebody registered with a provider themselves, used for their
 // own links instead of the deployment's. Spotify keeps an app in development
 // mode to five allowlisted people, and the app's owner is never one of the

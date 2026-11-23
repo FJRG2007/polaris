@@ -494,6 +494,8 @@ export interface DesktopGame {
     readonly key: string;
     readonly name: string;
     readonly startedAt: string;
+    /** The store's id for the game (`steam:252950`), sent by desktop apps that know it. */
+    readonly store?: string;
 }
 
 const METHODS = ["notify", "closeNotice", "pickFolder", "pushLocal", "openWindow"] as const;

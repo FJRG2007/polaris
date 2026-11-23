@@ -28,7 +28,7 @@ import * as readMarks from "@/lib/chat/read-marks";
 import { useChat } from "./chat-context";
 import { Elsewhere } from "./elsewhere";
 import { usePresence } from "@/components/presence-store";
-import { presenceLine } from "@/components/activity-card";
+import { ActivityMark, presenceActivity, presenceLine } from "@/components/activity-card";
 import { useDisplayFormat } from "@/components/display-format";
 import { rememberChannel } from "./recents";
 import { Avatar } from "@/components/avatar";
@@ -1535,16 +1535,15 @@ function Row({
      * that grows to three lines pushes the conversation below it off the screen.
      */
     // Or, when they said nothing, what they are playing or listening to.
-    const presence = presenceLine(
-        usePresence(personId),
-        useTranslations("components"),
-        useDisplayFormat()
-    );
+    const where = usePresence(personId);
+    const presence = presenceLine(where, useTranslations("components"), useDisplayFormat());
     const { viewerId: me } = useChat();
     // Somebody writing here says so in place of the presence line, as Discord's
     // list does; the detailed row puts it in place of the last message.
     const typing = typingLine(useTypingIn(channel?.id ?? "", me), channel?.others.length === 1, t);
     const said = typing ?? presence;
+    // The game's picture in front of "Playing <game>", as Discord's list draws it.
+    const doing = typing ? null : presenceActivity(where);
     const row = (
         <PersonRow
             as={IntentLink}
@@ -1593,13 +1592,14 @@ function Row({
                         {said && (
                             <span
                                 className={cn(
-                                    "min-w-0 truncate text-[0.6875rem] text-foreground-subtle",
+                                    "flex min-w-0 items-center gap-1 text-[0.6875rem] text-foreground-subtle",
                                     typing && "text-primary",
                                     roomy && "text-[0.75rem] md:text-[0.6875rem]"
                                 )}
                                 title={said}
                             >
-                                {said}
+                                {doing ? <ActivityMark activity={doing} /> : null}
+                                <span className="min-w-0 truncate">{said}</span>
                             </span>
                         )}
                     </span>

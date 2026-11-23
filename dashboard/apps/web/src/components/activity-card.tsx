@@ -49,6 +49,50 @@ function gameOf(activity: Pick<core.ActivityView, "gameId">): core.GameDefinitio
     return activity.gameId ? (core.findGame(activity.gameId) ?? null) : null;
 }
 
+/**
+ * The small mark in front of a one-line activity: the game's picture this server
+ * keeps for it, the catalog game's own mark, or the source's glyph - never an
+ * empty gap, and never a broken image when a picture fails to load.
+ */
+export function ActivityMark({
+    activity,
+    className
+}: {
+    activity: Pick<core.ActivityView, "source" | "gameId" | "imageUrl">;
+    className?: string;
+}) {
+    const [broken, setBroken] = useState(false);
+    const Icon = SOURCE_ICONS[activity.source];
+    const game = gameOf(activity);
+    // A row draws the game, not a track's album cover or a server's icon.
+    const picture = activity.source === "game" && activity.imageUrl && !broken ? activity.imageUrl : null;
+    if (picture)
+        return (
+            // Served by this server at a fixed 128px: nothing to optimize.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+                src={picture}
+                alt=""
+                aria-hidden
+                loading="lazy"
+                className={cn("size-3.5 shrink-0 rounded-[3px] object-cover", className)}
+                onError={() => setBroken(true)}
+            />
+        );
+    if (game) return <GameLogo game={game} className={cn("size-3", className)} />;
+    return <Icon className={cn("size-3 shrink-0", className)} aria-hidden />;
+}
+
+/** The activity a row's line is about, when the line is one (`presenceLine`):
+ *  nothing when they said something themselves, so the mark never sits in
+ *  front of a status somebody typed. */
+export function presenceActivity(
+    where: PresenceOf | null | undefined
+): core.ActivityView | null {
+    if (where?.note?.trim()) return null;
+    return where?.activity?.[0] ?? null;
+}
+
 /** "Playing Minecraft", "Listening to <track>", in the reader's language. */
 export function activityLine(
     activity: Pick<core.ActivityView, "source" | "name">,
@@ -99,8 +143,6 @@ export function ActivityLine({
     const t = useTranslations("components");
     const first = usePresence(personId)?.activity?.[0];
     if (!first) return null;
-    const Icon = SOURCE_ICONS[first.source];
-    const game = gameOf(first);
     const line = activityLine(first, t);
     return (
         <span
@@ -110,11 +152,7 @@ export function ActivityLine({
             )}
             title={line}
         >
-            {game ? (
-                <GameLogo game={game} className="size-3" />
-            ) : (
-                <Icon className="size-3 shrink-0" aria-hidden />
-            )}
+            <ActivityMark activity={first} />
             <span className="min-w-0 truncate">{line}</span>
         </span>
     );
@@ -229,14 +267,18 @@ export function ActivityCard({
                 <span className="relative size-14 shrink-0">
                     <span className="flex size-full items-center justify-center overflow-hidden rounded-md bg-muted">
                         {picture ? (
-                            // A picture from the music service's CDN or the
-                            // server's own icon, at the size it was handed:
-                            // there is no second copy to optimize.
+                            // A picture from the music service's CDN, the
+                            // server's own icon, or the game's store art this
+                            // server keeps: no second copy to optimize.
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                                 src={picture}
                                 alt=""
-                                className="size-full object-cover [image-rendering:pixelated]"
+                                className={cn(
+                                    "size-full object-cover",
+                                    // A server's 64px icon is pixel art; box art is not.
+                                    activity.source === "minecraft" && "[image-rendering:pixelated]"
+                                )}
                                 referrerPolicy="no-referrer"
                                 onError={() => setBroken(true)}
                             />

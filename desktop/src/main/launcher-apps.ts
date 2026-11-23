@@ -107,7 +107,7 @@ async function read(platform: NodeJS.Platform): Promise<Listing> {
             return true;
         })
         .slice(0, MAX_APPS);
-    const games = stores.flatMap((app) => (app.folder ? [{ name: app.label, folder: app.folder }] : []));
+    const games = stores.flatMap((app) => (app.folder ? [{ name: app.label, folder: app.folder, ...(app.store ? { store: app.store } : {}) }] : []));
     return { apps, games };
 }
 

@@ -17,7 +17,7 @@ vi.mock("@/components/presence", () => ({ useNow: () => Date.now() }));
 vi.mock("@/components/session-scope", () => ({ useSessionScope: () => "viewer" }));
 vi.mock("@/components/listen-along-button", () => ({ ListenAlongButton: () => null }));
 
-const { ActivityCard, activityLine } = await import("@/components/activity-card");
+const { ActivityCard, ActivityMark, activityLine } = await import("@/components/activity-card");
 const { translate } = await import("@/lib/i18n/translate");
 
 const playing: ActivityView = {
@@ -69,6 +69,50 @@ describe("the card for a game server", () => {
     it("reads in Spanish", () => {
         render(withMessages(<ActivityCard activity={playing} />, "es-ES"));
         expect(screen.getByLabelText("Jugando a Minecraft")).toBeTruthy();
+    });
+});
+
+describe("a game on somebody's computer", () => {
+    const rocket: ActivityView = {
+        source: "game",
+        key: "rocketleague.exe",
+        name: "Rocket League",
+        details: "",
+        state: "",
+        imageUrl: "/api/activity/game-art/steam%3A252950",
+        linkUrl: null,
+        startedAt: new Date().toISOString(),
+        endsAt: null
+    };
+
+    it("shows the picture this server keeps for it, on the card and in a row", () => {
+        const card = render(<ActivityCard activity={rocket} />, { wrapper: MessagesWrapper });
+        expect(images(card.container)).toEqual(["/api/activity/game-art/steam%3A252950"]);
+        // Box art is not pixel art.
+        expect(card.container.querySelector("img")!.className).not.toContain("pixelated");
+        cleanup();
+        const row = render(<ActivityMark activity={rocket} />);
+        expect(images(row.container)).toEqual(["/api/activity/game-art/steam%3A252950"]);
+    });
+
+    it("draws the game glyph, never a gap, when there is no picture or it fails", () => {
+        const row = render(<ActivityMark activity={rocket} />);
+        fireEvent.error(row.container.querySelector("img")!);
+        expect(images(row.container)).toEqual([]);
+        expect(row.container.querySelector("svg")).toBeTruthy();
+        cleanup();
+        const none = render(<ActivityMark activity={{ ...rocket, imageUrl: null }} />);
+        expect(none.container.querySelector("svg")).toBeTruthy();
+    });
+
+    it("never puts a track's cover in a row's mark", () => {
+        const row = render(<ActivityMark activity={{ ...rocket, source: "spotify", imageUrl: "https://i.scdn.co/image/x" }} />);
+        expect(images(row.container)).toEqual([]);
+    });
+
+    it("reads in Spanish", () => {
+        render(withMessages(<ActivityCard activity={rocket} />, "es-ES"));
+        expect(screen.getByLabelText("Jugando a Rocket League")).toBeTruthy();
     });
 });
 

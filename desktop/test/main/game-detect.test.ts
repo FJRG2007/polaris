@@ -88,6 +88,26 @@ describe("knowing a store game by its folder", () => {
     ]);
     const at = (path: string) => ({ name: path.split("\\").at(-1)!.toLowerCase(), path });
 
+    it("reports the store's id for a game started from its folder, and never a picture", () => {
+        const stored = storeGameFolders([
+            { name: "Rocket League", folder: "C:\\Program Files\\Epic Games\\rocketleague", store: "epic:fixture-namespace:fixture-item" },
+            { name: "Hades II", folder: "D:\\SteamLibrary\\steamapps\\common\\Hades II", store: "steam:100" }
+        ]);
+        expect(matchGame([at("D:\\SteamLibrary\\steamapps\\common\\Hades II\\Ship\\Hades2.exe")], [], KNOWN_GAMES, stored)).toEqual({
+            key: "hades2.exe",
+            name: "Hades II",
+            store: "steam:100"
+        });
+        // Known by name, and still the store's game because of where it runs from.
+        expect(matchGame([at("C:\\Program Files\\Epic Games\\rocketleague\\Binaries\\Win64\\RocketLeague.exe")], [], KNOWN_GAMES, stored)).toEqual({
+            key: "rocketleague.exe",
+            name: "Rocket League",
+            store: "epic:fixture-namespace:fixture-item"
+        });
+        // Known by name from anywhere else: no store, as before.
+        expect(matchGame([at("E:\\Games\\RocketLeague.exe")], [], KNOWN_GAMES, stored)).toEqual({ key: "rocketleague.exe", name: "Rocket League" });
+    });
+
     it("keeps only folders that hold one game, longest first", () => {
         expect(folders.map((game) => game.name)).toEqual(["Mod kit", "Satisfactory", "Hades II"]);
         expect(folders.find((game) => game.name === "Hades II")?.folder).toBe("d:\\steamlibrary\\steamapps\\common\\hades ii");

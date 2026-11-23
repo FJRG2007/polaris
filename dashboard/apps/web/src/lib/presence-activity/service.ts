@@ -30,6 +30,8 @@ import { sessionHref } from "@/lib/chat/activity-card";
 import { MAX_PLAYERS, PASS_TTL_MS } from "@/lib/chat/call-activity";
 import { isGameAway } from "@/lib/chat/game-away";
 import { activitySettingsFor, activitySettingsOf, rememberSeenGame } from "./settings";
+import { artRefOfReport, warmGameArt } from "./game-art";
+import { artRoute } from "./game-art-sources";
 
 /** The sources that are stored here rather than looked up. */
 export type StoredSource = Extract<core.ActivitySource, "spotify" | "game">;
@@ -198,11 +200,15 @@ export async function reportGame(
     const startedAt = new Date(
         Math.min(now.getTime(), Math.max(now.getTime() - OLDEST_START_MS, claimed))
     );
+    // The picture is the store's, fetched by this server: the report names the
+    // game's store id at most, never an image.
+    const art = await artRefOfReport(game.key, game.store).catch(() => null);
+    if (art) warmGameArt(art);
     await Promise.all([
         putActivity(
             userId,
             "game",
-            { key: game.key, name: game.name, startedAt },
+            { key: game.key, name: game.name, startedAt, imageUrl: art ? artRoute(art) : null },
             new Date(now.getTime() + GAME_REPORT_TTL_MS),
             now
         ),

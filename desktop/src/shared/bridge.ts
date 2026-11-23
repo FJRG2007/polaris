@@ -367,6 +367,9 @@ export interface GameActivity {
     readonly name: string;
     /** When this app first saw it, as an ISO moment. */
     readonly startedAt: string;
+    /** The store's id for it (`steam:252950`), when it runs from a store game's
+     *  folder. The dashboard finds the store's own art by it; no picture is sent. */
+    readonly store?: string;
 }
 
 /** A program somebody said is a game. */

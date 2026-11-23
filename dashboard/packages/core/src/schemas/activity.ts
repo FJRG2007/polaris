@@ -161,6 +161,25 @@ export function readStoredList<T>(raw: string | null | undefined, item: z.ZodTyp
 }
 
 /**
+ * Which game it is, by the store it came from: `steam:<appid>`, `gog:<id>`,
+ * `ubisoft:<id>`, `epic:<namespace>:<catalog item>`, `packaged:<AUMID>`.
+ *
+ * This is the only thing a computer says about a game's picture. The picture
+ * itself is fetched by the server from the store's own public catalog by this
+ * id, the way Discord draws a game from its own registry, so nobody's computer
+ * can put an image beside their name that the store did not publish.
+ */
+export const GAME_STORE_REF =
+    /^(?:steam:\d{1,10}|gog:\d{1,12}|ubisoft:\d{1,10}|epic:[A-Za-z0-9._-]{1,200}:[A-Za-z0-9._-]{1,200}|packaged:[A-Za-z0-9._-]{1,200}![A-Za-z0-9._-]{1,200})$/;
+
+export const gameStoreRefSchema = z.string().trim().regex(GAME_STORE_REF);
+
+/** The store a reference names: `steam` for `steam:252950`. */
+export function gameStoreOf(ref: string): string {
+    return ref.slice(0, ref.indexOf(":"));
+}
+
+/**
  * What the desktop app reports: the game it sees running, or none.
  *
  * `startedAt` is when the program was first seen, on the reporting computer's
@@ -172,7 +191,10 @@ export const gameReportSchema = z.object({
         .object({
             key: gameKeySchema,
             name: gameNameSchema,
-            startedAt: z.string().datetime()
+            startedAt: z.string().datetime(),
+            // Sent by desktop apps that know it. One that is not a store id is
+            // dropped rather than refusing the report: the game still shows.
+            store: gameStoreRefSchema.optional().catch(undefined)
         })
         .nullable()
 });
