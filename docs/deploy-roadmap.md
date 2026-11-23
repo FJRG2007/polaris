@@ -12,6 +12,66 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 
 ---
 
+## 0. Railway service settings parity (inventory 2026-11-23)
+
+Every service-level setting Railway documents (docs.railway.com: services,
+variables, networking, scaling, builds, deployments, cron, healthchecks, app
+sleeping, restart policy, config as code, environments), checked against the
+code. **present** = works end to end from the Settings tab; **partial** = some
+of it, the gap is named; **missing** = nothing on screen. Paths are relative to
+`dashboard/apps/web/src/`.
+
+| Railway setting | State | Where / gap |
+| --- | --- | --- |
+| Source repo, connect / change / disconnect | present | `app/(app)/apps/deploy/service-source-cards.tsx` |
+| Root directory | present | `service-settings.tsx` (rootDirectory card) |
+| Branch connected to the environment | present | `service-settings.tsx` (autoDeploy card) |
+| Auto deploy on push | present | `lib/deploy/auto-deploy-poller.ts`, webhook receiver |
+| Wait for CI | present | `lib/deploy/ci-wait.ts`, autoDeploy card |
+| Docker image source + registry credentials | present | `registries/`, source cards |
+| Generate public domain (editable) | present | `public-networking.tsx` |
+| Custom domain + target port | present | `public-networking.tsx`, `lib/deploy/router.ts` |
+| TCP proxy | present | `public-networking.tsx` (up to 8 per service) |
+| Private networking, editable DNS name, IPv4 + IPv6 | present | `private-network-panel.tsx`, `lib/deploy/private-names.ts` |
+| Private network isolation per project + environment | partial | `lib/deploy/service-networks.ts`: new environments are `environment` mode and an unrouted service is reachable only inside its environment; environments made before that mode keep `shared` (every project on one network), and a service with a public domain also joins the shared proxy network, where other projects' routed services can reach it by address |
+| Static outbound IPs | missing | egress pinned through a machine / relay / WireGuard exit the operator owns |
+| Outbound IPv6 | missing | IPv6 exists on private networks only (`dualStackNetworks`) |
+| Regions | partial | one machine per service (`server` card); a region = a Polaris machine, no choice of several |
+| Replicas | present | `scaling-section.tsx` (up to ten, autoscaling) |
+| Replicas spread across regions | missing | every copy runs on the service's one machine |
+| Per-replica CPU / memory limits | present | `scaling-section.tsx` resources card (limits apply per container) |
+| Serverless (app sleeping) | partial | `lib/deploy/sleep-service.ts`: wakes on the next visit, one local copy only; no remote machine, no request queueing while it wakes |
+| Builder (Dockerfile / Nixpacks / Railpack-style) | present | `service-source-cards.tsx` builder card |
+| Custom build command | present | `service-settings.tsx` buildCommands card |
+| Watch paths | present | autoDeploy card, `watchPaths` |
+| Dockerfile build args / target stage | partial | builders take them, no field on screen |
+| Custom start command | present | buildCommands card |
+| Pre-deploy command | missing | run in the new release before it takes traffic, failure keeps the old one |
+| Teardown: overlap and draining seconds | partial | `deploy-behaviour-section.tsx`: overlap on/off; no overlap or draining time |
+| Cron schedule for the whole service | partial | `cron-panel.tsx` runs commands inside the service; no "this service runs on a schedule and exits" mode |
+| Healthcheck path + timeout gating a deploy | partial | `scaling-section.tsx` health path feeds the balancer only with 2+ copies; the deploy gate (`packages/deploy/src/runtime/readiness.ts`) never probes a path |
+| Restart policy (never / on failure / always) + max retries | missing | every service is `unless-stopped` (`packages/deploy/src/compose-spec.ts`) |
+| Config-as-code file path | partial | `lib/deploy/repo-import.ts` reads `railway.json`/`railway.toml` once, when the service is created; no path setting, not re-read on deploy |
+| Service feature flags | partial | project-level flags only (`settings/feature-flags-section.tsx`) |
+| Delete service | present | `service-settings.tsx` deleteService card |
+| Service variables, raw editor | present | `variables-editor.tsx`, `variables-raw-dialog.tsx` |
+| Shared variables | present | `settings/shared-variables-section.tsx`, `${{shared.KEY}}` |
+| Reference variables `${{service.KEY}}` | present | `lib/deploy/references.ts`: resolved at deploy, scoped to the environment |
+| Sealed variables | missing | values can be revealed (audited) once saved |
+| Redeploy what references a changed variable | partial | saving offers a redeploy of the scope that changed; services in the same environment that reference it are not offered |
+| Egress proxy template (private only, generated password by reference) | missing | template catalogue has none |
+| Volumes | present | `volumes-panel.tsx` |
+| Deploy / build / runtime logs, metrics | present | `logs-view.tsx`, `observability-view.tsx` |
+| Environments, PR environments | present | `settings/environments-section.tsx` |
+| Rollback / redeploy | present | releases |
+| Project webhooks | present | `settings/webhooks-section.tsx` |
+| Templates | present | `lib/deploy/template-setup.ts` |
+| Move service to another environment / project | present | `move-dialogs.tsx` |
+
+Counts on 2026-11-23: present 27, partial 10, missing 7.
+
+---
+
 ## 1. Git integration & CI/CD
 
 | Item                                          | Status  | Prio | Notes                                                                                                                                                 |
