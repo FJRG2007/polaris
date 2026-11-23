@@ -17,7 +17,7 @@
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
-import { proveStepUp } from "@/lib/step-up";
+import { anyStepUpProofSchema, proveStepUp } from "@/lib/step-up";
 import * as orgs from "@/lib/orgs/org-service";
 import * as roles from "@/lib/orgs/role-service";
 import { recordAudit } from "@/lib/audit-service";
@@ -224,7 +224,7 @@ export async function transferOrgAction(
  */
 export async function deleteOrgAction(orgId: string, proof: unknown): Promise<{ error?: string }> {
     const caller = await actor();
-    const parsed = core.stepUpProofSchema.safeParse(proof);
+    const parsed = anyStepUpProofSchema.safeParse(proof);
     if (!parsed.success) return invalid(parsed.error.issues[0]?.message, "errors.confirmFirst");
     try {
         await orgs.requireOrgDeletion(caller, orgId);

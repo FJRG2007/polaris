@@ -138,7 +138,7 @@ Browser side: `lib/chat/e2ee/password-flows-client.ts`, loaded on submit only. `
 | --- | --- | --- |
 | Change password (`changePasswordOpaqueAction`; old `changePasswordAction` kept for unmoved accounts) | done | `apps/web/test/chat/e2ee/opaque-password-flows.test.ts` |
 | Step-up password proof through `StepUpDialog` / `proveStepUpAction` (`opaque-password` proof = the "password" choice) | done | same file, "a step-up password becomes its OPAQUE proof" |
-| Step-up proofs sent by the screens that embed `StepUpFields` directly (org delete, successor, lockdown, close account) | open | their schemas take `stepUpProofSchema` from core; route them through `sentStepUpProof` and `anyStepUpProofSchema` |
+| Step-up proofs sent by the screens that embed `StepUpFields` directly (org delete, account and org successor, lockdown, lift, close account) | done | `stepUpProofToSend` (`lib/step-up-proof-client.ts`) on the client, `anyStepUpProofSchema` in each action; `test/account/step-up-opaque-proofs.test.ts` (org delete by review: same one-line schema swap) |
 | Forgot-password reset, recovery completion, `recoverPasswordAction`, sign-up, promote email, admin reset, 2FA enable/disable, chat lock ops | open | reset, recovery and sign-up need a token-authorised variant of the set primitive (no session) |
 | Desktop, extension, mobile, TV | nothing to change | none posts a password itself; they sign in through the web form |
 

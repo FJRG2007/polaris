@@ -354,6 +354,29 @@ describe("proving the current password", () => {
     });
 });
 
+describe("the proof a step-up screen sends", () => {
+    it("a typed password goes as its OPAQUE proof, a code and every fallback as typed", async () => {
+        const { stepUpProofToSend } = await import("@/lib/step-up-proof-client");
+        const alice = await adoptedAccount();
+        const proof = await stepUpProofToSend({ proof: "password", password: PASSWORD });
+        expect(proof.proof).toBe("opaque-password");
+        expect(JSON.stringify(proof)).not.toContain(PASSWORD);
+        expect(await server.provesPassword(alice.id, proof as { loginId: string; finishLoginRequest?: string })).toBe(true);
+        expect(await stepUpProofToSend({ proof: "email", code: "123456" })).toEqual({ proof: "email", code: "123456" });
+        worker.down = true;
+        expect(await stepUpProofToSend({ proof: "password", password: PASSWORD })).toEqual({
+            proof: "password",
+            password: PASSWORD
+        });
+        worker.down = false;
+        state.sessionUser = { id: account("bob@example.com", PASSWORD).id, sessionId: "session-b" };
+        expect(await stepUpProofToSend({ proof: "password", password: PASSWORD })).toEqual({
+            proof: "password",
+            password: PASSWORD
+        });
+    });
+});
+
 describe("setting a new password", () => {
     it("replaces the password without the server ever seeing either", async () => {
         const alice = await adoptedAccount();

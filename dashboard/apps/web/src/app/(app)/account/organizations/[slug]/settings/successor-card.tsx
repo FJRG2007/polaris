@@ -30,6 +30,8 @@ import type { StepUpProofInput } from "@polaris/core";
 import { AccountInput } from "@/components/account-input";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { StepUpFields } from "@/components/step-up-fields";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
+import { stepUpProofToSend } from "@/lib/step-up-proof-client";
 import { HeartHandshake, Loader2, Trash2, UserPlus } from "lucide-react";
 import { clearOrgSuccessorAction, setOrgSuccessorAction } from "./successor-actions";
 import {
@@ -160,6 +162,7 @@ function OrgSuccessorDialog({
     const [proof, setProof] = useState<StepUpProofInput | null>(null);
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
 
     const open = mode !== null;
     const clearing = mode === "clear";
@@ -175,10 +178,12 @@ function OrgSuccessorDialog({
     const submit = async () => {
         if (!proof) return;
         setBusy(true);
+        setProtecting(false);
         setError("");
+        const sent = await stepUpProofToSend(proof, () => setProtecting(true));
         const result = clearing
-            ? await clearOrgSuccessorAction({ orgId, proof })
-            : await setOrgSuccessorAction({ orgId, identifier: identifier.trim(), proof });
+            ? await clearOrgSuccessorAction({ orgId, proof: sent })
+            : await setOrgSuccessorAction({ orgId, identifier: identifier.trim(), proof: sent });
         setBusy(false);
         if (result.error) {
             setError(result.error);
@@ -242,7 +247,16 @@ function OrgSuccessorDialog({
                         </Button>
                         <Button type="submit" disabled={!ready || busy}>
                             {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                            {clearing ? t("form.remove") : t("successor.dialog.nameThem")}
+                            {busy ? (
+                                <SlowSubmitLabel
+                                    busyLabel={clearing ? t("form.remove") : t("successor.dialog.nameThem")}
+                                    protecting={protecting}
+                                />
+                            ) : clearing ? (
+                                t("form.remove")
+                            ) : (
+                                t("successor.dialog.nameThem")
+                            )}
                         </Button>
                     </DialogFooter>
                 </form>

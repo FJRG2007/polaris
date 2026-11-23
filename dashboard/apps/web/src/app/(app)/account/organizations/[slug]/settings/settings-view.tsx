@@ -24,6 +24,8 @@ import { runAction } from "@/lib/run-action";
 import type { OrgDeletionImpact, OrgDetail } from "@/lib/orgs/org-service";
 import { useConfirm } from "@/components/confirm-dialog";
 import { StepUpFields } from "@/components/step-up-fields";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
+import { stepUpProofToSend } from "@/lib/step-up-proof-client";
 import { OrgPicturesCard } from "@/app/(app)/account/avatar-card";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { orgValidationMessage } from "@/app/(app)/account/organizations/org-validation";
@@ -408,6 +410,7 @@ function DangerCard({ org, impact }: { org: OrgDetail; impact: OrgDeletionImpact
     const [open, setOpen] = useState(false);
     const [proof, setProof] = useState<core.StepUpProofInput | null>(null);
     const [pending, setPending] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState("");
 
     const counts = { spaces: impact.spaces, tasks: impact.tasks };
@@ -445,7 +448,13 @@ function DangerCard({ org, impact }: { org: OrgDetail; impact: OrgDeletionImpact
                 onOpenChange={setOpen}
                 name={org.name}
                 kind="organization"
-                confirmLabel={t("settings.danger.button")}
+                confirmLabel={
+                    pending ? (
+                        <SlowSubmitLabel busyLabel={t("settings.danger.button")} protecting={protecting} />
+                    ) : (
+                        t("settings.danger.button")
+                    )
+                }
                 error={error}
                 pending={pending}
                 confirmDisabled={proof === null}
@@ -453,8 +462,10 @@ function DangerCard({ org, impact }: { org: OrgDetail; impact: OrgDeletionImpact
                 onConfirm={async () => {
                     if (!proof) return;
                     setPending(true);
+                    setProtecting(false);
                     setError("");
-                    const result = await runAction(() => deleteOrgAction(org.id, proof), setError);
+                    const sent = await stepUpProofToSend(proof, () => setProtecting(true));
+                    const result = await runAction(() => deleteOrgAction(org.id, sent), setError);
                     setPending(false);
                     if (!result || result.error) {
                         if (result?.error) setError(result.error);

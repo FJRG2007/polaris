@@ -22,9 +22,8 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
-import { proveStepUp } from "@/lib/step-up";
+import { anyStepUpProofSchema, proveStepUp } from "@/lib/step-up";
 import { recordAudit } from "@/lib/audit-service";
-import { stepUpProofSchema } from "@polaris/core";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { getTranslations } from "@/lib/i18n/request";
 import { clearOrgSuccessor, setOrgSuccessor, SuccessorError } from "@/lib/successor-service";
@@ -42,10 +41,10 @@ const SAY_WHO = "errors.sayWho";
 const setSchema = z.object({
     orgId: z.string().uuid(),
     identifier: z.string().trim().min(1, SAY_WHO).max(320),
-    proof: stepUpProofSchema
+    proof: anyStepUpProofSchema
 });
 
-const clearSchema = z.object({ orgId: z.string().uuid(), proof: stepUpProofSchema });
+const clearSchema = z.object({ orgId: z.string().uuid(), proof: anyStepUpProofSchema });
 
 /**
  * Whether this account owns the organization, said as a refusal or nothing.

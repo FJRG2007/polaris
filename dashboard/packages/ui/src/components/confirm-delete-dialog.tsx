@@ -50,7 +50,7 @@ export interface ConfirmDeleteDialogProps {
     /** Extra controls shown above the confirmation field, e.g. a "wipe data" switch. */
     children?: ReactNode;
     /** Overrides the button label when the action is not literally a delete. */
-    confirmLabel?: string;
+    confirmLabel?: ReactNode;
     /** Overrides the heading for an action that is not a delete - closing a tunnel,
      *  dropping a hostname. Say what it does, not the word the component defaults to. */
     title?: ReactNode;

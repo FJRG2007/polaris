@@ -20,6 +20,8 @@ import { useRouter } from "next/navigation";
 import { Loader2, ShieldAlert } from "lucide-react";
 import type { StepUpProofInput } from "@polaris/core";
 import { StepUpFields } from "@/components/step-up-fields";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
+import { stepUpProofToSend } from "@/lib/step-up-proof-client";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { SettingLock } from "./setting-card";
@@ -196,6 +198,7 @@ function LockdownDialog({
     const [proof, setProof] = useState<StepUpProofInput | null>(null);
     const [note, setNote] = useState("");
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
     const [error, setError] = useState("");
     const open = asking !== null;
     const words = asking ? wording(t, asking) : null;
@@ -203,13 +206,15 @@ function LockdownDialog({
     async function confirm(): Promise<void> {
         if (!asking || !proof) return;
         setBusy(true);
+        setProtecting(false);
         setError("");
+        const sent = await stepUpProofToSend(proof, () => setProtecting(true));
         const result =
             asking === "lockdown"
-                ? await raiseLockdownAction({ note, proof })
+                ? await raiseLockdownAction({ note, proof: sent })
                 : asking === "lift"
-                  ? await liftLockdownAction({ proof })
-                  : await closeAccountAction({ closure: asking, proof });
+                  ? await liftLockdownAction({ proof: sent })
+                  : await closeAccountAction({ closure: asking, proof: sent });
         setBusy(false);
         if (result.error) {
             setError(result.error);
@@ -286,7 +291,11 @@ function LockdownDialog({
                         onClick={() => void confirm()}
                     >
                         {busy && <Loader2 className="size-4 animate-spin" />}
-                        {words?.confirm}
+                        {busy && words ? (
+                            <SlowSubmitLabel busyLabel={words.confirm} protecting={protecting} />
+                        ) : (
+                            words?.confirm
+                        )}
                     </Button>
                 </DialogFooter>
             </DialogContent>

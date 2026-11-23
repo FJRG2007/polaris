@@ -15,12 +15,12 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
-import { proveStepUp } from "@/lib/step-up";
+import { anyStepUpProofSchema, proveStepUp } from "@/lib/step-up";
 import { recordAudit } from "@/lib/audit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { getTranslations } from "@/lib/i18n/request";
 import { firstIssue, localized } from "./action-messages";
-import { accountSuccessorSchema, stepUpProofSchema } from "@polaris/core";
+import { accountSuccessorSchema } from "@polaris/core";
 import { clearSuccessor, setSuccessor, SuccessorError } from "@/lib/successor-service";
 
 type ActionResult = { error?: string };
@@ -30,7 +30,7 @@ type ActionResult = { error?: string };
  *  have to be asked for again to undo it a second later. */
 const PURPOSE = "account-successor";
 
-const nameSuccessorSchema = accountSuccessorSchema.extend({ proof: stepUpProofSchema });
+const nameSuccessorSchema = accountSuccessorSchema.extend({ proof: anyStepUpProofSchema });
 
 export async function setSuccessorAction(input: unknown): Promise<ActionResult> {
     const user = await requireUser();
@@ -65,7 +65,7 @@ export async function clearSuccessorAction(proof: unknown): Promise<ActionResult
     const blocked = await newDeviceRefusal(user);
     if (blocked) return localized({ error: blocked });
 
-    const parsed = z.object({ proof: stepUpProofSchema }).safeParse(proof);
+    const parsed = z.object({ proof: anyStepUpProofSchema }).safeParse(proof);
     if (!parsed.success) return { error: (await getTranslations("accountSecurity"))("errors.confirmFirst") };
 
     const proven = await proveStepUp(user.id, PURPOSE, parsed.data.proof);

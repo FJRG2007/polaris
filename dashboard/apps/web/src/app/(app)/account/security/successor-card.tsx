@@ -28,6 +28,8 @@ import type { StepUpProofInput } from "@polaris/core";
 import { AccountInput } from "@/components/account-input";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { StepUpFields } from "@/components/step-up-fields";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
+import { stepUpProofToSend } from "@/lib/step-up-proof-client";
 import { Feedback, type SettingLock } from "./setting-card";
 import { HeartHandshake, Loader2, Trash2, UserPlus } from "lucide-react";
 import { clearSuccessorAction, setSuccessorAction } from "./successor-actions";
@@ -145,10 +147,12 @@ function SuccessorDialog({
     const [proof, setProof] = useState<StepUpProofInput | null>(null);
     const [error, setError] = useState("");
     const [busy, setBusy] = useState(false);
+    const [protecting, setProtecting] = useState(false);
 
     const open = mode !== null;
     const clearing = mode === "clear";
     const ready = proof !== null && (clearing || identifier.trim().length > 0);
+    const label = clearing ? t("passkeys.remove") : current ? t("successor.change") : t("successor.add");
 
     const close = () => {
         setIdentifier("");
@@ -160,10 +164,12 @@ function SuccessorDialog({
     const submit = async () => {
         if (!ready || busy || !proof) return;
         setBusy(true);
+        setProtecting(false);
         setError("");
+        const sent = await stepUpProofToSend(proof, () => setProtecting(true));
         const result = clearing
-            ? await clearSuccessorAction({ proof })
-            : await setSuccessorAction({ identifier: identifier.trim(), proof });
+            ? await clearSuccessorAction({ proof: sent })
+            : await setSuccessorAction({ identifier: identifier.trim(), proof: sent });
         setBusy(false);
         if (result.error) {
             setError(result.error);
@@ -228,7 +234,11 @@ function SuccessorDialog({
                             disabled={busy || !ready}
                         >
                             {busy && <Loader2 className="size-4 shrink-0 animate-spin" />}
-                            {clearing ? t("passkeys.remove") : current ? t("successor.change") : t("successor.add")}
+                            {busy ? (
+                                <SlowSubmitLabel busyLabel={label} protecting={protecting} />
+                            ) : (
+                                label
+                            )}
                         </Button>
                     </DialogFooter>
                 </form>

@@ -21,19 +21,19 @@ import { z } from "zod";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
-import { proveStepUp } from "@/lib/step-up";
+import { anyStepUpProofSchema, proveStepUp } from "@/lib/step-up";
 import { getTranslations } from "@/lib/i18n/request";
 import { firstIssue, localized } from "./action-messages";
 import { closeAccount, liftLockdown, raiseLockdown } from "@/lib/account-lifecycle";
 
 type ActionResult = { error?: string };
 
-const lockdownInput = core.lockdownSchema.extend({ proof: core.stepUpProofSchema });
+const lockdownInput = core.lockdownSchema.extend({ proof: anyStepUpProofSchema });
 const closeInput = z.object({
     closure: z.enum(core.ACCOUNT_CLOSURES),
-    proof: core.stepUpProofSchema
+    proof: anyStepUpProofSchema
 });
-const liftInput = z.object({ proof: core.stepUpProofSchema });
+const liftInput = z.object({ proof: anyStepUpProofSchema });
 
 /**
  * Shut the account down.
