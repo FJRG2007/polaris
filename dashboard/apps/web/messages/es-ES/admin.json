@@ -3299,7 +3299,7 @@
             "fix": "Configurar WhatsApp"
         },
         "integrity": {
-            "title": "Integridad del código",
+            "title": "Integridad",
             "hint": "Si el código que este servidor envía a los navegadores es el que Polaris publicó para su versión. Se comprueba tras cada arranque y actualización.",
             "verified": "Verificado",
             "changed": "Modificado",
@@ -3308,7 +3308,7 @@
             "changedDetail": "{count, plural, one {Un archivo de código no coincide} other {# archivos de código no coinciden}} con la versión firmada. Alguien puede haber modificado este servidor. Pide que nadie inicie sesión aquí hasta reinstalarlo desde una imagen limpia.",
             "more": "y {count} más",
             "checked": "Comprobado",
-            "again": "Volver a comprobar",
+            "again": "Comprobar",
             "failed": "No se pudo comprobar. Inténtalo de nuevo en un momento.",
             "reason": {
                 "no-stamp": "Este servidor se compiló desde el código fuente, así que no hay versión firmada con la que comparar.",
