@@ -124,4 +124,30 @@ describe("notification groups", () => {
         fireEvent.click(screen.getAllByRole("button", { name: "Unmute" })[0]!);
         expect(onMute).toHaveBeenCalledWith({ kind: "group", id: "deploy" }, null);
     });
+
+    it("heads every group with its mark, and leaves out a group with no rules", () => {
+        const state = rules([]);
+        for (const entry of NOTIFICATION_EVENTS) if (entry.group === "network") state.delete(entry.id);
+        const { container } = render(
+            <MessagesWrapper>
+                <EventGroups
+                    state={state}
+                    destinations={[]}
+                    onChange={() => {}}
+                    hold={{ holds: { mutes: {}, schedules: {} }, timeZone: "UTC", onMute: () => {}, onSchedule: () => {} }}
+                />
+            </MessagesWrapper>
+        );
+        expect(screen.queryByRole("button", { name: /^Network/ })).toBeNull();
+        const headers = [...container.querySelectorAll("button[aria-expanded]")];
+        expect(headers.length).toBeGreaterThan(0);
+        for (const header of headers) {
+            expect(
+                header.querySelector("[data-app-logo], [data-group-mark]"),
+                header.textContent ?? ""
+            ).not.toBeNull();
+        }
+        expect(container.querySelector('[data-app-logo="polar"]')).not.toBeNull();
+        expect(container.querySelector('[data-group-mark="polaris"]')).not.toBeNull();
+    });
 });
