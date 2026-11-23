@@ -29,7 +29,7 @@
             update: "Version {version} of this plugin is out. It does not install itself: download it from your Polaris and open the file.",
             getUpdate: "Open Downloads",
             updateNow:
-                "Version {version} of this plugin is out. It installs itself within six hours, or now.",
+                "Version {version} of this plugin is out. It installs itself within the hour, or now.",
             updateNowButton: "Update now",
             updateStarted:
                 "Updating: the Stream Deck app closes and opens again with the new version.",
@@ -112,7 +112,7 @@
             update: "Ya está la versión {version} de este plugin. No se instala sola: descárgala desde tu Polaris y abre el archivo.",
             getUpdate: "Abrir Descargas",
             updateNow:
-                "Ya está la versión {version} de este plugin. Se instala sola en seis horas, o ahora.",
+                "Ya está la versión {version} de este plugin. Se instala sola antes de una hora, o ahora.",
             updateNowButton: "Actualizar ya",
             updateStarted:
                 "Actualizando: la app de Stream Deck se cierra y se abre con la versión nueva.",

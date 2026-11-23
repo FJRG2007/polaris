@@ -19,7 +19,7 @@
 # the app's own install dialog.
 #
 # Then it leaves a scheduled task of this user's own (no administrator rights)
-# that runs every six hours, out of sight, and does the same when a newer
+# that runs every hour, out of sight, and does the same when a newer
 # release is out. What the task runs is a copy of THIS script as the release
 # attached it, checked against the digest GitHub publishes for it.
 #
@@ -66,6 +66,10 @@ function Invoke-PolarisStreamDeckInstall {
     $updater = Join-Path $base "update.ps1"
     $logFile = Join-Path $base "update.log"
     $taskName = "Polaris Stream Deck updates"
+    # How often the task runs. Every six hours let a morning of releases wait
+    # until the evening; once an hour is still far inside what GitHub lets one
+    # address ask unsigned (60 an hour), at one request a run.
+    $every = New-TimeSpan -Hours 1
 
     function Write-Log {
         param($Message)
@@ -282,9 +286,10 @@ function Invoke-PolarisStreamDeckInstall {
     }
 
     # The updater the task runs: this script, exactly as the release attached
-    # it, refreshed on every run.
+    # it, refreshed whenever the published one differs from the copy here.
     $script = $release.assets | Where-Object { $_.name -eq "install.ps1" } | Select-Object -First 1
-    if ($script) {
+    $same = $script -and $script.digest -and (Test-Path $updater) -and (Test-Digest $updater $script.digest)
+    if ($script -and -not $same) {
         $fresh = Join-Path $base ("update-" + [System.Guid]::NewGuid().ToString("N") + ".ps1")
         try {
             Invoke-WebRequest -Uri $script.browser_download_url -OutFile $fresh -UseBasicParsing -Headers @{ "User-Agent" = $agent["User-Agent"] }
@@ -301,32 +306,50 @@ function Invoke-PolarisStreamDeckInstall {
     }
 
     $updating = $false
-    if (-not $scheduled -and (Test-Path $updater)) {
-        # Started through conhost's headless mode where there is one, so no
-        # console window flashes every six hours (the extension's script
-        # explains the details).
-        $powershell = Join-Path $PSHOME "powershell.exe"
-        if (-not (Test-Path $powershell)) { $powershell = "powershell.exe" }
-        $command = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" scheduled "{1}" "{2}" "{3}"' -f
-            $updater, $repo, $api, $plugins
-        $conhost = Join-Path $env:SystemRoot "System32\conhost.exe"
-        if ([System.Environment]::OSVersion.Version.Build -ge 17763 -and (Test-Path $conhost)) {
-            $execute = $conhost
-            $arguments = '--headless "{0}" {1}' -f $powershell, $command
-        } else {
-            $execute = $powershell
-            $arguments = $command
+    # Started through conhost's headless mode where there is one, so no
+    # console window flashes every hour (the extension's script explains the
+    # details).
+    $powershell = Join-Path $PSHOME "powershell.exe"
+    if (-not (Test-Path $powershell)) { $powershell = "powershell.exe" }
+    $command = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" scheduled "{1}" "{2}" "{3}"' -f
+        $updater, $repo, $api, $plugins
+    $conhost = if ($env:SystemRoot) { Join-Path $env:SystemRoot "System32\conhost.exe" } else { "" }
+    if ($conhost -and [System.Environment]::OSVersion.Version.Build -ge 17763 -and (Test-Path $conhost)) {
+        $execute = $conhost
+        $arguments = '--headless "{0}" {1}' -f $powershell, $command
+    } else {
+        $execute = $powershell
+        $arguments = $command
+    }
+
+    # A person's run always (re)registers the task. A scheduled run leaves its
+    # own task alone, except to bring one an older release registered (every
+    # six hours) up to this release's schedule: nobody who installed it will
+    # run the line again to get that. Only a task that runs THIS updater
+    # counts, and a task the user deleted is not put back.
+    $register = -not $scheduled
+    if ($scheduled) {
+        $held = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+        if ($held -and @($held.Actions | Where-Object { "$($_.Arguments)".Contains($updater) }).Count -gt 0) {
+            $interval = [System.Xml.XmlConvert]::ToString($every)
+            $slow = @($held.Triggers | Where-Object { $_.Repetition.Interval -ne $interval }).Count -gt 0
+            $register = $slow -or $held.Actions.Count -ne 1 -or
+                $held.Actions[0].Execute -ne $execute -or $held.Actions[0].Arguments -ne $arguments
         }
+    }
+
+    if ($register -and (Test-Path $updater)) {
         try {
             $user = "$env:USERDOMAIN\$env:USERNAME"
             $action = New-ScheduledTaskAction -Execute $execute -Argument $arguments
-            $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(10) -RepetitionInterval (New-TimeSpan -Hours 6)
+            $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(10) -RepetitionInterval $every
             $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries `
                 -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 15) -MultipleInstances IgnoreNew
             $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
             # -Force replaces a task of the same name: running the line twice leaves one.
             Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings `
                 -Principal $principal -Description "Keeps Polaris for Stream Deck up to date." -Force | Out-Null
+            if ($scheduled) { Write-Log "re-registered the updates task with this release's settings" }
             $updating = $true
         } catch {
             Write-Log "could not set up the updates task: $($_.Exception.Message)"
@@ -336,7 +359,7 @@ function Invoke-PolarisStreamDeckInstall {
     if (-not $scheduled) {
         Write-Log ""
         if ($updating) {
-            Write-Log "It checks for a new version every 6 hours and installs it by itself."
+            Write-Log "It checks for a new version every hour and installs it by itself."
         } else {
             Write-Log "To update it, run this line again."
         }

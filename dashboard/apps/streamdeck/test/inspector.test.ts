@@ -149,7 +149,7 @@ describe("the settings screen", () => {
 
     it("offers Update now to a copy the install line put in, and asks the plugin for it", () => {
         const { dom, sent, text } = showUpdate({ now: true, updating: "idle" });
-        expect(text).toContain("installs itself within six hours, or now");
+        expect(text).toContain("installs itself within the hour, or now");
         const button = [...dom.window.document.querySelectorAll("button")].find(
             (b) => b.textContent === "Update now"
         );

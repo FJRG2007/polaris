@@ -1683,7 +1683,7 @@
             "installYourself": "Instálalo tú mismo",
             "command": {
                 "title": "Una línea, y se mantiene al día sola",
-                "hint": "Pégala en {shell} en el ordenador al que está conectado el deck. Instala el plugin, reinicia la app de Stream Deck si está abierta y busca una versión nueva cada 6 horas. Sin permisos de administrador y sin nada más que ejecutar."
+                "hint": "Pégala en {shell} en el ordenador al que está conectado el deck. Instala el plugin, reinicia la app de Stream Deck si está abierta y busca una versión nueva cada hora. Sin permisos de administrador y sin nada más que ejecutar."
             },
             "hosts": {
                 "streamdeck": "Windows y macOS",

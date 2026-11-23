@@ -1,8 +1,7 @@
 import { useWords } from "./words";
 import type { WordKey } from "@/lib/words";
-import { useEffect, useState } from "react";
-import { CheckMark, CopyMark } from "./marks";
-import { installLine, type TroubleReason, type UpdaterTrouble } from "@/lib/self-update";
+import type { ReactNode } from "react";
+import type { TroubleReason, UpdaterTrouble } from "@/lib/self-update";
 
 /** Each reason the updater gives, as the sentence that explains it. */
 const TROUBLE_WORDS: Record<TroubleReason, WordKey> = {
@@ -19,22 +18,20 @@ const TROUBLE_WORDS: Record<TroubleReason, WordKey> = {
 };
 
 /**
- * Automatic updates that have stopped, said where the version is: why, in the
- * updater's own words below it, and the one thing that repairs them - running
- * the install line again, which replaces the task or job and its updater. The
- * update by hand is offered beside it by the version line while a newer
- * version is out (the notice turns `manual`).
+ * Automatic updates that have stopped, said where the version is: why, and the
+ * updater's own words below it. Nothing here asks for a command: while a newer
+ * version is out the caller hands in the update by hand (download and steps) as
+ * `children`, since the notice turns `manual` once the updater says it is not
+ * working.
  */
-export function UpdaterBroken({ trouble }: { trouble: UpdaterTrouble }): React.JSX.Element {
+export function UpdaterBroken({
+    trouble,
+    children
+}: {
+    trouble: UpdaterTrouble;
+    children?: ReactNode;
+}): React.JSX.Element {
     const t = useWords();
-    const [line, setLine] = useState(() => installLine(null));
-    const [copied, setCopied] = useState(false);
-    useEffect(() => {
-        void browser.runtime
-            .getPlatformInfo()
-            .then((info) => setLine(installLine(info.os)))
-            .catch(() => undefined);
-    }, []);
     return (
         <div className="notice small version-steps" role="status">
             <p>
@@ -45,22 +42,7 @@ export function UpdaterBroken({ trouble }: { trouble: UpdaterTrouble }): React.J
                 })}
             </p>
             {trouble.detail ? <p className="muted">{trouble.detail}</p> : null}
-            <p className="muted">{t("popup.updater.repair")}</p>
-            <button
-                type="button"
-                className="field"
-                title={t("popup.updater.copy")}
-                aria-label={t("popup.updater.copy")}
-                onClick={() =>
-                    void navigator.clipboard.writeText(line).then(
-                        () => setCopied(true),
-                        () => setCopied(false)
-                    )
-                }
-            >
-                <span className="code">{line}</span>
-                {copied ? <CheckMark /> : <CopyMark />}
-            </button>
+            {children}
         </div>
     );
 }

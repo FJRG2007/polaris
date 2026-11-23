@@ -427,7 +427,7 @@ function VersionLine({
                 {newer ? (
                     <>
                         <span>{t("popup.version.available", { version: newer })}</span>
-                        {pending ? null : manual ? (
+                        {pending ? null : manual && !updater ? (
                             <button
                                 className="link"
                                 aria-expanded={steps}
@@ -435,7 +435,7 @@ function VersionLine({
                             >
                                 {t("popup.version.manual")}
                             </button>
-                        ) : notice?.kind === "store" ? (
+                        ) : manual ? null : notice?.kind === "store" ? (
                             <span>{t("popup.version.store")}</span>
                         ) : notice?.kind === "auto" ? (
                             <span>{t("popup.version.auto")}</span>
@@ -450,8 +450,11 @@ function VersionLine({
                     updateNow={!pending && notice?.kind === "store"}
                 />
             </p>
-            {updater ? <UpdaterBroken trouble={updater} /> : null}
-            {manual && steps ? (
+            {updater ? (
+                <UpdaterBroken trouble={updater}>
+                    {manual ? <ManualSteps notice={manual} /> : null}
+                </UpdaterBroken>
+            ) : manual && steps ? (
                 <div className="notice small version-steps">
                     <ManualSteps notice={manual} />
                 </div>

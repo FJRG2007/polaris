@@ -62,7 +62,10 @@ describe("where the extension looks", () => {
 
     it("checks on a slow alarm and when the browser starts, not when the popup opens", async () => {
         const source = await background;
-        expect(source).toContain('browser.alarms.create("update-check"');
+        // Created only when missing or on another period, so a worker waking
+        // many times an hour does not restart it before it ever fires.
+        expect(source).toContain("browser.alarms.create(update.UPDATE_CHECK_ALARM, { periodInMinutes: UPDATE_EVERY_MINUTES })");
+        expect(source).toContain("if (!update.alarmNeedsCreating(held)) return;");
         expect(source).toContain("void checkForUpdate();");
         // The popup's request reads what the check left behind.
         expect(source).toContain("update: await currentNotice()");

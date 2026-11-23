@@ -10,18 +10,20 @@
  *
  * The scheduler is never touched: the PowerShell run is given stand-in
  * scheduled-task commands (a function shadows a cmdlet of the same name), and
- * the shell run only rewrites a job that names its own updater, which a
- * temporary folder never is. Each script runs only where its shell exists.
+ * the shell run finds stand-in launchctl, systemctl and crontab first on its
+ * PATH. Both fail closed: a run whose stand-ins did not take stops before the
+ * script starts, and the test fails. Each script runs only where its shell
+ * exists.
  */
 
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { createHash } from "node:crypto";
 import { execFile, spawnSync } from "node:child_process";
 import { promisify } from "node:util";
 import { createServer, type Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 
 const SCRIPTS = join(__dirname, "..", "scripts");
 
@@ -157,6 +159,14 @@ function has(command: string, probe: string[]): boolean {
 const POWERSHELL = ["powershell.exe", "pwsh"].find((one) => has(one, ["-NoProfile", "-Command", "exit 0"]));
 const SH = process.platform !== "win32" || has("sh", ["-c", "command -v curl && command -v unzip"]);
 
+/** Stops a run before the script starts unless every scheduled-task command is a stand-in. */
+const TASK_GUARD = `foreach ($name in @("Get-ScheduledTask", "New-ScheduledTaskAction", "New-ScheduledTaskTrigger", "New-ScheduledTaskSettingsSet", "New-ScheduledTaskPrincipal", "Register-ScheduledTask", "Unregister-ScheduledTask")) {
+    # The real ones are functions too (CDXML), but they belong to a module.
+    $found = Get-Command $name
+    if ($found.CommandType -ne "Function" -or $found.Module) { [Console]::Error.WriteLine("stand-in did not take: $name"); exit 97 }
+}
+`;
+
 /** Stand-ins for the scheduled-task commands, so no run reaches the real scheduler. */
 const TASK_STUBS = `
 function Get-ScheduledTask {
@@ -174,7 +184,34 @@ function New-ScheduledTaskSettingsSet { "settings" }
 function New-ScheduledTaskPrincipal { "principal" }
 function Register-ScheduledTask { Add-Content -Path $env:POLARIS_TEST_TASKS -Value "registered" }
 function Unregister-ScheduledTask { Add-Content -Path $env:POLARIS_TEST_TASKS -Value "unregistered" }
-`;
+${TASK_GUARD}`;
+
+/** The exit code a run gives when a stand-in did not take, before anything ran. */
+const STUB_MISSING = 97;
+
+/** Turns a run refused for a missing stand-in into a failed test; any other exit is the script's own. */
+function failClosed(error: { code?: unknown; stderr?: unknown }): undefined {
+    if (error.code === STUB_MISSING) throw new Error(`the scheduler stand-ins did not take: ${String(error.stderr)}`);
+    return undefined;
+}
+
+/** Stand-ins for launchctl, systemctl and crontab, which answer a probe so a run can tell they took. */
+function shellStubs(root: string): string {
+    const bin = join(root, "bin");
+    mkdirSync(bin, { recursive: true });
+    for (const name of ["launchctl", "systemctl", "crontab"]) {
+        writeFileSync(
+            join(bin, name),
+            `#!/bin/sh\n[ "$1" = --polaris-stand-in ] && { echo stand-in; exit 0; }\necho "${name} $*" >> "$POLARIS_TEST_JOBS"\nexit 0\n`,
+            { mode: 0o755 }
+        );
+    }
+    return bin;
+}
+
+/** Runs the script given after it only when every scheduler command is a stand-in. */
+const SHELL_GUARD =
+    'for c in launchctl systemctl crontab; do [ "$("$c" --polaris-stand-in 2>/dev/null)" = stand-in ] || { echo "stand-in did not take: $c" >&2; exit 97; }; done; exec sh "$@"';
 
 describe.skipIf(!POWERSHELL)("the Windows updater", () => {
     const feed = new Feed();
@@ -204,7 +241,7 @@ describe.skipIf(!POWERSHELL)("the Windows updater", () => {
             POWERSHELL!,
             ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", runner, dir, api],
             { encoding: "utf8", timeout: 60_000, env: { ...process.env, POLARIS_TEST_TASKS: tasks, ...extra } }
-        ).catch(() => undefined);
+        ).catch(failClosed);
 
     it("installs the newest extension release and says so in the folder", async () => {
         feed.publish("0.1.300", { script: "install.ps1", scriptName: "install.ps1" });
@@ -242,17 +279,27 @@ describe.skipIf(!POWERSHELL)("the Windows updater", () => {
         expect(log).toContain("every PT1H");
         expect(log).toContain("registered");
     }, 90_000);
+
+    it("refuses to start when a stand-in did not take", async () => {
+        const probe = promisify(execFile)(POWERSHELL!, ["-NoProfile", "-NonInteractive", "-Command", `${TASK_GUARD}; "ran"`], {
+            encoding: "utf8",
+            timeout: 60_000
+        });
+        await expect(probe).rejects.toMatchObject({ code: STUB_MISSING });
+    }, 90_000);
 });
 
 describe.skipIf(!SH)("the macOS and Linux updater", () => {
     const feed = new Feed();
     let root = "";
     let dir = "";
+    let stubs = "";
 
     beforeAll(async () => {
         await feed.start();
         root = mkdtempSync(join(tmpdir(), "polaris-sh-"));
         dir = join(root, "extension", "chrome").replace(/\\/g, "/");
+        stubs = shellStubs(root);
     });
     afterAll(async () => {
         await feed.stop();
@@ -260,18 +307,20 @@ describe.skipIf(!SH)("the macOS and Linux updater", () => {
     });
 
     const run = (api = feed.api) =>
-        promisify(execFile)("sh", [join(SCRIPTS, "install.sh").replace(/\\/g, "/"), "scheduled"], {
+        promisify(execFile)("sh", ["-c", SHELL_GUARD, "guard", join(SCRIPTS, "install.sh").replace(/\\/g, "/"), "scheduled"], {
             encoding: "utf8",
             timeout: 60_000,
             env: {
                 ...process.env,
+                PATH: `${stubs}${delimiter}${process.env.PATH ?? ""}`,
+                POLARIS_TEST_JOBS: join(root, "jobs.log"),
                 HOME: root,
                 XDG_CONFIG_HOME: join(root, "config"),
                 POLARIS_EXTENSION_DIR: dir,
                 POLARIS_REPO: "test/polaris",
                 POLARIS_GITHUB_API: api
             }
-        }).catch(() => undefined);
+        }).catch(failClosed);
 
     it("installs the newest extension release and says so in the folder", async () => {
         feed.publish("0.1.300", { script: "install.sh", scriptName: "install.sh" });
@@ -297,5 +346,14 @@ describe.skipIf(!SH)("the macOS and Linux updater", () => {
     it("records GitHub out of reach", async () => {
         await run("http://127.0.0.1:9");
         expect(readNote(dir).check).toMatchObject({ outcome: "failed", reason: "unreachable" });
+    }, 90_000);
+
+    it("refuses to start when a stand-in did not take", async () => {
+        const probe = promisify(execFile)("sh", ["-c", SHELL_GUARD, "guard", "-c", "echo ran"], {
+            encoding: "utf8",
+            timeout: 60_000,
+            env: { ...process.env, PATH: process.env.PATH ?? "" }
+        });
+        await expect(probe).rejects.toMatchObject({ code: STUB_MISSING });
     }, 90_000);
 });

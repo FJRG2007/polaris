@@ -2,7 +2,7 @@
  * Updating now, for a plugin the install line put in.
  *
  * The install line leaves a job of the user's own that fetches and installs a
- * newer release every six hours (scripts/install.ps1, scripts/install.sh). A
+ * newer release every hour (scripts/install.ps1, scripts/install.sh). A
  * plugin installed that way can ask that job to run right away instead of
  * sending its owner to download the file. One opened from a file has no job,
  * and keeps the Downloads notice.

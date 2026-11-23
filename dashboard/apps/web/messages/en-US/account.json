@@ -1683,7 +1683,7 @@
             "installYourself": "Install it yourself",
             "command": {
                 "title": "One line, and it keeps itself up to date",
-                "hint": "Paste it into {shell} on the computer the deck is plugged into. It installs the plugin, restarts the Stream Deck app if it is open, and checks for a new version every 6 hours. No administrator rights, and nothing else to run."
+                "hint": "Paste it into {shell} on the computer the deck is plugged into. It installs the plugin, restarts the Stream Deck app if it is open, and checks for a new version every hour. No administrator rights, and nothing else to run."
             },
             "hosts": {
                 "streamdeck": "Windows and macOS",

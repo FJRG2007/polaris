@@ -10,6 +10,8 @@ related:
   - dashboard/apps/extension/src/lib/update.ts
   - dashboard/apps/extension/src/entrypoints/background.ts
   - dashboard/apps/extension/src/entrypoints/popup/updater-broken.tsx
+  - dashboard/apps/streamdeck/scripts/install.ps1
+  - dashboard/apps/streamdeck/scripts/install.sh
 reported: 2026-11-23
 fixed: 2026-11-23
 fix_commit: "fix(extension): the updater runs every hour and says when it is not working"
@@ -54,21 +56,26 @@ The owner re-ran the line at 14:59, which installed 0.1.279 by hand.
   `update.sh` from the release, and the new script, on its first scheduled run,
   re-registers a task or job that still runs on the old six-hour schedule (only
   one that names its own updater; on macOS the new plist is loaded at the next
-  sign-in, since booting the agent out would end the run doing it). Re-running
-  the install line re-registers it at once.
+  sign-in, since booting the agent out would end the run doing it).
 - **Every run writes what it found** into the extension's folder, as `check` in
   `polaris-updater.json` (time, `installed` / `current` / `failed`, a reason
   code, the error detail, and how often it runs), renamed into place so the
   extension never reads half a file.
 - **The popup says when it is not working**, under the version line:
-  "Automatic updates are not working: <reason>", the updater's own detail, and
-  the install line for this system with a copy button. A failed run shows at
+  "Automatic updates are not working: <reason>" and the updater's own detail.
+  It asks for no command: while a newer version is out, the update by hand
+  (download and steps) is shown inside the same notice. A failed run shows at
   once (GitHub out of reach only while a newer version is out); an updater that
   has not run for three of its periods while a newer version is out is reported
   as stopped, with when it last ran. While it shows, a newer version is offered
   as an update by hand (download and steps) instead of "installs it within the
   hour". Updaters from before this write no check and keep the 12-hour
   fallback.
+- **The Stream Deck plugin's updater had the same six-hour cadence** and gets
+  the same change: its Windows task and macOS launchd job run every hour, a
+  scheduled run re-registers a six-hour task or job that runs its own updater,
+  and (Windows) the updater script is downloaded only when its digest changed.
+  It reaches installs with the next Stream Deck release.
 
 ## Verified
 
@@ -83,14 +90,22 @@ The owner re-ran the line at 14:59, which installed 0.1.279 by hand.
   re-registered hourly. The scheduler is stubbed and never touched.
 - `test/self-update.test.ts`, `test/update.test.ts`,
   `test/updater-broken.test.tsx`: parsing the check, when it counts as trouble,
-  the kind turning `manual`, and the popup's text, line per system and copy.
+  the kind turning `manual`, and the popup's text, with the update by hand
+  inside it and no command line or copy button.
+- `dashboard/apps/streamdeck/test/updater-run.test.ts`: the Stream Deck
+  script's scheduled run installs into a temporary plugins folder and moves a
+  six-hour task that runs its own updater (and only that one) to hourly.
+- Every script test runs against stand-ins for the scheduler (and, for Stream
+  Deck, the process commands and AppData) and fails closed: a run whose
+  stand-ins did not take stops before the script starts.
 
 ## Not verified
 
 - A real scheduled run of the new script on Windows, macOS or Linux, and the
   re-registration of the owner's existing task (it happens on its own after the
-  first release carrying this). The shell script was exercised under Git Bash
-  on Windows, not on macOS or a systemd/cron Linux.
+  first release carrying this). The extension's shell script was exercised
+  under Git Bash on Windows, not on macOS or a systemd/cron Linux; the Stream
+  Deck shell script's launchd change was not exercised at all (macOS only).
 - The popup notice in a real browser.
 
 ## If it happens again

@@ -143,8 +143,6 @@
     "popup": {
         "updater": {
             "broken": "Automatic updates are not working: {reason}",
-            "repair": "To repair them, paste this install line again where you first pasted it. Until then, update by hand.",
-            "copy": "Copy the install line",
             "reason": {
                 "unreachable": "GitHub could not be reached.",
                 "noRelease": "no release was found to install.",

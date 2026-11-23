@@ -143,8 +143,6 @@
     "popup": {
         "updater": {
             "broken": "Las actualizaciones automáticas no funcionan: {reason}",
-            "repair": "Para repararlas, pega otra vez esta línea de instalación donde la pegaste. Mientras, actualiza a mano.",
-            "copy": "Copiar la línea de instalación",
             "reason": {
                 "unreachable": "no se pudo contactar con GitHub.",
                 "noRelease": "no se encontró ninguna versión que instalar.",

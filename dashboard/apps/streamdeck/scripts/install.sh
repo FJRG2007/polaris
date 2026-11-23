@@ -18,7 +18,7 @@
 # be swapped, the file is opened instead, which is the app's own install dialog.
 #
 # Then it leaves a launchd job of this user's own (no administrator rights)
-# that runs every six hours and does the same when a newer release is out.
+# that runs every hour and does the same when a newer release is out.
 # What the job runs is a copy of THIS script as the release attached it,
 # checked against the digest GitHub publishes for it.
 #
@@ -139,6 +139,11 @@ quit_app() {
 
 open_app() { open -g -b "$APP_ID" >/dev/null 2>&1 || true; }
 
+# How often the job runs, in seconds. Every six hours let a morning of
+# releases wait until the evening; once an hour is still far inside what GitHub
+# lets one address ask unsigned (60 an hour).
+EVERY_SECONDS=3600
+
 launchd_plist() { printf '%s/Library/LaunchAgents/%s.plist' "$HOME" "$JOB"; }
 
 install_job() {
@@ -158,14 +163,26 @@ install_job() {
         <key>POLARIS_REPO</key><string>$REPO</string>
         <key>POLARIS_GITHUB_API</key><string>$API</string>
     </dict>
-    <key>StartInterval</key><integer>21600</integer>
+    <key>StartInterval</key><integer>$EVERY_SECONDS</integer>
     <key>ProcessType</key><string>Background</string>
 </dict>
 </plist>
 EOF
+    # From the job itself, the new plist is left for the next sign-in to load:
+    # booting the agent out would end the very run doing it.
+    [ "$SCHEDULED" = 1 ] && return 0
     uid=$(id -u)
     launchctl bootout "gui/$uid/$JOB" >/dev/null 2>&1 || true
     launchctl bootstrap "gui/$uid" "$plist" || return 1
+}
+
+# Whether the job set up for THIS updater runs on an older schedule than this
+# release's - every six hours, before. Only a job that names this updater
+# counts, so a run against another folder never rewrites somebody's real job.
+job_outdated() {
+    plist=$(launchd_plist)
+    [ -f "$plist" ] && grep -qF "$UPDATER" "$plist" &&
+        ! grep -qF "<integer>$EVERY_SECONDS</integer>" "$plist"
 }
 
 remove_job() {
@@ -321,8 +338,11 @@ main() {
         fi
     fi
 
+    # Set up by a person's run. A scheduled run leaves its own job alone,
+    # except to bring one an older release set up to this one's schedule:
+    # nobody who installed it will run the line again to get that.
     updating=0
-    if [ "$SCHEDULED" = 0 ] && [ -f "$UPDATER" ]; then
+    if [ -f "$UPDATER" ] && { [ "$SCHEDULED" = 0 ] || job_outdated; }; then
         if [ "$(uname -s)" = Darwin ] && install_job; then
             updating=1
         else
@@ -333,7 +353,7 @@ main() {
     if [ "$SCHEDULED" = 0 ]; then
         log ""
         if [ "$updating" = 1 ]; then
-            log "It checks for a new version every 6 hours and installs it by itself."
+            log "It checks for a new version every hour and installs it by itself."
         else
             log "To update it, run this line again."
         fi

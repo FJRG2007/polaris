@@ -117,7 +117,7 @@ afterAll(async () => {
 /** The script the way the one-line install runs it: piped into `iex`. Resolves
  *  when PowerShell exits, whatever it printed. */
 async function install(dir: string) {
-    const env = { ...process.env, POLARIS_REPO: "example/polaris", POLARIS_GITHUB_API: api, POLARIS_EXTENSION_DIR: dir, POLARIS_TEST_SCRIPT: SCRIPT };
+    const env: NodeJS.ProcessEnv = { ...process.env, POLARIS_REPO: "example/polaris", POLARIS_GITHUB_API: api, POLARIS_EXTENSION_DIR: dir, POLARIS_TEST_SCRIPT: SCRIPT };
     delete env.POLARIS_EXTENSION_TAG;
     const command = `${STUBS}; iex ([IO.File]::ReadAllText($env:POLARIS_TEST_SCRIPT))`;
     const { stdout } = await run("powershell.exe", ["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", command], { env, windowsHide: true });

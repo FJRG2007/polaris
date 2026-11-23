@@ -192,15 +192,3 @@ export function updaterTrouble(note: unknown, now: number, behind: boolean): Upd
         ? { reason: "stopped", detail: null, at: check.at }
         : null;
 }
-
-/** The line that installs the extension, and repairs its updater when run again. */
-export const INSTALL_LINES = {
-    windows:
-        "irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/apps/extension/scripts/install.ps1 | iex",
-    unix: "curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/apps/extension/scripts/install.sh | sh"
-} as const;
-
-/** The install line for the system `runtime.getPlatformInfo()` names. */
-export function installLine(os: string | null | undefined): string {
-    return os === "win" ? INSTALL_LINES.windows : INSTALL_LINES.unix;
-}

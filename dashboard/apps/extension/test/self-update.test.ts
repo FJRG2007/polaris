@@ -9,8 +9,6 @@
 import { describe, expect, it } from "vitest";
 import {
     coveredBy,
-    installLine,
-    INSTALL_LINES,
     lastCheck,
     safeToRestart,
     updaterTrouble,
@@ -127,12 +125,5 @@ describe("the updater's last run (BUG-0022)", () => {
         expect(updaterTrouble(fine, at + 30 * HOUR, false)).toBeNull();
         // A clock moved backwards is not hours of silence.
         expect(updaterTrouble(fine, at - 10 * HOUR, true)).toBeNull();
-    });
-
-    it("hands each system its own install line", () => {
-        expect(installLine("win")).toBe(INSTALL_LINES.windows);
-        expect(installLine("mac")).toBe(INSTALL_LINES.unix);
-        expect(installLine("linux")).toBe(INSTALL_LINES.unix);
-        expect(installLine(null)).toBe(INSTALL_LINES.unix);
     });
 });
