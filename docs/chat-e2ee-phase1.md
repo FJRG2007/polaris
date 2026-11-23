@@ -75,13 +75,49 @@ Known residuals: a known address costs two more indexed reads than an unknown on
 
 Residual until phase 3: a server that consistently publishes a key it forged is not caught by the published-key verifier (that is what the transparency log is for).
 
+## Phase 1 inventory (ledger)
+
+Authoritative list: proposal section 14, phase 1. A row is done only with the commit and the test that prove it.
+
+| # | Unit | State | Evidence |
+| --- | --- | --- | --- |
+| 1 | `AK` (Ed25519 + X-Wing), lock envelope format, hybrid PQ envelope | done | `31dad22234`, `packages/chat-crypto/test/locks.test.ts` |
+| 2 | Device lock (IndexedDB, non-extractable key) | done | `31dad22234` |
+| 3 | Password lock over OPAQUE (RFC 9807), Argon2id 128 MiB | done (flag) | `31dad22234`, `6773c1b644`, `opaque-sign-in.test.ts` |
+| 4 | Passkey PRF lock | done (flag) | `892c916da1`, `passkey-prf-ceremony.test.ts` |
+| 5 | QR approval carries `AK` | done (flag) | `892c916da1`, `qr-key-transfer.test.ts`, `qr-approval.test.ts` |
+| 6 | Server tables, routes, sealed OPAQUE setup | done (flag) | `6773c1b644` |
+| 7 | Adoption of existing password accounts at next sign-in, no lockout | done (flag) | `6773c1b644` |
+| 8 | Password + second factor accounts get `AK` and the password lock | done (flag) | held password across the challenge page (`lib/chat/e2ee/held-password.ts`), `account-key-client.test.ts` "a sign-in that owed a second factor", `held-password.test.ts` |
+| 9 | A new browser opens an existing password lock when the sign-in brought no envelope (adoption, challenge) | done (flag) | `openWithUnlock` in `account-key-client.ts`; wrong password / reset elsewhere never replaces the lock (test) |
+| 10 | Native key stores: desktop `safeStorage`, Android Keystore, iOS Keychain | code done | `packages/chat-crypto/src/platform-store.ts` + tests; `desktop/src/main/key-wrap.ts` + `desktop/test/main/key-wrap.test.ts`; `mobile/android/.../ChatKeyStore.java`, `mobile/ios/Polaris/ChatKeyStore.swift`. Android and iOS not compiled on this machine; no app release cut yet |
+| 11 | Extension key store | not applicable in phase 1 | the extension renders no chat and never holds `AK`; its role (bundle verification) is phase 3 |
+| 12 | Sign-out removes the account's device lock (proposal 3.3); "sign out of all" removes every one | done | `lib/account-switch.ts`, `forgetEveryDeviceLock` test |
+| 13 | Accounts with no password and no PRF passkey (magic link, connection, SSO) | open, by design until phase 2 | a device-only `AK` would be orphaned by the first cleared browser with nothing to re-key it; they get `AK` through the QR approval today and through `ORK` in phase 2 (proposal 3.3 rows 3-4) |
+| 14 | Retire the better-auth password hash | blocked | see below |
+| 15 | Key management live for everyone (flag default) | not flipped | see below |
+| 16 | Notice on every device when one is added or `AK` opens with the password only | open | needs the device list of phase 2 |
+| 17 | Transparency log behind `AccountKeyVerifier` | phase 3 | - |
+
+**Why the hash is not retired (14).** Retiring `account.password` while any of these still verifies the password against it would lock people out, which the owner forbids: `changePasswordAction` and `promoteEmailAction` (current password), better-auth's two-factor enable/disable (password), the step-up password proof, the reset and sign-up forms (they write the hash), administrator credential resets, and every client or host version that signs in through `/sign-in/email`. Each needs an OPAQUE equivalent first, and the OPAQUE path itself is still behind the internal flag. Order: move those flows to OPAQUE, switch the flag on, then delete the hash for accounts that signed in over OPAQUE at least twice - checked against the state, never a version number.
+
+**Why the flag stays off (15).** Proposal section 14 keeps phases 1-13 behind the internal flag until phase 14, and decision 11 / gate G7 forbid a visible slowdown. With the flag on, the first sign-in after the update runs Argon2id at 128 MiB up to four times in the page (OPAQUE attempt, registration, verification, unlock) - seconds on a laptop, more on a phone - which has not been measured on real devices. Switching it on is an owner call against those two rules, not something this round did silently.
+
+## Adversarial review checklist (phase 1)
+
+| Check | Result |
+| --- | --- |
+| The held password never reaches storage, is taken once, expires, is dropped on abandon | pinned by `held-password.test.ts` |
+| An unlock answering for another account is refused | test |
+| A lock that does not open is never overwritten with a new key | test |
+| Platform-sealed values are bound to the server origin (desktop: inside the ciphertext; Android/iOS: GCM associated data) | desktop test; Android/iOS by code review only |
+| A platform store that is reset, locked, another, or throws reads as no device copy, never an error or another key | `platform-store.test.ts` |
+| An existing plain device record moves under the platform store on first read and stays readable when the store refuses | test |
+| Linux without a secret service is not trusted as a store | desktop test |
+| Only the Polaris main frame reaches the desktop and iOS stores | `fromPolaris` / frame check; Android's JavaScript interface is visible to every frame of the WebView, so a third-party frame could ask it to open a sealed device envelope, which is still useless without that origin's IndexedDB key |
+
 ## What remains of phase 1
 
-1. Native key stores (Keychain, Keystore, DPAPI/safeStorage) for desktop, Android, iOS.
-2. Retiring the better-auth hash for adopted accounts (only when the stack is switched on).
-3. Password-only accounts with a second factor: the password lock and a first `AK` are created only on a sign-in that reaches a full session on the page still holding the password (a trusted device, or a passkey sign-in). The 2FA page has no password, so an account that always answers a challenge and has no passkey gets neither until then.
-4. The password lock after a reset is re-sealed on a password sign-in in a browser that already holds `AK` (device lock); a reset done only on new browsers re-seals at the first such sign-in.
-5. The notice on every device of the account when one is added or `AK` is unlocked with the password only (design 3.2, 11.1 item 20) - with the device list of phase 2.
-6. The transparency log behind `AccountKeyVerifier` (phase 3).
-
-Tests added in this round: `packages/chat-crypto/test/qr-approval.test.ts` (19), `apps/web/test/chat/e2ee/qr-key-transfer.test.ts` (10), `account-key-client.test.ts` (14), `passkey-prf-ceremony.test.ts` (2). Mutation runs confirmed the verifier, commitment, signature and approver-session checks are each caught by a failing test.
+1. Rows 13, 14, 15 and 16 above, and app releases carrying row 10 (desktop tag, Android build, iOS build - the iOS one needs the owner's Apple signing).
+2. The password lock after a reset is re-sealed on a password sign-in in a browser that already holds `AK`; a reset done only on new browsers re-seals at the first such sign-in.
+3. The transparency log behind `AccountKeyVerifier` (phase 3).

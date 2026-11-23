@@ -138,4 +138,20 @@ describe("platform-sealed device lock", () => {
         expect(await device.openDeviceLock(store, a)).toBeNull();
         expect(await device.openDeviceLock(store, b)).toEqual({ accountKey: AK, akVersion: 1 });
     });
+
+    it("sign-out of all forgets every account's device lock and nothing else", async () => {
+        const a = account();
+        const b = account();
+        await device.createDeviceLock(inner, a, AK, 1);
+        await device.createDeviceLock(inner, b, AK, 1);
+        const other = indexedDB.open("polaris-unrelated", 1);
+        await new Promise((resolve) => (other.onsuccess = resolve));
+        other.result.close();
+        await device.forgetEveryDeviceLock();
+        expect(await device.openDeviceLock(inner, a)).toBeNull();
+        expect(await device.openDeviceLock(inner, b)).toBeNull();
+        const names = (await indexedDB.databases()).map((info) => info.name);
+        expect(names).toContain("polaris-unrelated");
+        await expect(device.forgetEveryDeviceLock({} as IDBFactory)).resolves.toBeUndefined();
+    });
 });

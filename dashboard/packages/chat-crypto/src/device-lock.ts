@@ -134,3 +134,18 @@ export async function openDeviceLock(
 export async function forgetDeviceLock(store: DeviceLockStore, userId: string): Promise<void> {
     await store.forget(userId);
 }
+
+/**
+ * "Sign out of all": every account's keys leave this browser. Browsers that
+ * cannot list their databases leave the others for each account's own
+ * sign-out; a failure to delete one never stops the rest.
+ */
+export async function forgetEveryDeviceLock(factory: IDBFactory = globalThis.indexedDB): Promise<void> {
+    if (typeof factory?.databases !== "function") return;
+    const names = (await factory.databases()).map((info) => info.name ?? "");
+    await Promise.all(
+        names
+            .filter((name) => name.startsWith(DATABASE_PREFIX) && name.length > DATABASE_PREFIX.length)
+            .map((name) => requestDone(factory.deleteDatabase(name)).catch(() => undefined))
+    );
+}

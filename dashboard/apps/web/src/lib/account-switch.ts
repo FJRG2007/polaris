@@ -30,6 +30,7 @@ import { dropMailCache } from "@/lib/mailbox/mail-cache";
 import { dropChatStore } from "@/lib/chat/offline/chat-cache";
 import { MENU_KEY as APP_MENU_KEY, STORE_KEY as APP_USAGE_KEY } from "@/lib/app-usage";
 import { pauseAutomaticPasskey } from "@/lib/local-passkeys";
+import { forgetDeviceLock, forgetEveryDeviceLock, indexedDbDeviceLockStore } from "@polaris/chat-crypto/device-lock";
 import { adoptLegacyPlaces, forgetPlaces, PREFIX as LAST_PLACE_PREFIX } from "@/lib/last-place";
 import { ACCOUNT_MARKER_KEY, currentAccount } from "@/lib/account-marker";
 import { STORE_KEY as RECENT_SEARCH_KEY } from "@/lib/search/recent";
@@ -110,10 +111,17 @@ function writeMarker(value: string): void {
  * then; a plain switch keeps them for when it comes back.
  */
 export async function leaveAccount(target: string, signedOut?: "this" | "all"): Promise<void> {
-    if (signedOut === "all") forgetPlaces();
-    else if (signedOut === "this") {
+    if (signedOut === "all") {
+        forgetPlaces();
+        await forgetEveryDeviceLock().catch(() => undefined);
+    } else if (signedOut === "this") {
         const account = currentAccount();
-        if (account) forgetPlaces(account);
+        if (account) {
+            forgetPlaces(account);
+            // The chat account key leaves this browser with its account (proposal 3.3);
+            // it comes back at the next sign-in from the password, a passkey or a device.
+            await forgetDeviceLock(indexedDbDeviceLockStore(), account).catch(() => undefined);
+        }
     }
     await forgetAccountTraces();
     // Signed out on purpose: the sign-in screen this lands on must not ask for
