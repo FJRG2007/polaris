@@ -1371,6 +1371,7 @@
         "sendCode": "Enviar",
         "makePrimary": "Hacer principal",
         "needsConfirm": "Confírmalo antes.",
+        "reconfirmHint": "Confírmalo otra vez para entrar con él.",
         "menuFor": "Acciones de {phone}",
         "remove": "Quitar",
         "removing": "Quitando...",

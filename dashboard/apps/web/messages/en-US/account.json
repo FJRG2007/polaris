@@ -1371,6 +1371,7 @@
         "sendCode": "Send code",
         "makePrimary": "Make primary",
         "needsConfirm": "Confirm it first.",
+        "reconfirmHint": "Confirm it again to sign in with it.",
         "menuFor": "Actions for {phone}",
         "remove": "Remove",
         "removing": "Removing...",

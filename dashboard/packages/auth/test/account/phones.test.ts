@@ -1,8 +1,8 @@
 /**
  * The phone numbers on an account: several per account, one primary, a
- * confirmed number belongs to one account only - and asking for a code for a
- * number another account holds answers like any other send, so the form is no
- * way to learn which numbers are registered.
+ * confirmed number belongs to one account only. A code goes to a number
+ * whichever account holds it, and entering it moves the number to whoever did -
+ * the recycled-number rule - unless the holder may not lose it.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -90,7 +90,7 @@ const prisma = {
     userPhone,
     $transaction: async (work: unknown) =>
         typeof work === "function"
-            ? (work as (tx: unknown) => Promise<unknown>)({ userPhone })
+            ? (work as (tx: unknown) => Promise<unknown>)({ userPhone, $executeRaw: async () => 0 })
             : Promise.all(work as Promise<unknown>[])
 };
 
@@ -101,8 +101,16 @@ vi.mock("../../src/security.js", () => ({
     verifySecret: async (_auth: unknown, hash: string, code: string) => hash === `hash:${code}`
 }));
 
-const { addUserPhone, getUserPhone, issuePhoneCode, listUserPhones, promoteUserPhone, removeUserPhone, verifyPhoneCode } =
-    await import("../../src/phone.js");
+const {
+    addUserPhone,
+    getUserPhone,
+    issuePhoneCode,
+    listUserPhones,
+    PHONE_KEPT_ELSEWHERE,
+    promoteUserPhone,
+    removeUserPhone,
+    verifyPhoneCode
+} = await import("../../src/phone.js");
 const auth = {} as never;
 
 // Fixture numbers only (Spain's 600 mobile range).
@@ -141,19 +149,49 @@ describe("adding numbers", () => {
 });
 
 describe("a number another account has confirmed", () => {
-    it("adds without saying so, gets no code, and can never be confirmed", async () => {
+    it("gets a code like any other, and entering it moves the number off the other account", async () => {
         await confirmed("owner", A);
-        const added = await addUserPhone(auth, "other", A, "pw");
+        await confirmed("owner", B);
+        const added = await addUserPhone(auth, "new", A, "pw");
         expect(added.error).toBeUndefined();
-        expect(await issuePhoneCode(auth, "other", added.id)).toEqual({ held: true, phone: A });
-        expect(await verifyPhoneCode(auth, "other", "123456", added.id)).toEqual({ error: "Ask for a code first." });
+        const issued = await issuePhoneCode(auth, "new", added.id);
+        expect(issued).toEqual({ code: expect.stringMatching(/^\d{6}$/), phone: A });
+        expect(await verifyPhoneCode(auth, "new", issued.code!, added.id)).toEqual({ takenFrom: ["owner"] });
+        expect(await listUserPhones("new")).toMatchObject([{ phone: A, verified: true, primary: true }]);
+        // The old account keeps its other number, which is now its primary.
+        expect(await listUserPhones("owner")).toMatchObject([{ phone: B, verified: true, primary: true }]);
     });
 
-    it("refuses a code sent before the other account confirmed, like a wrong one", async () => {
-        const mine = await addUserPhone(auth, "late", A, "pw");
-        const { code } = await issuePhoneCode(auth, "late", mine.id);
+    it("stays where it is when the holder may not lose it, and the code is spent", async () => {
         await confirmed("owner", A);
-        expect(await verifyPhoneCode(auth, "late", code!, mine.id)).toEqual({ error: "That code is not right." });
+        const added = await addUserPhone(auth, "new", A, "pw");
+        const { code } = await issuePhoneCode(auth, "new", added.id);
+        const refused = await verifyPhoneCode(auth, "new", code!, added.id, { mayTakeFrom: async () => false });
+        expect(refused).toEqual({ error: PHONE_KEPT_ELSEWHERE, keptBy: ["owner"] });
+        expect(await listUserPhones("owner")).toMatchObject([{ phone: A, verified: true }]);
+        expect(await verifyPhoneCode(auth, "new", code!, added.id)).toEqual({ error: "Ask for a code first." });
+    });
+
+    it("gives nothing away before the code is entered", async () => {
+        await confirmed("owner", A);
+        const held = await addUserPhone(auth, "new", A, "pw");
+        const free = await addUserPhone(auth, "new", B, "pw");
+        const [one, two] = [await issuePhoneCode(auth, "new", held.id), await issuePhoneCode(auth, "new", free.id)];
+        expect(Object.keys(one).sort()).toEqual(Object.keys(two).sort());
+        expect(await verifyPhoneCode(auth, "new", "000000", held.id)).toEqual({ error: "That code is not right." });
+    });
+
+    it("lets either side of a pair confirmed on both accounts claim it again", async () => {
+        const mine = await confirmed("u1", A);
+        await confirmed("u2", B);
+        // The state an install has from before a number was one account's only.
+        rows.find((row) => row.userId === "u2")!.phone = A;
+        expect(await listUserPhones("u1")).toMatchObject([{ phone: A, verified: true, reconfirm: true }]);
+        const { code } = await issuePhoneCode(auth, "u1", mine);
+        expect(await verifyPhoneCode(auth, "u1", code!, mine)).toEqual({ takenFrom: ["u2"] });
+        expect(await listUserPhones("u1")).toMatchObject([{ phone: A, verified: true, reconfirm: false }]);
+        expect(await listUserPhones("u2")).toEqual([]);
+        expect(await issuePhoneCode(auth, "u1", mine)).toEqual({ error: "That number is already confirmed." });
     });
 });
 

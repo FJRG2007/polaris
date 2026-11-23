@@ -193,3 +193,23 @@ export async function notifySecurityChange(userId: string | null, action: string
         href: change.href
     });
 }
+
+/**
+ * Tell an account about its number being proved by somebody else: `taken` when
+ * it moved to the account that entered the code, `kept` when it stayed because
+ * it was this account's only way to finish signing in. Neither names the other
+ * account - only that somebody now receives messages at the number.
+ */
+export async function notifyPhoneClaimed(userId: string, phone: string, outcome: "taken" | "kept"): Promise<void> {
+    const t = await wordsFor(userId, "notices");
+    await notify({
+        userId,
+        event: "account.security",
+        title:
+            outcome === "taken"
+                ? t("security.account_phone_taken", { phone })
+                : t("security.account_phone_contested", { phone }),
+        body: outcome === "taken" ? t("security.account_phone_taken_body") : t("security.account_phone_contested_body"),
+        href: "/account/details"
+    });
+}

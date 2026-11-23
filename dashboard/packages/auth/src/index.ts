@@ -184,6 +184,8 @@ export {
     MAX_USER_PHONES,
     issuePhoneCode,
     verifyPhoneCode,
+    PHONE_KEPT_ELSEWHERE,
+    type PhoneClaimOptions,
     type UserPhoneView
 } from "./phone.js";
 export { issueStepUpCode, verifyStepUpCode, discardStepUpCode } from "./step-up.js";

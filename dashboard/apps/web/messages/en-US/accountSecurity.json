@@ -488,6 +488,7 @@
         "phoneAlreadyConfirmed": "That number is already confirmed.",
         "phoneOnAccount": "That number is already on your account.",
         "phoneLimit": "You can hold at most 5 phone numbers.",
+        "phoneKeptElsewhere": "This number cannot be confirmed on this account. Use another number.",
         "phoneNotOnAccount": "That number is not on your account.",
         "phoneLastRequired": "Your administrator requires a confirmed number. Add another first.",
         "phoneConfirmFirst": "Confirm the number before making it primary.",

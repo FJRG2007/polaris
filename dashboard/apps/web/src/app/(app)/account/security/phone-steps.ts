@@ -25,8 +25,18 @@ import { phoneCodeRoute } from "@/lib/messaging/code-senders";
 import { sendSmsThroughChannel } from "@/lib/notifications/sms-service";
 import { sendCodeThroughChannel } from "@/lib/messaging/channel-runtime";
 import { getInstanceSecurity } from "@/lib/instance-security";
-import { otpCodeField, phoneField, TWO_FACTOR_CODE_TTL_MINUTES } from "@polaris/core";
-import { addUserPhone, issuePhoneCode, promoteUserPhone, removeUserPhone, verifyPhoneCode } from "@polaris/auth";
+import { challengeOptions } from "@/lib/two-factor-delivery";
+import { phoneCanApprove } from "@/lib/mobile/sign-in-approval";
+import { notifyPhoneClaimed } from "@/lib/notifications/security-events";
+import { maskPhone, otpCodeField, phoneField, TWO_FACTOR_CODE_TTL_MINUTES } from "@polaris/core";
+import {
+    addUserPhone,
+    issuePhoneCode,
+    promoteUserPhone,
+    removeUserPhone,
+    twoFactorEnabled,
+    verifyPhoneCode
+} from "@polaris/auth";
 
 type ActionResult = { error?: string };
 
@@ -41,6 +51,9 @@ export const CODE_SEND_LIMIT = 5;
 export const CODE_SEND_WINDOW_MS = 15 * 60 * 1000;
 export const CODE_CHECK_LIMIT = 10;
 export const CODE_CHECK_WINDOW_MS = 15 * 60 * 1000;
+/** How many confirmation codes one number may be sent across every account, so
+ *  a number nobody here holds cannot be flooded by accounts taking turns. */
+export const NUMBER_SEND_LIMIT = 5;
 
 const addPhoneSchema = z.object({
     phone: phoneField,
@@ -112,8 +125,8 @@ export async function makePhonePrimaryFor(userId: string, id: unknown): Promise<
  * sender, or the user's own connected channel on an older setup, else the SMS
  * code sender - so confirming the number and confirming the route are the same act.
  *
- * A number another account has confirmed is answered exactly like one a code
- * went to, and nothing is sent (see issuePhoneCode).
+ * A number another account has confirmed gets its code like any other: whoever
+ * holds the phone is who may have it (see verifyPhoneCode).
  */
 export async function sendPhoneCodeFor(userId: string, id?: unknown): Promise<ActionResult> {
     const phoneId = phoneIdField.safeParse(id ?? undefined);
@@ -128,12 +141,12 @@ export async function sendPhoneCodeFor(userId: string, id?: unknown): Promise<Ac
     if (!route) return { error: t("errors.connectWhatsAppFirst") };
 
     const issued = await issuePhoneCode(auth, userId, phoneId.data);
-    if (issued.held) {
-        await recordAudit({ actorId: userId, action: "account.phone.code-sent" });
-        return {};
-    }
     if (issued.error || !issued.code || !issued.phone) {
         return issued.error ? localized({ error: issued.error }) : { error: t("known.addPhoneFirst") };
+    }
+    const perNumber = await rateLimit(`phone-code-number:${issued.phone}`, NUMBER_SEND_LIMIT, CODE_SEND_WINDOW_MS);
+    if (!perNumber.ok) {
+        return { error: t("errors.tooManyCodes", { minutes: Math.ceil(perNumber.retryAfterMs / 60000) }) };
     }
 
     // Sent to this same person, so in the language they are reading in.
@@ -169,10 +182,49 @@ export async function verifyPhoneFor(userId: string, input: unknown): Promise<Ac
         const t = await getTranslations("accountSecurity");
         return { error: t("errors.tooManyAttempts", { minutes: Math.ceil(throttle.retryAfterMs / 60000) }) };
     }
-    const result = await verifyPhoneCode(auth, userId, parsed.data.code, parsed.data.id);
+    const phone = await prisma.userPhone.findFirst({
+        where: parsed.data.id ? { id: parsed.data.id, userId } : { userId },
+        orderBy: [{ primary: "desc" }, { createdAt: "asc" }],
+        select: { phone: true }
+    });
+    const result = await verifyPhoneCode(auth, userId, parsed.data.code, parsed.data.id, {
+        mayTakeFrom: (owner) => mayLosePhone(owner, phone?.phone ?? "")
+    });
+    const masked = phone ? maskPhone(phone.phone) : "";
+    for (const owner of result.takenFrom ?? []) {
+        // Recorded against the account that lost it, with no actor: the history
+        // of the one that proved the phone must not show that anybody had it.
+        await recordAudit({ actorId: null, action: "account.phone.taken", targetType: "user", targetId: owner });
+        await notifyPhoneClaimed(owner, masked, "taken").catch((error: unknown) => {
+            console.error("polaris: could not tell an account its number moved:", error);
+        });
+    }
+    for (const owner of result.keptBy ?? []) {
+        await notifyPhoneClaimed(owner, masked, "kept").catch((error: unknown) => {
+            console.error("polaris: could not tell an account somebody holds its number:", error);
+        });
+    }
     if (!result.error) {
         await recordAudit({ actorId: userId, action: "account.phone.verified" });
         revalidatePath("/account/security", "layout");
     }
-    return localized(result);
+    return localized({ error: result.error });
+}
+
+/**
+ * Whether an account may lose a number somebody else just proved they hold.
+ * Yes when it keeps another confirmed number (codes go there instead) or has no
+ * second step; otherwise only when a way to finish signing in survives that
+ * does not go through a phone number - an authenticator, an email or Telegram
+ * code, approval from the mobile app. Losing the number would otherwise lock
+ * the account out, so it keeps it, as Signal's registration lock keeps one.
+ */
+export async function mayLosePhone(ownerId: string, phone: string): Promise<boolean> {
+    const others = await prisma.userPhone.count({
+        where: { userId: ownerId, phone: { not: phone }, verifiedAt: { not: null } }
+    });
+    if (others > 0) return true;
+    if (!(await twoFactorEnabled(ownerId))) return true;
+    const [options, approval] = await Promise.all([challengeOptions(ownerId), phoneCanApprove(ownerId)]);
+    return approval || options.methods.some((entry) => entry.method !== "sms" && entry.method !== "whatsapp");
 }

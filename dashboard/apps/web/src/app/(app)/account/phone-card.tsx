@@ -137,7 +137,7 @@ export function PhoneCard({
     useEffect(() => {
         setPending(null);
         setConfirming((open) =>
-            open && phones.some((entry) => entry.id === open && !entry.verified) ? open : null
+            open && phones.some((entry) => entry.id === open && needsCode(entry)) ? open : null
         );
     }, [phones]);
 
@@ -317,6 +317,7 @@ function PhoneRow({
     const saving = entry.id === "pending";
     const working = saving || busy === entry.id;
     const sendTitle = canSend ? undefined : ts("errors.connectWhatsAppFirst");
+    const askable = needsCode(entry);
 
     return (
         <li className="flex flex-col gap-2 border-t border-border px-3 py-2 first:border-t-0">
@@ -334,7 +335,7 @@ function PhoneRow({
                     ) : (
                         <Badge className="border-warning-edge text-warning">{t("phone.unconfirmed")}</Badge>
                     )}
-                    {entry.verified || open ? null : (
+                    {!askable || open ? null : (
                         <Button
                             variant="ghost"
                             size="sm"
@@ -376,13 +377,13 @@ function PhoneRow({
                                     </span>
                                 </DropdownMenuItem>
                             )}
-                            {entry.verified ? null : (
+                            {askable ? (
                                 <DropdownMenuItem disabled={!canSend || working} title={sendTitle} onSelect={onSendCode}>
                                     <Send className="size-3.5" />
                                     {open ? t("phone.resend") : t("phone.sendCode")}
                                 </DropdownMenuItem>
-                            )}
-                            {entry.primary && entry.verified ? null : <DropdownMenuSeparator />}
+                            ) : null}
+                            {entry.primary && !askable ? null : <DropdownMenuSeparator />}
                             <DropdownMenuItem
                                 variant="danger"
                                 disabled={locked || working}
@@ -401,6 +402,9 @@ function PhoneRow({
                     </DropdownMenu>
                 </div>
             </div>
+            {entry.reconfirm && !open ? (
+                <p className="text-xs text-muted-foreground">{t("phone.reconfirmHint")}</p>
+            ) : null}
             {open ? (
                 <ConfirmPhoneForm
                     entry={entry}
@@ -414,6 +418,12 @@ function PhoneRow({
             ) : null}
         </li>
     );
+}
+
+/** Whether a code may be asked for this number: it is unconfirmed, or confirmed
+ *  on another account too, where a new code is what settles whose it is. */
+function needsCode(entry: UserPhoneView): boolean {
+    return !entry.verified || entry.reconfirm === true;
 }
 
 /** The code box for one number, labelled with the number the code went to. */

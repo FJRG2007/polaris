@@ -91,6 +91,14 @@ describe("PhoneCard", () => {
         await waitFor(() => expect(actions.verify).toHaveBeenCalledWith({ id: "p2", code: "123456" }));
     });
 
+    it("offers a new code for a confirmed number another account also holds", async () => {
+        renderCard([{ ...PRIMARY, reconfirm: true } as typeof PRIMARY]);
+        expect(screen.getByText("Confirm it again to sign in with it.")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: /^Confirm \+34/ }));
+        expect(await screen.findByLabelText(/^Code sent to \+34/)).toBeTruthy();
+        expect(actions.send).toHaveBeenCalledWith("p1");
+    });
+
     it("works out the number to add against every number held", () => {
         expect(phoneToAdd("+34600111222", [PRIMARY.phone])).toBeNull();
         expect(phoneToAdd("+34600111999", [PRIMARY.phone])).toBe("+34600111999");

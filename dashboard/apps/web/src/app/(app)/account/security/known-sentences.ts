@@ -38,6 +38,7 @@ const EXACT: ReadonlyMap<string, SecurityKey> = new Map<string, SecurityKey>([
     ["That number is already on your account.", "known.phoneOnAccount"],
     ["You can hold at most 5 phone numbers.", "known.phoneLimit"],
     ["That number is not on your account.", "known.phoneNotOnAccount"],
+    ["This number cannot be confirmed on this account. Use another number.", "known.phoneKeptElsewhere"],
     ["Your administrator requires a confirmed number. Add another first.", "known.phoneLastRequired"],
     ["Confirm the number before making it primary.", "known.phoneConfirmFirst"],
     ["Ask for a code first.", "known.askForCodeFirst"],

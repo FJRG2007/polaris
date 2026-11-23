@@ -67,4 +67,13 @@ because a similar one worked.
 - [x] A personal SMS alert sender never carries codes, and a number can be
       confirmed by SMS when WhatsApp is not set up. SMS is a second factor
       only; it never replaces the password.
+- [x] Reassigned numbers (prior art: WhatsApp and Signal give a number to
+      whoever enters the code texted to it; Signal's registration lock keeps it
+      for an account that would otherwise be locked out). A code goes to any
+      number added, whoever holds it, so the form reveals nothing; entering it
+      moves the number off the other account, which is told in-app and gets a
+      new primary. An account for which the number is the only way to finish
+      signing in keeps it, and is warned somebody else receives at it. A pair
+      confirmed on two accounts before uniqueness shows "Confirm it again" on
+      both, and whichever enters a new code claims it.
 - [ ] Not exercised against a running instance or a real Twilio account.
