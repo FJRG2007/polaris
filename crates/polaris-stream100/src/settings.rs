@@ -55,11 +55,51 @@ impl Default for Settings {
 impl Settings {
     /// Reads stored settings; anything missing or out of range takes its
     /// default, so an older or damaged file never turns a guard off.
+    ///
+    /// Field by field (and knob by knob): one value of the wrong type or past
+    /// its type's range (`"brightness": 500`) resets that value only, never
+    /// the rest of what the person chose.
     pub fn from_json(json: &str) -> Self {
-        let mut settings: Settings = serde_json::from_str(json).unwrap_or_default();
+        let mut settings = Settings::default();
+        let Ok(serde_json::Value::Object(stored)) = serde_json::from_str::<serde_json::Value>(json)
+        else {
+            return settings;
+        };
+        set(&mut settings.enabled, stored.get("enabled"));
+        each(&mut settings.knobs, stored.get("knobs"));
+        each(&mut settings.buttons, stored.get("buttons"));
+        if let Some(serde_json::Value::Object(tuning)) = stored.get("tuning") {
+            let target = &mut settings.tuning;
+            set(
+                &mut target.percent_per_detent,
+                tuning.get("percentPerDetent"),
+            );
+            set(&mut target.dead_band, tuning.get("deadBand"));
+            set(&mut target.settle_ms, tuning.get("settleMs"));
+            set(&mut target.max_acceleration, tuning.get("maxAcceleration"));
+            set(&mut target.max_step, tuning.get("maxStep"));
+        }
+        set(&mut settings.display, stored.get("display"));
+        set(&mut settings.brightness, stored.get("brightness"));
         settings.tuning = settings.tuning.clamped();
         settings.brightness = settings.brightness.clamp(10, 100);
         settings
+    }
+}
+
+/// Takes `value` into `slot` when it reads as the slot's type; keeps the slot otherwise.
+fn set<T: serde::de::DeserializeOwned>(slot: &mut T, value: Option<&serde_json::Value>) {
+    if let Some(read) = value.and_then(|value| T::deserialize(value).ok()) {
+        *slot = read;
+    }
+}
+
+/// [`set`] for each entry of a stored list, by position.
+fn each<T: serde::de::DeserializeOwned>(slots: &mut [T], value: Option<&serde_json::Value>) {
+    if let Some(serde_json::Value::Array(items)) = value {
+        for (slot, item) in slots.iter_mut().zip(items) {
+            set(slot, Some(item));
+        }
     }
 }
 

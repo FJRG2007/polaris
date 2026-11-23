@@ -29,8 +29,22 @@ pub enum TransportError {
     NotFound,
     #[error("another program is using the Stream 100")]
     Busy,
+    #[error("this system does not let Polaris open the Stream 100")]
+    NoAccess,
     #[error("the Stream 100 stopped answering: {0}")]
     Io(String),
+    #[error("reading the Stream 100 is not supported on this system yet")]
+    Unsupported,
+}
+
+/// Why the device or its interface would not open: no permission (on Linux,
+/// no `uaccess` rule for it) reads differently from another program holding it.
+fn refused(error: nusb::Error) -> TransportError {
+    match error.kind() {
+        nusb::ErrorKind::PermissionDenied => TransportError::NoAccess,
+        nusb::ErrorKind::Disconnected | nusb::ErrorKind::NotFound => TransportError::NotFound,
+        _ => TransportError::Busy,
+    }
 }
 
 /// The controller's input endpoint, opened.
@@ -45,11 +59,11 @@ impl Input {
             .map_err(|error| TransportError::Io(error.to_string()))?
             .find(|device| device.vendor_id() == VENDOR_ID && device.product_id() == PRODUCT_ID)
             .ok_or(TransportError::NotFound)?;
-        let device = info.open().wait().map_err(|_| TransportError::Busy)?;
+        let device = info.open().wait().map_err(refused)?;
         let interface = device
             .detach_and_claim_interface(INPUT_INTERFACE)
             .wait()
-            .map_err(|_| TransportError::Busy)?;
+            .map_err(refused)?;
         let endpoint = interface
             .endpoint::<Interrupt, In>(INPUT_ENDPOINT)
             .map_err(|error| TransportError::Io(error.to_string()))?;

@@ -58,6 +58,18 @@ pub struct Report {
     pub positions: [i16; 4],
 }
 
+/// A report as an operating system's HID API reads it, brought to the bytes
+/// the USB transfer carried. Windows puts the report id first, and `0` when
+/// the device numbers its reports with none - a byte the transfer itself does
+/// not have. A device that does number them sends the id in the transfer too,
+/// so a non-zero first byte stays.
+pub fn from_hid_read(bytes: &[u8]) -> &[u8] {
+    match bytes.split_first() {
+        Some((0, rest)) => rest,
+        _ => bytes,
+    }
+}
+
 impl Report {
     /// Decodes a report, or `None` when it is too short to be one.
     pub fn parse(bytes: &[u8]) -> Option<Self> {
@@ -73,6 +85,19 @@ impl Report {
             buttons: bytes[BUTTONS],
             positions,
         })
+    }
+
+    /// The report in the layout [`Report::parse`] reads, holding only the
+    /// fields decoded here, so a decoded report can cross to another thread
+    /// or process as bytes.
+    pub fn to_bytes(&self) -> [u8; MIN_REPORT_LEN] {
+        let mut bytes = [0u8; MIN_REPORT_LEN];
+        bytes[BUTTONS] = self.buttons;
+        for (index, position) in self.positions.iter().enumerate() {
+            let at = ENCODERS + index * 2;
+            bytes[at..at + 2].copy_from_slice(&position.to_le_bytes());
+        }
+        bytes
     }
 
     /// How far encoder `index` moved since `previous`, across the 16-bit wrap.

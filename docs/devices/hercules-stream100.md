@@ -189,11 +189,15 @@ the input itself makes possible, each with its guard in
 
 | Part | State |
 | --- | --- |
-| Input report decoding, knob engine, display message framing and checksum, image conversion, audio categories, ownership, manifest, settings schema | done, unit-tested (`cargo test -p polaris-stream100`) |
-| USB input transport (`--features usb`) | written against `nusb` 0.2.9, compiles, never run against a device |
+| Input report decoding, knob engine, display message framing and checksum, image conversion, audio categories, ownership, manifest, settings (read field by field: one bad value resets only itself) | done, unit-tested (`cargo test -p polaris-stream100`) |
+| Input on Windows (feature `native`) | the HID API: the largest input collection of `06f8:e053`, opened read-only and shared, one overlapped read at a time with a timeout. Windows puts the report id first (`0` when the device numbers none) and `report::from_hid_read` brings it back to the USB transfer's bytes. Exercised against another HID device (opens, times out, cancels cleanly); never against the Stream 100, which the Hercules driver holds |
+| Input on Linux | the USB transport (`nusb`); needs the `uaccess` rule for the device, and without it the add-on says the system does not let Polaris open it |
+| Input on macOS | not written (HID manager), so no package is built for macOS |
 | Display transport | not written: `nusb` 0.2 has no isochronous transfers, and initialization is not understood (above) |
-| Per-app audio backends (Core Audio, PipeWire, macOS process taps) | trait only |
-| Desktop binding (napi), add-on loading, button actions, settings page | not written |
+| Per-app audio backends | Windows Core Audio and PulseAudio/PipeWire done; macOS answers unsupported |
+| Desktop binding (`crates/polaris-stream100-node`) | `Controller` (reports in, volume out, actions back) and `Reader` (reads on a worker thread, `await reader.next(500)`) |
+| Device add-on (`device-addons/hercules-stream100`) | manifest generated from the crate (`cargo run -p polaris-stream100 --example manifest`, a test keeps them equal), entry `any/main.cjs`, native module built per platform by `.github/workflows/device-addons.yml` (Windows x64, Linux x64). Settings live only on the add-on's page, never in the app's own settings |
+| Game category | the engine takes running games (`Controller.setGames`), but the add-on protocol has no method that hands them over yet, so Games follows only the apps the classifier knows |
 
 ### Needed from a real device
 

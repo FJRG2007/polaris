@@ -1,60 +1,52 @@
-//! How this module describes itself to the desktop app.
+//! How this module describes itself to the desktop app: the device add-on
+//! manifest (`docs/device-addons.md`, schema in `@polaris/core/device-addons`).
 //!
-//! It is shaped as the first "device add-on": the desktop reads the manifest,
-//! watches for one of the USB ids it claims, and loads the module only while
-//! such a device is plugged in. With no controller there is nothing running
-//! and nothing loaded.
+//! `device-addons/hercules-stream100/manifest.json` is this function's output,
+//! checked by a test, so the published package and the code cannot drift. The
+//! desktop watches for the USB id it claims and runs the add-on only while
+//! such a device can be there; with no controller nothing runs.
 
-use serde::Serialize;
+use serde_json::{json, Value};
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct UsbId {
-    pub vendor_id: u16,
-    pub product_id: u16,
-}
+/// The platforms a package is built for: input is read on Windows (HID API)
+/// and Linux (USB). macOS has no input route yet, so it gets no package.
+pub const PLATFORMS: [&str; 2] = ["win32-x64", "linux-x64"];
 
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Manifest {
-    pub id: &'static str,
-    pub name: &'static str,
-    pub version: &'static str,
-    /// The devices that make the desktop load this module.
-    pub usb: Vec<UsbId>,
-    /// What the module needs from the machine and from Polaris, so a screen
-    /// can list it before anything is enabled.
-    pub permissions: Vec<&'static str>,
-}
+/// The script each platform's package starts.
+pub const ENTRY: &str = "main.cjs";
 
-pub fn manifest() -> Manifest {
-    Manifest {
-        id: "hercules-stream100",
-        name: "Hercules Stream 100",
-        version: env!("CARGO_PKG_VERSION"),
-        usb: vec![UsbId {
-            vendor_id: crate::VENDOR_ID,
-            product_id: crate::PRODUCT_ID,
+/// The first desktop release with the add-on host.
+pub const MIN_APP_VERSION: &str = "0.1.75";
+
+pub fn manifest() -> Value {
+    let entries: serde_json::Map<String, Value> = PLATFORMS
+        .iter()
+        .map(|platform| ((*platform).to_owned(), json!(ENTRY)))
+        .collect();
+    json!({
+        "schema": 1,
+        "id": "hercules-stream100",
+        "name": "Hercules Stream 100",
+        "version": env!("CARGO_PKG_VERSION"),
+        "publisher": "Polaris",
+        "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
+        "category": "devices",
+        "minAppVersion": MIN_APP_VERSION,
+        "entries": entries,
+        "claims": [{
+            "vendorId": crate::VENDOR_ID,
+            "productId": crate::PRODUCT_ID,
+            "name": "Hercules Stream 100",
         }],
-        permissions: vec![
-            // Read the knobs and buttons, draw on the display.
-            "usb:device",
-            // List the apps playing audio and change their volume and mute.
-            "audio:sessions",
-            // Run the same actions the Stream Deck plugin runs (call mute,
-            // deafen, hang up...), with the desktop's signed-in account.
-            "polaris:actions",
-            // Show call participants and what is playing.
-            "polaris:call-state",
-            "media:now-playing",
-        ],
-    }
+        // Read the knobs and buttons; set the volume and mute of the apps
+        // playing audio; run Polaris' call actions from the buttons. The
+        // display is asked for once something is drawn on it.
+        "permissions": ["usb", "audio-sessions", "polaris-actions"],
+        "settings": crate::addon::addon_settings(),
+    })
 }
 
 /// Whether a plugged-in device is one this module drives.
 pub fn claims(vendor_id: u16, product_id: u16) -> bool {
-    manifest()
-        .usb
-        .iter()
-        .any(|id| id.vendor_id == vendor_id && id.product_id == product_id)
+    vendor_id == crate::VENDOR_ID && product_id == crate::PRODUCT_ID
 }

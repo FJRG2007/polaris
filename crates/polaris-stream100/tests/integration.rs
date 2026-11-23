@@ -156,16 +156,28 @@ fn who_holds_the_device() {
 #[test]
 fn the_manifest_claims_only_the_stream_100() {
     let manifest = manifest::manifest();
-    assert_eq!(manifest.id, "hercules-stream100");
+    assert_eq!(manifest["id"], "hercules-stream100");
     assert!(manifest::claims(0x06f8, 0xe053));
     assert!(!manifest::claims(0x06f8, 0xe054));
-    let json = serde_json::to_value(&manifest).unwrap();
-    assert_eq!(json["usb"][0]["vendorId"], 0x06f8);
-    assert!(json["permissions"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|p| p == "audio:sessions"));
+    assert_eq!(manifest["claims"][0]["vendorId"], 0x06f8);
+    assert_eq!(manifest["claims"][0]["productId"], 0xe053);
+    assert_eq!(
+        manifest["permissions"],
+        serde_json::json!(["usb", "audio-sessions", "polaris-actions"])
+    );
+}
+
+#[test]
+fn the_published_manifest_is_the_crates_own() {
+    // device-addons/hercules-stream100/manifest.json is what CI packages; it
+    // must be exactly what the code declares (regenerate it from `manifest()`).
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../device-addons/hercules-stream100/manifest.json"
+    );
+    let published: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    assert_eq!(published, manifest::manifest());
 }
 
 #[test]
@@ -179,6 +191,18 @@ fn settings_default_and_survive_a_damaged_file() {
     assert_eq!(partial.tuning.dead_band, 24);
     assert_eq!(partial.display, DisplayMode::Call);
     assert_eq!(partial.knobs, defaults.knobs);
+    // One value past its type's range resets that value alone.
+    let damaged = Settings::from_json(
+        r#"{"brightness":500,"display":"call","buttons":["call.share",7],"knobs":[{"kind":"output"},{"kind":"bogus"}],"tuning":{"deadBand":-1,"maxStep":4}}"#,
+    );
+    assert_eq!(damaged.brightness, defaults.brightness);
+    assert_eq!(damaged.display, DisplayMode::Call);
+    assert_eq!(damaged.buttons[0], "call.share");
+    assert_eq!(damaged.buttons[1], defaults.buttons[1]);
+    assert_eq!(damaged.knobs[0], Target::Output);
+    assert_eq!(damaged.knobs[1], defaults.knobs[1]);
+    assert_eq!(damaged.tuning.dead_band, defaults.tuning.dead_band);
+    assert_eq!(damaged.tuning.max_step, 4);
     let page = serde_json::to_value(schema()).unwrap();
     assert_eq!(
         page[0],

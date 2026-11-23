@@ -1,4 +1,5 @@
-//! The operating system's side: per-app volume and who holds the controller.
+//! The operating system's side: per-app volume, the controller's input, and
+//! who holds the controller.
 //!
 //! - Windows: Core Audio sessions on every active output, and the Hercules
 //!   driver / Stream Control probe ([`windows`]).
@@ -9,6 +10,7 @@
 use crate::audio::{AudioError, AudioSessions};
 use crate::ownership::Observed;
 
+pub mod input;
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(windows)]

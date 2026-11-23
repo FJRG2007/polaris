@@ -2,7 +2,7 @@
 
 use polaris_stream100::display::{self, IndexedFrame, Sequence};
 use polaris_stream100::encoder::{self, Encoder, Tuning};
-use polaris_stream100::report::{Decoder, Event, KnobMap, Report};
+use polaris_stream100::report::{from_hid_read, Decoder, Event, KnobMap, Report};
 
 fn report(buttons: u8, positions: [i16; 4]) -> Report {
     let mut bytes = [0u8; 64];
@@ -23,6 +23,26 @@ fn hex(text: &str) -> Vec<u8> {
 #[test]
 fn a_short_report_is_refused() {
     assert_eq!(Report::parse(&[0u8; 10]), None);
+}
+
+#[test]
+fn a_windows_hid_read_reads_like_the_usb_transfer() {
+    // Windows' HID API puts the report id first: 0 when the device numbers
+    // none (a byte the transfer lacks), the id itself when it does.
+    let mut transfer = vec![0x01u8, 0x10, 0x00, 0x30, 0x00];
+    transfer.resize(64, 0);
+    let mut unnumbered = vec![0u8];
+    unnumbered.extend_from_slice(&transfer);
+    assert_eq!(from_hid_read(&unnumbered), &transfer[..]);
+    assert_eq!(from_hid_read(&transfer), &transfer[..]);
+    let decoded = Report::parse(from_hid_read(&unnumbered)).unwrap();
+    assert_eq!(decoded.buttons, 0x10);
+    assert_eq!(decoded.positions[0], 0x30);
+    assert!(from_hid_read(&[]).is_empty());
+    let again = Report::parse(&decoded.to_bytes()).unwrap();
+    assert_eq!(again, decoded);
+    let turned = report(0xa5, [-1, i16::MAX, i16::MIN, 300]);
+    assert_eq!(Report::parse(&turned.to_bytes()), Some(turned));
 }
 
 #[test]

@@ -17,10 +17,11 @@ path = "src/lib.rs"
 [features]
 default = []
 usb = ["dep:nusb"]
-# The operating system's per-app volume and, on Windows, who holds the device.
+# The operating system's per-app volume, the controller's input reports (the
+# HID API on Windows, `usb` elsewhere) and, on Windows, who holds the device.
 # Built only into the add-on's own binding, never into anything a machine
 # without the controller loads.
-native = ["dep:windows", "dep:pulseaudio"]
+native = ["usb", "dep:windows", "dep:pulseaudio"]
 
 [dependencies]
 serde = { workspace = true }
@@ -39,6 +40,10 @@ windows = { version = "=0.62.2", optional = true, features = [
     "Win32_Media_Audio",
     "Win32_Media_Audio_Endpoints",
     "Win32_Devices_DeviceAndDriverInstallation",
+    "Win32_Devices_HumanInterfaceDevice",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_Security",
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]

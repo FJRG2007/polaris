@@ -1,0 +1,378 @@
+{
+    "category": "devices",
+    "claims": [
+        {
+            "name": "Hercules Stream 100",
+            "productId": 57427,
+            "vendorId": 1784
+        }
+    ],
+    "entries": {
+        "linux-x64": "main.cjs",
+        "win32-x64": "main.cjs"
+    },
+    "id": "hercules-stream100",
+    "minAppVersion": "0.1.75",
+    "name": "Hercules Stream 100",
+    "permissions": [
+        "usb",
+        "audio-sessions",
+        "polaris-actions"
+    ],
+    "publisher": "Polaris",
+    "schema": 1,
+    "settings": [
+        {
+            "default": true,
+            "key": "enabled",
+            "kind": "toggle",
+            "label": {
+                "en-US": "Use the Stream 100"
+            }
+        },
+        {
+            "default": "calls",
+            "key": "knob1",
+            "kind": "choice",
+            "label": {
+                "en-US": "Knob 1"
+            },
+            "options": [
+                {
+                    "label": {
+                        "en-US": "Calls"
+                    },
+                    "value": "calls"
+                },
+                {
+                    "label": {
+                        "en-US": "Music"
+                    },
+                    "value": "music"
+                },
+                {
+                    "label": {
+                        "en-US": "Games"
+                    },
+                    "value": "games"
+                },
+                {
+                    "label": {
+                        "en-US": "Browser"
+                    },
+                    "value": "browser"
+                },
+                {
+                    "label": {
+                        "en-US": "System sounds"
+                    },
+                    "value": "system"
+                },
+                {
+                    "label": {
+                        "en-US": "Other apps"
+                    },
+                    "value": "other"
+                },
+                {
+                    "label": {
+                        "en-US": "Whole output"
+                    },
+                    "value": "output"
+                },
+                {
+                    "label": {
+                        "en-US": "Nothing"
+                    },
+                    "value": "none"
+                }
+            ]
+        },
+        {
+            "default": "music",
+            "key": "knob2",
+            "kind": "choice",
+            "label": {
+                "en-US": "Knob 2"
+            },
+            "options": [
+                {
+                    "label": {
+                        "en-US": "Calls"
+                    },
+                    "value": "calls"
+                },
+                {
+                    "label": {
+                        "en-US": "Music"
+                    },
+                    "value": "music"
+                },
+                {
+                    "label": {
+                        "en-US": "Games"
+                    },
+                    "value": "games"
+                },
+                {
+                    "label": {
+                        "en-US": "Browser"
+                    },
+                    "value": "browser"
+                },
+                {
+                    "label": {
+                        "en-US": "System sounds"
+                    },
+                    "value": "system"
+                },
+                {
+                    "label": {
+                        "en-US": "Other apps"
+                    },
+                    "value": "other"
+                },
+                {
+                    "label": {
+                        "en-US": "Whole output"
+                    },
+                    "value": "output"
+                },
+                {
+                    "label": {
+                        "en-US": "Nothing"
+                    },
+                    "value": "none"
+                }
+            ]
+        },
+        {
+            "default": "games",
+            "key": "knob3",
+            "kind": "choice",
+            "label": {
+                "en-US": "Knob 3"
+            },
+            "options": [
+                {
+                    "label": {
+                        "en-US": "Calls"
+                    },
+                    "value": "calls"
+                },
+                {
+                    "label": {
+                        "en-US": "Music"
+                    },
+                    "value": "music"
+                },
+                {
+                    "label": {
+                        "en-US": "Games"
+                    },
+                    "value": "games"
+                },
+                {
+                    "label": {
+                        "en-US": "Browser"
+                    },
+                    "value": "browser"
+                },
+                {
+                    "label": {
+                        "en-US": "System sounds"
+                    },
+                    "value": "system"
+                },
+                {
+                    "label": {
+                        "en-US": "Other apps"
+                    },
+                    "value": "other"
+                },
+                {
+                    "label": {
+                        "en-US": "Whole output"
+                    },
+                    "value": "output"
+                },
+                {
+                    "label": {
+                        "en-US": "Nothing"
+                    },
+                    "value": "none"
+                }
+            ]
+        },
+        {
+            "default": "output",
+            "key": "knob4",
+            "kind": "choice",
+            "label": {
+                "en-US": "Knob 4"
+            },
+            "options": [
+                {
+                    "label": {
+                        "en-US": "Calls"
+                    },
+                    "value": "calls"
+                },
+                {
+                    "label": {
+                        "en-US": "Music"
+                    },
+                    "value": "music"
+                },
+                {
+                    "label": {
+                        "en-US": "Games"
+                    },
+                    "value": "games"
+                },
+                {
+                    "label": {
+                        "en-US": "Browser"
+                    },
+                    "value": "browser"
+                },
+                {
+                    "label": {
+                        "en-US": "System sounds"
+                    },
+                    "value": "system"
+                },
+                {
+                    "label": {
+                        "en-US": "Other apps"
+                    },
+                    "value": "other"
+                },
+                {
+                    "label": {
+                        "en-US": "Whole output"
+                    },
+                    "value": "output"
+                },
+                {
+                    "label": {
+                        "en-US": "Nothing"
+                    },
+                    "value": "none"
+                }
+            ]
+        },
+        {
+            "default": "call.mic",
+            "key": "button1",
+            "kind": "action",
+            "label": {
+                "en-US": "Button 1"
+            }
+        },
+        {
+            "default": "call.deafen",
+            "key": "button2",
+            "kind": "action",
+            "label": {
+                "en-US": "Button 2"
+            }
+        },
+        {
+            "default": "call.camera",
+            "key": "button3",
+            "kind": "action",
+            "label": {
+                "en-US": "Button 3"
+            }
+        },
+        {
+            "default": "call.hangup",
+            "key": "button4",
+            "kind": "action",
+            "label": {
+                "en-US": "Button 4"
+            }
+        },
+        {
+            "default": 2,
+            "key": "percentPerDetent",
+            "kind": "range",
+            "label": {
+                "en-US": "Volume per click"
+            },
+            "max": 10,
+            "min": 1,
+            "step": 1
+        },
+        {
+            "default": 3,
+            "key": "maxAcceleration",
+            "kind": "range",
+            "label": {
+                "en-US": "Speed-up on a fast turn"
+            },
+            "max": 5,
+            "min": 1,
+            "step": 1
+        },
+        {
+            "default": 3,
+            "key": "deadBand",
+            "kind": "range",
+            "label": {
+                "en-US": "Ignore tiny movements"
+            },
+            "max": 24,
+            "min": 0,
+            "step": 1
+        },
+        {
+            "default": "mixer",
+            "key": "display",
+            "kind": "choice",
+            "label": {
+                "en-US": "Screen shows"
+            },
+            "options": [
+                {
+                    "label": {
+                        "en-US": "Volume of each knob"
+                    },
+                    "value": "mixer"
+                },
+                {
+                    "label": {
+                        "en-US": "People in the call"
+                    },
+                    "value": "call"
+                },
+                {
+                    "label": {
+                        "en-US": "What is playing"
+                    },
+                    "value": "nowPlaying"
+                },
+                {
+                    "label": {
+                        "en-US": "Off"
+                    },
+                    "value": "off"
+                }
+            ]
+        },
+        {
+            "default": 80,
+            "key": "brightness",
+            "kind": "range",
+            "label": {
+                "en-US": "Screen brightness"
+            },
+            "max": 100,
+            "min": 10,
+            "step": 5
+        }
+    ],
+    "summary": "Knobs follow calls, music and games instead of one app each, and the lit buttons mute, deafen or hang up a Polaris call.",
+    "version": "0.1.0"
+}

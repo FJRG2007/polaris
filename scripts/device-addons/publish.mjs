@@ -5,9 +5,9 @@
  *   node scripts/device-addons/publish.mjs <source dir> <out dir>
  *
  * Every folder in <source dir> is one add-on: `manifest.json`, `listing.json`
- * (icon, screenshots, changelog: file names inside the folder) and the files of
- * each platform under `<platform>/`, or under `any/` when they are the same
- * everywhere. Writes into <out dir> one zip per add-on and platform, the
+ * (icon, screenshots, changelog: file names inside the folder) and the files:
+ * those the same everywhere under `any/`, each platform's own under
+ * `<platform>/` (a native module CI built for it), laid over `any/`. Writes into <out dir> one zip per add-on and platform, the
  * pictures, `catalog.json` and `catalog.json.sig`, all to be uploaded to the
  * `device-addons` release. The key is the PKCS#8 PEM in DEVICE_ADDONS_SIGNING_KEY.
  *
@@ -56,9 +56,9 @@ for (const id of existsSync(source) ? readdirSync(source).sort() : []) {
     const packages = {};
     for (const platform of PLATFORMS) {
         if (!manifest.entries[platform]) continue;
-        const filesDir = existsSync(join(dir, platform)) ? join(dir, platform) : join(dir, "any");
-        if (!existsSync(filesDir)) throw new Error(`${id}: no files for ${platform}`);
-        const files = { ...filesUnder(filesDir), "manifest.json": [new TextEncoder().encode(JSON.stringify(manifest, null, 4)), { mtime: FIXED_TIME }] };
+        const layers = [join(dir, "any"), join(dir, platform)].filter((path) => existsSync(path));
+        if (layers.length === 0) throw new Error(`${id}: no files for ${platform}`);
+        const files = { ...Object.assign({}, ...layers.map((path) => filesUnder(path))), "manifest.json": [new TextEncoder().encode(JSON.stringify(manifest, null, 4)), { mtime: FIXED_TIME }] };
         if (!files[manifest.entries[platform]]) throw new Error(`${id}: ${platform} entry ${manifest.entries[platform]} is missing`);
         const zip = zipSync(files, { level: 9 });
         const name = `${id}-${manifest.version}-${platform}.zip`;

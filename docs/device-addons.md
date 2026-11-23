@@ -65,5 +65,7 @@ against the declaration on every read and write. An add-on may also name a
 ## Publishing an add-on
 
 `device-addons/<id>/manifest.json`, optional `listing.json` (`icon`,
-`screenshots`, `changelog`), and the files under `any/` or `<platform>/`. A push
-to main touching `device-addons/**` publishes the catalog.
+`screenshots`, `changelog`), and the files under `any/` and `<platform>/` (a
+platform's own files laid over `any/`). A native module is not committed: the
+workflow builds it per platform into `<platform>/` before packaging (the
+`native` job). A push to main touching `device-addons/**` publishes the catalog.
