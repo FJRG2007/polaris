@@ -17,6 +17,21 @@ import { initials, initialsInk, tintFor } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { switchAccountAction, type DeviceAccountView } from "@/app/device-account-actions";
 
+/** An account's initials on its own colour, the face every row on this page
+ *  gives an account. */
+export function AccountInitials({ account }: { account: Pick<DeviceAccountView, "userId" | "name"> }) {
+    const tint = tintFor(account.userId);
+    return (
+        <span
+            aria-hidden
+            className="grid size-8 shrink-0 place-items-center rounded-full text-xs font-semibold"
+            style={{ backgroundColor: tint, color: initialsInk(tint) }}
+        >
+            {initials(account.name)}
+        </span>
+    );
+}
+
 export function AccountChooser({ accounts }: { accounts: DeviceAccountView[] }) {
     const t = useTranslations("auth");
     const [busy, setBusy] = useState<string | null>(null);
@@ -41,7 +56,6 @@ export function AccountChooser({ accounts }: { accounts: DeviceAccountView[] }) 
             <h2 className="text-xs font-medium text-muted-foreground">{t("login.chooserTitle")}</h2>
             <ul className="flex flex-col gap-1">
                 {accounts.map((account) => {
-                    const tint = tintFor(account.userId);
                     return (
                         <li key={account.id}>
                             <button
@@ -51,13 +65,7 @@ export function AccountChooser({ accounts }: { accounts: DeviceAccountView[] }) 
                                 aria-label={t("login.chooserContinue", { name: account.name })}
                                 className="flex w-full min-w-0 items-center gap-3 rounded-md border border-border px-3 py-2 text-start transition-colors hover:bg-muted/60 disabled:opacity-60"
                             >
-                                <span
-                                    aria-hidden
-                                    className="grid size-8 shrink-0 place-items-center rounded-full text-xs font-semibold"
-                                    style={{ backgroundColor: tint, color: initialsInk(tint) }}
-                                >
-                                    {initials(account.name)}
-                                </span>
+                                <AccountInitials account={account} />
                                 <span className="flex min-w-0 flex-1 flex-col">
                                     <span
                                         className="truncate text-sm font-medium"

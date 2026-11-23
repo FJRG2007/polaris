@@ -1,4 +1,5 @@
 import { auth } from "@/lib/auth";
+import { prisma } from "@polaris/db";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { hasAnyUser } from "@polaris/auth";
@@ -10,6 +11,9 @@ import { LoginForm, type SignInProvider } from "./login-form";
 import { chatE2eeEnabled, passwordLockEnabled } from "@/lib/chat/e2ee/flag";
 import { connectionSignInOffered } from "@/lib/connections/oauth";
 import { pendingTwoFactorUserId } from "@/lib/two-factor-challenge";
+import { requestPhoneCountry } from "@/lib/phone-country";
+import type { SignedInHere } from "./signed-in-match";
+import type { DeviceAccount } from "@polaris/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +38,33 @@ async function signInProviders(): Promise<SignInProvider[]> {
         )
     );
     return offered.filter((provider): provider is SignInProvider => provider !== null);
+}
+
+/**
+ * The accounts this browser holds, with what a typed identifier can name each
+ * by. Their verified phone numbers are read here, for these accounts only - the
+ * ones whose sessions the browser already carries - so nothing on the page says
+ * anything about an account it is not signed in to.
+ */
+async function signedInHere(accounts: readonly DeviceAccount[]): Promise<SignedInHere[]> {
+    if (accounts.length === 0) return [];
+    const phones = await prisma.userPhone
+        .findMany({
+            where: { userId: { in: accounts.map((account) => account.userId) }, verifiedAt: { not: null } },
+            select: { userId: true, phone: true }
+        })
+        .catch(() => []);
+    const phoneOf = new Map(phones.map((row) => [row.userId, row.phone]));
+    return accounts.map((account) => ({
+        id: account.sessionId,
+        userId: account.userId,
+        name: account.name,
+        email: account.email,
+        image: null,
+        active: account.active,
+        username: account.username,
+        phone: phoneOf.get(account.userId) ?? null
+    }));
 }
 
 export default async function LoginPage({
@@ -83,6 +114,10 @@ export default async function LoginPage({
               max: MAX_DEVICE_ACCOUNTS
           }
         : null;
+    const [signedIn, phoneCountry] = await Promise.all([
+        signedInHere(onDevice),
+        requestPhoneCountry().catch(() => null)
+    ]);
     // The accounts still signed in here, offered when none of them is active.
     const chooser = session
         ? []
@@ -100,6 +135,8 @@ export default async function LoginPage({
             providers={providers}
             add={add}
             chooser={chooser}
+            signedIn={signedIn}
+            phoneCountry={phoneCountry}
             opaqueSignIn={passwordLockEnabled()}
             chatKeys={chatE2eeEnabled()}
         />

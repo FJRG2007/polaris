@@ -16,8 +16,14 @@ import { loadEnv } from "@polaris/config";
 import { getAuthMailStatus } from "@/lib/auth-mail";
 import { ssoOfferedFor } from "@/lib/saml-providers";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { clientIp, requestCountry } from "@/lib/request-context";
-import { defaultPhoneCountry, passkeyRelyingPartyId, phoneShapeField, toE164 } from "@polaris/core";
+import { clientIp } from "@/lib/request-context";
+import { requestPhoneCountry } from "@/lib/phone-country";
+import {
+    NATIONAL_PHONE_NUMBER,
+    passkeyRelyingPartyId,
+    phoneShapeField,
+    toE164
+} from "@polaris/core";
 import { emailForPhone, emailForUsername, emailLinkSignInAllowed } from "@polaris/auth";
 import {
     openSignInCode,
@@ -34,18 +40,8 @@ import {
 const PASSKEY_HINT_LIMIT = 10;
 const PASSKEY_HINT_WINDOW_MS = 10 * 60 * 1000;
 
-/** Digits with the separators people type, and nothing else. */
-const NATIONAL_NUMBER = /^[\d\s().-]{6,20}$/;
-
 async function emailForNationalNumber(value: string): Promise<string | null> {
-    const incoming = await headers();
-    const locales = (incoming.get("accept-language") ?? "")
-        .split(",")
-        .map((part) => part.split(";")[0]!.trim())
-        .filter(Boolean)
-        .slice(0, 8);
-    const country = defaultPhoneCountry({ server: await requestCountry(), locales });
-    const e164 = toE164(value, country);
+    const e164 = toE164(value, await requestPhoneCountry());
     return e164 ? emailForPhone(e164, e164) : null;
 }
 
@@ -62,7 +58,7 @@ export async function resolveIdentifier(identifier: string): Promise<string | nu
     // A national number ("600 00 00 03"), read in the country this request
     // comes from, or failing that the reader's language. A username can be all
     // digits too, so a number that names nobody falls through to it.
-    if (NATIONAL_NUMBER.test(value)) {
+    if (NATIONAL_PHONE_NUMBER.test(value)) {
         const found = await emailForNationalNumber(value);
         if (found) return found;
     }

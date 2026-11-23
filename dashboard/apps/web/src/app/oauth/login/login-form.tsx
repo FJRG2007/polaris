@@ -29,6 +29,8 @@ import {
 } from "./actions";
 import { pendingEnrollmentAction, type PendingEnrollment } from "@/app/oauth/enroll/actions";
 import { AccountChooser } from "./account-chooser";
+import type { PhoneCountry } from "@polaris/core";
+import { SignedInNotice, useSignedInMatch, type SignedInHere } from "./signed-in-match";
 import { prepareAddAccountAction, type DeviceAccountView } from "@/app/device-account-actions";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark, cn } from "@polaris/ui";
 
@@ -107,6 +109,8 @@ export function LoginForm({
     providers,
     add = null,
     chooser = [],
+    signedIn = [],
+    phoneCountry = null,
     opaqueSignIn = false,
     chatKeys = false
 }: {
@@ -125,6 +129,11 @@ export function LoginForm({
     add?: AddingAccount | null;
     /** Accounts still signed in on this browser, none of them active. */
     chooser?: DeviceAccountView[];
+    /** Every account signed in on this browser, active or not: a typed
+     *  identifier that names one is offered the switch instead of a sign-in. */
+    signedIn?: SignedInHere[];
+    /** The country a phone number typed without its code is read in. */
+    phoneCountry?: PhoneCountry | null;
 }) {
     const router = useRouter();
     const t = useTranslations("auth");
@@ -144,6 +153,10 @@ export function LoginForm({
     /** Set when signing in worked and this deployment still wants a second
      *  factor from the account. The whole screen becomes that step. */
     const [enrollment, setEnrollment] = useState<PendingEnrollment | null>(null);
+    /** The account on this browser the identifier names: signing in to it again
+     *  would open a second session, so every way in waits while it is typed. */
+    const alreadyHere = useSignedInMatch(values.identifier, signedIn, phoneCountry);
+    const blocked = alreadyHere !== null;
 
     // Prefill the identifier with the one used last on this device, and explain
     // why the last session ended if it ended for a reason.
@@ -167,7 +180,7 @@ export function LoginForm({
     // re-asked from scratch whenever the identifier changes.
     useEffect(() => {
         const identifier = values.identifier.trim();
-        if (!identifier) {
+        if (!identifier || alreadyHere) {
             setHasPasskey(false);
             setCanEmailLink(false);
             setCanSso(false);
@@ -189,7 +202,7 @@ export function LoginForm({
             current = false;
             clearTimeout(timer);
         };
-    }, [values.identifier]);
+    }, [values.identifier, alreadyHere]);
 
     /**
      * Hand the browser to a provider's own screen.
@@ -349,6 +362,7 @@ export function LoginForm({
 
     async function onSubmit(event: FormEvent) {
         event.preventDefault();
+        if (blocked) return;
         const parsed = form.submit(values);
         if (!parsed) return;
         setPending(true);
@@ -486,6 +500,9 @@ export function LoginForm({
                                     </p>
                                 ) : null}
                             </div>
+                            {alreadyHere ? (
+                                <SignedInNotice account={alreadyHere} back={add?.back ?? null} />
+                            ) : null}
                             <div className="flex flex-col gap-1">
                                 <Input
                                     type="password"
@@ -505,7 +522,7 @@ export function LoginForm({
                             {error ? <p className="text-sm text-danger">{error}</p> : null}
                             <Button
                                 type="submit"
-                                disabled={pending}
+                                disabled={pending || blocked}
                                 aria-busy={pending}
                                 className={pending ? "disabled:opacity-100" : undefined}
                             >
