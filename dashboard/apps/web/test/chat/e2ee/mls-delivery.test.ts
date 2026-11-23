@@ -394,4 +394,71 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         await say(fresh, "back again");
         expect(await heard(alice)).toEqual(["bob-phone-1: back again"]);
     });
+    const epochNow = async () => ((await call({ op: "group", channelId: CHANNEL })).body.group as { epoch: string }).epoch;
+
+    it("rejoins after losing the store it joined by Welcome with, and removes its old leaf", async () => {
+        const alice = await open(ALICE, "alice-laptop");
+        const lost = await open(BOB, "bob-phone-1");
+        await Promise.all([alice.register(), lost.register()]);
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB]);
+        await say(alice, "before");
+        expect(await heard(lost)).toEqual(["alice-laptop: before"]);
+
+        // Same address, new key: the Welcome in the log is for a key it no longer holds.
+        const fresh = await open(BOB, "bob-phone-1");
+        await fresh.register();
+        expect(await fresh.ensureGroup(CHANNEL)).toEqual(alice.groupOf(CHANNEL));
+        // create 0, add 1, external join 2, removal of the old leaf 3.
+        expect(await epochNow()).toBe("3");
+        await say(alice, "after");
+        expect(await heard(fresh)).toEqual(["alice-laptop: after"]);
+        await say(fresh, "back");
+        expect(await heard(alice)).toEqual(["bob-phone-1: back"]);
+        // The old copy reads its own removal and lets the group go.
+        expect(await heard(lost)).toEqual([]);
+        expect(lost.groupOf(CHANNEL)).toBeNull();
+    });
+
+    it("removes every device of an account that left; the removed device forgets the group and cannot rejoin", async () => {
+        const alice = await open(ALICE, "alice-laptop");
+        const bob = await open(BOB, "bob-phone-1");
+        const carol = await open(CAROL, "carol-desk-1");
+        for (const device of [alice, bob, carol]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB, CAROL]);
+        await Promise.all([bob.sync(CHANNEL), carol.sync(CHANNEL)]);
+        expect(await alice.removeAccounts(CHANNEL, [BOB])).toEqual([`${BOB}/bob-phone-1`]);
+        expect(await alice.removeAccounts(CHANNEL, [BOB])).toEqual([]);
+        state.members.delete(`${BOB}:${CHANNEL}`);
+        await say(alice, "bob is gone");
+        expect(await heard(carol)).toEqual(["alice-laptop: bob is gone"]);
+        state.members.add(`${BOB}:${CHANNEL}`);
+        expect(await heard(bob)).toEqual([]);
+        expect(bob.groupOf(CHANNEL)).toBeNull();
+        state.members.delete(`${BOB}:${CHANNEL}`);
+        await expect(bob.ensureGroup(CHANNEL)).rejects.toMatchObject({ status: 403 });
+    });
+
+    it("forgets an external join that lost the epoch race and joins again from the newer GroupInfo", async () => {
+        const alice = await open(ALICE, "alice-laptop");
+        const bob = await open(BOB, "bob-phone-1");
+        const dave = await open(DAVE, "dave-desk-1");
+        for (const device of [alice, bob, dave]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB]);
+        let raced = 0;
+        const racing: MlsTransport = async (body) => {
+            // alice commits epoch 1 while carol's external commit for it is on the way.
+            if (body.op === "commit" && raced++ === 0) await alice.addAccounts(CHANNEL, [DAVE]);
+            return through(CAROL)(body);
+        };
+        const carol = await open(CAROL, "carol-desk-1", new MemoryStore(), new Map(), racing);
+        await carol.register();
+        expect(await carol.ensureGroup(CHANNEL)).toEqual(alice.groupOf(CHANNEL));
+        expect(raced).toBe(2);
+        expect(await epochNow()).toBe("3");
+        await say(carol, "in after a lost race");
+        for (const device of [alice, bob, dave]) expect(await heard(device)).toEqual(["carol-desk-1: in after a lost race"]);
+    });
 });

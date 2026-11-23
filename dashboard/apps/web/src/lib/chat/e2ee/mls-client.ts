@@ -14,7 +14,12 @@
  * device that loses that race drops its pending commit, reads the winner's and
  * tries again. A device too far behind to catch up commit by commit (the log
  * keeps 256 epochs) rejoins from the group's latest GroupInfo by an external
- * commit.
+ * commit, after forgetting its own copy of the group. A device that lost its
+ * store rejoins with a new key, so its old leaf is still in the group: it
+ * removes that leaf itself once it is back (a device that kept its key needs
+ * nothing, the external commit replaces its leaf). A device removed from the
+ * group forgets it; a later Welcome, or a rejoin the server allows, brings it
+ * back.
  *
  * Nothing here is reachable while `chatE2eeEnabled()` is off: the route answers
  * 404 and no screen constructs a device.
@@ -51,6 +56,10 @@ export interface MlsMemberLike {
     keyPackage(): Uint8Array;
     createGroup(groupId: Uint8Array): void;
     addMembers(groupId: Uint8Array, keyPackages: Uint8Array[]): MlsCommitOut;
+    removeMembers(groupId: Uint8Array, leaves: number[]): MlsCommitOut;
+    forgetGroup(groupId: Uint8Array): void;
+    members(groupId: Uint8Array): { leaf: number; identity: Uint8Array }[];
+    ownLeaf(groupId: Uint8Array): number;
     mergePendingCommit(groupId: Uint8Array): void;
     clearPendingCommit(groupId: Uint8Array): void;
     joinByWelcome(welcome: Uint8Array): Uint8Array;
@@ -266,6 +275,47 @@ export class MlsDevice {
     }
 
     /**
+     * Remove every device of these accounts from the conversation's group (an
+     * account that left it). Returns the addresses removed; none when they
+     * hold no leaf.
+     */
+    async removeAccounts(channelId: string, userIds: string[]): Promise<string[]> {
+        const prefixes = userIds.map((id) => `${id}/`);
+        return this.removeLeaves(channelId, (identity) => prefixes.some((prefix) => identity.startsWith(prefix)) && identity !== this.address);
+    }
+
+    /**
+     * Commit the removal of the leaves whose identity `pick` selects, catching
+     * up and choosing again when another commit wins the epoch.
+     */
+    private async removeLeaves(channelId: string, pick: (identity: string) => boolean): Promise<string[]> {
+        for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt++) {
+            const groupId = this.requireGroup(channelId);
+            const own = this.member.ownLeaf(groupId);
+            const leaves = this.member.members(groupId).flatMap((m) => {
+                const identity = decoder.decode(m.identity);
+                return m.leaf !== own && pick(identity) ? [{ leaf: m.leaf, identity }] : [];
+            });
+            if (!leaves.length) return [];
+            const epoch = this.member.epoch(groupId);
+            const out = this.member.removeMembers(groupId, leaves.map((l) => l.leaf));
+            if (!out.groupInfo) throw new Error("an MLS remove commit came back without its GroupInfo");
+            const body: MlsBody = {
+                op: "commit",
+                channelId,
+                device: this.options.device,
+                epoch: epoch.toString(),
+                commit: toText(out.commit),
+                groupInfo: toText(out.groupInfo),
+                welcomes: []
+            };
+            if (await this.settleCommit(body, groupId)) return [...new Set(leaves.map((l) => l.identity))];
+            await this.sync(channelId);
+        }
+        throw new MlsRequestError(409, "staleEpoch");
+    }
+
+    /**
      * Encrypt and send one application message to the whole group, after
      * catching up: a message sealed in an epoch the group has left cannot be
      * read by the members that joined since.
@@ -306,8 +356,11 @@ export class MlsDevice {
     async rejoin(channelId: string): Promise<Uint8Array> {
         for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt++) {
             const answer = await this.send({ op: "group", channelId });
-            const group = answer.group as { epoch: string; groupInfo: string | null } | null;
+            const group = answer.group as { groupId: string; epoch: string; groupInfo: string | null } | null;
             if (!group?.groupInfo) throw new MlsRequestError(404, "unknownGroup");
+            // A copy of the group held from before (a fork, a device too far
+            // behind, or the previous attempt's refused join) would refuse the join.
+            this.forget(fromText(group.groupId));
             const joined = this.member.joinByExternalCommit(fromText(group.groupInfo));
             const body: MlsBody = {
                 op: "commit",
@@ -327,9 +380,24 @@ export class MlsDevice {
             this.setGroup(channelId, joined.groupId);
             // Everything up to this commit is behind the new state.
             await this.skipLogTo(channelId, BigInt(group.epoch));
+            // A leaf of this address under another key is this device before it
+            // lost its store. Clean-up, not the join: a failure leaves the
+            // stale leaf (it reads nothing new) instead of failing the rejoin.
+            await this.removeLeaves(channelId, (identity) => identity === this.address).catch((caught: unknown) => {
+                console.warn("polaris: this device's old MLS leaf could not be removed:", caught);
+            });
             return joined.groupId;
         }
         throw new MlsRequestError(409, "staleEpoch");
+    }
+
+    /** Drop the member's copy of a group, if it holds one. */
+    private forget(groupId: Uint8Array): void {
+        try {
+            this.member.forgetGroup(groupId);
+        } catch {
+            // Not held: nothing to forget.
+        }
     }
 
     groupOf(channelId: string): Uint8Array | null {
@@ -357,7 +425,13 @@ export class MlsDevice {
         let groupId = this.groupOf(channelId);
         if (event.kind === "welcome") {
             if (groupId) return null;
-            groupId = this.member.joinByWelcome(payload);
+            try {
+                groupId = this.member.joinByWelcome(payload);
+            } catch (caught) {
+                // A Welcome to this address under a key the device no longer holds (it lost its store).
+                console.warn("polaris: an MLS Welcome could not be opened and was skipped:", caught);
+                return null;
+            }
             await this.options.store.commit(this.member.storeChanges());
             this.setGroup(channelId, groupId);
             return null;
@@ -370,8 +444,12 @@ export class MlsDevice {
             await this.rejoin(channelId);
             return null;
         }
-        // Its own commits and messages come back in the log too; a member cannot (and need not) read those.
-        if (event.sender === this.address) return null;
+        // Its own messages come back in the log too; a member cannot (and need
+        // not) read those. Its own commits never get here (merged, so their
+        // epoch is behind): a commit from this address at this epoch is from
+        // an earlier copy of this device, such as its removal by the copy that
+        // replaced it, and is applied.
+        if (event.sender === this.address && event.kind !== "commit") return null;
         let processed: MlsProcessedOut;
         try {
             processed = this.member.process(groupId, payload);
@@ -385,6 +463,11 @@ export class MlsDevice {
             return null;
         }
         await this.options.store.commit(this.member.storeChanges());
+        // Removed: the member already dropped the group's state; so does the device.
+        if (!processed.active) {
+            this.setGroup(channelId, null);
+            return null;
+        }
         if (processed.kind !== "application") return null;
         return { channelId, sender: decoder.decode(processed.senderIdentity), epoch: processed.epoch, plaintext: processed.plaintext };
     }

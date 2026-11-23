@@ -410,6 +410,11 @@ impl MlsMember {
     }
 
     #[napi(catch_unwind)]
+    pub fn forget_group(&self, group_id: Uint8Array) -> napi::Result<(), ErrorClass> {
+        polaris_core::mls::Member::forget_group(&self.inner, &group_id).map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
     pub fn self_update(&self, group_id: Uint8Array) -> napi::Result<MlsCommit, ErrorClass> {
         polaris_core::mls::Member::self_update(&self.inner, &group_id)
             .map(mls_commit)

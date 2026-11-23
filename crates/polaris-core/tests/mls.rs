@@ -573,3 +573,77 @@ fn p14_out_of_order_messages_open() {
         assert_eq!(seen[&(i as usize)], [i]);
     }
 }
+
+/// A refused external join is forgotten and tried again from the newer
+/// GroupInfo; a member whose copy forked forgets it, rejoins, and its old
+/// leaf is removed - on both suites.
+#[test]
+fn forgotten_groups_can_be_joined_again() {
+    for suite in SUITES {
+        let (alice, bob) = pair(suite);
+        let stale_info = alice.group_info(GROUP).unwrap();
+
+        // carol joins from epoch 1's GroupInfo, but alice's update wins epoch 1.
+        let carol = member("carol", suite);
+        let (_, lost) = carol.join_by_external_commit(&stale_info).unwrap();
+        let won = alice.self_update(GROUP).unwrap();
+        alice.merge_pending_commit(GROUP).unwrap();
+        bob.process(GROUP, &won.commit).unwrap();
+        assert_kind(
+            carol.join_by_external_commit(&alice.group_info(GROUP).unwrap()),
+            ErrorKind::Rejected,
+            "a second join over a group still held",
+        );
+        assert!(alice.process(GROUP, &lost).is_err());
+        carol.forget_group(GROUP).unwrap();
+        assert_kind(carol.epoch(GROUP), ErrorKind::UnknownGroup, "forgotten");
+        assert_kind(
+            carol.forget_group(GROUP),
+            ErrorKind::UnknownGroup,
+            "forgotten twice",
+        );
+        let (_, commit) = carol
+            .join_by_external_commit(&alice.group_info(GROUP).unwrap())
+            .unwrap();
+        alice.process(GROUP, &commit).unwrap();
+        bob.process(GROUP, &commit).unwrap();
+        assert_agree(&[&alice, &bob, &carol]);
+
+        let bobs = |m: &Member| {
+            m.members(GROUP)
+                .unwrap()
+                .into_iter()
+                .filter(|x| x.identity == b"bob")
+                .count()
+        };
+        // bob forgets its copy and rejoins with the same key: the external
+        // commit replaces its old leaf itself (RFC 9420, 12.4.3.2 resync).
+        bob.forget_group(GROUP).unwrap();
+        let (_, commit) = bob
+            .join_by_external_commit(&alice.group_info(GROUP).unwrap())
+            .unwrap();
+        alice.process(GROUP, &commit).unwrap();
+        carol.process(GROUP, &commit).unwrap();
+        assert_eq!(bobs(&alice), 1);
+        assert_agree(&[&alice, &bob, &carol]);
+
+        // A bob that lost its store has a new key, so its old leaf stays
+        // until the new one removes it.
+        let old_leaf = bob.own_leaf(GROUP).unwrap();
+        let bob = Member::new(b"bob", suite, seed("bob/after-loss")).unwrap();
+        let (_, commit) = bob
+            .join_by_external_commit(&alice.group_info(GROUP).unwrap())
+            .unwrap();
+        alice.process(GROUP, &commit).unwrap();
+        carol.process(GROUP, &commit).unwrap();
+        assert_eq!(bobs(&alice), 2);
+        let removal = bob.remove_members(GROUP, &[old_leaf]).unwrap();
+        bob.merge_pending_commit(GROUP).unwrap();
+        alice.process(GROUP, &removal.commit).unwrap();
+        carol.process(GROUP, &removal.commit).unwrap();
+        assert_eq!(bobs(&alice), 1);
+        assert_agree(&[&alice, &bob, &carol]);
+        let sealed = bob.encrypt(GROUP, b"back").unwrap();
+        assert_eq!(alice.process(GROUP, &sealed).unwrap().plaintext, b"back");
+    }
+}

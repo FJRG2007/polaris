@@ -58,7 +58,17 @@ and resends whatever an earlier run committed and never sent. Then:
   loser of two simultaneous creates).
 - `addAccounts` claims packages, commits the add and sends one Welcome per
   device; on `staleEpoch` it drops its pending commit, reads the winner's and
-  tries again (three attempts).
+  tries again (three attempts). `removeAccounts` commits the removal of every
+  device of accounts that left, the same way.
+- A rejoin (external commit) first drops the device's own copy of the group
+  (`forgetGroup`): a forked copy, one too far behind, or the previous attempt's
+  join the server refused for a lost epoch race. A device that kept its key has
+  its old leaf replaced by the external commit itself; one that lost its store
+  has a new key, so once back it removes the leaf of its own address under the
+  old key. A Welcome for a key the device no longer holds is skipped.
+- A device that reads its own removal forgets the group; a later Welcome, or a
+  rejoin the server allows (the account still reaches the conversation), brings
+  it back.
 - `sendApplication` catches up first, so a message is never sealed in an epoch
   the group has left; `sync` reads the log and returns the messages from others.
 
@@ -81,4 +91,3 @@ are in `localStorage`.
 - Server-run members (Polar, webhooks) through the Node binding and
   `mls-store.ts`.
 - A per-message device signature.
-- Removing a device's stale leaf when it rejoins after losing its store.

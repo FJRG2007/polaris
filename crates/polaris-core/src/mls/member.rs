@@ -426,6 +426,24 @@ impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {
             .map_err(storage_error)
     }
 
+    /// Drop every trace of a group from this member's storage - its tree,
+    /// epoch secrets, pending commit and this epoch's leaf keys - so the
+    /// member can join it again (a Welcome or an external commit refuses a
+    /// group it already holds). For a device whose copy of the group forked
+    /// or fell too far behind, and for an external join the delivery service
+    /// refused. Unknown groups are refused with `UnknownGroup`.
+    pub fn forget_group(&self, group_id: &[u8]) -> Result<()> {
+        let mut group = self.load(group_id)?;
+        let (epoch, own_leaf) = (group.epoch(), group.own_leaf_index().u32());
+        group
+            .delete(self.provider.storage())
+            .map_err(storage_error)?;
+        self.provider
+            .storage()
+            .delete_encryption_epoch_key_pairs(group.group_id(), &epoch, own_leaf)
+            .map_err(storage_error)
+    }
+
     /// Join the group a Welcome invites this member to; returns the group id.
     pub fn join_by_welcome(&self, welcome: &[u8]) -> Result<Vec<u8>> {
         let MlsMessageBodyIn::Welcome(welcome) = decode(welcome)? else {

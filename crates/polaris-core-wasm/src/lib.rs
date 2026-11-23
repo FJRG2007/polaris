@@ -201,6 +201,11 @@ impl MlsMember {
             .map_err(mls_error)
     }
 
+    #[wasm_bindgen(js_name = forgetGroup)]
+    pub fn forget_group(&self, group_id: &[u8]) -> Result<(), JsValue> {
+        polaris_core::mls::Member::forget_group(&self.inner, group_id).map_err(mls_error)
+    }
+
     #[wasm_bindgen(js_name = selfUpdate)]
     pub fn self_update(&self, group_id: &[u8]) -> Result<MlsCommit, JsValue> {
         polaris_core::mls::Member::self_update(&self.inner, group_id)
