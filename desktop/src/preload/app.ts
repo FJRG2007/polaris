@@ -131,6 +131,10 @@ const bridge: PolarisDesktop = {
     },
     installUpdate: () => ipcRenderer.invoke(CHANNELS.installUpdate),
     checkForUpdates: async () => readUpdateCheck(await ipcRenderer.invoke(CHANNELS.checkUpdates)),
+    keyWrap: {
+        seal: (data) => ipcRenderer.invoke(CHANNELS.keyWrapSeal, data),
+        open: (sealed) => ipcRenderer.invoke(CHANNELS.keyWrapOpen, sealed)
+    },
     vpn: {
         deviceName: () => ipcRenderer.invoke(CHANNELS.vpnDeviceName),
         key: () => ipcRenderer.invoke(CHANNELS.vpnKey),

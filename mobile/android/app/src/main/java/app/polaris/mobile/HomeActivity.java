@@ -196,6 +196,8 @@ public final class HomeActivity extends Activity {
         cookies.setAcceptThirdPartyCookies(view, true);
 
         view.addJavascriptInterface(new PageBridge(this), "polarisMobile");
+        // The chat account key's device lock under the Android Keystore, bound to this server (ChatKeyStore).
+        view.addJavascriptInterface(new ChatKeyStore(origin), "PolarisKeyStore");
         view.setWebViewClient(new Client());
         view.setWebChromeClient(new Chrome());
         view.setDownloadListener((url, agent, disposition, mime, length) -> download(url, agent, disposition, mime));

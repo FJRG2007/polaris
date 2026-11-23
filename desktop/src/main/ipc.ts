@@ -32,6 +32,7 @@ import { kindOf, openPolarisWindow, type WindowKind } from "./windows";
 import { installTool } from "./install-tool";
 import { runner } from "./runner";
 import * as vpn from "./vpn";
+import { openKey, sealKey } from "./key-wrap";
 import { openTvInstall, registerTvInstall } from "./tv-install";
 import { browserFromName, installRequestSchema, type InstallResult } from "@/shared/install-tools";
 import {
@@ -62,6 +63,7 @@ import {
     ipcMain,
     nativeImage,
     powerMonitor,
+    safeStorage,
     shell,
     type IpcMainInvokeEvent,
     type NativeImage,
@@ -397,6 +399,17 @@ export function registerIpc(host: IpcHost): void {
         } catch {
             return "unknown";
         }
+    });
+
+    // The chat account key's device lock, sealed by the operating system's
+    // key store and bound to the server asking (see key-wrap).
+    ipcMain.handle(CHANNELS.keyWrapSeal, (event, data: unknown): string | null => {
+        if (!fromPolaris(event)) return null;
+        return sealKey(safeStorage, event.senderFrame?.url, data);
+    });
+    ipcMain.handle(CHANNELS.keyWrapOpen, (event, sealed: unknown): string | null => {
+        if (!fromPolaris(event)) return null;
+        return openKey(safeStorage, event.senderFrame?.url, sealed);
     });
 
     // The call's keys, held system-wide while a call is on. A shape that does

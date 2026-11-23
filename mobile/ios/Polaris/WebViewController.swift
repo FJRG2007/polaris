@@ -86,6 +86,10 @@ final class WebViewController: UIViewController, WKNavigationDelegate, WKUIDeleg
             WKUserScript(source: bridge, injectionTime: .atDocumentStart, forMainFrameOnly: true)
         )
         config.userContentController.add(WeakHandler(self), name: "polarisMobile")
+        // The chat account key's device lock under the Keychain, bound to this server (ChatKeyStore).
+        config.userContentController.addScriptMessageHandler(
+            ChatKeyStore(origin: origin), contentWorld: .page, name: "polarisKeyStore"
+        )
 
         web = WKWebView(frame: .zero, configuration: config)
         web.navigationDelegate = self

@@ -193,6 +193,14 @@ export interface PolarisDesktop {
     /** Ask for a newer version of this app now and say what was found. Newer
      *  than `installUpdate`: a page feature-detects it. */
     checkForUpdates?(): Promise<UpdateCheck>;
+    /** The operating system's key store for the chat account key's device
+     *  lock: one base64url envelope in, one sealed value out, bound to this
+     *  server; null for anything it cannot do. Absent from older apps, whose
+     *  page then keeps the lock in IndexedDB as a browser does. */
+    readonly keyWrap?: {
+        seal(data: string): Promise<string | null>;
+        open(sealed: string): Promise<string | null>;
+    };
     /** This computer's VPN. A refusal's `error` is a word, for the page to say. */
     readonly vpn: {
         deviceName(): Promise<string>;
@@ -649,6 +657,8 @@ export const CHANNELS = {
     computerEvent: "desktop:computer-event",
     defaultBrowser: "desktop:default-browser",
     systemIdle: "desktop:system-idle",
+    keyWrapSeal: "desktop:key-wrap-seal",
+    keyWrapOpen: "desktop:key-wrap-open",
     editAddWord: "desktop:edit-add-word",
     editReadClipboard: "desktop:edit-read-clipboard",
     editWriteClipboard: "desktop:edit-write-clipboard",
