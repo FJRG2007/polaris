@@ -16,12 +16,16 @@
         "./vectors": {
             "types": "./dist/vectors.d.ts",
             "import": "./dist/vectors.js"
+        },
+        "./mls-store": {
+            "types": "./dist/mls-store.d.ts",
+            "import": "./dist/mls-store.js"
         }
     },
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "scripts": {
-        "build": "tsup src/index.ts src/probe.ts src/vectors.ts src/smoke.ts src/bench.ts --format esm --dts --clean",
+        "build": "tsup src/index.ts src/probe.ts src/vectors.ts src/mls-store.ts src/smoke.ts src/bench.ts --format esm --dts --clean",
         "build:rust": "node scripts/build-rust.mjs",
         "typecheck": "tsc --noEmit",
         "test": "vitest run test/unit",
@@ -34,7 +38,8 @@
         "check:bindings": "node scripts/binding-check.mjs",
         "smoke": "node scripts/smoke.mjs",
         "bench": "node scripts/bench.mjs",
-        "vectors": "node scripts/vectors.mjs"
+        "vectors": "node scripts/vectors.mjs",
+        "test:browsers:mls": "node scripts/browser-mls-store.mjs"
     },
     "dependencies": {
         "@noble/hashes": "2.2.0"

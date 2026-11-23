@@ -270,6 +270,9 @@ jobs:
         run: npx playwright install --with-deps chromium webkit firefox
       - working-directory: dashboard
         run: npm run test:browsers -w @polaris/core-rs
+      # MLS state in IndexedDB through a killed page (plan E2).
+      - working-directory: dashboard
+        run: npm run test:browsers:mls -w @polaris/core-rs
       # The Rust MLS suites (the adversarial tests and the RFC 9420 passive-client
       # vectors) compiled to wasm32 and run in Node, then headless Chromium and
       # Firefox through the runner images' preinstalled webdrivers.
