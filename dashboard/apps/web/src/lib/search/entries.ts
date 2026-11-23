@@ -104,7 +104,8 @@ export function navigationEntries(
 ): CommandEntry[] {
     const entries: CommandEntry[] = [];
     const allowed = new Set([...appIds, "account"]);
-    const offered = (section: AppSection) => !gate || sectionOffered(section, { ...gate, isAdmin });
+    const offered = (section: AppSection) =>
+        gate ? sectionOffered(section, { ...gate, isAdmin }) : !section.desktopOnly;
     for (const app of POLARIS_APPS) {
         if (app.adminOnly && !isAdmin) continue;
         if (!allowed.has(app.id)) continue;

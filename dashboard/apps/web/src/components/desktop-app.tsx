@@ -21,6 +21,12 @@ export function useDesktopBridge(): PolarisDesktop | null {
     return useSyncExternalStore(never, desktopBridge, () => null);
 }
 
+/** Whether this page runs inside a desktop app that draws its own settings in
+ *  Settings > This app; false on the server and in a browser. */
+export function useDesktopAppSettings(): boolean {
+    return !!useDesktopBridge()?.appSettings;
+}
+
 const ICON_BUTTON =
     "rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground";
 

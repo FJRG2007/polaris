@@ -89,6 +89,7 @@ import { getReportedTimeZone, resolveDisplayPreferencesFor } from "@/lib/display
 import { PresenceReporter } from "@/components/notifications/presence-reporter";
 import { DesktopGameReporter } from "@/components/desktop-game-reporter";
 import { DesktopAddonsOpener } from "@/components/desktop-addons-opener";
+import { DesktopAppSettingsListener } from "@/components/desktop-app-settings-listener";
 import { ChatUnreadProvider } from "@/components/chat-unread";
 import { MailUnreadProvider } from "@/components/mail-unread";
 import { AppUnreadDriftProvider } from "@/components/app-unread";
@@ -335,6 +336,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                                 <PresenceReporter />
                                                                                 <DesktopGameReporter />
                                                                                 <DesktopAddonsOpener />
+                                                                                <DesktopAppSettingsListener />
                                                                                 <TimeZoneReporter
                                                                                     reported={
                                                                                         reportedZone

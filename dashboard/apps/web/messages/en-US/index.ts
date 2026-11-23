@@ -78,6 +78,7 @@ import mailSettings from "./mailSettings.json";
 import deployProject from "./deployProject.json";
 import deployService from "./deployService.json";
 import accountPrivacy from "./accountPrivacy.json";
+import appSettings from "./appSettings.json";
 import deploySettings from "./deploySettings.json";
 import domainSecurity from "./domainSecurity.json";
 import accountSecurity from "./accountSecurity.json";
@@ -89,6 +90,7 @@ export default {
     accountNotifications,
     accountOrgs,
     accountPrivacy,
+    appSettings,
     accountSecurity,
     admin,
     agents,

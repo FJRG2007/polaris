@@ -88,6 +88,7 @@ import { readHostRows, type HostRow, type SearchHost } from "@/lib/search/search
 import { keepUnlockProofs } from "@/app/(app)/chat/lock-session";
 import { openLockedChatsAction, searchLockAction } from "@/app/(app)/chat/lock-actions";
 import { maybeLockCode, revealLockedChats } from "@/app/(app)/chat/lock-reveal";
+import { useDesktopAppSettings } from "@/components/desktop-app";
 
 /** How long a fetched resource index is reused before it is asked for again. */
 const INDEX_TTL_MS = 60_000;
@@ -516,13 +517,15 @@ export function CommandPalette({
     const appKey = appIds.join(",");
     const heldKey = held.join(",");
     const installedKey = installed.join(",");
+    const desktop = useDesktopAppSettings();
     const navigation = useMemo(
         () =>
             navigationEntries(isAdmin, fromKey(appKey), {
                 held: fromKey(heldKey),
-                installed: fromKey(installedKey)
+                installed: fromKey(installedKey),
+                desktop
             }),
-        [isAdmin, appKey, heldKey, installedKey]
+        [isAdmin, appKey, heldKey, installedKey, desktop]
     );
 
     // "Take the tour of Chat": found by typing, never listed in the empty map.

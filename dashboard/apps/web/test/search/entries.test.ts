@@ -73,7 +73,9 @@ describe("navigationEntries", () => {
     it("covers every section the left rail can reach", () => {
         const hrefs = new Set(navigationEntries(true, ALL_APPS).map((entry) => entry.href));
         for (const sections of Object.values(APP_SECTIONS)) {
-            for (const section of sections) expect(hrefs.has(section.href)).toBe(true);
+            // The desktop app's own settings are found only inside the app (see
+            // test/account/app-settings-view.test.tsx).
+            for (const section of sections) if (!section.desktopOnly) expect(hrefs.has(section.href)).toBe(true);
         }
         for (const app of POLARIS_APPS) expect(hrefs.has(app.href)).toBe(true);
     });

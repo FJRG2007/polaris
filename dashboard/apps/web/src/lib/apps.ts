@@ -79,6 +79,12 @@ import {
     NotebookPen,
     PartyPopper,
     RefreshCw,
+    AppWindow,
+    ClipboardList,
+    Cpu,
+    Power,
+    AudioLines,
+    Search,
     MousePointerClick,
     Radio,
     Rocket,
@@ -687,6 +693,9 @@ export interface AppSection {
      * the server (see `installedSectionApps`) because the answer is a query.
      */
     requiresApp?: string;
+    /** A setting of the desktop app, kept on the computer: offered only inside
+     *  the app, whose bridge is what reads and writes it. */
+    desktopOnly?: boolean;
 }
 
 /**
@@ -700,6 +709,9 @@ export interface SectionGate {
     readonly held: readonly string[];
     /** The marketplace apps installed, of the ones any section requires. */
     readonly installed: readonly string[];
+    /** Whether this page runs inside the desktop app that draws its own settings
+     *  here; absent counts as not. */
+    readonly desktop?: boolean;
 }
 
 /**
@@ -711,6 +723,7 @@ export interface SectionGate {
  * screen for something this Polaris does not have.
  */
 export function sectionOffered(section: AppSection, gate: SectionGate): boolean {
+    if (section.desktopOnly && !gate.desktop) return false;
     if (section.requiresApp && !gate.installed.includes(section.requiresApp)) return false;
     if (section.reachedBy && gate.held.includes(section.reachedBy)) return true;
     if (section.adminOnly && !gate.isAdmin) return false;
@@ -827,6 +840,9 @@ const PRIVACY_GROUP = "Privacy";
 /** The heading for what somebody building on Polaris needs: API keys, their own
  *  model keys and the domains their deploys answer on. */
 const DEVELOPERS_GROUP = "Developers";
+
+/** The heading the desktop app's own settings are listed under in My account. */
+const THIS_APP_GROUP = "This app";
 
 /** The heading the Management areas are listed under, below the screens that
  *  answer before you know which area your question is in. */
@@ -2774,6 +2790,73 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: Globe,
             keywords: ["dns", "custom domain", "deploys", "hostnames", "wildcard", "own domain"],
             group: DEVELOPERS_GROUP
+        },
+        // The desktop app's own settings, one screen per category of
+        // `APP_SETTING_CATEGORIES`: kept on the computer and offered only inside
+        // the app, the way Discord lists its app settings beside the account's.
+        {
+            label: "General", // i18n-ignore
+            href: "/account/app/general",
+            icon: Power,
+            keywords: ["desktop", "startup", "open at login", "start with the computer", "tray"],
+            group: THIS_APP_GROUP,
+            desktopOnly: true
+        },
+        {
+            label: "Window and tray", // i18n-ignore
+            href: "/account/app/window",
+            icon: AppWindow,
+            keywords: ["desktop", "minimize", "tray", "close button", "window"],
+            group: THIS_APP_GROUP,
+            desktopOnly: true
+        },
+        {
+            label: "Search and shortcuts", // i18n-ignore
+            href: "/account/app/search",
+            icon: Search,
+            keywords: ["launcher", "spotlight", "alt space", "hotkey", "game mode", "search engine"],
+            group: THIS_APP_GROUP,
+            desktopOnly: true
+        },
+        {
+            label: "Clipboard", // i18n-ignore
+            href: "/account/app/clipboard",
+            icon: ClipboardList,
+            keywords: ["clipboard history", "copied", "paste", "copy"],
+            group: THIS_APP_GROUP,
+            desktopOnly: true
+        },
+        {
+            label: "Voice widget and games", // i18n-ignore
+            href: "/account/app/voice",
+            icon: AudioLines,
+            keywords: ["overlay", "voice widget", "call widget", "games", "in game"],
+            group: THIS_APP_GROUP,
+            desktopOnly: true
+        },
+        {
+            label: "Hosts", // i18n-ignore
+            href: "/account/app/hosts",
+            icon: Server,
+            keywords: ["servers", "switch server", "polaris address", "connect"],
+            group: THIS_APP_GROUP,
+            desktopOnly: true
+        },
+        {
+            label: "Advanced", // i18n-ignore
+            href: "/account/app/advanced",
+            icon: Cpu,
+            keywords: ["hardware acceleration", "gpu", "graphics"],
+            group: THIS_APP_GROUP,
+            desktopOnly: true
+        },
+        {
+            label: "Updates", // i18n-ignore
+            href: "/account/app/updates",
+            icon: RefreshCw,
+            keywords: ["version", "check for updates", "restart", "desktop app"],
+            group: THIS_APP_GROUP,
+            desktopOnly: true
         }
     ],
     office: [

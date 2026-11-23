@@ -16,6 +16,7 @@
 
 import { z } from "zod";
 import type { SeasonCalendar } from "@polaris/core";
+import type { AppKeyPress, AppSettingChange } from "@polaris/core/app-settings";
 
 export type DesktopOutcome = { readonly ok: true } | { readonly ok: false; readonly error: string };
 
@@ -373,6 +374,36 @@ export interface PolarisDesktop {
      *  app hands it back through `relaunched` after a restart it makes, and
      *  never otherwise. */
     holdCall?(note: string | null): Promise<boolean>;
+    /**
+     * The settings the app keeps on this computer, drawn by Settings > This app.
+     * Every answer is read with `readAppSettings`. Absent from an app older than
+     * 0.1.71, which keeps them on its own page only.
+     */
+    appSettings?: DesktopAppSettings;
+}
+
+/** The app's own settings, as `desktop/src/shared/bridge.ts` names them. */
+export interface DesktopAppSettings {
+    /** Every value and the facts beside them. */
+    get(): Promise<unknown>;
+    /** Change one; answers the snapshot after it, or null when refused. */
+    set(change: AppSettingChange): Promise<unknown>;
+    /** Start (true) or stop (false) taking a press as the launcher's key. */
+    record(recording: boolean): Promise<void>;
+    /** The press that becomes the launcher's key; answers the snapshot after it. */
+    setShortcut(press: AppKeyPress): Promise<unknown>;
+    /** Delete every copy the clipboard history kept. */
+    clearClipboard(): Promise<void>;
+    /** Start the app again, for a setting that applies then. */
+    relaunch(): Promise<void>;
+    /** Open the app's own page at its hosts, the only place they are changed. */
+    manageHosts(): Promise<void>;
+    /** Say this page draws the settings, so the tray and menus open them here. */
+    announce(): Promise<void>;
+    /** Hear that a value changed anywhere. Answers the way to stop. */
+    onChange(listener: () => void): () => void;
+    /** Hear the app asking to show a category. Answers the way to stop. */
+    onOpen(listener: (category: string) => void): () => void;
 }
 
 const desktopRelaunchSchema = z.object({

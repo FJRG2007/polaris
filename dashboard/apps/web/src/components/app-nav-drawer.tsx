@@ -19,6 +19,7 @@ import {
     resolveSubapp,
     sectionOffered
 } from "@/lib/apps";
+import { useDesktopAppSettings } from "@/components/desktop-app";
 
 export function AppNavDrawer({
     appIds = [],
@@ -35,6 +36,7 @@ export function AppNavDrawer({
 }) {
     const pathname = usePathname();
     const phone = usePhone();
+    const desktop = useDesktopAppSettings();
     const label = useNavLabel();
     const subapp = resolveSubapp(pathname);
     const app = resolveActiveApp(pathname);
@@ -45,7 +47,7 @@ export function AppNavDrawer({
         !subapp && app.id === OVERVIEW_APP_ID
             ? appIds.some((id) => id !== OVERVIEW_APP_ID)
             : sections.some(
-                  (section) => !section.hidden && sectionOffered(section, { isAdmin, held, installed })
+                  (section) => !section.hidden && sectionOffered(section, { isAdmin, held, installed, desktop })
               );
     if (!hasRail) return null;
     // The screen's title is the app it lists; the Overview lists the apps.
