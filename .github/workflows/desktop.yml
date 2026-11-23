@@ -38,6 +38,7 @@ on:
       - "dashboard/packages/core/src/search-text.ts"
       - "dashboard/packages/core-rs/**"
       - "crates/polaris-core*/**"
+      - "crates/polaris-native-host/**"
       - ".github/workflows/desktop.yml"
   pull_request:
     paths:
@@ -46,6 +47,7 @@ on:
       - "dashboard/packages/core/src/search-text.ts"
       - "dashboard/packages/core-rs/**"
       - "crates/polaris-core*/**"
+      - "crates/polaris-native-host/**"
       - ".github/workflows/desktop.yml"
   workflow_dispatch:
 
@@ -139,6 +141,13 @@ jobs:
         run: |
           [ "$RUNNER_OS" != Linux ] || sudo apt-get install -y musl-tools
           bash vpn-helper/build.sh --test
+
+      # The browser extension's native messaging host, staged into the app's
+      # resources and signed with the app (forge signs every binary it packs).
+      - name: Native messaging host
+        env:
+          TARGET: ${{ matrix.os == 'macos-latest' && (matrix.arch == 'arm64' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin') || matrix.os == 'ubuntu-latest' && 'x86_64-unknown-linux-musl' || '' }}
+        run: bash native-host/build.sh --test
 
       - name: Which signing secrets exist
         id: signing
@@ -263,6 +272,11 @@ jobs:
         timeout-minutes: 20
         run: bash vpn-helper/build.sh
 
+      # The extension's native messaging host, likewise.
+      - name: Native messaging host
+        timeout-minutes: 20
+        run: bash native-host/build.sh
+
       # Windows through SignPath, in two rounds, because Squirrel packs the app
       # into the installer: the packaged app is signed first and the installer
       # is made from it, so the package inside carries the signed polaris.exe;
@@ -305,6 +319,10 @@ jobs:
           for file in polaris.exe resources/vpn-helper/polaris-vpn-helper.exe; do
             powershell -NoProfile -Command "if ((Get-AuthenticodeSignature 'out/signed-app/$file').Status -ne 'Valid') { Write-Error '$file came back without a valid signature.'; exit 1 }"
           done
+          # Signed only once the SignPath artifact configuration lists it; until
+          # then it ships as built, which a browser starts all the same.
+          host=resources/native-host/polaris-native-host.exe
+          powershell -NoProfile -Command "if ((Get-AuthenticodeSignature 'out/signed-app/$host').Status -ne 'Valid') { Write-Output '::warning::$host came back unsigned.' }"
           rm -rf "out/Polaris-win32-x64"
           mv out/signed-app "out/Polaris-win32-x64"
           npx electron-forge make --skip-package --arch=x64

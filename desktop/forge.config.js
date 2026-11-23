@@ -74,9 +74,13 @@ module.exports = {
         asar: { unpack: "{**/node_modules/node-pty/**,**/dist/native/*.node}" },
         // The VPN service, built by CI (vpn-helper/stage.mjs). A package made
         // without it still runs: only connecting the VPN says it cannot.
-        ...(existsSync(path.join(__dirname, "vpn-helper", "stage", "vpn-helper"))
-            ? { extraResource: [path.join(__dirname, "vpn-helper", "stage", "vpn-helper")] }
-            : {}),
+        // The browser extension's native messaging host, built by CI
+        // (native-host/build.sh) and found at resources/native-host. A package
+        // made without it still runs: only pairing with the extension is off.
+        extraResource: [
+            path.join(__dirname, "vpn-helper", "stage", "vpn-helper"),
+            path.join(__dirname, "native-host", "stage", "native-host")
+        ].filter((folder) => existsSync(folder)),
         // The main process and preloads are bundled into dist/ (build/bundle.mjs),
         // so the app needs no node_modules: ship dist/ and package.json, plus
         // node-pty, the one native module (the runner's terminals), which
@@ -157,7 +161,9 @@ module.exports = {
                     bin: "polaris",
                     icon: `${ICON}.png`,
                     categories: ["Development", "Utility"],
-                    mimeType: LINK_MIME_TYPES
+                    mimeType: LINK_MIME_TYPES,
+                    // Takes back the browser manifests for the extension's native host.
+                    scripts: { postrm: path.join(__dirname, "build", "deb-postrm.sh") }
                 }
             }
         },
