@@ -2518,7 +2518,7 @@
         "permission": {
             "usb": "Hablar con los USB que admite",
             "audioSessions": "Cambiar el volumen de las apps del equipo",
-            "display": "Dibujar en la pantalla del propio equipo",
+            "display": "Dibujar en la pantalla del dispositivo",
             "polarisActions": "Usar acciones de llamada: silenciar, cámara, colgar",
             "network": "Acceder a internet"
         },
@@ -2546,7 +2546,7 @@
             "screenshot": "Captura {number} de {name}",
             "settings": "Ajustes",
             "noSettings": "Nada que configurar.",
-            "enabled": "Usar este complemento",
+            "enabled": "Activar complemento",
             "uninstall": "Desinstalar",
             "uninstallTitle": "¿Desinstalar {name}?",
             "uninstallBody": "Se borran sus archivos y ajustes de este equipo.",
@@ -2558,7 +2558,7 @@
         "action": {
             "none": "Nada",
             "mic": "Silenciar",
-            "deafen": "Ensordecer",
+            "deafen": "Sin audio",
             "camera": "Cámara",
             "share": "Compartir pantalla",
             "hangup": "Colgar",

@@ -940,7 +940,7 @@
         "targetPlaceholder": "Última etapa",
         "name": "Nombre",
         "value": "Valor",
-        "add": "Añadir argumento",
+        "add": "Nuevo argumento",
         "remove": "Quitar {name}",
         "problem": {
             "stage": "Una etapa lleva letras, cifras, puntos, guiones o guiones bajos.",

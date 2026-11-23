@@ -2472,7 +2472,7 @@
             "updates": "Updates"
         },
         "filters": {
-            "search": "Search add-ons",
+            "search": "Search for add-ons",
             "categories": "Categories"
         },
         "category": {
@@ -2557,10 +2557,10 @@
         },
         "action": {
             "none": "Nothing",
-            "mic": "Mute",
+            "mic": "Mute mic",
             "deafen": "Deafen",
             "camera": "Camera",
-            "share": "Share screen",
+            "share": "Share your screen",
             "hangup": "Hang up",
             "leave": "Hang up"
         }
