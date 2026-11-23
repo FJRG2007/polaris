@@ -136,15 +136,29 @@ vocabulary, `XWarpPointer`) carries over unchanged.
   refresh token). Send `User-Agent: polaris-terminal/<version> (<platform>; <arch>)`
   so the approval screen names the OS. The URL-scheme redirect and the paste
   modal go away; the device grant needs neither.
-- **Shared sign-in with Desktop (design, not built):** Desktop already relays
-  local requests through `polaris-native-host` over a per-user socket and is
-  itself signed in. The terminal can skip the browser when Desktop is running:
-  connect to the same socket, send `{ "type": "terminal-sign-in", "userCode" }`
-  after opening the request, and Desktop answers the approval on the user's
-  behalf through the same server action the approval page uses, after showing
-  its own confirmation. Nothing new on the server: Desktop calls
-  `answerCliSignInAction` with `kind: "terminal"`. The terminal still holds its
-  own key; Desktop never hands out its session.
+- **Shared sign-in with Desktop (built on the Polaris side):** when Desktop is
+  running, the terminal skips the browser. After opening its request it
+  connects to Desktop's native-host socket - the named pipe
+  `\\.\pipe\polaris-desktop-native-host-<user>` on Windows (user name
+  lowercased, anything outside `[a-z0-9._-]` as `_`; check the pipe's server runs
+  as the same user before writing, as `crates/polaris-native-host/src/ipc.rs`
+  does), `~/Library/Application Support/Polaris/native-host/desktop.sock` on
+  macOS, `$XDG_CONFIG_HOME/Polaris/native-host/desktop.sock` (default
+  `~/.config`) on Linux - and sends one frame: a 32-bit little-endian length,
+  then `{ "type": "terminal-sign-in", "server": "<instance origin>",
+  "userCode": "BCDF-GHJK" }`. Desktop answers one frame, `{ "ok": true }` or
+  `{ "ok": false, "reason" }` with `reason` one of `other-server` (Desktop shows
+  another Polaris), `signed-out`, `refused` (the person said no, the server
+  refused, or another question is already on screen), `unreachable` or
+  `bad-request`, and closes. Desktop reads the request
+  (`POST /api/terminal/authorize/describe`), asks in its own dialog naming the
+  device, system, code and scopes, and answers it
+  (`POST /api/terminal/authorize/answer`) over its own session, through the
+  approval page's service (`lib/cli/approval.ts`). On `ok` the terminal's claim
+  poll collects its key as usual; on anything else, or with no socket at all
+  (an older Desktop answers `bad-request`), it opens the approval page instead.
+  The terminal still holds its own key; Desktop never hands out its session.
+  Desktop 0.1.62 carries it.
 - **Instance address:** the terminal asks for the Polaris address once (the
   same field the CLI and Desktop take) and verifies it with `GET /api/instance`.
   The same-instance local fallback rule applies (`/api/instance` publishes
@@ -249,7 +263,7 @@ vocabulary, `XWarpPointer`) carries over unchanged.
     ones shared with it (online = open relay socket), with open (live output,
     pane picker, insert text via `input.insert` for control), rename (a `label`
     column the hello never overwrites), share (`terminal.instance` grant,
-    `view`/`control`, people only - no link variant yet) and sign out (revokes
+    `view`/`control`, people, or a watch-only link) and sign out (revokes
     the key, drops the row and its shares). It opens the relay as
     `?role=viewer` with a one-shot `DeployTicket` (mode `relay`) in
     `Sec-WebSocket-Protocol`, bound to that one terminal.
@@ -295,14 +309,33 @@ vocabulary, `XWarpPointer`) carries over unchanged.
   `plr login`.
 - **Gap:** no `terminal` subcommand; Node is required by the CLI and is not
   guaranteed on a terminal user's machine.
-- **Step:** add `polaris terminal <action> [--instance|--window|--tab|--pane]`
-  to the CLI: it reads the same discovery directory and broker protocol
-  (`local_control`), so it needs no server for a local instance, and goes
-  through the relay for a remote one. Install-if-missing: when the user enables
-  Scripting, the terminal checks for `polaris` on `PATH`; if absent it runs the
-  instance's own install line (`/cli/install.ps1` on Windows, `/cli/install.sh`
-  elsewhere) in a visible pane after asking, so nothing is installed silently.
-  The bundled `--control` flag stays as the fallback when there is no instance.
+- **Built:** `plr terminal list` and `plr terminal run ACTION [--params JSON]
+  [--instance ID] [--window W] [--tab T] [--pane P]` (CLI 0.8.0,
+  `packages/cli/src/commands/terminal.ts`, `src/terminal-local.ts`).
+  - Local: reads the discovery records from
+    `POLARIS_TERMINAL_LOCAL_CONTROL_DISCOVERY_DIR`, else
+    `$XDG_RUNTIME_DIR/polaris-terminal/local-control`, else
+    `~/.polaris-terminal/local-control`, and the same three with the Rook names
+    (`ROOK_LOCAL_CONTROL_DISCOVERY_DIR`, `rook`, `~/.rook`), so a terminal from
+    before the rename is found. A record is followed only with
+    `protocol_version` 1, endpoint host `127.0.0.1`, broker socket
+    `<instance_id>.broker.sock` and a live pid. Per request: the
+    `CredentialRequest` to the broker socket (write, close the write half, read
+    to EOF), then `POST http://127.0.0.1:<port>/v1/control` with the scoped
+    bearer. Rook's broker is Unix-only, so on Windows a local terminal is
+    reached through Polaris, and the CLI says so.
+  - Remote: `GET /api/terminal/instances` (a key with `terminal.control`) for
+    the list; one controller socket per `run`, with the CLI's key as a Bearer
+    header (Node 22 or newer; older Node gets a sentence saying so).
+  - `terminal.control` is in `CLI_SCOPES`; `plr login` asks for it, and asks
+    again without it when an older Polaris refuses the scope with a 400.
+- **Install-if-missing (terminal side):** when the user enables Scripting and
+  neither `polaris` nor `plr` is on `PATH`, the terminal offers to install the
+  CLI and, on yes, runs the instance's own line in a visible pane:
+  `irm <instance>/cli/install.ps1 | iex` on Windows,
+  `curl -fsSL <instance>/cli/install.sh | sh` elsewhere. The installer needs
+  Node 20 or newer and says so itself when it is missing; the pane shows that
+  sentence. The hidden `--control` flag stays as the fallback with no instance.
 
 ### Telemetry
 
@@ -378,9 +411,72 @@ vocabulary, `XWarpPointer`) carries over unchanged.
 | Approval page `/account/terminal` and Sessions label | `app/(app)/account/terminal/page.tsx`, `lib/device-sessions/kinds.ts` |
 | CI scaffold for `terminal/**` | `.github/workflows/terminal.yml` |
 | Remote-control relay at `/api/deploy/ws/terminal`, scope `terminal.control`, `TerminalInstance` | `apps/web/terminal-relay.mjs`, `apps/web/src/lib/terminal/relay.ts`, `app/api/terminal/relay/route.ts` |
+| Live pane output, `/account/terminals`, `terminal.instance` shares (people and link) | `terminal-relay.mjs`, `lib/terminal/instances.ts`, `app/(app)/account/terminals/`, `/k/<token>` |
+| `plr terminal list` / `run`, `GET /api/terminal/instances`, `terminal.control` in `CLI_SCOPES` | `packages/cli/src/commands/terminal.ts`, `packages/cli/src/terminal-local.ts`, `app/api/terminal/instances/` |
+| Desktop shared sign-in, `POST /api/terminal/authorize/describe` and `/answer` | `desktop/src/main/native-host/terminal-sign-in.ts`, `lib/cli/approval.ts` |
 
-| Live pane output, `/account/terminals`, `terminal.instance` shares | `terminal-relay.mjs`, `lib/terminal/instances.ts`, `app/(app)/account/terminals/` |
+Not built, with the design above: terminal objects (`/api/terminal/objects`).
 
-Not built, with the design above: link shares of a terminal, terminal
-objects, the `polaris terminal` CLI subcommand, and the Desktop
-shared sign-in.
+## Import-time checklist (owner)
+
+Done by the owner when Rook moves in; none of it can be done from the Polaris
+side before the tree exists. In order:
+
+1. **Decide LFS first.** Drop the ConPTY `.pdb` files (fetch them in the
+   bundling script) or keep them under LFS, then add `.gitattributes` rules
+   scoped to `terminal/**/*.pdb` and `terminal/crates/input_classifier/models/**`.
+   An LFS object once pushed stays in the history.
+2. **Bring the tree in with history and file modes:** `git subtree add
+   --prefix=terminal <rook remote> main` (or `git read-tree --prefix=terminal/`),
+   never a file copy. Check that `git ls-files -s terminal/script | grep -c 100755`
+   matches Rook's count.
+3. **Re-root `.gitattributes`:** every Rook pattern gains `terminal/`
+   (`terminal/app/src/terminal/ref_tests/data/** -text` above all).
+4. **Cargo:** add `"terminal"` to `exclude` in the root `Cargo.toml`; keep
+   `terminal/Cargo.toml`, `Cargo.lock` and `rust-toolchain.toml` (1.94.0). Run
+   `cargo metadata` at the root and confirm no terminal crate appears and the
+   root `Cargo.lock` is unchanged (the tunnel fingerprint check pins it).
+5. **Rename** with `script/rebrand.py` and the Polaris target, per the rename
+   map above (crates `pterm_*`, binary `polaris-terminal`, env
+   `POLARIS_TERMINAL_*`, AppId `dev.polaris.PolarisTerminal`, URL schemes
+   `polaris-terminal*`), in one commit, bootstrap scripts and `plugins/` included.
+6. **rook.dev sweep** by category (see "The rook.dev links"), then the test that
+   greps `terminal/` for `rook\.dev` and fails on a hit.
+7. **CI:** port Rook's `ci.yml` jobs into `.github/workflows/terminal.yml` behind
+   `needs.changes.outputs.terminal == 'true'`, with `working-directory: terminal`
+   and `Swatinem/rust-cache` `workspaces: terminal -> target`; keep the single
+   `terminal` result job as the required check. Add `terminal-release.yml` on
+   `terminal-v*` tags (Rook's `release.yml`, asset names renamed). Auto-tag only
+   for diffs under `terminal/`.
+8. **Update channel:** `ParsedVersion` and `github::compare_release_tags` strip a
+   leading `terminal-`; the release query filters to that prefix;
+   `script/release_tag` and `script/update_plist` learn it.
+9. **Terminal-side code against what Polaris already serves:**
+   - Sign-in: replace the Firebase flow with `POST /api/terminal/authorize`, then
+     the Desktop socket (`terminal-sign-in`) or the approval page, then poll
+     `POST /api/terminal/authorize/claim`; keep the key in the keychain; sign out
+     with `DELETE /api/terminal/session`.
+   - Relay: one socket to `/api/deploy/ws/terminal?role=instance` with the key,
+     `hello` within 10 s, `request` frames answered by the same dispatcher local
+     control uses, `ping` / `pong`.
+   - **Live output (`attach` / `detach` / `output`):** on
+     `{ "type": "attach", "pane" }` start forwarding that pane's PTY output as
+     `{ "type": "output", "pane", "data": "<base64 of the raw bytes>" }`, in
+     chunks of at most 64 KiB, sending the pane's current screen first so a new
+     watcher is not looking at a blank pane; on `{ "type": "detach", "pane" }`
+     stop. The relay caps a pane at 256 KiB/s with a 1 MiB burst and drops the
+     excess (the watcher sees `gap: true`), so coalesce rather than flood. Never
+     send output for a pane that is not attached; at most 16 attached panes per
+     socket. After a reconnect the relay sends `attach` again for every pane
+     still watched, so attachment state is not kept across sockets.
+   - Polar: the assistant's provider is the instance's compatible endpoints
+     (`/api/v1/chat/completions`, `/api/v1/messages`, `/api/v1/responses`,
+     `/api/v1/models`) with the terminal key.
+   - Telemetry: remove RudderStack and the Sentry DSN.
+   - User data: the one-time copy from `~/.rook-oss` / `~/.rook` and the
+     `dev.rook.RookOss` data directory, with a marker.
+   - Scripting: install-if-missing for the CLI (see "CLI integration").
+10. **Verify:** `cargo nextest run` in `terminal/` on the three systems through
+    CI, `npm run build` in `dashboard/`, a sign-in from a fresh terminal against
+    a real instance (browser path and Desktop path), `plr terminal run app.ping`
+    locally and through the relay, and a pane watched from `/account/terminals`.
