@@ -142,6 +142,40 @@ export async function usableRecord(
     return { record: row.record, ksfVersion: row.ksfVersion === 1 ? 1 : 2 };
 }
 
+/**
+ * Whether a password handed over in the clear is the one an account set over
+ * OPAQUE (`commitPassword`), given only the hash the caller compared it to -
+ * which is all better-auth's password check has. Such an account's hash opens
+ * for nothing, so without this every route that still takes a password (an old
+ * client's sign-in, arming a second factor, the lock screen, a quick PIN)
+ * would refuse its owner. Only a verified record still tagged with exactly this
+ * hash, and still the account's current one, is tried. Never throws.
+ */
+export async function passwordOpensHashlessAccount(hash: string, password: string): Promise<boolean> {
+    try {
+        if (!hash || !password) return false;
+        const row = await prisma.opaqueRecord.findFirst({
+            where: { passwordTag: passwordTag(hash), verifiedAt: { not: null } },
+            select: { userId: true }
+        });
+        if (!row) return false;
+        // Re-read through the tag of the account's CURRENT hash, so a record
+        // retired by a later password write is never tried.
+        const usable = await usableRecord(row.userId, "sign-in");
+        if (!usable) return false;
+        return await opaque.passwordOpensRecord({
+            serverSetup: await serverSetup(),
+            userId: row.userId,
+            record: usable.record,
+            password,
+            ksfVersion: usable.ksfVersion
+        });
+    } catch (caught) {
+        console.error("polaris: checking a password against its OPAQUE record failed:", caught);
+        return false;
+    }
+}
+
 /** Whether the account has already moved to OPAQUE for its current password. */
 export async function adopted(userId: string): Promise<boolean> {
     return (await usableRecord(userId, "sign-in")) !== null;

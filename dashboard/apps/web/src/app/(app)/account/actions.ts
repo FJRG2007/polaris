@@ -363,7 +363,8 @@ export async function promoteEmailOpaqueAction(emailId: unknown, proof: unknown)
     if (blocked) return localized({ error: blocked });
     const parsed = z.object({ emailId: emailIdSchema, proof: opaqueFinish }).safeParse({ emailId, proof });
     if (!parsed.success) return { error: (await getTranslations("account"))("profile.errors.addressGone") };
-    if (!(await provesPassword(user.id, parsed.data.proof))) return localized({ error: "Current password is incorrect." });
+    if (!(await provesPassword(user.id, parsed.data.proof)))
+        return { error: (await getTranslations("accountSecurity"))("known.wrongPassword") };
     const result = await promoteUserEmail(auth, user.id, parsed.data.emailId, { proven: true });
     if (!result.error) {
         await recordAudit({ actorId: user.id, action: "account.email.primary-changed", metadata: { method: "opaque" } });

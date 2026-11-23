@@ -70,6 +70,10 @@ vi.mock("@polaris/db", () => {
                 const row = t.records.get(where.userId);
                 return row ? { ...row } : null;
             },
+            findFirst: async ({ where }: { where: { passwordTag: string; verifiedAt: { not: null } } }) => {
+                const row = [...t.records.values()].find((r) => r.passwordTag === where.passwordTag && r.verifiedAt);
+                return row ? { userId: row.userId } : null;
+            },
             upsert: async ({ where, create, update }: Record<string, Record<string, unknown>>) => {
                 const id = where!.userId as string;
                 const existing = t.records.get(id);
@@ -520,5 +524,48 @@ describe("the kill switch never locks anybody out", () => {
         state.limitCap = 0;
         expect(await client.signInWithOpaque(alice.email, NEXT)).toBeNull();
         expect([...state.limits.keys()]).toContain(`e2ee-sign-in:${alice.email}`);
+    });
+});
+
+describe("a password set over OPAQUE still opens every check that takes one", () => {
+    // better-auth's verify, wrapped as packages/auth wraps it with the app's fallback.
+    const check = async (userId: string, password: string) => {
+        const hash = state.credentials.get(userId)!;
+        return hash === `scrypt:${password}` || (await service.passwordOpensHashlessAccount(hash, password));
+    };
+
+    it("the new password opens the hash its account was left with, and nothing else does", async () => {
+        const alice = await adoptedAccount();
+        const set = await flows.prepareNewPassword(NEXT, { email: alice.email });
+        expect(await server.setPasswordOverOpaque(alice.id, set)).toBe(true);
+        expect(await check(alice.id, NEXT)).toBe(true);
+        expect(await check(alice.id, PASSWORD)).toBe(false);
+        expect(await check(alice.id, "")).toBe(false);
+    });
+
+    it("never opens another account's hash, an unverified record, or one a later write retired", async () => {
+        const alice = await adoptedAccount();
+        const bob = account("bob@example.com", PASSWORD);
+        const set = await flows.prepareNewPassword(NEXT, { email: alice.email });
+        expect(await server.setPasswordOverOpaque(alice.id, set)).toBe(true);
+        expect(await check(bob.id, NEXT)).toBe(false);
+        expect(await service.passwordOpensHashlessAccount(`scrypt:${PASSWORD}`, NEXT)).toBe(false);
+
+        const hashless = state.credentials.get(alice.id)!;
+        state.tables.records.set(alice.id, { ...state.tables.records.get(alice.id)!, verifiedAt: null });
+        expect(await service.passwordOpensHashlessAccount(hashless, NEXT)).toBe(false);
+        state.tables.records.set(alice.id, { ...state.tables.records.get(alice.id)!, verifiedAt: new Date() });
+        expect(await service.passwordOpensHashlessAccount(hashless, NEXT)).toBe(true);
+
+        // An administrator's reset writes a real hash; the record stops counting.
+        state.credentials.set(alice.id, "scrypt:set by an administrator");
+        expect(await service.passwordOpensHashlessAccount(hashless, NEXT)).toBe(false);
+        expect(await check(alice.id, "set by an administrator")).toBe(true);
+    });
+
+    it("an account merely moved onto OPAQUE keeps its hash as the only check", async () => {
+        const alice = await adoptedAccount();
+        expect(await check(alice.id, PASSWORD)).toBe(true);
+        expect(await check(alice.id, NEXT)).toBe(false);
     });
 });

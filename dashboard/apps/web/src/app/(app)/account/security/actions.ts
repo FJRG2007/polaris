@@ -238,7 +238,7 @@ export async function changePasswordOpaqueAction(input: unknown): Promise<Action
     const parsed = z.object({ proof: opaqueFinish, set: opaqueFinish.optional() }).safeParse(input);
     const t = await getTranslations("accountSecurity");
     if (!parsed.success) return { error: t("errors.unreadable") };
-    if (!(await provesPassword(user.id, parsed.data.proof))) return localized({ error: "Current password is incorrect." });
+    if (!(await provesPassword(user.id, parsed.data.proof))) return { error: t("known.wrongPassword") };
     if (!parsed.data.set || !(await setPasswordOverOpaque(user.id, parsed.data.set)))
         return { error: t("password.notChanged") };
     await repairCredentialAccounts(user.id);

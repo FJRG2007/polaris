@@ -13,6 +13,7 @@
  */
 
 import * as opaque from "@serenity-kit/opaque";
+import { passwordKsf, type PasswordKsfVersion } from "./password-lock";
 
 function identifiersFor(userId: string): { client: string } {
     if (!userId) throw new RangeError("An OPAQUE exchange belongs to an account");
@@ -71,6 +72,52 @@ export async function finishLogin(
             serverLoginState,
             finishLoginRequest,
             identifiers: identifiersFor(userId)
+        });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Whether a password the server was handed in the clear opens a record, by
+ * running both halves of a login here. Only for the routes an old client still
+ * posts a password to, on an account whose password exists nowhere but its
+ * record: the server sees that password anyway, and this is the one way it can
+ * still tell a right one from a wrong one. Costs one Argon2id of the record's
+ * profile, so it is never the first check made.
+ */
+export async function passwordOpensRecord(input: {
+    readonly serverSetup: string;
+    readonly userId: string;
+    readonly record: string;
+    readonly password: string;
+    /** The profile the record was made with. */
+    readonly ksfVersion: PasswordKsfVersion;
+}): Promise<boolean> {
+    await opaque.ready;
+    const identifiers = identifiersFor(input.userId);
+    try {
+        const started = opaque.client.startLogin({ password: input.password });
+        const step = opaque.server.startLogin({
+            serverSetup: input.serverSetup,
+            userIdentifier: input.userId,
+            registrationRecord: input.record,
+            startLoginRequest: started.startLoginRequest,
+            identifiers
+        });
+        const finished = opaque.client.finishLogin({
+            clientLoginState: started.clientLoginState,
+            loginResponse: step.loginResponse,
+            password: input.password,
+            identifiers,
+            keyStretching: passwordKsf(input.ksfVersion)
+        });
+        if (!finished) return false;
+        opaque.server.finishLogin({
+            serverLoginState: step.serverLoginState,
+            finishLoginRequest: finished.finishLoginRequest,
+            identifiers
         });
         return true;
     } catch {

@@ -18,6 +18,11 @@ import { androidAppOrigins } from "./mobile/asset-links";
 
 const requestAuth = createRequestAuth({
     appOrigins: () => androidAppOrigins(),
+    // An account whose password was set over OPAQUE has a hash that opens for
+    // nothing; a password an old client or a remaining form posts is checked
+    // against its record instead. Imported lazily: it reaches the database.
+    passwordFallback: async ({ hash, password }) =>
+        (await import("./chat/e2ee/opaque-service")).passwordOpensHashlessAccount(hash, password),
     configuredHosts: async (request) => {
         const [
             { dashboardHosts, publicHostname },

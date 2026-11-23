@@ -19,6 +19,7 @@ import { randomUUID } from "node:crypto";
 import { loadEnv } from "@polaris/config";
 import { passkey } from "@better-auth/passkey";
 import { setSessionCookie } from "better-auth/cookies";
+import { hashPassword, verifyPassword } from "better-auth/crypto";
 import { deviceAccountsPlugin } from "./device-accounts.js";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
@@ -710,6 +711,15 @@ export interface AuthOptions {
     readonly appOrigins?: () => readonly string[];
 
     /**
+     * Asked when a password does not match its hash, before the check answers
+     * no: true when the password still opens the account another way. The app
+     * answers it for an account whose password was set over OPAQUE, whose hash
+     * opens for nothing (docs/chat-e2ee-phase1.md, "Password flows over
+     * OPAQUE"). Absent, a mismatch is a mismatch.
+     */
+    readonly passwordFallback?: (input: { hash: string; password: string }) => Promise<boolean>;
+
+    /**
      * Told about every session that opens, whatever the method, after it is stored,
      * except one still owed a second factor or held for another device's approval.
      * Supplied by the app so it can act on a successful sign-in - lifting a reputation
@@ -831,7 +841,16 @@ export function createAuth(options: AuthOptions = {}, address?: string) {
             // user server-side (see provisionUser). Sign-in stays open.
             disableSignUp: true,
             requireEmailVerification: false,
-            minPasswordLength: MIN_PASSWORD_LENGTH
+            minPasswordLength: MIN_PASSWORD_LENGTH,
+            // better-auth's own hasher, unchanged, with the app's second opinion
+            // on a mismatch. Every password check better-auth or Polaris makes
+            // goes through here, so one place covers all of them.
+            password: {
+                hash: hashPassword,
+                verify: async (input) =>
+                    (await verifyPassword(input)) ||
+                    (options.passwordFallback ? await options.passwordFallback(input).catch(() => false) : false)
+            }
         },
         session: {
             expiresIn: SESSION_MAX_AGE,

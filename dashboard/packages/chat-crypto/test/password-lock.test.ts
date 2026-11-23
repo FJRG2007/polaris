@@ -123,4 +123,26 @@ describe("password lock over OPAQUE", { timeout: 120_000 }, () => {
     it("stretches with Argon2id at 128 MiB, fixed in code", () => {
         expect(client.PASSWORD_KSF_V1["argon2id-custom"].memory).toBe(128 * 1024);
     });
+    it("checks a password handed over in the clear against the record, on the server alone", async () => {
+        const setup = await server.createServerSetup();
+        const made = await register(setup, ALICE, "server side check");
+        const check = (userId: string, password: string, ksfVersion: client.PasswordKsfVersion = 2) =>
+            server.passwordOpensRecord({ serverSetup: setup, userId, record: made.registrationRecord, password, ksfVersion });
+        const started = Date.now();
+        expect(await check(ALICE, "server side check")).toBe(true);
+        console.info(`passwordOpensRecord: ${Date.now() - started} ms`);
+        expect(await check(ALICE, "server side chec")).toBe(false);
+        expect(await check(BOB, "server side check")).toBe(false);
+        expect(await check(ALICE, "server side check", 1)).toBe(false);
+        expect(await check(ALICE, "")).toBe(false);
+        expect(
+            await server.passwordOpensRecord({
+                serverSetup: await server.createServerSetup(),
+                userId: ALICE,
+                record: made.registrationRecord,
+                password: "server side check",
+                ksfVersion: 2
+            })
+        ).toBe(false);
+    });
 });

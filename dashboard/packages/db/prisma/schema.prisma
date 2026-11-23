@@ -19133,6 +19133,8 @@ model OpaqueRecord {
     updatedAt   DateTime  @updatedAt
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([passwordTag])
 }
 
 // The server half of an OPAQUE login between its two steps. Single use: taken
