@@ -29,6 +29,8 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { AccountInput } from "@/components/account-input";
 import { useDisplayFormat } from "@/components/display-format";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import type { LinkVisitor } from "@/lib/link-visitor";
+import { LinkVisitorCell, VisitOriginCell } from "../../link-visitor-cell";
 import { RequestDialog } from "@/app/(app)/drive/request-dialog";
 import { useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { DeleteDropPointDialog } from "@/app/(app)/drive/drop-points/delete-drop-point-dialog";
@@ -107,13 +109,14 @@ export interface SubmissionRow {
     size: string;
     status: string;
     at: string;
-    uploader: string | null;
+    uploader: LinkVisitor | null;
 }
 
 export interface VisitorRow {
     id: string;
     ip: string | null;
-    user: string | null;
+    country: string | null;
+    user: LinkVisitor | null;
     userAgent: string | null;
     uploads: number;
     firstSeenAt: string;
@@ -584,7 +587,7 @@ function FilesTab({
                                         {formatBytes(BigInt(row.size))}
                                     </td>
                                     <td className="px-4 py-2 text-muted-foreground">
-                                        {row.uploader ?? t("detail.anonymous")}
+                                        <LinkVisitorCell visitor={row.uploader} />
                                     </td>
                                     <td className="px-4 py-2 text-muted-foreground">
                                         {format.dateTime(row.at)}
@@ -664,11 +667,15 @@ function VisitorsTab({ visitors }: { visitors: VisitorRow[] }) {
                                         key={row.id}
                                         className="border-t border-border hover:bg-card-hover"
                                     >
-                                        <td className="px-4 py-2 font-mono text-xs">
-                                            {row.ip ?? t("detail.visitors.unknown")}
+                                        <td className="px-4 py-2 text-xs">
+                                            <VisitOriginCell
+                                                ip={row.ip}
+                                                country={row.country}
+                                                signedIn={row.user !== null}
+                                            />
                                         </td>
-                                        <td className="px-4 py-2 text-muted-foreground">
-                                            {row.user ?? t("detail.anonymous")}
+                                        <td className="px-4 py-2">
+                                            <LinkVisitorCell visitor={row.user} />
                                         </td>
                                         <td className="px-4 py-2 text-muted-foreground">
                                             {format.dateTime(row.firstSeenAt)}

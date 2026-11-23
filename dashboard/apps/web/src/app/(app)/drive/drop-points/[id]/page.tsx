@@ -17,7 +17,7 @@ import {
     parseStringArray
 } from "@/lib/file-request-service";
 import { listConnections } from "@/lib/storage-service";
-import { resolveUserNames } from "@/lib/drive-meta-service";
+import { linkVisitorsByIds } from "@/lib/link-visitor";
 import {
     DropPointDetail,
     type DropPointConfig,
@@ -44,7 +44,7 @@ export default async function DropPointDetailPage({ params }: { params: Promise<
         ...submissions.map((row) => row.submittedByUserId),
         ...visits.map((row) => row.userId)
     ].filter((value): value is string => Boolean(value));
-    const names = await resolveUserNames(userIds);
+    const people = await linkVisitorsByIds(userIds);
 
     const config: DropPointConfig = {
         id: request.id,
@@ -81,14 +81,14 @@ export default async function DropPointDetailPage({ params }: { params: Promise<
         size: row.size.toString(),
         status: row.status,
         at: row.at.toISOString(),
-        uploader: row.submittedByUserId ? (names.get(row.submittedByUserId) ?? null) : null
+        uploader: row.submittedByUserId ? (people.get(row.submittedByUserId) ?? null) : null
     }));
 
     const visitors: VisitorRow[] = visits.map((row) => ({
         id: row.id,
-        // A signed-in visitor is their name, never their address or browser.
+        // A signed-in visitor is their profile, never their address or browser.
         ...visitOrigin(row),
-        user: row.userId ? (names.get(row.userId) ?? null) : null,
+        user: row.userId ? (people.get(row.userId) ?? null) : null,
         uploads: row.uploadCount,
         firstSeenAt: row.firstSeenAt.toISOString(),
         lastSeenAt: row.lastSeenAt.toISOString()

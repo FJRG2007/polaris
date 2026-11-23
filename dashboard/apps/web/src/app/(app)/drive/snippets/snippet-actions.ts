@@ -11,7 +11,7 @@
  * credential, and there is no session to resolve.
  */
 
-import { visitOrigin } from "@/lib/visitor-privacy";
+import { logOrigin, visitOrigin } from "@/lib/visitor-privacy";
 import { cookies } from "next/headers";
 import { getTranslations } from "@/lib/i18n/request";
 import { loadEnv } from "@polaris/config";
@@ -36,6 +36,8 @@ export interface SnippetLogRow {
     id: string;
     at: string;
     ip: string | null;
+    /** The anonymous visitor's country, from the address. */
+    country: string | null;
     action: string;
     reason: string | null;
     /** The visitor's Polaris account when they were signed in, else null. */
@@ -185,7 +187,7 @@ export async function getSnippetLogsAction(snippetId: string): Promise<{ logs: S
         logs: logs.map((row) => ({
             id: row.id,
             at: row.at.toISOString(),
-            ip: visitOrigin({ userId: row.user?.id, ip: row.ip }).ip,
+            ...logOrigin(visitOrigin({ userId: row.user?.id, ip: row.ip })),
             action: row.action,
             reason: row.reason,
             visitor: toLinkVisitor(row.user)

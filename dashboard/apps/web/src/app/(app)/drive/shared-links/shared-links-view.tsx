@@ -43,7 +43,7 @@ import {
     type ShareLogRow
 } from "../share-actions";
 import { useConfirm } from "@/components/confirm-dialog";
-import { LinkVisitorCell, signedInVisitors } from "../link-visitor-cell";
+import { LinkVisitorCell, signedInVisitors, VisitOriginCell } from "../link-visitor-cell";
 import { useDisplayFormat } from "@/components/display-format";
 import type { LinkGuardsView } from "@/lib/link-guards";
 import {
@@ -579,8 +579,12 @@ function ShareLogsDialog({
                                         <td className="py-1 pe-3 text-muted-foreground">
                                             {format.dateTime(row.at)}
                                         </td>
-                                        <td className="py-1 pe-3 font-mono text-xs">
-                                            {row.ip ?? "-"}
+                                        <td className="py-1 pe-3 text-xs">
+                                            <VisitOriginCell
+                                                ip={row.ip}
+                                                country={row.country}
+                                                signedIn={row.visitor !== null}
+                                            />
                                         </td>
                                         <td className="py-1 pe-3">
                                             <LinkVisitorCell visitor={row.visitor} />

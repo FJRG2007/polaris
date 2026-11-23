@@ -122,6 +122,7 @@ describe("only the owner reads the log, identities included", () => {
             at: AT.toISOString(),
             // Signed in: shown as their profile, never where they were.
             ip: null,
+            country: null,
             action: "view",
             reason: null,
             visitor: { id: VISITOR, name: "Ada Lovelace", username: "ada" }

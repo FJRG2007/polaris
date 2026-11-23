@@ -36,13 +36,12 @@ export async function linkVisitorId(): Promise<string | null> {
     }
 }
 
-/** The account columns an access log reads for its "Who" column. Email is not
- *  among them unless the account has nothing else to be called by. */
+/** The account columns an access log reads for its "Who" column. Never the
+ *  address: a log that does not read it cannot print it. */
 export const linkVisitorSelect = {
     id: true,
     name: true,
-    username: true,
-    email: true
+    username: true
 } as const;
 
 /** A signed-in visitor, as the owner of the link is shown them. */
@@ -52,6 +51,20 @@ export interface LinkVisitor {
     username: string | null;
 }
 
+/** Signed-in visitors by account id, shaped as `toLinkVisitor`. */
+export async function linkVisitorsByIds(ids: readonly string[]): Promise<Map<string, LinkVisitor>> {
+    const unique = [...new Set(ids.filter(Boolean))];
+    if (unique.length === 0) return new Map();
+    const { prisma } = await import("@polaris/db");
+    const users = await prisma.user.findMany({ where: { id: { in: unique } }, select: linkVisitorSelect });
+    const found = new Map<string, LinkVisitor>();
+    for (const user of users) {
+        const visitor = toLinkVisitor(user);
+        if (visitor) found.set(user.id, visitor);
+    }
+    return found;
+}
+
 /**
  * Shape an account for the owner's access log: the name it goes by and the
  * handle that opens its profile - never the email address, even for an account
@@ -59,7 +72,7 @@ export interface LinkVisitor {
  * nobody offered them.
  */
 export function toLinkVisitor(
-    user: { id: string; name: string; username: string | null; email: string } | null
+    user: { id: string; name: string; username: string | null } | null
 ): LinkVisitor | null {
     if (!user) return null;
     // Never the address: whoever reads a visitor log is not owed it.

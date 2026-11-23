@@ -726,7 +726,9 @@
         "who": "Who",
         "anonymous": "Anonymous",
         "openProfile": "Open {name}'s profile",
-        "signedIn": "{count, plural, one {# signed-in viewer} other {# signed-in viewers}}"
+        "signedIn": "{count, plural, one {# signed-in viewer} other {# signed-in viewers}}",
+        "private": "Private",
+        "privateHint": "Signed-in visitors are shown by their profile, never their address."
     },
     "sharedLinks": {
         "status": {
@@ -778,7 +780,7 @@
         "when": "When",
         "action": "Action",
         "actionDenied": "{action} denied ({reason})",
-        "ip": "IP"
+        "ip": "Origin"
     },
     "pages": {
         "drive": {
@@ -882,7 +884,7 @@
         "loading": "Loading...",
         "nobodyHasOpenedThisLink": "Nobody has opened this link yet.",
         "when": "When",
-        "address": "Address",
+        "address": "Origin",
         "what": "What",
         "status": {
             "private": "Private",

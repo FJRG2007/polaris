@@ -9,9 +9,18 @@
  * way to tell one caller from another, which is what the log is for.
  */
 
+import { countryForIp } from "@/lib/analytics-geoip";
+
 export interface VisitOrigin {
     readonly ip: string | null;
     readonly userAgent: string | null;
+    /** ISO 3166-1 alpha-2, from the address - never finer than the country. */
+    readonly country: string | null;
+}
+
+/** The parts of a visit's origin an access-log row carries. */
+export function logOrigin(origin: VisitOrigin): { ip: string | null; country: string | null } {
+    return { ip: origin.ip, country: origin.country };
 }
 
 /** The address and browser a visitor log may show for one visit. */
@@ -20,6 +29,6 @@ export function visitOrigin(visit: {
     readonly ip?: string | null;
     readonly userAgent?: string | null;
 }): VisitOrigin {
-    if (visit.userId) return { ip: null, userAgent: null };
-    return { ip: visit.ip ?? null, userAgent: visit.userAgent ?? null };
+    if (visit.userId) return { ip: null, userAgent: null, country: null };
+    return { ip: visit.ip ?? null, userAgent: visit.userAgent ?? null, country: countryForIp(visit.ip) };
 }

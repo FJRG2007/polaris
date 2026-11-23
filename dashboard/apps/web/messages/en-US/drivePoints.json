@@ -72,7 +72,7 @@
         "anonymous": "Anonymous",
         "visitors": {
             "empty": "No one has opened this drop point yet.",
-            "ip": "IP",
+            "ip": "Origin",
             "user": "User",
             "firstSeen": "First seen",
             "connected": "Connected",

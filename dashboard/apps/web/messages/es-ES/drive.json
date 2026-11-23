@@ -726,7 +726,9 @@
         "who": "Quién",
         "anonymous": "Anónimo",
         "openProfile": "Abrir el perfil de {name}",
-        "signedIn": "{count, plural, one {# persona con sesión} other {# personas con sesión}}"
+        "signedIn": "{count, plural, one {# persona con sesión} other {# personas con sesión}}",
+        "private": "Privado",
+        "privateHint": "Quien entra con su cuenta aparece por su perfil, nunca por su dirección."
     },
     "sharedLinks": {
         "status": {
@@ -778,7 +780,7 @@
         "when": "Cuándo",
         "action": "Acción",
         "actionDenied": "Denegado: {action} ({reason})",
-        "ip": "IP"
+        "ip": "Origen"
     },
     "pages": {
         "drive": {
@@ -882,7 +884,7 @@
         "loading": "Cargando...",
         "nobodyHasOpenedThisLink": "Nadie ha abierto este enlace todavía.",
         "when": "Cuándo",
-        "address": "Dirección",
+        "address": "Origen",
         "what": "Qué",
         "status": {
             "private": "Privado",

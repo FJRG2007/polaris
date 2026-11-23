@@ -72,7 +72,7 @@
         "anonymous": "Anónimo",
         "visitors": {
             "empty": "Nadie ha abierto aún este buzón.",
-            "ip": "IP",
+            "ip": "Origen",
             "user": "Usuario",
             "firstSeen": "Primera vez",
             "connected": "Conectado",

@@ -10,7 +10,8 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
 import type { LinkVisitor } from "@/lib/link-visitor";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { countryName } from "@/components/map/country-name";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 
 export function LinkVisitorCell({ visitor }: { visitor: LinkVisitor | null }) {
     const t = useTranslations("drive");
@@ -33,6 +34,40 @@ export function LinkVisitorCell({ visitor }: { visitor: LinkVisitor | null }) {
                     {visitor.name}
                 </span>
             )}
+        </span>
+    );
+}
+
+/**
+ * Where one visit came from, as `visitOrigin` allows it: the address and the
+ * country of an anonymous visitor, and nothing for a signed-in one - they are
+ * named in the "Who" column, and their address is theirs.
+ */
+export function VisitOriginCell({
+    ip,
+    country,
+    signedIn
+}: {
+    ip: string | null;
+    country: string | null;
+    signedIn: boolean;
+}) {
+    const t = useTranslations("drive");
+    const locale = useLocale();
+    if (signedIn) {
+        return (
+            <span className="text-muted-foreground" title={t("linkVisitor.privateHint")}>
+                {t("linkVisitor.private")}
+            </span>
+        );
+    }
+    const where = country ? countryName(country, locale) : null;
+    return (
+        <span className="flex min-w-0 flex-col">
+            <span className="truncate font-mono" title={ip ?? undefined}>
+                {ip ?? "-"}
+            </span>
+            {where ? <span className="truncate text-muted-foreground">{where}</span> : null}
         </span>
     );
 }

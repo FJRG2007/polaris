@@ -18,7 +18,7 @@ import { useConfirm } from "@/components/confirm-dialog";
 import { useDisplayFormat } from "@/components/display-format";
 import { Badge, Button, Card, CardBody, Input } from "@polaris/ui";
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { LinkVisitorCell } from "../link-visitor-cell";
+import { LinkVisitorCell, VisitOriginCell } from "../link-visitor-cell";
 import { ShareSnippetDialog, type SnippetSharing } from "./share-snippet-dialog";
 import {
     Code2,
@@ -387,7 +387,13 @@ function SnippetLogsDialog({
                                         <td className="py-1 pe-3 whitespace-nowrap">
                                             {format.dateTime(log.at)}
                                         </td>
-                                        <td className="py-1 pe-3 font-mono">{log.ip ?? "-"}</td>
+                                        <td className="py-1 pe-3">
+                                            <VisitOriginCell
+                                                ip={log.ip}
+                                                country={log.country}
+                                                signedIn={log.visitor !== null}
+                                            />
+                                        </td>
                                         <td className="py-1 pe-3">
                                             <LinkVisitorCell visitor={log.visitor} />
                                         </td>
