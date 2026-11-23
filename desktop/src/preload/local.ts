@@ -36,6 +36,7 @@ const bridge: PolarisLocal = {
         recordLauncherKey: (recording) => ipcRenderer.invoke(CHANNELS.connectLauncherRecord, recording),
         setLauncherEngine: (engine) => ipcRenderer.invoke(CHANNELS.connectLauncherEngine, engine),
         setClipboardKeep: (keep) => ipcRenderer.invoke(CHANNELS.connectClipboardKeep, keep),
+        setVoiceWidgetLook: (change) => ipcRenderer.invoke(CHANNELS.connectVoiceWidgetLook, change),
         clearClipboardHistory: () => ipcRenderer.invoke(CHANNELS.connectClipboardClear),
         relaunch: () => ipcRenderer.invoke(CHANNELS.connectRelaunch),
         close: () => ipcRenderer.invoke(CHANNELS.connectClose),

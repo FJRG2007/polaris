@@ -41,3 +41,4 @@ Security findings are not kept here; they live in
 | BUG-0028 | A message with a link is not shown as sent until its preview has loaded | Chat | Fixed, watching | dashboard/apps/web/src/app/(app)/chat/outbox.ts | 2026-11-23 |
 | BUG-0029 | Typing @ in a group DM shows only Polar, @here and @everyone at first | Chat | Fixed, watching | dashboard/apps/web/src/components/rich-text/suggestion.tsx | 2026-11-23 |
 | BUG-0030 | The @ picker is a small desktop popover on an iPhone | Chat | Fixed, watching | dashboard/apps/web/src/components/rich-text/suggestion.tsx | 2026-11-23 |
+| BUG-0031 | The desktop voice widget shows initials instead of people's profile pictures | Desktop | Fixed, watching | desktop/src/main/voice-widget.ts | 2026-11-23 |

@@ -126,6 +126,10 @@ export interface DesktopVoiceState {
         readonly speaking: boolean;
         readonly muted: boolean;
         readonly deafened: boolean;
+        /** Their face, as a path on this Polaris. Sent only to an app that
+         *  says it draws one (`voiceWidgetPictures`): an older app refuses the
+         *  whole state over a field it does not know. */
+        readonly picture?: string;
     }[];
     readonly selfMuted: boolean;
     readonly selfDeafened: boolean;
@@ -279,6 +283,8 @@ export interface PolarisDesktop {
     /** Who is in the call and who is talking, for the app's voice widget over
      *  every window; null once the call ends. Absent from an older app. */
     setVoiceState?(state: DesktopVoiceState | null): Promise<boolean>;
+    /** Whether the voice widget draws faces. Absent from an app older than it. */
+    readonly voiceWidgetPictures?: boolean;
     /** Hear a press on the voice widget's buttons. Answers the way to stop. */
     onVoiceAction?(listener: (action: "mic" | "deafen" | "leave") => void): () => void;
     /** The window that adds and switches servers. Absent from an older app. */

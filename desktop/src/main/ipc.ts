@@ -15,11 +15,11 @@ import { chooseShare, endShare, listShareSources, SOURCE_ID } from "./screen-sha
 import { canDrawOnShare, drawOnShare, stopDrawing } from "./annotate-overlay";
 import { strokeSchema } from "@/shared/annotate";
 import { setCallHotkeys } from "./call-hotkeys";
-import { followTextSize as followWidgetTextSize, setVoiceState, voiceWidgetAction } from "./voice-widget";
-import { launcherBinding, rememberLauncherClipboardKeep, rememberLauncherEngine, rememberTextSize, textSize } from "./settings";
+import { followTextSize as followWidgetTextSize, followVoiceWidgetLook, setVoiceState, voiceWidgetAction } from "./voice-widget";
+import { launcherBinding, rememberLauncherClipboardKeep, rememberLauncherEngine, rememberTextSize, rememberVoiceWidgetLook, textSize, voiceWidgetLook } from "./settings";
 import { CLIPBOARD_KEEP_IDS } from "@/shared/clipboard-store";
 import { readTextSize } from "@/shared/text-size";
-import { voiceActionSchema, voiceStateSchema } from "@/shared/voice-widget";
+import { lookChangeSchema, voiceActionSchema, voiceStateSchema, withLookChange } from "@/shared/voice-widget";
 import { callHotkeysSchema, type CallHotkeysResult } from "@/shared/call-hotkeys";
 import { closeNotice, showNotice } from "./notices";
 import { appBadgeSchema, applyAppBadge } from "./app-badge";
@@ -776,6 +776,13 @@ export function registerIpc(host: IpcHost): void {
         if (!from(event, "connect") || !keep.success) return false;
         rememberLauncherClipboardKeep(keep.data);
         followClipboardKeep();
+        return true;
+    });
+    ipcMain.handle(CHANNELS.connectVoiceWidgetLook, (event, raw: unknown): boolean => {
+        const change = lookChangeSchema.safeParse(raw);
+        if (!from(event, "connect") || !change.success) return false;
+        rememberVoiceWidgetLook(withLookChange(voiceWidgetLook(), change.data));
+        followVoiceWidgetLook();
         return true;
     });
     ipcMain.handle(CHANNELS.connectClipboardClear, (event) => {

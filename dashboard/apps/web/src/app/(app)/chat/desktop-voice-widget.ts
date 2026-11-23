@@ -14,6 +14,7 @@
 
 import { useEffect, useRef } from "react";
 import type { CallState } from "./call-state";
+import { avatarUrl } from "@/lib/avatar-url";
 import { desktopBridge, type DesktopVoiceState } from "@/lib/desktop-bridge";
 
 /** The fastest the widget is told anything: a speaking ring every 100 ms. */
@@ -26,8 +27,14 @@ type VoiceCall = Pick<
     "meeting" | "participantId" | "speaking" | "states" | "micOn" | "deafened"
 >;
 
-/** What the widget draws for this call: everybody admitted, the reader first. */
-export function voiceWidgetState(call: VoiceCall): DesktopVoiceState {
+/** A face, for an app that draws them; a guest has no account and so none. */
+function picture(userId: string | null, pictures: boolean): { picture?: string } {
+    return pictures && userId ? { picture: avatarUrl(userId) } : {};
+}
+
+/** What the widget draws for this call: everybody admitted, the reader first,
+ *  with their faces when the app draws them. */
+export function voiceWidgetState(call: VoiceCall, pictures = false): DesktopVoiceState {
     const admitted = (call.meeting?.participants ?? []).filter(
         (person) => person.admission === "admitted"
     );
@@ -41,7 +48,8 @@ export function voiceWidgetState(call: VoiceCall): DesktopVoiceState {
                       name: self.name.slice(0, 120),
                       speaking: call.speaking.has(self.id) && call.micOn,
                       muted: !call.micOn,
-                      deafened: call.deafened
+                      deafened: call.deafened,
+                      ...picture(self.userId, pictures)
                   }
               ]
             : []),
@@ -52,7 +60,8 @@ export function voiceWidgetState(call: VoiceCall): DesktopVoiceState {
                 name: person.name.slice(0, 120),
                 speaking: call.speaking.has(person.id),
                 muted: state?.muted ?? false,
-                deafened: state?.deafened ?? false
+                deafened: state?.deafened ?? false,
+                ...picture(person.userId, pictures)
             };
         })
     ].slice(0, MAX_PEOPLE);
@@ -90,13 +99,14 @@ export function useDesktopVoiceWidget(
     }, [active]);
 
     // The call as it is now, at most every interval, and nothing when unchanged.
-    const state = active ? JSON.stringify(voiceWidgetState(call)) : null;
+    const pictures = desktopBridge()?.voiceWidgetPictures === true;
+    const state = active ? JSON.stringify(voiceWidgetState(call, pictures)) : null;
     useEffect(() => {
         const desktop = desktopBridge();
         if (state === null || !desktop?.setVoiceState) return;
         const send = () => {
             timer.current = null;
-            const now = JSON.stringify(voiceWidgetState(latest.current.call));
+            const now = JSON.stringify(voiceWidgetState(latest.current.call, pictures));
             if (now === sent.current) return;
             sent.current = now;
             lastAt.current = Date.now();
@@ -106,5 +116,5 @@ export function useDesktopVoiceWidget(
         const wait = lastAt.current + VOICE_STATE_INTERVAL_MS - Date.now();
         if (wait <= 0) send();
         else timer.current = setTimeout(send, wait);
-    }, [state]);
+    }, [state, pictures]);
 }

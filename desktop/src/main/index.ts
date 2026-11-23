@@ -919,6 +919,7 @@ function start(): void {
                     startMinimized: settings.toggle("startMinimized"),
                     voiceWidget: settings.toggle("voiceWidget"),
                     voiceWidgetGameOnly: settings.toggle("voiceWidgetGameOnly"),
+                    voiceWidgetLook: settings.voiceWidgetLook(),
                     launcher: settings.toggle("launcher"),
                     launcherClipboard: settings.toggle("launcherClipboard"),
                     launcherGameMode: settings.toggle("launcherGameMode"),

@@ -23,7 +23,11 @@ const {
     setUpdateAttempted,
     textSize,
     toggle,
-    updateAttempted
+    updateAttempted,
+    rememberVoiceWidgetLook,
+    rememberVoiceWidgetPlace,
+    voiceWidgetLook,
+    voiceWidgetPlace
 } = await import("@/main/settings");
 
 beforeEach(() => {
@@ -144,5 +148,28 @@ describe("the restart the app made itself", () => {
         expect(takeRelaunch()).toBeNull();
         writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ relaunch: { reason: "crash", at: 1_000, calls: [] } }));
         expect(takeRelaunch()).toBeNull();
+    });
+});
+
+describe("the voice widget's look", () => {
+    const defaults = { avatars: "large", names: "always", people: "always", opacity: 100, corner: "top-left" };
+
+    it("is Discord's defaults for a file from before it existed", () => {
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidget: true }));
+        expect(voiceWidgetLook()).toEqual(defaults);
+    });
+
+    it("keeps each choice on its own when another is unknown", () => {
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ voiceWidgetAvatars: "small", voiceWidgetNames: "huge", voiceWidgetOpacity: "55", voiceWidgetCorner: "bottom-right" }));
+        expect(voiceWidgetLook()).toEqual({ ...defaults, avatars: "small", corner: "bottom-right" });
+    });
+
+    it("is kept, and a new corner forgets where it was dragged", () => {
+        rememberVoiceWidgetPlace({ x: 300, y: 200 });
+        rememberVoiceWidgetLook({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "top-left" });
+        expect(voiceWidgetLook()).toEqual({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "top-left" });
+        expect(voiceWidgetPlace()).toEqual({ x: 300, y: 200 });
+        rememberVoiceWidgetLook({ avatars: "small", names: "speaking", people: "speaking", opacity: 60, corner: "bottom-right" });
+        expect(voiceWidgetPlace()).toBeNull();
     });
 });

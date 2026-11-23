@@ -1,11 +1,23 @@
 /**
- * The voice widget's page: one row per person in the call - a face with their
- * initials, their name, a ring while they talk, and whether they are muted or
- * deafened - and, while unlocked, mute, deafen and leave.
+ * The voice widget's page: one row per person in the call - their face (the
+ * picture, or their initials while it is missing or fails), a ring while they
+ * talk, their name on a plate, and whether they are muted or deafened - and,
+ * while unlocked, mute, deafen and leave. Drawn as the settings chose: face
+ * size, when names and people show, and how opaque.
  */
 
 import { byId } from "./dom";
-import { faceColor, initials, MAX_ROWS, type VoiceAction, type VoicePerson, type WidgetView } from "@/shared/voice-widget";
+import {
+    faceColor,
+    initials,
+    MAX_ROWS,
+    shownPeople,
+    showsName,
+    type VoiceAction,
+    type VoicePerson,
+    type WidgetLook,
+    type WidgetView
+} from "@/shared/voice-widget";
 
 const ICONS = {
     mic: ["M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z", "M19 10v2a7 7 0 0 1-14 0v-2", "M12 19v3"],
@@ -63,40 +75,114 @@ function label(button: HTMLButtonElement, text: string): void {
 leave.replaceChildren(icon("leave"));
 label(leave, "Leave the call");
 
-function row(person: VoicePerson): HTMLElement {
+/** Each face the app fetched, by person id. */
+let faces: Readonly<Record<string, string>> = {};
+
+/** One person's row, kept between views so a face is not decoded again at every word. */
+interface Row {
+    readonly line: HTMLElement;
+    readonly face: HTMLElement;
+    readonly letters: Text;
+    readonly badge: HTMLElement;
+    readonly plate: HTMLElement;
+    readonly name: HTMLElement;
+    readonly state: HTMLElement;
+    picture: string | null;
+    marks: string;
+}
+
+const rows = new Map<string, Row>();
+
+function newRow(): Row {
     const line = document.createElement("div");
     line.className = "row";
     const face = document.createElement("span");
-    face.className = person.speaking ? "face speaking" : "face";
-    face.style.background = faceColor(person.id);
-    face.textContent = initials(person.name);
+    face.className = "face";
+    const letters = document.createTextNode("");
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    face.append(letters, badge);
+    const plate = document.createElement("span");
+    plate.className = "plate";
     const name = document.createElement("span");
     name.className = "name";
-    name.textContent = person.name || "Guest";
-    name.title = name.textContent;
     const state = document.createElement("span");
     state.className = "state";
-    if (person.muted) state.append(icon("micOff"));
-    if (person.deafened) state.append(icon("headphonesOff"));
-    line.append(face, name, state);
-    return line;
+    plate.append(name, state);
+    line.append(face, plate);
+    return { line, face, letters, badge, plate, name, state, picture: null, marks: "" };
+}
+
+/** The picture over the initials; one that fails to draw leaves the initials. */
+function drawPicture(row: Row, picture: string | null): void {
+    if (row.picture === picture) return;
+    row.picture = picture;
+    row.face.querySelector("img")?.remove();
+    if (!picture) return;
+    const image = document.createElement("img");
+    image.alt = "";
+    image.addEventListener("error", () => image.remove(), { once: true });
+    image.src = picture;
+    row.face.insertBefore(image, row.badge);
+}
+
+function marks(person: VoicePerson): readonly SVGSVGElement[] {
+    return [...(person.muted ? [icon("micOff")] : []), ...(person.deafened ? [icon("headphonesOff")] : [])];
+}
+
+function row(person: VoicePerson, look: WidgetLook): HTMLElement {
+    const shown = rows.get(person.id) ?? newRow();
+    rows.set(person.id, shown);
+    const named = showsName(person, look);
+    const shownName = person.name || "Guest";
+    shown.face.classList.toggle("speaking", person.speaking);
+    shown.face.style.background = faceColor(person.id);
+    shown.face.title = named ? "" : shownName;
+    shown.letters.data = initials(person.name);
+    drawPicture(shown, faces[person.id] ?? null);
+    shown.name.textContent = shownName;
+    shown.name.title = shownName;
+    shown.plate.hidden = !named;
+    // The mute marks sit in the plate beside the name, or on the face without one.
+    const key = `${person.muted}${person.deafened}${named}`;
+    if (key !== shown.marks) {
+        shown.marks = key;
+        shown.state.replaceChildren(...(named ? marks(person) : []));
+        shown.badge.replaceChildren(...(named ? [] : marks(person)));
+    }
+    shown.badge.hidden = named || (!person.muted && !person.deafened);
+    return shown.line;
 }
 
 function draw(view: WidgetView | null): void {
     if (!view) {
         people.replaceChildren();
+        rows.clear();
         controls.hidden = true;
         return;
     }
+    if (view.faces) faces = view.faces;
     const { participants, selfMuted, selfDeafened } = view.state;
-    const rows = participants.slice(0, MAX_ROWS).map(row);
-    if (participants.length > MAX_ROWS) {
+    const { look } = view;
+    const present = new Set(participants.map((person) => person.id));
+    for (const id of rows.keys()) if (!present.has(id)) rows.delete(id);
+    const shown = shownPeople(participants, look);
+    const lines = shown.slice(0, MAX_ROWS).map((person) => row(person, look));
+    const note = shown.length > MAX_ROWS
+        ? `and ${shown.length - MAX_ROWS} more`
+        // Only who talks is drawn and nobody is: unlocked, it still shows what it is.
+        : shown.length === 0 && view.unlocked ? "Nobody is talking" : null;
+    if (note) {
         const more = document.createElement("div");
         more.className = "row more";
-        more.textContent = `and ${participants.length - MAX_ROWS} more`;
-        rows.push(more);
+        more.textContent = note;
+        lines.push(more);
     }
-    people.replaceChildren(...rows);
+    people.replaceChildren(...lines);
+    panel.classList.toggle("small", look.avatars === "small");
+    panel.classList.toggle("bottom", view.anchor === "bottom");
+    // Unlocked it is being arranged, so it is drawn whole.
+    panel.style.opacity = view.unlocked ? "1" : String(look.opacity / 100);
     panel.classList.toggle("unlocked", view.unlocked);
     controls.hidden = !view.unlocked;
     mic.replaceChildren(icon(selfMuted ? "micOff" : "mic"));

@@ -4,7 +4,7 @@
         <meta charset="utf-8" />
         <meta
             http-equiv="Content-Security-Policy"
-            content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+            content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'"
         />
         <title>Voice - Polaris</title>
         <style>
@@ -19,57 +19,120 @@
                 color: #f4f4f6;
                 user-select: none;
             }
+            /* Discord's overlay voice widget: no panel behind the people, a
+               face and a plate that hugs the name, the mute mark in the plate. */
             #panel {
+                --face: 2rem;
+                --row: 2.25rem;
+                --plate: 1.5rem;
+                --name: 0.875rem;
                 box-sizing: border-box;
                 height: 100%;
-                padding: 0.5rem;
+                padding: 0.25rem;
                 border-radius: 0.625rem;
-                background: rgba(11, 12, 14, 0.55);
                 display: flex;
                 flex-direction: column;
             }
+            #panel.small {
+                --face: 1.375rem;
+                --row: 1.625rem;
+                --plate: 1.125rem;
+                --name: 0.75rem;
+            }
+            /* Unlocked it is being moved, so it shows where its edges are. */
             #panel.unlocked {
-                background: rgba(11, 12, 14, 0.85);
+                background: rgba(11, 12, 14, 0.6);
                 outline: 0.0625rem dashed rgba(255, 255, 255, 0.35);
                 outline-offset: -0.0625rem;
                 -webkit-app-region: drag;
             }
+            #people {
+                flex: 1 1 auto;
+                min-height: 0;
+                display: flex;
+                flex-direction: column;
+            }
+            #panel.bottom #people {
+                justify-content: flex-end;
+            }
             .row {
                 display: flex;
                 align-items: center;
-                gap: 0.5rem;
-                height: 2.125rem;
+                gap: 0.25rem;
+                height: var(--row);
                 min-width: 0;
+                flex: none;
             }
             .face {
+                position: relative;
                 flex: none;
-                width: 1.625rem;
-                height: 1.625rem;
+                width: var(--face);
+                height: var(--face);
                 border-radius: 50%;
                 display: grid;
                 place-items: center;
-                font-size: 0.6875rem;
+                font-size: calc(var(--face) * 0.38);
                 font-weight: 600;
                 color: #fff;
                 box-shadow: 0 0 0 0.125rem transparent;
                 transition: box-shadow 80ms linear;
             }
             .face.speaking {
-                box-shadow: 0 0 0 0.125rem #3ba55d;
+                box-shadow: 0 0 0 0.125rem #23a55a;
+            }
+            .face img {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                border-radius: 50%;
+                object-fit: cover;
+            }
+            .badge {
+                position: absolute;
+                right: -0.125rem;
+                bottom: -0.125rem;
+                display: flex;
+                padding: 0.0625rem;
+                border-radius: 0.375rem;
+                background: rgba(17, 18, 20, 0.9);
+                color: #f23f42;
+            }
+            .badge svg {
+                width: calc(var(--face) * 0.36);
+                height: calc(var(--face) * 0.36);
+            }
+            .badge[hidden],
+            .plate[hidden] {
+                display: none;
+            }
+            .plate {
+                flex: 0 1 auto;
+                min-width: 0;
+                display: flex;
+                align-items: center;
+                gap: 0.25rem;
+                height: var(--plate);
+                padding: 0 0.375rem;
+                border-radius: 0.25rem;
+                background: rgba(17, 18, 20, 0.7);
+                font-size: var(--name);
+                font-weight: 600;
             }
             .name {
-                flex: 1 1 auto;
                 min-width: 0;
                 overflow: hidden;
                 white-space: nowrap;
                 text-overflow: ellipsis;
-                text-shadow: 0 0.0625rem 0.125rem rgba(0, 0, 0, 0.8);
             }
             .state {
                 flex: none;
                 display: flex;
                 gap: 0.125rem;
-                color: #ed4245;
+                color: #f23f42;
+            }
+            .state:empty {
+                display: none;
             }
             svg {
                 width: 0.875rem;
@@ -84,7 +147,7 @@
             .more {
                 height: 1.375rem;
                 font-size: 0.75rem;
-                opacity: 0.75;
+                text-shadow: 0 0.0625rem 0.125rem rgba(0, 0, 0, 0.9);
             }
             #controls {
                 display: flex;

@@ -100,6 +100,7 @@ const bridge: PolarisDesktop = {
         };
     },
     setVoiceState: (state) => ipcRenderer.invoke(CHANNELS.voiceState, state),
+    voiceWidgetPictures: true,
     onVoiceAction: (listener) => {
         const heard = (_event: unknown, action: VoiceAction) => listener(action);
         ipcRenderer.on(CHANNELS.voiceAction, heard);

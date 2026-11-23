@@ -57,4 +57,18 @@ describe("the voice widget's state", () => {
         const meeting = { participants: many } as unknown as Call["meeting"];
         expect(voiceWidgetState(call({ meeting })).participants).toHaveLength(50);
     });
+
+    it("names each account's face only for an app that draws them", () => {
+        const meeting = {
+            participants: [
+                { id: "p-me", userId: "u-me", name: "Grace Hopper", admission: "admitted" },
+                { id: "p-guest", userId: null, name: "Visitor", admission: "admitted" }
+            ]
+        } as unknown as Call["meeting"];
+        const drawn = voiceWidgetState(call({ meeting }), true).participants;
+        expect(drawn.map((person) => person.picture)).toEqual(["/api/avatar/u-me", undefined]);
+        // An older app refuses a state with a field it does not know.
+        const older = voiceWidgetState(call({ meeting })).participants;
+        expect(older.every((person) => !("picture" in person))).toBe(true);
+    });
 });

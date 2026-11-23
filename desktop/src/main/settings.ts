@@ -19,6 +19,7 @@ import { DEFAULT_TEXT_SIZE, readTextSize, type TextSize } from "@/shared/text-si
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { readRelaunchMark, type RelaunchMark } from "@/shared/relaunch";
 import { DEFAULT_LAUNCHER_BINDING } from "@/shared/launcher-hotkey";
+import { AVATAR_SIZES, CORNERS, DEFAULT_LOOK, NAME_MODES, OPACITIES, PEOPLE_MODES, type Opacity, type WidgetLook } from "@/shared/voice-widget";
 import { SEARCH_ENGINE_IDS, type SearchEngine } from "@/shared/launcher";
 import { CLIPBOARD_KEEP_IDS, DEFAULT_CLIPBOARD_KEEP, clipboardOn, type ClipboardKeep } from "@/shared/clipboard-store";
 
@@ -41,6 +42,11 @@ const placeSchema = z.object({
     height: z.number().int().positive(),
     maximized: z.boolean()
 });
+
+/** The widget's opacity as the file keeps it: a choice, like every other one. */
+const OPACITY_CHOICES = OPACITIES.map(String) as [`${Opacity}`, ...`${Opacity}`[]];
+
+type OpacityChoice = (typeof OPACITY_CHOICES)[number];
 
 const settingsSchema = z.object({
     server: z.unknown().transform(readServerAddress).catch(null),
@@ -72,6 +78,14 @@ const settingsSchema = z.object({
     launcherGameMode: z.boolean().catch(true),
     // Where the widget was dragged to, or null for its corner.
     voiceWidgetPlace: z.object({ x: z.number().int(), y: z.number().int() }).nullable().catch(null),
+    // How the widget looks, as Discord's overlay voice widget offers: each
+    // choice on its own, so a file without one, or with one this build does
+    // not know, takes the default for that choice alone.
+    voiceWidgetAvatars: z.enum(AVATAR_SIZES).catch(DEFAULT_LOOK.avatars),
+    voiceWidgetNames: z.enum(NAME_MODES).catch(DEFAULT_LOOK.names),
+    voiceWidgetPeople: z.enum(PEOPLE_MODES).catch(DEFAULT_LOOK.people),
+    voiceWidgetOpacity: z.enum(OPACITY_CHOICES).catch(String(DEFAULT_LOOK.opacity) as OpacityChoice),
+    voiceWidgetCorner: z.enum(CORNERS).catch(DEFAULT_LOOK.corner),
     // The account's text size last seen in the Polaris window, or null before one was.
     textSize: z.unknown().transform(readTextSize).catch(null),
     // On unless somebody turned it off: the launcher opens with its key from anywhere.
@@ -108,6 +122,11 @@ const EMPTY: Settings = {
     voiceWidgetGameOnly: false,
     launcherGameMode: true,
     voiceWidgetPlace: null,
+    voiceWidgetAvatars: DEFAULT_LOOK.avatars,
+    voiceWidgetNames: DEFAULT_LOOK.names,
+    voiceWidgetPeople: DEFAULT_LOOK.people,
+    voiceWidgetOpacity: String(DEFAULT_LOOK.opacity) as OpacityChoice,
+    voiceWidgetCorner: DEFAULT_LOOK.corner,
     textSize: null,
     launcher: true,
     launcherBinding: DEFAULT_LAUNCHER_BINDING,
@@ -269,6 +288,33 @@ export function voiceWidgetPlace(): { x: number; y: number } | null {
 
 export function rememberVoiceWidgetPlace(place: { x: number; y: number }): void {
     save({ ...load(), voiceWidgetPlace: place });
+}
+
+/** How the voice widget looks. */
+export function voiceWidgetLook(): WidgetLook {
+    const settings = load();
+    return {
+        avatars: settings.voiceWidgetAvatars,
+        names: settings.voiceWidgetNames,
+        people: settings.voiceWidgetPeople,
+        opacity: Number(settings.voiceWidgetOpacity) as Opacity,
+        corner: settings.voiceWidgetCorner
+    };
+}
+
+/** Keep a new look. A new corner forgets where the widget was dragged, so it goes there. */
+export function rememberVoiceWidgetLook(look: WidgetLook): void {
+    const settings = load();
+    const moved = look.corner !== settings.voiceWidgetCorner;
+    save({
+        ...settings,
+        voiceWidgetAvatars: look.avatars,
+        voiceWidgetNames: look.names,
+        voiceWidgetPeople: look.people,
+        voiceWidgetOpacity: String(look.opacity) as OpacityChoice,
+        voiceWidgetCorner: look.corner,
+        ...(moved ? { voiceWidgetPlace: null } : {})
+    });
 }
 
 /** The account's text size, as last seen in the Polaris window. */

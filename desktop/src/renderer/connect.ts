@@ -24,6 +24,7 @@ import type { HostImport, LauncherStatus } from "@/shared/bridge";
 import { picker } from "./picker";
 import { SEARCH_ENGINE_IDS, SEARCH_ENGINES, type SearchEngine } from "@/shared/launcher";
 import type { ClipboardKeep } from "@/shared/clipboard-store";
+import { OPACITIES, type LookChange } from "@/shared/voice-widget";
 import { bindingFromPress } from "@/shared/launcher-hotkey";
 import jsQR from "jsqr";
 
@@ -658,6 +659,36 @@ const launcherKeep = picker(
     ],
     (value) => savedOrSay(window.polarisLocal.connect.setClipboardKeep(value as ClipboardKeep))
 );
+/** The voice widget's looks, the choices Discord's overlay voice widget offers. */
+function lookPicker<K extends LookChange["key"]>(key: K, options: readonly { value: string; label: string; }[]) {
+    const id = `voice-widget-${key}`;
+    const chosen = picker(byId(id), options, (value) =>
+        savedOrSay(window.polarisLocal.connect.setVoiceWidgetLook({ key, value: key === "opacity" ? Number(value) : value } as LookChange))
+    );
+    return { picker: chosen, row: byId<HTMLDivElement>(`${id}-row`) };
+}
+const widgetLook = {
+    avatars: lookPicker("avatars", [
+        { value: "large", label: "Large" },
+        { value: "small", label: "Small" }
+    ]),
+    names: lookPicker("names", [
+        { value: "always", label: "Always" },
+        { value: "speaking", label: "While talking" },
+        { value: "never", label: "Never" }
+    ]),
+    people: lookPicker("people", [
+        { value: "always", label: "Everyone in the call" },
+        { value: "speaking", label: "Only who is talking" }
+    ]),
+    opacity: lookPicker("opacity", OPACITIES.map((value) => ({ value: String(value), label: `${value}%` }))),
+    corner: lookPicker("corner", [
+        { value: "top-left", label: "Top left" },
+        { value: "top-right", label: "Top right" },
+        { value: "bottom-left", label: "Bottom left" },
+        { value: "bottom-right", label: "Bottom right" }
+    ])
+};
 const launcherClear = byId<HTMLButtonElement>("launcher-clear");
 const launcherClearRow = byId<HTMLDivElement>("launcher-clear-row");
 let recordingKey = false;
@@ -757,6 +788,7 @@ void showLauncherStatus();
 /** "Only while a game is running" means nothing with the widget off. */
 function followVoiceWidget(): void {
     toggles.voiceWidgetGameOnly.disabled = !toggles.voiceWidget.checked;
+    for (const { row } of Object.values(widgetLook)) row.hidden = !toggles.voiceWidget.checked;
     launcherRecord.disabled = !toggles.launcher.checked;
     followLauncher();
 }
@@ -823,6 +855,7 @@ const preferencesLoaded = window.polarisLocal.connect.preferences().catch(() => 
     toggles.startMinimized.checked = preferences.startMinimized;
     toggles.voiceWidget.checked = preferences.voiceWidget;
     toggles.voiceWidgetGameOnly.checked = preferences.voiceWidgetGameOnly;
+    for (const key of Object.keys(widgetLook) as (keyof typeof widgetLook)[]) widgetLook[key].picker.value = String(preferences.voiceWidgetLook[key]);
     toggles.launcher.checked = preferences.launcher;
     toggles.launcherClipboard.checked = preferences.launcherClipboard;
     toggles.launcherGameMode.checked = preferences.launcherGameMode;

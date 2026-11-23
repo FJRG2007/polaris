@@ -23,7 +23,7 @@ import type { Relaunch } from "./relaunch";
 import type { UpdateReady } from "./update-ready";
 import type { UpdateCheck } from "./update-check";
 import type { CallHotkey, CallHotkeysInput, CallHotkeysResult } from "./call-hotkeys";
-import type { VoiceAction, VoiceState, WidgetView } from "./voice-widget";
+import type { LookChange, VoiceAction, VoiceState, WidgetLook, WidgetView } from "./voice-widget";
 import type { SearchEngine } from "./launcher";
 import type { ClipboardKeep } from "./clipboard-store";
 
@@ -143,6 +143,10 @@ export interface PolarisDesktop {
     /** Who is in the call and who is speaking, for the voice widget; null once
      *  the call ends. Whether the app took it. */
     setVoiceState(state: VoiceState): Promise<boolean>;
+    /** Whether the voice widget draws the faces a person's `picture` names. A
+     *  page sends `picture` only to an app that says so: an older one refuses
+     *  the whole state over a field it does not know. */
+    readonly voiceWidgetPictures: true;
     /** Hear a press on the voice widget's buttons. Answers the way to stop. */
     onVoiceAction(listener: (action: VoiceAction) => void): () => void;
     /** Open the app's window for adding and switching servers. */
@@ -377,6 +381,8 @@ export interface Preferences {
     readonly voiceWidget: boolean;
     /** That widget only while a game is running. */
     readonly voiceWidgetGameOnly: boolean;
+    /** How the widget looks. */
+    readonly voiceWidgetLook: WidgetLook;
     /** The launcher opens with its key from anywhere. */
     readonly launcher: boolean;
     /** The launcher keeps what was copied. */
@@ -443,6 +449,8 @@ export interface PolarisLocal {
         setLauncherEngine(engine: SearchEngine): Promise<boolean>;
         /** How long the clipboard history keeps a copy. */
         setClipboardKeep(keep: ClipboardKeep): Promise<boolean>;
+        /** One of the voice widget's looks changed. */
+        setVoiceWidgetLook(change: LookChange): Promise<boolean>;
         /** Forget every copy the launcher kept. */
         clearClipboardHistory(): Promise<void>;
         /** Close and open the app again, so a setting read at start applies. */
@@ -767,6 +775,7 @@ export const CHANNELS = {
     connectLauncherRecord: "local:connect-launcher-record",
     connectLauncherEngine: "local:connect-launcher-engine",
     connectClipboardKeep: "local:connect-clipboard-keep",
+    connectVoiceWidgetLook: "local:connect-voice-widget-look",
     connectClipboardClear: "local:connect-clipboard-clear",
     connectRelaunch: "local:connect-relaunch",
     connectSwitch: "local:connect-switch",
