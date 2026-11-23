@@ -11,6 +11,7 @@
 export * from "./access-grants.js";
 export * from "./ark-maps.js";
 export * from "./phone.js";
+export * from "./signed-in-accounts.js";
 export * from "./comparison.js";
 export * from "./async.js";
 export * from "./account-standing.js";
