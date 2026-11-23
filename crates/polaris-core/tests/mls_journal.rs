@@ -225,3 +225,70 @@ fn deletions_and_a_removal_survive_a_restart() {
     alice.crash();
     assert_eq!(alice.member.members(GROUP).unwrap().len(), 1);
 }
+
+#[test]
+fn a_removed_member_keeps_none_of_the_group_on_disk() {
+    let mut alice = Device::new("alice");
+    let mut bob = Device::new("bob");
+    let key_package = bob.member.key_package().unwrap();
+    bob.persist();
+    // Everything bob holds that is not about any group: his identity and the
+    // KeyPackage the Welcome will consume.
+    let before: Vec<Vec<u8>> = bob.store.keys().cloned().collect();
+    alice.member.create_group(GROUP).unwrap();
+    let out = alice.member.add_members(GROUP, &[key_package]).unwrap();
+    alice.member.merge_pending_commit(GROUP).unwrap();
+    alice.persist();
+    bob.member.join_by_welcome(&out.welcome.unwrap()).unwrap();
+    bob.persist();
+    // A few epochs, so past-epoch secrets and old leaf keys exist too.
+    for _ in 0..3 {
+        let out = alice.member.self_update(GROUP).unwrap();
+        alice.member.merge_pending_commit(GROUP).unwrap();
+        alice.persist();
+        bob.member.process(GROUP, &out.commit).unwrap();
+        bob.persist();
+    }
+    talk(&alice, &bob, b"before the removal");
+    bob.persist();
+    let in_group: Vec<Vec<u8>> = bob
+        .store
+        .keys()
+        .filter(|key| !before.contains(key))
+        .cloned()
+        .collect();
+    assert!(!in_group.is_empty(), "the group wrote nothing to the store");
+
+    let out = alice
+        .member
+        .remove_members(GROUP, &[bob.member.own_leaf(GROUP).unwrap()])
+        .unwrap();
+    alice.member.merge_pending_commit(GROUP).unwrap();
+    alice.persist();
+    assert!(!bob.member.process(GROUP, &out.commit).unwrap().active);
+    let changes = bob.persist();
+
+    // The journal reports the group's keys as deletions, and the store keeps
+    // nothing the group ever wrote: no tree, no epoch secrets, no leaf keys.
+    for key in &in_group {
+        assert!(
+            !bob.store.contains_key(key),
+            "group state left on disk: {}",
+            String::from_utf8_lossy(&key[..key.len().min(80)])
+        );
+        assert!(
+            changes.contains(&StoreChange {
+                key: key.clone(),
+                value: None
+            }),
+            "the deletion never reached the host"
+        );
+    }
+    assert!(bob.store.keys().all(|key| before.contains(key)));
+    // Not even in memory, and not after a restart.
+    assert!(bob.member.epoch(GROUP).is_err());
+    bob.crash();
+    assert!(bob.member.epoch(GROUP).is_err());
+    // alice carries on alone.
+    assert_eq!(alice.member.members(GROUP).unwrap().len(), 1);
+}

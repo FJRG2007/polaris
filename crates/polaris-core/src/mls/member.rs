@@ -87,7 +87,9 @@ pub struct Processed {
     pub plaintext: Vec<u8>,
     /// The group's epoch after processing.
     pub epoch: u64,
-    /// False once a commit removed this member.
+    /// False once a commit removed this member (its own leave included). The
+    /// group's state is then deleted from storage: later calls for that group
+    /// answer `UnknownGroup`.
     pub active: bool,
 }
 
@@ -514,6 +516,9 @@ impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {
             return Err(rejected("the message belongs to another group"));
         }
         let mut group = self.load(group_id)?;
+        // The epoch and leaf this device's leaf keys are filed under, should
+        // the message remove it (see below).
+        let (epoch_before, own_leaf) = (group.epoch(), group.own_leaf_index().u32());
         let processed = group
             .process_message(&self.provider, protocol)
             .map_err(rejected)?;
@@ -561,13 +566,30 @@ impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {
                 return Err(rejected("this member sent that message; its key is gone"));
             }
         };
+        let epoch = group.epoch().as_u64();
+        let active = group.is_active();
+        if !active {
+            // OpenMLS only marks a removed member's group inactive and keeps
+            // its tree and epoch secrets in storage. A device that is out of
+            // the group has no use for them and must not keep them on disk,
+            // so the whole group goes (and the journal reports the deletions).
+            // `delete` drops the leaf keys of the epoch the removal moved
+            // to; the ones this device used until then stay unless named.
+            group
+                .delete(self.provider.storage())
+                .map_err(storage_error)?;
+            self.provider
+                .storage()
+                .delete_encryption_epoch_key_pairs(group.group_id(), &epoch_before, own_leaf)
+                .map_err(storage_error)?;
+        }
         Ok(Processed {
             kind,
             sender_leaf,
             sender_identity,
             plaintext,
-            epoch: group.epoch().as_u64(),
-            active: group.is_active(),
+            epoch,
+            active,
         })
     }
 
