@@ -59,13 +59,25 @@ export async function pwnedRange(prefix: string, signal?: AbortSignal): Promise<
  * treats it as a pass on purpose.
  */
 export async function passwordBreachCount(password: string, signal?: AbortSignal): Promise<number | null> {
+    return breachCountFrom(password, (prefix) => pwnedRange(prefix, signal));
+}
+
+/**
+ * The same count, with the range fetched by the caller - for a page that asks
+ * its own Polaris (`/api/polaris/pwned/[prefix]`) instead of the API itself.
+ * Only the hash's first five characters ever reach `range`.
+ */
+export async function breachCountFrom(
+    password: string,
+    range: (prefix: string) => Promise<string | null>
+): Promise<number | null> {
     if (!password) return null;
     try {
         const hash = await sha1Hex(password);
-        const range = await pwnedRange(hash.slice(0, 5), signal);
-        if (range === null) return null;
+        const bucket = await range(hash.slice(0, 5));
+        if (bucket === null) return null;
         const suffix = hash.slice(5);
-        for (const line of range.split("\n")) {
+        for (const line of bucket.split("\n")) {
             const [candidate, count] = line.trim().split(":");
             if (candidate === suffix) return Number(count) || 0;
         }
