@@ -3,9 +3,13 @@
  * key held system-wide (Alt+Space unless somebody records another).
  *
  * Built to cost next to nothing while it waits, which is most of the time:
- * - The window is made on the first press, not at start, reused while it is
- *   in use, and destroyed after `IDLE_MS` hidden, so a launcher nobody opens
- *   holds no renderer at all. The key itself costs one OS registration.
+ * - The window is made, hidden, a few seconds after start (`WARM_DELAY_MS`)
+ *   and kept: the first press only shows it, so it opens as fast as the
+ *   second. Made on that press instead, the press waited for a probe of the
+ *   instance, a new renderer and the whole `/launcher` page - seconds, every
+ *   time it had been put away for a while. One hidden renderer is the price,
+ *   paid only while the launcher is on; the key itself costs one OS
+ *   registration.
  * - Nothing runs on a timer except the clipboard history, on unless somebody
  *   turns it off (see `watchClipboard` for why it has to look).
  * - Its preload carries a handful of calls and no shared bundle.
@@ -42,8 +46,8 @@ import { conflictSentence, findLaunchers, likelyHolders, type FoundLauncher } fr
 import { LAUNCHER_CHANNELS, topMatches, webSearchUrl, type LauncherAnswer, type LauncherRow } from "@/shared/launcher";
 import { app, BrowserWindow, clipboard, ipcMain, net, powerMonitor, safeStorage, screen, session, shell, type IpcMainInvokeEvent } from "electron";
 
-/** Hidden this long, the window is destroyed; the next press makes a new one. */
-export const IDLE_MS = 5 * 60_000;
+/** How long after start the hidden window is made, so it does not compete with the main window's first load. */
+export const WARM_DELAY_MS = 4_000;
 /** How long Polaris's index is used before an open asks for it again. */
 const INDEX_FRESH_MS = 60_000;
 /** The most rows of each kind, so the list stays one screen. */
@@ -58,7 +62,9 @@ export interface LauncherHost {
 
 let host: LauncherHost | null = null;
 let window: BrowserWindow | null = null;
-let idleTimer: NodeJS.Timeout | null = null;
+let warmTimer: NodeJS.Timeout | null = null;
+/** Whether the window's page has drawn, so a press can show it straight away. */
+let ready = false;
 let release: (() => void) | null = null;
 /** The accelerator held now, or null. */
 let heldAccelerator: string | null = null;
@@ -259,10 +265,21 @@ function rowsFor(text: string, hostOnly = false): LauncherAnswer {
 function hide(): void {
     if (!window || window.isDestroyed() || !window.isVisible()) return;
     window.hide();
-    idleTimer = setTimeout(() => {
-        idleTimer = null;
-        if (window && !window.isDestroyed() && !window.isVisible()) window.destroy();
-    }, IDLE_MS);
+    void upgradeOwnPanel(window);
+}
+
+/**
+ * The kept window shows its own panel because the instance did not serve its
+ * search page when it was made - not signed in yet, offline, an older host.
+ * Ask again as it is put away, and make it again for that page once it does, so
+ * keeping the window never keeps the fallback.
+ */
+async function upgradeOwnPanel(kept: BrowserWindow): Promise<void> {
+    const origin = host?.server() ?? null;
+    if (remote || !origin || !(await servesLauncher(origin))) return;
+    if (window !== kept || kept.isDestroyed() || kept.isVisible() || remote) return;
+    kept.destroy();
+    make();
 }
 
 /** The program's own icon as a PNG data URL, asked of the system once per program. */
@@ -352,8 +369,14 @@ function create(): BrowserWindow {
     });
     made.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     made.on("blur", hide);
+    made.once("ready-to-show", () => {
+        if (window === made) ready = true;
+    });
     made.once("closed", () => {
-        if (window === made) window = null;
+        if (window === made) {
+            window = null;
+            ready = false;
+        }
     });
     const origin = host?.server() ?? null;
     void (origin ? servesLauncher(origin) : Promise.resolve(false)).then((served) => {
@@ -385,8 +408,6 @@ function place(target: BrowserWindow): void {
 
 /** The key's press: open the launcher, or put it away when it is in front. */
 export function toggleLauncher(): void {
-    if (idleTimer) clearTimeout(idleTimer);
-    idleTimer = null;
     if (window && !window.isDestroyed() && window.isVisible() && window.isFocused()) {
         hide();
         return;
@@ -396,14 +417,41 @@ export function toggleLauncher(): void {
     // Pointed at another Polaris since the window was made: make it again for that one.
     const origin = host?.server() ?? null;
     if (window && !window.isDestroyed() && remote && remote !== origin) window.destroy();
-    if (window && !window.isDestroyed()) {
+    if (window && !window.isDestroyed() && ready) {
         place(window);
         return;
     }
-    const made = (window = create());
+    // Still loading (pressed during the warm-up), or not made yet: show it once it has drawn.
+    const made = window && !window.isDestroyed() ? window : make();
     made.once("ready-to-show", () => {
         if (window === made) place(made);
     });
+}
+
+function make(): BrowserWindow {
+    ready = false;
+    window = create();
+    return window;
+}
+
+/**
+ * Make the window ahead of the first press, hidden, for the Polaris in use, and
+ * fill the index and the program list it will search - so a press only shows it.
+ */
+function warm(): void {
+    if (warmTimer) clearTimeout(warmTimer);
+    warmTimer = null;
+    if (!settings.toggle("launcher")) return;
+    const origin = host?.server() ?? null;
+    if (window && !window.isDestroyed() && remote && remote !== origin) window.destroy();
+    if (!window || window.isDestroyed()) make();
+    void refreshIndex();
+    installedApps();
+}
+
+function warmSoon(): void {
+    if (warmTimer) clearTimeout(warmTimer);
+    warmTimer = setTimeout(warm, WARM_DELAY_MS);
 }
 
 function holdKey(): void {
@@ -485,6 +533,7 @@ export function recordLauncherKey(recording: boolean): void {
 export function followLauncherSettings(): void {
     holdKey();
     if (!settings.toggle("launcher") && window && !window.isDestroyed()) window.destroy();
+    else warmSoon();
     watchClipboard();
 }
 
@@ -608,6 +657,7 @@ export function startLauncher(given: LauncherHost): void {
     });
     holdKey();
     watchClipboard();
+    warmSoon();
     // Refused at start: look once at who has it, so the settings can say.
     if (settings.toggle("launcher") && !heldAccelerator) void lookForLaunchers();
 }
@@ -618,5 +668,7 @@ export function stopLauncher(): void {
     release = null;
     if (clipTimer) clearInterval(clipTimer);
     clipTimer = null;
+    if (warmTimer) clearTimeout(warmTimer);
+    warmTimer = null;
     if (window && !window.isDestroyed()) window.destroy();
 }
