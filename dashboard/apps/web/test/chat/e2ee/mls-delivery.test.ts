@@ -9,6 +9,7 @@
  * relies on (unique keys, `updateMany` counts, all-or-nothing transactions).
  */
 
+import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -127,6 +128,8 @@ vi.mock("@polaris/db", () => {
 const { handleMls } = await import("@/lib/chat/e2ee/mls-handler");
 const { MlsDevice, MlsRequestError } = await import("@/lib/chat/e2ee/mls-client");
 const accountKeys = await import("@polaris/chat-crypto/account-key");
+const { IndexedDbHistoryKeyStore } = await import("@/lib/chat/e2ee/mls-history-keys");
+type MlsHistoryKeyStore = import("@/lib/chat/e2ee/mls-history-keys").MlsHistoryKeyStore;
 type MlsDevice = import("@/lib/chat/e2ee/mls-client").MlsDevice;
 type MlsDeviceStore = import("@/lib/chat/e2ee/mls-client").MlsDeviceStore;
 type MlsMemberClass = import("@/lib/chat/e2ee/mls-client").MlsMemberClass;
@@ -328,7 +331,15 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
             return answer.body;
         };
     type Account = { hpkePublicKey: Uint8Array; hpkePrivateKey: CryptoKey };
-    const open = (userId: string, device: string, store = new MemoryStore(), notes = new Map<string, string>(), transport = through(userId), account?: Account) =>
+    const open = (
+        userId: string,
+        device: string,
+        store = new MemoryStore(),
+        notes = new Map<string, string>(),
+        transport = through(userId),
+        account?: Account,
+        historyKeys?: MlsHistoryKeyStore
+    ) =>
         MlsDevice.open({
             userId,
             device,
@@ -336,6 +347,7 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
             store,
             transport,
             account,
+            historyKeys,
             notes: { getItem: (k) => notes.get(k) ?? null, setItem: (k, v) => void notes.set(k, v) }
         });
     const say = (device: MlsDevice, text: string) => device.sendApplication(CHANNEL, new TextEncoder().encode(text));
@@ -522,5 +534,23 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         expect(await laptop.historyKey(CHANNEL, 0n)).toBeNull();
         const stranger = await open(BOB, "bob-tablet", new MemoryStore(), new Map(), through(BOB), await unlocked(EVE));
         await expect(stranger.historyKey(CHANNEL, 1n)).rejects.toThrow();
+    });
+
+    it("keeps the history keys it read across a restart, with its account key locked", async () => {
+        const alice = await open(ALICE, "alice-laptop");
+        const [store, notes] = [new MemoryStore(), new Map<string, string>()];
+        const bob = await open(BOB, "bob-phone-1", store, notes, through(BOB), undefined, await IndexedDbHistoryKeyStore.open("bob-phone-1"));
+        for (const device of [alice, bob]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB]);
+        await bob.sync(CHANNEL);
+        const epochOne = await alice.historyKey(CHANNEL, 1n);
+        expect(await bob.historyKey(CHANNEL, 1n)).toEqual(epochOne);
+        // Restarted: a new run over the same store, no account key, nothing held in memory.
+        const restarted = await open(BOB, "bob-phone-1", store, notes, through(BOB), undefined, await IndexedDbHistoryKeyStore.open("bob-phone-1"));
+        expect(await restarted.historyKey(CHANNEL, 1n)).toEqual(epochOne);
+        // Without the store the restart has lost it (no account key to open an envelope with).
+        const forgetful = await open(BOB, "bob-phone-1", store, notes, through(BOB));
+        expect(await forgetful.historyKey(CHANNEL, 1n)).toBeNull();
     });
 });

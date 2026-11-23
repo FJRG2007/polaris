@@ -114,6 +114,9 @@ export async function leaveAccount(target: string, signedOut?: "this" | "all"): 
     if (signedOut === "all") {
         forgetPlaces();
         await forgetEveryDeviceLock().catch(() => undefined);
+        await import("@/lib/chat/e2ee/mls-browser")
+            .then((mls) => mls.forgetEveryBrowserDevice())
+            .catch(() => undefined);
     } else if (signedOut === "this") {
         const account = currentAccount();
         if (account) {
@@ -121,6 +124,10 @@ export async function leaveAccount(target: string, signedOut?: "this" | "all"): 
             // The chat account key leaves this browser with its account (proposal 3.3);
             // it comes back at the next sign-in from the password, a passkey or a device.
             await forgetDeviceLock(indexedDbDeviceLockStore(), account).catch(() => undefined);
+            // Its chat MLS device too, with the history keys it kept (sealed, but still this account's).
+            await import("@/lib/chat/e2ee/mls-browser")
+                .then((mls) => mls.forgetBrowserDevice(account))
+                .catch(() => undefined);
         }
     }
     await forgetAccountTraces();

@@ -35,6 +35,7 @@
  */
 
 import type { MlsBody } from "./schemas";
+import type { MlsHistoryKeyStore } from "./mls-history-keys";
 import * as content from "@polaris/chat-crypto/message-content";
 
 /** The hybrid ML-KEM-768 + X25519 suite (polaris_core::mls). */
@@ -173,6 +174,12 @@ export interface MlsDeviceOptions {
      * group, and writes no envelope for its own account.
      */
     account?: { hpkePublicKey: Uint8Array; hpkePrivateKey: CryptoKey };
+    /**
+     * Where the history keys this device reads or makes are kept across
+     * restarts, sealed (`IndexedDbHistoryKeyStore`). Without it they last one
+     * run, and a device with its account key locked loses them on restart.
+     */
+    historyKeys?: MlsHistoryKeyStore;
 }
 
 export class MlsDevice {
@@ -182,7 +189,7 @@ export class MlsDevice {
     private readonly inbox: MlsApplication[] = [];
     /** Group ids and cursors belong to one member: a device whose store was lost starts with none. */
     private readonly scope: string;
-    /** History keys this run holds, by `${channelId}/${epoch}`. */
+    /** History keys this run holds, by `${channelId}/${epoch}` (the persisted ones load on first use). */
     private readonly historyKeys = new Map<string, Uint8Array>();
 
     private constructor(
@@ -422,12 +429,21 @@ export class MlsDevice {
     }
 
     /**
-     * The conversation's history key for an epoch: the one this run read or
-     * made, else the envelope sealed to this account. Null when neither exists.
+     * The conversation's history key for an epoch: the one this device read or
+     * made (this run, or kept from an earlier one), else the envelope sealed to
+     * this account. Null when none of them exists.
      */
     async historyKey(channelId: string, epoch: bigint): Promise<Uint8Array | null> {
         const held = this.historyKeys.get(`${channelId}/${epoch}`);
         if (held) return held;
+        const kept = await this.options.historyKeys?.get(channelId, epoch).catch((caught: unknown) => {
+            console.warn("polaris: the device's kept history keys could not be read:", caught);
+            return null;
+        });
+        if (kept) {
+            this.historyKeys.set(`${channelId}/${epoch}`, kept);
+            return kept;
+        }
         const account = this.options.account;
         if (!account) return null;
         const answer = await this.send({ op: "history-keys", channelId, from: epoch.toString() });
@@ -435,8 +451,17 @@ export class MlsDevice {
         if (!found) return null;
         const binding = { recipient: this.options.userId, conversationId: channelId, epoch };
         const key = await content.openHistoryKey(account.hpkePrivateKey, fromText(found.envelope), binding);
-        this.historyKeys.set(`${channelId}/${epoch}`, key);
+        await this.keepHistoryKey(channelId, epoch, key);
         return key;
+    }
+
+    /** Hold a history key for this run and keep it for the next. */
+    private async keepHistoryKey(channelId: string, epoch: bigint, key: Uint8Array): Promise<void> {
+        this.historyKeys.set(`${channelId}/${epoch}`, key);
+        await this.options.historyKeys?.put(channelId, epoch, key).catch((caught: unknown) => {
+            // The account envelopes still hold it for a device whose account key is unlocked.
+            console.warn("polaris: a history key could not be kept on this device:", caught);
+        });
     }
 
     /**
@@ -450,7 +475,8 @@ export class MlsDevice {
             const groupId = this.requireGroup(channelId);
             const epoch = this.member.epoch(groupId);
             const key = content.newHistoryKey();
-            this.historyKeys.set(`${channelId}/${epoch}`, key);
+            // Kept before it is sent: a restart after the send still holds it.
+            await this.keepHistoryKey(channelId, epoch, key);
             const payload = this.member.encrypt(groupId, framed(HISTORY_KEY_KIND, key));
             await this.commitAndSend({ op: "application", channelId, device: this.options.device, epoch: epoch.toString(), payload: toText(payload) });
             await this.sealHistoryKey(channelId, epoch, key, accounts);
@@ -554,7 +580,7 @@ export class MlsDevice {
         const [kind, body] = [processed.plaintext[0], processed.plaintext.subarray(1)];
         if (kind === HISTORY_KEY_KIND) {
             if (body.length !== content.HISTORY_KEY_BYTES) return null;
-            this.historyKeys.set(`${channelId}/${processed.epoch}`, new Uint8Array(body));
+            await this.keepHistoryKey(channelId, processed.epoch, new Uint8Array(body));
             await this.sealHistoryKey(channelId, processed.epoch, body, []).catch((caught: unknown) => {
                 console.warn("polaris: a history key could not be sealed to this account:", caught);
             });

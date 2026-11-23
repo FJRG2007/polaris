@@ -85,6 +85,14 @@ pair (`account` option, once unlocked); without it a device still reads keys in
 the group. Every application message carries a one-byte kind: 0 content, 1 a
 history key.
 
+A device keeps every history key it reads or makes across restarts in
+`IndexedDbHistoryKeyStore` (`mls-history-keys.ts`, `historyKeys` option),
+one database per device. Never in the clear: each key is sealed with
+AES-256-GCM under a key and nonce derived (HKDF) from a non-extractable
+wrapping key held in the same database, bound to the device, conversation and
+epoch, and a slot is written once. Signing the account out of the browser
+deletes the device's MLS store and these keys.
+
 Crash safety: an operation's state changes and its request are written in one
 transaction before the request is sent. A commit the server took while the
 device never heard the answer comes back `staleEpoch` on resend; the device then
