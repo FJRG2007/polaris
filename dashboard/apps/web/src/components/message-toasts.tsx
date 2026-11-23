@@ -112,8 +112,10 @@ const sealedChannels = new Set<string>();
  * Sealed messages' words, opened on this device - the server never had them
  * (docs/chat-e2ee-mls.md). One behind the reader's chat lock stays as the
  * server redacted it, and one that does not open keeps the general line.
+ *
+ * Exported for its test (test/chat/e2ee/sealed-toasts.test.ts).
  */
-async function withOpenedWords(viewerId: string, toasts: readonly MessageToast[]): Promise<readonly MessageToast[]> {
+export async function withOpenedWords(viewerId: string, toasts: readonly MessageToast[]): Promise<readonly MessageToast[]> {
     if (!viewerId || !toasts.some((one) => one.sealed)) return toasts;
     // Only a sealed row says sealed chat is on, so this is where the shell turns it on for the account.
     sealedChat.configureSealedChat(viewerId);
