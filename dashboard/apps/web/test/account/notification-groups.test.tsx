@@ -139,7 +139,7 @@ describe("notification groups", () => {
             </MessagesWrapper>
         );
         expect(screen.queryByRole("button", { name: /^Network/ })).toBeNull();
-        const headers = [...container.querySelectorAll("button[aria-expanded]")];
+        const headers = [...container.querySelectorAll('button[aria-controls^="notify-group-"]')];
         expect(headers.length).toBeGreaterThan(0);
         for (const header of headers) {
             expect(

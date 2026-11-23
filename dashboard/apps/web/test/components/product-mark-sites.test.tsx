@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * Screens that name another Polaris product wear that product's logo beside the
- * name: Chat's "A file sent from Drive" setting, and the product groups of the
+ * name: Chat's "A file sent from Drive" setting, and every group of the
  * notification settings.
  */
 
@@ -9,6 +9,7 @@ import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { NOTIFICATION_EVENTS, defaultRule } from "@polaris/core";
+import { notificationGroupMark } from "@/lib/notifications/group-apps";
 
 vi.mock("../../src/app/(app)/account/notifications/actions", () => ({}));
 vi.mock("../../src/app/(app)/admin/apps/[appId]/settings/_chat/actions", () => ({
@@ -41,7 +42,7 @@ describe("product marks where another product is named", () => {
         expect(container.querySelectorAll("[data-app-logo]")).toHaveLength(1);
     });
 
-    it("marks the notification groups that are products, and only those", () => {
+    it("marks every notification group with its app's logo, or Polaris's own mark", () => {
         const state = new Map(NOTIFICATION_EVENTS.map((entry) => [entry.id, defaultRule(entry)]));
         const { container } = render(
             <EventGroups
@@ -60,12 +61,13 @@ describe("product marks where another product is named", () => {
         const marked = [...container.querySelectorAll("[data-app-logo]")].map((node) =>
             node.getAttribute("data-app-logo")
         );
-        const groups = new Set(NOTIFICATION_EVENTS.map((entry) => entry.group));
-        const expected = ["tasks", "calendar", "drive", "mail", "polar"].filter((group) =>
-            groups.has(group as never)
-        );
-        expect(expected.length).toBeGreaterThan(2);
+        const groups = [...new Set(NOTIFICATION_EVENTS.map((entry) => entry.group))];
+        const expected = groups.flatMap((group) => {
+            const mark = notificationGroupMark(group);
+            return mark.kind === "app" ? [mark.appId] : [];
+        });
         expect(marked.sort()).toEqual(expected.sort());
-        expect(marked).not.toContain("deploy");
+        expect(marked).toEqual(expect.arrayContaining(["apps", "home", "router", "chat", "polar"]));
+        expect(container.querySelectorAll("[data-group-mark]")).toHaveLength(2);
     });
 });
