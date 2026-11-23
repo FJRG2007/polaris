@@ -7,6 +7,7 @@
  */
 
 import { deployServicesChanged } from "@/lib/deploy/live";
+import { restartPolicyOf } from "@/lib/deploy/restart-policy";
 import { canDeployAnyway, checkReleaseImage, parseStoredWarning } from "@/lib/security/deploy-gate";
 import { queueDependencyScan } from "@/lib/security/lockfiles";
 import {
@@ -3115,6 +3116,7 @@ async function buildAppPlan(
     const healthcheck = app.healthcheck
         ? (JSON.parse(app.healthcheck) as AppDeployPlan["healthcheck"])
         : undefined;
+    const restart = restartPolicyOf(app);
     // Resolved WAF rules for this service, materialized into edge labels on deploy so
     // a remote server's own Traefik enforces them without the control plane.
     const resolvedWaf = await resolveWaf(app.id);
@@ -3371,6 +3373,7 @@ async function buildAppPlan(
             ...volumeMountSource(volume)
         })),
         healthcheck,
+        restart,
         // The image's command replaced, for a one-click service whose image does
         // nothing without its arguments (MinIO's `server /data`).
         ...(Array.isArray(source.command) &&

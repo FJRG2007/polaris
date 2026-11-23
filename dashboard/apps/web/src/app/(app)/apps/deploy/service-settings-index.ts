@@ -246,6 +246,13 @@ export const SERVICE_SETTINGS_INDEX = {
             es: ["sin cortes", "reinicio", "solapar", "volumenes", "estrategia"]
         }
     },
+    restartPolicy: {
+        section: "deploy",
+        keywords: {
+            en: ["restart policy", "restart", "on failure", "retries", "crash"],
+            es: ["politica de reinicio", "reiniciar", "fallo", "reintentos", "caida"]
+        }
+    },
     keepReleases: {
         section: "deploy",
         keywords: {

@@ -9,6 +9,7 @@
 
 import { ServerPicker } from "@/components/server-picker";
 import { DeployHooksCard } from "./deploy-hooks-card";
+import { RestartPolicyCard } from "./restart-policy-card";
 import { RestoreHistoryButton } from "@/components/restore-history";
 import Link from "next/link";
 import * as deployActions from "./actions";
@@ -867,6 +868,7 @@ export function SettingsTab({
                     canConfigure={configure}
                     parts={["strategy"]}
                 />
+                <RestartPolicyCard applicationId={app.id} canConfigure={configure} />
                 <SourceCards {...sourceProps} part="releases" />
                 {can("deploy.run") && <DeployHooksCard applicationId={app.id} />}
             </SettingsSection>

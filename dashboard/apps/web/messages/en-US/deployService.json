@@ -916,5 +916,21 @@
         "imageShort": "Nothing is built here. The image runs as published.",
         "other": "Set at creation",
         "otherShort": "Built the way it was set up when the service was created."
+    },
+    "restart": {
+        "title": "Restart policy",
+        "policy": "When it exits",
+        "maxRetries": "Max retries",
+        "retriesInvalid": "Between 1 and {max}.",
+        "option": {
+            "never": "Never",
+            "on-failure": "On failure",
+            "always": "Always"
+        },
+        "hint": {
+            "never": "An exited container stays stopped.",
+            "on-failure": "Started again only after it fails, up to the retries set.",
+            "always": "Started again whenever it exits, unless you stopped it."
+        }
     }
 }

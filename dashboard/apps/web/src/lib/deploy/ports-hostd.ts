@@ -8,7 +8,7 @@
 import { Readable } from "node:stream";
 import { HostdClient } from "@polaris/hostd-client";
 import { reclaimHostSpace } from "@/lib/deploy/host-space";
-import { CONTAINER_ID, forCompose, isReleaseImage, releaseContainersIn } from "@polaris/deploy";
+import { CONTAINER_ID, forCompose, forDaemon, isReleaseImage, releaseContainersIn } from "@polaris/deploy";
 import { ImageStoreBusy, LOCAL_MACHINE, withImageUse } from "@/lib/deploy/image-store-lock";
 import type {
     BuildRequest,
@@ -50,7 +50,7 @@ export class HostdPorts implements RuntimePorts {
         // of them is escaped here - see `forCompose`. Held open against a prune:
         // compose fetches any image it does not have yet - see `image-store-lock`.
         await withImageUse(LOCAL_MACHINE, async () => {
-            const res = await this.client.deployUp(forCompose(spec));
+            const res = await this.client.deployUp(forDaemon(forCompose(spec)));
             await drain(res, onOutput);
         });
     }
@@ -62,7 +62,7 @@ export class HostdPorts implements RuntimePorts {
 
     public async stackUp(spec: ComposeSpec, onOutput?: OutputSink): Promise<void> {
         await withImageUse(LOCAL_MACHINE, async () => {
-            const res = await this.client.stackUp(forCompose(spec));
+            const res = await this.client.stackUp(forDaemon(forCompose(spec)));
             await drain(res, onOutput);
         });
     }

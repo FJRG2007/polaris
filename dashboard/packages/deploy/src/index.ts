@@ -103,6 +103,7 @@ export type {
     RuntimeStatus,
     HealthcheckSpec,
     ResourceLimits,
+    RestartPolicy,
     MountTarget
 } from "./runtime/driver.js";
 export {
@@ -113,6 +114,9 @@ export {
     expandReplicas,
     deployBlockLines,
     forCompose,
+    forDaemon,
+    forSwarm,
+    composeRestart,
     replicaNames,
     clusterNodeNames,
     composeValue,

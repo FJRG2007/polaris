@@ -50,7 +50,7 @@ of it, the gap is named; **missing** = nothing on screen. Paths are relative to
 | Teardown: overlap and draining seconds | partial | `deploy-behaviour-section.tsx`: overlap on/off; no overlap or draining time |
 | Cron schedule for the whole service | partial | `cron-panel.tsx` runs commands inside the service; no "this service runs on a schedule and exits" mode |
 | Healthcheck path + timeout gating a deploy | partial | `scaling-section.tsx` health path feeds the balancer only with 2+ copies; the deploy gate (`packages/deploy/src/runtime/readiness.ts`) never probes a path |
-| Restart policy (never / on failure / always) + max retries | missing | every service is `unless-stopped` (`packages/deploy/src/compose-spec.ts`) |
+| Restart policy (never / on failure / always) + max retries | partial | `restart-policy-card.tsx`, `lib/deploy/restart-policy.ts`; on this machine the daemon takes `on-failure` without a count, so retries are unlimited there |
 | Config-as-code file path | partial | `lib/deploy/repo-import.ts` reads `railway.json`/`railway.toml` once, when the service is created; no path setting, not re-read on deploy |
 | Service feature flags | partial | project-level flags only (`settings/feature-flags-section.tsx`) |
 | Delete service | present | `service-settings.tsx` deleteService card |

@@ -31,6 +31,7 @@ const FILES = [
     "private-network-panel.tsx",
     "gpu-card.tsx",
     "deploy-hooks-card.tsx",
+    "restart-policy-card.tsx",
     "registries/registry-pick-card.tsx"
 ];
 

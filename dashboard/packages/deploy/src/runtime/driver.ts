@@ -181,9 +181,19 @@ export interface AppDeployPlan {
     /** The most CPU (cores) and memory (MB) the container may use. Absent is no
      *  limit. */
     readonly limits?: ResourceLimits;
+    /** What happens when the container exits. Absent restarts it unless it was
+     *  stopped on purpose. */
+    readonly restart?: RestartPolicy;
     /** Arguments that replace the image's own command, handed over as they are
      *  rather than through a shell. Absent runs what the image says. */
     readonly command?: readonly string[];
+}
+
+/** Railway's restart policy: never start an exited container again, start it
+ *  again only after it fails - at most `maxRetries` times - or always. */
+export interface RestartPolicy {
+    readonly policy: "never" | "on-failure" | "always";
+    readonly maxRetries: number;
 }
 
 /** Resource ceilings for one container. */

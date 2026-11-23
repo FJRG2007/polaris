@@ -12,7 +12,8 @@ import type {
     AppDeployPlan,
     DbDeployPlan,
     DbMemberPlan,
-    ResourceLimits
+    ResourceLimits,
+    RestartPolicy
 } from "./runtime/driver.js";
 
 export interface ComposeSpecPort {
@@ -113,6 +114,9 @@ export interface ComposeSpecService {
     readonly extraHosts?: string[];
     readonly dependsOn?: string[];
     readonly restart?: string;
+    /** Swarm only: how many times a task that exits is started again - 0 never,
+     *  absent without limit. Plain compose carries the same in `restart`. */
+    readonly restartMaxAttempts?: number;
     readonly healthcheck?: ComposeSpecHealth;
     /** `service:<name>` to share another service's network namespace - the port-80
      *  forwarder (see `private-names.ts`), which then has no networks, ports or
@@ -313,7 +317,7 @@ export function appComposeSpec(
                 ...(plan.alias && plan.alias !== plan.ref.name ? { aliases: [plan.alias] } : {}),
                 ...networkAliasesFor(plan.networkAliases, networks),
                 extraHosts: [HOST_GATEWAY],
-                restart: "unless-stopped",
+                restart: composeRestart(plan.restart),
                 replicas: plan.replicas > 1 ? plan.replicas : undefined,
                 ...limitFields(plan.limits),
                 healthcheck: plan.healthcheck
@@ -347,12 +351,51 @@ export function appComposeSpec(
  * does not come up. A service with a volume keeps swarm's stop-first default,
  * because two tasks writing one volume is how data gets corrupted.
  */
+/**
+ * The compose `restart` value for a service's restart policy: `no`, `on-failure:N`
+ * or `unless-stopped`. No policy is `unless-stopped`, which is what every service
+ * ran with before the setting existed.
+ */
+export function composeRestart(restart: RestartPolicy | undefined): string {
+    if (!restart) return "unless-stopped";
+    if (restart.policy === "never") return "no";
+    if (restart.policy === "on-failure") return `on-failure:${restart.maxRetries}`;
+    return "unless-stopped";
+}
+
+/**
+ * The same spec as this machine's daemon takes it. The daemon accepts the plain
+ * restart policy names only, so `on-failure:N` goes over as `on-failure`: it
+ * still stops a service that exits cleanly, and retries one that fails without a
+ * count until the daemon learns the counted form.
+ */
+export function forDaemon(spec: ComposeSpec): ComposeSpec {
+    return {
+        ...spec,
+        services: spec.services.map((service) =>
+            service.restart?.startsWith("on-failure:")
+                ? { ...service, restart: "on-failure" }
+                : service
+        )
+    };
+}
+
+/** Swarm's `max_attempts` for a compose restart value: 0 for `no`, N for
+ *  `on-failure:N`, and nothing - no limit - for the rest. */
+function swarmRestartAttempts(restart: string | undefined): number | undefined {
+    if (restart === "no") return 0;
+    const counted = /^on-failure:(\d+)$/.exec(restart ?? "");
+    return counted ? Number(counted[1]) : undefined;
+}
+
 export function forSwarm(spec: ComposeSpec): ComposeSpec {
     return {
         ...spec,
-        services: spec.services.map(({ pullPolicy: _dropped, ...service }) =>
-            service.volumes.length === 0 ? { ...service, rollingUpdate: true } : service
-        )
+        services: spec.services.map(({ pullPolicy: _dropped, ...service }) => {
+            const attempts = swarmRestartAttempts(service.restart);
+            const counted = attempts === undefined ? service : { ...service, restartMaxAttempts: attempts };
+            return service.volumes.length === 0 ? { ...counted, rollingUpdate: true } : counted;
+        })
     };
 }
 
@@ -470,11 +513,18 @@ export function gpuReservationLines(gpus: GpuCount): string[] {
  * reads from the same place, so one block serves both engines.
  */
 export function deployBlockLines(
-    service: Pick<ComposeSpecService, "replicas" | "rollingUpdate" | "cpus" | "memoryMb" | "gpus">
+    service: Pick<
+        ComposeSpecService,
+        "replicas" | "rollingUpdate" | "cpus" | "memoryMb" | "gpus" | "restartMaxAttempts"
+    >
 ): string[] {
     const replicated = service.replicas !== undefined && service.replicas > 1;
     const limited = service.cpus !== undefined || service.memoryMb !== undefined;
-    if (!replicated && !service.rollingUpdate && !limited && service.gpus === undefined) return [];
+    // Swarm reads the restart policy from here and ignores `restart:`; plain
+    // compose ignores this one, so writing it is harmless there.
+    const counted = service.restartMaxAttempts !== undefined;
+    if (!replicated && !service.rollingUpdate && !limited && service.gpus === undefined && !counted)
+        return [];
     const lines = ["    deploy:"];
     if (replicated || service.rollingUpdate) {
         lines.push(
@@ -499,6 +549,17 @@ export function deployBlockLines(
             "        monitor: 30s",
             "      rollback_config:",
             "        order: start-first"
+        );
+    }
+    if (counted) {
+        lines.push(
+            "      restart_policy:",
+            service.restartMaxAttempts === 0
+                ? "        condition: none"
+                : "        condition: on-failure",
+            ...((service.restartMaxAttempts ?? 0) > 0
+                ? [`        max_attempts: ${service.restartMaxAttempts}`]
+                : [])
         );
     }
     return lines;

@@ -5639,6 +5639,10 @@ model Application {
     // stopped first and then started, and the screen says so. Turned on for a
     // volume of uploads or a cache, where two writers are fine.
     overlapVolumes      Boolean   @default(false)
+    // Railway's restart policy: "never" | "on-failure" | "always". "always" is
+    // what every service ran with before the setting existed.
+    restartPolicy       String    @default("always")
+    restartMaxRetries   Int       @default(10)
     // JSON [{ name, aliases[] }]: networks of the operator's own that the service
     // joins on every deploy, beside its own, with the names it answers to there.
     // Never created or removed by Polaris - they are declared external.

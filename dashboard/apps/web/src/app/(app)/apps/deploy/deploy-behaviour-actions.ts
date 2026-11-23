@@ -16,6 +16,8 @@ import { recordDeployAudit } from "@/lib/deploy-audit";
 import { setExternalNetworks } from "@/lib/deploy/external-networks";
 import { requireApplicationAccess } from "@/lib/deploy-project-access";
 import { externalNetworksSchema } from "@/lib/deploy/external-networks-schema";
+import type { RestartPolicy } from "@polaris/deploy";
+import { readRestartPolicy, restartPolicySchema, setRestartPolicy } from "@/lib/deploy/restart-policy";
 import {
     deployBehaviour,
     setBlockVulnerableDeploys,
@@ -112,6 +114,42 @@ export async function setExternalNetworksAction(
             targetType: "application",
             targetId: applicationId,
             metadata: { networks: parsed.data.map((entry) => entry.name) }
+        });
+        revalidatePath(DEPLOY_PATH);
+        return {};
+    } catch (caught) {
+        return failure(caught, "behaviour.saveFailed");
+    }
+}
+
+export async function restartPolicyAction(
+    applicationId: string
+): Promise<{ error?: string; policy?: RestartPolicy }> {
+    const user = await requirePermission("deploy.read");
+    try {
+        const access = await requireApplicationAccess(applicationId, user.id, "project.read");
+        return { policy: await readRestartPolicy(applicationId, access.ownerId) };
+    } catch (caught) {
+        return failure(caught, "behaviour.loadFailed");
+    }
+}
+
+export async function setRestartPolicyAction(
+    applicationId: string,
+    value: unknown
+): Promise<{ error?: string }> {
+    const user = await requirePermission("deploy.manage");
+    const parsed = restartPolicySchema.safeParse(value);
+    if (!parsed.success) return { error: await reply("behaviour.saveFailed") };
+    try {
+        const access = await requireApplicationAccess(applicationId, user.id, "service.configure");
+        if (!(await setRestartPolicy(applicationId, access.ownerId, parsed.data))) return {};
+        await recordDeployAudit({
+            actorId: user.id,
+            action: "deploy.app.restartPolicy",
+            targetType: "application",
+            targetId: applicationId,
+            metadata: { ...parsed.data }
         });
         revalidatePath(DEPLOY_PATH);
         return {};

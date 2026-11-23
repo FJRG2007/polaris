@@ -916,5 +916,21 @@
         "imageShort": "Aquí no se construye nada. La imagen corre tal cual.",
         "other": "Fijado al crearlo",
         "otherShort": "Se construye como se configuró al crear el servicio."
+    },
+    "restart": {
+        "title": "Política de reinicio",
+        "policy": "Cuando se detiene",
+        "maxRetries": "Reintentos",
+        "retriesInvalid": "Entre 1 y {max}.",
+        "option": {
+            "never": "Nunca",
+            "on-failure": "Si falla",
+            "always": "Siempre"
+        },
+        "hint": {
+            "never": "Un contenedor detenido sigue detenido.",
+            "on-failure": "Se reinicia solo si falla, hasta los reintentos fijados.",
+            "always": "Se reinicia siempre que se detiene, salvo si lo paraste tú."
+        }
     }
 }
