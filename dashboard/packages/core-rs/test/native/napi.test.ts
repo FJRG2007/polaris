@@ -209,5 +209,7 @@ describe("Node binding: phone property equivalence with the TypeScript twin", ()
             { numRuns: RUNS }
         );
         expect(core.records()).toEqual([]);
-    });
+        // 50,000 calls on each side: about 3 s on a fast machine, past vitest's
+        // default 5 s on the slower CI runners (macOS x64, Alpine arm64).
+    }, 120_000);
 });
