@@ -157,6 +157,7 @@ export function StepUpFields({
                         className="h-9"
                         autoComplete="current-password"
                         type="password"
+                        autoFocus
                         placeholder={t("stepUp.proofs.password")}
                         onChange={(event) => setValue(event.target.value)}
                     />

@@ -59,6 +59,7 @@ export function CodeInput({
     length = CODE_LENGTH,
     masked = false,
     autoSubmit = false,
+    autoFocus = true,
     ...props
 }: Omit<InputProps, "value" | "onChange" | "type" | "maxLength"> & {
     value: string;
@@ -70,12 +71,17 @@ export function CodeInput({
     masked?: boolean;
     /** Submit the form once the last digit is typed. */
     autoSubmit?: boolean;
+    /** On by default: a code box appears because a code was just sent, so
+     *  the next thing anybody does is type it. Off only where it shares a
+     *  screen with a field that comes first. */
+    autoFocus?: boolean;
 }) {
     return (
         <Input
             inputMode="numeric"
             autoComplete={masked ? "off" : "one-time-code"}
             placeholder={exampleCode(length)}
+            autoFocus={autoFocus}
             {...props}
             type={masked ? "password" : "text"}
             value={value}
