@@ -34,10 +34,21 @@
  * keeps it, closing the tab throws it away, and another tab never sees it. It
  * also outlives nothing else - the note is read once and removed, so a later
  * reload does not walk back into a call that finished an hour ago.
+ *
+ * The desktop app restarting itself is not a reload: into an update, or for a
+ * restart it offered, it starts a new process, and the tab's storage goes with
+ * the old one - every call on through a desktop update was lost that way. So in
+ * the app the page also hands the app its note while it is on a call
+ * (`holdCallForRestart`), and the app writes it down only for a restart it
+ * makes itself and hands it back once on the next start
+ * (`takeRelaunchedCall`). Quitting the app writes nothing, so opening it again
+ * never opens a microphone by itself; an app or a page from before this simply
+ * carries nothing, as before.
  */
 
 import type { CallSession } from "./call-hold";
 import { takeCarry } from "@/lib/keep-call";
+import { desktopBridge, readDesktopRelaunch } from "@/lib/desktop-bridge";
 
 const KEY = "polaris.call.resume";
 
@@ -145,22 +156,81 @@ export function takeCallNote(
     }
     if (!raw) return null;
 
+    const note = readNote(raw, viewerId);
+    if (!note || typeof note.at !== "number" || Date.now() - note.at > WINDOW_MS) return null;
+    if (note.reason === "leaving" && !reloaded() && !cameBack(note)) return { kind: "lost", session: note.session };
+    return { kind: "resume", session: note.session, video: note.video === true };
+}
+
+/** A note as written, when it is one of this viewer's calls. */
+function readNote(raw: string, viewerId: string): (Partial<Note> & { session: CallSession }) | null {
     try {
-        const note = JSON.parse(raw) as Partial<Note>;
-        const session = note.session;
+        const note = JSON.parse(raw) as Partial<Note> | null;
+        const session = note?.session;
         if (
+            !note ||
             !session ||
             typeof session.meetingId !== "string" ||
             typeof session.channelId !== "string"
         )
             return null;
         if (note.viewerId !== viewerId) return null;
-        if (typeof note.at !== "number" || Date.now() - note.at > WINDOW_MS) return null;
-        if (note.reason === "leaving" && !reloaded() && !cameBack(note)) return { kind: "lost", session };
-        return { kind: "resume", session, video: note.video === true };
+        return { ...note, session };
     } catch {
         return null;
     }
+}
+
+/** The longest note the desktop app keeps. */
+const HELD_MAX = 8192;
+
+/**
+ * Hand the desktop app the call this page is on now, or null for none, so a
+ * restart the app makes itself carries it. Nothing outside the app, or in one
+ * from before it could; the app keeps only the latest, and forgets it with the
+ * page.
+ */
+export function holdCallForRestart(session: CallSession | null, video: boolean, viewerId: string): void {
+    const bridge = desktopBridge();
+    if (!bridge?.holdCall) return;
+    let held: string | null = null;
+    if (session) {
+        const note: Note = {
+            session: { ...session, placedAt: undefined },
+            video,
+            viewerId,
+            reason: "offered",
+            at: Date.now()
+        };
+        held = JSON.stringify(note);
+        // Too long to keep is not carried, rather than cut into a note that
+        // no longer reads.
+        if (held.length > HELD_MAX) held = null;
+    }
+    void bridge.holdCall(held).catch(() => undefined);
+}
+
+/**
+ * The call the desktop app carried across a restart it made itself, once:
+ * this viewer's, and within the same window as a reload. Null anywhere else,
+ * for a start a person made, and in an app from before it could.
+ */
+export async function takeRelaunchedCall(
+    viewerId: string
+): Promise<{ session: CallSession; video: boolean } | null> {
+    const bridge = desktopBridge();
+    if (!bridge?.relaunched) return null;
+    let answer: ReturnType<typeof readDesktopRelaunch> = null;
+    try {
+        answer = readDesktopRelaunch(await bridge.relaunched());
+    } catch {
+        return null;
+    }
+    if (!answer?.call) return null;
+    const now = Date.now();
+    if (now < answer.at || now - answer.at > WINDOW_MS) return null;
+    const note = readNote(answer.call, viewerId);
+    return note ? { session: note.session, video: note.video === true } : null;
 }
 
 /** This page's address, without its fragment. */

@@ -12,6 +12,7 @@ import { followTitleBarColors } from "@/shared/title-bar";
 import { reportTextSize } from "./text-size";
 import { holdOutsideLinks } from "./outside-links";
 import { checkPageCode } from "./integrity";
+import { readRelaunch } from "@/shared/relaunch";
 import { readUpdateReady } from "@/shared/update-ready";
 import { readUpdateCheck } from "@/shared/update-check";
 import type { CallHotkey } from "@/shared/call-hotkeys";
@@ -131,6 +132,8 @@ const bridge: PolarisDesktop = {
         };
     },
     installUpdate: () => ipcRenderer.invoke(CHANNELS.installUpdate),
+    relaunched: async () => readRelaunch(await ipcRenderer.invoke(CHANNELS.relaunched)),
+    holdCall: async (note) => (await ipcRenderer.invoke(CHANNELS.holdCall, note)) === true,
     checkForUpdates: async () => readUpdateCheck(await ipcRenderer.invoke(CHANNELS.checkUpdates)),
     keyWrap: {
         seal: (data) => ipcRenderer.invoke(CHANNELS.keyWrapSeal, data),

@@ -13,7 +13,13 @@
 
 import type { CallSession } from "@/app/(app)/chat/call-hold";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { rememberCall, takeCallNote, takeRememberedCall } from "@/app/(app)/chat/call-resume";
+import {
+    holdCallForRestart,
+    rememberCall,
+    takeCallNote,
+    takeRelaunchedCall,
+    takeRememberedCall
+} from "@/app/(app)/chat/call-resume";
 
 const SESSION: CallSession = {
     meetingId: "019f8506-683f-7dd0-9c13-1e9ee9237fe3",
@@ -178,5 +184,108 @@ describe("the note a page leaves on its way out", () => {
         rememberCall(SESSION, false, VIEWER, "leaving");
         loadedBy("navigate");
         expect(takeRememberedCall(VIEWER)).toBeNull();
+    });
+});
+
+/**
+ * The desktop app as far as a call carried across its restart goes: what the
+ * page handed it while on a call, and what it hands back after a restart it
+ * made, which is the page's note only when it wrote one down.
+ */
+function desktopApp(options: { restart?: "update" | "relaunch" | null; legacy?: boolean } = {}) {
+    let held: string | null = null;
+    const bridge: Record<string, unknown> = {
+        version: "0.1.70",
+        notify: () => undefined,
+        closeNotice: () => undefined,
+        pickFolder: () => undefined,
+        pushLocal: () => undefined,
+        openWindow: () => undefined
+    };
+    if (!options.legacy) {
+        bridge.holdCall = async (note: string | null) => {
+            held = note;
+            return true;
+        };
+        bridge.relaunched = async () => {
+            if (!options.restart) return null;
+            const call = held;
+            held = null;
+            return { reason: options.restart, at: Date.now(), call };
+        };
+    }
+    (globalThis as { window?: unknown }).window = { sessionStorage: storage, polarisDesktop: bridge };
+    return { held: () => held, bridge };
+}
+
+describe("a call carried across a restart of the desktop app", () => {
+    it("walks back into the call, with the camera as it was, after an update restart", async () => {
+        desktopApp({ restart: "update" });
+        holdCallForRestart(SESSION, true, VIEWER);
+        await Promise.resolve();
+        expect(await takeRelaunchedCall(VIEWER)).toEqual({ session: SESSION, video: true });
+    });
+
+    it("never rings anybody again", async () => {
+        const app = desktopApp({ restart: "relaunch" });
+        holdCallForRestart({ ...SESSION, placedAt: Date.now() }, false, VIEWER);
+        await Promise.resolve();
+        expect(JSON.parse(app.held()!).session.placedAt).toBeUndefined();
+        expect((await takeRelaunchedCall(VIEWER))?.session.placedAt).toBeUndefined();
+    });
+
+    it("carries nothing once the call ended", async () => {
+        const app = desktopApp({ restart: "update" });
+        holdCallForRestart(SESSION, false, VIEWER);
+        holdCallForRestart(null, false, VIEWER);
+        await Promise.resolve();
+        expect(app.held()).toBeNull();
+        expect(await takeRelaunchedCall(VIEWER)).toBeNull();
+    });
+
+    it("does not rejoin when the app was quit and opened again", async () => {
+        desktopApp({ restart: null });
+        holdCallForRestart(SESSION, true, VIEWER);
+        await Promise.resolve();
+        expect(await takeRelaunchedCall(VIEWER)).toBeNull();
+    });
+
+    it("is somebody else's call after signing in as another person", async () => {
+        desktopApp({ restart: "update" });
+        holdCallForRestart(SESSION, true, VIEWER);
+        await Promise.resolve();
+        expect(await takeRelaunchedCall("019f0000-0000-7000-8000-000000000002")).toBeNull();
+    });
+
+    it("is nothing past the window, or for an answer that is not one", async () => {
+        const app = desktopApp({ restart: "update" });
+        app.bridge.relaunched = async () => ({
+            reason: "update",
+            at: Date.now() - 10 * 60 * 1000,
+            call: JSON.stringify({ session: SESSION, video: true, viewerId: VIEWER, at: Date.now() })
+        });
+        expect(await takeRelaunchedCall(VIEWER)).toBeNull();
+        app.bridge.relaunched = async () => ({ reason: "crash", at: Date.now(), call: "{}" });
+        expect(await takeRelaunchedCall(VIEWER)).toBeNull();
+        app.bridge.relaunched = async () => {
+            throw new Error("closed");
+        };
+        expect(await takeRelaunchedCall(VIEWER)).toBeNull();
+    });
+
+    it("works with an app from before it, and in a plain browser tab", async () => {
+        desktopApp({ legacy: true });
+        holdCallForRestart(SESSION, true, VIEWER);
+        expect(await takeRelaunchedCall(VIEWER)).toBeNull();
+        (globalThis as { window?: unknown }).window = { sessionStorage: storage };
+        holdCallForRestart(SESSION, true, VIEWER);
+        expect(await takeRelaunchedCall(VIEWER)).toBeNull();
+        expect(storage.size).toBe(0);
+    });
+
+    it("leaves a reload of the same tab to the tab's own note", async () => {
+        desktopApp({ restart: null });
+        rememberCall(SESSION, true, VIEWER);
+        expect(takeRememberedCall(VIEWER)).toEqual({ session: SESSION, video: true });
     });
 });

@@ -52,6 +52,7 @@ import {
     type PreferenceToggle,
     type SystemIdle
 } from "@/shared/bridge";
+import { readCallNote, type Relaunch } from "@/shared/relaunch";
 import type { ServerRow } from "@/shared/servers";
 import type { UpdateReadyState } from "./update-ready";
 import type { UpdateCheck } from "@/shared/update-check";
@@ -111,6 +112,10 @@ export interface IpcHost extends PushHost {
     readonly openServers: () => void;
     /** The update waiting for a restart, and the restart into it. */
     readonly updates: Pick<UpdateReadyState, "current" | "install" | "offer">;
+    /** Why this run began, for a page of this origin, with its call once. */
+    readonly relaunched: (origin: string) => Relaunch;
+    /** A page is on this call now (its own note of it), or on none. */
+    readonly holdCall: (sender: number, origin: string, note: string | null) => void;
     /** Ask for a newer version now, from a press. */
     readonly checkUpdates: () => Promise<UpdateCheck>;
     /** What the download a check began came to, once it has. */
@@ -633,6 +638,37 @@ export function registerIpc(host: IpcHost): void {
     });
 
     ipcMain.handle(CHANNELS.updateCurrent, (event) => (fromPolaris(event) ? host.updates.current() : null));
+
+    // Takes nothing, and answers once per run: the first Polaris page to ask
+    // after a restart the app made is the one that carries the call across it.
+    ipcMain.handle(CHANNELS.relaunched, (event, ...args: unknown[]) => {
+        if (!fromPolaris(event) || !z.tuple([]).safeParse(args).success) return null;
+        return host.relaunched(new URL(event.senderFrame!.url).origin);
+    });
+
+    // The page's own note of the call it is on, kept only to be handed back to
+    // it after a restart the app makes. Forgotten with the page.
+    const holding = new Set<number>();
+    ipcMain.handle(CHANNELS.holdCall, (event, ...args: unknown[]): boolean => {
+        if (!fromPolaris(event) || args.length !== 1) return false;
+        const note = readCallNote(args[0]);
+        if (note === undefined) return false;
+        const sender = event.sender;
+        host.holdCall(sender.id, new URL(event.senderFrame!.url).origin, note);
+        if (!holding.has(sender.id)) {
+            holding.add(sender.id);
+            sender.once("destroyed", () => {
+                holding.delete(sender.id);
+                host.holdCall(sender.id, "", null);
+            });
+            // Another page in the same window is not on this call; one that
+            // is says so again as it comes back into it.
+            sender.on("did-start-navigation", (details: { isMainFrame?: boolean; isSameDocument?: boolean; }) => {
+                if (details?.isMainFrame && !details.isSameDocument) host.holdCall(sender.id, "", null);
+            });
+        }
+        return true;
+    });
 
     // Takes nothing: what is installed is what the app downloaded and checked
     // itself, never anything the page names.

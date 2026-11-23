@@ -53,13 +53,18 @@ const updates = {
     offer: vi.fn()
 };
 
+const relaunched = vi.fn((_origin: string) => ({ reason: "update" as const, at: 1_000, call: "note" }));
+const holdCall = vi.fn();
+
 beforeEach(async () => {
     handlers.clear();
     updates.current.mockClear();
     updates.install.mockClear();
     updates.offer.mockClear();
     const { registerIpc } = await import("@/main/ipc");
-    registerIpc({ server: () => ORIGIN, updates } as unknown as IpcHost);
+    relaunched.mockClear();
+    holdCall.mockClear();
+    registerIpc({ server: () => ORIGIN, updates, relaunched, holdCall } as unknown as IpcHost);
 });
 
 describe("the update channels", () => {
@@ -108,5 +113,43 @@ describe("the update channels", () => {
         offer?.(event("polaris", "https://elsewhere.example.test/"), true);
         offer?.(event("polaris"), "yes");
         expect(updates.offer).not.toHaveBeenCalled();
+    });
+});
+
+describe("why this run began", () => {
+    it("is told to a Polaris page", () => {
+        expect(handlers.get(CHANNELS.relaunched)?.(event("polaris"))).toEqual({ reason: "update", at: 1_000, call: "note" });
+        expect(relaunched).toHaveBeenCalledWith(ORIGIN);
+    });
+
+    it("is told to nobody else, nor to a question that names anything", () => {
+        expect(handlers.get(CHANNELS.relaunched)?.(event("connect"))).toBeNull();
+        expect(handlers.get(CHANNELS.relaunched)?.(event("polaris", "https://elsewhere.example.test/"))).toBeNull();
+        expect(handlers.get(CHANNELS.relaunched)?.(event("polaris"), "update")).toBeNull();
+        expect(relaunched).not.toHaveBeenCalled();
+    });
+});
+
+describe("the call a page holds", () => {
+    it("is kept for a Polaris page, and forgotten when the page goes", () => {
+        const page = event("polaris");
+        expect(handlers.get(CHANNELS.holdCall)?.(page, "note")).toBe(true);
+        expect(holdCall).toHaveBeenLastCalledWith(page.sender.id, ORIGIN, "note");
+        expect(handlers.get(CHANNELS.holdCall)?.(page, null)).toBe(true);
+        expect(holdCall).toHaveBeenLastCalledWith(page.sender.id, ORIGIN, null);
+
+        handlers.get(CHANNELS.holdCall)?.(page, "note");
+        page.sender.emit("did-start-navigation", { isMainFrame: true, isSameDocument: true });
+        expect(holdCall).toHaveBeenLastCalledWith(page.sender.id, ORIGIN, "note");
+        page.sender.emit("did-start-navigation", { isMainFrame: true, isSameDocument: false });
+        expect(holdCall).toHaveBeenLastCalledWith(page.sender.id, "", null);
+    });
+
+    it("is refused from elsewhere, or when it is not a note", () => {
+        expect(handlers.get(CHANNELS.holdCall)?.(event("connect"), "note")).toBe(false);
+        expect(handlers.get(CHANNELS.holdCall)?.(event("polaris", "https://elsewhere.example.test/"), "note")).toBe(false);
+        expect(handlers.get(CHANNELS.holdCall)?.(event("polaris"), { session: {} })).toBe(false);
+        expect(handlers.get(CHANNELS.holdCall)?.(event("polaris"))).toBe(false);
+        expect(holdCall).not.toHaveBeenCalled();
     });
 });

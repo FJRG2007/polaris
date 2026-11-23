@@ -14,6 +14,8 @@ vi.mock("electron", () => ({ app: { getPath: () => folder.path } }));
 
 const {
     hardwareAcceleration,
+    rememberRelaunch,
+    takeRelaunch,
     rememberHardwareAcceleration,
     rememberTextSize,
     rememberToggle,
@@ -118,5 +120,29 @@ describe("the account's text size", () => {
         expect(textSize()).toBe(18);
         writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ textSize: 17 }));
         expect(textSize()).toBe(16);
+    });
+});
+
+describe("the restart the app made itself", () => {
+    const mark = { reason: "update" as const, at: 1_000, calls: [{ origin: "https://polaris.example.test", note: "{}" }] };
+
+    it("is read once, on the next start", () => {
+        rememberRelaunch(mark);
+        expect(takeRelaunch()).toEqual(mark);
+        expect(takeRelaunch()).toBeNull();
+    });
+
+    it("keeps the rest of the settings", () => {
+        setUpdateAttempted("0.1.70");
+        rememberRelaunch(mark);
+        expect(updateAttempted()).toBe("0.1.70");
+        takeRelaunch();
+        expect(updateAttempted()).toBe("0.1.70");
+    });
+
+    it("is none for a file without it, or with anything else in its place", () => {
+        expect(takeRelaunch()).toBeNull();
+        writeFileSync(join(folder.path, "settings.json"), JSON.stringify({ relaunch: { reason: "crash", at: 1_000, calls: [] } }));
+        expect(takeRelaunch()).toBeNull();
     });
 });

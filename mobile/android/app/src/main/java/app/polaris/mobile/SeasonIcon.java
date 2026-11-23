@@ -5,7 +5,6 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.media.AudioManager;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -145,10 +144,7 @@ final class SeasonIcon {
         int importance = state.importance;
         if (importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
                 || importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE) return true;
-        AudioManager audio = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
-        if (audio == null) return true;
-        int mode = audio.getMode();
-        return mode == AudioManager.MODE_IN_COMMUNICATION || mode == AudioManager.MODE_IN_CALL;
+        return InCall.now(app);
     }
 
     private static void apply(Context app, String entry) {

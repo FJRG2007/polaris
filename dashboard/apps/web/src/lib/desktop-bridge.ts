@@ -339,6 +339,31 @@ export interface PolarisDesktop {
     /** Ask for a newer version of the app now. Absent from an app older than
      *  0.1.14; what it answers is read with `readDesktopUpdateCheck`. */
     checkForUpdates?(): Promise<unknown>;
+    /** Why this run of the app began - it restarted itself into an update, or
+     *  for a restart it offered - with the note this page held of its call
+     *  then, once; null for a start nobody but a person made. Read with
+     *  `readDesktopRelaunch`. Absent, with `holdCall`, from an app older than
+     *  0.1.70. */
+    relaunched?(): Promise<unknown>;
+    /** This page's own note of the call it is on now, or null for none: the
+     *  app hands it back through `relaunched` after a restart it makes, and
+     *  never otherwise. */
+    holdCall?(note: string | null): Promise<boolean>;
+}
+
+const desktopRelaunchSchema = z.object({
+    reason: z.enum(["update", "relaunch"]),
+    at: z.number().finite(),
+    call: z.string().max(8192).nullable()
+});
+
+/** Why the desktop app's run began, as it says it. */
+export type DesktopRelaunch = z.infer<typeof desktopRelaunchSchema>;
+
+/** The app's answer as one: anything else is a start nobody but a person made. */
+export function readDesktopRelaunch(raw: unknown): DesktopRelaunch | null {
+    const parsed = desktopRelaunchSchema.safeParse(raw);
+    return parsed.success ? parsed.data : null;
 }
 
 const updateCheckSchema = z.discriminatedUnion("kind", [

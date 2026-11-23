@@ -17,6 +17,7 @@ import type { WindowPlace } from "@/shared/window-place";
 import { readServers, withServer, type SavedServer } from "@/shared/servers";
 import { DEFAULT_TEXT_SIZE, readTextSize, type TextSize } from "@/shared/text-size";
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
+import { readRelaunchMark, type RelaunchMark } from "@/shared/relaunch";
 import { DEFAULT_LAUNCHER_BINDING } from "@/shared/launcher-hotkey";
 import { SEARCH_ENGINE_IDS, type SearchEngine } from "@/shared/launcher";
 import { CLIPBOARD_KEEP_IDS, DEFAULT_CLIPBOARD_KEEP, clipboardOn, type ClipboardKeep } from "@/shared/clipboard-store";
@@ -46,6 +47,8 @@ const settingsSchema = z.object({
     servers: z.unknown().transform(readServers).catch([]),
     pushes: z.record(z.string().uuid(), pushSchema).catch({}),
     updateAttempted: z.string().max(64).nullable().catch(null),
+    // Why the app is about to start again, written just before it restarts itself.
+    relaunch: z.unknown().transform(readRelaunchMark).catch(null),
     windowPlace: placeSchema.nullable().catch(null),
     // On unless somebody turned it off, which reaches installs from before it existed.
     openAtLogin: z.boolean().catch(true),
@@ -95,6 +98,7 @@ const EMPTY: Settings = {
     servers: [],
     pushes: {},
     updateAttempted: null,
+    relaunch: null,
     windowPlace: null,
     openAtLogin: true,
     hardwareAcceleration: true,
@@ -176,6 +180,32 @@ export function updateAttempted(): string | null {
 
 export function setUpdateAttempted(version: string): void {
     save({ ...load(), updateAttempted: version });
+}
+
+/**
+ * Write down that the app is restarting itself, why, and the calls it carries,
+ * just before it does. Never in the way of the restart: a disk that refuses
+ * only costs the calls being carried across it.
+ */
+export function rememberRelaunch(mark: RelaunchMark): void {
+    try {
+        save({ ...load(), relaunch: mark });
+    } catch {
+        // The restart goes ahead; the next run is a fresh start.
+    }
+}
+
+/** What the last run wrote down before restarting, once: removed as it is
+ *  read, so a later start that nobody asked for is not taken for a restart. */
+export function takeRelaunch(): RelaunchMark | null {
+    const settings = load();
+    if (settings.relaunch === null) return null;
+    try {
+        save({ ...settings, relaunch: null });
+    } catch {
+        // Left behind, it is still only good for its window.
+    }
+    return settings.relaunch;
 }
 
 /** Where the main window was when it last moved. */

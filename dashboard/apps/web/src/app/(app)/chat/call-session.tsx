@@ -32,7 +32,7 @@ import { useChatStream } from "./use-chat-stream";
 import { playCallSound } from "@/lib/call-sounds";
 import { RecordingPanel } from "./recording-panel";
 import { usePresenceRefresh } from "@/components/presence-store";
-import { rememberCall, takeCallNote } from "./call-resume";
+import { holdCallForRestart, rememberCall, takeCallNote, takeRelaunchedCall } from "./call-resume";
 import { setCallLive, useCallLinkGuard } from "@/lib/keep-call";
 import { handsQueueSummary, type HandInQueue } from "./call-signals";
 import { ControlHint } from "./control-hint";
@@ -145,7 +145,21 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
     const toast = useToast();
     useEffect(() => {
         const back = takeCallNote(viewerId);
-        if (!back) return;
+        // Asked either way, so the app's note is spent on this page: a reload of
+        // the same tab has its own note, and a restart of the desktop app has
+        // only the app's.
+        const relaunch = takeRelaunchedCall(viewerId);
+        if (!back) {
+            let gone = false;
+            void relaunch.then((carried) => {
+                // Joined meanwhile, or the page went: nothing to walk back into.
+                if (!carried || gone || current.current.session) return;
+                enter({ ...carried.session, placedAt: undefined }, carried.video);
+            });
+            return () => {
+                gone = true;
+            };
+        }
         // Brought back, never rung again: whoever was being rung may have
         // answered while this page was loading.
         const session = { ...back.session, placedAt: undefined };
@@ -181,6 +195,15 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
      */
     const current = useRef({ session, withVideo });
     current.current = { session, withVideo };
+
+    /**
+     * The desktop app restarting itself is not a reload: a new process, and this
+     * tab's note gone with the old one. So the app is told which call this page
+     * is on, as it changes, and none once it ends.
+     */
+    useEffect(() => {
+        holdCallForRestart(session, withVideo, viewerId);
+    }, [session, withVideo, viewerId]);
     useEffect(() => {
         const note = (event: PageTransitionEvent) => {
             if (event.persisted) return;

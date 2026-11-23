@@ -132,9 +132,15 @@ final class SelfUpdate {
         }, "update-download").start();
     }
 
-    /** The app went to the background: a version waiting is installed now, with no prompt, where Android allows it. */
+    /**
+     * The app went to the background: a version waiting is installed now, with no prompt, where Android allows it.
+     *
+     * Not during a call: installing over the app ends its process, and the call in its page with it - somebody who
+     * switched to another app mid-call came back to no call at all. It waits for the next time they leave with none.
+     */
     static void installWhenLeaving(Activity activity) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || !allowed(activity)) return;
+        if (InCall.now(activity)) return;
         String version = ready(activity);
         if (version == null || prefs(activity).getBoolean("confirm", false)) return;
         // Copying the APK into the session is tens of megabytes: never on the main thread.

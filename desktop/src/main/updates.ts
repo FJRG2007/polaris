@@ -29,6 +29,7 @@
  */
 
 import { existsSync } from "node:fs";
+import { markRelaunch } from "./relaunch";
 import { replaceAppImage } from "./appimage";
 import { repository } from "../../package.json";
 import { app, autoUpdater, net, powerMonitor } from "electron";
@@ -144,9 +145,16 @@ export function watchForUpdates(found: (update: Update) => void): FirstCheck {
             found({ version: failed, page: source.page(`desktop-v${failed}`) });
         }
     };
-    const installed = (version: string, restart: () => void) => {
+    const installed = (version: string, install: () => void) => {
         announced = version;
         waiting = version;
+        // Whatever presses it - the page, the menu, the notice, the update at
+        // start - the next run is told it began as this restart, so a call that
+        // was on is walked back into rather than lost (`@/shared/relaunch`).
+        const restart = () => {
+            markRelaunch("update");
+            install();
+        };
         found({ version, page: source.page(`desktop-v${version}`), restart });
         ended(true);
         settleDownload({ kind: "ready", version });

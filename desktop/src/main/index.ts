@@ -50,6 +50,7 @@ import { describeServer, listServers, normalizeServerName, renameServer, replace
 import { setOpenAtLogin, startedAtLogin } from "./login-item";
 import { restoredPlace } from "@/shared/window-place";
 import * as settings from "./settings";
+import { cancelRelaunch, holdCall, loadRelaunch, markRelaunch, relaunched } from "./relaunch";
 import { savedServers, serverAddress, setSavedServers, setServerAddress, setUpdateAttempted, updateAttempted } from "./settings";
 import { backIndex, isServerUrl, serverPath } from "./navigation";
 import { kindOf, openLocalSheet, openLocalWindow, openPolarisWindow, type LocalSheet } from "./windows";
@@ -772,6 +773,9 @@ function start(): void {
     accelerated = settings.hardwareAcceleration();
     if (!accelerated) app.disableHardwareAcceleration();
     current = serverAddress();
+    // Whether this run is the app restarting itself, with the calls it carries:
+    // read once, before anything can restart again; handed to the pages once.
+    loadRelaunch();
     startHidden = startedAtLogin(process.argv) && settings.toggle("startMinimized");
 
     app.on("browser-window-created", (_event, window) => hideMenuBar(window));
@@ -906,6 +910,7 @@ function start(): void {
             relaunch: () => {
                 if (pushRunning()) return { ok: false, error: "A push is still running. Restart once it finishes." };
                 const appImage = process.env.APPIMAGE;
+                markRelaunch("relaunch");
                 app.relaunch(appImage ? { execPath: appImage, args: process.argv.slice(1) } : undefined);
                 app.exit(0);
                 return { ok: true };
@@ -925,6 +930,8 @@ function start(): void {
             closeConnect,
             openServers: openConnect,
             updates,
+            relaunched,
+            holdCall,
             checkUpdates: () =>
                 updateWatch?.checkNow() ??
                 Promise.resolve({ kind: "failed", reason: "Polaris is still starting. Try again in a moment." } as const),
@@ -1060,6 +1067,9 @@ function start(): void {
         if (choice === 1) {
             confirmedQuit = true;
             app.quit();
+        } else {
+            // Not restarting after all: a later start is not this restart.
+            cancelRelaunch();
         }
     });
 }

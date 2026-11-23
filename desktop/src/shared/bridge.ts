@@ -18,6 +18,7 @@
 import type { StrokeInput } from "./annotate";
 import type { ServerRow } from "./servers";
 import type { InstallRequest, InstallResult } from "./install-tools";
+import type { Relaunch } from "./relaunch";
 import type { UpdateReady } from "./update-ready";
 import type { UpdateCheck } from "./update-check";
 import type { CallHotkey, CallHotkeysInput, CallHotkeysResult } from "./call-hotkeys";
@@ -191,6 +192,14 @@ export interface PolarisDesktop {
     onUpdateReady(listener: (update: UpdateReady) => void): () => void;
     /** Restart into the waiting update. */
     installUpdate(): Promise<Outcome>;
+    /** Why this run of the app began: the app restarted itself into an update
+     *  or because a restart it offered was pressed, with the note this page
+     *  held of its call then (once), or null. Newer than `installUpdate`: a
+     *  page feature-detects it, with `holdCall`. */
+    relaunched?(): Promise<Relaunch>;
+    /** The page's own note of the call it is on now, or null for none: handed
+     *  back by `relaunched` after a restart the app makes, never otherwise. */
+    holdCall?(note: string | null): Promise<boolean>;
     /** Ask for a newer version of this app now and say what was found. Newer
      *  than `installUpdate`: a page feature-detects it. */
     checkForUpdates?(): Promise<UpdateCheck>;
@@ -697,6 +706,8 @@ export const CHANNELS = {
     titleBarColors: "desktop:title-bar-colors",
     updateReady: "desktop:update-ready",
     updateCurrent: "desktop:update-current",
+    relaunched: "desktop:relaunched",
+    holdCall: "desktop:hold-call",
     installUpdate: "desktop:install-update",
     checkUpdates: "desktop:check-updates",
     vpnDeviceName: "desktop:vpn-device-name",
