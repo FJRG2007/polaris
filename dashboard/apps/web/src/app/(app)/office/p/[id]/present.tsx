@@ -14,7 +14,7 @@ import * as core from "@polaris/core";
 import * as deck from "@/lib/office/deck";
 import * as motion from "@/lib/office/slide-motion";
 import { ShowStage, STILL, useShowPlan, type SlideMotion } from "./show-stage";
-import { Button, cn, matchShortcut } from "@polaris/ui";
+import { Button, clearWindowControls, cn, matchShortcut } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChevronLeft, ChevronRight, Maximize, Minimize, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
@@ -208,7 +208,8 @@ export function Present({
                 if (event.button === 0) next();
             }}
             className={cn(
-                "fixed inset-0 z-50 flex safe-p-0 touch-none select-none flex-col bg-black text-white outline-none",
+                clearWindowControls("fixed inset-0 z-50"),
+                "flex safe-p-0 touch-none select-none flex-col bg-black text-white outline-none",
                 !controls && "cursor-none"
             )}
         >

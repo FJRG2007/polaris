@@ -18,7 +18,7 @@ import { findGame } from "../games/registry";
 import { hostUi } from "@polaris/app-host/client";
 import { useEffect, useRef, useState } from "react";
 import { Expand, Shrink, UserPlus, Users, X } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
+import { clearWindowControls, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
 
 type InviteAccess = { ok: true } | { ok: false; reason: "denied" | "missing" };
 
@@ -85,7 +85,7 @@ export function GamePlayer({ gameId, together }: { gameId: string; together: boo
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col bg-background">
+        <div className={clearWindowControls("fixed inset-0 z-50 flex flex-col bg-background")}>
             <header className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
                 <Icon className="h-4 w-4 shrink-0" aria-hidden />
                 <h1 className="min-w-0 flex-1 truncate text-sm font-medium" title={name}>

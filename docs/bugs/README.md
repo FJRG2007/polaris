@@ -35,3 +35,4 @@ Security findings are not kept here; they live in
 | BUG-0022 | The browser extension's automatic updates leave it versions behind, with nothing on screen | Extension | Fixed, watching | dashboard/apps/extension/scripts/install.ps1 | 2026-11-23 |
 | BUG-0023 | Polaris desktop does not seem to open with the computer, or opens minutes later | Desktop | Fixed, watching | desktop/src/main/login-item.ts | 2026-11-23 |
 | BUG-0024 | Pages with a dynamic route are told their code was changed, and password fields are blocked | Integrity | Fixed, watching | dashboard/packages/core/src/integrity-paths.ts | 2026-11-23 |
+| BUG-0025 | In Polaris desktop the top right of the window shows different or missing buttons compared with the web | Desktop | Fixed, watching | dashboard/packages/ui/src/shell/window-controls.ts | 2026-11-23 |

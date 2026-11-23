@@ -122,6 +122,8 @@
        the page; 0px in a browser. Anything fixed to the top right starts below
        it, or the buttons cover it. */
     --window-controls-height: env(titlebar-area-height, 0px);
+    /* Their width, from the right edge; 0px in a browser. */
+    --window-controls-width: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
 
     /* The edges of the screen a notch, a punch-hole, a Dynamic Island, the
        status bar or the home indicator take, in whichever orientation the phone
@@ -633,8 +635,14 @@ html[data-input="touch"] :is(a, button, [role="button"], [role="tab"], [role="me
     app-region: drag;
 }
 
+/* Every item in the bar takes the pointer - a badge that only has a tooltip
+   as much as a button - and only the gaps between them move the window. A
+   drag region swallows hover too, so anything left out of this showed its
+   tooltip in a browser and never in the app. */
+.app-titlebar > * > *,
 .app-titlebar
     :is(
+        [title],
         a,
         button,
         input,
@@ -666,7 +674,7 @@ html[data-input="touch"] :is(a, button, [role="button"], [role="tab"], [role="me
 
 /* On the header's last group, so it ends where the window buttons begin. */
 .app-titlebar-end {
-    padding-inline-end: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw));
+    padding-inline-end: var(--window-controls-width);
 }
 
 /* A page with no header still has to be movable: a strip under the buttons'

@@ -53,7 +53,11 @@ export function AppShell({
                 controls start below them and inside the side insets of a phone
                 held sideways (see --safe-top in tokens.css). */}
             <header className="app-titlebar z-40 flex h-[calc(var(--header-height)+var(--header-safe-top))] shrink-0 items-center justify-between gap-1 border-b border-border bg-surface pe-[calc(0.5rem+var(--safe-end))] ps-[calc(0.5rem+var(--safe-start))] pt-[var(--header-safe-top)] sm:gap-4 sm:pe-[calc(1rem+var(--safe-end))] sm:ps-[calc(1rem+var(--safe-start))]">
-                <div className="flex min-w-0 items-center gap-1 sm:gap-3">
+                {/* When the bar runs out of room - the desktop app's window
+                    buttons take its right end at the same window width - this
+                    side gives way, cut at its own edge; it never runs on under
+                    the account controls, which always stay whole. */}
+                <div className="flex min-w-0 items-center gap-1 [overflow-clip-margin:0.5rem] [overflow:clip] sm:gap-3">
                     {navButton}
                     {mark ?? <PolarisMark className="shrink-0" nameClassName="hidden sm:inline" />}
                     {switcher}

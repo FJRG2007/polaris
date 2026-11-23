@@ -15,6 +15,7 @@ import {
     type PhoneLayout
 } from "./dialog-surface";
 import { useUiStrings } from "../lib/ui-strings";
+import { clearWindowControls } from "../shell/window-controls";
 import {
     forwardRef,
     useCallback,
@@ -88,12 +89,16 @@ export const DialogContent = forwardRef<
             <RadixDialog.Overlay className={OVERLAY} />
             <RadixDialog.Content
                 ref={attach}
-                className={cn(
-                    DIALOG_SURFACE,
-                    CENTRED_MOTION,
-                    className,
-                    // Last, so it wins over the caller's desktop placement on a phone.
-                    PHONE_CLASSES[layout]
+                // Wherever it is pinned to the top of the window, it starts below
+                // the desktop app's window buttons (clearWindowControls).
+                className={clearWindowControls(
+                    cn(
+                        DIALOG_SURFACE,
+                        CENTRED_MOTION,
+                        className,
+                        // Last, so it wins over the caller's desktop placement on a phone.
+                        PHONE_CLASSES[layout]
+                    )
                 )}
                 data-swipe-back-pane={screen}
                 {...props}

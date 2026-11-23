@@ -240,6 +240,7 @@ export {
     PHONE_TABS_HIDE,
     shellScroller
 } from "./shell/app-shell";
+export { clearWindowControls } from "./shell/window-controls";
 export { SWIPE_BACK_EDGE } from "./shell/swipe-back";
 export {
     fitBoard,

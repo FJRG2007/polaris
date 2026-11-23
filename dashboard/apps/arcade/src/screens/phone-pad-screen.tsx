@@ -12,7 +12,7 @@
 import { useArcadeT } from "./i18n";
 import { findGame } from "../games/registry";
 import { hostUi } from "@polaris/app-host/client";
-import { Button, Input, Switch } from "@polaris/ui";
+import { Button, clearWindowControls, Input, Switch } from "@polaris/ui";
 import {
     padFrame,
     stickAxes,
@@ -362,7 +362,7 @@ function PadController({ pad, onEnd }: { pad: Claimed; onEnd: (why: Problem) => 
     );
 
     return (
-        <div className="fixed inset-0 z-50 flex select-none flex-col gap-2 overflow-hidden overscroll-none bg-background px-[max(0.5rem,env(safe-area-inset-left))] pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] [-webkit-touch-callout:none] [touch-action:none]">
+        <div className={clearWindowControls("fixed inset-0 z-50 flex select-none flex-col gap-2 overflow-hidden overscroll-none bg-background px-[max(0.5rem,env(safe-area-inset-left))] pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] [-webkit-touch-callout:none] [touch-action:none]")}>
             <div className="flex min-w-0 shrink-0 items-center gap-2 pr-[env(safe-area-inset-right)]">
                 <span className="size-2 shrink-0 rounded-full bg-emerald-500" aria-hidden />
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
