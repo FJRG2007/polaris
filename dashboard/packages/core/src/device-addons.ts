@@ -269,3 +269,66 @@ export function readAddonSettingChange(settings: readonly AddonSetting[], key: u
     const fitted = settingValue(setting, value);
     return fitted === undefined ? null : { key: setting.key, value: fitted };
 }
+
+/**
+ * The client actions an add-on may run and an `action` setting may pick: the
+ * Polaris deck's own ids, so a device's buttons do what a deck key does.
+ * Recording and the soundboard are left out: the deck asks the server whether
+ * the person may record, and a sound needs a clip chosen, neither of which a
+ * device button can carry. `call.leave` is the first name `call.hangup` had.
+ */
+export const ADDON_ACTIONS = ["call.mic", "call.deafen", "call.camera", "call.share", "call.hangup", "call.leave"] as const;
+
+export type AddonAction = (typeof ADDON_ACTIONS)[number];
+
+/** An add-on's text in the reader's language, English when it ships none. */
+export function addonText(text: { readonly "en-US": string; readonly [locale: string]: string }, locale: string): string {
+    return text[locale] ?? text[locale.split("-")[0] ?? ""] ?? text["en-US"];
+}
+
+const addonStatusSchema = z.object({ state: z.enum(["connected", "sleeping", "busy", "error"]), detail: z.string().max(200).optional() });
+
+/** How an installed add-on runs: its process, or why there is none. */
+const addonRunSchema = z.union([
+    z.object({
+        state: z.enum(["starting", "running", "restarting", "failed"]),
+        crashes: z.number().int().nonnegative(),
+        status: addonStatusSchema.nullable()
+    }),
+    z.object({ state: z.enum(["disabled", "sleeping", "missing"]) })
+]);
+
+const installedAddonSchema = z.object({
+    id: z.string().regex(/^[a-z][a-z0-9-]{1,47}$/),
+    version: versionSchema,
+    enabled: z.boolean(),
+    granted: z.array(z.enum(ADDON_PERMISSIONS)).max(ADDON_PERMISSIONS.length),
+    /** Null when its files are gone or no longer read. */
+    manifest: z.unknown().transform((value) => readAddonManifest(value)),
+    update: versionSchema.nullable(),
+    run: addonRunSchema
+});
+
+/** What a desktop app answers for its add-ons (`polarisDesktop.addons.get()`). */
+export const addonsSnapshotSchema = z.object({
+    platform: z.enum(ADDON_PLATFORMS).nullable(),
+    appVersion: z.string().max(40),
+    /** Null until a signed catalog was fetched once; a broken one reads as none. */
+    catalog: z.unknown().transform((value) => (value === null ? null : readAddonCatalog(value))),
+    installed: z.array(installedAddonSchema).max(500),
+    installing: z.record(z.string(), z.object({ received: z.number().nonnegative(), total: z.number().nonnegative() }))
+});
+
+export type AddonsSnapshot = z.infer<typeof addonsSnapshotSchema>;
+export type InstalledAddon = z.infer<typeof installedAddonSchema>;
+
+export function readAddonsSnapshot(value: unknown): AddonsSnapshot | null {
+    const parsed = addonsSnapshotSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
+}
+
+/** What an install answers: done, or the reason it was not. */
+export const addonInstallResultSchema = z.union([
+    z.object({ ok: z.literal(true) }),
+    z.object({ ok: z.literal(false), reason: z.string().max(40) })
+]);

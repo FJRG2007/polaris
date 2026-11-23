@@ -24,7 +24,8 @@ import type { CallState } from "./call-state";
 import { playClip } from "./soundboard-player";
 import * as rules from "@/lib/chat/soundboard";
 import type { CallRecording } from "./call-recorder";
-import { onCallRemote, remoteStep } from "@/lib/chat/call-remote";
+import { desktopBridge } from "@/lib/desktop-bridge";
+import { emitCallRemote, onCallRemote, remoteStep } from "@/lib/chat/call-remote";
 
 export function useCallRemote(
     meetingId: string | null,
@@ -79,6 +80,17 @@ export function useCallRemote(
                     channel: played.from
                 });
             }
+        });
+    }, [meetingId]);
+
+    // A device add-on's camera or screen button, from the desktop app: the
+    // same command a deck key sends, turned the other way from where it is.
+    useEffect(() => {
+        const listen = desktopBridge()?.onCallAction;
+        if (!meetingId || !listen) return;
+        return listen((action) => {
+            const now = latest.current.call;
+            emitCallRemote(action === "camera" ? { command: "camera", on: !now.cameraOn } : { command: "share", on: !now.sharing });
         });
     }, [meetingId]);
 

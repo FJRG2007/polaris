@@ -35,6 +35,7 @@ import {
     Container,
     Database,
     Download,
+    Puzzle,
     EyeOff,
     Earth,
     FileText,
@@ -2478,6 +2479,16 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "text size",
                 "accessibility"
             ]
+        },
+        // Hardware support the desktop app installs on this computer only.
+        // Out of the rail: it does nothing in a browser, so only the app's own
+        // ways in (its "device found" notice) and search reach it.
+        {
+            label: "Device add-ons", // i18n-ignore
+            href: "/account/addons",
+            icon: Puzzle,
+            keywords: ["add-on", "addon", "plugin", "extension", "device", "usb", "hercules", "stream 100", "mixer"],
+            hidden: true
         },
         {
             label: "Keyboard shortcuts", // i18n-ignore

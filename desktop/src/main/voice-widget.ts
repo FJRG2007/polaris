@@ -31,6 +31,7 @@ import {
     lockKeys,
     widgetSize,
     widgetVisible,
+    type CallPageAction,
     type VoiceAction,
     type VoiceState,
     type WidgetLook,
@@ -120,6 +121,13 @@ export function voiceStateNow(): VoiceState {
 export function voiceWidgetAction(action: VoiceAction): boolean {
     if (!holder || holder.isDestroyed() || !state) return false;
     holder.send(CHANNELS.voiceAction, action);
+    return true;
+}
+
+/** A call action the widget has no button for, sent to the same page (`onCallAction`). */
+export function callPageAction(action: CallPageAction): boolean {
+    if (!holder || holder.isDestroyed() || !state) return false;
+    holder.send(CHANNELS.callAction, action);
     return true;
 }
 

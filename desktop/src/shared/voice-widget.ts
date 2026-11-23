@@ -57,6 +57,9 @@ export const voiceActionSchema = z.enum(["mic", "deafen", "leave"]);
 
 export type VoiceAction = z.infer<typeof voiceActionSchema>;
 
+/** A call action from somewhere other than the widget (a device add-on), for the page holding the call. */
+export type CallPageAction = "camera" | "share";
+
 /** What the widget window is told to draw. */
 export interface WidgetView {
     readonly state: NonNullable<VoiceState>;

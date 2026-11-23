@@ -287,6 +287,24 @@ export interface PolarisDesktop {
     readonly voiceWidgetPictures?: boolean;
     /** Hear a press on the voice widget's buttons. Answers the way to stop. */
     onVoiceAction?(listener: (action: "mic" | "deafen" | "leave") => void): () => void;
+    /** Hear a device add-on's camera or screen button. Absent from an app older than add-ons. */
+    onCallAction?(listener: (action: "camera" | "share") => void): () => void;
+    /**
+     * The device add-ons on this computer, for Settings > Device add-ons.
+     * Every answer is read through `@polaris/core/device-addons`; absent from
+     * an app older than them.
+     */
+    addons?: {
+        get(): Promise<unknown>;
+        refresh(): Promise<void>;
+        install(id: string, accepted: readonly string[]): Promise<unknown>;
+        uninstall(id: string): Promise<boolean>;
+        setEnabled(id: string, enabled: boolean): Promise<boolean>;
+        settings(id: string): Promise<unknown>;
+        setSetting(id: string, key: string, value: unknown): Promise<unknown>;
+        onChange(listener: () => void): () => void;
+        onOpen(listener: (id: string) => void): () => void;
+    };
     /** The window that adds and switches servers. Absent from an older app. */
     openServers?(): Promise<void>;
     /** Windows' Default apps at Polaris, to pick it for mailto links; false

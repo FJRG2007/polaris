@@ -11,7 +11,7 @@ import type { AddonAction } from "@/shared/addon-protocol";
 import { watchUsb, type UsbWatch } from "./presence";
 import type { AddonChild, WantedAddon } from "./supervisor";
 import { createAddonManager, type AddonManager } from "./manager";
-import { voiceStateNow, voiceWidgetAction } from "../voice-widget";
+import { callPageAction, voiceStateNow, voiceWidgetAction } from "../voice-widget";
 import { ADDON_PERMISSIONS, addonPlatform, type UsbDevice } from "@polaris/core/device-addons";
 import { app, ipcMain, net, Notification, utilityProcess, webContents, type IpcMainInvokeEvent } from "electron";
 
@@ -46,6 +46,28 @@ function fork(wanted: WantedAddon): AddonChild {
     };
 }
 
+/**
+ * One of ADDON_ACTIONS, done by the page holding the call. Mute, deafen and
+ * hanging up go the way the voice widget's buttons do, which every page that
+ * reports a call understands; the camera and the screen go on a channel of
+ * their own, so a page older than it hears nothing rather than something else.
+ */
+function runAddonAction(action: AddonAction): boolean {
+    switch (action) {
+        case "call.mic":
+            return voiceWidgetAction("mic");
+        case "call.deafen":
+            return voiceWidgetAction("deafen");
+        case "call.hangup":
+        case "call.leave":
+            return voiceWidgetAction("leave");
+        case "call.camera":
+            return callPageAction("camera");
+        case "call.share":
+            return callPageAction("share");
+    }
+}
+
 function broadcast(channel: string, ...args: unknown[]): void {
     for (const contents of webContents.getAllWebContents()) if (!contents.isDestroyed()) contents.send(channel, ...args);
 }
@@ -61,9 +83,8 @@ export function startDeviceAddons(showPolaris: () => void): AddonManager {
         call: async (id, method, params) => {
             if (method === "settings.get") return manager?.settings(id) ?? null;
             if (method === "polaris.state") return { call: voiceStateNow() };
-            // judgeCall checked the shape: "call.mic", "call.deafen" or "call.leave".
-            const action = (params as { action: AddonAction }).action;
-            return voiceWidgetAction(action.slice("call.".length) as "mic" | "deafen" | "leave");
+            // judgeCall checked the shape: one of ADDON_ACTIONS.
+            return runAddonAction((params as { action: AddonAction }).action);
         },
         devices: () => devices,
         offer: (entry, deviceName) => {

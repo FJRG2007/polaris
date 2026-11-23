@@ -2456,5 +2456,113 @@
             "cannotAnswer": "That request cannot be answered.",
             "noScopes": "Your account cannot use Polar, which is all Polaris Terminal asks for. Ask an administrator for access."
         }
+    },
+    "addons": {
+        "page": {
+            "title": "Device add-ons",
+            "intro": "Support for hardware you plug into this computer. Installed here only, and works on any server.",
+            "browser": "Add-ons run in the Polaris desktop app. Open this page there to install them.",
+            "download": "Get the desktop app",
+            "oldApp": "This version of the desktop app has no add-ons. Update it to get them.",
+            "back": "Device add-ons"
+        },
+        "tabs": {
+            "browse": "Browse",
+            "installed": "Installed",
+            "updates": "Updates"
+        },
+        "filters": {
+            "search": "Search add-ons",
+            "categories": "Categories"
+        },
+        "category": {
+            "all": "All",
+            "devices": "Devices",
+            "audio": "Audio",
+            "streaming": "Streaming",
+            "input": "Input",
+            "other": "Other"
+        },
+        "empty": {
+            "catalog": "No add-ons are published yet.",
+            "offline": "The add-on list could not be reached. Installed add-ons keep working.",
+            "installed": "Nothing installed on this computer.",
+            "updates": "Everything is up to date.",
+            "noMatch": "No add-on matches \"{query}\"."
+        },
+        "card": {
+            "install": "Install",
+            "update": "Update to {version}",
+            "open": "Configure",
+            "installing": "Installing {percent}%",
+            "preparing": "Installing",
+            "platform": "Not for this computer",
+            "appVersion": "Needs app {version}",
+            "by": "By {publisher}",
+            "more": "More for {name}",
+            "details": "Details",
+            "icon": "{name} icon"
+        },
+        "status": {
+            "connected": "Connected",
+            "sleeping": "Unplugged",
+            "busy": "In use elsewhere",
+            "error": "Not working",
+            "starting": "Starting",
+            "running": "Running",
+            "restarting": "Restarting",
+            "failed": "Stopped after crashing",
+            "disabled": "Turned off",
+            "missing": "Files missing, reinstall it"
+        },
+        "permission": {
+            "usb": "Talk to the USB devices it supports",
+            "audioSessions": "Change the volume of apps on this computer",
+            "display": "Draw on the device's own screen",
+            "polarisActions": "Run call actions: mute, camera, hang up",
+            "network": "Reach the internet"
+        },
+        "install": {
+            "title": "Install {name}?",
+            "asks": "It will be allowed to:",
+            "none": "It asks for no permissions.",
+            "size": "Download: {size}",
+            "confirm": "Install"
+        },
+        "failure": {
+            "platform": "It has no version for this computer.",
+            "appVersion": "It needs a newer desktop app. Update the app first.",
+            "download": "The download failed. Try again.",
+            "integrity": "The download did not match what was published, so nothing was installed.",
+            "other": "It could not be installed. Try again."
+        },
+        "detail": {
+            "version": "Version",
+            "size": "Size",
+            "published": "Published",
+            "publisher": "Publisher",
+            "permissions": "Permissions",
+            "changelog": "What's new",
+            "screenshot": "{name} screenshot {number}",
+            "settings": "Settings",
+            "noSettings": "Nothing to set up.",
+            "enabled": "Use this add-on",
+            "uninstall": "Uninstall",
+            "uninstallTitle": "Uninstall {name}?",
+            "uninstallBody": "Its files and settings are removed from this computer.",
+            "notFound": "This add-on is not on this computer or in the list.",
+            "installFirst": "Install it to set it up.",
+            "saveFailed": "That change was not saved.",
+            "toggleFailed": "It could not be switched."
+        },
+        "action": {
+            "none": "Nothing",
+            "mic": "Mute",
+            "deafen": "Deafen",
+            "camera": "Camera",
+            "share": "Share screen",
+            "hangup": "Hang up",
+            "leave": "Hang up"
+        }
     }
 }

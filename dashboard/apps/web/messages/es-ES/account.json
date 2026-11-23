@@ -2456,5 +2456,113 @@
             "cannotAnswer": "No se puede responder a esa solicitud.",
             "noScopes": "Tu cuenta no puede usar Polar, que es lo único que pide Polaris Terminal. Pide acceso a un administrador."
         }
+    },
+    "addons": {
+        "page": {
+            "title": "Complementos",
+            "intro": "Soporte para el hardware que conectas a este equipo. Solo se instala aquí y va con cualquier servidor.",
+            "browser": "Los complementos van en la app de escritorio de Polaris. Abre esta página allí para instalarlos.",
+            "download": "Descargar la app",
+            "oldApp": "Esta versión de la app no tiene complementos. Actualízala para tenerlos.",
+            "back": "Complementos"
+        },
+        "tabs": {
+            "browse": "Explorar",
+            "installed": "Instalados",
+            "updates": "Novedades"
+        },
+        "filters": {
+            "search": "Buscar complementos",
+            "categories": "Categorías"
+        },
+        "category": {
+            "all": "Todos",
+            "devices": "Equipos",
+            "audio": "Audio",
+            "streaming": "Directos",
+            "input": "Entrada",
+            "other": "Otros"
+        },
+        "empty": {
+            "catalog": "Aún no hay complementos publicados.",
+            "offline": "No se pudo cargar la lista. Los instalados siguen funcionando.",
+            "installed": "Nada instalado en este equipo.",
+            "updates": "Todo está al día.",
+            "noMatch": "Ningún complemento coincide con \"{query}\"."
+        },
+        "card": {
+            "install": "Instalar",
+            "update": "Actualizar a {version}",
+            "open": "Configurar",
+            "installing": "Instalando {percent}%",
+            "preparing": "Instalando",
+            "platform": "No para este equipo",
+            "appVersion": "Requiere app {version}",
+            "by": "De {publisher}",
+            "more": "Más de {name}",
+            "details": "Detalles",
+            "icon": "Icono de {name}"
+        },
+        "status": {
+            "connected": "Conectado",
+            "sleeping": "Desconectado",
+            "busy": "En uso por otra app",
+            "error": "No funciona",
+            "starting": "Iniciando",
+            "running": "En marcha",
+            "restarting": "Reiniciando",
+            "failed": "Detenido por fallos",
+            "disabled": "Desactivado",
+            "missing": "Faltan archivos, reinstálalo"
+        },
+        "permission": {
+            "usb": "Hablar con los USB que admite",
+            "audioSessions": "Cambiar el volumen de las apps del equipo",
+            "display": "Dibujar en la pantalla del propio equipo",
+            "polarisActions": "Usar acciones de llamada: silenciar, cámara, colgar",
+            "network": "Acceder a internet"
+        },
+        "install": {
+            "title": "¿Instalar {name}?",
+            "asks": "Podrá:",
+            "none": "No pide ningún permiso.",
+            "size": "Descarga: {size}",
+            "confirm": "Instalar"
+        },
+        "failure": {
+            "platform": "No tiene versión para este equipo.",
+            "appVersion": "Necesita una app más nueva. Actualiza la app primero.",
+            "download": "Falló la descarga. Inténtalo de nuevo.",
+            "integrity": "La descarga no coincidía con lo publicado y no se instaló nada.",
+            "other": "No se pudo instalar. Inténtalo de nuevo."
+        },
+        "detail": {
+            "version": "Versión",
+            "size": "Tamaño",
+            "published": "Publicado",
+            "publisher": "Autor",
+            "permissions": "Permisos",
+            "changelog": "Novedades",
+            "screenshot": "Captura {number} de {name}",
+            "settings": "Ajustes",
+            "noSettings": "Nada que configurar.",
+            "enabled": "Usar este complemento",
+            "uninstall": "Desinstalar",
+            "uninstallTitle": "¿Desinstalar {name}?",
+            "uninstallBody": "Se borran sus archivos y ajustes de este equipo.",
+            "notFound": "Este complemento no está en el equipo ni en la lista.",
+            "installFirst": "Instálalo para configurarlo.",
+            "saveFailed": "No se guardó el cambio.",
+            "toggleFailed": "No se pudo cambiar."
+        },
+        "action": {
+            "none": "Nada",
+            "mic": "Silenciar",
+            "deafen": "Ensordecer",
+            "camera": "Cámara",
+            "share": "Compartir pantalla",
+            "hangup": "Colgar",
+            "leave": "Colgar"
+        }
     }
 }

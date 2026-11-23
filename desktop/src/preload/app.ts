@@ -16,7 +16,7 @@ import { readRelaunch } from "@/shared/relaunch";
 import { readUpdateReady } from "@/shared/update-ready";
 import { readUpdateCheck } from "@/shared/update-check";
 import type { CallHotkey } from "@/shared/call-hotkeys";
-import type { VoiceAction } from "@/shared/voice-widget";
+import type { CallPageAction, VoiceAction } from "@/shared/voice-widget";
 import {
     CHANNELS,
     VERSION_ARGUMENT,
@@ -106,6 +106,13 @@ const bridge: PolarisDesktop = {
         ipcRenderer.on(CHANNELS.voiceAction, heard);
         return () => {
             ipcRenderer.removeListener(CHANNELS.voiceAction, heard);
+        };
+    },
+    onCallAction: (listener) => {
+        const heard = (_event: unknown, action: CallPageAction) => listener(action);
+        ipcRenderer.on(CHANNELS.callAction, heard);
+        return () => {
+            ipcRenderer.removeListener(CHANNELS.callAction, heard);
         };
     },
     openServers: () => ipcRenderer.invoke(CHANNELS.openServers),

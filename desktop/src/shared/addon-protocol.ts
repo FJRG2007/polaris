@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import type { AddonPermission, AddonSettingValue, UsbDevice } from "@polaris/core/device-addons";
+import { ADDON_ACTIONS, type AddonPermission, type AddonSettingValue, type UsbDevice } from "@polaris/core/device-addons";
 
 /** The methods an add-on may call, and the permission each one needs (null: none). */
 export const ADDON_METHODS = {
@@ -41,10 +41,7 @@ export const addonMessageSchema = z.discriminatedUnion("type", [
 
 export type AddonMessage = z.infer<typeof addonMessageSchema>;
 
-/** The app actions an add-on can run, the same ones the voice widget and call keys run. */
-export const ADDON_ACTIONS = ["call.mic", "call.deafen", "call.leave"] as const;
-
-export type AddonAction = (typeof ADDON_ACTIONS)[number];
+export { ADDON_ACTIONS, type AddonAction } from "@polaris/core/device-addons";
 
 /** The parameters of each method, checked before the app acts on them. */
 export const ADDON_PARAMS = {

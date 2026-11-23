@@ -23,7 +23,7 @@ import type { Relaunch } from "./relaunch";
 import type { UpdateReady } from "./update-ready";
 import type { UpdateCheck } from "./update-check";
 import type { CallHotkey, CallHotkeysInput, CallHotkeysResult } from "./call-hotkeys";
-import type { LookChange, VoiceAction, VoiceState, WidgetLook, WidgetView } from "./voice-widget";
+import type { CallPageAction, LookChange, VoiceAction, VoiceState, WidgetLook, WidgetView } from "./voice-widget";
 import type { SearchEngine } from "./launcher";
 import type { ClipboardKeep } from "./clipboard-store";
 
@@ -149,6 +149,8 @@ export interface PolarisDesktop {
     readonly voiceWidgetPictures: true;
     /** Hear a press on the voice widget's buttons. Answers the way to stop. */
     onVoiceAction(listener: (action: VoiceAction) => void): () => void;
+    /** Hear a device add-on's camera or screen button, for the page holding the call. Answers the way to stop. */
+    onCallAction(listener: (action: CallPageAction) => void): () => void;
     /** Open the app's window for adding and switching servers. */
     openServers(): Promise<void>;
     /**
@@ -749,6 +751,7 @@ export const CHANNELS = {
     callHotkey: "desktop:call-hotkey",
     voiceState: "desktop:voice-state",
     voiceAction: "desktop:voice-action",
+    callAction: "desktop:call-action",
     widgetView: "desktop:widget-view",
     widgetAction: "desktop:widget-action",
     openServers: "desktop:open-servers",

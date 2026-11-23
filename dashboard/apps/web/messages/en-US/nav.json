@@ -223,6 +223,7 @@
         }
     },
     "labels": {
+        "Device add-ons": "Device add-ons",
         "Network filter": "Network filter",
         "Your computers": "Your computers",
         "Your terminals": "Your terminals",

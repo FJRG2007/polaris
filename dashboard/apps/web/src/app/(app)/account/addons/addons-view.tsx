@@ -1,0 +1,535 @@
+"use client";
+
+/**
+ * Device add-ons: the store (Browse / Installed / Updates, search and
+ * categories) and each add-on's own page, drawn from what the desktop app
+ * answers (`lib/device-addons-client`). Built from the marketplace's own store
+ * pieces (`@polaris/ui/store-card`, `store-layout`), so it reads as the same
+ * store. An add-on's settings are its manifest's declarative list, drawn with
+ * Polaris's own controls - no add-on markup reaches this page.
+ */
+
+import Link from "next/link";
+import { formatBytes } from "@polaris/core";
+import { Loader2, Package } from "lucide-react";
+import { useConfirm } from "@/components/confirm-dialog";
+import { StoreCard, StatusBadge } from "@polaris/ui/store-card";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import { OverflowMenu, StoreFilters, StoreNoMatch, StoreSection } from "@polaris/ui/store-layout";
+import { Badge, Button, ControlSlider, SegmentedControl, Select, Skeleton, Switch, useToast } from "@polaris/ui";
+import {
+    ADDON_ACTIONS,
+    ADDON_CATEGORIES,
+    addonText,
+    readAddonSettingValues,
+    type AddonEntry,
+    type AddonManifest,
+    type AddonPermission,
+    type AddonSetting,
+    type AddonSettingValue,
+    type AddonsSnapshot,
+    type InstalledAddon
+} from "@polaris/core/device-addons";
+import {
+    addonListings,
+    addonOffer,
+    useAddons,
+    useInstallAddon,
+    type AddonListing,
+    type AddonOffer,
+    type AddonsBridge,
+    type AddonsState
+} from "@/lib/device-addons-client";
+
+type Words = ReturnType<typeof useTranslations<"account">>;
+type Tab = "browse" | "installed" | "updates";
+type Category = "" | (typeof ADDON_CATEGORIES)[number];
+
+const PERMISSION_KEY: Record<AddonPermission, string> = {
+    usb: "usb",
+    "audio-sessions": "audioSessions",
+    display: "display",
+    "polaris-actions": "polarisActions",
+    network: "network"
+};
+
+/** The picker's list: `call.leave` reads as hang up, so it is offered once, as `call.hangup`. */
+const PICKABLE_ACTIONS = ADDON_ACTIONS.filter((action) => action !== "call.leave");
+
+function say(t: Words, key: string, values?: Record<string, string | number>): string {
+    return (t as unknown as (key: string, values?: Record<string, string | number>) => string)(`addons.${key}`, values);
+}
+
+function manifestOf(listing: AddonListing): AddonManifest | null {
+    return listing.entry ?? listing.installed?.manifest ?? null;
+}
+
+function runLabel(t: Words, installed: InstalledAddon): { status: string; label: string } {
+    const run = installed.run;
+    if ("status" in run && run.status && (run.state === "running" || run.state === "starting")) {
+        return { status: run.status.state === "connected" ? "running" : run.status.state === "error" ? "failed" : "idle", label: run.status.detail ?? say(t, `status.${run.status.state}`) };
+    }
+    return { status: run.state === "running" ? "running" : run.state === "failed" || run.state === "missing" ? "failed" : "idle", label: say(t, `status.${run.state}`) };
+}
+
+function AddonIcon({ entry, size }: { entry: AddonEntry | null; size: number }) {
+    const t = useTranslations("account");
+    if (entry?.icon) {
+        return (
+            // eslint-disable-next-line @next/next/no-img-element -- a release asset, cached by the browser
+            <img src={entry.icon} alt={say(t, "card.icon", { name: entry.name })} width={size} height={size} loading="lazy" className="shrink-0 rounded-md" />
+        );
+    }
+    return (
+        <span className="grid shrink-0 place-items-center rounded-md bg-muted text-muted-foreground" style={{ width: size, height: size }} aria-hidden>
+            <Package style={{ width: size * 0.5, height: size * 0.5 }} />
+        </span>
+    );
+}
+
+/** The leading action for one add-on: install, its progress, update, configure, or why it cannot. */
+function OfferButton({ offer, href, onInstall, size = "sm" }: { offer: AddonOffer; href: string; onInstall: () => void; size?: "sm" | "md" }) {
+    const t = useTranslations("account");
+    switch (offer.kind) {
+        case "install":
+            return (
+                <Button size={size} onClick={onInstall}>
+                    {say(t, "card.install")}
+                </Button>
+            );
+        case "installing":
+            return (
+                <Button size={size} disabled aria-busy>
+                    <Loader2 className="size-4 animate-spin" />
+                    {offer.percent === null ? say(t, "card.preparing") : say(t, "card.installing", { percent: offer.percent })}
+                </Button>
+            );
+        case "update":
+            return (
+                <Button size={size} onClick={onInstall}>
+                    {say(t, "card.update", { version: offer.version })}
+                </Button>
+            );
+        case "installed":
+            return (
+                <Button asChild size={size} variant="secondary">
+                    <Link href={href}>{say(t, "card.open")}</Link>
+                </Button>
+            );
+        case "unavailable":
+            return (
+                <Badge className="text-muted-foreground">
+                    {offer.reason === "platform" ? say(t, "card.platform") : say(t, "card.appVersion", { version: offer.needs })}
+                </Badge>
+            );
+    }
+}
+
+/** Install with its permissions read out first; a failure is said in a toast. */
+function useInstallFlow(bridge: AddonsBridge | null): [(entry: AddonEntry) => void, ReactNode] {
+    const t = useTranslations("account");
+    const toast = useToast();
+    const [confirm, element] = useConfirm();
+    const install = useInstallAddon(bridge);
+    const start = (entry: AddonEntry) => {
+        const asks = entry.permissions.map((permission) => `- ${say(t, `permission.${PERMISSION_KEY[permission]}`)}`);
+        const description = [
+            asks.length > 0 ? say(t, "install.asks") : say(t, "install.none"),
+            ...asks,
+            ""
+        ].join("\n");
+        void (async () => {
+            const ok = await confirm({ title: say(t, "install.title", { name: entry.name }), description, confirmLabel: say(t, "install.confirm") });
+            if (!ok) return;
+            const problem = await install(entry);
+            if (problem) toast.show({ title: say(t, `failure.${problem === "app-version" ? "appVersion" : problem}`) });
+        })();
+    };
+    return [start, element];
+}
+
+function hrefOf(id: string): string {
+    return `/account/addons/${encodeURIComponent(id)}`;
+}
+
+function Notice({ children, action }: { children: ReactNode; action?: ReactNode }) {
+    return (
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
+            <span className="min-w-0">{children}</span>
+            {action}
+        </div>
+    );
+}
+
+function NotHere({ state }: { state: AddonsState }) {
+    const t = useTranslations("account");
+    if (state.kind === "browser") {
+        return (
+            <Notice
+                action={
+                    <Button asChild size="sm" variant="secondary">
+                        <Link href="/account/downloads">{say(t, "page.download")}</Link>
+                    </Button>
+                }
+            >
+                {say(t, "page.browser")}
+            </Notice>
+        );
+    }
+    if (state.kind === "old-app") return <Notice>{say(t, "page.oldApp")}</Notice>;
+    return null;
+}
+
+function StoreSkeleton() {
+    return (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" aria-hidden>
+            <Skeleton className="h-40 w-full" />
+            <Skeleton className="h-40 w-full" />
+        </div>
+    );
+}
+
+function AddonCard({ listing, snapshot, onInstall }: { listing: AddonListing; snapshot: AddonsSnapshot; onInstall: (entry: AddonEntry) => void }) {
+    const t = useTranslations("account");
+    const manifest = manifestOf(listing);
+    if (!manifest) return null;
+    const offer = addonOffer(snapshot, listing.id, listing.entry);
+    const run = listing.installed ? runLabel(t, listing.installed) : null;
+    const href = hrefOf(listing.id);
+    return (
+        <StoreCard
+            preview={
+                <div className="grid aspect-[16/10] place-items-center bg-muted">
+                    <AddonIcon entry={listing.entry} size={56} />
+                </div>
+            }
+            mark={<AddonIcon entry={listing.entry} size={40} />}
+            title={
+                <Link href={href} className="block truncate font-medium hover:underline" title={manifest.name}>
+                    {manifest.name}
+                </Link>
+            }
+            byline={say(t, "card.by", { publisher: manifest.publisher })}
+            summary={manifest.summary}
+            badges={<Badge>{say(t, `category.${manifest.category}`)}</Badge>}
+            status={run ? <StatusBadge status={run.status} label={run.label} /> : null}
+            actions={
+                <>
+                    <OfferButton offer={offer} href={href} onInstall={() => listing.entry && onInstall(listing.entry)} />
+                    <OverflowMenu label={say(t, "card.more", { name: manifest.name })} entries={[{ key: "details", label: say(t, "card.details"), onSelect: () => window.location.assign(href) }]} />
+                </>
+            }
+        />
+    );
+}
+
+export function AddonsStore() {
+    const t = useTranslations("account");
+    const state = useAddons();
+    const [tab, setTab] = useState<Tab>("browse");
+    const [query, setQuery] = useState("");
+    const [category, setCategory] = useState<Category>("");
+    const [startInstall, installDialog] = useInstallFlow(state.kind === "ready" || state.kind === "loading" ? state.bridge : null);
+
+    const snapshot = state.kind === "ready" ? state.snapshot : null;
+    const listings = useMemo(() => (snapshot ? addonListings(snapshot) : []), [snapshot]);
+    const needle = query.trim().toLowerCase();
+    const shown = listings.filter((listing) => {
+        const manifest = manifestOf(listing);
+        if (!manifest) return false;
+        if (tab === "installed" && !listing.installed) return false;
+        if (tab === "updates" && !listing.installed?.update) return false;
+        if (category && manifest.category !== category) return false;
+        return !needle || `${manifest.name} ${manifest.publisher} ${manifest.summary}`.toLowerCase().includes(needle);
+    });
+    const updates = listings.filter((listing) => listing.installed?.update).length;
+
+    let body: ReactNode;
+    if (state.kind === "browser" || state.kind === "old-app") body = <NotHere state={state} />;
+    else if (!snapshot) body = <StoreSkeleton />;
+    else if (shown.length > 0) {
+        body = (
+            <StoreSection label={say(t, `tabs.${tab}`)}>
+                {shown.map((listing) => (
+                    <AddonCard key={listing.id} listing={listing} snapshot={snapshot} onInstall={startInstall} />
+                ))}
+            </StoreSection>
+        );
+    } else if (needle || category) body = <StoreNoMatch>{say(t, "empty.noMatch", { query: query.trim() })}</StoreNoMatch>;
+    else if (tab === "installed") body = <StoreNoMatch>{say(t, "empty.installed")}</StoreNoMatch>;
+    else if (tab === "updates") body = <StoreNoMatch>{say(t, "empty.updates")}</StoreNoMatch>;
+    else body = <StoreNoMatch>{snapshot.catalog ? say(t, "empty.catalog") : say(t, "empty.offline")}</StoreNoMatch>;
+
+    return (
+        <div className="flex min-w-0 flex-col gap-4">
+            <SegmentedControl
+                value={tab}
+                onValueChange={(value: string) => setTab(value as Tab)}
+                aria-label={say(t, "page.title")}
+                options={[
+                    { value: "browse", label: say(t, "tabs.browse") },
+                    { value: "installed", label: say(t, "tabs.installed") },
+                    { value: "updates", label: updates > 0 ? `${say(t, "tabs.updates")} (${updates})` : say(t, "tabs.updates") }
+                ]}
+            />
+            <StoreFilters
+                query={query}
+                onQueryChange={setQuery}
+                category={category}
+                onCategoryChange={setCategory}
+                categories={[{ value: "" as Category, label: say(t, "category.all") }, ...ADDON_CATEGORIES.map((value) => ({ value, label: say(t, `category.${value}`) }))]}
+                words={{ search: say(t, "filters.search"), categories: say(t, "filters.categories") }}
+            />
+            {body}
+            {installDialog}
+        </div>
+    );
+}
+
+/** One declared setting, drawn with Polaris's own control for its kind. */
+function SettingRow({ setting, value, locale, onChange }: { setting: AddonSetting; value: AddonSettingValue; locale: string; onChange: (value: AddonSettingValue) => void }) {
+    const t = useTranslations("account");
+    const label = addonText(setting.label, locale);
+    const hint = setting.hint ? addonText(setting.hint, locale) : null;
+    let control: ReactNode;
+    switch (setting.kind) {
+        case "toggle":
+            control = <Switch checked={value === true} onChange={onChange} aria-label={label} />;
+            break;
+        case "choice":
+            control = (
+                <Select
+                    value={typeof value === "string" ? value : setting.default}
+                    onValueChange={onChange}
+                    aria-label={label}
+                    className="w-48"
+                    options={setting.options.map((option) => ({ value: option.value, label: addonText(option.label, locale) }))}
+                />
+            );
+            break;
+        case "range":
+            control = (
+                <ControlSlider
+                    className="w-48"
+                    value={typeof value === "number" ? value : setting.default}
+                    min={setting.min}
+                    max={setting.max}
+                    step={setting.step}
+                    label={label}
+                    onCommit={onChange}
+                />
+            );
+            break;
+        case "action":
+            control = (
+                <Select
+                    value={typeof value === "string" ? (value === "call.leave" ? "call.hangup" : value) : "none"}
+                    onValueChange={(next) => onChange(next === "none" ? null : next)}
+                    aria-label={label}
+                    className="w-48"
+                    options={[{ value: "none", label: say(t, "action.none") }, ...PICKABLE_ACTIONS.map((action) => ({ value: action, label: say(t, `action.${action.slice("call.".length)}`) }))]}
+                />
+            );
+            break;
+    }
+    return (
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 py-2">
+            <div className="min-w-0 flex-1 basis-48">
+                <p className="truncate text-sm font-medium" title={label}>
+                    {label}
+                </p>
+                {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+            </div>
+            {control}
+        </div>
+    );
+}
+
+/** The settings, changed at once on the page and put back when the app refuses. */
+function AddonSettings({ bridge, manifest }: { bridge: AddonsBridge; manifest: AddonManifest }) {
+    const t = useTranslations("account");
+    const locale = useLocale();
+    const toast = useToast();
+    const [values, setValues] = useState<Record<string, AddonSettingValue> | null>(null);
+
+    useEffect(() => {
+        let live = true;
+        void bridge
+            .settings(manifest.id)
+            .then((stored) => {
+                if (live && stored) setValues(readAddonSettingValues(manifest.settings, stored));
+            })
+            .catch(() => undefined);
+        return () => {
+            live = false;
+        };
+    }, [bridge, manifest]);
+
+    if (manifest.settings.length === 0) return <p className="text-sm text-muted-foreground">{say(t, "detail.noSettings")}</p>;
+    if (!values) return <Skeleton className="h-24 w-full" />;
+
+    const change = (key: string, value: AddonSettingValue) => {
+        if (values[key] === value) return;
+        const before = values;
+        setValues({ ...values, [key]: value });
+        void bridge
+            .setSetting(manifest.id, key, value)
+            .then((after) => {
+                if (!after) throw new Error("refused");
+                setValues(readAddonSettingValues(manifest.settings, after));
+            })
+            .catch(() => {
+                setValues(before);
+                toast.show({ title: say(t, "detail.saveFailed") });
+            });
+    };
+
+    return (
+        <div className="flex min-w-0 flex-col divide-y divide-border">
+            {manifest.settings.map((setting) => (
+                <SettingRow key={setting.key} setting={setting} value={values[setting.key] ?? null} locale={locale} onChange={(value) => change(setting.key, value)} />
+            ))}
+        </div>
+    );
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+    return (
+        <div className="min-w-0">
+            <dt className="text-xs text-muted-foreground">{label}</dt>
+            <dd className="truncate text-sm">{children}</dd>
+        </div>
+    );
+}
+
+export function AddonPage({ id }: { id: string }) {
+    const t = useTranslations("account");
+    const state = useAddons();
+    const toast = useToast();
+    const [confirm, confirmElement] = useConfirm();
+    const bridge = state.kind === "ready" || state.kind === "loading" ? state.bridge : null;
+    const [startInstall, installDialog] = useInstallFlow(bridge);
+
+    const back = (
+        <Link href="/account/addons" className="text-sm text-muted-foreground hover:underline">
+            {say(t, "page.back")}
+        </Link>
+    );
+    if (state.kind === "browser" || state.kind === "old-app") {
+        return (
+            <div className="flex min-w-0 flex-col gap-4">
+                {back}
+                <NotHere state={state} />
+            </div>
+        );
+    }
+    if (state.kind === "loading") {
+        return (
+            <div className="flex min-w-0 flex-col gap-4">
+                {back}
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-40 w-full" />
+            </div>
+        );
+    }
+    const listing = addonListings(state.snapshot).find((item) => item.id === id) ?? null;
+    const manifest = listing ? manifestOf(listing) : null;
+    if (!listing || !manifest) {
+        return (
+            <div className="flex min-w-0 flex-col gap-4">
+                {back}
+                <Notice>{say(t, "detail.notFound")}</Notice>
+            </div>
+        );
+    }
+    const { entry, installed } = listing;
+    const offer = addonOffer(state.snapshot, id, entry);
+    const run = installed ? runLabel(t, installed) : null;
+    const size = entry && state.snapshot.platform ? entry.packages[state.snapshot.platform]?.size : undefined;
+
+    const uninstall = async () => {
+        const ok = await confirm({ title: say(t, "detail.uninstallTitle", { name: manifest.name }), description: say(t, "detail.uninstallBody"), confirmLabel: say(t, "detail.uninstall"), danger: true });
+        if (ok) await state.bridge.uninstall(id).catch(() => false);
+    };
+    const toggle = (enabled: boolean) => {
+        void state.bridge
+            .setEnabled(id, enabled)
+            .then((done) => {
+                if (!done) throw new Error("refused");
+            })
+            .catch(() => toast.show({ title: say(t, "detail.toggleFailed") }));
+    };
+
+    return (
+        <div className="flex min-w-0 flex-col gap-5">
+            {back}
+            <header className="flex min-w-0 flex-wrap items-start gap-3">
+                <AddonIcon entry={entry} size={56} />
+                <div className="min-w-0 flex-1 basis-48">
+                    <h1 className="truncate text-[1.0625rem] font-semibold tracking-tight" title={manifest.name}>
+                        {manifest.name}
+                    </h1>
+                    <p className="truncate text-sm text-muted-foreground">{say(t, "card.by", { publisher: manifest.publisher })}</p>
+                    {run ? (
+                        <div className="mt-1">
+                            <StatusBadge status={run.status} label={run.label} />
+                        </div>
+                    ) : null}
+                </div>
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    {offer.kind !== "installed" ? <OfferButton offer={offer} href={hrefOf(id)} size="md" onInstall={() => entry && startInstall(entry)} /> : null}
+                    {installed ? (
+                        <>
+                            <Switch checked={installed.enabled} onChange={toggle} aria-label={say(t, "detail.enabled")} />
+                            <Button variant="secondary" onClick={() => void uninstall()}>
+                                {say(t, "detail.uninstall")}
+                            </Button>
+                        </>
+                    ) : null}
+                </div>
+            </header>
+            <p className="text-sm">{manifest.summary}</p>
+            {installed && installed.manifest ? (
+                <section className="flex min-w-0 flex-col gap-2" aria-label={say(t, "detail.settings")}>
+                    <h2 className="text-sm font-medium text-muted-foreground">{say(t, "detail.settings")}</h2>
+                    <AddonSettings bridge={state.bridge} manifest={installed.manifest} />
+                </section>
+            ) : null}
+            {entry && entry.screenshots.length > 0 ? (
+                <div className="flex min-w-0 gap-3 overflow-x-auto">
+                    {entry.screenshots.map((url, index) => (
+                        // eslint-disable-next-line @next/next/no-img-element -- a release asset, cached by the browser
+                        <img key={url} src={url} loading="lazy" alt={say(t, "detail.screenshot", { name: manifest.name, number: index + 1 })} className="h-48 shrink-0 rounded-md border border-border" />
+                    ))}
+                </div>
+            ) : null}
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Fact label={say(t, "detail.version")}>{installed?.version ?? manifest.version}</Fact>
+                <Fact label={say(t, "detail.size")}>{size ? formatBytes(size) : "-"}</Fact>
+                <Fact label={say(t, "detail.published")}>{entry ? new Date(entry.published).toLocaleDateString() : "-"}</Fact>
+                <Fact label={say(t, "detail.publisher")}>{manifest.publisher}</Fact>
+            </dl>
+            <section className="flex min-w-0 flex-col gap-1" aria-label={say(t, "detail.permissions")}>
+                <h2 className="text-sm font-medium text-muted-foreground">{say(t, "detail.permissions")}</h2>
+                {manifest.permissions.length === 0 ? (
+                    <p className="text-sm">{say(t, "install.none")}</p>
+                ) : (
+                    <ul className="list-disc ps-5 text-sm">
+                        {manifest.permissions.map((permission) => (
+                            <li key={permission}>{say(t, `permission.${PERMISSION_KEY[permission]}`)}</li>
+                        ))}
+                    </ul>
+                )}
+            </section>
+            {entry?.changelog ? (
+                <section className="flex min-w-0 flex-col gap-1" aria-label={say(t, "detail.changelog")}>
+                    <h2 className="text-sm font-medium text-muted-foreground">{say(t, "detail.changelog")}</h2>
+                    <p className="whitespace-pre-line text-sm">{entry.changelog}</p>
+                </section>
+            ) : null}
+            {confirmElement}
+            {installDialog}
+        </div>
+    );
+}
