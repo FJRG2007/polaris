@@ -229,3 +229,4 @@ export {
     type PrincipalType,
     type PolicySummary
 } from "./policies.js";
+export { PROVEN_PASSWORD_LIFETIME_MS, withProvenPassword } from "./proven-password.js";

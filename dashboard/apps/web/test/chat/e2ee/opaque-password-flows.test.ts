@@ -163,6 +163,8 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 vi.mock("@polaris/auth", () => ({
+    // The real scope is tested in packages/auth; here only what it is handed.
+    withProvenPassword: async (hash: string, run: (standIn: string) => Promise<unknown>) => run(`proven:${hash}`),
     signInWithOpaque: async (_auth: unknown, userId: string) => {
         const challenged = state.twoFactor.has(userId);
         state.issued.push({ userId, challenged });
@@ -527,6 +529,22 @@ describe("the kill switch never locks anybody out", () => {
         state.limitCap = 0;
         expect(await client.signInWithOpaque(alice.email, NEXT)).toBeNull();
         expect([...state.limits.keys()]).toContain(`e2ee-sign-in:${alice.email}`);
+    });
+});
+
+describe("a route that insists on the password runs on a proof", () => {
+    it("hands the route a stand-in for the account's current hash, and nothing for a wrong proof", async () => {
+        const alice = await adoptedAccount();
+        const ran: string[] = [];
+        const run = async (standIn: string) => {
+            ran.push(standIn);
+            return "armed";
+        };
+        expect(await server.withPasswordProof(alice.id, await flows.provePassword(PASSWORD), run)).toBe("armed");
+        expect(ran).toEqual([`proven:${state.credentials.get(alice.id)}`]);
+        expect(await server.withPasswordProof(alice.id, await flows.provePassword("not the password"), run)).toBeNull();
+        expect(ran).toHaveLength(1);
+        expect(sent(PASSWORD)).toBe(false);
     });
 });
 

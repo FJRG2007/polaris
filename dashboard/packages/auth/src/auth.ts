@@ -21,6 +21,7 @@ import { passkey } from "@better-auth/passkey";
 import { setSessionCookie } from "better-auth/cookies";
 import { hashPassword, verifyPassword } from "better-auth/crypto";
 import { deviceAccountsPlugin } from "./device-accounts.js";
+import { spendProvenPassword } from "./proven-password.js";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -841,6 +842,9 @@ export function passwordHasher(options: Pick<AuthOptions, "passwordFallback" | "
             return hash;
         },
         verify: async (input: { hash: string; password: string }): Promise<boolean> => {
+            // A password a server action just proved over OPAQUE, once, in its own
+            // scope (proven-password.ts); never padded, it was never typed here.
+            if (spendProvenPassword(input)) return true;
             const began = Date.now();
             if (await verifyPassword(input)) return true;
             const opens = options.passwordFallback

@@ -15,6 +15,7 @@ async function sessionId(): Promise<string | null> {
 }
 
 import { auth } from "@/lib/auth";
+import { withProvenPassword } from "@polaris/auth";
 import { randomBytes } from "node:crypto";
 import * as opaque from "./opaque-service";
 import { passwordLockEnabled } from "./flag";
@@ -42,6 +43,24 @@ export async function provesPassword(userId: string, proof: OpaqueFinish): Promi
         if (!(caught instanceof opaque.OpaqueRefusal)) console.error("polaris: a password proof failed:", caught);
         return false;
     }
+}
+
+/**
+ * Run a better-auth route that insists on the password in its body (arming or
+ * removing a second factor) with a proof instead: once the proof checks out,
+ * `run` gets a stand-in the account's password check accepts once, for the
+ * hash read here after the proof, for 30 s (`withProvenPassword`). Null when the
+ * proof does not prove the password; the stand-in never leaves this process.
+ */
+export async function withPasswordProof<T>(
+    userId: string,
+    proof: OpaqueFinish,
+    run: (standIn: string) => Promise<T>
+): Promise<T | null> {
+    if (!(await provesPassword(userId, proof))) return null;
+    const hash = await opaque.credentialHash(userId);
+    if (!hash) return null;
+    return withProvenPassword(hash, run);
 }
 
 /**
