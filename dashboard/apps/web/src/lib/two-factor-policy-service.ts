@@ -13,12 +13,14 @@
 
 import { prisma } from "@polaris/db";
 import { resolveGeo } from "@/lib/geo-service";
-import type { SecondFactor, TwoFactorMethod } from "@polaris/core";
+import type { SecondFactor, SignInMethod, TwoFactorMethod } from "@polaris/core";
 import { describeTwoFactorMethods } from "@/lib/two-factor-delivery";
 import { loadTwoFactorPolicy, rememberSignInCountry, usualSignInCountries } from "@/lib/two-factor-policy-store";
+import { signInRisk } from "@/lib/sign-in-risk";
 import {
     acceptedMethods,
     isUnusualCountry,
+    planRiskCheck,
     planStepUp,
     requiredFactors,
     serializeStepUp,
@@ -65,12 +67,16 @@ export async function beginSignInStepUp(input: {
     ip: string | undefined;
     country: string | null;
     factor: SecondFactor | null;
+    /** How the sign-in identified the account; a risk check applies to a password only. */
+    method?: SignInMethod | null;
+    userAgent?: string | null;
 }): Promise<{ stepUp: string | null; country: string | null }> {
     const { userId, sessionId, factor } = input;
-    if (!factor || factor === "backup-code") {
+    if (factor === "backup-code") {
         await rememberSignInCountry(userId, input.country);
         return { stepUp: null, country: input.country };
     }
+    if (!factor) return riskCheck(input);
     try {
         const [policy, setUp] = await Promise.all([loadTwoFactorPolicy(userId), setUpMethods(userId)]);
         const accepted = acceptedMethods(setUp, policy.refused);
@@ -96,6 +102,48 @@ export async function beginSignInStepUp(input: {
         // A policy that cannot be read is the default one; the sign-in already
         // answered the challenge it always had to.
         console.error("two-factor policy not applied:", error);
+        return { stepUp: null, country: input.country };
+    }
+}
+
+/**
+ * A password sign-in that answered no second factor - the account has none -
+ * asked for one code when it looks risky: an unusual country, a new device, or
+ * impossible travel. Only under the account's "When to ask for more" setting
+ * ("standard" never asks), only for a password (a passkey, a scanned code, a
+ * connected account or an emailed link prove more than a password, or prove
+ * the very mailbox a code would go to), and only when a code can actually be
+ * delivered somewhere: the step must never be one nobody can answer.
+ */
+async function riskCheck(input: {
+    userId: string;
+    sessionId: string;
+    ip: string | undefined;
+    country: string | null;
+    method?: SignInMethod | null;
+    userAgent?: string | null;
+}): Promise<{ stepUp: string | null; country: string | null }> {
+    const { userId, sessionId } = input;
+    try {
+        const policy = await loadTwoFactorPolicy(userId);
+        if (input.method !== "password" || policy.strictness === "standard") {
+            await rememberSignInCountry(userId, input.country);
+            return { stepUp: null, country: input.country };
+        }
+        const country = await countryOf(input.ip, input.country);
+        const reason = isUnusualCountry(country, await usualSignInCountries(userId, sessionId))
+            ? "unusual-country"
+            : await signInRisk({ userId, sessionId, country, userAgent: input.userAgent ?? null });
+        const available = reason
+            ? (await describeTwoFactorMethods(userId))
+                  .filter((status) => status.method !== "totp" && status.available)
+                  .map((status) => status.method)
+            : [];
+        const plan = reason ? planRiskCheck({ available, reason }) : null;
+        if (!plan) await rememberSignInCountry(userId, country);
+        return { stepUp: plan ? serializeStepUp(plan) : null, country };
+    } catch (error) {
+        console.error("polaris: sign-in risk check not applied:", error);
         return { stepUp: null, country: input.country };
     }
 }

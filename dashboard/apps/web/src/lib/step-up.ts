@@ -89,10 +89,19 @@ export async function stepUpOptions(userId: string): Promise<StepUpOptions> {
 export async function sendStepUpCode(
     userId: string,
     purpose: string,
-    method: TwoFactorDeliveryMethod
+    method: TwoFactorDeliveryMethod,
+    /**
+     * The sign-in risk check: any way the account can receive a code right now
+     * counts, set up as a second factor or not - an account with none is
+     * exactly the one being asked. The caller has already checked the method
+     * is one the session's own step-up state offered.
+     */
+    options: { anyReachable?: boolean } = {}
 ): Promise<{ error?: string }> {
-    const { choices } = await stepUpOptions(userId);
-    if (!choices.some((choice) => choice.proof === method)) {
+    const reachable = options.anyReachable
+        ? (await describeTwoFactorMethods(userId)).some((status) => status.method === method && status.available)
+        : (await stepUpOptions(userId)).choices.some((choice) => choice.proof === method);
+    if (!reachable) {
         return { error: (await readerWords("accountSecurity"))("known.notAWayToConfirm") };
     }
 
@@ -133,15 +142,19 @@ export async function sendStepUpCode(
 export async function proveStepUp(
     userId: string,
     purpose: string,
-    proof: StepUpProofInput
+    proof: StepUpProofInput,
+    /** As for `sendStepUpCode`: the sign-in risk check accepts any reachable method. */
+    options: { anyReachable?: boolean } = {}
 ): Promise<{ error?: string }> {
     const throttle = await rateLimit(`step-up:${userId}`, PROOF_LIMIT, PROOF_WINDOW_MS);
     if (!throttle.ok) {
         return { error: (await readerWords("accountSecurity"))("errors.tooManyAttempts", { minutes: minutes(throttle.retryAfterMs) }) };
     }
 
-    const { choices } = await stepUpOptions(userId);
-    if (!choices.some((choice) => choice.proof === proof.proof)) {
+    const offered = options.anyReachable
+        ? (await describeTwoFactorMethods(userId)).some((status) => status.method === proof.proof && status.available)
+        : (await stepUpOptions(userId)).choices.some((choice) => choice.proof === proof.proof);
+    if (!offered) {
         return { error: (await readerWords("accountSecurity"))("known.notAWayToConfirm") };
     }
 

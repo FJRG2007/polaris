@@ -137,7 +137,7 @@ const FACTOR_METHOD: Partial<Record<SecondFactor, TwoFactorMethod>> = {
 };
 
 /** Why a sign-in was asked for more, for the screen that asks. */
-export type StepUpReason = "unusual-country" | "all-methods" | "not-accepted";
+export type StepUpReason = "unusual-country" | "all-methods" | "not-accepted" | "new-device" | "impossible-travel";
 
 /** What a sign-in still owes, as stored against its session. */
 export interface StepUpState {
@@ -162,7 +162,7 @@ const stepUpStateSchema = z.object({
     question: z.boolean(),
     questionDone: z.boolean(),
     phoneConfirmed: z.boolean(),
-    reason: z.enum(["unusual-country", "all-methods", "not-accepted"])
+    reason: z.enum(["unusual-country", "all-methods", "not-accepted", "new-device", "impossible-travel"])
 });
 
 /**
@@ -236,6 +236,28 @@ export function planStepUp(input: {
 }
 
 /** What is still to answer. */
+/**
+ * The extra check a risky sign-in owes when nothing else was asked of it: an
+ * account with no second factor, signing in with its password. One code from
+ * any way the account can receive one right now; null when there is none, so a
+ * risky sign-in is never left at a step nobody can answer.
+ */
+export function planRiskCheck(input: {
+    available: readonly TwoFactorMethod[];
+    reason: "unusual-country" | "new-device" | "impossible-travel";
+}): StepUpState | null {
+    if (input.available.length === 0) return null;
+    return {
+        need: 1,
+        accepted: [...input.available],
+        done: [],
+        question: false,
+        questionDone: false,
+        phoneConfirmed: false,
+        reason: input.reason
+    };
+}
+
 export function stepUpRemaining(state: StepUpState): {
     factorsLeft: number;
     methods: TwoFactorMethod[];

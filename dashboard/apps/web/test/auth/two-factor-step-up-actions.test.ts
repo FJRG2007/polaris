@@ -63,7 +63,7 @@ describe("confirming the number before a WhatsApp code", () => {
     it("sends once the number matches, and remembers that it did", async () => {
         expect(await actions.sendStepUpFactorCodeAction({ method: "whatsapp", phone: "+34 600 111 222" })).toEqual({});
         expect(service.advanceStepUp.mock.calls[0]![2]).toMatchObject({ phoneConfirmed: true });
-        expect(stepUp.sendStepUpCode).toHaveBeenCalledWith("user-1", "sign-in-step-up:whatsapp", "whatsapp");
+        expect(stepUp.sendStepUpCode).toHaveBeenCalledWith("user-1", "sign-in-step-up:whatsapp", "whatsapp", { anyReachable: true });
     });
 
     it("stops after too many tries", async () => {
@@ -91,7 +91,7 @@ describe("answering a factor", () => {
 
     it("opens the session when the last owed factor is right", async () => {
         expect(await actions.proveStepUpFactorAction({ method: "email", code: "123456" })).toEqual({ complete: true });
-        expect(stepUp.proveStepUp).toHaveBeenCalledWith("user-1", "sign-in-step-up:email", { proof: "email", code: "123456" });
+        expect(stepUp.proveStepUp).toHaveBeenCalledWith("user-1", "sign-in-step-up:email", { proof: "email", code: "123456" }, { anyReachable: true });
         expect(service.advanceStepUp.mock.calls[0]![2]).toBeNull();
     });
 

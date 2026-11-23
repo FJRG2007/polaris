@@ -124,7 +124,9 @@ export async function sendStepUpFactorCodeAction(input: unknown): Promise<StepUp
         if (!(await advanceStepUp(current.sessionId, current.raw, next))) return { error: t("stepUp.changed") };
     }
 
-    const sent = await sendStepUpCode(current.userId, purposeFor(method), method);
+    // The method was checked against this session's own stored step-up above,
+    // which for a risk check lists every way the account can receive a code.
+    const sent = await sendStepUpCode(current.userId, purposeFor(method), method, { anyReachable: true });
     return sent.error ? { error: sent.error } : {};
 }
 
@@ -139,7 +141,7 @@ export async function proveStepUpFactorAction(input: unknown): Promise<StepUpRes
     // A WhatsApp code can only have been sent after the number was confirmed.
     if (method === "whatsapp" && !current.state.phoneConfirmed) return { error: t("stepUp.notOwed") };
 
-    const proven = await proveStepUp(current.userId, purposeFor(method), { proof: method, code });
+    const proven = await proveStepUp(current.userId, purposeFor(method), { proof: method, code }, { anyReachable: true });
     if (proven.error) return { error: proven.error };
     return settle(current, recordFactor(current.state, method));
 }

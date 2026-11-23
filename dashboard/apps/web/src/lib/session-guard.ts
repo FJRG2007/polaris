@@ -772,7 +772,9 @@ async function createSessionState(input: {
         // none of the methods, so the policy still asks for what it asks of
         // every other sign-in; reading it as "no challenge" would let a sign-in
         // skip the extra step just by waiting before its first page.
-        factor: signIn.secondFactor ?? (signIn.method === null && input.twoFactorEnabled ? "code" : null)
+        factor: signIn.secondFactor ?? (signIn.method === null && input.twoFactorEnabled ? "code" : null),
+        method: signIn.method,
+        userAgent: userAgent ?? null
     });
     const decided = await prisma.sessionState.updateMany({
         where: { sessionId: input.sessionId },
