@@ -19092,3 +19092,20 @@ model OpaqueServerSetup {
     keyId      String
     createdAt  DateTime @default(now())
 }
+
+// The storage of an MLS member the server itself runs - Polar as a leaf and the
+// webhook and automation service members (docs/chat-e2ee-proposal.md, section
+// 7); people's devices keep theirs in their own IndexedDB. One row per key of
+// the member's OpenMLS store, the value sealed under POLARIS_MASTER_KEY like
+// every other stored secret. Each operation's changes are written in one
+// transaction (apps/web/src/lib/chat/e2ee/mls-store.ts).
+model MlsStoreEntry {
+    // The member's device id, e.g. "service/polar".
+    device     String
+    key        Bytes
+    ciphertext Bytes
+    nonce      Bytes
+    keyId      String
+
+    @@id([device, key])
+}
