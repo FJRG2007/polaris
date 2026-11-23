@@ -10,13 +10,20 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
+import { cspNonce, strictCsp } from "@/lib/integrity/csp";
 
 const PATH_HEADER = "x-polaris-path";
 
 export function middleware(request: NextRequest) {
     const headers = new Headers(request.headers);
     headers.set(PATH_HEADER, request.nextUrl.pathname);
-    return NextResponse.next({ request: { headers } });
+    // The strict script policy, report-only (lib/integrity/csp). On the request
+    // too, which is where Next.js reads the nonce it puts on its own scripts.
+    const policy = strictCsp(cspNonce());
+    headers.set("content-security-policy-report-only", policy);
+    const response = NextResponse.next({ request: { headers } });
+    response.headers.set("Content-Security-Policy-Report-Only", policy);
+    return response;
 }
 
 export const config = {
