@@ -31,6 +31,7 @@ let message: {
     replyCount: number;
     deletedAt: Date | null;
     createdAt: Date;
+    e2eeEpoch?: number | null;
 };
 
 /** What the fake database was asked to do. */
@@ -246,6 +247,14 @@ describe("editing", () => {
         await expect(edit(actor, { messageId: "message-1", body: "after" })).rejects.toThrow(
             /your own/
         );
+    });
+
+    it("is refused for a sealed message, which a plain edit would put in the clear", async () => {
+        const { edit } = await import("@/lib/chat/messages");
+        message.e2eeEpoch = 3;
+        await expect(edit(actor, { messageId: "message-1", body: "after" })).rejects.toBeInstanceOf(ChatRuleError);
+        expect(written.updates).toHaveLength(0);
+        expect(written.edits).toHaveLength(0);
     });
 });
 

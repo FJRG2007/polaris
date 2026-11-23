@@ -19,6 +19,7 @@
  */
 
 import { useOpenedSealed } from "./opened-sealed";
+import { rewritable } from "./rewritable";
 import { fittedSize, placeholderUrl } from "@/lib/chat/media-shape";
 import { VanishMark } from "./vanish-controls";
 import { GroupInviteCards, InviteCards } from "./invite-card";
@@ -861,9 +862,9 @@ function useMessageKeys({
             // so a key can never do something the screen does not offer: your own
             // to rewrite, your own or anybody's here to take down, and anything
             // at all to answer - wherever answering is offered.
-            // A poll is not rewritten - see `rewrite` in `Message`. The key
+            // A poll or a sealed row is not rewritten - see `rewritable`. The key
             // follows the pencil rather than reaching past it.
-            if (wanted === "edit" && (message.kind === "poll" || gameInviteIn(message.body) || !mine || !shown.onEdit)) return;
+            if (wanted === "edit" && (!rewritable(message) || !mine || !shown.onEdit)) return;
             if (wanted === "delete" && !mine && !shown.canModerate) return;
             if (wanted === "reply" && !shown.onReply) return;
             event.preventDefault();
@@ -999,8 +1000,8 @@ const Message = memo(function Message({
      * the service refuses it and the pencil is not offered. Taking it down and
      * asking again is the way to change a poll.
      */
-    // A poll and a game invite are cards, not text to rewrite.
-    const rewrite = message.kind === "poll" || gameInviteIn(message.body) ? undefined : onEdit;
+    // A poll and a game invite are cards, and a sealed row is not rewritten yet - see `rewritable`.
+    const rewrite = rewritable(message) ? onEdit : undefined;
     /** Who wrote it, when that is somebody other than the reader. Read out here
      *  so the name and the face can both ask about them without narrowing it
      *  again in two places. */
