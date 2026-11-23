@@ -21,11 +21,21 @@
  * group forgets it; a later Welcome, or a rejoin the server allows, brings it
  * back.
  *
+ * History keys (docs/chat-e2ee-proposal.md 4.2 item 4): the device that moves
+ * the group to a new epoch makes that epoch's history key `HK`, sends it to the
+ * group as an MLS application message, and seals it to its own account and to
+ * each account it just added (`sealHistoryKey`, the public keys from
+ * `account-keys`). Every device that reads it seals it to its own account too
+ * (the first envelope written wins), so the account's next new device - which
+ * MLS cannot give the past - opens the history from those envelopes.
+ * Application messages carry a one-byte kind in front: 0 content, 1 an `HK`.
+ *
  * Nothing here is reachable while `chatE2eeEnabled()` is off: the route answers
  * 404 and no screen constructs a device.
  */
 
 import type { MlsBody } from "./schemas";
+import * as content from "@polaris/chat-crypto/message-content";
 
 /** The hybrid ML-KEM-768 + X25519 suite (polaris_core::mls). */
 export const MLS_SUITE = 0x004f;
@@ -35,6 +45,8 @@ const KEY_PACKAGE_TARGET = 20;
 const KEY_PACKAGE_LOW = 10;
 const COMMIT_ATTEMPTS = 3;
 const EVENTS_PAGE = 200;
+const CONTENT_KIND = 0;
+const HISTORY_KEY_KIND = 1;
 
 export interface MlsCommitOut {
     commit: Uint8Array;
@@ -154,6 +166,13 @@ export interface MlsDeviceOptions {
     transport: MlsTransport;
     ciphersuite?: number;
     random?: (length: number) => Uint8Array;
+    /**
+     * The account key's HPKE pair, once the account key is unlocked: history
+     * keys are sealed to the public half and opened with the private one.
+     * Without it the device still reads and distributes history keys in the
+     * group, and writes no envelope for its own account.
+     */
+    account?: { hpkePublicKey: Uint8Array; hpkePrivateKey: CryptoKey };
 }
 
 export class MlsDevice {
@@ -163,6 +182,8 @@ export class MlsDevice {
     private readonly inbox: MlsApplication[] = [];
     /** Group ids and cursors belong to one member: a device whose store was lost starts with none. */
     private readonly scope: string;
+    /** History keys this run holds, by `${channelId}/${epoch}`. */
+    private readonly historyKeys = new Map<string, Uint8Array>();
 
     private constructor(
         private readonly options: MlsDeviceOptions,
@@ -241,6 +262,7 @@ export class MlsDevice {
             this.setGroup(channelId, null);
             return this.rejoin(channelId);
         }
+        await this.distributeHistoryKey(channelId, []);
         return groupId;
     }
 
@@ -267,7 +289,10 @@ export class MlsDevice {
                 groupInfo: toText(out.groupInfo),
                 welcomes: packages.map((p) => ({ recipient: p.address, welcome }))
             };
-            if (await this.settleCommit(body, groupId)) return packages.map((p) => p.address);
+            if (await this.settleCommit(body, groupId)) {
+                await this.distributeHistoryKey(channelId, [...new Set(packages.map((p) => p.address.slice(0, p.address.indexOf("/"))))]);
+                return packages.map((p) => p.address);
+            }
             // The epoch moved under us: catch up and claim fresh packages (the claimed ones are spent).
             await this.sync(channelId);
         }
@@ -309,7 +334,10 @@ export class MlsDevice {
                 groupInfo: toText(out.groupInfo),
                 welcomes: []
             };
-            if (await this.settleCommit(body, groupId)) return [...new Set(leaves.map((l) => l.identity))];
+            if (await this.settleCommit(body, groupId)) {
+                await this.distributeHistoryKey(channelId, []);
+                return [...new Set(leaves.map((l) => l.identity))];
+            }
             await this.sync(channelId);
         }
         throw new MlsRequestError(409, "staleEpoch");
@@ -325,7 +353,7 @@ export class MlsDevice {
         await this.pull(channelId);
         const groupId = this.requireGroup(channelId);
         const epoch = this.member.epoch(groupId);
-        const payload = this.member.encrypt(groupId, plaintext);
+        const payload = this.member.encrypt(groupId, framed(CONTENT_KIND, plaintext));
         await this.commitAndSend({ op: "application", channelId, device: this.options.device, epoch: epoch.toString(), payload: toText(payload) });
     }
 
@@ -386,9 +414,63 @@ export class MlsDevice {
             await this.removeLeaves(channelId, (identity) => identity === this.address).catch((caught: unknown) => {
                 console.warn("polaris: this device's old MLS leaf could not be removed:", caught);
             });
+            // A removal above moved the epoch again and already gave it a key.
+            if (this.member.epoch(joined.groupId) === BigInt(group.epoch) + 1n) await this.distributeHistoryKey(channelId, []);
             return joined.groupId;
         }
         throw new MlsRequestError(409, "staleEpoch");
+    }
+
+    /**
+     * The conversation's history key for an epoch: the one this run read or
+     * made, else the envelope sealed to this account. Null when neither exists.
+     */
+    async historyKey(channelId: string, epoch: bigint): Promise<Uint8Array | null> {
+        const held = this.historyKeys.get(`${channelId}/${epoch}`);
+        if (held) return held;
+        const account = this.options.account;
+        if (!account) return null;
+        const answer = await this.send({ op: "history-keys", channelId, from: epoch.toString() });
+        const found = (answer.historyKeys as { epoch: string; envelope: string }[]).find((k) => k.epoch === epoch.toString());
+        if (!found) return null;
+        const binding = { recipient: this.options.userId, conversationId: channelId, epoch };
+        const key = await content.openHistoryKey(account.hpkePrivateKey, fromText(found.envelope), binding);
+        this.historyKeys.set(`${channelId}/${epoch}`, key);
+        return key;
+    }
+
+    /**
+     * Give the epoch this device just committed its history key: to the group
+     * as an application message, and sealed to this account and `accounts`.
+     * Best effort - the commit stands either way, and a member that misses the
+     * message still opens the key from its account's envelope.
+     */
+    private async distributeHistoryKey(channelId: string, accounts: string[]): Promise<void> {
+        try {
+            const groupId = this.requireGroup(channelId);
+            const epoch = this.member.epoch(groupId);
+            const key = content.newHistoryKey();
+            this.historyKeys.set(`${channelId}/${epoch}`, key);
+            const payload = this.member.encrypt(groupId, framed(HISTORY_KEY_KIND, key));
+            await this.commitAndSend({ op: "application", channelId, device: this.options.device, epoch: epoch.toString(), payload: toText(payload) });
+            await this.sealHistoryKey(channelId, epoch, key, accounts);
+        } catch (caught) {
+            console.warn("polaris: a history key could not be distributed:", caught);
+        }
+    }
+
+    /** Seal `key` to this account and to `others` that have an account key, and store the envelopes. */
+    private async sealHistoryKey(channelId: string, epoch: bigint, key: Uint8Array, others: string[]): Promise<void> {
+        const envelopes: { recipient: string; envelope: string }[] = [];
+        const seal = async (recipient: string, publicKey: Uint8Array) =>
+            envelopes.push({ recipient, envelope: toText(await content.sealHistoryKey(publicKey, key, { recipient, conversationId: channelId, epoch })) });
+        if (this.options.account) await seal(this.options.userId, this.options.account.hpkePublicKey);
+        const recipients = others.filter((id) => id !== this.options.userId);
+        if (recipients.length) {
+            const answer = await this.send({ op: "account-keys", channelId, userIds: recipients });
+            for (const found of answer.accountKeys as { userId: string; hpkePublicKey: string }[]) await seal(found.userId, fromText(found.hpkePublicKey));
+        }
+        if (envelopes.length) await this.send({ op: "put-history-keys", channelId, epoch: epoch.toString(), envelopes });
     }
 
     /** Drop the member's copy of a group, if it holds one. */
@@ -469,7 +551,17 @@ export class MlsDevice {
             return null;
         }
         if (processed.kind !== "application") return null;
-        return { channelId, sender: decoder.decode(processed.senderIdentity), epoch: processed.epoch, plaintext: processed.plaintext };
+        const [kind, body] = [processed.plaintext[0], processed.plaintext.subarray(1)];
+        if (kind === HISTORY_KEY_KIND) {
+            if (body.length !== content.HISTORY_KEY_BYTES) return null;
+            this.historyKeys.set(`${channelId}/${processed.epoch}`, new Uint8Array(body));
+            await this.sealHistoryKey(channelId, processed.epoch, body, []).catch((caught: unknown) => {
+                console.warn("polaris: a history key could not be sealed to this account:", caught);
+            });
+            return null;
+        }
+        if (kind !== CONTENT_KIND) return null;
+        return { channelId, sender: decoder.decode(processed.senderIdentity), epoch: processed.epoch, plaintext: new Uint8Array(body) };
     }
 
     /** Move the log cursor past every event before `epoch` (after a rejoin). */
@@ -563,6 +655,13 @@ export class MlsDevice {
     private send(body: MlsBody): Promise<Record<string, unknown>> {
         return this.options.transport(body);
     }
+}
+
+function framed(kind: number, body: Uint8Array): Uint8Array {
+    const out = new Uint8Array(body.length + 1);
+    out[0] = kind;
+    out.set(body, 1);
+    return out;
 }
 
 function noteKey(device: string, name: string): string {

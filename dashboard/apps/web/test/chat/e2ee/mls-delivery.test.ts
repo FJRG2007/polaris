@@ -126,6 +126,7 @@ vi.mock("@polaris/db", () => {
 
 const { handleMls } = await import("@/lib/chat/e2ee/mls-handler");
 const { MlsDevice, MlsRequestError } = await import("@/lib/chat/e2ee/mls-client");
+const accountKeys = await import("@polaris/chat-crypto/account-key");
 type MlsDevice = import("@/lib/chat/e2ee/mls-client").MlsDevice;
 type MlsDeviceStore = import("@/lib/chat/e2ee/mls-client").MlsDeviceStore;
 type MlsMemberClass = import("@/lib/chat/e2ee/mls-client").MlsMemberClass;
@@ -326,13 +327,15 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
             if (answer.status !== 200) throw new MlsRequestError(answer.status, String(answer.body.error));
             return answer.body;
         };
-    const open = (userId: string, device: string, store = new MemoryStore(), notes = new Map<string, string>(), transport = through(userId)) =>
+    type Account = { hpkePublicKey: Uint8Array; hpkePrivateKey: CryptoKey };
+    const open = (userId: string, device: string, store = new MemoryStore(), notes = new Map<string, string>(), transport = through(userId), account?: Account) =>
         MlsDevice.open({
             userId,
             device,
             MlsMember,
             store,
             transport,
+            account,
             notes: { getItem: (k) => notes.get(k) ?? null, setItem: (k, v) => void notes.set(k, v) }
         });
     const say = (device: MlsDevice, text: string) => device.sendApplication(CHANNEL, new TextEncoder().encode(text));
@@ -483,5 +486,41 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         expect(await epochNow()).toBe("3");
         await say(carol, "in after a lost race");
         for (const device of [alice, bob, dave]) expect(await heard(device)).toEqual(["carol-desk-1: in after a lost race"]);
+    });
+
+    it("gives each new epoch a history key: in the group, and sealed to the accounts for their next device", async () => {
+        // An account key published for alice and bob (as account-keys serves it), none for carol.
+        const unlocked = async (userId: string): Promise<Account> => {
+            const ak = accountKeys.generateAccountKey();
+            const { signPublicKey, hpkePublicKey } = await accountKeys.accountPublicKeys(ak);
+            (state.tables.chatAccountKey ??= []).push({ userId, akVersion: 1, signPublicKey: Buffer.from(signPublicKey), hpkePublicKey: Buffer.from(hpkePublicKey) });
+            return { hpkePublicKey, hpkePrivateKey: (await accountKeys.accountHpkeKeyPair(ak)).privateKey };
+        };
+        const [aliceKey, bobKey] = [await unlocked(ALICE), await unlocked(BOB)];
+        const alice = await open(ALICE, "alice-laptop", new MemoryStore(), new Map(), through(ALICE), aliceKey);
+        // bob's phone has not unlocked the account key: it reads the key in the group, seals nothing.
+        const bob = await open(BOB, "bob-phone-1");
+        const carol = await open(CAROL, "carol-desk-1");
+        for (const device of [alice, bob, carol]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB, CAROL]);
+        await say(alice, "keyed");
+        expect(await heard(bob)).toEqual(["alice-laptop: keyed"]);
+        await carol.sync(CHANNEL);
+        const epochOne = await alice.historyKey(CHANNEL, 1n);
+        expect(epochOne).toHaveLength(32);
+        expect(await bob.historyKey(CHANNEL, 1n)).toEqual(epochOne);
+        expect(await carol.historyKey(CHANNEL, 1n)).toEqual(epochOne);
+        expect(await alice.historyKey(CHANNEL, 0n)).not.toEqual(epochOne);
+        const sealed = (state.tables.chatHistoryKey ?? []).map((r) => `${r.epoch}:${r.recipient === ALICE ? "alice" : r.recipient === BOB ? "bob" : "other"}`);
+        // Carol has no account key, so nothing is sealed to her; the organisation key is not built.
+        expect(sealed.sort()).toEqual(["0:alice", "1:alice", "1:bob"]);
+
+        // bob's next device, account key unlocked, opens epoch 1 from the envelope.
+        const laptop = await open(BOB, "bob-laptop", new MemoryStore(), new Map(), through(BOB), bobKey);
+        expect(await laptop.historyKey(CHANNEL, 1n)).toEqual(epochOne);
+        expect(await laptop.historyKey(CHANNEL, 0n)).toBeNull();
+        const stranger = await open(BOB, "bob-tablet", new MemoryStore(), new Map(), through(BOB), await unlocked(EVE));
+        await expect(stranger.historyKey(CHANNEL, 1n)).rejects.toThrow();
     });
 });

@@ -73,6 +73,18 @@ and resends whatever an earlier run committed and never sent. Then:
 - `sendApplication` catches up first, so a message is never sealed in an epoch
   the group has left; `sync` reads the log and returns the messages from others.
 
+History keys: the device that moves the group to a new epoch (create, add,
+remove, rejoin) makes that epoch's `HK`, sends it to the group as an MLS
+application message, and seals it to its own account and to every account it
+added (`sealHistoryKey`, public keys from `account-keys`, stored with
+`put-history-keys`). Each device that reads it seals it to its own account as
+well; the first envelope per account and epoch wins. `historyKey(channel,
+epoch)` returns the key this run holds, else opens the account's envelope - how
+an account's new device reads the past. Sealing needs the account key's HPKE
+pair (`account` option, once unlocked); without it a device still reads keys in
+the group. Every application message carries a one-byte kind: 0 content, 1 a
+history key.
+
 Crash safety: an operation's state changes and its request are written in one
 transaction before the request is sent. A commit the server took while the
 device never heard the answer comes back `staleEpoch` on resend; the device then
@@ -87,11 +99,12 @@ are in `localStorage`.
 
 - Sealing chat message bodies with `sealMessage` and the history key, the
   `ChatMessage` columns that carry them, and the reader path.
-- History-key distribution: the HK as an MLS application message to the group
-  and `sealHistoryKey` envelopes to members' account keys (served by
-  `account-keys`) and `org`. The organisation recovery key (proposal 3.5) has
-  no public key stored anywhere yet - its custodian setup is not built - so
+- The `org` history-key envelope. The organisation recovery key (proposal 3.5)
+  has no public key stored anywhere yet - its custodian setup is not built - so
   nothing can serve it and no `org` envelope can be sealed until it is.
+- Envelopes for dormant members (accounts in the conversation with no device
+  in the group, proposal 4.2 item 4): the committer seals only to itself and
+  to the accounts it adds; the rest seal their own when a device reads the key.
 - Server-run members (Polar, webhooks) through the Node binding and
   `mls-store.ts`.
 - A per-message device signature.
