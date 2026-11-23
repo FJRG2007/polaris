@@ -19,7 +19,7 @@ import * as motion from "@/lib/office/slide-motion";
 import type { ShowStep } from "./present";
 import { SlideDrawing } from "./slide-canvas";
 import { restingStates, STILL, useShowPlan, type SlideMotion } from "./show-stage";
-import { Button, clearWindowControls, cn, matchShortcut } from "@polaris/ui";
+import { Button, clearWindowControls, cn, matchShortcut, windowControlsBand } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     audiencePath,
@@ -255,6 +255,7 @@ export function PresenterView({
             }}
             className={clearWindowControls("fixed inset-0 z-50 flex flex-col bg-background safe-p-0 text-foreground outline-none")}
         >
+            <div aria-hidden className={windowControlsBand("bg-background")} />
             <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-3 py-2">
                 <div className="flex items-center gap-1">
                     <span

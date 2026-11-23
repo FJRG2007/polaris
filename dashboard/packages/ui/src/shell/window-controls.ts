@@ -71,3 +71,19 @@ export function clearWindowControls(className: string | undefined): string {
     }
     return cn(className, ...extra);
 }
+
+/**
+ * The band above a full-window surface that `clearWindowControls` moved below
+ * it, filled with the surface's own ground.
+ *
+ * Moved down, the surface leaves the band showing whatever is behind it - the
+ * app's header, undimmed, with its bottom border running across the top of a
+ * dark viewer - and the window buttons are painted the colour of that strip.
+ * Put this first inside the surface with the surface's background class: it is
+ * fixed to the top of the window, so the surface's `overflow: hidden` does not
+ * clip it, it drags the window the way the header it covers did, and in a
+ * browser it is 0px tall.
+ */
+export function windowControlsBand(background: string): string {
+    return cn("fixed inset-x-0 top-0 h-[var(--window-controls-height)] [app-region:drag]", background);
+}

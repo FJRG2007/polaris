@@ -44,7 +44,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import * as flying from "./flight";
 import { useZoomPan } from "../lib/use-zoom-pan";
-import { clearWindowControls } from "../shell/window-controls";
+import { clearWindowControls, windowControlsBand } from "../shell/window-controls";
 import { MoreHorizontal, X, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from "lucide-react";
 import {
     ContextMenu,
@@ -190,7 +190,7 @@ export function ImageViewer({
     // Zoom and pan never go through React while a gesture lasts: the hook
     // moves the picture on the compositor and tells this component once it
     // settles. See `use-zoom-pan`.
-    const look = useZoomPan();
+    const look = useZoomPan({ looseAtFit: true });
     const { reset, zoomIn, zoomOut, targetRef } = look;
     const [said, setSaid] = useState("");
     /** Where a press started and whether it started off the picture, so a press
@@ -611,6 +611,7 @@ export function ImageViewer({
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0 bg-background/95"
             />
+            <div data-viewer-chrome="" aria-hidden="true" className={windowControlsBand("bg-background/95")} />
             <div
                 data-viewer-chrome=""
                 className="relative flex shrink-0 items-center gap-2 px-3 py-2"

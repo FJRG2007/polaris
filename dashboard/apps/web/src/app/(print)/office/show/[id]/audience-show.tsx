@@ -10,7 +10,7 @@
  */
 
 import * as deck from "@/lib/office/deck";
-import { clearWindowControls } from "@polaris/ui";
+import { clearWindowControls, windowControlsBand } from "@polaris/ui";
 import * as edits from "@/app/(app)/office/p/[id]/deck-edits";
 import * as motion from "@/lib/office/slide-motion";
 import { useDeckMotion } from "@/app/(app)/office/p/[id]/show-stage";
@@ -69,7 +69,11 @@ export function AudienceShow({
     const go = useCallback((step: ShowStep) => channel.current?.send({ kind: "go", to: step }), []);
     const driven = useMemo(() => (at ? { at, go } : undefined), [at, go]);
 
-    if (slides.length === 0 || !driven) return <div className={clearWindowControls("fixed inset-0 bg-black")} />;
+    if (slides.length === 0 || !driven) return (
+            <div className={clearWindowControls("fixed inset-0 bg-black")}>
+                <div aria-hidden className={windowControlsBand("bg-black")} />
+            </div>
+        );
     return (
         <ImageSourceProvider source={source}>
             <SlideLookProvider lookOf={lookOf}>

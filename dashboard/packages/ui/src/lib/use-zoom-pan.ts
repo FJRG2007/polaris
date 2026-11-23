@@ -61,6 +61,13 @@ export interface ZoomPanOptions {
      * finger can still scroll past it and only a pinch is the picture's.
      */
     readonly idleTouchAction?: string;
+    /**
+     * A single pointer moves the picture even when it is not zoomed, and it
+     * stays where it is let go until the zoom changes or it is put back. The
+     * picture viewer had this before the engine was shared and people still
+     * reach for it; a camera or a call tile keeps its picture where it is.
+     */
+    readonly looseAtFit?: boolean;
 }
 
 export interface ZoomPan {
@@ -108,6 +115,7 @@ interface Metrics {
 
 export function useZoomPan(options: ZoomPanOptions = {}): ZoomPan {
     const idleTouch = options.idleTouchAction ?? "none";
+    const looseAtFit = options.looseAtFit === true;
     const [zoom, setZoom] = useState<Zoom>(geometry.NO_ZOOM);
     const live = useRef<Zoom>(geometry.NO_ZOOM);
     const frame = useRef<HTMLElement | null>(null);
@@ -127,6 +135,15 @@ export function useZoomPan(options: ZoomPanOptions = {}): ZoomPan {
     const tap = useRef<{ x: number; y: number; at: number; moved: boolean } | null>(null);
     const lastTap = useRef<{ x: number; y: number; at: number } | null>(null);
     const toggledAt = useRef(0);
+    /** How far an unzoomed picture was moved by hand, in px (`looseAtFit`). */
+    const loose = useRef({ x: 0, y: 0 });
+
+    /** The transform for the zoom with the hand-moved shift in front of it. */
+    const transformOf = useCallback((at: Zoom) => {
+        const zoomed = geometry.zoomTransformPx(at, cover.current, metrics.current);
+        const { x, y } = loose.current;
+        return x === 0 && y === 0 ? zoomed : `translate3d(${+x.toFixed(2)}px, ${+y.toFixed(2)}px, 0) ${zoomed}`;
+    }, []);
 
     /** Read the frame and what the picture covers of it. Called when a gesture
      *  starts - never per move. */
@@ -161,12 +178,12 @@ export function useZoomPan(options: ZoomPanOptions = {}): ZoomPan {
     }, []);
 
     const paint = useCallback((ease: boolean) => {
-        const value = geometry.zoomTransformPx(live.current, cover.current, metrics.current);
+        const value = transformOf(live.current);
         for (const target of targets.current) {
             target.style.transition = ease ? `transform ${STEP_MS}ms ease-out` : "";
             target.style.transform = value;
         }
-    }, []);
+    }, [transformOf]);
 
     /** One write per frame, however many events asked for it. */
     const schedule = useCallback(() => {
@@ -220,6 +237,7 @@ export function useZoomPan(options: ZoomPanOptions = {}): ZoomPan {
         (next: (current: Zoom, cover: Cover) => Zoom, ease = true) => {
             if (!gesturing.current) measureFrame();
             live.current = next(live.current, cover.current);
+            loose.current = { x: 0, y: 0 };
             paint(ease && !gesturing.current);
             if (!gesturing.current) commit();
         },
@@ -256,6 +274,7 @@ export function useZoomPan(options: ZoomPanOptions = {}): ZoomPan {
             const onWheel = (event: WheelEvent) => {
                 event.preventDefault();
                 begin();
+                loose.current = { x: 0, y: 0 };
                 live.current = geometry.zoomBy(
                     live.current,
                     geometry.wheelFactor(event),
@@ -277,16 +296,12 @@ export function useZoomPan(options: ZoomPanOptions = {}): ZoomPan {
             if (!node) return () => {};
             targets.current.add(node);
             node.style.transformOrigin = "center";
-            node.style.transform = geometry.zoomTransformPx(
-                live.current,
-                cover.current,
-                metrics.current
-            );
+            node.style.transform = transformOf(live.current);
             return () => {
                 targets.current.delete(node);
             };
         },
-        []
+        [transformOf]
     );
 
     useEffect(
@@ -377,8 +392,9 @@ export function useZoomPan(options: ZoomPanOptions = {}): ZoomPan {
                         moved: false
                     };
                 }
-                // A single pointer only moves a zoomed picture; two always pinch.
-                if (pointers.current.size < 2 && !geometry.isZoomed(live.current)) return;
+                // A single pointer only moves a zoomed picture, unless the
+                // caller lets it move one at fit; two always pinch.
+                if (pointers.current.size < 2 && !geometry.isZoomed(live.current) && !looseAtFit) return;
                 begin();
                 if (pointers.current.size >= 2) pinched.current = true;
                 try {
@@ -404,7 +420,14 @@ export function useZoomPan(options: ZoomPanOptions = {}): ZoomPan {
                     const other = first![0] === event.pointerId ? second![1] : first![1];
                     const before: [FramePoint, FramePoint] = [from, other];
                     const after: [FramePoint, FramePoint] = [to, other];
+                    loose.current = { x: 0, y: 0 };
                     live.current = geometry.pinchBy(live.current, before, after, cover.current);
+                } else if (looseAtFit && !geometry.isZoomed(live.current)) {
+                    const box = metrics.current;
+                    loose.current = {
+                        x: loose.current.x + (to.x - from.x) * box.width,
+                        y: loose.current.y + (to.y - from.y) * box.height
+                    };
                 } else {
                     const { x, y } = { x: to.x - from.x, y: to.y - from.y };
                     live.current = geometry.panBy(live.current, x, y, cover.current);
@@ -415,7 +438,7 @@ export function useZoomPan(options: ZoomPanOptions = {}): ZoomPan {
             onPointerUp: release,
             onPointerCancel: release
         },
-        transform: geometry.zoomTransformPx(zoom, cover.current, metrics.current),
+        transform: transformOf(zoom),
         zoom,
         zoomed: geometry.isZoomed(zoom),
         engaged: () => geometry.isZoomed(live.current) || (gesturing.current && pinched.current),

@@ -15,7 +15,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePlacesT } from "../use-places-t";
 import { driftPosition } from "./panel-state";
 import { WeatherIcon } from "./panel-weather";
-import { clearWindowControls } from "@polaris/ui";
+import { clearWindowControls, windowControlsBand } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import type { WeatherState } from "./panel-weather";
 
@@ -83,6 +83,7 @@ export function PanelScreensaver({
             onClick={onWake}
             className={clearWindowControls("fixed inset-0 z-[100] cursor-pointer overflow-hidden bg-black text-white")}
         >
+            <div aria-hidden className={windowControlsBand("bg-black")} />
             <div
                 className="absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-2 text-center opacity-80 transition-[left,top] duration-[30000ms] ease-in-out motion-reduce:transition-none"
                 style={{ left: `${at.left}%`, top: `${at.top}%` }}

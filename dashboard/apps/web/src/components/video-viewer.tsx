@@ -18,6 +18,7 @@
 
 import { X } from "lucide-react";
 import { useEffect } from "react";
+import { clearWindowControls, windowControlsBand } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { MediaPlayer } from "@/components/media-player";
 
@@ -62,8 +63,9 @@ export function VideoViewer({
             // The ground closes it; the player does not. A press that landed on
             // the pause button must not also put the video away.
             onClick={onClose}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 safe-p-4 backdrop-blur-sm"
+            className={clearWindowControls("fixed inset-0 z-[60] flex items-center justify-center bg-black/90 safe-p-4 backdrop-blur-sm")}
         >
+            <div aria-hidden className={windowControlsBand("bg-black/90 backdrop-blur-sm")} />
             <button
                 type="button"
                 onClick={onClose}

@@ -119,3 +119,68 @@ Check whether the control is pinned to the top edge without going through
 `clearWindowControls`; the sweep test names the file. For a header item, check
 it is a direct item of a header group or has a `title`, and that the left group
 is what overflows.
+
+## Reopened 2026-11-23: the video viewer, the seam, the picture that would not move
+
+Reported again with the picture viewer's zoom controls under the window buttons,
+"and in Deploy", plus an ugly edge along the buttons' band, worse with a dialog
+open, and a picture at fit that could no longer be dragged.
+
+- **Video viewer** (`apps/web/src/components/video-viewer.tsx`): `fixed inset-0`
+  with its close at the top right and no `clearWindowControls`. The sweep let it
+  through because any `bg-black/` surface counted as a backdrop.
+- **The seam**: the window buttons are one flat colour, read by the desktop
+  preload (`desktop/src/shared/title-bar.ts`) as the first *opaque* background
+  under them. With a dialog open that skipped the dimmed backdrop and took the
+  undimmed page, so a light block sat in the corner of a dark screen. A
+  full-window surface moved below the band also left the app's header,
+  undimmed, with its bottom border showing above it.
+- **The picture at fit**: the shared gesture engine (d75d1ab73b) only moved a
+  zoomed picture; the viewer's own drag before it moved one at any zoom.
+
+### Fix
+
+- The preload composites every layer at the point (`elementsFromPoint`, each
+  background's alpha times its opacity) and reads again on `transitionend` /
+  `animationend`, so the buttons take the dimmed colour once a backdrop has
+  faded in. `rgbaOf` also reads `rgb(r g b / a)` and `color(srgb ...)`.
+- `windowControlsBand(background)` (`packages/ui/src/shell/window-controls.ts`):
+  a fixed layer filling the band above a full-window surface with its own
+  ground (and dragging the window). Used by the picture and video viewers, the
+  presenter, the slide show, the audience show, the arcade player and phone
+  pad, and the Places screensaver.
+- `useZoomPan({ looseAtFit: true })`: a single pointer moves an unzoomed
+  picture, and it stays where it is let go until the zoom changes, it is reset,
+  or another picture opens. Only the picture viewer passes it; cameras and call
+  tiles keep the old behaviour.
+- The sweep (`apps/web/test/ui/window-controls-band.test.ts`) reads each JSX
+  `className` as a whole - every string in a `cn(...)`, conditionals, and the
+  right-hand side of same-file constants - over `apps/*/src` and
+  `packages/*/src`, and treats `fixed` + `inset-0`/`inset-y-0`, or `top-0` with
+  a right edge, as reaching the buttons. Only a childless layer counts as a
+  backdrop. Checked by pointing it at the old video viewer, which it names.
+
+### Verified
+
+- `packages/ui/test/image-viewer-window-controls.test.tsx`: the viewer starts
+  below the band, its zoom and close have no ancestor pinned back to the top,
+  and the band above it has the viewer's ground.
+- `apps/web/test/components/use-zoom-pan.test.tsx`: a drag moves an unzoomed
+  picture with `looseAtFit`, it stays, and a zoom puts it back.
+- `desktop/test/shared/title-bar.test.ts`: an 80% black backdrop over a white
+  header gives `#333333`; nothing opaque gives no colour.
+
+### Not verified
+
+- The real Electron window was not run, and the headless-Chrome screenshots
+  with the band simulated were not taken in this pass.
+- Deploy's project and environment pickers still switch on window width
+  (`md:`) while the bar switches on its own (`tb-*`); popovers' collision
+  padding does not include the band yet.
+
+### If it happens again
+
+A control under the buttons: the sweep names the file unless the surface goes
+through `clearWindowControls`. A lighter or darker block under the buttons:
+compare `composite(...)` with what is drawn there at the point the preload
+samples (just left of the buttons, 8px down).

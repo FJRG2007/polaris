@@ -14,7 +14,7 @@ import * as core from "@polaris/core";
 import * as deck from "@/lib/office/deck";
 import * as motion from "@/lib/office/slide-motion";
 import { ShowStage, STILL, useShowPlan, type SlideMotion } from "./show-stage";
-import { Button, clearWindowControls, cn, matchShortcut } from "@polaris/ui";
+import { Button, clearWindowControls, cn, matchShortcut, windowControlsBand } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChevronLeft, ChevronRight, Maximize, Minimize, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
@@ -213,6 +213,7 @@ export function Present({
                 !controls && "cursor-none"
             )}
         >
+            <div aria-hidden className={windowControlsBand("bg-black")} />
             <div className="flex min-h-0 flex-1 items-center justify-center [container-type:size]">
                 {ended ? (
                     <div className="flex flex-col items-center gap-2 text-center">

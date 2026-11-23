@@ -24,8 +24,8 @@ function flushFrames() {
     for (const callback of due) callback(0);
 }
 
-function Probe() {
-    const look = useZoomPan();
+function Probe({ looseAtFit = false }: { looseAtFit?: boolean }) {
+    const look = useZoomPan({ looseAtFit });
     renders += 1;
     return (
         <div data-testid="frame" ref={look.frameRef} {...look.frameProps}>
@@ -141,6 +141,25 @@ describe("useZoomPan", () => {
         fireEvent.pointerDown(frame, { pointerId: 1, pointerType: "mouse", button: 0, clientX: 500, clientY: 250 });
         fireEvent.pointerMove(frame, { pointerId: 1, pointerType: "mouse", clientX: 300, clientY: 250 });
         expect(frames).toHaveLength(0);
+    });
+
+    it("moves an unzoomed picture by hand where the caller allows it, until the zoom changes", () => {
+        // The picture viewer: before the engine was shared, a picture at fit
+        // could be dragged around, and people still reach for it.
+        render(<Probe looseAtFit />);
+        const frame = screen.getByTestId("frame");
+        const target = screen.getByTestId("target");
+        fireEvent.pointerDown(frame, { pointerId: 1, pointerType: "mouse", button: 0, clientX: 500, clientY: 250 });
+        fireEvent.pointerMove(frame, { pointerId: 1, pointerType: "mouse", clientX: 380, clientY: 290 });
+        flushFrames();
+        expect(target.style.transform).toBe("translate3d(-120px, 40px, 0) translate3d(0px, 0px, 0) scale(1)");
+        fireEvent.pointerUp(frame, { pointerId: 1, pointerType: "mouse", clientX: 380, clientY: 290 });
+        // Let go, it stays where it was put.
+        expect(target.style.transform).toBe("translate3d(-120px, 40px, 0) translate3d(0px, 0px, 0) scale(1)");
+        expect(screen.getByTestId("scale").textContent).toBe("1.00");
+        // A zoom puts it back in the middle and zooms from there.
+        fireEvent.click(screen.getByText("in"));
+        expect(target.style.transform).toBe("translate3d(0px, 0px, 0) scale(1.5)");
     });
 
     it("pinches with two fingers around their midpoint", () => {
