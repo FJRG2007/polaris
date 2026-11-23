@@ -17,6 +17,7 @@ import type { Session, WebContents } from "electron";
 import {
     createIntegrityChecker,
     readFiles,
+    servedPath,
     sriDigest,
     type IntegrityChecker,
     type IntegrityVerdict
@@ -47,7 +48,10 @@ export async function checkPageFiles(contents: WebContents, origin: string, raw:
         files.map(async (file) => {
             if (file.digest) return file;
             try {
-                const response = await session.fetch(`${origin}${file.path}`, { credentials: "omit", cache: "force-cache" });
+                const response = await session.fetch(`${origin}${servedPath(file.path)}`, {
+                    credentials: "omit",
+                    cache: "force-cache"
+                });
                 return { path: file.path, digest: response.ok ? await sriDigest(await response.arrayBuffer()) : "" };
             } catch {
                 return file;

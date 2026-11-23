@@ -45,7 +45,7 @@ import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
 import * as update from "@/lib/update";
 import * as devicePairing from "@/lib/device-pairing";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
-import { sriDigest } from "@polaris/core/integrity";
+import { servedPath, sriDigest } from "@polaris/core/integrity";
 import { checkPage, originPattern, readFiles } from "@/lib/integrity";
 import { INTEGRITY_CHECK, type IntegrityReply } from "@/lib/integrity-messages";
 import { BLOCKED_HOSTS_KEY, PAGE_FILLING_KEY } from "@/lib/page-filling";
@@ -4950,7 +4950,7 @@ async function answerIntegrity(raw: unknown, senderUrl: string | undefined): Pro
         files.map(async (file) => {
             if (file.digest) return file;
             try {
-                const response = await fetch(`${origin}${file.path}`, { credentials: "omit", cache: "force-cache" });
+                const response = await fetch(`${origin}${servedPath(file.path)}`, { credentials: "omit", cache: "force-cache" });
                 return { path: file.path, digest: response.ok ? await sriDigest(await response.arrayBuffer()) : "" };
             } catch {
                 return file;

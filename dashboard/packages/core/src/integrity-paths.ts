@@ -16,7 +16,9 @@ export interface CheckedFile {
 /**
  * The path a loaded resource is checked under, or null when it is not one this
  * checks: another origin, or not a file of code. The query is dropped (Next.js
- * adds `?dpl=` to some), the path kept exactly as served.
+ * adds `?dpl=` to some) and the path decoded: the manifest names files as they
+ * sit on disk (`[[...path]]`), while a browser reports a dynamic route's chunk
+ * percent-encoded (`%5B%5B...path%5D%5D`), and the two must meet.
  */
 export function checkedPath(url: string, origin: string): string | null {
     let parsed: URL;
@@ -26,7 +28,30 @@ export function checkedPath(url: string, origin: string): string | null {
         return null;
     }
     if (parsed.origin !== origin) return null;
-    return CODE_EXTENSIONS.some((extension) => parsed.pathname.endsWith(extension)) ? parsed.pathname : null;
+    if (!CODE_EXTENSIONS.some((extension) => parsed.pathname.endsWith(extension))) return null;
+    return decodedPath(parsed.pathname);
+}
+
+/** Each segment decoded on its own, so an encoded slash never becomes a new one.
+ *  A segment that is not valid percent-encoding stays as served. */
+function decodedPath(pathname: string): string {
+    return pathname
+        .split("/")
+        .map((segment) => {
+            try {
+                const decoded = decodeURIComponent(segment);
+                return decoded.includes("/") ? segment : decoded;
+            } catch {
+                return segment;
+            }
+        })
+        .join("/");
+}
+
+/** The address a checked path is fetched from again: its route brackets
+ *  encoded the way the browser asked for it in the first place. */
+export function servedPath(path: string): string {
+    return path.replace(/\[/g, "%5B").replace(/\]/g, "%5D");
 }
 
 /** The SRI form of a SHA-256, as the manifest writes it. */

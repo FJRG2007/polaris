@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
     checkedPath,
+    servedPath,
     judge,
     manifestUrl,
     readManifest,
@@ -52,6 +53,25 @@ describe("integrity", () => {
         expect(checkedPath("https://cdn.example/_next/static/a.js", ORIGIN)).toBeNull();
         expect(checkedPath(`${ORIGIN}/_next/static/media/font.woff2`, ORIGIN)).toBeNull();
         expect(checkedPath("not a url", "nope")).toBeNull();
+    });
+
+    it("checks a dynamic route's chunk under the name the manifest gives it", () => {
+        expect(
+            checkedPath(`${ORIGIN}/_next/static/chunks/app/(app)/game-servers/%5B%5B...path%5D%5D/page-c8.js`, ORIGIN)
+        ).toBe("/_next/static/chunks/app/(app)/game-servers/[[...path]]/page-c8.js");
+        expect(checkedPath(`${ORIGIN}/_next/static/chunks/app/tasks/l/%5BlistId%5D/page.js`, ORIGIN)).toBe(
+            "/_next/static/chunks/app/tasks/l/[listId]/page.js"
+        );
+        expect(checkedPath(`${ORIGIN}/_next/static/chunks/a%2Fb.js`, ORIGIN)).toBe("/_next/static/chunks/a%2Fb.js");
+        expect(checkedPath(`${ORIGIN}/_next/static/chunks/bad%E0.js`, ORIGIN)).toBe("/_next/static/chunks/bad%E0.js");
+    });
+
+    it("verifies a dynamic route's chunk loaded percent-encoded", () => {
+        const routed: IntegrityManifest = { ...manifest, files: { ...manifest.files, "/_next/static/chunks/[id]/p.js": A } };
+        const path = checkedPath(`${ORIGIN}/_next/static/chunks/%5Bid%5D/p.js`, ORIGIN);
+        expect(path).not.toBeNull();
+        expect(judge(STAMP, routed, [{ path: path as string, digest: A }]).kind).toBe("verified");
+        expect(servedPath(path as string)).toBe("/_next/static/chunks/%5Bid%5D/p.js");
     });
 
     it("verifies a page whose files all match", () => {

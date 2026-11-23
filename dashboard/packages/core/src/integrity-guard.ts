@@ -12,7 +12,7 @@
  * neither restyle nor read the warning.
  */
 
-import { checkedPath, sriDigest, type CheckedFile } from "./integrity-paths";
+import { checkedPath, servedPath, sriDigest, type CheckedFile } from "./integrity-paths";
 import type { IntegrityVerdict } from "./integrity";
 
 /** The warning's words, in the reader's language. */
@@ -51,7 +51,7 @@ export function loadedPaths(skip: ReadonlySet<string> = new Set()): string[] {
 export async function hashPath(path: string): Promise<string> {
     if (!globalThis.crypto?.subtle) return "";
     try {
-        const response = await fetch(path, { cache: "force-cache", credentials: "same-origin" });
+        const response = await fetch(servedPath(path), { cache: "force-cache", credentials: "same-origin" });
         return response.ok ? await sriDigest(await response.arrayBuffer()) : "";
     } catch {
         return "";

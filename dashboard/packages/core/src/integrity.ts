@@ -15,7 +15,7 @@
 import { z } from "zod";
 import type { CheckedFile } from "./integrity-paths";
 
-export { CODE_EXTENSIONS, checkedPath, sriDigest, type CheckedFile } from "./integrity-paths";
+export { CODE_EXTENSIONS, checkedPath, servedPath, sriDigest, type CheckedFile } from "./integrity-paths";
 
 /** Where CI publishes the manifests (`.github/workflows/dashboard-publish.yml`). */
 export const MANIFEST_BASE = "https://raw.githubusercontent.com/FJRG2007/polaris/integrity/manifests/";
