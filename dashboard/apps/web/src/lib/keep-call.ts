@@ -62,6 +62,7 @@ export const OUTSIDE_APP_PREFIXES: readonly string[] = [
     "/f",
     "/forms",
     "/k",
+    "/launcher",
     "/legal",
     "/m",
     "/mail/print",

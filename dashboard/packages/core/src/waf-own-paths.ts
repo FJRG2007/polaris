@@ -56,6 +56,7 @@ export const POLARIS_ROUTE_ROOTS: readonly string[] = [
     "icon.svg",
     "images",
     "k",
+    "launcher",
     "legal",
     "logos",
     "m",
