@@ -3,8 +3,8 @@
 //! test here, on both accepted suites, natively and in WebAssembly.
 
 use polaris_core::mls::{
-    ErrorKind, Member, MemoryStorage, ProcessedKind, CLASSIC_CIPHERSUITE, MAX_PAST_EPOCHS,
-    POLARIS_CIPHERSUITE,
+    ErrorKind, Member, MemoryStorage, ProcessedKind, CLASSIC_CIPHERSUITE, CONTENT_SIGNATURE_LABEL,
+    MAX_PAST_EPOCHS, POLARIS_CIPHERSUITE,
 };
 use std::collections::HashMap;
 
@@ -645,5 +645,30 @@ fn forgotten_groups_can_be_joined_again() {
         assert_agree(&[&alice, &bob, &carol]);
         let sealed = bob.encrypt(GROUP, b"back").unwrap();
         assert_eq!(alice.process(GROUP, &sealed).unwrap().plaintext, b"back");
+    }
+}
+
+/// A content signature is plain Ed25519 under the device's MLS signature key,
+/// over the label and the payload: it verifies against the published key,
+/// and not without the label, for another payload or under another key.
+#[test]
+fn content_signatures_verify_against_the_signature_key() {
+    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+    for suite in SUITES {
+        let alice = member("alice", suite);
+        let bob = member("bob", suite);
+        let payload = b"conversation|message|epoch|digest";
+        let signature = alice.sign_content(payload).unwrap();
+        let signature = Signature::from_slice(&signature).unwrap();
+        let key = |m: &Member| {
+            VerifyingKey::from_bytes(m.signature_public_key().try_into().unwrap()).unwrap()
+        };
+        let labelled = [CONTENT_SIGNATURE_LABEL, payload].concat();
+        assert!(key(&alice).verify(&labelled, &signature).is_ok());
+        assert!(key(&alice).verify(payload, &signature).is_err());
+        assert!(key(&alice)
+            .verify(&[CONTENT_SIGNATURE_LABEL, b"another"].concat(), &signature)
+            .is_err());
+        assert!(key(&bob).verify(&labelled, &signature).is_err());
     }
 }

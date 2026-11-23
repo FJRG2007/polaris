@@ -667,6 +667,16 @@ export async function send(...args: Parameters<typeof sendUnguarded>): Promise<s
     }
 }
 
+/** The `ChatMessage` columns of a sealed message (see the schema). */
+export interface SealedColumns {
+    readonly e2eeCiphertext: Uint8Array<ArrayBuffer>;
+    readonly e2eeEpoch: bigint;
+    readonly e2eeSenderLeaf: number;
+    readonly e2eeDevice: string;
+    readonly e2eeSignature: Uint8Array<ArrayBuffer>;
+    readonly e2eeSignatureKey: Uint8Array<ArrayBuffer>;
+}
+
 async function sendUnguarded(
     actor: ChatActor,
     input: core.ChatSendInput,
@@ -709,7 +719,13 @@ async function sendUnguarded(
      * row is written in the same transaction as its first message, so a post
      * never exists without the thread it heads.
      */
-    forumPost: core.ChatForumPostFields | null = null
+    forumPost: core.ChatForumPostFields | null = null,
+    /**
+     * The sealed content, when the message is end to end encrypted
+     * (`lib/chat/e2ee/sealed-messages`): stored beside an empty body, which
+     * is all the server ever sees of it.
+     */
+    sealed: SealedColumns | null = null
 ): Promise<string> {
     const access = await requirePostable(actor, input.channelId);
     // A space's emoji only inside that space: anything else the text names is
@@ -728,7 +744,7 @@ async function sendUnguarded(
     // A forward is the exception, and it was a bug: the message being passed on
     // is the content, the note on top is optional and says so on the dialog -
     // and this refused every forward somebody sent without typing one.
-    if (attachments.length === 0 && !quote?.forwarded && !location && isBlankMarkdown(input.body)) {
+    if (attachments.length === 0 && !quote?.forwarded && !location && !sealed && isBlankMarkdown(input.body)) {
         throw new ChatRuleError({ key: "errors.bodyRequired" });
     }
 
@@ -851,7 +867,8 @@ async function sendUnguarded(
                           }
                       }
                     : {}),
-                ...(location ? { location: { create: { ...location } } } : {})
+                ...(location ? { location: { create: { ...location } } } : {}),
+                ...(sealed ?? {})
             },
             select: { id: true, createdAt: true }
         });

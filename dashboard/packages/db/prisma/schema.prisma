@@ -11209,6 +11209,19 @@ model ChatMessage {
     publishedFromId String? @db.Uuid
     // The channel that message is in, so the copy links back to it.
     publishedFromChannelId String? @db.Uuid
+    // Sealed end to end (docs/chat-e2ee-mls.md, behind the chat E2EE flag):
+    // the content under the conversation's history key for `e2eeEpoch`, bound
+    // to `clientKey` as the message id and to the sender's MLS leaf; `body` is
+    // empty. `e2eeSignature` is the sending device's over it, and
+    // `e2eeSignatureKey` the key the server held for that device when it took
+    // the message, so a later rekey of the device never orphans the past.
+    // All null for every message that is not sealed.
+    e2eeCiphertext   Bytes?
+    e2eeEpoch        BigInt?
+    e2eeSenderLeaf   Int?
+    e2eeDevice       String?
+    e2eeSignature    Bytes?
+    e2eeSignatureKey Bytes?
     createdAt   DateTime  @default(now())
 
     channel     ChatChannel      @relation(fields: [channelId], references: [id], onDelete: Cascade)

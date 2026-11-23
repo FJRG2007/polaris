@@ -27,6 +27,17 @@ const state = vi.hoisted(() => ({
 
 vi.mock("@/lib/session", () => ({ backgroundUser: async () => state.user }));
 vi.mock("@/lib/rate-limit-service", () => ({ rateLimit: async () => ({ ok: true }) }));
+// The ordinary send, reduced to the row it writes: what a sealed message adds to it is under test here.
+vi.mock("@/lib/chat/messages", () => ({
+    send: async (actor: { id: string }, input: { channelId: string; body: string; clientKey?: string }, ...rest: unknown[]) => {
+        const rows = (state.tables.chatMessage ??= []);
+        const earlier = rows.find((r) => r.authorId === actor.id && r.clientKey === input.clientKey);
+        if (earlier) return earlier.id;
+        const id = crypto.randomUUID();
+        rows.push({ id, channelId: input.channelId, authorId: actor.id, clientKey: input.clientKey, body: input.body, deletedAt: null, expiresAt: null, audience: [], ...(rest[5] as Row) });
+        return id;
+    }
+}));
 vi.mock("@/lib/chat/access", () => ({
     channelAccess: async (actor: { id: string }, channelId: string) => (state.members.has(`${actor.id}:${channelId}`) ? { id: channelId } : null)
 }));
@@ -105,6 +116,7 @@ vi.mock("@polaris/db", () => {
         mlsGroupEvent: table("mlsGroupEvent", []),
         chatHistoryKey: table("chatHistoryKey", ["channelId", "epoch", "recipient"]),
         chatAccountKey: table("chatAccountKey", ["userId"]),
+        chatMessage: table("chatMessage", []),
         // All or nothing, one at a time (Postgres's row lock on the group does
         // the same for two commits): run on the live tables, put the copy back
         // on a throw.
@@ -552,5 +564,63 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         // Without the store the restart has lost it (no account key to open an envelope with).
         const forgetful = await open(BOB, "bob-phone-1", store, notes, through(BOB));
         expect(await forgetful.historyKey(CHANNEL, 1n)).toBeNull();
+    });
+
+    it("seals a message under the epoch's history key, signed by the device, and only a member opens it", async () => {
+        const alice = await open(ALICE, "alice-laptop");
+        const bob = await open(BOB, "bob-phone-1");
+        for (const device of [alice, bob]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB]);
+        await bob.sync(CHANNEL);
+        const clientKey = crypto.randomUUID();
+        const id = await alice.sendSealed(CHANNEL, new TextEncoder().encode("only for us"), { clientKey });
+        // A retry of the same send is the same message.
+        expect(await alice.sendSealed(CHANNEL, new TextEncoder().encode("only for us"), { clientKey })).toBe(id);
+        const row = state.tables.chatMessage!.find((r) => r.id === id)!;
+        expect(row.body).toBe("");
+        expect(Buffer.from(row.e2eeCiphertext as Uint8Array).includes(Buffer.from("only for us"))).toBe(false);
+        expect(Buffer.from(row.e2eeSignatureKey as Uint8Array)).toEqual(Buffer.from(state.tables.mlsDevice!.find((d) => d.userId === ALICE)!.signatureKey as Uint8Array));
+        const [read] = await bob.readSealed(CHANNEL, [id]);
+        expect(new TextDecoder().decode(read!.opened!)).toBe("only for us");
+        expect(read!.sender).toBe(`${ALICE}/alice-laptop`);
+
+        // Changed at rest: the signature no longer covers it, and nothing is opened.
+        const ciphertext = new Uint8Array(row.e2eeCiphertext as Uint8Array);
+        ciphertext[5] ^= 1;
+        row.e2eeCiphertext = ciphertext;
+        expect((await bob.readSealed(CHANNEL, [id]))[0]!.opened).toBeNull();
+
+        // A device without the history key gets nothing; a deleted message is not served.
+        const late = await open(CAROL, "carol-desk-1");
+        state.members.add(`${CAROL}:${CHANNEL}`);
+        expect((await late.readSealed(CHANNEL, [id]))[0]!.opened).toBeNull();
+        row.deletedAt = new Date();
+        expect(await bob.readSealed(CHANNEL, [id])).toEqual([]);
+    });
+
+    it("refuses a sealed message with another device's signature, from a future epoch, or from a device not its own", async () => {
+        const alice = await open(ALICE, "alice-laptop");
+        await alice.register();
+        await alice.ensureGroup(CHANNEL);
+        const send = (overrides: Record<string, unknown>, as = ALICE) =>
+            call(
+                {
+                    op: "send-sealed",
+                    channelId: CHANNEL,
+                    device: "alice-laptop",
+                    clientKey: crypto.randomUUID(),
+                    epoch: "0",
+                    senderLeaf: 0,
+                    ciphertext: Buffer.alloc(40, 1).toString("base64url"),
+                    signature: Buffer.alloc(64, 2).toString("base64url"),
+                    ...overrides
+                },
+                as
+            );
+        expect(await send({})).toMatchObject({ status: 409, body: { error: "badSignature" } });
+        expect(await send({ epoch: "9" })).toMatchObject({ status: 409, body: { error: "futureEpoch" } });
+        expect(await send({}, BOB)).toMatchObject({ status: 409, body: { error: "unknownDevice" } });
+        expect(state.tables.chatMessage ?? []).toEqual([]);
     });
 });

@@ -11,6 +11,9 @@ use openmls_traits::storage::{StorageProvider, CURRENT_VERSION};
 use openmls_traits::types::SignatureScheme;
 use openmls_traits::OpenMlsProvider;
 
+/// What `Member::sign_content` signs in front of the payload.
+pub const CONTENT_SIGNATURE_LABEL: &[u8] = b"polaris/chat-e2ee/content-signature/v1\0";
+
 fn rejected(error: impl std::fmt::Display) -> MlsError {
     MlsError::new(ErrorKind::Rejected, error)
 }
@@ -250,6 +253,21 @@ impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {
 
     pub fn signature_public_key(&self) -> &[u8] {
         self.signer.public()
+    }
+
+    /// An Ed25519 signature with this device's MLS signature key over
+    /// `CONTENT_SIGNATURE_LABEL || payload`, for content stored outside MLS
+    /// (a chat message sealed under a history key). The label keeps it apart
+    /// from every MLS signature, which signs a length-prefixed "MLS 1.0 "
+    /// label first, so no payload makes this an MLS signature oracle.
+    pub fn sign_content(&self, payload: &[u8]) -> Result<Vec<u8>> {
+        use openmls_traits::signatures::Signer as _;
+        let mut data = Vec::with_capacity(CONTENT_SIGNATURE_LABEL.len() + payload.len());
+        data.extend_from_slice(CONTENT_SIGNATURE_LABEL);
+        data.extend_from_slice(payload);
+        self.signer
+            .sign(&data)
+            .map_err(|error| internal(format!("{error:?}")))
     }
 
     pub fn ciphersuite(&self) -> u16 {

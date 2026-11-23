@@ -93,6 +93,24 @@ wrapping key held in the same database, bound to the device, conversation and
 epoch, and a slot is written once. Signing the account out of the browser
 deletes the device's MLS store and these keys.
 
+Sealed messages: `sendSealed(channel, plaintext)` catches up, seals the content
+with `sealMessage` under the current epoch's history key (message id = the
+send's `clientKey`, bound to the sender's leaf), and signs it with the
+device's MLS signature key (`signContent`, Ed25519 over
+`CONTENT_SIGNATURE_LABEL || canonical(..., SHA-256(sealed))`). The route op
+`send-sealed` takes it only from the session's own device, for a group at or
+past that epoch, with a signature that verifies under the key the server holds
+for the device; it copies that key onto the row and stores the message through
+the ordinary `send` with an empty body, so every posting rule still applies and
+nothing that reads a body has anything to read. `ChatMessage` carries
+`e2eeCiphertext`, `e2eeEpoch`, `e2eeSenderLeaf`, `e2eeDevice`, `e2eeSignature`
+and `e2eeSignatureKey` (migration `20280102000000_chat_sealed_messages`,
+additive; its header has the reverse). `readSealed(channel, ids)` (op
+`read-sealed`, at most 100, only messages the account may see) checks each
+signature, then opens the content with the epoch's history key; a message that
+fails either comes back with `opened: null`. Verifying needs WebCrypto Ed25519
+(Node 20+, current browsers).
+
 Crash safety: an operation's state changes and its request are written in one
 transaction before the request is sent. A commit the server took while the
 device never heard the answer comes back `staleEpoch` on resend; the device then
@@ -105,8 +123,9 @@ are in `localStorage`.
 
 ## Not built yet
 
-- Sealing chat message bodies with `sealMessage` and the history key, the
-  `ChatMessage` columns that carry them, and the reader path.
+- The chat screens on sealed messages: the composer calling `sendSealed` and
+  the message list calling `readSealed` for rows with an empty body, once the
+  flag is on. The library, route and columns are built; no screen uses them.
 - The `org` history-key envelope. The organisation recovery key (proposal 3.5)
   has no public key stored anywhere yet - its custodian setup is not built - so
   nothing can serve it and no `org` envelope can be sealed until it is.
@@ -115,4 +134,5 @@ are in `localStorage`.
   to the accounts it adds; the rest seal their own when a device reads the key.
 - Server-run members (Polar, webhooks) through the Node binding and
   `mls-store.ts`.
-- A per-message device signature.
+- Sign-out deletes the browser's MLS device, but its leaf stays in each group
+  until another member removes it.

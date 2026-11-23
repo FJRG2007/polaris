@@ -65,7 +65,9 @@ mod member;
 mod provider;
 
 pub use journal::{Journal, StoreChange};
-pub use member::{CommitOutput, GroupMember, Member, Processed, ProcessedKind};
+pub use member::{
+    CommitOutput, GroupMember, Member, Processed, ProcessedKind, CONTENT_SIGNATURE_LABEL,
+};
 pub use openmls_memory_storage::MemoryStorage;
 pub use provider::{Provider, SeededRand};
 

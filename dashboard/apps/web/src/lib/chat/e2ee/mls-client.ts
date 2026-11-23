@@ -73,6 +73,7 @@ export interface MlsMemberLike {
     forgetGroup(groupId: Uint8Array): void;
     members(groupId: Uint8Array): { leaf: number; identity: Uint8Array }[];
     ownLeaf(groupId: Uint8Array): number;
+    signContent(payload: Uint8Array): Uint8Array;
     mergePendingCommit(groupId: Uint8Array): void;
     clearPendingCommit(groupId: Uint8Array): void;
     joinByWelcome(welcome: Uint8Array): Uint8Array;
@@ -132,6 +133,29 @@ export interface MlsApplication {
     sender: string;
     epoch: bigint;
     plaintext: Uint8Array;
+}
+
+/** A stored sealed message, opened by `readSealed`. */
+export interface MlsSealedMessage {
+    id: string;
+    authorId: string | null;
+    /** `${userId}/${device}` of the device that signed it. */
+    sender: string;
+    epoch: bigint;
+    /** The content; null when its signature or sealing does not check out, or no key here opens it. */
+    opened: Uint8Array | null;
+}
+
+interface SealedWire {
+    id: string;
+    authorId: string | null;
+    clientKey: string;
+    device: string;
+    epoch: string;
+    senderLeaf: number;
+    ciphertext: string;
+    signature: string;
+    signatureKey: string;
 }
 
 const encoder = new TextEncoder();
@@ -362,6 +386,62 @@ export class MlsDevice {
         const epoch = this.member.epoch(groupId);
         const payload = this.member.encrypt(groupId, framed(CONTENT_KIND, plaintext));
         await this.commitAndSend({ op: "application", channelId, device: this.options.device, epoch: epoch.toString(), payload: toText(payload) });
+    }
+
+    /**
+     * Seal a chat message's content under the group's current history key and
+     * sign it with this device's key, then store it (`send-sealed`). The
+     * message id is `clientKey`, made fresh for each message and reused only
+     * to retry the same one. Returns the stored message's id.
+     */
+    async sendSealed(channelId: string, plaintext: Uint8Array, options: { clientKey?: string; parentId?: string | null } = {}): Promise<string> {
+        this.requireGroup(channelId);
+        await this.pull(channelId);
+        const groupId = this.requireGroup(channelId);
+        const epoch = this.member.epoch(groupId);
+        const key = await this.historyKey(channelId, epoch);
+        // Never sent in the clear instead: the caller shows the send as failed.
+        if (!key) throw new Error("this device holds no history key for the conversation's current epoch");
+        const clientKey = options.clientKey ?? crypto.randomUUID();
+        const binding = { conversationId: channelId, epoch, messageId: clientKey, senderLeaf: this.member.ownLeaf(groupId) };
+        const ciphertext = await content.sealMessage(key, binding, plaintext);
+        const signature = this.member.signContent(await content.messageSignaturePayload(binding, ciphertext));
+        const answer = await this.send({
+            op: "send-sealed",
+            channelId,
+            device: this.options.device,
+            clientKey,
+            parentId: options.parentId ?? null,
+            epoch: epoch.toString(),
+            senderLeaf: binding.senderLeaf,
+            ciphertext: toText(ciphertext),
+            signature: toText(signature)
+        });
+        return String(answer.id);
+    }
+
+    /**
+     * Read and open these sealed messages: each one's signature is checked
+     * under the key the server held for its device, then its content opened
+     * with the epoch's history key. A message that fails either comes back
+     * without content (`opened: null`), never with what it claimed.
+     */
+    async readSealed(channelId: string, messageIds: string[]): Promise<MlsSealedMessage[]> {
+        const answer = await this.send({ op: "read-sealed", channelId, messageIds });
+        const rows = answer.messages as SealedWire[];
+        const out: MlsSealedMessage[] = [];
+        for (const row of rows) {
+            const epoch = BigInt(row.epoch);
+            const binding = { conversationId: channelId, epoch, messageId: row.clientKey, senderLeaf: row.senderLeaf };
+            const ciphertext = fromText(row.ciphertext);
+            let opened: Uint8Array | null = null;
+            if (await content.verifyMessageSignature(fromText(row.signatureKey), binding, ciphertext, fromText(row.signature))) {
+                const key = await this.historyKey(channelId, epoch).catch(() => null);
+                if (key) opened = await content.openMessage(key, binding, ciphertext).catch(() => null);
+            }
+            out.push({ id: row.id, authorId: row.authorId, sender: `${row.authorId}/${row.device}`, epoch, opened });
+        }
+        return out;
     }
 
     /** Read the group's log from where this device left off; returns the application messages, in order. */

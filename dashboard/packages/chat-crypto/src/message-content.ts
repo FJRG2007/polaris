@@ -19,10 +19,14 @@
  * each member account (history for its next new device) and the dormant
  * members as a hybrid post-quantum envelope (`sealHistoryKey`, 4.5).
  *
- * enigma: the proposal's per-message device signature over (conversation,
- * message id, epoch, ciphertext hash) is not here yet - authenticity of a
- * message currently rests on HK being known only to group members. Upgrade:
- * sign with the device's MLS signature key once the binding exposes signing.
+ * Each sealed message also carries its device's signature (proposal 4.2):
+ * Ed25519 under the sending device's MLS signature key, made by the binding's
+ * `signContent`, over
+ *
+ *     CONTENT_SIGNATURE_LABEL || canonical(LABEL, "signature", conversation, epoch, messageId, sender, SHA-256(sealed))
+ *
+ * so a member holding `HK` - every member, and every device of every member
+ * account later - still cannot write a message in another device's name.
  */
 
 import { openHybrid, sealHybrid } from "./hybrid-envelope";
@@ -35,6 +39,9 @@ export const HISTORY_KEY_BYTES = 32;
 const KEY_BYTES = 32;
 const NONCE_BYTES = 12;
 const TAG_BYTES = 16;
+/** What the binding's `signContent` puts in front of the payload (polaris_core::mls::CONTENT_SIGNATURE_LABEL). */
+const CONTENT_SIGNATURE_LABEL = new TextEncoder().encode("polaris/chat-e2ee/content-signature/v1\u0000");
+const SIGNATURE_BYTES = 64;
 
 /** What one message's ciphertext is bound to. */
 export interface MessageBinding {
@@ -101,6 +108,35 @@ export async function openMessage(historyKey: Uint8Array, binding: MessageBindin
         return new Uint8Array(opened);
     } catch {
         throw new MessageOpenError();
+    }
+}
+
+/** What the sending device signs for one sealed message (handed to the binding's `signContent`). */
+export async function messageSignaturePayload(binding: MessageBinding, sealed: Uint8Array): Promise<Uint8Array> {
+    const { conversationId, epoch, messageId, senderLeaf } = binding;
+    infoOf(binding);
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", owned(sealed)));
+    return canonical(LABEL, "signature", conversationId, BigInt(epoch).toString(), messageId, senderLeaf, digest);
+}
+
+/**
+ * Whether `signature` is the sending device's over this sealed message, under
+ * its published MLS signature key (Ed25519, 32 bytes). False for anything that
+ * does not verify, including a malformed key or signature.
+ */
+export async function verifyMessageSignature(
+    signaturePublicKey: Uint8Array,
+    binding: MessageBinding,
+    sealed: Uint8Array,
+    signature: Uint8Array
+): Promise<boolean> {
+    if (signaturePublicKey.length !== 32 || signature.length !== SIGNATURE_BYTES) return false;
+    try {
+        const key = await crypto.subtle.importKey("raw", owned(signaturePublicKey), { name: "Ed25519" }, false, ["verify"]);
+        const signed = owned(concat(CONTENT_SIGNATURE_LABEL, await messageSignaturePayload(binding, sealed)));
+        return await crypto.subtle.verify({ name: "Ed25519" }, key, owned(signature), signed);
+    } catch {
+        return false;
     }
 }
 

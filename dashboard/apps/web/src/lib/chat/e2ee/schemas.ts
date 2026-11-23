@@ -135,7 +135,20 @@ export const mlsBody = z.discriminatedUnion("op", [
         epoch,
         envelopes: z.array(z.object({ recipient: z.string().min(1).max(64), envelope: base64Url(64, 4096) })).min(1).max(1000)
     }),
-    z.object({ op: z.literal("history-keys"), channelId, from: epoch.default("0") })
+    z.object({ op: z.literal("history-keys"), channelId, from: epoch.default("0") }),
+    // A chat message sealed under the epoch's history key, signed by the device.
+    z.object({
+        op: z.literal("send-sealed"),
+        channelId,
+        device: deviceId,
+        clientKey: z.string().uuid(),
+        parentId: z.string().uuid().nullable().optional(),
+        epoch,
+        senderLeaf: z.number().int().min(0).max(0xffffffff),
+        ciphertext: base64Url(17, 256 * 1024),
+        signature: base64Url(64, 64)
+    }),
+    z.object({ op: z.literal("read-sealed"), channelId, messageIds: z.array(z.string().uuid()).min(1).max(100) })
 ]);
 export type MlsBody = z.infer<typeof mlsBody>;
 

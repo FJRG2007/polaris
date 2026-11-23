@@ -20,6 +20,7 @@ import { prisma } from "@polaris/db";
 import { chatE2eeEnabled } from "./flag";
 import { NextResponse } from "next/server";
 import * as delivery from "./mls-delivery";
+import * as sealed from "./sealed-messages";
 import { backgroundUser } from "@/lib/session";
 import { mlsBody, type MlsBody } from "./schemas";
 import { channelAccess } from "@/lib/chat/access";
@@ -76,7 +77,7 @@ export async function handleMls(request: Request): Promise<Response> {
     try {
         return await run(user.id, parsed.data);
     } catch (caught) {
-        if (caught instanceof delivery.MlsDeliveryRefusal) return json({ error: caught.reason }, 409);
+        if (caught instanceof delivery.MlsDeliveryRefusal || caught instanceof sealed.SealedRefusal) return json({ error: caught.reason }, 409);
         console.error("polaris: an MLS delivery step failed:", caught);
         return json(REFUSED, 400);
     }
@@ -159,6 +160,35 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
         case "history-keys": {
             const keys = await delivery.historyKeys(body.channelId, userId, BigInt(body.from));
             return json({ historyKeys: keys.map((k) => ({ epoch: k.epoch.toString(), envelope: text(k.envelope) })) });
+        }
+        case "send-sealed": {
+            const id = await sealed.sendSealed(userId, {
+                channelId: body.channelId,
+                device: body.device,
+                clientKey: body.clientKey,
+                parentId: body.parentId,
+                epoch: BigInt(body.epoch),
+                senderLeaf: body.senderLeaf,
+                ciphertext: bytes(body.ciphertext),
+                signature: bytes(body.signature)
+            });
+            return json({ id });
+        }
+        case "read-sealed": {
+            const rows = await sealed.readSealed(userId, body.channelId, body.messageIds);
+            return json({
+                messages: rows.map((r) => ({
+                    id: r.id,
+                    authorId: r.authorId,
+                    clientKey: r.clientKey,
+                    device: r.device,
+                    epoch: r.epoch.toString(),
+                    senderLeaf: r.senderLeaf,
+                    ciphertext: text(r.ciphertext),
+                    signature: text(r.signature),
+                    signatureKey: text(r.signatureKey)
+                }))
+            });
         }
     }
 }

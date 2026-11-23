@@ -410,6 +410,13 @@ impl MlsMember {
     }
 
     #[napi(catch_unwind)]
+    pub fn sign_content(&self, payload: Uint8Array) -> napi::Result<Uint8Array, ErrorClass> {
+        polaris_core::mls::Member::sign_content(&self.inner, &payload)
+            .map(Uint8Array::from)
+            .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
     pub fn forget_group(&self, group_id: Uint8Array) -> napi::Result<(), ErrorClass> {
         polaris_core::mls::Member::forget_group(&self.inner, &group_id).map_err(mls_error)
     }
