@@ -12,6 +12,7 @@
 import { z } from "zod";
 import { describeDevice } from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
+import { resolveGeo } from "@/lib/geo-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { clientIp, clientUserAgent } from "@/lib/request-context";
 import { challengeIdentifier, pendingTwoFactorUserId } from "@/lib/two-factor-challenge";
@@ -23,9 +24,22 @@ import {
 } from "@/lib/mobile/sign-in-approval";
 import { createHash } from "node:crypto";
 
-export type PhoneApprovalRequest = { ok: true; id: string } | { ok: false; reason: "unavailable" | "tooMany" };
+export type PhoneApprovalRequest =
+    | { ok: true; id: string; matchNumber: number }
+    | { ok: false; reason: "unavailable" | "tooMany" };
 
 const approvalIdSchema = z.string().uuid();
+/** The prompt goes out without a place rather than wait on a slow lookup. */
+const PLACE_WAIT_MS = 1_500;
+
+/** "Madrid, Spain", or whatever part of it is known, or null. */
+async function approximatePlace(ip: string | undefined): Promise<string | null> {
+    if (!ip) return null;
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), PLACE_WAIT_MS));
+    const geo = await Promise.race([resolveGeo(ip).catch(() => null), timeout]);
+    if (!geo) return null;
+    return [geo.city, geo.country].filter(Boolean).join(", ") || null;
+}
 
 function challengeKey(identifier: string): string {
     return createHash("sha256").update(identifier).digest("hex").slice(0, 32);
@@ -40,11 +54,12 @@ export async function requestPhoneApprovalAction(): Promise<PhoneApprovalRequest
     ]);
     if (!perAccount.ok || !perChallenge.ok) return { ok: false, reason: "tooMany" };
     const [userAgent, ip] = await Promise.all([clientUserAgent(), clientIp()]);
-    const id = await requestApproval({
+    const { id, matchNumber } = await requestApproval({
         userId,
         identifier,
         device: userAgent ? describeDevice(userAgent) : null,
-        ip: ip ?? null
+        ip: ip ?? null,
+        place: await approximatePlace(ip)
     });
     await recordAudit({
         actorId: userId,
@@ -52,7 +67,7 @@ export async function requestPhoneApprovalAction(): Promise<PhoneApprovalRequest
         targetType: "sign-in-approval",
         targetId: id
     });
-    return { ok: true, id };
+    return { ok: true, id, matchNumber };
 }
 
 export async function phoneApprovalStatusAction(id: unknown): Promise<ApprovalState> {

@@ -375,7 +375,9 @@
             },
             "askTitle": "¿Eres tú quien entra?",
             "askBody": "{device}, desde {ip}",
-            "askBodyUnknown": "Un nuevo acceso a tu cuenta"
+            "askBodyUnknown": "Un nuevo acceso a tu cuenta",
+            "outdated": "Actualiza la app de Polaris para aprobar accesos. Puedes seguir denegándolos.",
+            "mismatch": "Ese no era el número de la pantalla de acceso. El acceso se denegó."
         }
     },
     "codeMessage": {

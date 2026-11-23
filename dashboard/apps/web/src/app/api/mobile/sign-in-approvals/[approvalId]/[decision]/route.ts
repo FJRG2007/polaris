@@ -6,11 +6,18 @@
  * signed with the phone's own key (`device-proof`). A browser tab signed in to
  * the same account has the session but not the key, so it cannot approve a
  * sign-in on anybody's behalf.
+ *
+ * An approval carries the number picked on the phone (`?number=42`), and that
+ * number is part of what the phone signs, so it cannot be swapped on the way.
+ * A "not me" or a wrong pick tells the account at once, with the way to lock
+ * it down.
  */
 
 import { z } from "zod";
 import { apiUser } from "@/lib/api-session";
 import { recordAudit } from "@/lib/audit-service";
+import { wordsFor } from "@/lib/notifications/notice-words";
+import { notify } from "@/lib/notifications/dispatch";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { readerWords } from "@/lib/i18n/reader-words";
 import { decideApproval } from "@/lib/mobile/sign-in-approval";
@@ -27,15 +34,48 @@ export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "no-store" } as const;
 const paramsSchema = z.object({ approvalId: z.string().uuid(), decision: z.enum(["approve", "deny"]) });
+const numberSchema = z
+    .string()
+    .regex(/^[1-9][0-9]$/)
+    .transform(Number)
+    .nullable();
 
 type Params = { params: Promise<{ approvalId: string; decision: string }> };
 
-export async function GET(_request: Request, { params }: Params): Promise<Response> {
+/** The number picked on the phone, only ever on an approval. Undefined when malformed. */
+function pickedNumber(request: Request, decision: "approve" | "deny"): number | null | undefined {
+    if (decision === "deny") return null;
+    const parsed = numberSchema.safeParse(new URL(request.url).searchParams.get("number"));
+    return parsed.success ? parsed.data : undefined;
+}
+
+/** What the phone signs: the request, the decision, and the number when there is one. */
+function signedTarget(approvalId: string, decision: string, picked: number | null): string {
+    return picked === null ? `${approvalId}:${decision}` : `${approvalId}:${decision}:${picked}`;
+}
+
+/** Tells the account a sign-in was refused from its phone, and where to lock it down. */
+async function tellAccount(userId: string, mismatch: boolean): Promise<void> {
+    const t = await wordsFor(userId, "notices");
+    await notify({
+        userId,
+        event: "account.security",
+        title: t("account.signInRefusedTitle"),
+        body: t(mismatch ? "account.signInMismatchBody" : "account.signInRefusedBody"),
+        href: "/account/security",
+        actionRequired: true
+    }).catch(() => undefined);
+}
+
+export async function GET(request: Request, { params }: Params): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     const input = paramsSchema.safeParse(await params);
-    if (!input.success) return Response.json({ error: "Not found" }, { status: 404, headers: NO_STORE });
-    const target = `${input.data.approvalId}:${input.data.decision}`;
+    const picked = input.success ? pickedNumber(request, input.data.decision) : undefined;
+    if (!input.success || picked === undefined) {
+        return Response.json({ error: "Not found" }, { status: 404, headers: NO_STORE });
+    }
+    const target = signedTarget(input.data.approvalId, input.data.decision, picked);
     return Response.json({ challenge: deviceChallenge("sign-in-approval", target, user.id) }, { headers: NO_STORE });
 }
 
@@ -45,7 +85,8 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     const words = await readerWords("api");
     const input = paramsSchema.safeParse(await params);
     const proof = deviceProofSchema.safeParse(await request.json().catch(() => null));
-    if (!input.success || !proof.success) {
+    const picked = input.success ? pickedNumber(request, input.data.decision) : undefined;
+    if (!input.success || !proof.success || picked === undefined) {
         return Response.json({ error: words("mobile.signIn.refused.signature") }, { status: 400, headers: NO_STORE });
     }
     const allowed = await rateLimit(`phone-approval:answer:${user.id}`, 20, 60_000);
@@ -53,7 +94,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     const { approvalId, decision } = input.data;
     let keyId: string;
     try {
-        keyId = await proveDevice(user.id, "sign-in-approval", `${approvalId}:${decision}`, proof.data);
+        keyId = await proveDevice(user.id, "sign-in-approval", signedTarget(approvalId, decision, picked), proof.data);
     } catch (error) {
         if (error instanceof DeviceProofRefused) {
             return Response.json(
@@ -63,18 +104,26 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
         }
         throw error;
     }
-    if (!(await decideApproval(user.id, approvalId, decision))) {
+    const outcome = await decideApproval(user.id, approvalId, decision, picked);
+    if (outcome === "gone") {
         return Response.json({ error: words("mobile.signIn.gone") }, { status: 410, headers: NO_STORE });
+    }
+    if (outcome === "outdated") {
+        return Response.json({ error: words("mobile.signIn.outdated") }, { status: 426, headers: NO_STORE });
     }
     await deviceUsed(keyId);
     await recordAudit({
         actorId: user.id,
-        action: decision === "approve" ? "account.phone-approval.approved" : "account.phone-approval.denied",
+        action: `account.phone-approval.${outcome}`,
         targetType: "sign-in-approval",
         targetId: approvalId
     });
+    if (outcome !== "approved") await tellAccount(user.id, outcome === "mismatch");
+    if (outcome === "mismatch") {
+        return Response.json({ error: words("mobile.signIn.mismatch") }, { status: 409, headers: NO_STORE });
+    }
     return Response.json(
-        { ok: true, text: words(decision === "approve" ? "mobile.signIn.approved" : "mobile.signIn.denied") },
+        { ok: true, text: words(outcome === "approved" ? "mobile.signIn.approved" : "mobile.signIn.denied") },
         { headers: NO_STORE }
     );
 }

@@ -375,7 +375,9 @@
             },
             "askTitle": "Is this you signing in?",
             "askBody": "{device}, from {ip}",
-            "askBodyUnknown": "A new sign-in to your account"
+            "askBodyUnknown": "A new sign-in to your account",
+            "outdated": "Update the Polaris app to approve sign-ins. You can still deny them.",
+            "mismatch": "That was not the number on the sign-in screen. The sign-in was denied."
         }
     },
     "codeMessage": {

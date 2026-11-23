@@ -13,6 +13,13 @@
  * Each request is bound to one challenge by a hash of its identifier, lives two
  * minutes, is answered once and collected once. The raw identifier is never
  * stored: it is what finishes the challenge.
+ *
+ * Number matching (as GitHub Mobile and Microsoft Authenticator do it): the
+ * browser shows a two-digit number and the phone lists it among three, so a
+ * prompt the person did not cause - somebody else holding their password and
+ * pressing the button over and over - cannot be approved by a reflexive tap.
+ * A wrong pick denies the request, and three in an hour switch phone approval
+ * off for the account until the hour has passed.
  */
 
 import { prisma } from "@polaris/db";
@@ -23,13 +30,19 @@ import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 export const APPROVAL_TTL_MS = 2 * 60_000;
 /** How long the handed-over code is good for: it is spent straight away. */
 const CODE_TTL_MS = 60_000;
+/** Wrong picks tolerated in `MISMATCH_WINDOW_MS` before phone approval rests. */
+export const MISMATCH_LIMIT = 3;
+const MISMATCH_WINDOW_MS = 60 * 60_000;
 
 export type ApprovalDecision = "approve" | "deny";
+
+/** How a phone's answer landed. */
+export type DecisionOutcome = "approved" | "denied" | "mismatch" | "outdated" | "gone";
 
 /** What the waiting browser learns when it asks. */
 export type ApprovalState =
     | { state: "pending" }
-    | { state: "denied" }
+    | { state: "denied"; reason: "not-me" | "mismatch" }
     | { state: "expired" }
     | { state: "approved"; code: string };
 
@@ -41,6 +54,8 @@ export type ApprovalChange =
           id: string;
           device: string | null;
           ip: string | null;
+          place: string | null;
+          choices: number[] | null;
           expiresAt: Date;
       }
     | { kind: "settled"; userId: string; id: string };
@@ -80,12 +95,34 @@ function sameHash(left: string, right: string): boolean {
     return a.length === b.length && timingSafeEqual(a, b);
 }
 
-/** Whether the account has the phone app on a phone that could answer. */
+/**
+ * The three numbers the phone offers: the right one and two others, in an order
+ * that does not give it away. Worked out from the request's id, so a phone that
+ * connects later - or reconnects - is offered the same three.
+ */
+export function matchChoices(id: string, matchNumber: number): number[] {
+    const seed = createHash("sha256").update(`choices:${id}`).digest();
+    const others: number[] = [];
+    for (let index = 0; others.length < 2; index += 1) {
+        const candidate = 10 + ((seed[index % seed.length]! + index * 37) % 90);
+        if (candidate !== matchNumber && !others.includes(candidate)) others.push(candidate);
+    }
+    others.splice(seed[31]! % 3, 0, matchNumber);
+    return others;
+}
+
+/** Whether the account has the phone app on a phone that could answer, and is not resting it. */
 export async function phoneCanApprove(userId: string): Promise<boolean> {
     const key = await prisma.mobileDeviceKey
         .findFirst({ where: { userId, platform: "android" }, select: { id: true } })
         .catch(() => null);
-    return Boolean(key);
+    if (!key) return false;
+    const wrong = await prisma.signInApproval
+        .count({
+            where: { userId, reason: "mismatch", decidedAt: { gt: new Date(Date.now() - MISMATCH_WINDOW_MS) } }
+        })
+        .catch(() => 0);
+    return wrong < MISMATCH_LIMIT;
 }
 
 /** Ask the phone. Any earlier request for the same challenge stops counting. */
@@ -94,7 +131,8 @@ export async function requestApproval(input: {
     identifier: string;
     device: string | null;
     ip: string | null;
-}): Promise<string> {
+    place: string | null;
+}): Promise<{ id: string; matchNumber: number }> {
     const challengeHash = hashChallenge(input.identifier);
     const now = new Date();
     const earlier = await prisma.signInApproval.findMany({
@@ -109,12 +147,16 @@ export async function requestApproval(input: {
         for (const row of earlier) publish({ kind: "settled", userId: input.userId, id: row.id });
     }
     const expiresAt = new Date(now.getTime() + APPROVAL_TTL_MS);
+    const matchNumber = randomInt(10, 100);
+    const place = input.place?.slice(0, 120) ?? null;
     const created = await prisma.signInApproval.create({
         data: {
             userId: input.userId,
             challengeHash,
             device: input.device?.slice(0, 200) ?? null,
             ip: input.ip?.slice(0, 64) ?? null,
+            place,
+            matchNumber,
             expiresAt
         },
         select: { id: true }
@@ -125,29 +167,57 @@ export async function requestApproval(input: {
         id: created.id,
         device: input.device,
         ip: input.ip,
+        place,
+        choices: matchChoices(created.id, matchNumber),
         expiresAt
     });
-    return created.id;
+    return { id: created.id, matchNumber };
 }
 
 /** Requests still waiting on an answer, for a phone that connects after they were made. */
 export async function pendingApprovals(userId: string) {
-    return prisma.signInApproval.findMany({
+    const rows = await prisma.signInApproval.findMany({
         where: { userId, status: "pending", expiresAt: { gt: new Date() } },
-        select: { id: true, device: true, ip: true, expiresAt: true },
+        select: { id: true, device: true, ip: true, place: true, matchNumber: true, expiresAt: true },
         orderBy: { createdAt: "desc" },
         take: 5
     });
+    return rows.map(({ matchNumber, ...row }) => ({
+        ...row,
+        choices: matchNumber === null ? null : matchChoices(row.id, matchNumber)
+    }));
 }
 
-/** The phone's answer. False when there is nothing left to answer. */
-export async function decideApproval(userId: string, id: string, decision: ApprovalDecision): Promise<boolean> {
+/**
+ * The phone's answer. `picked` is the number chosen on the phone; a request that
+ * carries a number is approved only with the right one. An approval without a
+ * pick, from a phone app that predates number matching, changes nothing and is
+ * answered "outdated" so the phone can say to update - denying still works.
+ */
+export async function decideApproval(
+    userId: string,
+    id: string,
+    decision: ApprovalDecision,
+    picked: number | null = null
+): Promise<DecisionOutcome> {
+    const live = { id, userId, status: "pending", expiresAt: { gt: new Date() } };
+    const row = await prisma.signInApproval.findFirst({ where: live, select: { matchNumber: true } });
+    if (!row) return "gone";
+    let outcome: DecisionOutcome;
+    if (decision === "deny") outcome = "denied";
+    else if (row.matchNumber === null) outcome = "approved";
+    else if (picked === null) return "outdated";
+    else outcome = picked === row.matchNumber ? "approved" : "mismatch";
     const { count } = await prisma.signInApproval.updateMany({
-        where: { id, userId, status: "pending", expiresAt: { gt: new Date() } },
-        data: { status: decision === "approve" ? "approved" : "denied", decidedAt: new Date() }
+        where: live,
+        data: {
+            status: outcome === "approved" ? "approved" : "denied",
+            reason: outcome === "denied" ? "not-me" : outcome === "mismatch" ? "mismatch" : null,
+            decidedAt: new Date()
+        }
     });
     publish({ kind: "settled", userId, id });
-    return count === 1;
+    return count === 1 ? outcome : "gone";
 }
 
 /**
@@ -158,10 +228,10 @@ export async function decideApproval(userId: string, id: string, decision: Appro
 export async function collectApproval(identifier: string, id: string): Promise<ApprovalState> {
     const row = await prisma.signInApproval.findUnique({
         where: { id },
-        select: { userId: true, challengeHash: true, status: true, expiresAt: true }
+        select: { userId: true, challengeHash: true, status: true, reason: true, expiresAt: true }
     });
     if (!row || !sameHash(row.challengeHash, hashChallenge(identifier))) return { state: "expired" };
-    if (row.status === "denied") return { state: "denied" };
+    if (row.status === "denied") return { state: "denied", reason: row.reason === "mismatch" ? "mismatch" : "not-me" };
     if (row.status === "pending") return row.expiresAt > new Date() ? { state: "pending" } : { state: "expired" };
     if (row.status !== "approved") return { state: "expired" };
 

@@ -44,6 +44,9 @@ export interface MobileNotice {
     /** A sign-in asking this phone: the request to answer, and when it stops counting (epoch ms). */
     readonly approvalId?: string;
     readonly expiresAt?: number;
+    /** The three numbers the phone offers, one of them on the asking browser.
+     *  Absent on a request made before number matching. */
+    readonly choices?: number[];
     /** A ringing call: the call to decline from the phone, and who is calling,
      *  which the phone's incoming-call screen names on its own. */
     readonly meetingId?: string;
@@ -137,19 +140,28 @@ export async function GET(request: Request): Promise<Response> {
                 );
             }
 
-            function ask(approval: { id: string; device: string | null; ip: string | null; expiresAt: Date }): void {
+            function ask(approval: {
+                id: string;
+                device: string | null;
+                ip: string | null;
+                place: string | null;
+                choices: number[] | null;
+                expiresAt: Date;
+            }): void {
+                const where = approval.place && approval.ip ? `${approval.place} (${approval.ip})` : approval.ip;
                 send({
                     kind: "sign-in",
                     channelId: "",
                     tag: `sign-in:${approval.id}`,
                     title: api("mobile.signIn.askTitle"),
                     body:
-                        approval.device && approval.ip
-                            ? api("mobile.signIn.askBody", { device: approval.device, ip: approval.ip })
+                        approval.device && where
+                            ? api("mobile.signIn.askBody", { device: approval.device, ip: where })
                             : (approval.device ?? api("mobile.signIn.askBodyUnknown")),
                     path: "/account/sessions",
                     approvalId: approval.id,
-                    expiresAt: approval.expiresAt.getTime()
+                    expiresAt: approval.expiresAt.getTime(),
+                    ...(approval.choices ? { choices: approval.choices } : {})
                 });
             }
 

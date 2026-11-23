@@ -11788,6 +11788,14 @@ model SignInApproval {
     // How the browser asking reads, and where from - what the phone shows.
     device        String?
     ip            String?
+    // Roughly where the address is ("Madrid, Spain"), for the phone's prompt.
+    place         String?
+    // The two-digit number the browser shows and the phone must pick. Null on
+    // a request made before number matching, which an old phone app answers.
+    matchNumber   Int?
+    // Why a denied request was denied: "not-me" (the phone said so) or
+    // "mismatch" (the wrong number was picked). Counted to stop push bombing.
+    reason        String?
     createdAt     DateTime  @default(now())
     expiresAt     DateTime
     decidedAt     DateTime?
@@ -11795,6 +11803,7 @@ model SignInApproval {
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId, status, expiresAt])
+    @@index([userId, reason, decidedAt])
     @@index([challengeHash])
 }
 
