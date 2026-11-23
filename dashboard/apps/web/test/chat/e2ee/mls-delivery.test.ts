@@ -10,6 +10,10 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { existsSync, readdirSync } from "node:fs";
 
 type Row = Record<string, unknown>;
 
@@ -120,6 +124,11 @@ vi.mock("@polaris/db", () => {
 });
 
 const { handleMls } = await import("@/lib/chat/e2ee/mls-handler");
+const { MlsDevice, MlsRequestError } = await import("@/lib/chat/e2ee/mls-client");
+type MlsDevice = import("@/lib/chat/e2ee/mls-client").MlsDevice;
+type MlsDeviceStore = import("@/lib/chat/e2ee/mls-client").MlsDeviceStore;
+type MlsMemberClass = import("@/lib/chat/e2ee/mls-client").MlsMemberClass;
+type MlsTransport = import("@/lib/chat/e2ee/mls-client").MlsTransport;
 
 const ALICE = "11111111-1111-4111-8111-111111111111";
 const BOB = "22222222-2222-4222-8222-222222222222";
@@ -242,5 +251,144 @@ describe("/api/e2ee/mls", () => {
         await call({ op: "put-history-keys", channelId: CHANNEL, epoch: "1", envelopes: [{ recipient: BOB, envelope: blob(9, 100) }] });
         const mine = (await call({ op: "history-keys", channelId: CHANNEL }, BOB)).body.historyKeys;
         expect(mine).toEqual([{ epoch: "1", envelope: blob(2, 100) }]);
+    });
+});
+
+// A device driven by `MlsDevice` against this route, with the real MLS member
+// (the Node binding). Skipped where the binding is not built: the protocol
+// itself is covered by packages/core-rs, this covers the client's ordering.
+const nativeDir = join(dirname(fileURLToPath(import.meta.url)), "../../../../../packages/core-rs/native");
+const nativeFile = existsSync(nativeDir) ? readdirSync(nativeDir).find((f) => f.startsWith(`polaris-core.${process.platform}-${process.arch}`)) : undefined;
+const CAROL = "55555555-5555-4555-8555-555555555555";
+const DAVE = "66666666-6666-4666-8666-666666666666";
+
+class MemoryStore implements MlsDeviceStore {
+    state = new Map<string, Uint8Array>();
+    outbox: { id: number; message: Uint8Array }[] = [];
+    private next = 1;
+    async load() {
+        const keys = [...this.state.keys()];
+        return { keys: keys.map((k) => new Uint8Array(Buffer.from(k, "hex"))), values: keys.map((k) => this.state.get(k) as Uint8Array), outbox: [...this.outbox] };
+    }
+    async commit(changes: readonly { key: Uint8Array; value?: Uint8Array | null }[], messages: readonly Uint8Array[] = []) {
+        for (const { key, value } of changes) {
+            const id = Buffer.from(key).toString("hex");
+            if (value) this.state.set(id, new Uint8Array(value));
+            else this.state.delete(id);
+        }
+        return messages.map((message) => {
+            const id = this.next++;
+            this.outbox.push({ id, message });
+            return id;
+        });
+    }
+    async sent(id: number) {
+        this.outbox = this.outbox.filter((entry) => entry.id !== id);
+    }
+}
+
+describe.skipIf(!nativeFile)("a device against the route", () => {
+    const { MlsMember } = (nativeFile ? createRequire(import.meta.url)(join(nativeDir, nativeFile)) : {}) as { MlsMember: MlsMemberClass };
+    const through =
+        (userId: string, lose: { afterCommit?: boolean } = {}): MlsTransport =>
+        async (body) => {
+            const answer = await call(body, userId);
+            if (lose.afterCommit && body.op === "commit") {
+                lose.afterCommit = false;
+                throw new TypeError("network error");
+            }
+            if (answer.status !== 200) throw new MlsRequestError(answer.status, String(answer.body.error));
+            return answer.body;
+        };
+    const open = (userId: string, device: string, store = new MemoryStore(), notes = new Map<string, string>(), transport = through(userId)) =>
+        MlsDevice.open({
+            userId,
+            device,
+            MlsMember,
+            store,
+            transport,
+            notes: { getItem: (k) => notes.get(k) ?? null, setItem: (k, v) => void notes.set(k, v) }
+        });
+    const say = (device: MlsDevice, text: string) => device.sendApplication(CHANNEL, new TextEncoder().encode(text));
+    const heard = async (device: MlsDevice) => (await device.sync(CHANNEL)).map((m) => `${m.sender.split("/")[1]}: ${new TextDecoder().decode(m.plaintext)}`);
+
+    beforeEach(() => {
+        for (const user of [CAROL, DAVE]) state.members.add(`${user}:${CHANNEL}`);
+    });
+
+    it("creates the group, adds an account by its key packages, and carries messages both ways", async () => {
+        const alice = await open(ALICE, "alice-laptop");
+        const bob = await open(BOB, "bob-phone-1");
+        await alice.register();
+        await bob.register();
+        expect(state.tables.mlsKeyPackage?.filter((r) => r.userId === BOB)).toHaveLength(20);
+        await bob.register();
+        expect(state.tables.mlsKeyPackage?.filter((r) => r.userId === BOB)).toHaveLength(20);
+        const groupId = await alice.ensureGroup(CHANNEL);
+        expect(await alice.ensureGroup(CHANNEL)).toEqual(groupId);
+        expect(await alice.addAccounts(CHANNEL, [BOB])).toEqual([`${BOB}/bob-phone-1`]);
+        expect(await heard(bob)).toEqual([]);
+        expect(bob.groupOf(CHANNEL)).toEqual(alice.groupOf(CHANNEL));
+        await say(alice, "hello bob");
+        expect(await heard(bob)).toEqual(["alice-laptop: hello bob"]);
+        await say(bob, "hi alice");
+        expect(await heard(alice)).toEqual(["bob-phone-1: hi alice"]);
+        expect(await heard(alice)).toEqual([]);
+    });
+
+    it("loses a commit race without forking: drops its commit, reads the winner's and adds again", async () => {
+        const alice = await open(ALICE, "alice-laptop");
+        const bob = await open(BOB, "bob-phone-1");
+        const carol = await open(CAROL, "carol-desk-1");
+        const dave = await open(DAVE, "dave-desk-1");
+        for (const device of [alice, bob, carol, dave]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB]);
+        await bob.sync(CHANNEL);
+        await bob.addAccounts(CHANNEL, [CAROL]);
+        // alice has not read bob's commit: her add for epoch 1 loses, and the retry is for epoch 2.
+        expect(await alice.addAccounts(CHANNEL, [DAVE])).toEqual([`${DAVE}/dave-desk-1`]);
+        for (const device of [bob, carol, dave]) await device.sync(CHANNEL);
+        await say(dave, "made it");
+        expect(await heard(alice)).toEqual(["dave-desk-1: made it"]);
+        expect(await heard(carol)).toEqual(["dave-desk-1: made it"]);
+        expect(((await call({ op: "group", channelId: CHANNEL })).body.group as { epoch: string }).epoch).toBe("3");
+    });
+
+    it("finishes a commit the server took after a restart that never heard the answer", async () => {
+        const store = new MemoryStore();
+        const notes = new Map<string, string>();
+        const lose = { afterCommit: true };
+        const alice = await open(ALICE, "alice-laptop", store, notes, through(ALICE, lose));
+        const bob = await open(BOB, "bob-phone-1");
+        await alice.register();
+        await bob.register();
+        await alice.ensureGroup(CHANNEL);
+        await expect(alice.addAccounts(CHANNEL, [BOB])).rejects.toThrow("network error");
+        expect(store.outbox).toHaveLength(1);
+        const restarted = await open(ALICE, "alice-laptop", store, notes);
+        expect(store.outbox).toHaveLength(0);
+        await bob.sync(CHANNEL);
+        await say(restarted, "after the restart");
+        expect(await heard(bob)).toEqual(["alice-laptop: after the restart"]);
+    });
+
+    it("joins again from the GroupInfo when the device lost its store, and two creators end in one group", async () => {
+        const notes = new Map<string, string>();
+        const alice = await open(ALICE, "alice-laptop");
+        const bob = await open(BOB, "bob-phone-1", new MemoryStore(), notes);
+        await Promise.all([alice.register(), bob.register()]);
+        const [mine, theirs] = await Promise.all([alice.ensureGroup(CHANNEL), bob.ensureGroup(CHANNEL)]);
+        expect(theirs).toEqual(mine);
+        await say(bob, "joined by myself");
+        expect(await heard(alice)).toEqual(["bob-phone-1: joined by myself"]);
+
+        const fresh = await open(BOB, "bob-phone-1", new MemoryStore(), notes);
+        await fresh.register();
+        expect(await fresh.ensureGroup(CHANNEL)).toEqual(mine);
+        await say(alice, "still here");
+        expect(await heard(fresh)).toEqual(["alice-laptop: still here"]);
+        await say(fresh, "back again");
+        expect(await heard(alice)).toEqual(["bob-phone-1: back again"]);
     });
 });

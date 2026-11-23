@@ -50,6 +50,7 @@
         "@polaris/chat-crypto": "0.1.0",
         "@polaris/config": "0.1.0",
         "@polaris/core": "0.1.0",
+        "@polaris/core-rs": "0.1.0",
         "@polaris/db": "0.1.0",
         "@polaris/deploy": "0.1.0",
         "@polaris/diagrams": "0.1.0",
