@@ -5,7 +5,7 @@
  * including the request that loses the race to create its row.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
     user: { findUnique: vi.fn() },
@@ -32,7 +32,10 @@ vi.mock("@/lib/account-rules", () => ({
     listAccountRules: vi.fn(async () => []),
     evaluateAccountRequest: vi.fn(async () => ({ action: "allow", source: null, ruleName: null, country: null }))
 }));
-const keys = vi.hoisted(() => ({ owesPhishingResistantSignIn: vi.fn(async () => false) }));
+const keys = vi.hoisted(() => ({
+    owesPhishingResistantSignIn: vi.fn(async () => false),
+    owesPhone: vi.fn(async (_userId: string, _known?: unknown) => false)
+}));
 vi.mock("@/lib/instance-security", () => ({
     getInstanceSecurity: vi.fn(async () => ({ requireSecondFactor: false })),
     ...keys
@@ -205,5 +208,80 @@ describe("an instance that requires passkeys or security keys", () => {
         db.sessionState.findUnique.mockResolvedValue(existingState());
         expect((await guardSession(input)).ok).toBe(true);
         expect(keys.owesPhishingResistantSignIn).toHaveBeenCalledWith("user-1", "session-1", true);
+    });
+});
+
+describe("an instance that requires a phone", () => {
+    afterEach(async () => {
+        const { getInstanceSecurity } = await import("@/lib/instance-security");
+        vi.mocked(getInstanceSecurity).mockResolvedValue({ requireSecondFactor: false } as never);
+    });
+
+    async function requirePhone() {
+        const { getInstanceSecurity } = await import("@/lib/instance-security");
+        vi.mocked(getInstanceSecurity).mockResolvedValue({ requireSecondFactor: false, requirePhone: true } as never);
+    }
+
+    function account(overrides: Record<string, unknown> = {}) {
+        return {
+            bannedAt: null,
+            disabledAt: null,
+            deletionRequestedAt: null,
+            twoFactorEnabled: true,
+            isAdmin: false,
+            passwordChangeRequired: false,
+            phone: null,
+            security: {
+                idleLockMinutes: 0,
+                sessionMaxMinutes: 0,
+                requireLoginApproval: false,
+                bindSessionsToClient: false,
+                pinSessionsToAddress: "off",
+                lockdownAt: null
+            },
+            ...overrides
+        };
+    }
+
+    it("holds an account a code can reach on the enrollment step", async () => {
+        await requirePhone();
+        db.user.findUnique.mockResolvedValue(account());
+        db.sessionState.findUnique.mockResolvedValue(existingState());
+        keys.owesPhone.mockResolvedValueOnce(true);
+        expect(await guardSession(input)).toEqual({ ok: false, redirect: "/oauth/enroll" });
+        expect(keys.owesPhone).toHaveBeenCalledWith("user-1", { isAdmin: false, phoneVerified: false });
+    });
+
+    it("lets it through once the number is confirmed, without asking again", async () => {
+        await requirePhone();
+        db.user.findUnique.mockResolvedValue(account({ phone: { verifiedAt: new Date() } }));
+        db.sessionState.findUnique.mockResolvedValue(existingState());
+        expect((await guardSession(input)).ok).toBe(true);
+        expect(keys.owesPhone).not.toHaveBeenCalled();
+    });
+
+    it("lets through an account no code can reach", async () => {
+        await requirePhone();
+        db.user.findUnique.mockResolvedValue(account());
+        db.sessionState.findUnique.mockResolvedValue(existingState());
+        keys.owesPhone.mockResolvedValueOnce(false);
+        expect((await guardSession(input)).ok).toBe(true);
+    });
+
+    it("never holds an administrator", async () => {
+        await requirePhone();
+        db.user.findUnique.mockResolvedValue(account({ isAdmin: true }));
+        db.sessionState.findUnique.mockResolvedValue(existingState());
+        expect((await guardSession(input)).ok).toBe(true);
+        expect(keys.owesPhone).not.toHaveBeenCalled();
+    });
+
+    it("holds a brand-new session from its very first request", async () => {
+        await requirePhone();
+        db.user.findUnique.mockResolvedValue(account());
+        db.sessionState.findUnique.mockResolvedValue(null);
+        policy.beginSignInStepUp.mockResolvedValue({ stepUp: null, country: null });
+        keys.owesPhone.mockResolvedValueOnce(true);
+        expect(await guardSession(input)).toEqual({ ok: false, redirect: "/oauth/enroll" });
     });
 });
