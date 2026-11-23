@@ -1,13 +1,27 @@
 /**
  * The risk check a password-only sign-in may owe: impossible travel read by
- * continent and time, and the one-code plan that is never a dead end.
+ * continent and time, a datacenter address only when Criminal IP is connected,
+ * and the one-code plan that is never a dead end.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@polaris/db", () => ({ prisma: {} }));
+const db = vi.hoisted(() => ({
+    sessionState: { findFirst: vi.fn() },
+    accountDevice: { count: vi.fn() }
+}));
+const integrations = vi.hoisted(() => ({ getIntegrationState: vi.fn(), getIntegrationSecret: vi.fn() }));
+const reputation = vi.hoisted(() => ({ rememberedVerdict: vi.fn(), rememberVerdict: vi.fn() }));
+const lookups = vi.hoisted(() => ({ takeServedLookup: vi.fn() }));
+const criminalIp = vi.hoisted(() => ({ checkCriminalIp: vi.fn() }));
 
-const { impossibleTravel, TRAVEL_WINDOW_MS } = await import("@/lib/sign-in-risk");
+vi.mock("@polaris/db", () => ({ prisma: db }));
+vi.mock("@/lib/integration-service", () => integrations);
+vi.mock("@/lib/address-reputation", () => reputation);
+vi.mock("@/lib/integrations/provider-pause", () => lookups);
+vi.mock("@/lib/integrations/criminalip", () => criminalIp);
+
+const { impossibleTravel, signInRisk, TRAVEL_WINDOW_MS } = await import("@/lib/sign-in-risk");
 const { planRiskCheck, parseStepUp, serializeStepUp } = await import("@/lib/two-factor-policy");
 
 const NOW = new Date("2026-11-23T12:00:00Z");
@@ -34,5 +48,49 @@ describe("planRiskCheck", () => {
 
     it("asks nothing when no code can be delivered", () => {
         expect(planRiskCheck({ available: [], reason: "impossible-travel" })).toBeNull();
+    });
+});
+
+describe("signInRisk datacenter address", () => {
+    const input = { userId: "user-1", sessionId: "session-1", country: "ES", userAgent: null, ip: "203.0.113.7" };
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        db.sessionState.findFirst.mockResolvedValue(null);
+        db.accountDevice.count.mockResolvedValue(0);
+        integrations.getIntegrationState.mockResolvedValue({ enabled: true, config: {} });
+        integrations.getIntegrationSecret.mockResolvedValue("key");
+        reputation.rememberedVerdict.mockResolvedValue(null);
+        lookups.takeServedLookup.mockResolvedValue(true);
+    });
+
+    it("is not a signal when Criminal IP is not connected", async () => {
+        integrations.getIntegrationState.mockResolvedValue(null);
+        expect(await signInRisk(input)).toBeNull();
+        expect(criminalIp.checkCriminalIp).not.toHaveBeenCalled();
+    });
+
+    it("asks Criminal IP only about hosting, and remembers the answer", async () => {
+        criminalIp.checkCriminalIp.mockResolvedValue({ allow: false, reasons: ["Hosting or datacenter"] });
+        expect(await signInRisk(input)).toBe("datacenter");
+        expect(criminalIp.checkCriminalIp).toHaveBeenCalledWith("key", "203.0.113.7", ["is_hosting"]);
+        expect(reputation.rememberVerdict).toHaveBeenCalledWith("203.0.113.7", "criminalip", ["is_hosting"], {
+            allow: false,
+            reason: "Hosting or datacenter"
+        });
+    });
+
+    it("reads a remembered answer without a lookup", async () => {
+        reputation.rememberedVerdict.mockResolvedValue({ allow: true, reason: null });
+        expect(await signInRisk(input)).toBeNull();
+        expect(criminalIp.checkCriminalIp).not.toHaveBeenCalled();
+    });
+
+    it("is not a signal when the budget is spent or the lookup fails", async () => {
+        lookups.takeServedLookup.mockResolvedValue(false);
+        expect(await signInRisk(input)).toBeNull();
+        lookups.takeServedLookup.mockResolvedValue(true);
+        criminalIp.checkCriminalIp.mockRejectedValue(new Error("down"));
+        expect(await signInRisk(input)).toBeNull();
     });
 });

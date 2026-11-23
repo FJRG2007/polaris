@@ -108,9 +108,9 @@ export async function beginSignInStepUp(input: {
 
 /**
  * A password sign-in that answered no second factor - the account has none -
- * asked for one code when it looks risky: an unusual country, a new device, or
- * impossible travel. Only under the account's "When to ask for more" setting
- * ("standard" never asks), only for a password (a passkey, a scanned code, a
+ * asked for one code when it looks risky: an unusual country, a new device,
+ * impossible travel, or a datacenter address. Only under the account's "When
+ * to ask for more" setting ("standard" never asks), only for a password (a passkey, a scanned code, a
  * connected account or an emailed link prove more than a password, or prove
  * the very mailbox a code would go to), and only when a code can actually be
  * delivered somewhere: the step must never be one nobody can answer.
@@ -133,7 +133,7 @@ async function riskCheck(input: {
         const country = await countryOf(input.ip, input.country);
         const reason = isUnusualCountry(country, await usualSignInCountries(userId, sessionId))
             ? "unusual-country"
-            : await signInRisk({ userId, sessionId, country, userAgent: input.userAgent ?? null });
+            : await signInRisk({ userId, sessionId, country, userAgent: input.userAgent ?? null, ip: input.ip });
         const available = reason
             ? (await describeTwoFactorMethods(userId))
                   .filter((status) => status.method !== "totp" && status.available)

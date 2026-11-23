@@ -13,9 +13,12 @@
  *   session keeps; two neighbouring countries an hour apart are an ordinary
  *   train ride.
  *
- * A datacenter address is not a signal here: Polaris has no classifier for it
- * without an optional reputation integration, and one that only some
- * deployments have would ask on some servers and not others.
+ * - Datacenter: the address belongs to a hosting provider, which is where
+ *   scripted sign-ins come from rather than people. Only when the operator
+ *   connected Criminal IP (Management > Integrations), the one reputation
+ *   provider that answers it; without it this is simply not a signal. The
+ *   answer is cached per address and counted against the provider's budget
+ *   like every other lookup.
  *
  * Never throws: a check that cannot be made is a sign-in that is not asked
  * for more, never one that is refused.
@@ -23,8 +26,15 @@
 
 import { prisma } from "@polaris/db";
 import { continentOf } from "@polaris/core";
+import { checkCriminalIp } from "@/lib/integrations/criminalip";
+import { takeServedLookup } from "@/lib/integrations/provider-pause";
+import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-service";
+import { rememberedVerdict, rememberVerdict } from "@/lib/address-reputation";
 
-export type SignInRisk = "impossible-travel" | "new-device";
+export type SignInRisk = "impossible-travel" | "new-device" | "datacenter";
+
+/** The one Criminal IP rule read here: the address is a hosting provider's. */
+const HOSTING_RULE = ["is_hosting"] as const;
 
 /** How recent another continent's sign-in has to be to make this one impossible. */
 export const TRAVEL_WINDOW_MS = 3 * 60 * 60_000;
@@ -47,6 +57,7 @@ export async function signInRisk(input: {
     sessionId: string;
     country: string | null;
     userAgent: string | null;
+    ip?: string | undefined;
 }): Promise<SignInRisk | null> {
     try {
         const previous = await prisma.sessionState.findFirst({
@@ -56,6 +67,7 @@ export async function signInRisk(input: {
         });
         if (impossibleTravel(previous && { country: previous.country, at: previous.createdAt }, input.country, new Date()))
             return "impossible-travel";
+        if (input.ip && (await hostedAddress(input.ip))) return "datacenter";
         if (!input.userAgent) return null;
         const [known, any] = await Promise.all([
             prisma.accountDevice.count({ where: { userId: input.userId, userAgent: input.userAgent.slice(0, 512) } }),
@@ -65,5 +77,27 @@ export async function signInRisk(input: {
     } catch (error) {
         console.error("polaris: sign-in risk not read:", error);
         return null;
+    }
+}
+
+/**
+ * Whether Criminal IP calls this address a hosting provider's. False whenever
+ * that cannot be known: the integration is not connected or switched on, it has
+ * no key, its lookup budget is spent, or the lookup failed.
+ */
+async function hostedAddress(ip: string): Promise<boolean> {
+    const state = await getIntegrationState("criminalip");
+    if (!state?.enabled) return false;
+    const apiKey = await getIntegrationSecret("criminalip");
+    if (!apiKey) return false;
+    const remembered = await rememberedVerdict(ip, "criminalip", HOSTING_RULE);
+    if (remembered) return !remembered.allow;
+    if (!(await takeServedLookup("criminalip"))) return false;
+    try {
+        const { allow, reasons } = await checkCriminalIp(apiKey, ip, HOSTING_RULE);
+        await rememberVerdict(ip, "criminalip", HOSTING_RULE, { allow, reason: reasons[0] ?? null });
+        return !allow;
+    } catch {
+        return false;
     }
 }

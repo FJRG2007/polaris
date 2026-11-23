@@ -137,7 +137,7 @@ const FACTOR_METHOD: Partial<Record<SecondFactor, TwoFactorMethod>> = {
 };
 
 /** Why a sign-in was asked for more, for the screen that asks. */
-export type StepUpReason = "unusual-country" | "all-methods" | "not-accepted" | "new-device" | "impossible-travel";
+export type StepUpReason = "unusual-country" | "all-methods" | "not-accepted" | "new-device" | "impossible-travel" | "datacenter";
 
 /** What a sign-in still owes, as stored against its session. */
 export interface StepUpState {
@@ -162,7 +162,7 @@ const stepUpStateSchema = z.object({
     question: z.boolean(),
     questionDone: z.boolean(),
     phoneConfirmed: z.boolean(),
-    reason: z.enum(["unusual-country", "all-methods", "not-accepted", "new-device", "impossible-travel"])
+    reason: z.enum(["unusual-country", "all-methods", "not-accepted", "new-device", "impossible-travel", "datacenter"])
 });
 
 /**
@@ -235,7 +235,6 @@ export function planStepUp(input: {
     };
 }
 
-/** What is still to answer. */
 /**
  * The extra check a risky sign-in owes when nothing else was asked of it: an
  * account with no second factor, signing in with its password. One code from
@@ -244,7 +243,7 @@ export function planStepUp(input: {
  */
 export function planRiskCheck(input: {
     available: readonly TwoFactorMethod[];
-    reason: "unusual-country" | "new-device" | "impossible-travel";
+    reason: "unusual-country" | "new-device" | "impossible-travel" | "datacenter";
 }): StepUpState | null {
     if (input.available.length === 0) return null;
     return {
@@ -258,6 +257,7 @@ export function planRiskCheck(input: {
     };
 }
 
+/** What is still to answer. */
 export function stepUpRemaining(state: StepUpState): {
     factorsLeft: number;
     methods: TwoFactorMethod[];
