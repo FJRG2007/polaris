@@ -29,6 +29,8 @@ import {
 } from "./actions";
 import { pendingEnrollmentAction, type PendingEnrollment } from "@/app/oauth/enroll/actions";
 import { AccountChooser } from "./account-chooser";
+import { PhoneSignIn } from "./phone-sign-in";
+import { phoneSignInOffered } from "./phone-sign-in-actions";
 import { prepareAddAccountAction, type DeviceAccountView } from "@/app/device-account-actions";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark, cn } from "@polaris/ui";
 
@@ -141,6 +143,7 @@ export function LoginForm({
     const [linkSent, setLinkSent] = useState(false);
     const [hasPasskey, setHasPasskey] = useState(false);
     const [canSso, setCanSso] = useState(false);
+    const [canPhone, setCanPhone] = useState(false);
     /** Set when signing in worked and this deployment still wants a second
      *  factor from the account. The whole screen becomes that step. */
     const [enrollment, setEnrollment] = useState<PendingEnrollment | null>(null);
@@ -171,6 +174,7 @@ export function LoginForm({
             setHasPasskey(false);
             setCanEmailLink(false);
             setCanSso(false);
+            setCanPhone(false);
             return;
         }
         let current = true;
@@ -183,6 +187,9 @@ export function LoginForm({
             });
             void ssoOffered(identifier).then((offered) => {
                 if (current) setCanSso(offered);
+            });
+            void phoneSignInOffered(identifier).then((offered) => {
+                if (current) setCanPhone(offered);
             });
         }, 400);
         return () => {
@@ -536,6 +543,20 @@ export function LoginForm({
                                     <KeyRound className="size-4" />
                                     {t("login.passkey")}
                                 </Button>
+                            ) : null}
+                            {canPhone ? (
+                                <PhoneSignIn
+                                    identifier={values.identifier.trim()}
+                                    disabled={pending}
+                                    onSignedIn={() => {
+                                        window.localStorage.setItem(LAST_IDENTIFIER_KEY, values.identifier.trim());
+                                        landAfterSignIn(router);
+                                    }}
+                                    onSsoRequired={() => {
+                                        setCanSso(true);
+                                        setError(t("login.ssoRequired"));
+                                    }}
+                                />
                             ) : null}
                             {providers.length > 0 ? (
                                 <div className="flex flex-col gap-2">

@@ -17,8 +17,8 @@ import { getAuthMailStatus } from "@/lib/auth-mail";
 import { ssoOfferedFor } from "@/lib/saml-providers";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { clientIp } from "@/lib/request-context";
-import { passkeyRelyingPartyId } from "@polaris/core";
-import { emailForUsername, emailLinkSignInAllowed } from "@polaris/auth";
+import { passkeyRelyingPartyId, phoneShapeField, toE164 } from "@polaris/core";
+import { emailForPhone, emailForUsername, emailLinkSignInAllowed } from "@polaris/auth";
 import {
     openSignInCode,
     redeemSignInCode,
@@ -37,6 +37,13 @@ const PASSKEY_HINT_WINDOW_MS = 10 * 60 * 1000;
 export async function resolveIdentifier(identifier: string): Promise<string | null> {
     const value = identifier.trim().toLowerCase();
     if (value.includes("@")) return value;
+    // A verified phone number, typed in international form ("+34 600 00 00 03").
+    // It still signs in through the password (OPAQUE) or the phone approval:
+    // this only names the account, exactly as a username does.
+    if (value.startsWith("+")) {
+        const phone = phoneShapeField.safeParse(value);
+        return phone.success ? emailForPhone(phone.data, toE164(phone.data)) : null;
+    }
     // Only when that account accepts its username here. A username is public -
     // it is how somebody is mentioned, searched for and linked to - so an
     // account that turns this off is asking for the address to be required as
