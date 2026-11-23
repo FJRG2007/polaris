@@ -10,6 +10,7 @@
 import { StrictMode } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { exampleCode } from "@/components/code-input";
 
 const sendStepUpCodeAction = vi.fn(async () => ({}) as { error?: string });
 const proveStepUpAction = vi.fn(async () => ({}) as { error?: string });
@@ -49,7 +50,7 @@ async function flush() {
 }
 
 function typeCode(value: string) {
-    fireEvent.change(screen.getByPlaceholderText(/stepUp.codePlaceholder|000000/), { target: { value } });
+    fireEvent.change(screen.getByPlaceholderText(new RegExp(`stepUp.codePlaceholder|000000|${exampleCode()}`)), { target: { value } });
 }
 
 describe("second-factor confirmation dialog", () => {
