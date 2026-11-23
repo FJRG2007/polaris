@@ -18,6 +18,7 @@
  * was taken back.
  */
 
+import { useOpenedSealed } from "./opened-sealed";
 import { fittedSize, placeholderUrl } from "@/lib/chat/media-shape";
 import { VanishMark } from "./vanish-controls";
 import { GroupInviteCards, InviteCards } from "./invite-card";
@@ -412,7 +413,7 @@ export interface MessageListProps {
 }
 
 export function MessageList({
-    messages,
+    messages: listed,
     viewerId,
     canPost,
     canModerate,
@@ -425,6 +426,8 @@ export function MessageList({
     outgoing,
     ...given
 }: MessageListProps) {
+    // Sealed rows drawn with what this device opened them to (none while sealed chat is off).
+    const messages = useOpenedSealed(listed);
     // Every handler a row receives, held to one identity - see `useSteady`.
     const onOpenThread = useSteady(given.onOpenThread);
     const onReact = useSteady(given.onReact)!;

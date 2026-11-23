@@ -17,6 +17,7 @@ import { useComposerEmoji, type SpaceEmojiScope } from "./space-emoji";
 import { X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
+import * as outbox from "./outbox";
 import { unlockProofFor } from "./lock-session";
 import * as core from "@polaris/core";
 import { Composer } from "./composer";
@@ -333,10 +334,11 @@ export function ThreadPanel({
                         } else {
                             await runAction(
                                 () =>
-                                    actions.sendAction({
+                                    outbox.sendNow({
                                         channelId: root.channelId,
                                         body,
                                         parentId: root.id,
+                                        replyToId: null,
                                         translation: sent
                                     }),
                                 setError

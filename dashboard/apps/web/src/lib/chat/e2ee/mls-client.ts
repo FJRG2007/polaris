@@ -401,7 +401,7 @@ export class MlsDevice {
      * message id is `clientKey`, made fresh for each message and reused only
      * to retry the same one. Returns the stored message's id.
      */
-    async sendSealed(channelId: string, plaintext: Uint8Array, options: { clientKey?: string; parentId?: string | null } = {}): Promise<string> {
+    async sendSealed(channelId: string, plaintext: Uint8Array, options: { clientKey?: string; parentId?: string | null; replyToId?: string | null } = {}): Promise<string> {
         this.requireGroup(channelId);
         await this.pull(channelId);
         const groupId = this.requireGroup(channelId);
@@ -419,6 +419,7 @@ export class MlsDevice {
             device: this.options.device,
             clientKey,
             parentId: options.parentId ?? null,
+            replyToId: options.replyToId ?? null,
             epoch: epoch.toString(),
             senderLeaf: binding.senderLeaf,
             ciphertext: toText(ciphertext),

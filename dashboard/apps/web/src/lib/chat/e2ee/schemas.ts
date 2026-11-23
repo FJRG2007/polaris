@@ -145,6 +145,7 @@ export const mlsBody = z.discriminatedUnion("op", [
         device: deviceId,
         clientKey: z.string().uuid(),
         parentId: z.string().uuid().nullable().optional(),
+        replyToId: z.string().uuid().nullable().optional(),
         epoch,
         senderLeaf: z.number().int().min(0).max(0xffffffff),
         ciphertext: base64Url(17, 256 * 1024),

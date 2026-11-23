@@ -2215,14 +2215,7 @@ export function ChannelView({
             // Nowhere to keep it (a private window, a WebView without IndexedDB,
             // a full disk): sent at once, with the same key, as it always was.
             const direct = await runAction(
-                () =>
-                    actions.sendAction({
-                        channelId,
-                        body,
-                        replyToId: answering,
-                        translation,
-                        clientKey: key
-                    }),
+                () => outbox.sendNow({ key, channelId, body, replyToId: answering, translation }),
                 setError
             );
             if (direct?.error || !direct?.id) {

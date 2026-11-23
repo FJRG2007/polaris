@@ -90,6 +90,7 @@ export function ChatShell({
     orgId,
     orgName,
     may,
+    sealed = false,
     children
 }: {
     viewerId: string;
@@ -100,11 +101,14 @@ export function ChatShell({
      *  layout. The screens read it to decide what to offer; every one of them is
      *  checked again where it happens. */
     may: ChatAllowances;
+    /** Sealed chat is on here (`chatE2eeEnabled()`, resolved by the layout). */
+    sealed?: boolean;
     children: ReactNode;
 }) {
     return (
         <ChatProvider
             may={may}
+            sealed={sealed}
             orgId={orgId}
             orgName={orgName}
             viewerId={viewerId}

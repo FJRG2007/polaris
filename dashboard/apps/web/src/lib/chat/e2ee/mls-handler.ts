@@ -181,6 +181,7 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
                 device: body.device,
                 clientKey: body.clientKey,
                 parentId: body.parentId,
+                replyToId: body.replyToId,
                 epoch: BigInt(body.epoch),
                 senderLeaf: body.senderLeaf,
                 ciphertext: bytes(body.ciphertext),

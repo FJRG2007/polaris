@@ -7,7 +7,7 @@
  */
 
 import { IndexedDbMlsStore } from "@polaris/core-rs/mls-store";
-import { fetchTransport, MlsDevice, type MlsMemberClass } from "./mls-client";
+import { fetchTransport, MlsDevice, type MlsDeviceOptions, type MlsMemberClass } from "./mls-client";
 import { IndexedDbHistoryKeyStore } from "./mls-history-keys";
 
 const BASE = "/core-rs/mls/";
@@ -44,11 +44,15 @@ export function browserDeviceId(userId: string): string {
     return made;
 }
 
-/** Open (and register) this browser's device for the signed-in account. */
-export async function openBrowserDevice(userId: string): Promise<MlsDevice> {
+/**
+ * Open (and register) this browser's device for the signed-in account. With
+ * `account` (the account key's HPKE pair) it seals and opens history keys for
+ * the account too.
+ */
+export async function openBrowserDevice(userId: string, account?: MlsDeviceOptions["account"]): Promise<MlsDevice> {
     const device = browserDeviceId(userId);
     const [MlsMember, store, historyKeys] = await Promise.all([loadMlsMember(), IndexedDbMlsStore.open(device), IndexedDbHistoryKeyStore.open(device)]);
-    const opened = await MlsDevice.open({ userId, device, MlsMember, store, historyKeys, notes: localStorage, transport: fetchTransport() });
+    const opened = await MlsDevice.open({ userId, device, MlsMember, store, historyKeys, ...(account ? { account } : {}), notes: localStorage, transport: fetchTransport() });
     await opened.register();
     return opened;
 }

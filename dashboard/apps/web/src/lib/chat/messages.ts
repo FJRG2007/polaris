@@ -120,6 +120,9 @@ export interface ChatMessageView {
     /** Seen only by the people it was for ("Only you can see this"), never by
      *  the rest of the conversation - see `ephemeral`. */
     readonly ephemeral?: boolean;
+    /** Sealed end to end: `body` is empty here and the reader's device opens
+     *  the content (`useOpenedSealed`, docs/chat-e2ee-mls.md). */
+    readonly sealed?: boolean;
     readonly kind: core.ChatMessageKind;
     /** Empty for a deleted message - the tombstone carries no text. */
     readonly body: string;
@@ -2311,7 +2314,9 @@ export const MESSAGE_SELECT = {
     publishedFromChannelId: true,
     translation: true,
     components: true,
-    audience: true
+    audience: true,
+    // Whether the row is sealed (docs/chat-e2ee-mls.md); the sealed bytes are read apart, by `read-sealed`.
+    e2eeEpoch: true
 } as const;
 
 interface Row {
@@ -2352,6 +2357,8 @@ interface Row {
     components?: unknown;
     /** Who an ephemeral answer is for - see `ephemeral`. Empty is everybody. */
     audience?: readonly string[];
+    /** Set on a sealed message (the epoch it was sealed in). */
+    e2eeEpoch?: bigint | null;
 }
 
 /** The buttons and forms a message carries; none once it is deleted. */
@@ -2735,6 +2742,7 @@ export async function decorateMessages(
             ...(row.agent ? { fromAgent: row.agent } : {}),
             ...componentsView(row),
             ...(isEphemeral(row.audience) ? { ephemeral: true } : {}),
+            ...(row.e2eeEpoch != null && !row.deletedAt ? { sealed: true } : {}),
             kind: row.kind as core.ChatMessageKind,
             body: row.deletedAt ? "" : notice ? noticeString(notice) : row.body,
             ...(notice ? { notice } : {}),

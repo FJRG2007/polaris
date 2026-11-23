@@ -125,15 +125,79 @@ In a browser the member is the WebAssembly build staged at `public/core-rs/mls`
 is opened), the state is `IndexedDbMlsStore`, and the device id and group notes
 are in `localStorage`.
 
+## Chat screens (`sealed-chat.ts`, `opened-sealed.ts`)
+
+The chat layout passes `chatE2eeEnabled()` to the chat provider, which hands
+the account to `configureSealedChat`; off, it hands `null`, nothing loads the
+device or its WebAssembly, and every send and read is the plain one. On:
+
+- **Sending.** The outbox's `deliver` (and `sendNow`, for a box that could
+  not keep the message, and the thread composer) seals through this browser's
+  device: `ensureGroup`, then `sendSealed` with the outbox key as the message
+  id, the thread as `parentId` and the message answered as `replyToId` (both
+  metadata, as every posting rule needs them). A refusal (4xx but 429) fails
+  the entry; anything else leaves it queued. It is never sent in the clear
+  instead. The device is opened with the account key's HPKE pair from this
+  browser's own lock (`deviceAccountHpke`), when it holds one.
+- **What is sealed.** `{"v":1,"body":...,"translation"?:...}` as UTF-8 JSON,
+  parsed on open against the same schema as a plain send; anything else opens
+  to nothing.
+- **Reading.** A row with `e2eeEpoch` set is `sealed: true` in
+  `ChatMessageView` (its ciphertext is not selected with the page).
+  `MessageList` runs `useOpenedSealed`: sealed rows not opened yet are read
+  with `read-sealed` (100 per request) without joining the group - the
+  history keys sealed to the account open them - and drawn with the body they
+  opened to. Opened bodies stay in memory for the page (5,000 at most), and a
+  sender's own text is kept the moment the server takes it, so a row never
+  blinks empty after its draft. A row that does not open keeps its empty body.
+
+## Server-run members: the design (decided, not built)
+
+Polar and webhooks take part as MLS members the server runs (proposal 7),
+through the Node binding and `mls-store.ts`:
+
+- **Who they are.** Each kind is a fixed service account id, a UUID with
+  version nibble 0, which neither `uuid(7)` nor `gen_random_uuid()` can ever
+  give a person: Polar `00000000-0000-0000-0000-000000000001`, webhooks
+  `00000000-0000-0000-0000-000000000002`. The address shape stays
+  `${userId}/${device}`, so the schemas, `MlsDevice` and the log need nothing
+  new.
+- **One device per conversation.** Polar's device id is the conversation id
+  without dashes; a webhook's is the webhook id without dashes (a webhook
+  belongs to one channel). A member is restored from all of its store at once,
+  so a single device across every group would load every group for every
+  message; per conversation, each store holds one group. The store's `device`
+  key is the full address.
+- **Who it reaches.** A service account reaches a conversation only through
+  what puts it there: Polar where it was added as a member ("Can read
+  messages", visible in the member list), a webhook in its own channel. The
+  same test answers `channelAccess` for it everywhere the route checks an
+  account - claiming its key packages, a Welcome addressed to it, its
+  history-key envelope - so a person adds or removes Polar the way they add
+  anybody.
+- **Transport.** In-process: the ops run against `mls-delivery.ts` and
+  `sealed-messages.ts` directly, as the service account, with no session and
+  no route. Polar's replies and a webhook's posts go through
+  `MlsDevice.sendSealed`, so they are signed by the service device's leaf
+  like anybody's.
+- **Crash safety.** The outbox the device store needs is kept in
+  `MlsStoreEntry` under a reserved key prefix, committed in the same
+  transaction as the member's changes and left out of what `restore` reads.
+- **One writer.** Two server instances must never run the same service device
+  at once (they would fork its ratchet): each operation holds a lease on the
+  device's address for its length.
+- **Honesty.** What reaches a service member is read by whoever runs Polaris
+  and, for Polar, the model provider; the member list says so.
+
 ## Not built yet
 
-- The chat screens on sealed messages: the composer calling `sendSealed` and
-  the message list calling `readSealed` for rows with an empty body, once the
-  flag is on. The library, route and columns are built; no screen uses them.
+- Other surfaces that read a body on the server - conversation previews,
+  notifications, search, link cards, pins and edits - see an empty one for a
+  sealed message. Each needs its own client-side opening before the flag can
+  go on.
 - The `org` history-key envelope. The organisation recovery key (proposal 3.5)
   has no public key stored anywhere yet - its custodian setup is not built - so
   nothing can serve it and no `org` envelope can be sealed until it is.
-- Server-run members (Polar, webhooks) through the Node binding and
-  `mls-store.ts`.
+- Server-run members (Polar, webhooks): designed above, not built.
 - Sign-out deletes the browser's MLS device, but its leaf stays in each group
   until another member removes it.

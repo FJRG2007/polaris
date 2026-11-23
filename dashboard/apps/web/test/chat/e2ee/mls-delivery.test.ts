@@ -34,7 +34,7 @@ vi.mock("@/lib/chat/messages", () => ({
         const earlier = rows.find((r) => r.authorId === actor.id && r.clientKey === input.clientKey);
         if (earlier) return earlier.id;
         const id = crypto.randomUUID();
-        rows.push({ id, channelId: input.channelId, authorId: actor.id, clientKey: input.clientKey, body: input.body, deletedAt: null, expiresAt: null, audience: [], ...(rest[5] as Row) });
+        rows.push({ id, channelId: input.channelId, authorId: actor.id, clientKey: input.clientKey, body: input.body, deletedAt: null, expiresAt: null, audience: [], replyToId: (rest[1] as { messageId?: string } | null)?.messageId ?? null, ...(rest[5] as Row) });
         return id;
     }
 }));
@@ -590,6 +590,9 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         const [read] = await bob.readSealed(CHANNEL, [id]);
         expect(new TextDecoder().decode(read!.opened!)).toBe("only for us");
         expect(read!.sender).toBe(`${ALICE}/alice-laptop`);
+        // An answer keeps who it answers as metadata, the way a plain reply does.
+        const answer = await bob.sendSealed(CHANNEL, new TextEncoder().encode("same here"), { replyToId: id });
+        expect(state.tables.chatMessage!.find((r) => r.id === answer)).toMatchObject({ body: "", replyToId: id, authorId: BOB });
 
         // Changed at rest: the signature no longer covers it, and nothing is opened.
         const ciphertext = new Uint8Array(row.e2eeCiphertext as Uint8Array);

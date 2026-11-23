@@ -117,6 +117,23 @@ export function deviceStore(): deviceLock.DeviceLockStore {
     return wrap ? platformSealedStore(inner, wrap) : inner;
 }
 
+/**
+ * The account key's HPKE pair from this browser's own lock, for the MLS
+ * device to seal and open history keys with; null when this browser holds no
+ * copy of the account's published key. The key itself is not kept.
+ */
+export async function deviceAccountHpke(): Promise<{ hpkePublicKey: Uint8Array; hpkePrivateKey: CryptoKey } | null> {
+    const state = await keyState();
+    const held = state ? await fromDevice(state) : null;
+    if (!held) return null;
+    try {
+        const [published, pair] = await Promise.all([account.accountPublicKeys(held.accountKey), account.accountHpkeKeyPair(held.accountKey)]);
+        return { hpkePublicKey: published.hpkePublicKey, hpkePrivateKey: pair.privateKey };
+    } finally {
+        held.accountKey.fill(0);
+    }
+}
+
 async function keepOnDevice(userId: string, held: HeldKey): Promise<void> {
     await deviceLock.createDeviceLock(deviceStore(), userId, held.accountKey, held.akVersion);
 }

@@ -12,8 +12,9 @@
 
 import { useEffect } from "react";
 import * as actions from "./actions";
+import * as sealedChat from "@/lib/chat/e2ee/sealed-chat";
 import { chatStore } from "@/lib/chat/offline/chat-cache";
-import { drainOutbox, type OutboxEntry, type OutboxEvent } from "@/lib/chat/offline/outbox";
+import { drainOutbox, type OutboxEntry, type OutboxEvent, type OutboxSendResult } from "@/lib/chat/offline/outbox";
 
 const KIND = "outbox";
 const listeners = new Set<(event: OutboxEvent | null) => void>();
@@ -50,6 +51,65 @@ export async function discard(key: string): Promise<void> {
     notify(null);
 }
 
+/** A message on its way: an outbox entry, or a thread answer (`parentId`, no key of its own). */
+type Sendable = Pick<OutboxEntry, "channelId" | "body" | "replyToId" | "translation"> & { key?: string; parentId?: string | null };
+
+/**
+ * Send one message now, for a caller that could not keep it in the outbox:
+ * answers as `sendAction` does and throws when the server cannot be reached.
+ * With sealed chat off it is `sendAction` itself.
+ */
+export async function sendNow(entry: Sendable): Promise<{ id?: string; error?: string }> {
+    if (!sealedChat.sealedChatActive())
+        return actions.sendAction({
+            channelId: entry.channelId,
+            body: entry.body,
+            ...(entry.parentId ? { parentId: entry.parentId } : {}),
+            replyToId: entry.replyToId,
+            translation: entry.translation,
+            ...(entry.key ? { clientKey: entry.key } : {})
+        });
+    const result = await deliver(entry);
+    if (result === "unreachable") throw new Error("the sealed message could not be sent");
+    return "sent" in result ? { id: result.sent } : { error: result.refused };
+}
+
+/**
+ * Send one kept message: sealed through this browser's MLS device when sealed
+ * chat is on (never in the clear instead), else the ordinary send.
+ */
+export async function deliver(entry: Sendable): Promise<OutboxSendResult> {
+    if (sealedChat.sealedChatActive()) {
+        try {
+            const id = await sealedChat.sendSealedMessage({
+                channelId: entry.channelId,
+                body: entry.body,
+                clientKey: entry.key ?? crypto.randomUUID(),
+                parentId: entry.parentId ?? null,
+                replyToId: entry.replyToId,
+                ...(entry.translation ? { translation: entry.translation } : {})
+            });
+            return { sent: id };
+        } catch (caught) {
+            if (sealedChat.sealedSendFailure(caught) === "refused") return { refused: "" };
+            console.warn("polaris: a sealed message was not sent yet:", caught);
+            return "unreachable";
+        }
+    }
+    try {
+        const result = await actions.sendAction({
+            channelId: entry.channelId,
+            body: entry.body,
+            replyToId: entry.replyToId,
+            translation: entry.translation,
+            clientKey: entry.key
+        });
+        return result.id ? { sent: result.id } : { refused: result.error ?? "" };
+    } catch {
+        return "unreachable";
+    }
+}
+
 let running: Promise<void> | null = null;
 let again = false;
 
@@ -57,20 +117,7 @@ async function drainOnce(): Promise<void> {
     const entries = (await chatStore.readAll<OutboxEntry>(KIND)).map((entry) => entry.value);
     if (entries.length === 0) return;
     await drainOutbox(entries, {
-        async send(entry) {
-            try {
-                const result = await actions.sendAction({
-                    channelId: entry.channelId,
-                    body: entry.body,
-                    replyToId: entry.replyToId,
-                    translation: entry.translation,
-                    clientKey: entry.key
-                });
-                return result.id ? { sent: result.id } : { refused: result.error ?? "" };
-            } catch {
-                return "unreachable";
-            }
-        },
+        send: deliver,
         save: async (entry) => void (await chatStore.write(KIND, entry.key, entry)),
         drop: (key) => chatStore.forget(KIND, key),
         notify

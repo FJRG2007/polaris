@@ -30,6 +30,8 @@ export interface SealedSend {
     /** The message id the content is bound to, and the send's idempotency key. */
     clientKey: string;
     parentId?: string | null;
+    /** The message this one answers, quoted above it (metadata, as a thread is). */
+    replyToId?: string | null;
     epoch: bigint;
     senderLeaf: number;
     ciphertext: Uint8Array;
@@ -62,7 +64,7 @@ export async function sendSealed(userId: string, input: SealedSend): Promise<str
         { id: userId },
         { channelId: input.channelId, body: "", clientKey: input.clientKey, parentId: input.parentId ?? null },
         [],
-        null,
+        input.replyToId ? { messageId: input.replyToId, forwarded: false } : null,
         null,
         null,
         null,

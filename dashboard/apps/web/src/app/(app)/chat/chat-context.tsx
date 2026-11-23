@@ -18,6 +18,7 @@
 import type { ChatLists } from "@/lib/chat/chat-lists";
 import { readSnapshot, writeSnapshot } from "@/lib/snapshot-cache";
 import { chatStore } from "@/lib/chat/offline/chat-cache";
+import { configureSealedChat } from "@/lib/chat/e2ee/sealed-chat";
 import { useOutboxFlusher } from "./outbox";
 import * as core from "@polaris/core";
 import { listChannelsAction } from "./actions";
@@ -226,6 +227,7 @@ export function ChatProvider({
     orgId,
     orgName,
     may,
+    sealed = false,
     children
 }: {
     viewerId: string;
@@ -233,6 +235,8 @@ export function ChatProvider({
     orgId: string | null;
     orgName: string | null;
     may: ChatAllowances;
+    /** Sealed chat is on (docs/chat-e2ee-mls.md); off, every send and read is the plain one. */
+    sealed?: boolean;
     children: ReactNode;
 }) {
     const router = useRouter();
@@ -264,6 +268,11 @@ export function ChatProvider({
     const [activeSpaceId, setActiveSpaceId] = useState<string | null>(null);
 
     const keptLists = useRef<KeptLists | null>(null);
+    // Before the outbox flusher's effect, which may send at once.
+    useEffect(() => {
+        configureSealedChat(sealed ? viewerId : null);
+        return () => configureSealedChat(null);
+    }, [sealed, viewerId]);
     useOutboxFlusher(viewerId);
     /** The server has answered, so a late read of the device's copy is moot. */
     const answered = useRef(false);
