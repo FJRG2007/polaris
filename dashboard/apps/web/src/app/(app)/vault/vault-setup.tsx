@@ -27,6 +27,7 @@
 import * as core from "@polaris/core";
 import { useState, type FormEvent } from "react";
 import { createAccountVaultAction } from "./vault-actions";
+import { passwordToSend } from "@/lib/password-proof-client";
 import { createVaultKeys } from "@/lib/vault/crypto";
 import type { SymmetricKey } from "@/lib/vault/crypto";
 import { Button, Card, CardBody, Input, Checkbox } from "@polaris/ui";
@@ -103,8 +104,8 @@ export function VaultSetup({
             const result = await createAccountVaultAction({
                 // Verified again on the server. Checked here as well because the
                 // comparison above needs it here, and a rule enforced only in a
-                // browser is not enforced.
-                accountPassword: account,
+                // browser is not enforced. As an OPAQUE proof when the account has one.
+                accountPassword: await passwordToSend(account),
                 masterPasswordHash: keys.masterPasswordHash,
                 masterPasswordHint: hint.trim() || null,
                 key: keys.protectedKey,

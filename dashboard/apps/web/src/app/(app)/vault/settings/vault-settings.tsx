@@ -31,6 +31,7 @@ import {
     setUnlockTimeoutAction
 } from "../vault-actions";
 import { loadPage } from "@/lib/keep-call";
+import { passwordToSend } from "@/lib/password-proof-client";
 
 const MIN_LENGTH = 12;
 
@@ -132,8 +133,8 @@ export function VaultSettings() {
                 ),
                 newMasterPasswordHash: await crypto.masterPasswordHash(masterKey, next),
                 // Verified on the server as well: a rule enforced only in a
-                // browser is not enforced.
-                accountPassword,
+                // browser is not enforced. As an OPAQUE proof when the account has one.
+                accountPassword: await passwordToSend(accountPassword),
                 key: await crypto.encryptBytes(crypto.symmetricKeyBytes(currentKey), stretched),
                 kdf: settings.kdf,
                 kdfIterations: settings.kdfIterations,

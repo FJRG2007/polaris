@@ -23,6 +23,7 @@ import * as folders from "@/lib/vault/folders";
 import { auth } from "@/lib/auth";
 import { requirePermission } from "@/lib/session";
 import { getUserSecurity, verifyAccountPassword } from "@polaris/auth";
+import { withPasswordOrProof } from "@/lib/chat/e2ee/opaque-password";
 import { sharingBaseUrl } from "@/lib/domain-service";
 import * as accessLog from "@/lib/vault/access-log";
 import type { ItemUseEntry } from "@/lib/vault/item-uses";
@@ -110,9 +111,13 @@ export async function setUnlockTimeoutAction(minutes: number): Promise<{ error?:
  * place that comparison can happen, since the master password never arrives
  * here - so this is what makes that comparison something more than a suggestion
  * the client could skip.
+ *
+ * It arrives typed or as an OPAQUE proof (`passwordToSend`); a proof runs the
+ * same check on its one-use stand-in, and one that does not check out is a wrong
+ * password.
  */
-async function accountPasswordOk(userId: string, password: string): Promise<boolean> {
-    return verifyAccountPassword(auth, userId, password);
+async function accountPasswordOk(userId: string, given: unknown): Promise<boolean> {
+    return (await withPasswordOrProof(userId, given, (password) => verifyAccountPassword(auth, userId, password))) ?? false;
 }
 
 export async function createAccountVaultAction(input: unknown): Promise<{ error?: string }> {

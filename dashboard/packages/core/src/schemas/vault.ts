@@ -310,12 +310,32 @@ export const vaultPasswordSchema = z.object({
  * only ever the dashboard talking to itself, where the password is both the
  * proof of who is asking and the value the master password is checked against.
  */
+/**
+ * The Polaris account password as the dashboard sends it: typed (an older
+ * dashboard, an account not on OPAQUE yet), or an OPAQUE proof of it - a login id
+ * and the browser's final login message, absent when the browser already knew
+ * the password was wrong - so the password itself never reaches the server. The
+ * server finishes the proof against its own record; only the bounds live here.
+ */
+export const vaultAccountPasswordSchema = z.union([
+    z.string().min(1).max(512),
+    z.object({
+        loginId: z.string().uuid(),
+        finishLoginRequest: z
+            .string()
+            .min(16)
+            .max(2048)
+            .regex(/^[A-Za-z0-9_-]+$/)
+            .optional()
+    })
+]);
+
 export const vaultSetupSchema = vaultRegisterSchema.extend({
-    accountPassword: z.string().min(1).max(512)
+    accountPassword: vaultAccountPasswordSchema
 });
 
 export const vaultPasswordChangeSchema = vaultPasswordSchema.extend({
-    accountPassword: z.string().min(1).max(512)
+    accountPassword: vaultAccountPasswordSchema
 });
 
 /** Proving the master password again, for a screen that asks a second time. */
