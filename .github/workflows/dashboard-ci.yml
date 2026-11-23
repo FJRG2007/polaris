@@ -231,6 +231,41 @@ jobs:
       - uses: ./.github/actions/workspace-packages
       - run: npm run test -w @polaris/web -- --shard=${{ matrix.shard }}/8
 
+  # The chat's MLS devices driven through the delivery route by real members -
+  # the Node binding of @polaris/core-rs, which the shards above do not build, so
+  # there those tests skip. Here the binding is built for this runner (glibc, a
+  # cached cargo build) and the suite is told a missing one is a failure, so the
+  # tests that skip everywhere else cannot quietly skip here too.
+  web-mls-native:
+    name: web MLS devices (Node binding)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      # rust-toolchain.toml at the root picks the toolchain.
+      - run: cargo --version
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: web-mls-native-x86_64-unknown-linux-gnu
+
+      - run: npm ci --prefer-offline || npm ci --prefer-offline || npm ci --prefer-offline
+      - run: npm run db:generate
+      - uses: ./.github/actions/workspace-packages
+      - run: npm run build:rust -w @polaris/core-rs -- --only node --node-target x86_64-unknown-linux-gnu
+      - name: MLS device tests against the route
+        env:
+          POLARIS_REQUIRE_CORE_RS_NATIVE: "1"
+        run: npm run test -w @polaris/web -- test/chat/e2ee --maxWorkers=2
+
   # Proof that the app compiles, for branches and pull requests. The publish workflow
   # builds the very same app inside the image it ships, so it asks for this to be
   # skipped rather than paying for a second Next build of the same commit.

@@ -259,6 +259,9 @@ describe("/api/e2ee/mls", () => {
 // itself is covered by packages/core-rs, this covers the client's ordering.
 const nativeDir = join(dirname(fileURLToPath(import.meta.url)), "../../../../../packages/core-rs/native");
 const nativeFile = existsSync(nativeDir) ? readdirSync(nativeDir).find((f) => f.startsWith(`polaris-core.${process.platform}-${process.arch}`)) : undefined;
+// CI's MLS job builds the binding and sets this, so a binding that failed to
+// land there fails the run instead of skipping the suite.
+if (process.env.POLARIS_REQUIRE_CORE_RS_NATIVE && !nativeFile) throw new Error(`no Node binding of @polaris/core-rs for ${process.platform}-${process.arch} in ${nativeDir}`);
 const CAROL = "55555555-5555-4555-8555-555555555555";
 const DAVE = "66666666-6666-4666-8666-666666666666";
 
