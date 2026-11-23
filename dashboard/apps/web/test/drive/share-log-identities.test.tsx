@@ -120,7 +120,8 @@ describe("only the owner reads the log, identities included", () => {
         expect(logs[0]).toEqual({
             id: "l1",
             at: AT.toISOString(),
-            ip: "203.0.113.4",
+            // Signed in: shown as their profile, never where they were.
+            ip: null,
             action: "view",
             reason: null,
             visitor: { id: VISITOR, name: "Ada Lovelace", username: "ada" }
@@ -149,7 +150,7 @@ describe("what the owner is told about a visitor", () => {
         });
     });
 
-    it("falls back to the handle, then the email, when there is no name", () => {
+    it("falls back to the handle, and never to the email, when there is no name", () => {
         expect(
             toLinkVisitor({ id: VISITOR, name: "  ", username: "ada", email: "ada@example.test" })
                 ?.name
@@ -158,7 +159,7 @@ describe("what the owner is told about a visitor", () => {
             toLinkVisitor({ id: VISITOR, name: "", username: null, email: "ada@example.test" })
         ).toEqual({
             id: VISITOR,
-            name: "ada@example.test",
+            name: "Somebody",
             username: null
         });
     });

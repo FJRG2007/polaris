@@ -53,14 +53,16 @@ export interface LinkVisitor {
 }
 
 /**
- * Shape an account for the owner's access log: the name it goes by, the handle
- * that opens its profile, and the email address only when there is neither -
- * the owner is told who it was, not handed contact details nobody offered them.
+ * Shape an account for the owner's access log: the name it goes by and the
+ * handle that opens its profile - never the email address, even for an account
+ * with neither, since the owner is told who it was, not handed contact details
+ * nobody offered them.
  */
 export function toLinkVisitor(
     user: { id: string; name: string; username: string | null; email: string } | null
 ): LinkVisitor | null {
     if (!user) return null;
-    const name = user.name.trim() || user.username?.trim() || user.email;
+    // Never the address: whoever reads a visitor log is not owed it.
+    const name = user.name.trim() || user.username?.trim() || "Somebody";
     return { id: user.id, name, username: user.username?.trim() || null };
 }

@@ -8,6 +8,7 @@
  * source of truth for what may be shared or on what terms.
  */
 
+import { visitOrigin } from "@/lib/visitor-privacy";
 import { cookies } from "next/headers";
 import { getTranslations } from "@/lib/i18n/request";
 import { revalidatePath } from "next/cache";
@@ -225,7 +226,7 @@ export async function getShareLogsAction(shareId: string): Promise<{ logs: Share
         logs: logs.map((row) => ({
             id: row.id,
             at: row.at.toISOString(),
-            ip: row.ip,
+            ip: visitOrigin({ userId: row.user?.id, ip: row.ip }).ip,
             action: row.action,
             reason: row.reason,
             visitor: toLinkVisitor(row.user)

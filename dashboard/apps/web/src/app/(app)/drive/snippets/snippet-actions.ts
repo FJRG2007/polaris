@@ -11,6 +11,7 @@
  * credential, and there is no session to resolve.
  */
 
+import { visitOrigin } from "@/lib/visitor-privacy";
 import { cookies } from "next/headers";
 import { getTranslations } from "@/lib/i18n/request";
 import { loadEnv } from "@polaris/config";
@@ -184,7 +185,7 @@ export async function getSnippetLogsAction(snippetId: string): Promise<{ logs: S
         logs: logs.map((row) => ({
             id: row.id,
             at: row.at.toISOString(),
-            ip: row.ip,
+            ip: visitOrigin({ userId: row.user?.id, ip: row.ip }).ip,
             action: row.action,
             reason: row.reason,
             visitor: toLinkVisitor(row.user)

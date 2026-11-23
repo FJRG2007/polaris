@@ -6,6 +6,7 @@
  * Owner-scoped: an id the caller does not own resolves to null and renders a 404.
  */
 
+import { visitOrigin } from "@/lib/visitor-privacy";
 import { notFound } from "next/navigation";
 import { parseLinkSchedule } from "@/lib/link-guards";
 import { requirePermission } from "@/lib/session";
@@ -85,9 +86,9 @@ export default async function DropPointDetailPage({ params }: { params: Promise<
 
     const visitors: VisitorRow[] = visits.map((row) => ({
         id: row.id,
-        ip: row.ip,
+        // A signed-in visitor is their name, never their address or browser.
+        ...visitOrigin(row),
         user: row.userId ? (names.get(row.userId) ?? null) : null,
-        userAgent: row.userAgent,
         uploads: row.uploadCount,
         firstSeenAt: row.firstSeenAt.toISOString(),
         lastSeenAt: row.lastSeenAt.toISOString()
