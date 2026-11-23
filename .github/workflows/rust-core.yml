@@ -4,7 +4,8 @@ name: rust-core
 # WebAssembly bindings, and the facades in dashboard/packages/core-rs. Every
 # target replays the same golden vectors - native Rust, the napi binding on
 # Windows, macOS (Intel and Apple silicon) and musl Linux (x64 and arm64), and
-# the WebAssembly build in Node and in headless Chromium, WebKit and Firefox -
+# the WebAssembly build in Node and in headless Chromium, WebKit and Firefox,
+# and MLS groups mixing napi and wasm members -
 # so a divergence between targets fails here (plan 4.4).
 #
 # No `paths:` filter on the triggers: a filtered workflow never reports, and a
@@ -293,6 +294,76 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # Cross-target MLS (plan E3): each platform's napi binding and the wasm chunk
+  # in one Node process, as members of the same groups - every assignment of
+  # members to targets, both suites (test/interop). Built once by the jobs
+  # above and taken from their artifacts, so the bytes tested are the bytes
+  # shipped.
+  interop:
+    name: MLS interop napi x wasm ${{ matrix.name }}
+    needs: [changes, native, wasm]
+    if: needs.changes.outputs.core == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: win32-x64-msvc
+            os: windows-latest
+          - name: darwin-x64
+            os: macos-15-intel
+          - name: darwin-arm64
+            os: macos-latest
+            browsers: true
+          - name: linux-x64-musl
+            os: ubuntu-latest
+            alpine: true
+          - name: linux-arm64-musl
+            os: ubuntu-24.04-arm
+            alpine: true
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: core-rs-native-${{ matrix.name }}
+          path: dashboard/packages/core-rs/native
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: core-rs-wasm
+          path: dashboard/packages/core-rs
+      - if: ${{ !matrix.alpine }}
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - if: ${{ !matrix.alpine }}
+        working-directory: dashboard
+        run: |
+          $CORE_RS_INSTALL
+          npm run test:interop -w @polaris/core-rs -- --maxWorkers=2
+      # The same with the wasm member inside a real page of each engine and the
+      # server's members on the binding in Node.
+      - if: matrix.browsers
+        working-directory: dashboard
+        run: |
+          npx playwright install chromium webkit firefox
+          npm run test:browsers:mls-interop -w @polaris/core-rs -- chromium firefox webkit
+      - if: matrix.alpine
+        run: |
+          docker run --rm \
+            -v "$PWD:/w" -w /w/dashboard \
+            -e CORE_RS_INSTALL -e NPM_CONFIG_FUND -e NPM_CONFIG_AUDIT -e NPM_CONFIG_FETCH_RETRIES \
+            -e NPM_CONFIG_FETCH_RETRY_MINTIMEOUT -e NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT \
+            node:22-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a \
+            sh -euc '$CORE_RS_INSTALL; npm run test:interop -w @polaris/core-rs -- --maxWorkers=2'
+
   # Every cargo-fuzz target for a fixed time (plan 4.3). A crash fails the job
   # and its input is uploaded, to become a regression vector.
   fuzz:
@@ -381,7 +452,7 @@ jobs:
   # The one check to require: it always reports, and it is green only when every
   # job above passed, or was skipped because nothing it checks changed.
   rust-core:
-    needs: [changes, rust, native, wasm, fuzz, bench]
+    needs: [changes, rust, native, wasm, interop, fuzz, bench]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

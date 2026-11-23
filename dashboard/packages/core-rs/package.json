@@ -35,6 +35,7 @@
         "test": "vitest run test/unit",
         "test:native": "vitest run test/native",
         "test:wasm": "vitest run test/wasm",
+        "test:interop": "vitest run test/interop",
         "test:browsers": "node scripts/browser-parity.mjs",
         "check:size": "node scripts/wasm-size.mjs",
         "check:guard": "node scripts/no-simulation-guard.mjs",
@@ -43,7 +44,8 @@
         "smoke": "node scripts/smoke.mjs",
         "bench": "node scripts/bench.mjs",
         "vectors": "node scripts/vectors.mjs",
-        "test:browsers:mls": "node scripts/browser-mls-store.mjs"
+        "test:browsers:mls": "node scripts/browser-mls-store.mjs",
+        "test:browsers:mls-interop": "node scripts/browser-mls-interop.mjs"
     },
     "dependencies": {
         "@noble/hashes": "2.2.0",

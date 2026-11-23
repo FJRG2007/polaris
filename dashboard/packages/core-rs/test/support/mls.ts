@@ -59,6 +59,15 @@ export type MlsMemberClass = (new (identity: Uint8Array, ciphersuite: number, se
     ): MlsMemberLike;
 };
 
+/**
+ * Which binding plays each member: one class for a single-target run, or a
+ * class per member for the cross-target matrix (E3) - a group created on one
+ * binding must take members, commits and messages from the other.
+ */
+export type Cast = MlsMemberClass | { alice: MlsMemberClass; bob: MlsMemberClass; carol: MlsMemberClass };
+
+const castOf = (cast: Cast) => (typeof cast === "function" ? { alice: cast, bob: cast, carol: cast } : cast);
+
 const text = new TextEncoder();
 const bytes = (value: Uint8Array | null | undefined) => Array.from(value ?? []);
 const seed = () => crypto.getRandomValues(new Uint8Array(32));
@@ -73,11 +82,12 @@ function refusal(call: () => unknown): { code?: string; message: string } {
     throw new Error("the call was expected to be refused");
 }
 
-export function runGroupLife(Member: MlsMemberClass, suite: number) {
+export function runGroupLife(cast: Cast, suite: number) {
+    const roles = castOf(cast);
     const groupId = text.encode(`group-${suite}`);
-    const alice = new Member(text.encode("alice"), suite, seed());
-    const bob = new Member(text.encode("bob"), suite, seed());
-    const carol = new Member(text.encode("carol"), suite, seed());
+    const alice = new roles.alice(text.encode("alice"), suite, seed());
+    const bob = new roles.bob(text.encode("bob"), suite, seed());
+    const carol = new roles.carol(text.encode("carol"), suite, seed());
     expect(alice.signaturePublicKey()).toHaveLength(32);
 
     alice.createGroup(groupId);
@@ -159,12 +169,13 @@ class Store {
 }
 
 /** Crash and restart around a commit through the binding's journal (E2). */
-export function runRestarts(Member: MlsMemberClass, suite: number) {
+export function runRestarts(cast: Cast, suite: number) {
+    const roles = castOf(cast);
     const groupId = text.encode("restart");
     const aliceStore = new Store();
     const bobStore = new Store();
-    let alice = new Member(text.encode("alice"), suite, seed());
-    let bob = new Member(text.encode("bob"), suite, seed());
+    let alice = new roles.alice(text.encode("alice"), suite, seed());
+    let bob = new roles.bob(text.encode("bob"), suite, seed());
     const alicePk = alice.signaturePublicKey();
     const bobPk = bob.signaturePublicKey();
     const keyPackage = bob.keyPackage();
@@ -180,7 +191,7 @@ export function runRestarts(Member: MlsMemberClass, suite: number) {
     // alice dies before persisting her commit: it never happened.
     alice.selfUpdate(groupId);
     alice.mergePendingCommit(groupId);
-    alice = aliceStore.restore(Member, "alice", suite, alicePk);
+    alice = aliceStore.restore(roles.alice, "alice", suite, alicePk);
     expect(alice.epoch(groupId)).toBe(1n);
 
     // bob dies before persisting a processed commit: it is delivered again.
@@ -188,18 +199,46 @@ export function runRestarts(Member: MlsMemberClass, suite: number) {
     alice.mergePendingCommit(groupId);
     aliceStore.persist(alice);
     bob.process(groupId, update.commit);
-    bob = bobStore.restore(Member, "bob", suite, bobPk);
+    bob = bobStore.restore(roles.bob, "bob", suite, bobPk);
     expect(bob.epoch(groupId)).toBe(1n);
     bob.process(groupId, update.commit);
     bobStore.persist(bob);
 
     // Both restart from their stores and carry on.
-    alice = aliceStore.restore(Member, "alice", suite, alicePk);
-    bob = bobStore.restore(Member, "bob", suite, bobPk);
+    alice = aliceStore.restore(roles.alice, "alice", suite, alicePk);
+    bob = bobStore.restore(roles.bob, "bob", suite, bobPk);
     expect([alice.epoch(groupId), bob.epoch(groupId)]).toEqual([2n, 2n]);
     const sealed = alice.encrypt(groupId, text.encode("after restarts"));
     expect(bytes(bob.process(groupId, sealed).plaintext)).toEqual(bytes(text.encode("after restarts")));
 
-    expect(refusal(() => Member.restore(text.encode("bob"), suite, seed(), [new Uint8Array(1)], [], bobPk)).code).toBe("MlsMalformed");
-    expect(refusal(() => Member.restore(text.encode("bob"), suite, seed(), [], [], bobPk)).code).toBe("MlsStorage");
+    expect(refusal(() => roles.bob.restore(text.encode("bob"), suite, seed(), [new Uint8Array(1)], [], bobPk)).code).toBe("MlsMalformed");
+    expect(refusal(() => roles.bob.restore(text.encode("bob"), suite, seed(), [], [], bobPk)).code).toBe("MlsStorage");
+}
+
+/**
+ * A device's journal written through one binding and restored through the
+ * other: the stored key/value format is the crate's, not the binding's, so a
+ * store never has to be rewritten when the code that reads it changes target.
+ */
+export function runStoreHandover(from: MlsMemberClass, to: MlsMemberClass, suite: number) {
+    const groupId = text.encode("handover");
+    const store = new Store();
+    const alice = new from(text.encode("alice"), suite, seed());
+    const bob = new to(text.encode("bob"), suite, seed());
+    const alicePk = alice.signaturePublicKey();
+    alice.createGroup(groupId);
+    const added = alice.addMembers(groupId, [bob.keyPackage()]);
+    alice.mergePendingCommit(groupId);
+    store.persist(alice);
+    bob.joinByWelcome(added.welcome as Uint8Array);
+
+    const moved = store.restore(to, "alice", suite, alicePk);
+    expect(moved.epoch(groupId)).toBe(1n);
+    expect(bytes(moved.signaturePublicKey())).toEqual(bytes(alicePk));
+    const sealed = moved.encrypt(groupId, text.encode("same state, other target"));
+    expect(bytes(bob.process(groupId, sealed).plaintext)).toEqual(bytes(text.encode("same state, other target")));
+    const update = bob.selfUpdate(groupId);
+    bob.mergePendingCommit(groupId);
+    expect(moved.process(groupId, update.commit).kind).toBe("commit");
+    expect(bytes(moved.epochAuthenticator(groupId))).toEqual(bytes(bob.epochAuthenticator(groupId)));
 }
