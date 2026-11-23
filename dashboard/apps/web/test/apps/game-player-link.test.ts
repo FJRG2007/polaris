@@ -466,9 +466,19 @@ describe("refusals the owner is done with", () => {
         };
         await service.grantPlayerAccess(OWNER, SERVER, OWNER, {
             username: "AdaMC",
-            address: "5.5.5.5"
+            address: "5.5.5.5",
+            answersRefusal: true
         });
         expect(service.readRefusals(config).map((one) => one.address)).toEqual(["6.6.6.6"]);
+    });
+
+    it("stay when an address was typed rather than answered, so a guess confirms nothing", async () => {
+        config = { playerRefusals: [refusal("AdaMC", "5.5.5.5", 1)] };
+        await service.grantPlayerAccess(OWNER, SERVER, OWNER, {
+            username: "AdaMC",
+            address: "5.5.5.5"
+        });
+        expect(service.readRefusals(config).map((one) => one.address)).toEqual(["5.5.5.5"]);
     });
 
     it("can be cleared one at a time, by who and when, or several at once", async () => {

@@ -109,12 +109,16 @@ export async function viewerSeesSignInAddresses(viewer?: {
 
 /**
  * The list as the person asking may see it. Unless they may see addresses,
- * every address on it - typed, copied from a sign-in, or one a refused player
- * arrived from - is replaced with its opaque reference on this server
- * (`address-refs.ts`), so the screen can still tell two players on one line
- * apart from two on different lines, and act on either, without reading where
- * anybody connects from. Enforcement never goes through here - it reads the
- * rows themselves.
+ * every address on it is replaced with an opaque reference (`address-refs.ts`):
+ *
+ * - An address the server observed - copied from a linked account's sign-ins,
+ *   or one a refused player arrived from - reads as the reference of the
+ *   address on this server, so two players on one line read as one.
+ * - An address somebody typed reads as a reference of its own row, never of the
+ *   address. Otherwise typing a guess and comparing it with what is listed
+ *   would tell a manager where a player connects from.
+ *
+ * Enforcement never goes through here - it reads the rows themselves.
  */
 export async function forViewer(
     view: PlayerAccessView,
@@ -123,23 +127,38 @@ export async function forViewer(
 ): Promise<PlayerAccessView> {
     if (await viewerSeesSignInAddresses(viewer)) return view;
     const key = await addressRefKey();
-    const masked = (address: string): string =>
-        address === ANY_ADDRESS ? address : addressRef(key, installedAppId, address);
     return {
         ...view,
-        rules: view.rules.map((rule) => ({ ...rule, address: masked(rule.address) })),
+        rules: view.rules.map((rule) => ({
+            ...rule,
+            address: ruleReference(key, installedAppId, rule)
+        })),
         refusals: view.refusals.map((refusal) =>
-            refusal.address ? { ...refusal, address: masked(refusal.address) } : refusal
+            refusal.address
+                ? { ...refusal, address: addressRef(key, installedAppId, refusal.address) }
+                : refusal
         )
     };
 }
 
+/** What a rule's address reads as to somebody not allowed to see it. */
+function ruleReference(
+    key: string,
+    installedAppId: string,
+    rule: Pick<PlayerAccessRule, "id" | "address" | "source">
+): string {
+    if (rule.address === ANY_ADDRESS) return rule.address;
+    return rule.source === "session"
+        ? addressRef(key, installedAppId, rule.address)
+        : addressRef(key, installedAppId, `rule:${rule.id}`);
+}
+
 /**
  * The address an action was sent, with a reference turned back into the
- * address it stands for on this server. Only addresses the server already
- * holds - its rules and the places refused players arrived from - can be
- * reached this way; a reference to anything else is refused. A literal address
- * is returned as typed: whoever typed it already knows it.
+ * address it stands for on this server. Only what the server already lists -
+ * its rules and the places refused players arrived from - can be reached this
+ * way; a reference to anything else is refused. A literal address is returned
+ * as typed: whoever typed it already knows it.
  */
 export async function resolveAddressInput(
     ownerId: string,
@@ -148,10 +167,12 @@ export async function resolveAddressInput(
 ): Promise<string> {
     if (!isAddressRef(value)) return value;
     const view = await listPlayerAccess(ownerId, installedAppId);
-    const candidates = new Set<string>();
-    for (const rule of view.rules) candidates.add(rule.address);
-    for (const refusal of view.refusals) if (refusal.address) candidates.add(refusal.address);
-    const found = resolveAddressRef(await addressRefKey(), installedAppId, value, candidates);
+    const key = await addressRefKey();
+    for (const rule of view.rules) {
+        if (ruleReference(key, installedAppId, rule) === value) return rule.address;
+    }
+    const observed = view.refusals.flatMap((refusal) => (refusal.address ? [refusal.address] : []));
+    const found = resolveAddressRef(key, installedAppId, value, observed);
     if (!found) throw new Error(gameMessage("games", "lib.addressRefUnknown"));
     return found;
 }
@@ -1111,7 +1132,14 @@ export async function grantPlayerAccess(
     ownerId: string,
     installedAppId: string,
     actorId: string,
-    input: { username: string; address: string; note?: string }
+    input: {
+        username: string;
+        address: string;
+        note?: string;
+        /** Whether this answers a refusal the caller was shown. A typed address
+         *  never clears one: a refusal vanishing would confirm a guess. */
+        answersRefusal?: boolean;
+    }
 ): Promise<void> {
     const install = await resolve(ownerId, installedAppId);
     // The spelling the server has seen, not the one that was typed: on a server
@@ -1144,7 +1172,7 @@ export async function grantPlayerAccess(
         update: input.note?.trim() ? { note: input.note.trim() } : {}
     });
     // A refusal from the address just allowed has been answered.
-    await dropRefusals(
+    if (input.answersRefusal) await dropRefusals(
         installedAppId,
         (one) => one.player.toLowerCase() === username.toLowerCase() && one.address === address
     ).catch(() => undefined);

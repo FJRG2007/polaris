@@ -51,7 +51,10 @@ const view = {
         rule("3", "cy", "203.0.113.7", "manual"),
         rule("4", "dee", "any", "manual")
     ],
-    refusals: [{ player: "eve", address: "192.0.2.9", why: "", at: "", count: 1 }],
+    refusals: [
+        { player: "eve", address: "192.0.2.9", why: "", at: "", count: 1 },
+        { player: "ada", address: "203.0.113.7", why: "", at: "", count: 1 }
+    ],
     links: [],
     bindAddresses: true,
     addressesAvailable: true,
@@ -74,10 +77,14 @@ describe("player addresses on the players screen", () => {
         const [ada, bob, cy, dee] = addressesOf(shown);
         for (const ref of [ada, bob, cy]) expect(refs.isAddressRef(ref!)).toBe(true);
         expect(JSON.stringify(shown)).not.toMatch(/203\.0\.113|198\.51\.100|192\.0\.2/);
-        // Two players on one line still read as one, and "any" is not an address.
-        expect(ada).toBe(cy);
+        // An observed address reads the same wherever it was observed, so a
+        // sign-in and a refused join from one line read as one.
+        expect(ada).toBe(shown.refusals[1]!.address);
         expect(ada).not.toBe(bob);
         expect(dee).toBe("any");
+        // A typed address reads as its own row, never as the address: typing a
+        // guess must not reveal whether a player connects from it.
+        expect(cy).not.toBe(ada);
         expect(refs.isAddressRef(shown.refusals[0]!.address!)).toBe(true);
         // The stored view is untouched: enforcement reads the rows themselves.
         expect(view.rules[0]!.address).toBe("203.0.113.7");
@@ -133,8 +140,8 @@ describe("acting on an address by its reference", () => {
     });
 
     it("labels a reference without the address in it", () => {
-        const t = (_key: string, values?: Record<string, string>) => `Address ${values?.ref}`;
-        expect(addressShown("ref-3f9ac21b00", t)).toBe("Address 3F9A-C21B");
-        expect(addressShown("203.0.113.7", t)).toBe("203.0.113.7");
+        const label = (ref: string) => `Address ${ref}`;
+        expect(addressShown("ref-3f9ac21b00", label)).toBe("Address 3F9A-C21B");
+        expect(addressShown("203.0.113.7", label)).toBe("203.0.113.7");
     });
 });

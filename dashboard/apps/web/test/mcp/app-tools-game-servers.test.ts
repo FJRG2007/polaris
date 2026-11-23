@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
     getServerRoster: vi.fn(),
     listPlayerAccess: vi.fn(),
     forViewer: vi.fn(),
+    resolveAddressInput: vi.fn(async (_owner: string, _server: string, value: string) => value),
     grantPlayerAccess: vi.fn(),
     revokePlayerAccess: vi.fn(),
     announceNow: vi.fn(),
@@ -91,6 +92,7 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/player-access", () => ({
     listPlayerAccess: mocks.listPlayerAccess,
     forViewer: mocks.forViewer,
+    resolveAddressInput: mocks.resolveAddressInput,
     grantPlayerAccess: mocks.grantPlayerAccess,
     revokePlayerAccess: mocks.revokePlayerAccess
 }));
@@ -321,7 +323,7 @@ describe("who may join", () => {
             { id: GAME, answering: false, players: [], online: 0, max: 20 }
         ]);
         const read = await call("games_players", { serverId: GAME }, ["gameservers.read"]);
-        expect(mocks.forViewer).toHaveBeenCalledWith(view, ADA);
+        expect(mocks.forViewer).toHaveBeenCalledWith(view, ADA, GAME);
         expect(mocks.getServerRoster).not.toHaveBeenCalled();
         expect(read.structuredContent).toMatchObject({ online: [], roster: null });
     });

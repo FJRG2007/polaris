@@ -18,6 +18,7 @@ import { useGameText, useSchemaText } from "../screens/game-text";
 import { useMemo, useState, useTransition } from "react";
 import { GameAccessForm } from "./game-access-form";
 import { ACCESS_REACH_NOTE } from "../lib/minecraft/access";
+import { addressShown } from "../lib/minecraft/address-label";
 import { Badge, Button, Card, CardBody, Switch, useOptimisticToggle } from "@polaris/ui";
 import type { PlayerAccessView } from "../lib/minecraft/player-access";
 import {
@@ -207,7 +208,7 @@ export function GameAccessEditor({
                                             key={address}
                                             className="inline-flex items-center gap-0.5"
                                         >
-                                            <Badge>{schemaText(address)}</Badge>
+                                            <Badge>{addressShown(address, (ref) => t("accessEditor.addressRef", { ref }))}</Badge>
                                             {/* Each address goes on its own. Taking the last
                                                 one takes the player, which the service decides
                                                 so both screens agree about it. A linked
@@ -218,11 +219,15 @@ export function GameAccessEditor({
                                                     type="button"
                                                     disabled={pending}
                                                     aria-label={t("accessEditor.removeAddress", {
-                                                        address,
+                                                        address: addressShown(address, (ref) =>
+                                                            t("accessEditor.addressRef", { ref })
+                                                        ),
                                                         name: person.username
                                                     })}
                                                     title={t("accessEditor.removeAddress", {
-                                                        address,
+                                                        address: addressShown(address, (ref) =>
+                                                            t("accessEditor.addressRef", { ref })
+                                                        ),
                                                         name: person.username
                                                     })}
                                                     className="text-muted-foreground hover:text-danger disabled:opacity-50"

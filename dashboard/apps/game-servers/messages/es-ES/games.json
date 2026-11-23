@@ -510,6 +510,7 @@
         "whoCanConnect": "Quién se conecta",
         "follows": "Sigue los inicios de sesión de {name} en Polaris",
         "removeAddress": "Quitar {address} de {name}",
+        "addressRef": "Dirección {ref}",
         "removeNamed": "Quitar a {name}",
         "removeEverything": "Quitar a {name} y todas sus direcciones"
     },

@@ -13,12 +13,14 @@ export function isAddressRef(value: string): boolean {
     return REF_PATTERN.test(value);
 }
 
-/** The text to show for `address`: a reference as "Address 3F9A-C21B", anything else as is. */
-export function addressShown(
-    address: string,
-    t: (key: string, values?: Record<string, string>) => string
-): string {
+/**
+ * The text to show for `address`: a reference through `label` (which words it,
+ * "Address 3F9A-C21B"), anything else as is.
+ */
+export function addressShown(address: string, label: (ref: string) => string): string {
     if (!isAddressRef(address)) return address;
-    const code = address.slice(ADDRESS_REF_PREFIX.length, ADDRESS_REF_PREFIX.length + 8).toUpperCase();
-    return t("playersTab.addressRef", { ref: `${code.slice(0, 4)}-${code.slice(4)}` });
+    const code = address
+        .slice(ADDRESS_REF_PREFIX.length, ADDRESS_REF_PREFIX.length + 8)
+        .toUpperCase();
+    return label(`${code.slice(0, 4)}-${code.slice(4)}`);
 }

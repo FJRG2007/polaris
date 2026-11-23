@@ -1152,13 +1152,13 @@ export function PlayerAccessDialog({
                                         key={held}
                                         className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs"
                                     >
-                                        {addressShown(held, t)}
+                                        {addressShown(held, (ref) => t("playersTab.addressRef", { ref }))}
                                         {onRemoveAddress && !following && (
                                             <button
                                                 type="button"
                                                 disabled={pending}
                                                 aria-label={t("players.removeAddressFrom", {
-                                                    address: addressShown(held, t),
+                                                    address: addressShown(held, (ref) => t("playersTab.addressRef", { ref })),
                                                     name: player.username
                                                 })}
                                                 title={t("players.removeNamed", { name: held })}

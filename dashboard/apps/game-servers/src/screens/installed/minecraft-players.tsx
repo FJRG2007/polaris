@@ -729,7 +729,7 @@ export function MinecraftPlayers({
                                     <span className="font-medium">{refusal.player}</span>
                                     <span className="text-muted-foreground">
                                         {from
-                                            ? t("playersTab.arrivedFrom", { address: addressShown(from, t) })
+                                            ? t("playersTab.arrivedFrom", { address: addressShown(from, (ref) => t("playersTab.addressRef", { ref })) })
                                             : t("playersTab.arrivedFromAnAddressThe")}
                                         {" - "}
                                         {format.dateTime(refusal.at)}
@@ -1540,7 +1540,7 @@ function PlayerRow({
                     ) : (
                         <TagList>
                             {player.addresses.map((address) => (
-                                <Badge key={address}>{addressShown(address, t)}</Badge>
+                                <Badge key={address}>{addressShown(address, (ref) => t("playersTab.addressRef", { ref }))}</Badge>
                             ))}
                         </TagList>
                     )}

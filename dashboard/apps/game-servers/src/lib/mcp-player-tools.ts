@@ -392,7 +392,7 @@ const accessInput = z.object({
         .min(1)
         .max(43)
         .optional()
-        .describe('Where they may connect from, for grant: one IP, a range (CIDR), or "any".'),
+        .describe('Where they may connect from, for grant: one IP, a range (CIDR), "any", or an address reference (ref-...) read off the access list.'),
     note: z.string().trim().max(120).optional().describe("Who they are, for the list.")
 });
 
@@ -432,20 +432,26 @@ const accessTool = () =>
                     }
                 };
             }
-            const address = input.address ?? refuse('Say where they connect from, or "any".');
+            const given = input.address ?? refuse('Say where they connect from, or "any".');
+            // A reference read off the list is resolved on this server; the
+            // reply below repeats what was sent, never the address behind it.
+            const resolved = await attempt(() =>
+                playerAccess.resolveAddressInput(access.ownerId, input.serverId, given)
+            );
             await attempt(() =>
                 playerAccess.grantPlayerAccess(access.ownerId, input.serverId, user.id, {
                     username: input.username,
-                    address,
+                    address: resolved,
                     ...(input.note ? { note: input.note } : {})
                 })
             );
+            const address = given;
             await recordAudit({
                 actorId: user.id,
                 action: "minecraft.access-grant",
                 targetType: "installedApp",
                 targetId: input.serverId,
-                metadata: { player: input.username, address, via: "mcp" }
+                metadata: { player: input.username, address: resolved, via: "mcp" }
             });
             return {
                 text: `${input.username} may join ${access.install.name} from ${address}.`,

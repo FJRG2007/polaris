@@ -510,6 +510,7 @@
         "whoCanConnect": "Who can connect",
         "follows": "Follows {name}'s Polaris sign-ins",
         "removeAddress": "Remove {address} from {name}",
+        "addressRef": "Address {ref}",
         "removeNamed": "Remove {name}",
         "removeEverything": "Remove {name} and every address they have"
     },

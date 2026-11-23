@@ -924,9 +924,14 @@ export async function grantPlayerAccessAction(
             parsed.data.installedAppId,
             parsed.data.address
         );
+        // Answering a refusal clears it - but only when the address came from
+        // the screen. A typed one that cleared a refusal would confirm a guess.
+        const answersRefusal =
+            address !== parsed.data.address || (await playerAccess.viewerSeesSignInAddresses());
         await playerAccess.grantPlayerAccess(access.ownerId, parsed.data.installedAppId, user.id, {
             username: parsed.data.username,
             address,
+            answersRefusal,
             ...(parsed.data.note ? { note: parsed.data.note } : {})
         });
         await recordAudit({
