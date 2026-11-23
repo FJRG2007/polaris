@@ -121,9 +121,7 @@
         "recoveryUnverified": "No pudo responder a ninguna pregunta de recuperación. Comprueba quién es antes de aprobarlo en Personas.",
         "signInRefusedTitle": "Se rechazó un acceso desde tu móvil",
         "signInRefusedBody": "Dijiste que no eras tú. Si alguien sabe tu contraseña, cámbiala o bloquea la cuenta desde Seguridad.",
-        "signInMismatchBody": "Se eligió un número equivocado y se denegó. Si no eras tú, alguien puede saber tu contraseña: cámbiala o bloquea la cuenta desde Seguridad.",
-        "phoneSignInRefusedBody": "Dijiste que no eras tú. Alguien escribió tu correo para entrar con tu móvil; no entró nadie. Si se repite, bloquea la cuenta desde Seguridad.",
-        "phoneSignInMismatchBody": "Se eligió un número equivocado, se denegó y no entró nadie. Si no eras tú, bloquea la cuenta desde Seguridad."
+        "signInMismatchBody": "Se eligió un número equivocado y se denegó. Si no eras tú, alguien puede saber tu contraseña: cámbiala o bloquea la cuenta desde Seguridad."
     },
     "safety": {
         "lockedDownTitle": "Se ha bloqueado una cuenta",

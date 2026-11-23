@@ -136,7 +136,6 @@ export {
 } from "./device-accounts.js";
 export { signInWithConnection, type ConnectionSignInResult } from "./connection-sign-in.js";
 export { signInWithOpaque, OPAQUE_SIGN_IN_PATH, type OpaqueSignInResult } from "./opaque-sign-in.js";
-export { signInWithPhone, PHONE_SIGN_IN_PATH } from "./phone-sign-in.js";
 export {
     SSO_ERROR_PATH,
     SSO_REQUIRED_CODE,

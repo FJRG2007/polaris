@@ -1002,7 +1002,6 @@
             "passkey": "Llave de acceso",
             "emailLink": "Enlace por correo",
             "qrCode": "Código QR",
-            "phone": "Con el móvil",
             "sso": "Acceso único"
         },
         "secondFactors": {

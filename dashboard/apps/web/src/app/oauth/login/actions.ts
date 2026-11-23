@@ -38,8 +38,8 @@ export async function resolveIdentifier(identifier: string): Promise<string | nu
     const value = identifier.trim().toLowerCase();
     if (value.includes("@")) return value;
     // A verified phone number, typed in international form ("+34 600 00 00 03").
-    // It still signs in through the password (OPAQUE) or the phone approval:
-    // this only names the account, exactly as a username does.
+    // The password (OPAQUE) still has to be given, and the second factor after
+    // it: this only names the account, exactly as a username does.
     if (value.startsWith("+")) {
         const phone = phoneShapeField.safeParse(value);
         return phone.success ? emailForPhone(phone.data, toE164(phone.data)) : null;

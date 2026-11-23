@@ -11796,9 +11796,8 @@ model SignInApproval {
     // Why a denied request was denied: "not-me" (the phone said so) or
     // "mismatch" (the wrong number was picked). Counted to stop push bombing.
     reason        String?
-    // "second-factor": finishes the challenge the browser holds. "sign-in": the
-    // approval is the whole sign-in, with no password (challengeHash is then the
-    // hash of a secret in the asking browser's cookie).
+    // Always "second-factor": the phone finishes the challenge the browser holds
+    // and never replaces the password. Any other value is never collected.
     purpose       String    @default("second-factor")
     createdAt     DateTime  @default(now())
     expiresAt     DateTime
