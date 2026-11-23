@@ -75,13 +75,11 @@ describe("the names networks", () => {
             names
         ]);
         expect(net.serviceNetworks({ ...base, mode: "environment", names: true })).toEqual([
-            PROXY,
             net.environmentNetwork("env-1"),
             names
         ]);
         const links = [{ source: "a", target: "b" }];
         expect(net.serviceNetworks({ ...base, mode: "links", links, names: true })).toEqual([
-            PROXY,
             net.serviceNetwork("a"),
             net.serviceNetwork("b"),
             net.serviceNamesNetwork("a"),

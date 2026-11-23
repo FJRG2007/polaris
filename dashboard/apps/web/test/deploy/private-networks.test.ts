@@ -98,12 +98,13 @@ describe("the networks a stored service is deployed onto", () => {
         ]);
     });
 
-    it("takes a routed service with a closed port onto the proxy network beside its own", () => {
-        expect(networksForService(facts({ routed: true }))).toEqual([
-            PROXY,
-            environmentNetwork("env-1")
-        ]);
-        // A published port is what this machine's edge dials, so no proxy network.
+    it("keeps a routed service off the proxy network: the edge reaches it on its own", () => {
+        expect(networksForService(facts({ routed: true }))).toEqual([environmentNetwork("env-1")]);
+        expect(
+            networksForService(
+                facts({ routed: true, target: { kind: "ssh", hostId: "host-1", proxyNetwork: PROXY } })
+            )
+        ).toEqual([environmentNetwork("env-1")]);
         expect(networksForService(facts({ routed: true, published: true }))).toEqual([
             environmentNetwork("env-1")
         ]);

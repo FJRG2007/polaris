@@ -108,11 +108,6 @@ export function networksForService(facts: ServiceNetworkFacts): string[] {
         proxyNetwork: facts.target.proxyNetwork,
         environmentId: facts.environment.id,
         serviceId: facts.serviceId,
-        joinsProxy: deploy.joinsProxy({
-            local: isLocal(facts.target),
-            published: facts.published,
-            routed: facts.routed
-        }),
         links: deploy.linksOfLayout(facts.environment.layout),
         names: facts.names,
         crossLinks: facts.crossLinks

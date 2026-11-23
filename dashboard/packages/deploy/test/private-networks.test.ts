@@ -79,13 +79,41 @@ describe("which networks a service joins", () => {
         expect(serviceNetworks({ ...base, mode: "shared", joinsProxy: false })).toEqual([PROXY]);
     });
 
-    it("puts an environment's services on its own network, and on the proxy only when the edge needs it", () => {
+    it("puts an environment's services on its own network and never on the proxy, routed or not", () => {
         const own = environmentNetwork("env-1");
-        expect(serviceNetworks({ ...base, mode: "environment", joinsProxy: true })).toEqual([
-            PROXY,
-            own
-        ]);
+        expect(serviceNetworks({ ...base, mode: "environment", joinsProxy: true })).toEqual([own]);
         expect(serviceNetworks({ ...base, mode: "environment", joinsProxy: false })).toEqual([own]);
+    });
+
+    it("leaves no network in common between a routed service and another project's", () => {
+        const modes = ["environment", "links"] as const;
+        for (const mine of modes)
+            for (const theirs of modes) {
+                const a = serviceNetworks({
+                    proxyNetwork: PROXY,
+                    environmentId: "env-a",
+                    serviceId: "svc-a",
+                    mode: mine,
+                    joinsProxy: true,
+                    names: true
+                });
+                const b = serviceNetworks({
+                    proxyNetwork: PROXY,
+                    environmentId: "env-b",
+                    serviceId: "svc-b",
+                    mode: theirs,
+                    joinsProxy: true,
+                    names: true
+                });
+                expect(a.filter((name) => b.includes(name))).toEqual([]);
+                expect(a).not.toContain(PROXY);
+            }
+        // A shared environment stays on the proxy, so it shares nothing with an
+        // isolated one - and only other shared ones reach it, which is what
+        // isolating every environment ends.
+        const shared = serviceNetworks({ ...base, mode: "shared" });
+        const isolated = serviceNetworks({ ...base, environmentId: "env-b", mode: "environment" });
+        expect(shared.filter((name) => isolated.includes(name))).toEqual([]);
     });
 
     it("joins in links mode only the networks of the services it links to", () => {
@@ -121,14 +149,10 @@ describe("which networks a service joins", () => {
         expect(linksOfLayout('{"links":"no"}')).toEqual([]);
     });
 
-    it("keeps on the proxy network only what the edge dials there", () => {
-        // This machine's edge dials a published port on the host's address.
+    it("keeps nothing in a private mode on the proxy network: the edge is on its private one", () => {
         expect(joinsProxy({ local: true, published: true, routed: true })).toBe(false);
-        // A closed port is dialled by name.
-        expect(joinsProxy({ local: true, published: false, routed: true })).toBe(true);
-        // Another server routes by the container's labels, over the proxy network.
-        expect(joinsProxy({ local: false, published: true, routed: true })).toBe(true);
-        // Nothing routes to it at all.
+        expect(joinsProxy({ local: true, published: false, routed: true })).toBe(false);
+        expect(joinsProxy({ local: false, published: true, routed: true })).toBe(false);
         expect(joinsProxy({ local: false, published: false, routed: false })).toBe(false);
     });
 

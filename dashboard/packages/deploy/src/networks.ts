@@ -13,10 +13,13 @@
  *   networks of the ones its canvas links point at - so only linked services can
  *   reach each other, and a link drawn on the board is a connection made.
  *
- * In both private modes a service stays on the shared proxy network only when the
- * edge has to reach it there (see `joinsProxy`), and a database never does: it is
- * reached by the services beside it, and the dashboard is attached to the private
- * network by the daemon that creates it.
+ * In both private modes a service never joins the shared proxy network, routed
+ * or not: a routed service on it was reachable by address from every other
+ * project's routed services there. The edge reaches it on its private network
+ * instead - the daemon attaches this machine's edge (and the dashboard) to every
+ * private network it creates, and another server's deploy script and onboarding
+ * attach that server's edge - so a domain still answers, and only the services
+ * beside it (or linked to it) can dial it.
  *
  * Beside those, every service gets private names - `<name>.polaris.internal`
  * and the bare `<name>` - on a network that carries nothing else: its
@@ -103,9 +106,9 @@ export interface NetworkPlanInput {
     readonly proxyNetwork: string;
     readonly environmentId: string;
     readonly serviceId: string;
-    /** Whether the edge must reach this service over the proxy network - see
-     *  `joinsProxy`. Always false for a database. */
-    readonly joinsProxy: boolean;
+    /** @deprecated Ignored: `shared` mode joins the proxy network whatever it
+     *  says, and a private mode never does (see the module notes). */
+    readonly joinsProxy?: boolean;
     /** The canvas links, for `links` mode. */
     readonly links?: readonly ServiceLink[];
     /** Whether the service carries private names: the target makes names
@@ -124,14 +127,13 @@ export function serviceNetworks(input: NetworkPlanInput): string[] {
     // network as the one it dials it on - never picks one it is not on.
     const names = input.names ? [...namesNetworksOf(input), ...(input.crossLinks ?? [])] : [];
     if (input.mode === "shared") return [input.proxyNetwork, ...names];
-    const proxy = input.joinsProxy ? [input.proxyNetwork] : [];
+    // Private: the edge dials the first network, which it is attached to.
     if (input.mode === "environment")
-        return [...proxy, environmentNetwork(input.environmentId), ...names];
+        return [environmentNetwork(input.environmentId), ...names];
     // Its own, so what links to it can reach it, and each one it links to. A link
     // in either direction is a connection both ways, because a reply travels the
     // same network the request came in on.
     return [
-        ...proxy,
         serviceNetwork(input.serviceId),
         ...linkedPeers(input).map(serviceNetwork),
         ...names
@@ -170,21 +172,18 @@ export function ownNamesNetwork(
 }
 
 /**
- * Whether the edge has to reach a service over the proxy network.
+ * Whether a service in a private mode has to be on the proxy network: never any
+ * more. The edge reaches it on the private network it is attached to (see the
+ * module notes), so staying on the proxy only let other projects reach it.
  *
- * On this machine the edge dials a service with a published port on the host's
- * own address, so only a service with its port closed and a route to it needs to
- * be on the proxy network - and one without any route is reached by nobody but
- * its neighbours. On another server routing rides the container's own labels
- * over the proxy network, so every routed service there stays on it.
+ * @deprecated Always false; kept for callers that still ask.
  */
-export function joinsProxy(service: {
+export function joinsProxy(_service: {
     readonly local: boolean;
     readonly published: boolean;
     readonly routed: boolean;
 }): boolean {
-    if (!service.routed) return false;
-    return !service.local || !service.published;
+    return false;
 }
 
 /** The label every private network is created with - the daemon uses the same -
