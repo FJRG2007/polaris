@@ -32,7 +32,9 @@ async function preview(onPick: ((element: unknown) => void) | null) {
 describe("chat HTML preview", () => {
     it("is sandboxed without the page's own origin, and has no picker outside a thread that takes one", async () => {
         const frame = await preview(null);
-        expect(frame.getAttribute("sandbox")).toBe("allow-scripts");
+        // Popups, so a link opens outside the preview - never the page's own origin.
+        expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-popups allow-popups-to-escape-sandbox");
+        expect(frame.getAttribute("sandbox")).not.toContain("allow-same-origin");
         expect(frame.getAttribute("srcdoc")).not.toContain("data-polaris-picker");
         expect(screen.queryByRole("button", { name: /pick an element/i })).toBeNull();
     });
