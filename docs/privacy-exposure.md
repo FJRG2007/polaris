@@ -41,13 +41,22 @@ adding a surface that shows one person to another.
 | Office opens, task views, chat attachment opens | Who opened | Safe: no IP or user agent stored | Prisma `OfficeDocumentOpen`, `TaskView`, `ChatAttachmentOpen` |
 | Webhooks | Caller IP | Owner's own integration log | `lib/automations/webhook-service.ts` |
 
-## Not yet swept by hand
+## Per-file verdicts (`email: true`, 69 files)
 
-The deterministic sweep found 69 files selecting `email: true`, 13 selecting
-`lastSeenAt: true` and 10 selecting `userAgent: true`. The ones above are
-reviewed; the remaining `email: true` and `lastSeenAt: true` selects (org and
-team member lists, presence, read receipts, exports, notifications) still need
-a per-file verdict.
+| Group | Files | Verdict |
+|---|---|---|
+| Own account or server-side only | calendar event-titles, occurrences, upcoming; places automation-runtime; drive activity-actions; api/extension/session; api/v1/me; account-recovery-service; admin-credentials-service; automations/runner; avatar-service; cli/sign-in; crm-host; email-verification-service; extension/sessions; instance-security; mailbox/delegate; mcp/acting-user; mcp/tools; notifications/dispatch; second-factor-enrollment; two-factor-delivery; vault account-identity, api/sends, auth, identity, sync; view-as-service; packages/auth account, saml-sso, security | Safe: the account's own address, or read to send mail / sign in, never shown to another person |
+| Roster rule already applied | access/grants, access/subject-owner, deploy-project-service, friends-service, notes/shelf-service, orgs/invitation-service, orgs/org-service, successor-service | Safe: every address passes `contactLines` |
+| Administrator-only | admin/users identity-card, user-admin-service, firewall actions (others' addresses only to admins), address-accounts, compliance/evidence-readings, connections/store (runner pools, `system.manage`), group-members, packages/auth groups, polar answer-feedback-service and usage, safety-queue, vpn/service and wireguard-service (own devices unless admin), org-directory | Safe |
+| Server-side matching only | calendar presence-busy, calendar-host (`accountsByEmail` never shown), mailbox/face-owner, tasks/share-service, crm activities and duplicates (CRM contacts, not accounts), invite-service (admin invitations) | Safe: the address picks an account and is not returned |
+| Calendar attendees | calendar event-detail, invitations, meetings `emailInvites` (host only) | Accepted: an attendee address is one the organizer typed or was allowed to see (the picker honours `allowedBy`); iCalendar carries attendees as addresses (RFC 5545 `ATTENDEE`) |
+| Visitor logs | link-visitor | Fixed: the select no longer reads the address at all |
+| Vault members and add picker | vault/orgs `listMembers`, vault/share-actions | Fixed: members and candidates go through `contactLines`; the picker sends an account id and the server finds the address |
+| Mention and account search | rich-text/mention-service | Fixed: a colleague matched only by part of an address they hide is left out (`hiddenAddressMatches` in `people-search.ts`) |
+| Notification defaults | packages/core schemas/notifications | Not a read: `email: true` is the mail channel default |
+
+Not yet swept by hand: the 13 `lastSeenAt: true` selects (presence, read receipts,
+chat, computers, outage tracker, mailbox contacts, file requests).
 
 ## Sweeps
 
