@@ -46,6 +46,12 @@ describe("the Chromium manifest", () => {
         expect(manifest["permissions"]).toContain("contextMenus");
     });
 
+    it("may reach Polaris Desktop's native messaging host, to pair with it", () => {
+        for (const [browser, manifestVersion] of [["chrome", 3], ["firefox", 2]] as const) {
+            expect(manifestFor({ browser, manifestVersion })["permissions"]).toContain("nativeMessaging");
+        }
+    });
+
     it("holds every web page, and nothing that is not one", () => {
         // What puts the list of logins under a login box on every site, the way
         // a password manager's is. Web pages only: no file://, no browser pages.

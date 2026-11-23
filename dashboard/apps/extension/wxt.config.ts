@@ -110,6 +110,10 @@ export default defineConfig({
             "contextMenus",
             "proxy",
             "privacy",
+            // Handing Polaris Desktop on the same computer a pairing nonce
+            // (`src/lib/device-pairing.ts`), so the sessions screen can show
+            // this browser under that computer by proof rather than by address.
+            "nativeMessaging",
             ...(browser === "firefox" ? [] : ["tabGroups", "webRequest", "webRequestAuthProvider"])
         ],
         // Filling from the keyboard, without going through the toolbar. The

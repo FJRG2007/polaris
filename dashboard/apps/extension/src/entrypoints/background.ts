@@ -43,6 +43,7 @@ import { totpCode, totpRemaining } from "@polaris/vault-crypto/totp";
 import { GENERATOR_KEY, readGeneratorOptions } from "@/lib/generator";
 import { openVault, unlockRefusal, type UnlockOutcome } from "@/lib/unlock";
 import * as update from "@/lib/update";
+import * as devicePairing from "@/lib/device-pairing";
 import { displayHost, isBlockedHost, matchesPage, rankForPage } from "@/lib/matching";
 import { BLOCKED_HOSTS_KEY, PAGE_FILLING_KEY } from "@/lib/page-filling";
 import * as launcherStore from "@/lib/launcher-settings";
@@ -291,6 +292,11 @@ const LINK_SHELF = storage.defineItem<string | null>("local:link.shelf", { fallb
 /** When the server was last asked about it, so opening the popup twenty times
  *  does not ask twenty times. */
 const LINK_CHECKED = storage.defineItem<number | null>("session:link.checkedAt", {
+    fallback: null
+});
+/** The last attempt to pair this connection with Polaris Desktop on the same
+ *  computer (`lib/device-pairing`). */
+const DEVICE_PAIRING = storage.defineItem<devicePairing.PairingMemory | null>("local:link.devicePairing", {
     fallback: null
 });
 
@@ -1150,6 +1156,28 @@ async function closeForbiddenVault(): Promise<void> {
  * everything, and an unreachable server changes nothing at all - a Polaris
  * somebody is behind a tunnel from is not a connection that was revoked.
  */
+/**
+ * Pair this connection with Polaris Desktop when it is due - once it pairs,
+ * never again for this connection. Quiet whatever happens: no desktop app, an
+ * old server or a refusal just leaves the sessions screen as it was.
+ */
+async function pairWithDesktopIfDue(origin: string, token: string, accountId: string): Promise<void> {
+    const connection = `${origin} ${accountId}`;
+    const now = Date.now();
+    if (!devicePairing.pairingDue(await DEVICE_PAIRING.getValue(), connection, now)) return;
+    const runtime = browser.runtime as typeof browser.runtime & {
+        sendNativeMessage?: (host: string, message: unknown) => Promise<unknown>;
+    };
+    const outcome = await devicePairing
+        .pairWithDesktop(origin, token, {
+            fetch: (input, init) => fetch(input, init),
+            sendNative: typeof runtime.sendNativeMessage === "function" ? (host, message) => runtime.sendNativeMessage!(host, message) : null,
+            runtimeId: browser.runtime.id ?? null
+        })
+        .catch((): devicePairing.PairingOutcome => "failed");
+    await DEVICE_PAIRING.setValue(devicePairing.rememberPairing(connection, outcome, now));
+}
+
 async function refreshLink(force = false, floorMs = LINK_CHECK_FLOOR_MS): Promise<void> {
     const [origin, token, checkedAt] = await Promise.all([
         reachOrigin(),
@@ -1166,6 +1194,7 @@ async function refreshLink(force = false, floorMs = LINK_CHECK_FLOOR_MS): Promis
         await dropLink();
         return;
     }
+    void pairWithDesktopIfDue(origin, token, state.account.id);
     const [held, shelf, spoken] = await Promise.all([
         LINK_FACES.getValue(),
         LINK_SHELF.getValue(),
