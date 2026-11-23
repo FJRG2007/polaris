@@ -1,0 +1,25 @@
+[package]
+name = "polaris-stream100"
+version = "0.1.0"
+description = "Polaris' driver for the Hercules Stream 100: its USB protocol, knob handling, display frames and per-app audio categories (docs/devices/hercules-stream100.md)."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+# The protocol, the knob engine, the display frames and the audio categories
+# are pure and always built. Talking to the device is the `usb` feature, so a
+# machine without the controller (and every CI job) never links a USB stack.
+[features]
+default = []
+usb = ["dep:nusb"]
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+serde_json = { workspace = true }
+nusb = { version = "0.2.9", optional = true }
