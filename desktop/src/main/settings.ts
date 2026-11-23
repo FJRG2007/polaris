@@ -19,6 +19,7 @@ import { DEFAULT_TEXT_SIZE, readTextSize, type TextSize } from "@/shared/text-si
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { DEFAULT_LAUNCHER_BINDING } from "@/shared/launcher-hotkey";
 import { SEARCH_ENGINE_IDS, type SearchEngine } from "@/shared/launcher";
+import { CLIPBOARD_KEEP_IDS, DEFAULT_CLIPBOARD_KEEP, clipboardOn, type ClipboardKeep } from "@/shared/clipboard-store";
 
 /** A platform `docker build --platform` takes, or "" for this computer's own. */
 export const PUSH_PLATFORMS = ["", "linux/amd64", "linux/arm64"] as const;
@@ -70,8 +71,15 @@ const settingsSchema = z.object({
     launcher: z.boolean().catch(true),
     // The launcher's key in the dashboard's spelling; a file without one uses the default.
     launcherBinding: z.string().max(40).catch(DEFAULT_LAUNCHER_BINDING),
-    // Off unless somebody turned it on: the launcher keeps what was copied, in memory.
-    launcherClipboard: z.boolean().catch(false),
+    // On unless somebody turned it off (see `launcherClipboardChosen`): the
+    // launcher keeps what was copied.
+    launcherClipboard: z.boolean().catch(true),
+    // Whether `launcherClipboard` is somebody's own choice. Files from before
+    // the history was on by default carry `false` there for everyone who saved
+    // any setting, chosen or not, so only a value set with this marker counts.
+    launcherClipboardChosen: z.boolean().catch(false),
+    // How long the clipboard history keeps a copy.
+    launcherClipboardKeep: z.enum(CLIPBOARD_KEEP_IDS).catch(DEFAULT_CLIPBOARD_KEEP),
     // Where a web search from the launcher goes.
     launcherEngine: z.enum(SEARCH_ENGINE_IDS).catch("duckduckgo")
 });
@@ -94,7 +102,9 @@ const EMPTY: Settings = {
     textSize: null,
     launcher: true,
     launcherBinding: DEFAULT_LAUNCHER_BINDING,
-    launcherClipboard: false,
+    launcherClipboard: true,
+    launcherClipboardChosen: false,
+    launcherClipboardKeep: DEFAULT_CLIPBOARD_KEEP,
     launcherEngine: "duckduckgo"
 };
 
@@ -102,10 +112,15 @@ function file(): string {
     return join(app.getPath("userData"), "settings.json");
 }
 
+/** A stored value that nobody chose gives way to today's default. */
+function withDefaults(settings: Settings): Settings {
+    return { ...settings, launcherClipboard: clipboardOn(settings.launcherClipboard, settings.launcherClipboardChosen) };
+}
+
 function load(): Settings {
     try {
         const parsed = settingsSchema.safeParse(JSON.parse(readFileSync(file(), "utf8")));
-        return parsed.success ? parsed.data : { ...EMPTY };
+        return parsed.success ? withDefaults(parsed.data) : { ...EMPTY };
     } catch {
         return { ...EMPTY };
     }
@@ -197,7 +212,16 @@ export function toggle(name: Toggle): boolean {
 }
 
 export function rememberToggle(name: Toggle, on: boolean): void {
-    save({ ...load(), [name]: on });
+    save({ ...load(), [name]: on, ...(name === "launcherClipboard" ? { launcherClipboardChosen: true } : {}) });
+}
+
+/** How long the clipboard history keeps a copy. */
+export function launcherClipboardKeep(): ClipboardKeep {
+    return load().launcherClipboardKeep;
+}
+
+export function rememberLauncherClipboardKeep(keep: ClipboardKeep): void {
+    save({ ...load(), launcherClipboardKeep: keep });
 }
 
 /** Where the voice widget was dragged to, or null for its corner. */

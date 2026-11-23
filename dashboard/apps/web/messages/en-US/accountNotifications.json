@@ -853,6 +853,7 @@
         "standing": {
             "on": "On for this device.",
             "off": "Off for this device.",
+            "desktop": "Polaris Desktop shows these notices itself while it runs, open or in the tray.",
             "denied": "{clientKind, select, desktop {The system blocks notices from Polaris. Allow them in the system settings.} phone {The phone blocks notices from Polaris. Allow them in the phone's settings.} other {This browser blocks notices from Polaris. Allow them in its site settings.}}",
             "unsupported": "{clientKind, select, desktop {This app cannot receive notices with Polaris closed.} phone {This app cannot receive notices with Polaris closed.} other {This browser cannot receive notices with Polaris closed.}}"
         }

@@ -841,6 +841,8 @@ function start(): void {
                     voiceWidgetGameOnly: settings.toggle("voiceWidgetGameOnly"),
                     launcher: settings.toggle("launcher"),
                     launcherClipboard: settings.toggle("launcherClipboard"),
+                    launcherClipboardKeep: settings.launcherClipboardKeep(),
+                    launcherClipboardPersists: launcher.clipboardPersists(),
                     launcherEngine: settings.launcherEngine(),
                     version: app.getVersion()
                 };
