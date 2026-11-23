@@ -71,13 +71,72 @@ export function symbolFor(background: string): string {
     return luminance < 0.5 ? "#e6e7ea" : "#1c1d21";
 }
 
-/** The first opaque background at a point, walking up from what is drawn there. */
-function backgroundAt(x: number, y: number): string | null {
-    for (let node = document.elementFromPoint(x, y); node; node = node.parentElement) {
-        const hex = hexOf(getComputedStyle(node).backgroundColor);
-        if (hex) return hex;
+/** A colour's channels (0-255) and alpha (0-1). */
+export interface Rgba {
+    readonly r: number;
+    readonly g: number;
+    readonly b: number;
+    readonly a: number;
+}
+
+/** A computed colour - `rgb(...)`, `rgba(...)`, or the `color(srgb ...)` a
+ *  newer colour function computes to - or null when it is not one. */
+export function rgbaOf(css: string): Rgba | null {
+    const value = css.trim();
+    const alphaOf = (raw: string | undefined) =>
+        raw === undefined ? 1 : raw.endsWith("%") ? parseFloat(raw) / 100 : Number(raw);
+    const rgb = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)(?:[\s,/]+([\d.]+%?))?\s*\)$/.exec(value);
+    const srgb = /^color\(srgb\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+%?))?\s*\)$/.exec(value);
+    const match = rgb ?? srgb;
+    if (!match) return null;
+    const scale = rgb ? 1 : 255;
+    const [r, g, b] = [match[1], match[2], match[3]].map((channel) => Math.min(255, Number(channel) * scale)) as [
+        number,
+        number,
+        number
+    ];
+    const a = Math.min(1, Math.max(0, alphaOf(match[4])));
+    return [r, g, b, a].every(Number.isFinite) ? { r, g, b, a } : null;
+}
+
+/**
+ * What shows through a stack of layers, top first: each one's colour over
+ * everything under it. Null when nothing in the stack is opaque enough to say.
+ *
+ * The buttons are one flat colour, so they have to be what the eye sees there,
+ * not the first opaque thing under them: with a dialog open the page under the
+ * buttons is dimmed by its backdrop, and reading past the backdrop to the page
+ * painted the buttons the undimmed colour - a light block in the corner of a
+ * dark screen.
+ */
+export function composite(layers: readonly Rgba[]): string | null {
+    let left = 1;
+    const sum = { r: 0, g: 0, b: 0 };
+    for (const layer of layers) {
+        if (layer.a <= 0) continue;
+        sum.r += layer.r * layer.a * left;
+        sum.g += layer.g * layer.a * left;
+        sum.b += layer.b * layer.a * left;
+        left *= 1 - layer.a;
+        if (left < 0.004) break;
     }
-    return null;
+    if (left >= 0.004) return null;
+    const hex = (value: number) => Math.round(Math.min(255, Math.max(0, value))).toString(16).padStart(2, "0");
+    return `#${hex(sum.r)}${hex(sum.g)}${hex(sum.b)}`;
+}
+
+/** The colour the eye sees at a point: every layer drawn there, top first,
+ *  with its own opacity and its ancestors' folded in. */
+function backgroundAt(x: number, y: number): string | null {
+    const layers: Rgba[] = [];
+    for (const node of document.elementsFromPoint(x, y)) {
+        const colour = rgbaOf(getComputedStyle(node).backgroundColor);
+        if (!colour || colour.a === 0) continue;
+        let opacity = 1;
+        for (let up: Element | null = node; up; up = up.parentElement) opacity *= Number(getComputedStyle(up).opacity) || 0;
+        layers.push({ ...colour, a: colour.a * opacity });
+    }
+    return composite(layers);
 }
 
 /**
@@ -119,5 +178,9 @@ export function followTitleBarColors(report: (colors: TitleBarColors) => void): 
         new MutationObserver(soon).observe(document.body, { childList: true });
     });
     window.addEventListener("load", soon);
+    // A dialog's backdrop fades in: read again once it has, or the buttons keep
+    // the colour of its first frame.
+    document.addEventListener("transitionend", soon, true);
+    document.addEventListener("animationend", soon, true);
     window.addEventListener("resize", soon);
 }

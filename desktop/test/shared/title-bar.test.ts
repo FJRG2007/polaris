@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { foreignPageCss, hexOf, overlayHeight, symbolFor, titleBarColorsSchema } from "@/shared/title-bar";
+import { composite, foreignPageCss, hexOf, overlayHeight, rgbaOf, symbolFor, titleBarColorsSchema } from "@/shared/title-bar";
 
 describe("title bar colours", () => {
     it("reads an opaque computed colour as hex", () => {
@@ -38,5 +38,25 @@ describe("title bar colours", () => {
         expect(css).toContain("app-region: drag");
         expect(css).toContain("background: #101114");
         expect(() => foreignPageCss("red; } body { display: none")).toThrow();
+    });
+
+    it("paints the buttons the dimmed colour a dialog's backdrop makes, not the page under it", () => {
+        // A white header under an 80% black backdrop is what the eye sees as
+        // #333333; the first opaque layer alone would say #ffffff.
+        const backdrop = rgbaOf("rgba(0, 0, 0, 0.8)")!;
+        const header = rgbaOf("rgb(255, 255, 255)")!;
+        expect(composite([backdrop, header])).toBe("#333333");
+        expect(composite([header])).toBe("#ffffff");
+    });
+
+    it("waits for something opaque before it says a colour", () => {
+        expect(composite([rgbaOf("rgba(0, 0, 0, 0.5)")!])).toBeNull();
+        expect(composite([])).toBeNull();
+    });
+
+    it("reads the colour functions a computed style can come back as", () => {
+        expect(rgbaOf("rgb(16 17 20 / 0.5)")).toEqual({ r: 16, g: 17, b: 20, a: 0.5 });
+        expect(rgbaOf("color(srgb 1 0 0.5)")).toEqual({ r: 255, g: 0, b: 127.5, a: 1 });
+        expect(rgbaOf("transparent")).toBeNull();
     });
 });
