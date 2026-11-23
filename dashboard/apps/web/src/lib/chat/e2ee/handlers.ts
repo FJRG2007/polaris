@@ -9,8 +9,13 @@
  *
  * Both answer 404 while their switch is off (`passwordLockEnabled()` for the
  * password lock, `chatE2eeEnabled()` for the passkey locks) - nothing about
- * them exists then. Refusals are one fixed body whatever the
- * cause; internals are logged, never returned.
+ * them exists then - with one exception that keeps the kill switch from ever
+ * locking anybody out: an account already on OPAQUE (a verified record for its
+ * current password) keeps signing in, proving and setting its password over
+ * OPAQUE whatever the switch says. Its password may exist nowhere else - one set
+ * over OPAQUE leaves no usable hash. The switch only stops moving accounts that
+ * are not on it yet. Refusals are one fixed body whatever the cause; internals
+ * are logged, never returned.
  */
 
 import { auth } from "@/lib/auth";
@@ -93,8 +98,13 @@ async function releasedEnvelope(userId: string): Promise<{ akVersion: number; en
 }
 
 export async function handleSignIn(request: Request): Promise<Response> {
-    if (!passwordLockEnabled()) return json(NOT_FOUND, 404);
     const parsed = signInBody.safeParse(await readBody(request));
+    // With the kill switch the sign-in itself stays, for the accounts already on
+    // OPAQUE: a start for any other address runs against no record (as it does
+    // for an unknown one) and can never finish. Moving an account (adopt,
+    // verify) is what the switch stops.
+    const signingIn = parsed.success && (parsed.data.op === "sign-in-start" || parsed.data.op === "sign-in-finish");
+    if (!passwordLockEnabled() && !signingIn) return json(NOT_FOUND, 404);
     if (!parsed.success) return json({ error: "invalid" }, 400);
     const body = parsed.data;
     const address = await addressKey();
@@ -186,20 +196,24 @@ export async function handleSignIn(request: Request): Promise<Response> {
  * (reading the state, creating the key, the OPAQUE unlock) with the password
  * lock's own.
  */
-function opEnabled(op: KeysBody["op"]): boolean {
+function opEnabled(op: KeysBody["op"], onOpaque: boolean): boolean {
     if (op === "put-passkey-lock" || op === "delete-passkey-lock") return chatE2eeEnabled();
-    return passwordLockEnabled() || chatE2eeEnabled();
+    return passwordLockEnabled() || chatE2eeEnabled() || onOpaque;
 }
 
 export async function handleKeys(request: Request): Promise<Response> {
-    if (!passwordLockEnabled() && !chatE2eeEnabled()) return json(NOT_FOUND, 404);
+    const switchedOn = passwordLockEnabled() || chatE2eeEnabled();
     const user = await backgroundUser();
+    // With every switch off, the route exists only for an account already on
+    // OPAQUE (its password may live nowhere else); the rest get the 404 as before.
+    const onOpaque = !switchedOn && user ? await opaque.adopted(user.id) : false;
+    if (!switchedOn && !onOpaque) return json(NOT_FOUND, 404);
     // i18n-ignore: a status body no screen shows
     if (!user) return json({ error: "Unauthorized" }, 401);
     const parsed = keysBody.safeParse(await readBody(request));
     if (!parsed.success) return json({ error: "invalid" }, 400);
     const body = parsed.data;
-    if (!opEnabled(body.op)) return json(NOT_FOUND, 404);
+    if (!opEnabled(body.op, onOpaque)) return json(NOT_FOUND, 404);
     try {
         switch (body.op) {
             case "state": {

@@ -21,11 +21,19 @@ import { passwordLockEnabled } from "./flag";
 import { backgroundUser } from "@/lib/session";
 import type { OpaqueFinish } from "./schemas";
 
+/** Whether this account may prove or set its password over OPAQUE: always with
+ *  the password lock on, and with the kill switch only when it is already on
+ *  OPAQUE - its password may exist nowhere else, so the switch must never take
+ *  the flows away from it. */
+export async function opaqueFlowsOpen(userId: string): Promise<boolean> {
+    return passwordLockEnabled() || (await opaque.adopted(userId));
+}
+
 /** Whether this finish proves the signed-in account's current password. Spends
  *  the login whatever the outcome; never throws. */
 export async function provesPassword(userId: string, proof: OpaqueFinish): Promise<boolean> {
-    if (!passwordLockEnabled()) return false;
     try {
+        if (!(await opaqueFlowsOpen(userId))) return false;
         const bind = await sessionId();
         if (!bind) return false;
         await opaque.finishLogin(proof.loginId, "proof", proof.finishLoginRequest, userId, bind);
@@ -42,8 +50,8 @@ export async function provesPassword(userId: string, proof: OpaqueFinish): Promi
  * opens the account through a route that still checks the hash. Never throws.
  */
 export async function setPasswordOverOpaque(userId: string, set: OpaqueFinish): Promise<boolean> {
-    if (!passwordLockEnabled()) return false;
     try {
+        if (!(await opaqueFlowsOpen(userId))) return false;
         const bind = await sessionId();
         if (!bind) return false;
         const verified = await opaque.finishSetLogin(set.loginId, set.finishLoginRequest, userId, bind);

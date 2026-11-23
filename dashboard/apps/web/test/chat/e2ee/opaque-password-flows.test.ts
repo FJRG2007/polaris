@@ -269,16 +269,16 @@ describe("which path a form takes", () => {
         expect(await flows.opaquePasswordReady()).toEqual({ name: "Alice Example", email: alice.email });
     });
 
-    it("an account not moved yet, the kill switch, and no session keep the old action", async () => {
+    it("an account not moved yet, with or without the kill switch, and no session keep the old action", async () => {
         const bob = account("bob@example.com", PASSWORD);
-        state.sessionUser = { id: bob.id, name: "Bob", email: bob.email };
+        state.sessionUser = { id: bob.id, name: "Bob", email: bob.email, sessionId: "session-b" };
         expect(await flows.opaquePasswordReady()).toBeNull();
 
-        await adoptedAccount();
         process.env.POLARIS_INTERNAL_PASSWORD_LOCK = "0";
         delete process.env.POLARIS_INTERNAL_CHAT_E2EE;
         expect(await flows.opaquePasswordReady()).toBeNull();
-        expect(await server.provesPassword(state.sessionUser!.id, { loginId: randomUUID() })).toBe(false);
+        expect((await post("/api/e2ee/keys", { op: "state" })).status).toBe(404);
+        expect(await server.provesPassword(bob.id, { loginId: randomUUID() })).toBe(false);
 
         delete process.env.POLARIS_INTERNAL_PASSWORD_LOCK;
         state.sessionUser = null;
@@ -433,5 +433,69 @@ describe("setting a new password", () => {
         state.credentials.set(alice.id, "scrypt:reset by an old client");
         state.sessionUser = null;
         expect(await client.signInWithOpaque(alice.email, NEXT)).toBeNull();
+    });
+});
+
+describe("the kill switch never locks anybody out", () => {
+    /** Alice changed her password over OPAQUE, so no hash opens her account;
+     *  then the switch is thrown. */
+    async function onlyOnOpaque(): Promise<UserRow> {
+        const alice = await adoptedAccount();
+        const set = await flows.prepareNewPassword(NEXT, { email: alice.email });
+        expect(await server.setPasswordOverOpaque(alice.id, set)).toBe(true);
+        process.env.POLARIS_INTERNAL_PASSWORD_LOCK = "0";
+        delete process.env.POLARIS_INTERNAL_CHAT_E2EE;
+        state.bodies.length = 0;
+        return alice;
+    }
+
+    it("an account whose password was set over OPAQUE still signs in with it", async () => {
+        const alice = await onlyOnOpaque();
+        state.sessionUser = null;
+        expect(await client.signInWithOpaque(alice.email, NEXT)).toEqual({ challenged: false });
+        expect(state.issued.at(-1)).toEqual({ userId: alice.id, challenged: false });
+        expect(sent(NEXT)).toBe(false);
+        expect(await client.signInWithOpaque(alice.email, "not the password at all")).toBeNull();
+        await client.backgroundIdle();
+
+        // A second factor is still asked for.
+        state.twoFactor.add(alice.id);
+        expect(await client.signInWithOpaque(alice.email, NEXT)).toEqual({ challenged: true });
+    });
+
+    it("its proofs and a new password keep working", async () => {
+        const alice = await onlyOnOpaque();
+        expect(await flows.opaquePasswordReady()).toEqual({ name: "Alice Example", email: alice.email });
+        const proof = await flows.provePassword(NEXT);
+        expect(await server.provesPassword(alice.id, proof)).toBe(true);
+        const third = "a third staple of 2026";
+        const set = await flows.prepareNewPassword(third, { email: alice.email });
+        expect(await server.setPasswordOverOpaque(alice.id, set)).toBe(true);
+        expect(sent(NEXT) || sent(third)).toBe(false);
+        state.sessionUser = null;
+        expect(await client.signInWithOpaque(alice.email, third)).toEqual({ challenged: false });
+        await client.backgroundIdle();
+    });
+
+    it("nobody new is moved onto OPAQUE, and an account not on it cannot sign in over it", async () => {
+        await onlyOnOpaque();
+        const bob = account("bob@example.com", PASSWORD);
+        state.sessionUser = null;
+        expect(await client.adoptOpaque(bob.email, PASSWORD)).toBe(false);
+        expect(state.tables.records.has(bob.id)).toBe(false);
+        for (const op of ["adopt-start", "adopt-finish", "verify-start", "verify-finish"])
+            expect((await post("/api/e2ee/sign-in", { op })).status).toBe(404);
+        // The start answers like any address, and can never finish.
+        expect(await client.signInWithOpaque(bob.email, PASSWORD)).toBeNull();
+        expect(state.issued.some((issued) => issued.userId === bob.id)).toBe(false);
+        expect(state.credentials.get(bob.id)).toBe(`scrypt:${PASSWORD}`);
+    });
+
+    it("the sign-in stays rate limited", async () => {
+        const alice = await onlyOnOpaque();
+        state.sessionUser = null;
+        state.limitCap = 0;
+        expect(await client.signInWithOpaque(alice.email, NEXT)).toBeNull();
+        expect([...state.limits.keys()]).toContain(`e2ee-sign-in:${alice.email}`);
     });
 });

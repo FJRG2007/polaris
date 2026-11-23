@@ -245,21 +245,29 @@ describe("the switches", () => {
         expect(passkey.status).not.toBe(200);
     });
 
-    it("the kill switch takes both routes away and the form signs in the old way", async () => {
+    it("the kill switch stops moving accounts and never locks out one already moved", async () => {
         delete process.env.POLARIS_INTERNAL_CHAT_E2EE;
         const alice = account("alice@example.com", "correct horse battery");
+        const bob = account("bob@example.com", "another fine password");
         expect(await client.adoptOpaque(alice.email, "correct horse battery")).toBe(true);
         process.env.POLARIS_INTERNAL_PASSWORD_LOCK = "0";
         const { passwordLockEnabled } = await import("@/lib/chat/e2ee/flag");
         expect(passwordLockEnabled()).toBe(false);
         expect((await post("/api/e2ee/sign-in", { op: "sign-in-start" })).status).toBe(404);
-        state.sessionUser = { id: alice.id };
+        // Nobody new is moved, and an account not moved has no OPAQUE route at all.
+        expect(await client.adoptOpaque(bob.email, "another fine password")).toBe(false);
+        expect(state.tables.records.get(bob.id)).toBeUndefined();
+        state.sessionUser = { id: bob.id };
         expect((await post("/api/e2ee/keys", { op: "state" })).status).toBe(404);
-        // An account already moved: OPAQUE answers nothing, the old route still has its hash.
-        expect(await client.signInWithOpaque(alice.email, "correct horse battery")).toBeNull();
+        expect(await client.signInWithOpaque(bob.email, "another fine password")).toBeNull();
         expect(state.issued).toEqual([]);
+        // An account already moved keeps both ways in: its hash, and OPAQUE.
+        state.sessionUser = { id: alice.id };
+        expect((await post("/api/e2ee/keys", { op: "state" })).status).toBe(200);
         expect(state.credentials.get(alice.id)).toBe("scrypt:correct horse battery");
-        expect(await client.adoptOpaque(alice.email, "correct horse battery")).toBe(false);
+        state.sessionUser = null;
+        expect(await client.signInWithOpaque(alice.email, "correct horse battery")).toEqual({ challenged: false });
+        expect(state.issued).toEqual([{ userId: alice.id, challenged: false }]);
     });
 
     it("a worker that does not start leaves the old way running and the account unmoved", async () => {

@@ -2,8 +2,10 @@
  * The browser half of the OPAQUE password sign-in and of the adoption that
  * moves an existing account onto it (docs/chat-e2ee-phase1.md).
  *
- * Only ever called by the sign-in form when the server rendered it with the
- * password lock on; with it off the form never imports a byte of this.
+ * Called by the sign-in form when the server rendered it with the password
+ * lock on; with the kill switch the form loads it only to retry a password the
+ * old route refused (`signInWithOpaque` alone, never the adoption), for the
+ * accounts whose password was set over OPAQUE and exists nowhere else.
  *
  * Neither function can make a sign-in fail or slow it down by more than one
  * Argon2id run. `signInWithOpaque` returns null for anything short of a

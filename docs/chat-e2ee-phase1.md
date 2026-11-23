@@ -142,7 +142,7 @@ Browser side: `lib/chat/e2ee/password-flows-client.ts`, loaded on submit only. `
 | Forgot-password reset, recovery completion, `recoverPasswordAction`, sign-up, promote email, admin reset, 2FA enable/disable, chat lock ops | open | reset, recovery and sign-up need a token-authorised variant of the set primitive (no session) |
 | Desktop, extension, mobile, TV | nothing to change | none posts a password itself; they sign in through the web form |
 
-Consequence to know: an account whose password was set over OPAQUE has no password hash any more. With the kill switch (`POLARIS_INTERNAL_PASSWORD_LOCK=0`) such an account cannot sign in with its password until it resets it through the old reset form, which writes a real hash again.
+An account whose password was set over OPAQUE has no usable password hash any more, so the kill switch (`POLARIS_INTERNAL_PASSWORD_LOCK=0`) must never take OPAQUE away from it. With the switch, nothing is moved onto OPAQUE (no adoption, `adopt-*`/`verify-*` answer 404, and the OPAQUE flows answer 404 for an account not on it yet), but an account already on OPAQUE (a verified record for its current password) keeps all of it: `sign-in-start`/`sign-in-finish` stay up (a start for any other address runs against no record and cannot finish), `/api/e2ee/keys` answers that account, and `provesPassword`/`setPasswordOverOpaque` accept it (`opaqueFlowsOpen`). The sign-in form runs `/sign-in/email` first and tries OPAQUE only when that refuses the password, so accounts that still have a hash never pay for the second try. Pinned by the "kill switch" cases in `opaque-password-flows.test.ts`.
 
 ## Adversarial review checklist (phase 1)
 

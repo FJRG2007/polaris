@@ -117,8 +117,9 @@ export function LoginForm({
     awaitingSetup: boolean;
     /** The password lock (`passwordLockEnabled()`): prove the password over
      *  OPAQUE, and move an account onto it after a password sign-in. With it
-     *  false - the kill switch - the sign-in below runs exactly as it always
-     *  has and never loads the OPAQUE code. */
+     *  false - the kill switch - the old password sign-in runs first and
+     *  nothing is moved; only a password it refuses is tried over OPAQUE, for
+     *  the accounts whose password exists nowhere else. */
     opaqueSignIn?: boolean;
     /** Chat end-to-end encryption's internal flag: passkey PRF locks and the
      *  account key carried over a QR approval. */
@@ -378,16 +379,35 @@ export function LoginForm({
         // With the password lock on: the OPAQUE sign-in first (one Argon2id, in a
         // worker), and the password sign-in below whenever it does not end in a
         // session.
-        const e2ee = opaqueSignIn ? await import("@/lib/chat/e2ee/sign-in-client") : null;
-        const viaOpaque = e2ee
+        let e2ee = opaqueSignIn ? await import("@/lib/chat/e2ee/sign-in-client") : null;
+        let viaOpaque = e2ee
             ? await e2ee.signInWithOpaque(email, parsed.password, () => setProtecting(true))
             : null;
-        const { data, error: signInError } = viaOpaque
+        let { data, error: signInError } = viaOpaque
             ? { data: { twoFactorRedirect: viaOpaque.challenged } as unknown, error: null }
             : await signIn.email({
                   email,
                   password: parsed.password
               });
+        // The kill switch never locks anybody out: an account whose password was
+        // set over OPAQUE has no usable hash, so a password the old route refused
+        // is tried over OPAQUE before the form says it is wrong. Nothing is moved
+        // onto OPAQUE here (no adoption below), and an account the server has
+        // not got on OPAQUE simply fails the second try too.
+        if (
+            !opaqueSignIn &&
+            signInError &&
+            (signInError as { code?: string }).code !== "SSO_REQUIRED" &&
+            signInRefusal(signInError) === "credentials"
+        ) {
+            const fallback = await import("@/lib/chat/e2ee/sign-in-client");
+            viaOpaque = await fallback.signInWithOpaque(email, parsed.password, () => setProtecting(true));
+            if (viaOpaque) {
+                e2ee = fallback;
+                data = { twoFactorRedirect: viaOpaque.challenged };
+                signInError = null;
+            }
+        }
         setPending(false);
         if (signInError) {
             // A domain that must use its identity provider is told so, and
@@ -404,7 +424,7 @@ export function LoginForm({
         // OPAQUE while this tab still holds it. Queued in the background and
         // never awaited, so the page moves on at once; it never fails the
         // sign-in, and an adoption cut short is retried at the next one.
-        if (e2ee && !viaOpaque) {
+        if (opaqueSignIn && e2ee && !viaOpaque) {
             const challenged = (data as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect === true;
             void e2ee.adoptInBackground(email, parsed.password, !challenged);
         }
