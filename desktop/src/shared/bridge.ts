@@ -666,6 +666,7 @@ export const CHANNELS = {
     systemIdle: "desktop:system-idle",
     keyWrapSeal: "desktop:key-wrap-seal",
     keyWrapOpen: "desktop:key-wrap-open",
+    integrityCheck: "desktop:integrity-check",
     editAddWord: "desktop:edit-add-word",
     editReadClipboard: "desktop:edit-read-clipboard",
     editWriteClipboard: "desktop:edit-write-clipboard",

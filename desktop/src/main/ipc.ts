@@ -34,6 +34,7 @@ import { installTool } from "./install-tool";
 import { runner } from "./runner";
 import * as vpn from "./vpn";
 import { openKey, sealKey } from "./key-wrap";
+import { checkPageFiles, pageChanged } from "./integrity";
 import { openTvInstall, registerTvInstall } from "./tv-install";
 import { browserFromName, installRequestSchema, type InstallResult } from "@/shared/install-tools";
 import {
@@ -404,13 +405,22 @@ export function registerIpc(host: IpcHost): void {
 
     // The chat account key's device lock, sealed by the operating system's
     // key store and bound to the server asking (see key-wrap).
+    // Refused to a page the code check found changed (integrity.ts): the key
+    // it would unwrap is the one a changed page is after.
     ipcMain.handle(CHANNELS.keyWrapSeal, (event, data: unknown): string | null => {
-        if (!fromPolaris(event)) return null;
+        if (!fromPolaris(event) || pageChanged(event.sender)) return null;
         return sealKey(safeStorage, event.senderFrame?.url, data);
     });
     ipcMain.handle(CHANNELS.keyWrapOpen, (event, sealed: unknown): string | null => {
-        if (!fromPolaris(event)) return null;
+        if (!fromPolaris(event) || pageChanged(event.sender)) return null;
         return openKey(safeStorage, event.senderFrame?.url, sealed);
+    });
+    // The page code check (docs/integrity.md): the files the preload hashed, for
+    // the configured Polaris only, so no other page can make this fetch anything.
+    ipcMain.handle(CHANNELS.integrityCheck, async (event, files: unknown) => {
+        const page = event.senderFrame?.url;
+        if (!fromPolaris(event) || !page) return null;
+        return checkPageFiles(event.sender, new URL(page).origin, files).catch(() => null);
     });
 
     // The call's keys, held system-wide while a call is on. A shape that does
