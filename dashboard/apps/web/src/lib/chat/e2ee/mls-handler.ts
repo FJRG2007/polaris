@@ -78,8 +78,19 @@ export async function handleMls(request: Request): Promise<Response> {
     if (!parsed.success) return json({ error: "invalid" }, 400);
     const limit = await rateLimit(`e2ee-mls:${user.id}`, PER_ACCOUNT, WINDOW_MS);
     if (!limit.ok) return json({ error: "tooMany", retryAfterMs: limit.retryAfterMs }, 429);
+    return answerMls(user.id, parsed.data);
+}
+
+/**
+ * One op, as `userId`, past the session and the rate limit: the route's own
+ * answer, and the in-process transport of the members the server runs
+ * (`service-device.ts`), which have no session. Every per-account check the
+ * route makes still holds - `channelAccess` answers a service account too.
+ */
+export async function answerMls(userId: string, body: MlsBody): Promise<Response> {
+    if (!chatE2eeEnabled()) return json({ error: "Not found" }, 404);
     try {
-        return await run(user.id, parsed.data);
+        return await run(userId, body);
     } catch (caught) {
         if (caught instanceof delivery.MlsDeliveryRefusal || caught instanceof sealed.SealedRefusal) return json({ error: caught.reason }, 409);
         console.error("polaris: an MLS delivery step failed:", caught);

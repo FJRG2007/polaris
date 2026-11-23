@@ -240,8 +240,13 @@ through the Node binding and `mls-store.ts`:
 - The `org` history-key envelope. The organisation recovery key (proposal 3.5)
   has no public key stored anywhere yet - its custodian setup is not built - so
   nothing can serve it and no `org` envelope can be sealed until it is.
-- Server-run members (Polar, webhooks): who they are and where they reach are
-  built; the service device (its store, outbox, lease and in-process ops), the
-  member list's "Add Polar" and Polar answering a sealed conversation are not.
+- Server-run members (Polar, webhooks): who they are, where they reach and the
+  service device are built (`service-device.ts`: the Node binding's member
+  through `nativeMlsMember`, its store, outbox, notes and history keys in
+  `MlsStoreEntry` under the reserved prefix ` polaris/`, a lease per device
+  address, ops in-process through `answerMls`; a service's sealed message is
+  stored with no author under Polar's or the webhook's name). Not built: the
+  member list's "Add Polar", Polar reading a sealed question and answering it,
+  and a webhook's route posting sealed in a sealed conversation.
 - Sign-out deletes the browser's MLS device, but its leaf stays in each group
   until another member removes it.

@@ -22,7 +22,7 @@ export function memoryPrisma(state: MemoryTablesState) {
             if (key === "userId_device") return matches(row, want as Row);
             if (want && typeof want === "object" && !(want instanceof Uint8Array)) {
                 const cond = want as { in?: unknown[]; gt?: bigint; gte?: bigint; lt?: bigint };
-                if (cond.in) return cond.in.includes(row[key]);
+                if (cond.in) return cond.in.some((value) => same(row[key], value));
                 if (cond.gt !== undefined) return (row[key] as bigint) > cond.gt;
                 if (cond.gte !== undefined) return (row[key] as bigint) >= cond.gte;
                 if (cond.lt !== undefined) return (row[key] as bigint) < cond.lt;
@@ -37,6 +37,7 @@ export function memoryPrisma(state: MemoryTablesState) {
         const fill = (data: Row) => ({
             ...(name === "mlsGroupEvent" ? { seq: ++state.seq, recipient: null } : {}),
             ...(name === "mlsKeyPackage" ? { id: crypto.randomUUID(), createdAt: new Date(Date.now() + rows().length) } : {}),
+            ...(name === "chatMessage" ? { id: crypto.randomUUID(), createdAt: new Date() } : {}),
             ...data
         });
         return {
@@ -49,7 +50,16 @@ export function memoryPrisma(state: MemoryTablesState) {
             count: async ({ where }: { where: Row }) => rows().filter((r) => matches(r, where)).length,
             create: async ({ data }: { data: Row }) => {
                 unique(data);
-                rows().push(fill(data));
+                const row = fill(data);
+                rows().push(row);
+                return row;
+            },
+            update: async ({ where, data }: { where: Row; data: Row }) => {
+                const row = rows().find((r) => matches(r, where));
+                if (!row) throw new Error("record not found");
+                for (const [key, value] of Object.entries(data))
+                    row[key] = value && typeof value === "object" && "increment" in value ? ((row[key] as number) ?? 0) + (value as { increment: number }).increment : value;
+                return row;
             },
             createMany: async ({ data, skipDuplicates }: { data: Row[]; skipDuplicates?: boolean }) => {
                 for (const d of data) {
@@ -88,10 +98,15 @@ export function memoryPrisma(state: MemoryTablesState) {
         chatHistoryKey: table("chatHistoryKey", ["channelId", "epoch", "recipient"]),
         chatAccountKey: table("chatAccountKey", ["userId"]),
         chatMessage: table("chatMessage", []),
+        chatChannel: table("chatChannel", ["id"]),
+        chatWebhook: table("chatWebhook", ["id"]),
+        mlsStoreEntry: table("mlsStoreEntry", ["device", "key"]),
         // All or nothing, one at a time (Postgres's row lock on the group does
         // the same for two commits): run on the live tables, put the copy back
         // on a throw.
-        $transaction: (fn: (tx: unknown) => Promise<unknown>) => {
+        // The array form takes operations that already ran (these are eager): it only waits for them.
+        $transaction: (fn: ((tx: unknown) => Promise<unknown>) | Promise<unknown>[]) => {
+            if (Array.isArray(fn)) return Promise.all(fn);
             const run = queue.then(async () => {
                 const snapshot = structuredClone(state.tables);
                 try {

@@ -24,5 +24,5 @@ export {
     type FallbackReason,
     type OpSpec
 } from "./runtime";
-export { nativeFileName, nativeSource } from "./native";
+export { nativeFileName, nativeMlsMember, nativeSource } from "./native";
 export { loadWasmBinding, useWasm } from "./wasm";

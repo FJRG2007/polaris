@@ -247,8 +247,9 @@ export class MlsDevice {
             member = options.MlsMember.restore(identity, suite, random(32), snapshot.keys, snapshot.values, fromText(signatureKey));
         else {
             member = new options.MlsMember(identity, suite, random(32));
-            await options.store.commit(member.storeChanges());
+            // Noted first: a store that carries notes in its commit (the server's) writes both at once.
             options.notes.setItem(noteKey(options.device, "signature-key"), toText(member.signaturePublicKey()));
+            await options.store.commit(member.storeChanges());
         }
         const device = new MlsDevice(options, member);
         for (const entry of snapshot.outbox) {
@@ -284,7 +285,8 @@ export class MlsDevice {
         if (known) return known;
         const answer = await this.send({ op: "group", channelId });
         if (answer.group) {
-            await this.sync(channelId);
+            // `pull`, not `sync`: messages read after the Welcome wait for the caller's next `sync`.
+            await this.pull(channelId);
             return this.groupOf(channelId) ?? (await this.rejoin(channelId));
         }
         const groupId = (this.options.random ?? ((n: number) => crypto.getRandomValues(new Uint8Array(n))))(16);
@@ -794,6 +796,11 @@ function framed(kind: number, body: Uint8Array): Uint8Array {
     out[0] = kind;
     out.set(body, 1);
     return out;
+}
+
+/** The note `MlsDevice.open` needs to restore a device's member: without it the device starts over. */
+export function signatureNoteKey(device: string): string {
+    return noteKey(device, "signature-key");
 }
 
 function noteKey(device: string, name: string): string {
