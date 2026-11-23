@@ -39,7 +39,11 @@ vi.mock("@/lib/chat/messages", () => ({
     }
 }));
 vi.mock("@/lib/chat/access", () => ({
-    channelAccess: async (actor: { id: string }, channelId: string) => (state.members.has(`${actor.id}:${channelId}`) ? { id: channelId } : null)
+    channelAccess: async (actor: { id: string }, channelId: string) => (state.members.has(`${actor.id}:${channelId}`) ? { id: channelId } : null),
+    conversationAudience: async (actor: { id: string }, channelId: string) =>
+        state.members.has(`${actor.id}:${channelId}`)
+            ? [...state.members].filter((m) => m.endsWith(`:${channelId}`)).map((m) => m.slice(0, m.indexOf(":")))
+            : null
 }));
 
 vi.mock("@polaris/db", () => {
@@ -538,12 +542,14 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         expect(await alice.historyKey(CHANNEL, 0n)).not.toEqual(epochOne);
         const sealed = (state.tables.chatHistoryKey ?? []).map((r) => `${r.epoch}:${r.recipient === ALICE ? "alice" : r.recipient === BOB ? "bob" : "other"}`);
         // Carol has no account key, so nothing is sealed to her; the organisation key is not built.
-        expect(sealed.sort()).toEqual(["0:alice", "1:alice", "1:bob"]);
+        // Bob, a member before he had a device in the group, gets epoch 0 as well.
+        expect(sealed.sort()).toEqual(["0:alice", "0:bob", "1:alice", "1:bob"]);
 
         // bob's next device, account key unlocked, opens epoch 1 from the envelope.
         const laptop = await open(BOB, "bob-laptop", new MemoryStore(), new Map(), through(BOB), bobKey);
         expect(await laptop.historyKey(CHANNEL, 1n)).toEqual(epochOne);
-        expect(await laptop.historyKey(CHANNEL, 0n)).toBeNull();
+        // Epoch 0 was sealed to bob as a member before his first device joined.
+        expect(await laptop.historyKey(CHANNEL, 0n)).toEqual(await alice.historyKey(CHANNEL, 0n));
         const stranger = await open(BOB, "bob-tablet", new MemoryStore(), new Map(), through(BOB), await unlocked(EVE));
         await expect(stranger.historyKey(CHANNEL, 1n)).rejects.toThrow();
     });
@@ -622,5 +628,29 @@ describe.skipIf(!nativeFile)("a device against the route", () => {
         expect(await send({ epoch: "9" })).toMatchObject({ status: 409, body: { error: "futureEpoch" } });
         expect(await send({}, BOB)).toMatchObject({ status: 409, body: { error: "unknownDevice" } });
         expect(state.tables.chatMessage ?? []).toEqual([]);
+    });
+
+    it("seals each epoch's history key to dormant members too, and to nobody outside the conversation", async () => {
+        const unlocked = async (userId: string): Promise<Account> => {
+            const ak = accountKeys.generateAccountKey();
+            const { signPublicKey, hpkePublicKey } = await accountKeys.accountPublicKeys(ak);
+            (state.tables.chatAccountKey ??= []).push({ userId, akVersion: 1, signPublicKey: Buffer.from(signPublicKey), hpkePublicKey: Buffer.from(hpkePublicKey) });
+            return { hpkePublicKey, hpkePrivateKey: (await accountKeys.accountHpkeKeyPair(ak)).privateKey };
+        };
+        const [aliceKey, daveKey] = [await unlocked(ALICE), await unlocked(DAVE)];
+        await unlocked(EVE);
+        const alice = await open(ALICE, "alice-laptop", new MemoryStore(), new Map(), through(ALICE), aliceKey);
+        const bob = await open(BOB, "bob-phone-1");
+        for (const device of [alice, bob]) await device.register();
+        await alice.ensureGroup(CHANNEL);
+        await alice.addAccounts(CHANNEL, [BOB]);
+        const epochOne = await alice.historyKey(CHANNEL, 1n);
+        const recipients = (state.tables.chatHistoryKey ?? []).filter((r) => r.epoch === 1n).map((r) => r.recipient);
+        // Dave is in the conversation with no device anywhere; Eve has a key but is not in it.
+        expect(recipients).toContain(DAVE);
+        expect(recipients).not.toContain(EVE);
+        // Dave's first device opens the epoch from his envelope.
+        const daveFirst = await open(DAVE, "dave-desk-1", new MemoryStore(), new Map(), through(DAVE), daveKey);
+        expect(await daveFirst.historyKey(CHANNEL, 1n)).toEqual(epochOne);
     });
 });

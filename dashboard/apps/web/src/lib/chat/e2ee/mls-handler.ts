@@ -14,6 +14,8 @@
  * conversation, and answers an account outside it exactly as one without a
  * key (left out, never refused), so it cannot be used to learn who exists or
  * who has set up encryption anywhere but in a conversation the caller is in.
+ * `member-account-keys` lists the keys of the conversation's own people only,
+ * to a caller who is one of them.
  */
 
 import { prisma } from "@polaris/db";
@@ -23,13 +25,15 @@ import * as delivery from "./mls-delivery";
 import * as sealed from "./sealed-messages";
 import { backgroundUser } from "@/lib/session";
 import { mlsBody, type MlsBody } from "./schemas";
-import { channelAccess } from "@/lib/chat/access";
+import { channelAccess, conversationAudience } from "@/lib/chat/access";
 import { rateLimit } from "@/lib/rate-limit-service";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const PER_ACCOUNT = 1_200;
 /** The organisation recovery key's envelope recipient (proposal 3.5). */
 const ORG_RECIPIENT = "org";
+/** Members per `member-account-keys` page. */
+const MEMBER_PAGE = 100;
 
 function json(body: unknown, status = 200): NextResponse {
     return NextResponse.json(body, { status, headers: { "cache-control": "no-store" } });
@@ -111,6 +115,16 @@ async function run(userId: string, body: MlsBody): Promise<Response> {
                     signPublicKey: text(k.signPublicKey),
                     hpkePublicKey: text(k.hpkePublicKey)
                 }))
+            });
+        }
+        case "member-account-keys": {
+            // The people in the conversation (the same list @ offers), by id, after the cursor.
+            const audience = ((await conversationAudience({ id: userId }, body.channelId)) ?? []).sort();
+            const page = audience.filter((id) => !body.after || id > body.after).slice(0, MEMBER_PAGE);
+            const keys = await delivery.accountPublicKeys(page);
+            return json({
+                accountKeys: keys.map((k) => ({ userId: k.userId, akVersion: k.akVersion, hpkePublicKey: text(k.hpkePublicKey) })),
+                next: page.length === MEMBER_PAGE ? page[page.length - 1] : null
             });
         }
         case "group": {

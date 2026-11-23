@@ -77,7 +77,11 @@ History keys: the device that moves the group to a new epoch (create, add,
 remove, rejoin) makes that epoch's `HK`, sends it to the group as an MLS
 application message, and seals it to its own account and to every account it
 added (`sealHistoryKey`, public keys from `account-keys`, stored with
-`put-history-keys`). Each device that reads it seals it to its own account as
+`put-history-keys`), and to every other member of the conversation with an
+account key (`member-account-keys`, 100 per page, the people `@` offers), so a
+dormant member - one with no device in the group - opens it from its first
+device (proposal 4.2 item 4). A committer reads at most 100 pages (10,000
+members) and puts 100 envelopes per request. Each device that reads it seals it to its own account as
 well; the first envelope per account and epoch wins. `historyKey(channel,
 epoch)` returns the key this run holds, else opens the account's envelope - how
 an account's new device reads the past. Sealing needs the account key's HPKE
@@ -129,9 +133,6 @@ are in `localStorage`.
 - The `org` history-key envelope. The organisation recovery key (proposal 3.5)
   has no public key stored anywhere yet - its custodian setup is not built - so
   nothing can serve it and no `org` envelope can be sealed until it is.
-- Envelopes for dormant members (accounts in the conversation with no device
-  in the group, proposal 4.2 item 4): the committer seals only to itself and
-  to the accounts it adds; the rest seal their own when a device reads the key.
 - Server-run members (Polar, webhooks) through the Node binding and
   `mls-store.ts`.
 - Sign-out deletes the browser's MLS device, but its leaf stays in each group

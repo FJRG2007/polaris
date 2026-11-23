@@ -27,7 +27,10 @@
  * each account it just added (`sealHistoryKey`, the public keys from
  * `account-keys`). Every device that reads it seals it to its own account too
  * (the first envelope written wins), so the account's next new device - which
- * MLS cannot give the past - opens the history from those envelopes.
+ * MLS cannot give the past - opens the history from those envelopes. The
+ * committer also seals it to every other member with an account key
+ * (`member-account-keys`), so a member with no device in the group yet - a
+ * dormant one - finds it too.
  * Application messages carry a one-byte kind in front: 0 content, 1 an `HK`.
  *
  * Nothing here is reachable while `chatE2eeEnabled()` is off: the route answers
@@ -48,6 +51,10 @@ const COMMIT_ATTEMPTS = 3;
 const EVENTS_PAGE = 200;
 const CONTENT_KIND = 0;
 const HISTORY_KEY_KIND = 1;
+/** Envelopes per `put-history-keys` request. */
+const ENVELOPES_PER_PUT = 100;
+/** Member pages a committer reads (100 members each): a conversation's first 10,000 people. */
+const MEMBER_PAGES = 100;
 
 export interface MlsCommitOut {
     commit: Uint8Array;
@@ -559,24 +566,42 @@ export class MlsDevice {
             await this.keepHistoryKey(channelId, epoch, key);
             const payload = this.member.encrypt(groupId, framed(HISTORY_KEY_KIND, key));
             await this.commitAndSend({ op: "application", channelId, device: this.options.device, epoch: epoch.toString(), payload: toText(payload) });
-            await this.sealHistoryKey(channelId, epoch, key, accounts);
+            await this.sealHistoryKey(channelId, epoch, key, accounts, true);
         } catch (caught) {
             console.warn("polaris: a history key could not be distributed:", caught);
         }
     }
 
-    /** Seal `key` to this account and to `others` that have an account key, and store the envelopes. */
-    private async sealHistoryKey(channelId: string, epoch: bigint, key: Uint8Array, others: string[]): Promise<void> {
+    /**
+     * Seal `key` to this account and to `others` that have an account key, and
+     * store the envelopes. `everyMember` (the committer) also seals it to every
+     * member of the conversation with an account key - the dormant ones too,
+     * with no device in the group, so their first device reads this epoch.
+     */
+    private async sealHistoryKey(channelId: string, epoch: bigint, key: Uint8Array, others: string[], everyMember = false): Promise<void> {
         const envelopes: { recipient: string; envelope: string }[] = [];
-        const seal = async (recipient: string, publicKey: Uint8Array) =>
+        const sealed = new Set<string>();
+        const seal = async (recipient: string, publicKey: Uint8Array) => {
+            if (sealed.has(recipient)) return;
+            sealed.add(recipient);
             envelopes.push({ recipient, envelope: toText(await content.sealHistoryKey(publicKey, key, { recipient, conversationId: channelId, epoch })) });
+        };
         if (this.options.account) await seal(this.options.userId, this.options.account.hpkePublicKey);
-        const recipients = others.filter((id) => id !== this.options.userId);
+        // Never sealed to this account under a key the server handed out: its own is `account`.
+        sealed.add(this.options.userId);
+        const recipients = others.filter((id) => !sealed.has(id));
         if (recipients.length) {
             const answer = await this.send({ op: "account-keys", channelId, userIds: recipients });
             for (const found of answer.accountKeys as { userId: string; hpkePublicKey: string }[]) await seal(found.userId, fromText(found.hpkePublicKey));
         }
-        if (envelopes.length) await this.send({ op: "put-history-keys", channelId, epoch: epoch.toString(), envelopes });
+        for (let after: string | undefined, pages = 0; everyMember && pages < MEMBER_PAGES; pages++) {
+            const answer = await this.send({ op: "member-account-keys", channelId, ...(after ? { after } : {}) });
+            for (const found of answer.accountKeys as { userId: string; hpkePublicKey: string }[]) await seal(found.userId, fromText(found.hpkePublicKey));
+            if (typeof answer.next !== "string") break;
+            after = answer.next;
+        }
+        for (let at = 0; at < envelopes.length; at += ENVELOPES_PER_PUT)
+            await this.send({ op: "put-history-keys", channelId, epoch: epoch.toString(), envelopes: envelopes.slice(at, at + ENVELOPES_PER_PUT) });
     }
 
     /** Drop the member's copy of a group, if it holds one. */
