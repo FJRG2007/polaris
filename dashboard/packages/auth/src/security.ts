@@ -11,6 +11,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { hashPassword, verifyPassword as verifyHash } from "better-auth/crypto";
 import type { Auth } from "./auth.js";
 import { repairCredentialAccounts } from "./provision.js";
 import {
@@ -119,16 +120,16 @@ async function verifyPassword(auth: Auth, userId: string, password: string): Pro
 /**
  * Hash a low-entropy secret (PIN, recovery answer, a sent code) with the password
  * hasher, so everything short enough to be guessed is stored the same slow way.
+ * better-auth's own hasher, not the account's (`ctx.password`): these are never
+ * an account password, so its OPAQUE fallback and timing floor are not theirs.
  */
-export async function hashSecret(auth: Auth, value: string): Promise<string> {
-    const ctx = await auth.$context;
-    return ctx.password.hash(value);
+export async function hashSecret(_auth: Auth, value: string): Promise<string> {
+    return hashPassword(value);
 }
 
 /** Check a value against a hash written by hashSecret. */
-export async function verifySecret(auth: Auth, hash: string, value: string): Promise<boolean> {
-    const ctx = await auth.$context;
-    return ctx.password.verify({ hash, password: value });
+export async function verifySecret(_auth: Auth, hash: string, value: string): Promise<boolean> {
+    return verifyHash({ hash, password: value });
 }
 
 /**
@@ -507,8 +508,7 @@ export async function verifyQuickPin(auth: Auth, userId: string, pin: string): P
         select: { pinHash: true, pinLength: true }
     });
     if (!row?.pinHash) return false;
-    const ctx = await auth.$context;
-    const matched = await ctx.password.verify({ hash: row.pinHash, password: pin });
+    const matched = await verifySecret(auth, row.pinHash, pin);
     if (matched && row.pinLength === null) {
         await prisma.userSecurity.updateMany({
             where: { userId, pinHash: row.pinHash, pinLength: null },
@@ -602,15 +602,11 @@ export async function verifySecurityAnswers(
         select: { answerHash: true }
     });
     if (rows.length === 0 || rows.length !== answers.length) return false;
-    const ctx = await auth.$context;
     let allMatch = true;
     for (const [index, row] of rows.entries()) {
         // Verify every answer rather than short-circuiting, so the time taken
         // does not reveal which answer was the wrong one.
-        const match = await ctx.password.verify({
-            hash: row.answerHash,
-            password: normalizeAnswer(answers[index] ?? "")
-        });
+        const match = await verifySecret(auth, row.answerHash, normalizeAnswer(answers[index] ?? ""));
         if (!match) allMatch = false;
     }
     return allMatch;

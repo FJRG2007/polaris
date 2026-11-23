@@ -15,6 +15,7 @@
 
 import { createRequestAuth } from "@polaris/auth";
 import { androidAppOrigins } from "./mobile/asset-links";
+import { checkFloorMs } from "./chat/e2ee/clear-password-pool";
 
 const requestAuth = createRequestAuth({
     appOrigins: () => androidAppOrigins(),
@@ -23,6 +24,9 @@ const requestAuth = createRequestAuth({
     // against its record instead. Imported lazily: it reaches the database.
     passwordFallback: async ({ hash, password }) =>
         (await import("./chat/e2ee/opaque-service")).passwordOpensHashlessAccount(hash, password),
+    // A wrong password takes as long whether or not the fallback had a record
+    // to try. Read from the pool directly: it never touches the database.
+    passwordCheckFloorMs: () => checkFloorMs(),
     configuredHosts: async (request) => {
         const [
             { dashboardHosts, publicHostname },

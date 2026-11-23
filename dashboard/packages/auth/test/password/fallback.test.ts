@@ -50,3 +50,53 @@ describe("the password check", () => {
         expect(await plain.password.verify({ hash, password: "anything" })).toBe(false);
     });
 });
+
+describe("the time a password check takes", () => {
+    const FLOOR = 300;
+    const timed = async <T>(run: () => Promise<T>): Promise<[T, number]> => {
+        const began = performance.now();
+        const result = await run();
+        return [result, performance.now() - began];
+    };
+
+    it("is the same for a wrong password whether or not the fallback had a record to try", async () => {
+        // One account the fallback finds nothing for, one it runs an expensive check on.
+        const fallback = async ({ password }: { hash: string; password: string }) => {
+            if (password.startsWith("hashless")) await new Promise((resolve) => setTimeout(resolve, 120));
+            return false;
+        };
+        const ctx = await authModule.createAuth({ passwordFallback: fallback, passwordCheckFloorMs: () => FLOOR }).$context;
+        const hash = await ctx.password.hash("a secret nobody keeps");
+        const [plainResult, plain] = await timed(() => ctx.password.verify({ hash, password: "plain wrong" }));
+        const [hashlessResult, hashless] = await timed(() => ctx.password.verify({ hash, password: "hashless wrong" }));
+        expect(plainResult).toBe(false);
+        expect(hashlessResult).toBe(false);
+        expect(plain).toBeGreaterThanOrEqual(FLOOR - 5);
+        expect(hashless).toBeGreaterThanOrEqual(FLOOR - 5);
+        expect(Math.abs(plain - hashless)).toBeLessThan(60);
+    });
+
+    it("is the same for an address with no account, which better-auth answers with a hash", async () => {
+        const ctx = await authModule.createAuth({ passwordFallback: async () => false, passwordCheckFloorMs: () => FLOOR })
+            .$context;
+        const hash = await ctx.password.hash("a secret nobody keeps");
+        const [, unknown] = await timed(() => ctx.password.hash("guessed password"));
+        const [, wrong] = await timed(() => ctx.password.verify({ hash, password: "guessed password" }));
+        expect(unknown).toBeGreaterThanOrEqual(FLOOR - 5);
+        expect(Math.abs(unknown - wrong)).toBeLessThan(60);
+    });
+
+    it("is never padded for the right password, nor for a PIN or an answer", async () => {
+        const auth = authModule.createAuth({ passwordFallback: async () => false, passwordCheckFloorMs: () => 2_000 });
+        const ctx = await auth.$context;
+        const hash = await authModule.passwordHasher({}).hash("right password here");
+        const [opens, right] = await timed(() => ctx.password.verify({ hash, password: "right password here" }));
+        expect(opens).toBe(true);
+        expect(right).toBeLessThan(1_000);
+        const security = await import("../../src/security.js");
+        const [pinHash, hashing] = await timed(() => security.hashSecret(auth, "1234"));
+        const [pinWrong, checking] = await timed(() => security.verifySecret(auth, pinHash, "4321"));
+        expect(pinWrong).toBe(false);
+        expect(hashing + checking).toBeLessThan(1_000);
+    });
+});

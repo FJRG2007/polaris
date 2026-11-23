@@ -177,6 +177,9 @@ vi.mock("@/lib/rate-limit-service", () => ({
         const count = (state.limits.get(key) ?? 0) + 1;
         state.limits.set(key, count);
         return { ok: count <= state.limitCap, retryAfterMs: 60_000 };
+    },
+    resetRateLimit: async (key: string) => {
+        state.limits.delete(key);
     }
 }));
 
@@ -561,6 +564,22 @@ describe("a password set over OPAQUE still opens every check that takes one", ()
         state.credentials.set(alice.id, "scrypt:set by an administrator");
         expect(await service.passwordOpensHashlessAccount(hashless, NEXT)).toBe(false);
         expect(await check(alice.id, "set by an administrator")).toBe(true);
+    });
+
+    it("counts failures in a row per account and refuses past the limit, before any Argon2id", async () => {
+        const alice = await adoptedAccount();
+        const set = await flows.prepareNewPassword(NEXT, { email: alice.email });
+        expect(await server.setPasswordOverOpaque(alice.id, set)).toBe(true);
+        expect(await check(alice.id, "wrong once")).toBe(false);
+        expect(state.limits.get(`opaque-clear:${alice.id}`)).toBe(1);
+        expect(state.limits.get("opaque-clear-address:203.0.113.9")).toBe(1);
+        // The right password clears the account's count, not the address's.
+        expect(await check(alice.id, NEXT)).toBe(true);
+        expect(state.limits.has(`opaque-clear:${alice.id}`)).toBe(false);
+        expect(state.limits.get("opaque-clear-address:203.0.113.9")).toBe(2);
+        // Past the cap even the right password is refused until the window ends.
+        state.limitCap = 0;
+        expect(await check(alice.id, NEXT)).toBe(false);
     });
 
     it("an account merely moved onto OPAQUE keeps its hash as the only check", async () => {

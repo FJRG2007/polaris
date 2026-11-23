@@ -190,7 +190,10 @@ const nextConfig = {
         "/**": [
             "../../node_modules/quickjs-emscripten-core/**",
             "../../node_modules/@jitl/quickjs-ffi-types/**",
-            "../../node_modules/@jitl/quickjs-singlefile-cjs-release-sync/**"
+            "../../node_modules/@jitl/quickjs-singlefile-cjs-release-sync/**",
+            // Likewise the OPAQUE module the clear-password check threads load
+            // (lib/chat/e2ee/clear-password-pool.ts).
+            "../../node_modules/@serenity-kit/opaque/**"
         ]
     },
     // Pages that moved; the old paths keep working for anything already linking to

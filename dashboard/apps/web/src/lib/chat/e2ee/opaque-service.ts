@@ -26,7 +26,10 @@ import { loadEnv } from "@polaris/config";
 import { prisma, Prisma } from "@polaris/db";
 import { createHash, timingSafeEqual } from "node:crypto";
 import * as opaque from "@polaris/chat-crypto/opaque-server";
-import { PASSWORD_KSF_CURRENT, type PasswordKsfVersion } from "@polaris/chat-crypto/password-lock";
+import { clientIp } from "@/lib/request-context";
+import { passwordOpensRecordOffThread } from "./clear-password-pool";
+import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
+import { PASSWORD_KSF_CURRENT, passwordKsf, type PasswordKsfVersion } from "@polaris/chat-crypto/password-lock";
 import { CredentialDecryptError, decryptSecret, encryptSecret, secretFingerprint } from "@polaris/storage";
 
 const SETUP_ID = "default";
@@ -142,6 +145,32 @@ export async function usableRecord(
     return { record: row.record, ksfVersion: row.ksfVersion === 1 ? 1 : 2 };
 }
 
+/** Checks in the clear an account may fail in a row, and an address may make, per window. */
+const CLEAR_WINDOW_MS = 15 * 60 * 1000;
+const CLEAR_PER_ACCOUNT = 10;
+const CLEAR_PER_ADDRESS = 60;
+
+/**
+ * Whether the per-account and per-address limits leave room for one more
+ * check in the clear. The account's count is of failures in a row (a right
+ * password clears it), so typing it on the lock screen all day never runs
+ * out; the address's is of every check. Read before the Argon2id, so a flood
+ * of wrong passwords is refused for the cost of a counter.
+ */
+async function clearCheckAllowed(userId: string): Promise<boolean> {
+    let address: string | undefined;
+    try {
+        address = await clientIp();
+    } catch {
+        // Outside a request (a background check): only the account counts.
+    }
+    const results = await Promise.all([
+        rateLimit(`opaque-clear:${userId}`, CLEAR_PER_ACCOUNT, CLEAR_WINDOW_MS),
+        ...(address ? [rateLimit(`opaque-clear-address:${address}`, CLEAR_PER_ADDRESS, CLEAR_WINDOW_MS)] : [])
+    ]);
+    return results.every((result) => result.ok);
+}
+
 /**
  * Whether a password handed over in the clear is the one an account set over
  * OPAQUE (`commitPassword`), given only the hash the caller compared it to -
@@ -149,7 +178,9 @@ export async function usableRecord(
  * for nothing, so without this every route that still takes a password (an old
  * client's sign-in, arming a second factor, the lock screen, a quick PIN)
  * would refuse its owner. Only a verified record still tagged with exactly this
- * hash, and still the account's current one, is tried. Never throws.
+ * hash, and still the account's current one, is tried, within the limits
+ * above, on a pool thread (`clear-password-pool.ts`). The caller pads a
+ * mismatch to `checkFloorMs`, so how long this took says nothing. Never throws.
  */
 export async function passwordOpensHashlessAccount(hash: string, password: string): Promise<boolean> {
     try {
@@ -163,13 +194,16 @@ export async function passwordOpensHashlessAccount(hash: string, password: strin
         // retired by a later password write is never tried.
         const usable = await usableRecord(row.userId, "sign-in");
         if (!usable) return false;
-        return await opaque.passwordOpensRecord({
+        if (!(await clearCheckAllowed(row.userId))) return false;
+        const opens = await passwordOpensRecordOffThread({
             serverSetup: await serverSetup(),
             userId: row.userId,
             record: usable.record,
             password,
-            ksfVersion: usable.ksfVersion
+            keyStretching: passwordKsf(usable.ksfVersion)
         });
+        if (opens) await resetRateLimit(`opaque-clear:${row.userId}`);
+        return opens;
     } catch (caught) {
         console.error("polaris: checking a password against its OPAQUE record failed:", caught);
         return false;

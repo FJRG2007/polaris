@@ -39,6 +39,12 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
+// PINs are hashed with better-auth's own hasher, never the account's (security.ts).
+vi.mock("better-auth/crypto", () => ({
+    hashPassword: async (value: string) => `hashed:${value}`,
+    verifyPassword: async ({ hash, password }: { hash: string; password: string }) => hash === `hashed:${password}`
+}));
+
 const auth = {
     $context: Promise.resolve({
         password: {

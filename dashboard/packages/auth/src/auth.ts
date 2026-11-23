@@ -720,6 +720,15 @@ export interface AuthOptions {
     readonly passwordFallback?: (input: { hash: string; password: string }) => Promise<boolean>;
 
     /**
+     * The least time, in milliseconds, a failed password check and a password
+     * hash take. With a fallback that runs an Argon2id for some accounts only,
+     * a wrong password would otherwise answer sooner for every other account -
+     * and an unknown address, which better-auth answers with a hash, sooner
+     * still. Absent, nothing is padded.
+     */
+    readonly passwordCheckFloorMs?: () => number;
+
+    /**
      * Told about every session that opens, whatever the method, after it is stored,
      * except one still owed a second factor or held for another device's approval.
      * Supplied by the app so it can act on a successful sign-in - lifting a reputation
@@ -802,6 +811,47 @@ async function allowedHosts(options: AuthOptions): Promise<Set<string>> {
  *                Defaults to the published app URL, which is what every caller
  *                outside the request handler wants.
  */
+/** Resolves once `floorMs` has passed since `began`. */
+async function paddedFrom(began: number, floorMs: number): Promise<void> {
+    const left = began + floorMs - Date.now();
+    if (left > 0) await new Promise((resolve) => setTimeout(resolve, left));
+}
+
+/**
+ * better-auth's own hasher, unchanged, with the app's second opinion on a
+ * mismatch. Every account password check better-auth or Polaris makes goes
+ * through here, so one place covers all of them. A mismatch and a hash are
+ * both padded to the floor, so the time taken says neither whether the
+ * fallback had a record to try nor whether the address exists. A match is
+ * never padded: whoever sent it already knows the password.
+ */
+export function passwordHasher(options: Pick<AuthOptions, "passwordFallback" | "passwordCheckFloorMs">) {
+    const floor = () => {
+        try {
+            return options.passwordCheckFloorMs?.() ?? 0;
+        } catch {
+            return 0;
+        }
+    };
+    return {
+        hash: async (password: string): Promise<string> => {
+            const began = Date.now();
+            const hash = await hashPassword(password);
+            await paddedFrom(began, floor());
+            return hash;
+        },
+        verify: async (input: { hash: string; password: string }): Promise<boolean> => {
+            const began = Date.now();
+            if (await verifyPassword(input)) return true;
+            const opens = options.passwordFallback
+                ? await options.passwordFallback(input).catch(() => false)
+                : false;
+            await paddedFrom(began, floor());
+            return opens;
+        }
+    };
+}
+
 export function createAuth(options: AuthOptions = {}, address?: string) {
     const env = loadEnv();
     const localName = env.POLARIS_LOCAL_HOSTNAME;
@@ -842,15 +892,7 @@ export function createAuth(options: AuthOptions = {}, address?: string) {
             disableSignUp: true,
             requireEmailVerification: false,
             minPasswordLength: MIN_PASSWORD_LENGTH,
-            // better-auth's own hasher, unchanged, with the app's second opinion
-            // on a mismatch. Every password check better-auth or Polaris makes
-            // goes through here, so one place covers all of them.
-            password: {
-                hash: hashPassword,
-                verify: async (input) =>
-                    (await verifyPassword(input)) ||
-                    (options.passwordFallback ? await options.passwordFallback(input).catch(() => false) : false)
-            }
+            password: passwordHasher(options)
         },
         session: {
             expiresIn: SESSION_MAX_AGE,
