@@ -3297,6 +3297,24 @@
             "hint": "Accounts without a confirmed number add and confirm one the next time they sign in. Accounts no code can reach are not held, and administrators never are.",
             "noChannel": "The number is confirmed with a WhatsApp code, and no WhatsApp sender is connected.",
             "fix": "Set up WhatsApp codes"
+        },
+        "integrity": {
+            "title": "Code integrity",
+            "hint": "Whether the code this server sends to browsers is what Polaris published for its version. Checked after every start and update.",
+            "verified": "Verified",
+            "changed": "Changed",
+            "unverifiable": "Cannot verify",
+            "verifiedDetail": "{count, plural, one {The one file of code matches} other {All # files of code match}} the signed build.",
+            "changedDetail": "{count, plural, one {One file of code differs} other {# files of code differ}} from the signed build. Someone may have modified this server. Ask people not to sign in here until it is reinstalled from a clean image.",
+            "more": "and {count} more",
+            "checked": "Checked",
+            "again": "Check again",
+            "failed": "Could not check. Try again in a moment.",
+            "reason": {
+                "no-stamp": "This server was built from source, so there is no signed build to compare with.",
+                "no-manifest": "No signed record exists for this version, or GitHub could not be reached. Versions from before records were published cannot be checked.",
+                "nothing-loaded": "No files of code were found to check."
+            }
         }
     },
     "uploads": {

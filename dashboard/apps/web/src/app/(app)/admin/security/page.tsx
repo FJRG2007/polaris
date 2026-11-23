@@ -15,6 +15,7 @@
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { SecurityAdminLoader } from "./loader";
+import { CodeIntegrityCard } from "./code-integrity-card";
 import { getTranslations } from "@/lib/i18n/request";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export default async function AdminSecurityPage() {
             <PageHeader title={t("security.title")} description={t("security.description")} />
             <div className="flex flex-col gap-4">
                 <SecurityAdminLoader revision={Date.now()} />
+                <CodeIntegrityCard />
             </div>
         </div>
     );

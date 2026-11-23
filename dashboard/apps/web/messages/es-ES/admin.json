@@ -3297,6 +3297,24 @@
             "hint": "Las cuentas sin número confirmado añaden y confirman uno al volver a entrar. No se retiene a cuentas a las que no llega el código, ni nunca a administradores.",
             "noChannel": "El número se confirma con un código de WhatsApp y no hay remitente de WhatsApp conectado.",
             "fix": "Configurar WhatsApp"
+        },
+        "integrity": {
+            "title": "Integridad del código",
+            "hint": "Si el código que este servidor envía a los navegadores es el que Polaris publicó para su versión. Se comprueba tras cada arranque y actualización.",
+            "verified": "Verificado",
+            "changed": "Modificado",
+            "unverifiable": "No verificable",
+            "verifiedDetail": "{count, plural, one {El archivo de código coincide} other {Los # archivos de código coinciden}} con la versión firmada.",
+            "changedDetail": "{count, plural, one {Un archivo de código no coincide} other {# archivos de código no coinciden}} con la versión firmada. Alguien puede haber modificado este servidor. Pide que nadie inicie sesión aquí hasta reinstalarlo desde una imagen limpia.",
+            "more": "y {count} más",
+            "checked": "Comprobado",
+            "again": "Volver a comprobar",
+            "failed": "No se pudo comprobar. Inténtalo de nuevo en un momento.",
+            "reason": {
+                "no-stamp": "Este servidor se compiló desde el código fuente, así que no hay versión firmada con la que comparar.",
+                "no-manifest": "No hay registro firmado para esta versión o no se pudo contactar con GitHub. Las versiones anteriores a la publicación de registros no se pueden comprobar.",
+                "nothing-loaded": "No se encontraron archivos de código que comprobar."
+            }
         }
     },
     "uploads": {

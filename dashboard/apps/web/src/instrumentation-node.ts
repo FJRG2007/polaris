@@ -207,6 +207,15 @@ export async function registerNode(): Promise<void> {
         })
         .catch((error) => console.error("polaris: could not store the ready-made policies:", error));
 
+    // Whether this container serves the code Polaris built: its files against
+    // the signed manifest of its build (lib/integrity/self-check). A minute in,
+    // so the hashing never competes with a start; every update is a new start.
+    setTimeout(() => {
+        void import("./lib/integrity/self-check")
+            .then(({ checkOwnCodeAtStart }) => checkOwnCodeAtStart())
+            .catch((error) => console.error("polaris: could not check this server's code:", error));
+    }, 60_000).unref();
+
     // The certificate contact chosen in Domains, put back where the edge reads it
     // when it starts, for a volume that was recreated or restored since.
     const { syncAcmeEmailFile } = await import("./lib/tls/acme-edge");
