@@ -106,6 +106,10 @@ jobs:
       - run: cargo clippy --locked --all-targets -p polaris-core -p polaris-core-vectors -p polaris-core-node -p polaris-core-wasm -- -D warnings
       - run: cargo clippy --locked --target wasm32-unknown-unknown -p polaris-core -p polaris-core-wasm -- -D warnings
       - run: cargo test --locked -p polaris-core -p polaris-core-vectors
+      # The fuzz crate is its own workspace (it needs nightly to run, not to
+      # compile), so the checks above do not reach it.
+      - run: cargo fmt --check --manifest-path crates/polaris-core/fuzz/Cargo.toml
+      - run: cargo clippy --locked --manifest-path crates/polaris-core/fuzz/Cargo.toml -- -D warnings
 
   native:
     name: napi ${{ matrix.name }}
@@ -273,10 +277,95 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # Every cargo-fuzz target for a fixed time (plan 4.3). A crash fails the job
+  # and its input is uploaded, to become a regression vector.
+  fuzz:
+    name: fuzz smoke (60 s per target)
+    needs: changes
+    if: needs.changes.outputs.core == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # libFuzzer and the sanitizers need nightly; this overrides
+      # rust-toolchain.toml for every cargo and rustc call in the job.
+      RUSTUP_TOOLCHAIN: nightly
+      CARGO_FUZZ_VERSION: "0.13.2"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install nightly --profile minimal && cargo --version
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: rust-core-fuzz
+          workspaces: crates/polaris-core/fuzz -> target
+      - run: cargo install cargo-fuzz --version "$CARGO_FUZZ_VERSION" --locked
+      - working-directory: crates/polaris-core/fuzz
+        run: cargo fetch --locked
+      - name: Run each target for 60 s
+        working-directory: crates/polaris-core
+        run: |
+          targets=$(cargo fuzz list)
+          [ -n "$targets" ] || { echo "no fuzz targets found" >&2; exit 1; }
+          for target in $targets; do
+            echo "::group::$target"
+            cargo fuzz run "$target" -- -max_total_time=60
+            echo "::endgroup::"
+          done
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: core-rs-fuzz-artifacts
+          path: crates/polaris-core/fuzz/artifacts/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Criterion over the golden vectors, and the TypeScript twin against the Node
+  # binding over the same files (plan 4.7). It reports, into the job summary;
+  # it fails only when a benchmark cannot build or run, never on a number.
+  bench:
+    name: benchmarks (report only)
+    needs: changes
+    if: needs.changes.outputs.core == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+      - run: cargo --version
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: rust-core-bench
+      - name: criterion
+        run: |
+          set -o pipefail
+          cargo bench --locked -p polaris-core -- --quick | tee "$RUNNER_TEMP/criterion.txt"
+          { echo "### criterion (polaris-core, --quick)"; echo '```'; grep -E '^(probe/|[[:space:]]+(time|change):)' "$RUNNER_TEMP/criterion.txt" || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+      - working-directory: dashboard
+        run: $CORE_RS_INSTALL
+      - working-directory: dashboard
+        run: npm run build:rust -w @polaris/core-rs -- --only node
+      - working-directory: dashboard
+        run: npm run build -w @polaris/core-rs
+      - name: TypeScript twin vs Node binding
+        working-directory: dashboard
+        env:
+          POLARIS_CORE_RS_REQUIRED: "1"
+        run: |
+          set -o pipefail
+          npm run --silent bench -w @polaris/core-rs | tee "$RUNNER_TEMP/node-bench.txt"
+          { echo "### Node: TypeScript twin vs napi binding"; echo '```'; cat "$RUNNER_TEMP/node-bench.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
   # The one check to require: it always reports, and it is green only when every
   # job above passed, or was skipped because nothing it checks changed.
   rust-core:
-    needs: [changes, rust, native, wasm]
+    needs: [changes, rust, native, wasm, fuzz, bench]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

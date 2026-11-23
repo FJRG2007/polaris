@@ -1,0 +1,34 @@
+# The probe domain's fuzz targets (docs/rust-core-plan.md 4.3), run by
+# `cargo +nightly fuzz run <target>` from this directory. Its own workspace and
+# lockfile: libFuzzer needs nightly and a sanitizer build, which the root
+# workspace never sees (it lists this directory under `exclude`).
+[package]
+name = "polaris-core-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+license = "AGPL-3.0-only"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "=0.4.13"
+polaris-core = { path = ".." }
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "decode_hex"
+path = "fuzz_targets/decode_hex.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fnv1a32"
+path = "fuzz_targets/fnv1a32.rs"
+test = false
+doc = false
+bench = false

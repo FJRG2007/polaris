@@ -11,7 +11,7 @@ members = [
     "crates/polaris-core-node",
     "crates/polaris-core-wasm",
 ]
-exclude = ["vendor/smoltcp"]
+exclude = ["vendor/smoltcp", "crates/polaris-core/fuzz"]
 
 [workspace.package]
 edition = "2021"

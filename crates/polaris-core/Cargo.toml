@@ -10,9 +10,18 @@ authors.workspace = true
 
 [lib]
 path = "src/lib.rs"
+# No libtest benchmarks: `cargo bench -p polaris-core -- --quick` passes
+# `--quick` to every bench target, and only criterion (benches/) understands it.
+bench = false
 
 [dependencies]
 
 [dev-dependencies]
 polaris-core-vectors = { path = "../polaris-core-vectors" }
 proptest = "1.7.0"
+criterion = { version = "=0.7.0", default-features = false, features = ["cargo_bench_support"] }
+
+# Criterion over the golden vectors (plan 4.7): `cargo bench -p polaris-core`.
+[[bench]]
+name = "probe"
+harness = false
