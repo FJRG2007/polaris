@@ -91,7 +91,7 @@ dashboard/packages/
 
 | Where it runs | Binding | Packaging | Notes |
 |---|---|---|---|
-| Dashboard server (Next.js, Node) | napi-rs | prebuilt `.node` per platform in the image: linux-x64-musl and linux-arm64-musl at least, matching the image base | loaded once per process; falls back to TS if the `.node` is missing |
+| Dashboard server (Next.js, Node) | napi-rs | prebuilt `.node` matching the image base, which is glibc (`node:22-trixie-slim`): linux-x64-gnu in the published amd64 image (linux-arm64-gnu when an arm64 image is published); built by CI into the build context, since `crates/` is outside it | loaded once per process; falls back to TS if the `.node` is missing |
 | Desktop (Electron main) | napi-rs | prebuilt per platform (win-x64, mac-x64, mac-arm64, linux-x64) inside the app, ABI checked against Electron 44 | signed with the app |
 | Browser dashboard | wasm-bindgen | `.wasm` emitted as a hashed static asset, fetched lazily | `wasm-opt -Oz`, brotli budget per module |
 | Browser extension | wasm-bindgen | packaged in the extension, MV3 CSP `wasm-unsafe-eval` | Firefox MV2 build checked separately |

@@ -68,8 +68,10 @@ module.exports = {
             NSCameraUsageDescription: "Polaris uses the camera for video calls in Chat."
         },
         icon: ICON,
-        // node-pty's native binaries cannot be loaded from inside the archive.
-        asar: { unpack: "**/node_modules/node-pty/**" },
+        // Native binaries cannot be loaded from inside the archive: node-pty's,
+        // and the Rust core's binding (dist/native, build/bundle.mjs), which loads
+        // from app.asar.unpacked/dist/native (build/core-rs-smoke.mjs checks it).
+        asar: { unpack: "{**/node_modules/node-pty/**,**/dist/native/*.node}" },
         // The VPN service, built by CI (vpn-helper/stage.mjs). A package made
         // without it still runs: only connecting the VPN says it cannot.
         ...(existsSync(path.join(__dirname, "vpn-helper", "stage", "vpn-helper"))

@@ -21,7 +21,7 @@
     "main": "./dist/index.js",
     "types": "./dist/index.d.ts",
     "scripts": {
-        "build": "tsup src/index.ts src/probe.ts src/vectors.ts --format esm --dts --clean",
+        "build": "tsup src/index.ts src/probe.ts src/vectors.ts src/smoke.ts --format esm --dts --clean",
         "build:rust": "node scripts/build-rust.mjs",
         "typecheck": "tsc --noEmit",
         "test": "vitest run test/unit",
@@ -32,6 +32,7 @@
         "check:guard": "node scripts/no-simulation-guard.mjs",
         "check:ledger": "node scripts/ledger-check.mjs",
         "check:bindings": "node scripts/binding-check.mjs",
+        "smoke": "node scripts/smoke.mjs",
         "vectors": "node scripts/vectors.mjs"
     },
     "dependencies": {

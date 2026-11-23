@@ -36,12 +36,16 @@ on:
       - "desktop/**"
       - "dashboard/packages/core/src/tv-compat/**"
       - "dashboard/packages/core/src/search-text.ts"
+      - "dashboard/packages/core-rs/**"
+      - "crates/polaris-core*/**"
       - ".github/workflows/desktop.yml"
   pull_request:
     paths:
       - "desktop/**"
       - "dashboard/packages/core/src/tv-compat/**"
       - "dashboard/packages/core/src/search-text.ts"
+      - "dashboard/packages/core-rs/**"
+      - "crates/polaris-core*/**"
       - ".github/workflows/desktop.yml"
   workflow_dispatch:
 
@@ -173,6 +177,12 @@ jobs:
           security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
           rm -f "$certificate"
 
+      # The Rust core's Node binding for this target (build/bundle.mjs packages
+      # it outside the archive; build/core-rs-smoke.mjs checks it loads).
+      - uses: ./.github/actions/core-rs-bindings
+        with:
+          node-target: ${{ matrix.os == 'windows-latest' && 'x86_64-pc-windows-msvc' || matrix.os == 'ubuntu-latest' && 'x86_64-unknown-linux-gnu' || matrix.arch == 'arm64' && 'aarch64-apple-darwin' || 'x86_64-apple-darwin' }}
+
       - name: Build the installers
         env:
           WINDOWS_CERTIFICATE_PASSWORD: ${{ steps.signing.outputs.windows == 'true' && secrets.WINDOWS_CERTIFICATE_PASSWORD || '' }}
@@ -183,6 +193,7 @@ jobs:
         run: |
           npm run build
           npx electron-forge make --arch=${{ matrix.arch }}
+          POLARIS_CORE_RS_REQUIRED=1 node build/core-rs-smoke.mjs --arch ${{ matrix.arch }}
 
       - name: Remove the signing material
         if: always()

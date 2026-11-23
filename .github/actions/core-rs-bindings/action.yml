@@ -1,0 +1,51 @@
+name: Rust core bindings
+description: >
+  Build the Rust core's bindings into dashboard/packages/core-rs (native/ and
+  wasm/) for an artifact to package (docs/rust-core-plan.md, F6). Same tools and
+  digests as rust-core.yml's wasm job.
+inputs:
+  node-target:
+    description: Rust target triple of the Node binding to build; empty builds none.
+    default: ""
+  wasm:
+    description: '"true" builds the WebAssembly binding (Linux x64 runners only).'
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - name: Rust targets
+      shell: bash
+      run: |
+        cargo --version
+        if [ -n "${{ inputs.node-target }}" ]; then rustup target add "${{ inputs.node-target }}"; fi
+        if [ "${{ inputs.wasm }}" = "true" ]; then rustup target add wasm32-unknown-unknown; fi
+    - name: Install wasm-bindgen and wasm-opt
+      if: inputs.wasm == 'true'
+      shell: bash
+      env:
+        WASM_BINDGEN_VERSION: "0.2.130"
+        WASM_BINDGEN_SHA256: 9687f3bb551b9f66f37ed32a40d7913a00f7962db653054e56857bc306c3227f
+        BINARYEN_VERSION: "133"
+        BINARYEN_SHA256: 2dc9c7813f5375db93d96ead4b78222fcc3e2677bbb832297af4797782a37489
+      run: |
+        mkdir -p "$RUNNER_TEMP/core-rs-tools/bin"
+        cd "$RUNNER_TEMP/core-rs-tools"
+        wb="wasm-bindgen-$WASM_BINDGEN_VERSION-x86_64-unknown-linux-musl"
+        curl -fsSL --retry 3 -o wb.tar.gz "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$WASM_BINDGEN_VERSION/$wb.tar.gz"
+        echo "$WASM_BINDGEN_SHA256  wb.tar.gz" | sha256sum -c -
+        tar -xzf wb.tar.gz && cp "$wb/wasm-bindgen" bin/
+        by="binaryen-version_$BINARYEN_VERSION-x86_64-linux.tar.gz"
+        curl -fsSL --retry 3 -o by.tar.gz "https://github.com/WebAssembly/binaryen/releases/download/version_$BINARYEN_VERSION/$by"
+        echo "$BINARYEN_SHA256  by.tar.gz" | sha256sum -c -
+        tar -xzf by.tar.gz
+        cp "binaryen-version_$BINARYEN_VERSION/bin/wasm-opt" bin/
+        if [ -d "binaryen-version_$BINARYEN_VERSION/lib" ]; then cp -r "binaryen-version_$BINARYEN_VERSION/lib" .; fi
+        echo "$RUNNER_TEMP/core-rs-tools/bin" >> "$GITHUB_PATH"
+    - name: Build the Node binding
+      if: inputs.node-target != ''
+      shell: bash
+      run: node dashboard/packages/core-rs/scripts/build-rust.mjs --only node --node-target "${{ inputs.node-target }}"
+    - name: Build the WebAssembly binding
+      if: inputs.wasm == 'true'
+      shell: bash
+      run: node dashboard/packages/core-rs/scripts/build-rust.mjs --only wasm

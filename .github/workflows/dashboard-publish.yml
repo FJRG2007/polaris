@@ -232,7 +232,7 @@ jobs:
           # it runs. Matched by exclusion, so a new app package rebuilds the image
           # without anybody remembering to add it here.
           web=false
-          has '^dashboard/(packages|cli|patches|scripts)/|^dashboard/resources/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$' && web=true
+          has '^dashboard/(packages|cli|patches|scripts)/|^dashboard/resources/|^dashboard/docker/(Dockerfile|entrypoint\.sh)|^dashboard/package(-lock)?\.json$|^crates/polaris-core' && web=true
           grep -E '^dashboard/apps/' "$CHANGED" | grep -qvE '^dashboard/apps/(extension|site|companion|streamdeck)/' && web=true
           out web "$web"
           has '^dashboard/mdns/' && out mdns true || out mdns false
@@ -341,6 +341,14 @@ jobs:
           sudo swapon "$swap"
           free -h
       - uses: actions/checkout@v7
+      # The Rust core's bindings, into the build context: `crates/` is outside it,
+      # so the image cannot build them itself. glibc, like the runner's base
+      # (node:22-trixie-slim); the image checks the binding loads while it builds
+      # (POLARIS_CORE_RS_REQUIRED below).
+      - uses: ./.github/actions/core-rs-bindings
+        with:
+          node-target: x86_64-unknown-linux-gnu
+          wasm: "true"
       # `cleanup: false` here and in every job: the runner VM is thrown away with
       # the job, and removing this builder first cost the web job 45 seconds.
       - uses: docker/setup-buildx-action@v4
@@ -376,6 +384,7 @@ jobs:
             POLARIS_APP_BUNDLES=publish
             POLARIS_BUILD_SKIP_LINT=1
             POLARIS_BUILD_SKIP_TYPECHECK=1
+            POLARIS_CORE_RS_REQUIRED=1
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
           outputs: type=image,name=ghcr.io/fjrg2007/polaris-dashboard,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
           # No attestation manifests. buildx attaches one to the index by

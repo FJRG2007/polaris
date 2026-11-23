@@ -1,4 +1,5 @@
 import { defineConfig } from "wxt";
+import { wasmAssets } from "../../packages/core-rs/scripts/wasm-assets.mjs";
 
 /**
  * What the extension asks the browser for, and deliberately does not.
@@ -29,6 +30,22 @@ import { defineConfig } from "wxt";
 export default defineConfig({
     srcDir: "src",
     modules: ["@wxt-dev/module-react"],
+    hooks: {
+        /**
+         * The Rust core's WebAssembly binding, under `core-rs/` with the
+         * manifest that names it (packages/core-rs/scripts/wasm-assets.mjs). It
+         * compiles under the extension pages' policy below on manifest v3 and
+         * under Firefox's default on v2. A build without it (no Rust toolchain)
+         * still works, the facades answering with TypeScript; extension.yml
+         * builds it first and checks the packaged copy loads.
+         */
+        "build:publicAssets": (_wxt, files) => {
+            const assets = wasmAssets();
+            if (!assets) return;
+            for (const file of assets.files) files.push({ absoluteSrc: file.src, relativeDest: `core-rs/${file.name}` });
+            files.push({ relativeDest: "core-rs/manifest.json", contents: `${JSON.stringify(assets.manifest)}\n` });
+        }
+    },
     /**
      * One name per browser, with no version in it.
      *

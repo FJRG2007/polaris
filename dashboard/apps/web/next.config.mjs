@@ -160,7 +160,12 @@ const nextConfig = {
         // its own copy: yjs warns "already imported" and a Y.Doc made by one copy
         // fails `instanceof` in another. y-protocols and y-prosemirror stay
         // bundled and import this single copy.
-        "yjs"
+        "yjs",
+        // The Rust core's facades load their Node binding from the package's own
+        // `native/` folder, found next to `dist/`. Bundled into a server chunk
+        // that folder is no longer beside them, so the package stays in
+        // node_modules, where the image puts the binding (docker/Dockerfile).
+        "@polaris/core-rs"
     ],
     // Trace from the monorepo root so the standalone server lands at the path the
     // Docker image expects (apps/web/.next/standalone/apps/web/server.js).

@@ -11,29 +11,15 @@
 import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { copyFileSync, mkdirSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
+import { CORE_RS_NATIVE, mainNode, node } from "./node-build.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DIST = join(ROOT, "dist");
 
 rmSync(DIST, { recursive: true, force: true });
 
-const node = {
-    bundle: true,
-    platform: "node",
-    target: "node24",
-    format: "cjs",
-    // node-pty is a native module: it ships as itself in node_modules (see
-    // forge.config.js) and is loaded at run time by the runner.
-    external: ["electron", "node-pty"],
-    // Shared modules under dashboard/packages/core import zod, and CI installs
-    // only this folder's packages, so resolve it from here as tsconfig does.
-    alias: { zod: join(ROOT, "node_modules/zod") },
-    logLevel: "info",
-    legalComments: "none"
-};
-
-await build({ ...node, entryPoints: [join(ROOT, "src/main/index.ts")], outfile: join(DIST, "main/index.js") });
+await build({ ...mainNode, entryPoints: [join(ROOT, "src/main/index.ts")], outfile: join(DIST, "main/index.js") });
 await build({
     ...node,
     entryPoints: {
@@ -70,3 +56,12 @@ for (const file of ["IBMPlexSans-Regular.woff2", "IBMPlexSans-Medium.woff2", "IB
 // and the tray icon on Windows and Linux.
 copyFileSync(join(ROOT, "assets/icon.png"), join(DIST, "icon.png"));
 copyFileSync(join(ROOT, "assets/icon.ico"), join(DIST, "icon.ico"));
+
+// The Rust core's Node binding for this platform (see CORE_RS_NATIVE). None
+// built, as without a Rust toolchain, is not an error: the facades answer with
+// TypeScript. desktop.yml builds it and checks the packaged copy loads.
+const coreNative = (existsSync(CORE_RS_NATIVE) ? readdirSync(CORE_RS_NATIVE, { withFileTypes: true }) : []).filter(
+    (entry) => entry.isFile() && entry.name.startsWith(`polaris-core.${process.platform}-`) && entry.name.endsWith(".node")
+);
+if (coreNative.length) mkdirSync(join(DIST, "native"), { recursive: true });
+for (const entry of coreNative) copyFileSync(join(CORE_RS_NATIVE, entry.name), join(DIST, "native", entry.name));

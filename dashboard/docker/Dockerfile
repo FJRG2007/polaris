@@ -50,6 +50,7 @@ COPY packages/chat-crypto/package.json ./packages/chat-crypto/
 COPY packages/cli/package.json ./packages/cli/
 COPY packages/config/package.json ./packages/config/
 COPY packages/core/package.json ./packages/core/
+COPY packages/core-rs/package.json ./packages/core-rs/
 COPY packages/db/package.json ./packages/db/
 COPY packages/deploy/package.json ./packages/deploy/
 COPY packages/diagrams/package.json ./packages/diagrams/
@@ -123,7 +124,25 @@ ARG POLARIS_BUILD_SKIP_TYPECHECK=""
 # No compile cache: this stage starts from an empty .next and nothing keeps it,
 # and holding and serializing that cache took the compile from about 8 GB to
 # nearly 15 GB - past the 16 GB runner CI builds on (next.config.mjs).
-RUN NODE_OPTIONS="$NODE_BUILD_OPTIONS" POLARIS_BUILD_COMPILE_CACHE=off npm run build
+# "1" makes a build without the Rust core's bindings fail instead of shipping
+# without them (packages/core-rs/scripts/wasm-assets.mjs). Passed only by
+# dashboard-publish.yml, which builds them into the context first
+# (.github/actions/core-rs-bindings): `crates/` sits outside this context, so an
+# operator's own build has none, and its facades answer with TypeScript.
+ARG POLARIS_CORE_RS_REQUIRED=""
+RUN NODE_OPTIONS="$NODE_BUILD_OPTIONS" POLARIS_BUILD_COMPILE_CACHE=off POLARIS_CORE_RS_REQUIRED="$POLARIS_CORE_RS_REQUIRED" npm run build
+
+# The Rust core's facades as the server loads them: the built package, its one
+# dependency, the Node binding for Linux and the check that proves it loads.
+# Assembled here and copied into the runner whole, because nothing imports the
+# package yet and Next's tracing would leave it out (next.config.mjs keeps it in
+# node_modules, so it finds `native/` beside `dist/` once something does).
+RUN mkdir -p /build/core-rs-runtime/scripts /build/core-rs-runtime/native /build/core-rs-runtime/node_modules/@noble \
+    && cp -r packages/core-rs/package.json packages/core-rs/dist /build/core-rs-runtime/ \
+    && cp packages/core-rs/scripts/smoke.mjs packages/core-rs/scripts/wasm-assets.mjs /build/core-rs-runtime/scripts/ \
+    && if ls packages/core-rs/native/polaris-core.linux-*.node > /dev/null 2>&1; then cp packages/core-rs/native/polaris-core.linux-*.node /build/core-rs-runtime/native/; fi \
+    && cp -r "$(node -p 'require("node:path").dirname(require.resolve("@noble/hashes/sha2.js", { paths: ["packages/core-rs"] }))')" \
+        /build/core-rs-runtime/node_modules/@noble/hashes
 
 # Bundle the deploy terminal sidecar into one self-contained CJS file. It runs as
 # a separate process alongside the Next server, outside the standalone bundle, so
@@ -358,6 +377,18 @@ COPY --from=builder --chown=node:node /build/apps/web/ws-server.bundle.cjs ./app
 
 # Which app bundle belongs to this build (and, built here, the bundles themselves).
 COPY --from=app-bundles-build --chown=node:node /build/app-bundles-image ./app-bundles
+
+# The Rust core's facades and their Node binding (assembled in the builder), at
+# the path workspace packages take in the standalone tree, linked into
+# node_modules as tracing would link it. Then the binding is loaded, here, by
+# this image's own Node on this image's own system: one that is there and does
+# not load, or answers differently from TypeScript, fails the build. With none
+# for this platform the check says so and passes - unless CI asked for it.
+COPY --from=builder --chown=node:node /build/core-rs-runtime ./packages/core-rs
+ARG POLARIS_CORE_RS_REQUIRED=""
+RUN mkdir -p node_modules/@polaris \
+    && if [ ! -e node_modules/@polaris/core-rs ]; then ln -s ../../packages/core-rs node_modules/@polaris/core-rs; fi \
+    && POLARIS_CORE_RS_REQUIRED="$POLARIS_CORE_RS_REQUIRED" node node_modules/@polaris/core-rs/scripts/smoke.mjs --native
 
 # Schema + migrations so the entrypoint can run `prisma migrate deploy`.
 COPY --from=builder --chown=node:node /build/packages/db/prisma ./packages/db/prisma

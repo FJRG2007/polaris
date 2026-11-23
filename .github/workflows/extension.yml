@@ -69,8 +69,22 @@ jobs:
 
       # Both targets. Chrome gets manifest v3 and Firefox v2, from one source - and
       # `zip` also writes the sources package that Firefox's review asks for.
+      # The Rust core's WebAssembly binding, packaged by wxt.config.ts; then
+      # the packaged copy is loaded and both manifests are checked to let it
+      # compile (docs/rust-core-plan.md, F6).
+      - uses: ./.github/actions/core-rs-bindings
+        with:
+          wasm: "true"
       - run: npm run zip --workspace @polaris/extension
       - run: npm run zip:firefox --workspace @polaris/extension
+      - name: The packaged Rust core loads
+        env:
+          POLARIS_CORE_RS_REQUIRED: "1"
+        run: |
+          node packages/core-rs/scripts/smoke.mjs --wasm apps/extension/.output/chrome-mv3/core-rs
+          node packages/core-rs/scripts/smoke.mjs --wasm apps/extension/.output/firefox-mv2/core-rs
+          node packages/core-rs/scripts/smoke.mjs --manifest apps/extension/.output/chrome-mv3/manifest.json
+          node packages/core-rs/scripts/smoke.mjs --manifest apps/extension/.output/firefox-mv2/manifest.json
 
       # A signed Firefox package, so Firefox offers to install it with one press:
       # release Firefox installs nothing unsigned. Mozilla signs it as unlisted
