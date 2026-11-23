@@ -59,6 +59,19 @@ function roots(platform: NodeJS.Platform): string[] {
     return [];
 }
 
+/**
+ * What an installer drops beside its program that is not a program: its
+ * uninstaller, and links to its documents and web pages ("Git Release Notes",
+ * "Node.js website", "Inno Setup FAQ", "User manual (PDF, English)").
+ * Raycast lists only what opens as an app, and so does this.
+ */
+const NOT_A_PROGRAM = /\b(uninstall\w*|read ?me|faqs?|release notes|revision history|change ?log|documentation|manuals?|user guide|licen[cs]e|website|web site|support cent(?:er|re)|live support|example scripts)\b/i;
+
+/** Whether a Start menu shortcut's name is a program somebody would open, not its uninstaller or documents. */
+export function isProgramShortcut(label: string): boolean {
+    return !/^uninstall/i.test(label) && !NOT_A_PROGRAM.test(label);
+}
+
 async function walk(platform: NodeJS.Platform, dir: string, depth: number, out: InstalledApp[]): Promise<void> {
     if (out.length >= MAX_APPS) return;
     const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
@@ -74,8 +87,7 @@ async function walk(platform: NodeJS.Platform, dir: string, depth: number, out: 
         }
         if (!/\.(lnk|url)$/i.test(entry.name)) continue;
         const label = entry.name.replace(/\.(lnk|url)$/i, "");
-        // An uninstaller listed beside its program is not what anybody launches.
-        if (/uninstall/i.test(label)) continue;
+        if (!isProgramShortcut(label)) continue;
         out.push({ label, path });
     }
 }

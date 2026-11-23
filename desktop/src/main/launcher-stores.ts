@@ -254,14 +254,19 @@ const epicManifestSchema = z.object({
     LaunchExecutable: z.string().max(500).optional(),
     bIsIncompleteInstall: z.boolean().optional(),
     AppCategories: z.array(z.string().max(100)).max(50).optional(),
-    TechnicalType: z.string().max(200).optional()
+    TechnicalType: z.string().max(200).optional(),
+    MainGameAppName: z.string().max(200).optional(),
+    bIsApplication: z.boolean().optional()
 });
 
 /**
  * The Epic Games Launcher's installed games: one `.item` JSON per install in
  * `%ProgramData%\Epic\EpicGamesLauncher\Data\Manifests`, launched with the
  * launcher's own link (Playnite's `EpicLauncher.GameLaunchUrlMask`). Add-ons
- * that cannot be launched and engine plugins are left out, as Playnite does.
+ * that cannot be launched and engine plugins are left out, as Playnite does,
+ * and so is content installed inside another game (`MainGameAppName` names that
+ * game, as Fortnite's "Save the World" and "LEGO Fortnite" content do): it is
+ * part of the game, not something of its own to open.
  */
 export async function epicGames(programData: string): Promise<StoreApp[]> {
     const dir = join(programData, "Epic", "EpicGamesLauncher", "Data", "Manifests");
@@ -274,6 +279,8 @@ export async function epicGames(programData: string): Promise<StoreApp[]> {
         if (categories.includes("addons") && !categories.includes("addons/launchable")) continue;
         if (categories.some((category) => category === "plugins" || category === "plugins/engine")) continue;
         if (manifest.TechnicalType?.includes("plugins/engine")) continue;
+        if (manifest.MainGameAppName && manifest.MainGameAppName !== manifest.AppName) continue;
+        if (manifest.bIsApplication === false) continue;
         if (!(await exists(manifest.InstallLocation))) continue;
         const exe = manifest.LaunchExecutable && /\.exe$/i.test(manifest.LaunchExecutable) ? inside(manifest.InstallLocation, manifest.LaunchExecutable) : null;
         const uri = `com.epicgames.launcher://apps/${manifest.CatalogNamespace}%3A${manifest.CatalogItemId}%3A${manifest.AppName}?action=launch&silent=true`;
@@ -307,7 +314,9 @@ async function steamRoots(programFilesX86: string | undefined): Promise<string[]
  * Steam's installed games: every library folder `steamapps\libraryfolders.vdf`
  * lists, and an `appmanifest_<id>.acf` per game in each, launched with
  * `steam://rungameid/<id>` (Playnite's `SteamLibrary`). A game still
- * downloading is left out until its manifest says it is fully installed.
+ * downloading is left out until its manifest says it is fully installed, and a
+ * soundtrack - installed under `steamapps\music` rather than `common` - is
+ * music that belongs to a game, not a program.
  */
 export async function steamGames(programFilesX86: string | undefined): Promise<StoreApp[]> {
     const out: StoreApp[] = [];
@@ -339,6 +348,8 @@ export async function steamGames(programFilesX86: string | undefined): Promise<S
                 const icon = join(root, "appcache", "librarycache", `${id}_icon.jpg`);
                 const installdir = vdfGet(state, "installdir");
                 const home = typeof installdir === "string" ? inside(join(apps, "common"), installdir) : null;
+                const music = typeof installdir === "string" ? inside(join(apps, "music"), installdir) : null;
+                if (music && !(home && (await exists(home))) && (await exists(music))) continue;
                 out.push({
                     label: title.data,
                     path: `steam:${id}`,
@@ -356,6 +367,8 @@ export async function steamGames(programFilesX86: string | undefined): Promise<S
 
 const gogInfoSchema = z.object({
     name: label.optional(),
+    gameId: z.string().max(40).optional(),
+    rootGameId: z.string().max(40).optional(),
     playTasks: z
         .array(
             z.object({
@@ -376,7 +389,8 @@ const UNINSTALL = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
  * GOG games: the uninstall entries GOG's installers write (`<id>_is1`,
  * publisher `GOG.com`), and the primary play task of the `goggame-<id>.info`
  * in each game's folder (Playnite's `GogLibrary`). The task is started only
- * when it is an executable inside that folder that takes no arguments.
+ * when it is an executable inside that folder that takes no arguments. A DLC,
+ * whose info names another game as its root, is part of that game.
  */
 export async function gogGames(): Promise<StoreApp[]> {
     const out: StoreApp[] = [];
@@ -393,6 +407,7 @@ export async function gogGames(): Promise<StoreApp[]> {
         const dir = entry?.values.get("installlocation");
         if (!dir || !folder.safeParse(dir).success || !(await exists(dir))) continue;
         const info = await readJson(join(dir, `goggame-${id}.info`), gogInfoSchema);
+        if (info?.rootGameId && info.rootGameId !== (info.gameId ?? id)) continue;
         const task = info?.playTasks?.find((candidate) => candidate.isPrimary);
         if (!task || (task.type && task.type !== "FileTask") || task.arguments?.trim() || !task.path || !/\.exe$/i.test(task.path)) continue;
         const exe = inside(dir, task.path);

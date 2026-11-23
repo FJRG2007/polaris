@@ -121,6 +121,27 @@ describe("Epic Games", () => {
         expect(games[0]?.icon).toBeUndefined();
     });
 
+    it("leaves out content installed inside another game, as Fortnite's own modes are", async () => {
+        dir(fortnite);
+        dir(manifests, ["A.item", "B.item", "C.item"]);
+        file(join(manifests, "A.item"), JSON.stringify({
+            DisplayName: "Fortnite", AppName: "Fortnite", CatalogNamespace: "fn", CatalogItemId: "4fe75bbc5a674f4f9b356b5c90567da5",
+            InstallLocation: fortnite, AppCategories: ["games", "applications"], MainGameAppName: "", bIsApplication: true
+        }));
+        // The fields a real "Save the World" manifest carries: hidden, not an application, inside Fortnite.
+        file(join(manifests, "B.item"), JSON.stringify({
+            DisplayName: "Fortnite Save the World Content", AppName: "aa31f9e94e844b299ca757d1d0b97a09", CatalogNamespace: "fn",
+            CatalogItemId: "0b41f0192f7f4f2691684581aedc0778", InstallLocation: fortnite, AppCategories: ["hidden"],
+            MainGameAppName: "Fortnite", bIsApplication: false
+        }));
+        // Named after its game but missing the application flag: still part of it.
+        file(join(manifests, "C.item"), JSON.stringify({
+            DisplayName: "LEGO Fortnite Content", AppName: "94bc5ec13f8f438c97fdbef3e9019e27", CatalogNamespace: "fn",
+            CatalogItemId: "b619cf61a4144d67bd753dc990637e7c", InstallLocation: fortnite, MainGameAppName: "Fortnite"
+        }));
+        expect((await stores.epicGames(base)).map((game) => game.label)).toEqual(["Fortnite"]);
+    });
+
     it("gives no folder to an engine, so running it is never a game", async () => {
         const engine = join(base, "Epic Games", "UE_5.3");
         dir(engine);
@@ -169,6 +190,16 @@ describe("Steam", () => {
         expect(game?.folder).toBeUndefined();
     });
 
+    it("leaves out a soundtrack, which Steam installs as music rather than as a program", async () => {
+        commands.set("reg.exe query HKCU\\Software\\Valve\\Steam /v SteamPath", `\r\nHKEY_CURRENT_USER\\Software\\Valve\\Steam\r\n    SteamPath    REG_SZ    ${steam}\r\n\r\n`);
+        dir(join(steam, "steamapps"), ["appmanifest_20.acf", "appmanifest_21.acf"]);
+        file(join(steam, "steamapps", "appmanifest_20.acf"), `"AppState"\n{\n\t"appid"\t\t"20"\n\t"name"\t\t"Hades II"\n\t"StateFlags"\t\t"4"\n\t"installdir"\t\t"Hades II"\n}\n`);
+        file(join(steam, "steamapps", "appmanifest_21.acf"), `"AppState"\n{\n\t"appid"\t\t"21"\n\t"name"\t\t"Hades II Soundtrack"\n\t"StateFlags"\t\t"4"\n\t"installdir"\t\t"Hades II Soundtrack"\n}\n`);
+        dir(join(steam, "steamapps", "common", "Hades II"));
+        dir(join(steam, "steamapps", "music", "Hades II Soundtrack"));
+        expect((await stores.steamGames(undefined)).map((game) => game.label)).toEqual(["Hades II"]);
+    });
+
     it("reads Valve's format strictly, and gives up on a broken file", () => {
         expect(stores.parseVdf(`"a" { "b" "c\\"d" }`)).toEqual({ a: { b: "c\"d" } });
         expect(stores.parseVdf(`"a" { "b" "c"`)).toBeNull();
@@ -198,6 +229,22 @@ describe("GOG", () => {
                 folder: game
             }
         ]);
+    });
+});
+
+describe("GOG downloadable content", () => {
+    const hive = "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+    const game = join(base, "GOG Games", "Witcher 3");
+
+    it("leaves out a DLC whose info names another game as its root", async () => {
+        commands.set(`reg.exe query ${hive} /s /f GOG.com /d /e`, `\r\n${long(hive)}\\1640424747_is1\r\n    Publisher    REG_SZ    GOG.com\r\n\r\n`);
+        commands.set(`reg.exe query ${hive}\\1640424747_is1`, `\r\n${long(hive)}\\1640424747_is1\r\n    InstallLocation    REG_SZ    ${game}\r\n    DisplayName    REG_SZ    Blood and Wine\r\n`);
+        dir(game);
+        file(join(game, "goggame-1640424747.info"), JSON.stringify({
+            name: "Blood and Wine", gameId: "1640424747", rootGameId: "1207664663",
+            playTasks: [{ isPrimary: true, type: "FileTask", path: "bin\\x64\\witcher3.exe" }]
+        }));
+        expect(await stores.gogGames()).toEqual([]);
     });
 });
 
