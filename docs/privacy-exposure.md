@@ -8,15 +8,26 @@ adding a surface that shows one person to another.
 
 ## Lessons taken from other messengers
 
-- WhatsApp added "Protect IP address in calls" because 1:1 calls went peer to
-  peer (WhatsApp help center, "How to protect IP address in calls").
-- Signal and Telegram leaked readers' addresses through link previews until
-  previews were generated on the sender's side or through a proxy (Mysk research,
-  "Link previews: how a simple feature can have privacy and security risks", 2020).
-- Discord serves every embedded image through its media proxy for the same reason
-  (Discord developer docs, "Embed" `proxy_url`).
-- Telegram's "People nearby" and contact import were account and location
-  oracles (public research on Telegram contact discovery, 2021-2024).
+Each line was checked against its source on 2026-11-23.
+
+- A 1:1 call that goes peer to peer hands each side the other's IP address;
+  WhatsApp's "Protect IP address in calls" relays every call through its servers
+  instead ([Enhancing the security of WhatsApp calls](https://engineering.fb.com/2023/11/08/security/whatsapp-calls-enhancing-security/),
+  Meta Engineering, 2023-11-08).
+- A link preview built on the receiver's device opens the link from the reader's
+  phone and leaks their address; Signal builds it on the sender's side, and
+  Discord, Slack and others fetch it on their servers ([Link Previews: How a Simple
+  Feature Can Have Privacy and Security Risks](https://www.mysk.blog/2020/10/25/link-previews/),
+  Mysk, 2020-10-25).
+- Discord hands clients a proxied address for every embedded image
+  (`proxy_url` on the embed image structure,
+  [Discord developer docs, Message resource](https://docs.discord.com/developers/resources/message)).
+- Telegram's "People Nearby" distances let a researcher trilaterate users' exact
+  locations ([The Register, 2021-01-05](https://www.theregister.com/2021/01/05/telegram_location_people_nearby/)).
+- Contact discovery is an account oracle at scale: 10% of US mobile numbers were
+  queried on WhatsApp and all of them on Signal, Telegram's API exposed data even
+  about unregistered numbers, and very few users change default privacy settings
+  ([All the Numbers are US](https://eprint.iacr.org/2020/1119), NDSS 2021).
 
 ## Surfaces
 
@@ -55,8 +66,29 @@ adding a surface that shows one person to another.
 | Mention and account search | rich-text/mention-service | Fixed: a colleague matched only by part of an address they hide is left out (`hiddenAddressMatches` in `people-search.ts`) |
 | Notification defaults | packages/core schemas/notifications | Not a read: `email: true` is the mail channel default |
 
-Not yet swept by hand: the 13 `lastSeenAt: true` selects (presence, read receipts,
-chat, computers, outage tracker, mailbox contacts, file requests).
+## Per-file verdicts (`lastSeenAt: true`, 13 files)
+
+Last seen is covered by two settings of the person seen: `lastSeen` (the presence
+dot) and `lastActive` (the "active N ago" line), plus `readReceipts` for the chat
+marks. Swept by hand on 2026-11-23; no select needed a fix.
+
+| File | What the column is | Verdict |
+|---|---|---|
+| `lib/presence-service.ts` `presenceFor` | Freshest session per account | Safe: dot only for people `allowedBy(viewer, "lastSeen")` lets through, the time only under `reciprocalAmong(viewer, "lastActive")`; everyone else reads "offline" |
+| `lib/presence-service.ts` `doNotDisturbOf` | The account's own sessions | Safe: asked only about the signed-in account (notifications page, bell stream, mail arrivals) |
+| `lib/chat/chat-service.ts` (list ticks) | Each member's seen mark | Safe: read state only through `receiptsAmong` and the conversation's receipts rule; withheld members cap at delivered (`memberReceiptAt`) |
+| `lib/chat/messages.ts` (receipt state, mark read) | Members' seen marks; the reader's own mark | Safe: same `receiptsAmong` gate; the mark-read select is the reader's own row |
+| `lib/user-admin-service.ts` | Account last used, address | Administrator-only (`requireAdmin` on every caller) |
+| `lib/address-accounts.ts` | Sessions seen on an address | Administrator-only (`system.manage`; others' addresses only to admins) |
+| `lib/extension/sessions.ts` | Own extension sessions | Safe: `where: { userId }`, the account's own rows |
+| `lib/file-request-service.ts` | Drop-point visit times | Safe: owner-checked; the visitor shown through `visitOrigin` |
+| `lib/mailbox/contacts.ts` | When the owner last mailed an address | Safe: the mailbox owner's own contacts |
+| `lib/computers/computer-service.ts`, `lib/polar/claude-subscription/turns.ts`, `lib/polar/local-models/catalogue.ts` | Own computers' heartbeat | Safe: filtered by `userId` |
+| `lib/connectivity/outage-tracker.ts`, `lib/analytics-geo-backfill.ts` | Instance outages, analytics sessions | Not about a person |
+
+Other `lastSeenAt` reads outside the grep: game-server challenge players (in-game
+time, shown to that server's managers) and Places cameras (device heartbeat) - not
+an account's presence.
 
 ## Sweeps
 
