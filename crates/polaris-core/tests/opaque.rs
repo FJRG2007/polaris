@@ -1,6 +1,10 @@
 //! OPAQUE (RFC 9807): the RFC's own vectors replayed through the module's
 //! generic steps, then the production suite's behaviour - round trips, every
 //! refusal, enumeration resistance, tampering and malformed input.
+//! Native only: the vectors are read from disk and the properties use
+//! proptest, which does not build for wasm32.
+
+#![cfg(not(target_arch = "wasm32"))]
 
 use polaris_core::opaque::{self, generic, Error, Idents, KsfParams};
 use proptest::prelude::*;

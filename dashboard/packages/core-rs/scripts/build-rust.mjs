@@ -4,6 +4,8 @@
  *   native/polaris-core.<platform>.node   the Node binding (napi-rs), profile release-node
  *   wasm/polaris_core_wasm.js + _bg.wasm  the WebAssembly binding (wasm-bindgen --target web), wasm-opt -Oz
  *   wasm/polaris_core_opaque_wasm.*      OPAQUE (RFC 9807) in its own module, same toolchain
+ *   wasm-mls/polaris_core_mls.js + _bg.wasm  the same binding with the `mls` feature, loaded only by
+ *                                         encrypted chat, so other pages never download OpenMLS
  *
  *   npm run build:rust -w @polaris/core-rs [-- --node-target <rust triple>] [-- --only node|wasm]
  *
@@ -89,18 +91,22 @@ function buildWasm() {
     const outDir = join(packageDir, "wasm");
     rmSync(outDir, { recursive: true, force: true });
     for (const crate of WASM_CRATES) buildWasmCrate(crate, outDir);
-    process.stdout.write(`[build-rust] wrote ${outDir}\n`);
+    // MLS: the core binding again with its `mls` feature, in a directory of its
+    // own that only encrypted chat fetches.
+    const mlsDir = join(packageDir, "wasm-mls");
+    rmSync(mlsDir, { recursive: true, force: true });
+    buildWasmCrate("polaris-core-wasm", mlsDir, ["mls"], "polaris_core_mls");
 }
 
-function buildWasmCrate(crate, outDir) {
-    const name = crate.replaceAll("-", "_");
-    run("cargo", ["build", "--locked", "-p", crate, "--target", "wasm32-unknown-unknown", "--profile", "release-wasm"]);
-    const built = join(repoRoot, "target", "wasm32-unknown-unknown", "release-wasm", `${name}.wasm`);
+function buildWasmCrate(crate, outDir, features = [], name = crate.replaceAll("-", "_")) {
+    const featureArgs = features.length ? ["--features", features.join(",")] : [];
+    run("cargo", ["build", "--locked", "-p", crate, ...featureArgs, "--target", "wasm32-unknown-unknown", "--profile", "release-wasm"]);
+    const built = join(repoRoot, "target", "wasm32-unknown-unknown", "release-wasm", `${crate.replaceAll("-", "_")}.wasm`);
     run("wasm-bindgen", ["--target", "web", "--out-dir", outDir, "--out-name", name, built]);
     const wasm = join(outDir, `${name}_bg.wasm`);
     // rustc's wasm32-unknown-unknown enables these features by default and does
     // not declare them in the module, so wasm-opt has to be told.
-    const features = [
+    const wasmFeatures = [
         "--enable-bulk-memory",
         "--enable-bulk-memory-opt",
         "--enable-nontrapping-float-to-int",
@@ -109,8 +115,8 @@ function buildWasmCrate(crate, outDir) {
         "--enable-reference-types",
         "--enable-multivalue"
     ];
-    run("wasm-opt", ["-Oz", ...features, wasm, "-o", wasm]);
-    process.stdout.write(`[build-rust] wrote ${outDir}\n`);
+    run("wasm-opt", ["-Oz", ...wasmFeatures, wasm, "-o", wasm]);
+    process.stdout.write(`[build-rust] wrote ${outDir}/${name}.js\n`);
 }
 
 function main(argv) {

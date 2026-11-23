@@ -9,7 +9,7 @@
 //! aborting the process (built with the `release-node` profile, which
 //! unwinds).
 
-use napi::bindgen_prelude::Uint8Array;
+use napi::bindgen_prelude::{BigInt, Uint8Array};
 use napi_derive::napi;
 
 /// The code a domain error carries across the boundary.
@@ -245,4 +245,249 @@ pub fn opaque_finish_client_login(
         })
     })
     .map_err(opaque_error)
+}
+
+// ---- mls (docs/rust-core-plan.md Phase 2, E1) ----------------------------
+// One device's MLS state behind a class. Every argument and result is the
+// RFC 9420 wire encoding; an error carries the domain's code (`MlsRejected`,
+// ...) and OpenMLS's explanation.
+
+fn mls_error(error: polaris_core::mls::MlsError) -> napi::Error<ErrorClass> {
+    napi::Error::new(ErrorClass(error.code()), error.message)
+}
+
+/// What a commit produced (`polaris_core::mls::CommitOutput`).
+#[napi(object)]
+pub struct MlsCommit {
+    pub commit: Uint8Array,
+    pub welcome: Option<Uint8Array>,
+    pub group_info: Option<Uint8Array>,
+}
+
+fn mls_commit(output: polaris_core::mls::CommitOutput) -> MlsCommit {
+    MlsCommit {
+        commit: output.commit.into(),
+        welcome: output.welcome.map(Uint8Array::from),
+        group_info: output.group_info.map(Uint8Array::from),
+    }
+}
+
+/// An external join: the group id and the commit to send.
+#[napi(object)]
+pub struct MlsExternalJoin {
+    pub group_id: Uint8Array,
+    pub commit: Uint8Array,
+}
+
+/// The outcome of processing a message (`polaris_core::mls::Processed`).
+#[napi(object)]
+pub struct MlsProcessed {
+    pub kind: String,
+    pub sender_leaf: Option<u32>,
+    pub sender_identity: Uint8Array,
+    pub plaintext: Uint8Array,
+    pub epoch: BigInt,
+    pub active: bool,
+}
+
+/// One leaf of a group (`polaris_core::mls::GroupMember`).
+#[napi(object)]
+pub struct MlsGroupMember {
+    pub leaf: u32,
+    pub identity: Uint8Array,
+    pub signature_key: Uint8Array,
+}
+
+#[napi]
+pub struct MlsMember {
+    inner: polaris_core::mls::Member,
+}
+
+#[napi]
+impl MlsMember {
+    #[napi(constructor, catch_unwind)]
+    pub fn new(
+        identity: Uint8Array,
+        ciphersuite: u32,
+        seed: Uint8Array,
+    ) -> napi::Result<Self, ErrorClass> {
+        polaris_core::mls::Member::from_binding(&identity, ciphersuite, &seed)
+            .map(|inner| MlsMember { inner })
+            .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn signature_public_key(&self) -> Uint8Array {
+        polaris_core::mls::Member::signature_public_key(&self.inner)
+            .to_vec()
+            .into()
+    }
+
+    #[napi(catch_unwind)]
+    pub fn key_package(&self) -> napi::Result<Uint8Array, ErrorClass> {
+        polaris_core::mls::Member::key_package(&self.inner)
+            .map(Uint8Array::from)
+            .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn create_group(&self, group_id: Uint8Array) -> napi::Result<(), ErrorClass> {
+        polaris_core::mls::Member::create_group(&self.inner, &group_id).map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn add_members(
+        &self,
+        group_id: Uint8Array,
+        key_packages: Vec<Uint8Array>,
+    ) -> napi::Result<MlsCommit, ErrorClass> {
+        let packages: Vec<Vec<u8>> = key_packages
+            .iter()
+            .map(|package| package.to_vec())
+            .collect();
+        polaris_core::mls::Member::add_members(&self.inner, &group_id, &packages)
+            .map(mls_commit)
+            .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn remove_members(
+        &self,
+        group_id: Uint8Array,
+        leaves: Vec<u32>,
+    ) -> napi::Result<MlsCommit, ErrorClass> {
+        polaris_core::mls::Member::remove_members(&self.inner, &group_id, &leaves)
+            .map(mls_commit)
+            .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn self_update(&self, group_id: Uint8Array) -> napi::Result<MlsCommit, ErrorClass> {
+        polaris_core::mls::Member::self_update(&self.inner, &group_id)
+            .map(mls_commit)
+            .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn merge_pending_commit(&self, group_id: Uint8Array) -> napi::Result<(), ErrorClass> {
+        polaris_core::mls::Member::merge_pending_commit(&self.inner, &group_id).map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn clear_pending_commit(&self, group_id: Uint8Array) -> napi::Result<(), ErrorClass> {
+        polaris_core::mls::Member::clear_pending_commit(&self.inner, &group_id).map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn join_by_welcome(&self, welcome: Uint8Array) -> napi::Result<Uint8Array, ErrorClass> {
+        polaris_core::mls::Member::join_by_welcome(&self.inner, &welcome)
+            .map(Uint8Array::from)
+            .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn group_info(&self, group_id: Uint8Array) -> napi::Result<Uint8Array, ErrorClass> {
+        polaris_core::mls::Member::group_info(&self.inner, &group_id)
+            .map(Uint8Array::from)
+            .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn join_by_external_commit(
+        &self,
+        group_info: Uint8Array,
+    ) -> napi::Result<MlsExternalJoin, ErrorClass> {
+        polaris_core::mls::Member::join_by_external_commit(&self.inner, &group_info)
+            .map(|(group_id, commit)| MlsExternalJoin {
+                group_id: group_id.into(),
+                commit: commit.into(),
+            })
+            .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn encrypt(
+        &self,
+        group_id: Uint8Array,
+        plaintext: Uint8Array,
+    ) -> napi::Result<Uint8Array, ErrorClass> {
+        polaris_core::mls::Member::encrypt(&self.inner, &group_id, &plaintext)
+            .map(Uint8Array::from)
+            .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn process(
+        &self,
+        group_id: Uint8Array,
+        message: Uint8Array,
+    ) -> napi::Result<MlsProcessed, ErrorClass> {
+        polaris_core::mls::Member::process(&self.inner, &group_id, &message)
+            .map(|processed| MlsProcessed {
+                kind: processed.kind.as_str().to_string(),
+                sender_leaf: processed.sender_leaf,
+                sender_identity: processed.sender_identity.into(),
+                plaintext: processed.plaintext.into(),
+                epoch: BigInt::from(processed.epoch),
+                active: processed.active,
+            })
+            .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn epoch(&self, group_id: Uint8Array) -> napi::Result<BigInt, ErrorClass> {
+        polaris_core::mls::Member::epoch(&self.inner, &group_id)
+            .map(BigInt::from)
+            .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn epoch_authenticator(
+        &self,
+        group_id: Uint8Array,
+    ) -> napi::Result<Uint8Array, ErrorClass> {
+        polaris_core::mls::Member::epoch_authenticator(&self.inner, &group_id)
+            .map(Uint8Array::from)
+            .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn export_secret(
+        &self,
+        group_id: Uint8Array,
+        label: String,
+        context: Uint8Array,
+        length: u32,
+    ) -> napi::Result<Uint8Array, ErrorClass> {
+        polaris_core::mls::Member::export_secret(
+            &self.inner,
+            &group_id,
+            &label,
+            &context,
+            length as usize,
+        )
+        .map(Uint8Array::from)
+        .map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn own_leaf(&self, group_id: Uint8Array) -> napi::Result<u32, ErrorClass> {
+        polaris_core::mls::Member::own_leaf(&self.inner, &group_id).map_err(mls_error)
+    }
+
+    #[napi(catch_unwind)]
+    pub fn members(&self, group_id: Uint8Array) -> napi::Result<Vec<MlsGroupMember>, ErrorClass> {
+        polaris_core::mls::Member::members(&self.inner, &group_id)
+            .map(|members| {
+                members
+                    .into_iter()
+                    .map(|member| MlsGroupMember {
+                        leaf: member.leaf,
+                        identity: member.identity.into(),
+                        signature_key: member.signature_key.into(),
+                    })
+                    .collect()
+            })
+            .map_err(mls_error)
+    }
 }

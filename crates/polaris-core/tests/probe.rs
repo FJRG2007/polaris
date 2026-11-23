@@ -1,5 +1,9 @@
 //! The probe domain against the golden vectors generated from its TypeScript
 //! twin (plan 4.1), and its invariants under random input (plan 4.2).
+//! Native only: the vectors are read from disk, and the browsers replay them
+//! through the real wasm build instead (scripts/browser-parity.mjs).
+
+#![cfg(not(target_arch = "wasm32"))]
 
 use polaris_core::probe::{decode_hex, fnv1a32, HexError};
 use polaris_core_vectors::{load, Decoded, Expect};

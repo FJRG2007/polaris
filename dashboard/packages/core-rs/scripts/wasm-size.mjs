@@ -2,7 +2,8 @@
  * Fail when the built WebAssembly module is over its brotli budget
  * (docs/rust-core-plan.md, 4.7). The budget lives in wasm-budget.json and is
  * quoted in the ledger row of the unit that owns it; raising it is a reviewed
- * change to both.
+ * change to both. A bare key is a file in wasm/; a key with a slash is a path
+ * from this package (wasm-mls/polaris_core_mls_bg.wasm, a lazily loaded chunk).
  *
  *   npm run check:size -w @polaris/core-rs     (after npm run build:rust)
  */
@@ -16,7 +17,7 @@ const packageDir = fileURLToPath(new URL("..", import.meta.url));
 const budgets = JSON.parse(readFileSync(join(packageDir, "wasm-budget.json"), "utf8"));
 let failed = false;
 for (const [file, budget] of Object.entries(budgets)) {
-    const path = join(packageDir, "wasm", file);
+    const path = file.includes("/") ? join(packageDir, ...file.split("/")) : join(packageDir, "wasm", file);
     if (!existsSync(path)) {
         process.stderr.write(`[wasm-size] ${path} is missing: run npm run build:rust first\n`);
         failed = true;

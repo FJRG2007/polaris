@@ -4,5 +4,8 @@
     },
     "polaris_core_opaque_wasm_bg.wasm": {
         "brotliBytes": 61440
+    },
+    "wasm-mls/polaris_core_mls_bg.wasm": {
+        "brotliBytes": 430080
     }
 }

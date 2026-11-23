@@ -15,7 +15,7 @@ path = "src/lib.rs"
 
 [dependencies]
 polaris-core = { path = "../polaris-core", features = ["opaque"] }
-napi = { version = "=3.16.1", default-features = false, features = ["napi4"] }
+napi = { version = "=3.16.2", default-features = false, features = ["napi6"] }
 napi-derive = { version = "=3.7.0", default-features = false }
 
 [build-dependencies]

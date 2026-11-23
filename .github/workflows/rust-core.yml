@@ -244,7 +244,7 @@ jobs:
           wb="wasm-bindgen-$WASM_BINDGEN_VERSION-x86_64-unknown-linux-musl"
           curl -fsSL --retry 3 -o wb.tar.gz "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$WASM_BINDGEN_VERSION/$wb.tar.gz"
           echo "$WASM_BINDGEN_SHA256  wb.tar.gz" | sha256sum -c -
-          tar -xzf wb.tar.gz && cp "$wb/wasm-bindgen" bin/
+          tar -xzf wb.tar.gz && cp "$wb/wasm-bindgen" "$wb/wasm-bindgen-test-runner" bin/
           by="binaryen-version_$BINARYEN_VERSION-x86_64-linux.tar.gz"
           curl -fsSL --retry 3 -o by.tar.gz "https://github.com/WebAssembly/binaryen/releases/download/version_$BINARYEN_VERSION/$by"
           echo "$BINARYEN_SHA256  by.tar.gz" | sha256sum -c -
@@ -270,10 +270,23 @@ jobs:
         run: npx playwright install --with-deps chromium webkit firefox
       - working-directory: dashboard
         run: npm run test:browsers -w @polaris/core-rs
+      # The Rust MLS suites (the adversarial tests and the RFC 9420 passive-client
+      # vectors) compiled to wasm32 and run in Node, then headless Chromium and
+      # Firefox through the runner images' preinstalled webdrivers.
+      - name: MLS suites on wasm32 (Node, Chromium, Firefox)
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: wasm-bindgen-test-runner
+        run: |
+          suites=(--locked --release -p polaris-core --target wasm32-unknown-unknown --test mls --test mls_rfc9420)
+          cargo test "${suites[@]}"
+          WASM_BINDGEN_USE_BROWSER=1 CHROMEDRIVER="$CHROMEWEBDRIVER/chromedriver" cargo test "${suites[@]}"
+          WASM_BINDGEN_USE_BROWSER=1 GECKODRIVER="$GECKOWEBDRIVER/geckodriver" cargo test "${suites[@]}"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: core-rs-wasm
-          path: dashboard/packages/core-rs/wasm/
+          path: |
+            dashboard/packages/core-rs/wasm/
+            dashboard/packages/core-rs/wasm-mls/
           if-no-files-found: error
           retention-days: 14
 
