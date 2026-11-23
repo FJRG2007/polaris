@@ -1,0 +1,103 @@
+name: terminal
+
+# Polaris Terminal (docs/terminal-integration.md): a separate Cargo workspace
+# under terminal/, with its own Cargo.lock and rust-toolchain.toml. This is the
+# scaffold the import fills in - until terminal/ exists every run reports green
+# in seconds.
+#
+# No `paths:` filter on the triggers: a filtered workflow never reports, and a
+# required check that never reports stays pending forever. `changes` decides
+# instead, every job after it is skipped when nothing under terminal/ changed
+# (or terminal/ does not exist yet), and `terminal` always reports.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: terminal-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      terminal: ${{ steps.diff.outputs.terminal }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Nothing to build until the workspace has been imported.
+          if [ ! -f terminal/Cargo.toml ]; then
+            echo "terminal=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          pattern='^(terminal/|\.github/workflows/terminal\.yml$)'
+          case "$EVENT" in
+            pull_request) from="$BASE" ;;
+            push) from="$BEFORE" ;;
+            *) from="" ;;
+          esac
+          # A first push, a dispatch, or a base missing from the history (a force
+          # push) has nothing safe to compare against, so it builds.
+          if [ -z "$from" ] || [ "$from" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$from^{commit}" 2>/dev/null; then
+            terminal=true
+          elif git diff --name-only "$from" "$GITHUB_SHA" | grep -Eq "$pattern"; then
+            terminal=true
+          else
+            terminal=false
+          fi
+          echo "terminal=$terminal" >> "$GITHUB_OUTPUT"
+
+  # Formatting is platform independent, so it runs once. The clippy, test and
+  # release-profile jobs per OS are ported from Rook's ci.yml when the code
+  # arrives, each behind the same `needs.changes.outputs.terminal` condition and
+  # listed in the result job's `needs`.
+  fmt:
+    needs: changes
+    if: needs.changes.outputs.terminal == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: terminal
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # rustup reads terminal/rust-toolchain.toml from the working directory, so
+      # this installs the terminal's pinned toolchain, not the root's.
+      - run: rustup show active-toolchain || rustup toolchain install
+      - run: cargo fmt --all --check
+
+  # The one check to require: it always reports, and it is green only when every
+  # job above passed, or was skipped because nothing it checks changed.
+  terminal:
+    needs: [changes, fmt]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: $RESULTS"
+          for r in $RESULTS; do
+            case "$r" in success|skipped) ;; *) echo "a terminal job ended $r" >&2; exit 1 ;; esac
+          done
