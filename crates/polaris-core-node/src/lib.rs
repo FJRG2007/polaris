@@ -301,6 +301,15 @@ pub struct MlsGroupMember {
 #[napi]
 pub struct MlsMember {
     inner: polaris_core::mls::Member,
+    journal: polaris_core::mls::Journal,
+}
+
+/// One key the host's store writes (`value`) or deletes (no `value`),
+/// `polaris_core::mls::StoreChange`.
+#[napi(object)]
+pub struct MlsStoreChange {
+    pub key: Uint8Array,
+    pub value: Option<Uint8Array>,
 }
 
 #[napi]
@@ -312,8 +321,47 @@ impl MlsMember {
         seed: Uint8Array,
     ) -> napi::Result<Self, ErrorClass> {
         polaris_core::mls::Member::from_binding(&identity, ciphersuite, &seed)
-            .map(|inner| MlsMember { inner })
+            .map(|inner| MlsMember {
+                inner,
+                journal: polaris_core::mls::Journal::default(),
+            })
             .map_err(mls_error)
+    }
+
+    /// The device as the host's store holds it (`keys[i]` holds `values[i]`);
+    /// `seed` is fresh for this boot.
+    #[napi(factory, catch_unwind)]
+    pub fn restore(
+        identity: Uint8Array,
+        ciphersuite: u32,
+        seed: Uint8Array,
+        keys: Vec<Uint8Array>,
+        values: Vec<Uint8Array>,
+        signature_public_key: Uint8Array,
+    ) -> napi::Result<Self, ErrorClass> {
+        polaris_core::mls::Member::restore_from_binding(
+            &identity,
+            ciphersuite,
+            &seed,
+            keys.iter().map(|key| key.to_vec()).collect(),
+            values.iter().map(|value| value.to_vec()).collect(),
+            &signature_public_key,
+        )
+        .map(|(inner, journal)| MlsMember { inner, journal })
+        .map_err(mls_error)
+    }
+
+    /// Everything changed since the last call, for the host to write in one
+    /// transaction (`polaris_core::mls::Journal`).
+    #[napi(catch_unwind)]
+    pub fn store_changes(&self) -> Vec<MlsStoreChange> {
+        polaris_core::mls::Journal::changes(&self.journal, self.inner.storage())
+            .into_iter()
+            .map(|change| MlsStoreChange {
+                key: change.key.into(),
+                value: change.value.map(Uint8Array::from),
+            })
+            .collect()
     }
 
     #[napi(catch_unwind)]

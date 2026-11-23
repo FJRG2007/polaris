@@ -60,9 +60,11 @@
 //! loads the group from it and OpenMLS writes every change back, so a member
 //! rebuilt from the same storage carries on where the last one stopped.
 
+mod journal;
 mod member;
 mod provider;
 
+pub use journal::{Journal, StoreChange};
 pub use member::{CommitOutput, GroupMember, Member, Processed, ProcessedKind};
 pub use openmls_memory_storage::MemoryStorage;
 pub use provider::{Provider, SeededRand};

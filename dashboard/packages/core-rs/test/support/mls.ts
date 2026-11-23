@@ -44,9 +44,20 @@ export interface MlsMemberLike {
     exportSecret(groupId: Uint8Array, label: string, context: Uint8Array, length: number): Uint8Array;
     ownLeaf(groupId: Uint8Array): number;
     members(groupId: Uint8Array): { leaf: number; identity: Uint8Array; signatureKey: Uint8Array }[];
+    clearPendingCommit(groupId: Uint8Array): void;
+    storeChanges(): { key: Uint8Array; value?: Uint8Array | null }[];
 }
 
-export type MlsMemberClass = new (identity: Uint8Array, ciphersuite: number, seed: Uint8Array) => MlsMemberLike;
+export type MlsMemberClass = (new (identity: Uint8Array, ciphersuite: number, seed: Uint8Array) => MlsMemberLike) & {
+    restore(
+        identity: Uint8Array,
+        ciphersuite: number,
+        seed: Uint8Array,
+        keys: Uint8Array[],
+        values: Uint8Array[],
+        signaturePublicKey: Uint8Array
+    ): MlsMemberLike;
+};
 
 const text = new TextEncoder();
 const bytes = (value: Uint8Array | null | undefined) => Array.from(value ?? []);
@@ -127,4 +138,68 @@ export function runRefusals(Member: MlsMemberClass) {
     const member = new Member(text.encode("x"), 0x004f, seed());
     expect(refusal(() => member.epoch(text.encode("nope"))).code).toBe("MlsUnknownGroup");
     expect(refusal(() => member.joinByWelcome(new Uint8Array([1, 2, 3]))).code).toMatch(/^Mls/);
+}
+
+/** A host store (IndexedDB, the server's table) for one device: one transaction per persist. */
+class Store {
+    readonly entries = new Map<string, [Uint8Array, Uint8Array]>();
+    persist(member: MlsMemberLike) {
+        const changes = member.storeChanges();
+        for (const { key, value } of changes) {
+            const id = bytes(key).join(",");
+            if (value) this.entries.set(id, [key, value]);
+            else this.entries.delete(id);
+        }
+        return changes;
+    }
+    restore(Member: MlsMemberClass, name: string, suite: number, signaturePublicKey: Uint8Array) {
+        const rows = [...this.entries.values()];
+        return Member.restore(text.encode(name), suite, seed(), rows.map((r) => r[0]), rows.map((r) => r[1]), signaturePublicKey);
+    }
+}
+
+/** Crash and restart around a commit through the binding's journal (E2). */
+export function runRestarts(Member: MlsMemberClass, suite: number) {
+    const groupId = text.encode("restart");
+    const aliceStore = new Store();
+    const bobStore = new Store();
+    let alice = new Member(text.encode("alice"), suite, seed());
+    let bob = new Member(text.encode("bob"), suite, seed());
+    const alicePk = alice.signaturePublicKey();
+    const bobPk = bob.signaturePublicKey();
+    const keyPackage = bob.keyPackage();
+    bobStore.persist(bob);
+    alice.createGroup(groupId);
+    const added = alice.addMembers(groupId, [keyPackage]);
+    alice.mergePendingCommit(groupId);
+    expect(aliceStore.persist(alice).length).toBeGreaterThan(0);
+    bob.joinByWelcome(added.welcome as Uint8Array);
+    bobStore.persist(bob);
+    expect(alice.storeChanges()).toEqual([]);
+
+    // alice dies before persisting her commit: it never happened.
+    alice.selfUpdate(groupId);
+    alice.mergePendingCommit(groupId);
+    alice = aliceStore.restore(Member, "alice", suite, alicePk);
+    expect(alice.epoch(groupId)).toBe(1n);
+
+    // bob dies before persisting a processed commit: it is delivered again.
+    const update = alice.selfUpdate(groupId);
+    alice.mergePendingCommit(groupId);
+    aliceStore.persist(alice);
+    bob.process(groupId, update.commit);
+    bob = bobStore.restore(Member, "bob", suite, bobPk);
+    expect(bob.epoch(groupId)).toBe(1n);
+    bob.process(groupId, update.commit);
+    bobStore.persist(bob);
+
+    // Both restart from their stores and carry on.
+    alice = aliceStore.restore(Member, "alice", suite, alicePk);
+    bob = bobStore.restore(Member, "bob", suite, bobPk);
+    expect([alice.epoch(groupId), bob.epoch(groupId)]).toEqual([2n, 2n]);
+    const sealed = alice.encrypt(groupId, text.encode("after restarts"));
+    expect(bytes(bob.process(groupId, sealed).plaintext)).toEqual(bytes(text.encode("after restarts")));
+
+    expect(refusal(() => Member.restore(text.encode("bob"), suite, seed(), [new Uint8Array(1)], [], bobPk)).code).toBe("MlsMalformed");
+    expect(refusal(() => Member.restore(text.encode("bob"), suite, seed(), [], [], bobPk)).code).toBe("MlsStorage");
 }

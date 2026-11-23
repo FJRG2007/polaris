@@ -104,6 +104,16 @@ pub struct MlsGroupMember {
 #[wasm_bindgen]
 pub struct MlsMember {
     inner: polaris_core::mls::Member,
+    journal: polaris_core::mls::Journal,
+}
+
+/// One key the host's store writes (`value`) or deletes (no `value`),
+/// `polaris_core::mls::StoreChange`.
+#[cfg(feature = "mls")]
+#[wasm_bindgen(getter_with_clone)]
+pub struct MlsStoreChange {
+    pub key: Vec<u8>,
+    pub value: Option<Vec<u8>>,
 }
 
 #[cfg(feature = "mls")]
@@ -112,8 +122,46 @@ impl MlsMember {
     #[wasm_bindgen(constructor)]
     pub fn new(identity: &[u8], ciphersuite: u32, seed: &[u8]) -> Result<MlsMember, JsValue> {
         polaris_core::mls::Member::from_binding(identity, ciphersuite, seed)
-            .map(|inner| MlsMember { inner })
+            .map(|inner| MlsMember {
+                inner,
+                journal: polaris_core::mls::Journal::default(),
+            })
             .map_err(mls_error)
+    }
+
+    /// The device as the host's store holds it (`keys[i]` holds `values[i]`);
+    /// `seed` is fresh for this boot.
+    pub fn restore(
+        identity: &[u8],
+        ciphersuite: u32,
+        seed: &[u8],
+        keys: Vec<js_sys::Uint8Array>,
+        values: Vec<js_sys::Uint8Array>,
+        #[wasm_bindgen(js_name = signaturePublicKey)] signature_public_key: &[u8],
+    ) -> Result<MlsMember, JsValue> {
+        polaris_core::mls::Member::restore_from_binding(
+            identity,
+            ciphersuite,
+            seed,
+            keys.iter().map(js_sys::Uint8Array::to_vec).collect(),
+            values.iter().map(js_sys::Uint8Array::to_vec).collect(),
+            signature_public_key,
+        )
+        .map(|(inner, journal)| MlsMember { inner, journal })
+        .map_err(mls_error)
+    }
+
+    /// Everything changed since the last call, for the host to write in one
+    /// transaction (`polaris_core::mls::Journal`).
+    #[wasm_bindgen(js_name = storeChanges)]
+    pub fn store_changes(&self) -> Vec<MlsStoreChange> {
+        polaris_core::mls::Journal::changes(&self.journal, self.inner.storage())
+            .into_iter()
+            .map(|change| MlsStoreChange {
+                key: change.key,
+                value: change.value,
+            })
+            .collect()
     }
 
     #[wasm_bindgen(js_name = signaturePublicKey)]

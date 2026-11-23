@@ -1,5 +1,6 @@
 //! One device's MLS identity and every group operation it performs.
 
+use super::journal::Journal;
 use super::provider::Provider;
 use super::{ErrorKind, MlsError, Result, MAX_PAST_EPOCHS, SUPPORTED_CIPHERSUITES};
 use openmls::prelude::tls_codec::{Deserialize as _, Serialize as _};
@@ -129,17 +130,50 @@ impl Member<MemoryStorage> {
     /// [`Member::new`] from the loosely typed values a binding receives: a
     /// suite outside `u16` or a seed that is not 32 bytes is refused here.
     pub fn from_binding(identity: &[u8], ciphersuite: u32, seed: &[u8]) -> Result<Self> {
-        let suite = u16::try_from(ciphersuite).map_err(|_| {
-            MlsError::new(
-                ErrorKind::UnsupportedCiphersuite,
-                format!("cipher suite {ciphersuite} is not one Polaris accepts"),
-            )
-        })?;
-        let seed: [u8; 32] = seed.try_into().map_err(|_| {
-            MlsError::new(ErrorKind::Malformed, "the seed must be exactly 32 bytes")
-        })?;
+        let (suite, seed) = binding_args(ciphersuite, seed)?;
         Self::new(identity, suite, seed)
     }
+
+    /// [`Member::open`] over what a host's store holds for this device
+    /// (`keys[i]` holds `values[i]`), with the [`Journal`] that knows the store
+    /// holds exactly that. `seed` must be fresh on every boot: a seed used
+    /// before would replay the randomness drawn after it.
+    pub fn restore_from_binding(
+        identity: &[u8],
+        ciphersuite: u32,
+        seed: &[u8],
+        keys: Vec<Vec<u8>>,
+        values: Vec<Vec<u8>>,
+        signature_public_key: &[u8],
+    ) -> Result<(Self, Journal)> {
+        let (suite, seed) = binding_args(ciphersuite, seed)?;
+        if keys.len() != values.len() {
+            return Err(MlsError::new(
+                ErrorKind::Malformed,
+                format!(
+                    "the store gave {} keys and {} values",
+                    keys.len(),
+                    values.len()
+                ),
+            ));
+        }
+        let (storage, journal) = Journal::restore(keys.into_iter().zip(values));
+        Self::open(identity, suite, seed, storage, signature_public_key)
+            .map(|member| (member, journal))
+    }
+}
+
+fn binding_args(ciphersuite: u32, seed: &[u8]) -> Result<(u16, [u8; 32])> {
+    let suite = u16::try_from(ciphersuite).map_err(|_| {
+        MlsError::new(
+            ErrorKind::UnsupportedCiphersuite,
+            format!("cipher suite {ciphersuite} is not one Polaris accepts"),
+        )
+    })?;
+    let seed: [u8; 32] = seed
+        .try_into()
+        .map_err(|_| MlsError::new(ErrorKind::Malformed, "the seed must be exactly 32 bytes"))?;
+    Ok((suite, seed))
 }
 
 impl<S: StorageProvider<CURRENT_VERSION>> Member<S> {

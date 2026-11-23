@@ -10,7 +10,7 @@ import { describe, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { packageDir, requireBuilt } from "../support/files";
-import { runGroupLife, runRefusals, SUITES, type MlsMemberClass } from "../support/mls";
+import { runGroupLife, runRefusals, runRestarts, SUITES, type MlsMemberClass } from "../support/mls";
 
 const glueUrl = pathToFileURL(requireBuilt(join(packageDir, "wasm-mls", "polaris_core_mls.js"))).href;
 const wasmBytes = readFileSync(requireBuilt(join(packageDir, "wasm-mls", "polaris_core_mls_bg.wasm")));
@@ -24,4 +24,6 @@ describe("wasm MlsMember", () => {
     for (const suite of SUITES)
         it(`runs a group's life on suite 0x${suite.toString(16)}`, () => runGroupLife(glue.MlsMember, suite));
     it("carries every refusal's code", () => runRefusals(glue.MlsMember));
+    for (const suite of SUITES)
+        it(`restarts from its store around a commit on suite 0x${suite.toString(16)}`, () => runRestarts(glue.MlsMember, suite));
 });

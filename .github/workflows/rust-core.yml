@@ -277,7 +277,7 @@ jobs:
         env:
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: wasm-bindgen-test-runner
         run: |
-          suites=(--locked --release -p polaris-core --target wasm32-unknown-unknown --test mls --test mls_rfc9420)
+          suites=(--locked --release -p polaris-core --target wasm32-unknown-unknown --test mls --test mls_rfc9420 --test mls_journal)
           cargo test "${suites[@]}"
           WASM_BINDGEN_USE_BROWSER=1 CHROMEDRIVER="$CHROMEWEBDRIVER/chromedriver" cargo test "${suites[@]}"
           WASM_BINDGEN_USE_BROWSER=1 GECKODRIVER="$GECKOWEBDRIVER/geckodriver" cargo test "${suites[@]}"

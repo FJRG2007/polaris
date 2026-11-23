@@ -8,7 +8,7 @@ import { describe, it } from "vitest";
 import { createRequire } from "node:module";
 import { nativeFileName } from "../../src/native";
 import { packageDir, requireBuilt } from "../support/files";
-import { runGroupLife, runRefusals, SUITES, type MlsMemberClass } from "../support/mls";
+import { runGroupLife, runRefusals, runRestarts, SUITES, type MlsMemberClass } from "../support/mls";
 
 const report = process.report.getReport() as { header?: { glibcVersionRuntime?: string } };
 const musl = process.platform === "linux" && !report.header?.glibcVersionRuntime;
@@ -18,4 +18,5 @@ const { MlsMember } = createRequire(import.meta.url)(builtPath) as { MlsMember: 
 describe("napi MlsMember", () => {
     for (const suite of SUITES) it(`runs a group's life on suite 0x${suite.toString(16)}`, () => runGroupLife(MlsMember, suite));
     it("carries every refusal's code", () => runRefusals(MlsMember));
+    for (const suite of SUITES) it(`restarts from its store around a commit on suite 0x${suite.toString(16)}`, () => runRestarts(MlsMember, suite));
 });
