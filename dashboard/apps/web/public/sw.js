@@ -11,13 +11,18 @@
  * stored copy of a screen or a redirect is how a tab shows yesterday's state,
  * and the login handoff in particular must never be replayed.
  *
- * The one exception is the chat, so it opens with no network at all, like a
- * messenger: a page under /chat that loaded is kept, and used only when the
- * network cannot answer for it - never in place of an answer. The build's own
+ * The one exception is the app's own screens, so Polaris opens with no network
+ * at all, like a messenger: a page of the signed-in app that loaded is kept, and
+ * used only when the network cannot answer for it - never in place of an answer.
+ * A page never opened here falls back to the nearest one above it that was (a
+ * note to the notes list), and only then to the offline page. The build's own
  * scripts and styles it needs are kept with it (their names change with every
  * build, so a kept one is never stale). No API answer is ever kept, nor a
- * redirect, and the whole shell is deleted when the account signs out or
- * changes (`account-switch`), so it never shows one account's page to another.
+ * redirect, nor a public page, the Vault or the PIN screen; an app behind the
+ * PIN is dropped from here by the page (`offline-shell`), so the lock cannot be
+ * walked around offline. The kept pages are bounded (`PAGES_KEPT`, oldest out
+ * first) and the whole shell is deleted when the account signs out or changes
+ * (`account-switch`), so it never shows one account's page to another.
  */
 
 const CACHE = "polaris-offline-v4";
@@ -28,8 +33,20 @@ const SHELL = "polaris-shell-v1";
  * cannot answer for an attachment; deleted with the shell on sign-out. */
 const MEDIA = "polaris-chat-media";
 
-function isChatPage(url) {
-    return url.pathname === "/chat" || url.pathname.startsWith("/chat/");
+/* The signed-in app's top-level sections whose pages are kept for offline use:
+ * the `(app)` route group, less the Vault (secrets) and the PIN screen. A test
+ * holds this list to the route group, so a new app is not silently left out. */
+const KEPT_SECTIONS = [
+    "account", "admin", "analytics", "announcements", "apps", "automations", "calendar", "chat", "crm",
+    "drive", "game-servers", "games", "home", "mail", "mail-server", "network-filter", "notes", "office",
+    "places", "polar", "router", "status-pages", "tasks", "telemetry", "tools", "translate", "vpn", "watch"
+];
+/* How many pages are kept at most; the least recently loaded go first. */
+const PAGES_KEPT = 80;
+
+function isKeptPage(url) {
+    const section = url.pathname.split("/")[1] || "";
+    return KEPT_SECTIONS.includes(section);
 }
 
 function keepable(answer) {
@@ -59,11 +76,37 @@ function trimStatic(cache) {
     });
 }
 
-/** The chat page as it last loaded here, or the offline page. */
-function keptChat(url, answer) {
+/** Keeps the most recently loaded pages: a page is put back last every time
+ *  it loads, so the first ones listed are the ones not opened for longest. */
+function trimPages(cache) {
+    return cache.keys().then((keys) => {
+        const pages = keys.filter((key) => !new URL(key.url).pathname.startsWith("/_next/static/"));
+        return Promise.all(pages.slice(0, Math.max(0, pages.length - PAGES_KEPT)).map((key) => cache.delete(key)));
+    });
+}
+
+function keepPage(path, copy) {
     return caches
         .open(SHELL)
-        .then((cache) => cache.match(url.pathname).then((kept) => kept || cache.match("/chat")))
+        .then((cache) =>
+            cache
+                .delete(path)
+                .then(() => cache.put(path, copy))
+                .then(() => trimPages(cache))
+        )
+        .catch(() => undefined);
+}
+
+/** The page as it last loaded here, else the nearest page above it that did
+ *  (never above its own section), else the offline page. */
+function keptPage(url, answer) {
+    const parts = url.pathname.split("/").filter(Boolean);
+    const paths = parts.map((_, at) => "/" + parts.slice(0, parts.length - at).join("/"));
+    return caches
+        .open(SHELL)
+        .then((cache) =>
+            paths.reduce((found, path) => found.then((kept) => kept || cache.match(path)), Promise.resolve(undefined))
+        )
         .then((kept) => kept || offlinePage(answer));
 }
 
@@ -94,7 +137,7 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
     const url = new URL(event.request.url);
     if (url.origin !== self.location.origin || event.request.method !== "GET") return;
-    // A build's scripts and styles, once the chat shell has been kept: their
+    // A build's scripts and styles, kept with the pages that use them: their
     // names are content hashes, so the kept copy is the same file.
     if (url.pathname.startsWith("/_next/static/")) {
         event.respondWith(
@@ -135,21 +178,17 @@ self.addEventListener("fetch", (event) => {
         return;
     }
     if (event.request.mode !== "navigate") return;
-    if (isChatPage(url)) {
+    if (isKeptPage(url)) {
         event.respondWith(
             fetch(event.request)
                 .then((answer) => {
                     if (keepable(answer)) {
-                        const copy = answer.clone();
-                        caches
-                            .open(SHELL)
-                            .then((cache) => cache.put(url.pathname, copy))
-                            .catch(() => undefined);
+                        keepPage(url.pathname, answer.clone());
                         return answer;
                     }
-                    return isGatewayFailure(answer.status) ? keptChat(url, answer) : answer;
+                    return isGatewayFailure(answer.status) ? keptPage(url, answer) : answer;
                 })
-                .catch(() => keptChat(url))
+                .catch(() => keptPage(url))
         );
         return;
     }

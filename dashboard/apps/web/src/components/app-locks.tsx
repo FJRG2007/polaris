@@ -6,12 +6,13 @@
  * the server is what keeps a locked app shut (see `app-lock-service`).
  */
 
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setAppLockAction } from "@/app/(app)/app-launcher-actions";
 import { AppLocksContext } from "@/components/app-locks-context";
+import { forgetLockedPages } from "@/lib/offline/offline-shell";
 
 export function AppLocksProvider({
     initial,
@@ -27,6 +28,9 @@ export function AppLocksProvider({
     const t = useTranslations("nav");
     const [locked, setLocked] = useState<readonly string[]>(initial);
     const latest = useRef(locked);
+
+    // A locked app is never left readable offline (`lib/offline/offline-shell`).
+    useEffect(() => void forgetLockedPages(locked), [locked]);
 
     const toggleLock = useCallback(
         (appId: string) => {

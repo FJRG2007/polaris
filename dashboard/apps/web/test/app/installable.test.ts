@@ -5,7 +5,7 @@
  * tab reopened the next day used to fall into.
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 import { isGatewayFailure } from "@polaris/core/instance-fallback";
@@ -94,14 +94,14 @@ describe("the service worker", () => {
     it("answers with the offline page exactly when a gateway speaks for a dead Polaris", async () => {
         for (const status of [200, 401, 404, 500, 501, 502, 503, 504, 505, 519, 520, 530, 531]) {
             const worker = boot(async () => answer(status));
-            expect((await worker.request("/home")) === worker.offline, `status ${status}`).toBe(
+            expect((await worker.request("/login")) === worker.offline, `status ${status}`).toBe(
                 isGatewayFailure(status)
             );
             expect(worker.kept(), `status ${status}`).toEqual([]);
         }
     });
 
-    it("keeps a chat page that loaded, and uses it only when the network cannot answer", async () => {
+    it("keeps an app page that loaded, and uses it only when the network cannot answer", async () => {
         let online = true;
         const page = answer(200);
         const worker = boot(async () => {
@@ -109,10 +109,65 @@ describe("the service worker", () => {
             return page;
         });
         expect(await worker.request("/chat/c/1")).toBe(page);
-        expect(worker.kept()).toEqual(["/chat/c/1"]);
+        expect(await worker.request("/notes")).toBe(page);
+        expect(worker.kept()).toEqual(["/chat/c/1", "/notes"]);
         online = false;
         expect(await worker.request("/chat/c/1")).toBe(page);
+        expect(await worker.request("/notes")).toBe(page);
         expect(await worker.request("/home")).toBe(worker.offline);
+    });
+
+    it("falls back to the nearest kept page above, never past the page's own section", async () => {
+        let online = true;
+        const list = answer(200);
+        const worker = boot(async () => {
+            if (!online) throw new TypeError("offline");
+            return list;
+        });
+        await worker.request("/notes");
+        await worker.request("/home");
+        online = false;
+        expect(await worker.request("/notes/n1/edit")).toBe(list);
+        expect(await worker.request("/tasks/t1")).toBe(worker.offline);
+        // A gateway answering for a dead Polaris is the same as no answer.
+        online = true;
+        const gateway = boot(async (url) => (url.endsWith("/notes") ? list : answer(502)));
+        await gateway.request("/notes");
+        expect(await gateway.request("/notes/n2")).toBe(list);
+    });
+
+    it("never keeps the Vault, the PIN screen or a page outside the app", async () => {
+        const worker = boot(async () => answer(200));
+        for (const path of ["/vault", "/vault/items/1", "/app-lock", "/login", "/s/abc", "/f/xyz", "/"]) {
+            await worker.request(path);
+        }
+        expect(worker.kept()).toEqual([]);
+    });
+
+    it("keeps a bounded number of pages, the least recently loaded going first", async () => {
+        const worker = boot(async () => answer(200));
+        const most = Number(/const PAGES_KEPT = (\d+);/.exec(workerSource)?.[1]);
+        expect(most).toBeGreaterThan(0);
+        for (let at = 0; at < most + 5; at += 1) await worker.request(`/notes/n${at}`);
+        // Loading the first one again puts it back last, so it survives.
+        await worker.request("/notes/n5");
+        await worker.request("/notes/extra");
+        const kept = worker.kept();
+        expect(kept).toHaveLength(most);
+        expect(kept).not.toContain("/notes/n6");
+        expect(kept.slice(-2)).toEqual(["/notes/n5", "/notes/extra"]);
+    });
+
+    it("keeps every section of the signed-in app but the Vault and the PIN screen", () => {
+        const listed = /const KEPT_SECTIONS = \[([^\]]*)\]/.exec(workerSource)?.[1] ?? "";
+        const sections = [...listed.matchAll(/"([^"]+)"/g)].map((match) => match[1]).sort();
+        const group = new URL("../../src/app/(app)/", import.meta.url);
+        const routes = readdirSync(group, { withFileTypes: true })
+            .filter((entry) => entry.isDirectory() && !entry.name.startsWith("("))
+            .map((entry) => entry.name)
+            .filter((name) => name !== "vault" && name !== "app-lock")
+            .sort();
+        expect(sections).toEqual(routes);
     });
 
     it("never keeps a redirect, a refusal, an API answer or another origin's", async () => {

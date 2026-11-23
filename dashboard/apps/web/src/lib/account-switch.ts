@@ -28,6 +28,7 @@
 import { dropAllSnapshots } from "@/lib/snapshot-cache";
 import { dropMailCache } from "@/lib/mailbox/mail-cache";
 import { dropChatStore } from "@/lib/chat/offline/chat-cache";
+import { SHELL_CACHE } from "@/lib/offline/offline-shell";
 import { MENU_KEY as APP_MENU_KEY, STORE_KEY as APP_USAGE_KEY } from "@/lib/app-usage";
 import { pauseAutomaticPasskey } from "@/lib/local-passkeys";
 import { forgetDeviceLock, forgetEveryDeviceLock, indexedDbDeviceLockStore } from "@polaris/chat-crypto/device-lock";
@@ -63,8 +64,8 @@ export async function forgetAccountTraces(): Promise<void> {
     }
     await dropMailCache().catch(() => undefined);
     await dropChatStore().catch(() => undefined);
-    // The chat pages the service worker kept to open offline (`public/sw.js`).
-    await globalThis.caches?.delete("polaris-shell-v1").catch(() => undefined);
+    // The pages the service worker kept to open offline (`public/sw.js`).
+    await globalThis.caches?.delete(SHELL_CACHE).catch(() => undefined);
     // The media fetched ahead for offline reading (`chat/media-download`).
     await globalThis.caches?.delete("polaris-chat-media").catch(() => undefined);
 }
