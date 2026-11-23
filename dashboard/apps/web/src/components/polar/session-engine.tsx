@@ -154,6 +154,14 @@ function Mark({ on }: { on: boolean }) {
     return <Check className={cn("ms-auto size-3.5 shrink-0 text-primary", !on && "opacity-0")} />;
 }
 
+// Tools that cannot take this model are left out, except the ones people
+// reach for by name, so their reason is still read here.
+function pillOptions(source: Pick<CodeSource, "key" | "kind" | "engines">) {
+    return engineOptions(source, KNOWN_ENGINES, null).filter(
+        (option) => option.disabled !== "cannotServe" || option.id === NATIVE_ENGINE || NAMED_ENGINES.has(option.id)
+    );
+}
+
 /**
  * The composer's override for one task: "Your setting" (null) or an engine
  * that can run the picked model. Engines that cannot are listed, disabled,
@@ -172,11 +180,7 @@ export function CodeEnginePill({
     disabled: boolean;
 }) {
     const t = useTranslations("polar");
-    // Tools that cannot take this model are left out, except the ones people
-    // reach for by name, so their reason is still read here.
-    const options = engineOptions(source, KNOWN_ENGINES, null).filter(
-        (option) => option.disabled !== "cannotServe" || option.id === NATIVE_ENGINE || NAMED_ENGINES.has(option.id)
-    );
+    const options = pillOptions(source);
     const picked = value ? (options.find((option) => option.id === value && option.disabled === null) ?? null) : null;
     const label = picked ? engineName(picked.id, t) : t("settings.engine.yourSetting");
     return (
@@ -197,35 +201,56 @@ export function CodeEnginePill({
                 className="max-h-[min(24rem,var(--radix-dropdown-menu-content-available-height))] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain"
             >
                 <SheetMenuLabel>{t("settings.engine.label")}</SheetMenuLabel>
-                <SheetMenuItem onSelect={() => onChange(null)} className="items-start">
-                    <span className="flex min-w-0 flex-col">
-                        <span className="truncate">{t("settings.engine.yourSetting")}</span>
-                        <span className="text-xs text-muted-foreground">{t("settings.engine.yourSettingHint")}</span>
-                    </span>
-                    <Mark on={picked === null} />
-                </SheetMenuItem>
-                <SheetMenuSeparator />
-                {options.map((option) => (
-                    <SheetMenuItem
-                        key={option.id}
-                        disabled={option.disabled !== null}
-                        onSelect={() => onChange(option.id)}
-                        className="items-start"
-                    >
-                        <span className="flex min-w-0 flex-col">
-                            <span className="truncate" title={engineName(option.id, t)}>
-                                {engineName(option.id, t)}
-                            </span>
-                            {option.disabled ? (
-                                <span className="text-xs text-muted-foreground">
-                                    {engineReason(option.disabled, t)}
-                                </span>
-                            ) : null}
-                        </span>
-                        <Mark on={picked?.id === option.id} />
-                    </SheetMenuItem>
-                ))}
+                <EngineItems source={source} value={value} onChange={onChange} />
             </SheetMenuContent>
         </SheetMenu>
+    );
+}
+
+/** The tools as menu rows, "Your setting" first, for the pill and the start
+ *  options. */
+export function EngineItems({
+    source,
+    value,
+    onChange
+}: {
+    source: Pick<CodeSource, "key" | "kind" | "engines">;
+    value: string | null;
+    onChange: (engine: string | null) => void;
+}) {
+    const t = useTranslations("polar");
+    const options = pillOptions(source);
+    const picked = value ? (options.find((option) => option.id === value && option.disabled === null) ?? null) : null;
+    return (
+        <>
+            <SheetMenuItem onSelect={() => onChange(null)} className="items-start">
+                <span className="flex min-w-0 flex-col">
+                    <span className="truncate">{t("settings.engine.yourSetting")}</span>
+                    <span className="text-xs text-muted-foreground">{t("settings.engine.yourSettingHint")}</span>
+                </span>
+                <Mark on={picked === null} />
+            </SheetMenuItem>
+            <SheetMenuSeparator />
+            {options.map((option) => (
+                <SheetMenuItem
+                    key={option.id}
+                    disabled={option.disabled !== null}
+                    onSelect={() => onChange(option.id)}
+                    className="items-start"
+                >
+                    <span className="flex min-w-0 flex-col">
+                        <span className="truncate" title={engineName(option.id, t)}>
+                            {engineName(option.id, t)}
+                        </span>
+                        {option.disabled ? (
+                            <span className="text-xs text-muted-foreground">
+                                {engineReason(option.disabled, t)}
+                            </span>
+                        ) : null}
+                    </span>
+                    <Mark on={picked?.id === option.id} />
+                </SheetMenuItem>
+            ))}
+        </>
     );
 }

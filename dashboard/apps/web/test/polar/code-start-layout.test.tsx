@@ -4,7 +4,8 @@
  * composer are drawn from the first paint and only switch on when access and
  * the choices land. The repository picked last - "No repository" included - is
  * the one shown, in every open Code. And "/" lists the person's skills and
- * their own commands, on Chat's list.
+ * their own commands, on Chat's list: a skill has no chip of its own. The
+ * composer holds the model and one options menu, nothing else.
  */
 
 import type { ReactNode } from "react";
@@ -172,13 +173,13 @@ describe("Code opens without moving", () => {
         render(<PolarChat />, { wrapper: MessagesWrapper });
         await screen.findByRole("textbox", { name: "Task for the agent" });
         const before = chips();
-        expect(before).toEqual(["Where the agent works", "Issue", "Skill"]);
-        const skill = screen.getByRole("button", { name: /^Skill:/ });
-        expect((skill as HTMLButtonElement).disabled).toBe(true);
+        expect(before).toEqual(["Where the agent works", "Issue"]);
+        const where = screen.getByRole("button", { name: /^Where the agent works:/ });
+        expect((where as HTMLButtonElement).disabled).toBe(true);
         gate.resolve();
         await waitFor(() =>
             expect(
-                (screen.getByRole("button", { name: /^Skill:/ }) as HTMLButtonElement).disabled
+                (screen.getByRole("button", { name: /^Where the agent works:/ }) as HTMLButtonElement).disabled
             ).toBe(false)
         );
         expect(chips()).toEqual(before);
@@ -233,9 +234,10 @@ describe("Code's slash commands", () => {
         const box = await screen.findByRole("textbox", { name: "Task for the agent" });
         await waitFor(() =>
             expect(
-                (screen.getByRole("button", { name: /^Skill:/ }) as HTMLButtonElement).disabled
+                (screen.getByRole("button", { name: /^Where the agent works:/ }) as HTMLButtonElement).disabled
             ).toBe(false)
         );
+        expect(screen.queryByRole("button", { name: /^Skill/ })).toBeNull();
         fireEvent.change(box, { target: { value: "/" } });
         const list = await screen.findByRole("listbox", { name: "Commands" });
         expect(within(list).getByText("/review")).toBeTruthy();
@@ -245,10 +247,43 @@ describe("Code's slash commands", () => {
         expect(within(list).getByText("/goal")).toBeTruthy();
         for (let step = 0; step < 5; step++) fireEvent.keyDown(box, { key: "ArrowDown" });
         fireEvent.keyDown(box, { key: "Enter" });
-        await waitFor(() =>
-            expect(screen.getByRole("button", { name: "Skill: review" })).toBeTruthy()
-        );
+        await waitFor(() => expect(screen.getByLabelText("Skill: /review")).toBeTruthy());
+        // Named and removable, never a picker.
+        expect(screen.queryByRole("button", { name: /^Skill:/ })).toBeNull();
+        fireEvent.click(screen.getByRole("button", { name: "Remove the skill" }));
+        expect(screen.queryByLabelText("Skill: /review")).toBeNull();
         expect((box as HTMLTextAreaElement).value).toBe("");
         expect(screen.queryByRole("listbox", { name: "Commands" })).toBeNull();
+    });
+});
+
+describe("The composer's controls", () => {
+    it("are the model and one options menu that holds the rest", async () => {
+        gate.resolve();
+        render(<PolarChat />, { wrapper: MessagesWrapper });
+        await screen.findByRole("textbox", { name: "Task for the agent" });
+        const options = await screen.findByRole("button", { name: /^Session options:/ });
+        expect(screen.getByRole("button", { name: /^Model:/ })).toBeTruthy();
+        expect(options.textContent).toBe("Full access");
+        expect(options.getAttribute("aria-label")).toBe(
+            "Session options: Permissions: Full access, Conversation: Terminal, Engine: Your setting, Runs on: Polaris"
+        );
+        // None of what the menu holds is a chip of its own any more.
+        for (const gone of [/^Permissions:/, /^Engine:/, /^Conversation:/, /^Runs on:/, /^Skill/])
+            expect(screen.queryByRole("button", { name: gone })).toBeNull();
+        fireEvent.pointerDown(options, { button: 0, ctrlKey: false, pointerType: "mouse" });
+        const menu = await screen.findByRole("menu");
+        const groups = within(menu)
+            .getAllByRole("group")
+            .map((group) => group.getAttribute("aria-label"));
+        expect(groups).toEqual(["Permissions", "Conversation", "Engine", "Runs on"]);
+        for (const row of ["Ask first", "Edit files", "Plan only", "Full access", "Terminal", "Chat", "Your setting", "Polaris"])
+            expect(within(menu).getAllByRole("menuitem").some((item) => item.textContent?.includes(row))).toBe(true);
+        fireEvent.click(within(menu).getByRole("menuitem", { name: /^Plan only/ }));
+        await waitFor(() =>
+            expect(screen.getByRole("button", { name: /^Session options:/ }).textContent).toBe("Plan only")
+        );
+        // The pick is the saved default for the next task.
+        expect(window.localStorage.getItem("polar.code.permissionMode")).toBe("plan");
     });
 });

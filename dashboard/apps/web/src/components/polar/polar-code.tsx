@@ -47,7 +47,8 @@ import { neighbourSession, useCodeKeys, useStopTwice } from "@/components/polar/
 import { useCodeTheme } from "@/components/polar/polar-display";
 import { CodeAccountSwitch } from "@/components/polar/code-account-switch";
 import { CodeAgentSwitch, canSwitchAgent } from "@/components/polar/code-agent-switch";
-import { CodeEnginePill, KNOWN_ENGINES } from "@/components/polar/session-engine";
+import { KNOWN_ENGINES } from "@/components/polar/session-engine";
+import { CodeStartOptions } from "@/components/polar/code-start-options";
 import { engineOptions, NATIVE_ENGINE } from "@/lib/polar/native/engine-choice";
 import { CodeView } from "@/components/json-view";
 import { Work } from "@/components/polar/elements/work";
@@ -118,7 +119,7 @@ import {
 import { estimateTokens } from "@/lib/polar/compaction";
 import {
     CodeIssueChip,
-    CodeSkillChip,
+    CodeSkillTag,
     CodePersonaChip,
     type PickedIssue,
     CodeWhereChip,
@@ -1386,32 +1387,17 @@ function CodeStart({
                                 onOpenChange={setModelOpen}
                                 effort={tool ? codeEffort(tool, effort, chooseEffort, t) : null}
                             />
-                            {tool && runOn ? (
-                                <CodeEnginePill
-                                    source={runOn}
-                                    value={engineOverride}
-                                    onChange={setEngine}
-                                    disabled={busy || pending}
-                                />
-                            ) : null}
-                            {asksMode ? (
-                                <PermissionModePicker
-                                    value={mode}
-                                    onChange={chooseMode}
-                                    disabled={busy}
-                                />
-                            ) : null}
-                            {offersChat ? (
-                                <SessionSurfacePicker value={surface} onChange={chooseSurface} disabled={busy} />
-                            ) : null}
-                            {!polar ? (
-                                <CodePlacePicker
-                                    computers={computers}
-                                    value={computerId}
-                                    onChange={choosePlace}
-                                    disabled={busy || pending}
-                                />
-                            ) : null}
+                            <CodeStartOptions
+                                mode={asksMode ? { value: mode, onChange: chooseMode } : null}
+                                surface={offersChat ? { value: surface, onChange: chooseSurface } : null}
+                                engine={
+                                    tool && runOn ? { source: runOn, value: engineOverride, onChange: setEngine } : null
+                                }
+                                place={
+                                    !polar ? { computers, value: computerId, onChange: choosePlace } : null
+                                }
+                                disabled={busy || pending}
+                            />
                         </>
                     ) : null
                 }
@@ -1458,12 +1444,11 @@ function CodeStart({
                             disabled={busy || pending}
                         />
                     ) : null}
-                    <CodeSkillChip
-                        skills={choices?.skills ?? []}
-                        skill={skill}
-                        onSkill={setSkill}
-                        disabled={busy || choices === null}
-                    />
+                    {/* A skill is picked with "/" in the box; once picked it shows
+                        here only to say so and to be removed. */}
+                    {skill !== null ? (
+                        <CodeSkillTag skill={skill} onClear={() => setSkill(null)} disabled={busy} />
+                    ) : null}
                     {(choices?.code?.personas.length ?? 0) > 0 ? (
                         <CodePersonaChip
                             personas={choices?.code?.personas ?? []}

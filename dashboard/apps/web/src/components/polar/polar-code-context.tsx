@@ -670,60 +670,79 @@ export function CodePlacePicker({
             </SheetMenuTrigger>
             <SheetMenuContent title={t("code.place.label")} align="start" className="w-72 max-w-[calc(100vw-2rem)]">
                 <SheetMenuLabel>{t("code.place.label")}</SheetMenuLabel>
-                <SheetMenuItem onSelect={() => onChange(null)} className="items-start">
-                    <Server className="mt-0.5 size-4 shrink-0" aria-hidden />
-                    <span className="flex min-w-0 flex-col">
-                        <span className="truncate">{t("code.place.polaris")}</span>
-                        <span className="text-xs text-muted-foreground">{t("code.place.polarisHint")}</span>
-                    </span>
-                    <Mark on={value === null} />
-                </SheetMenuItem>
-                {computers === null ? (
-                    <div className="px-2 py-1.5" aria-hidden>
-                        <div className="h-8 animate-pulse rounded bg-muted" />
-                    </div>
-                ) : (
-                    computers.map((computer) => (
-                        <SheetMenuItem
-                            key={computer.id}
-                            disabled={!computer.online}
-                            onSelect={() => onChange(computer.id)}
-                            className="items-start"
-                        >
-                            {computer.kind === "server" ? (
-                                <HardDrive className="mt-0.5 size-4 shrink-0" aria-hidden />
-                            ) : (
-                                <Laptop className="mt-0.5 size-4 shrink-0" aria-hidden />
-                            )}
-                            <span className="flex min-w-0 flex-col">
-                                <span className="truncate" title={computer.name}>
-                                    {computer.name}
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                    {computer.kind === "server"
-                                        ? computer.online
-                                            ? t("code.place.server")
-                                            : t("code.place.serverOffline")
-                                        : computer.online
-                                          ? t("code.place.online")
-                                          : t("code.place.offline")}
-                                </span>
-                            </span>
-                            <Mark on={computer.id === value} />
-                        </SheetMenuItem>
-                    ))
-                )}
-                <SheetMenuSeparator />
-                <SheetMenuItem asChild>
-                    <Link href="/account/computers">
-                        <Plus className="size-4 shrink-0" aria-hidden />
-                        <span className="truncate">
-                            {computers && computers.length > 0 ? t("code.place.manage") : t("code.place.pair")}
-                        </span>
-                    </Link>
-                </SheetMenuItem>
+                <CodePlaceItems computers={computers} value={value} onChange={onChange} />
             </SheetMenuContent>
         </SheetMenu>
+    );
+}
+
+/** Polaris and the person's computers as menu rows, with the link to pair
+ *  one, for the picker and the start options. */
+export function CodePlaceItems({
+    computers,
+    value,
+    onChange
+}: {
+    computers: PolarCodeComputer[] | null;
+    value: string | null;
+    onChange: (computerId: string | null) => void;
+}) {
+    const t = useTranslations("polar");
+    return (
+        <>
+            <SheetMenuItem onSelect={() => onChange(null)} className="items-start">
+                <Server className="mt-0.5 size-4 shrink-0" aria-hidden />
+                <span className="flex min-w-0 flex-col">
+                    <span className="truncate">{t("code.place.polaris")}</span>
+                    <span className="text-xs text-muted-foreground">{t("code.place.polarisHint")}</span>
+                </span>
+                <Mark on={value === null} />
+            </SheetMenuItem>
+            {computers === null ? (
+                <div className="px-2 py-1.5" aria-hidden>
+                    <div className="h-8 animate-pulse rounded bg-muted" />
+                </div>
+            ) : (
+                computers.map((computer) => (
+                    <SheetMenuItem
+                        key={computer.id}
+                        disabled={!computer.online}
+                        onSelect={() => onChange(computer.id)}
+                        className="items-start"
+                    >
+                        {computer.kind === "server" ? (
+                            <HardDrive className="mt-0.5 size-4 shrink-0" aria-hidden />
+                        ) : (
+                            <Laptop className="mt-0.5 size-4 shrink-0" aria-hidden />
+                        )}
+                        <span className="flex min-w-0 flex-col">
+                            <span className="truncate" title={computer.name}>
+                                {computer.name}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                                {computer.kind === "server"
+                                    ? computer.online
+                                        ? t("code.place.server")
+                                        : t("code.place.serverOffline")
+                                    : computer.online
+                                      ? t("code.place.online")
+                                      : t("code.place.offline")}
+                            </span>
+                        </span>
+                        <Mark on={computer.id === value} />
+                    </SheetMenuItem>
+                ))
+            )}
+            <SheetMenuSeparator />
+            <SheetMenuItem asChild>
+                <Link href="/account/computers">
+                    <Plus className="size-4 shrink-0" aria-hidden />
+                    <span className="truncate">
+                        {computers && computers.length > 0 ? t("code.place.manage") : t("code.place.pair")}
+                    </span>
+                </Link>
+            </SheetMenuItem>
+        </>
     );
 }
 
@@ -876,24 +895,30 @@ export function PermissionModePicker({
             </SheetMenuTrigger>
             <SheetMenuContent title={t("code.mode.label")} align="start" className="w-72 max-w-[calc(100vw-2rem)]">
                 <SheetMenuLabel>{t("code.mode.label")}</SheetMenuLabel>
-                {core.SESSION_PERMISSION_MODES.map((mode) => (
-                    <SheetMenuItem
-                        key={mode}
-                        onSelect={() => onChange(mode)}
-                        className="items-start"
-                    >
-                        <span className="flex min-w-0 flex-col">
-                            <span className="truncate">{t(`code.mode.${mode}.name`)}</span>
-                            <span className="text-xs text-muted-foreground">
-                                {t(`code.mode.${mode}.hint`)}
-                            </span>
-                        </span>
-                        <Mark on={mode === value} />
-                    </SheetMenuItem>
-                ))}
+                <PermissionModeItems value={value} onChange={onChange} />
             </SheetMenuContent>
         </SheetMenu>
     );
+}
+
+/** The permission modes as menu rows, for the picker and the start options. */
+export function PermissionModeItems({
+    value,
+    onChange
+}: {
+    value: core.SessionPermissionMode;
+    onChange: (mode: core.SessionPermissionMode) => void;
+}) {
+    const t = useTranslations("polar");
+    return core.SESSION_PERMISSION_MODES.map((mode) => (
+        <SheetMenuItem key={mode} onSelect={() => onChange(mode)} className="items-start">
+            <span className="flex min-w-0 flex-col">
+                <span className="truncate">{t(`code.mode.${mode}.name`)}</span>
+                <span className="text-xs text-muted-foreground">{t(`code.mode.${mode}.hint`)}</span>
+            </span>
+            <Mark on={mode === value} />
+        </SheetMenuItem>
+    ));
 }
 /**
  * Where a running session's conversation is held: its agent's own terminal, or
@@ -926,24 +951,30 @@ export function SessionSurfacePicker({
             </SheetMenuTrigger>
             <SheetMenuContent title={t("code.surface.label")} align="start" className="w-72 max-w-[calc(100vw-2rem)]">
                 <SheetMenuLabel>{t("code.surface.label")}</SheetMenuLabel>
-                {acpProviders.SESSION_SURFACES.map((surface) => (
-                    <SheetMenuItem
-                        key={surface}
-                        onSelect={() => onChange(surface)}
-                        className="items-start"
-                    >
-                        <span className="flex min-w-0 flex-col">
-                            <span className="truncate">{t(`code.surface.${surface}.name`)}</span>
-                            <span className="text-xs text-muted-foreground">
-                                {t(`code.surface.${surface}.hint`)}
-                            </span>
-                        </span>
-                        <Mark on={surface === value} />
-                    </SheetMenuItem>
-                ))}
+                <SessionSurfaceItems value={value} onChange={onChange} />
             </SheetMenuContent>
         </SheetMenu>
     );
+}
+
+/** Terminal or Chat as menu rows, for the picker and the start options. */
+export function SessionSurfaceItems({
+    value,
+    onChange
+}: {
+    value: acpProviders.SessionSurface;
+    onChange: (surface: acpProviders.SessionSurface) => void;
+}) {
+    const t = useTranslations("polar");
+    return acpProviders.SESSION_SURFACES.map((surface) => (
+        <SheetMenuItem key={surface} onSelect={() => onChange(surface)} className="items-start">
+            <span className="flex min-w-0 flex-col">
+                <span className="truncate">{t(`code.surface.${surface}.name`)}</span>
+                <span className="text-xs text-muted-foreground">{t(`code.surface.${surface}.hint`)}</span>
+            </span>
+            <Mark on={surface === value} />
+        </SheetMenuItem>
+    ));
 }
 const CHIP =
     "flex h-7 min-w-0 max-w-full items-center gap-1.5 rounded-md border border-border px-2 text-xs text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground disabled:opacity-60 [@media(pointer:coarse)]:h-11";
@@ -1106,90 +1137,29 @@ export interface CodeSkillOption {
     readonly description: string;
 }
 
-/** Start the task with one of the person's Polar skills as its instructions. */
-export function CodeSkillChip({
-    skills,
+/** The skill picked with "/" for the task: named, and removable. Skills are
+ *  chosen from the box's "/" menu, as in Claude Code, not from a chip. */
+export function CodeSkillTag({
     skill,
-    onSkill,
+    onClear,
     disabled
 }: {
-    skills: readonly CodeSkillOption[];
-    skill: string | null;
-    onSkill: (skill: string | null) => void;
+    skill: string;
+    onClear: () => void;
     disabled: boolean;
 }) {
     const t = useTranslations("polar");
-    const [query, setQuery] = useState("");
-    const shown = skills.filter((option) =>
-        menuSearchMatches(`${option.name} ${option.description}`, query)
-    );
     return (
         <span className="flex min-w-0 max-w-full items-center gap-0.5">
-            <DropdownMenu onOpenChange={(next) => (next ? undefined : setQuery(""))}>
-                <DropdownMenuTrigger asChild disabled={disabled}>
-                    <button
-                        type="button"
-                        aria-label={`${t("code.skill.label")}: ${skill ?? t("code.skill.none")}`}
-                        title={skill ?? t("code.skill.pick")}
-                        className={CHIP}
-                    >
-                        <Wand2 className="size-3.5 shrink-0" aria-hidden />
-                        <span className="min-w-0 truncate">{skill ?? t("code.skill.label")}</span>
-                        <ChevronDown className="size-3.5 shrink-0" aria-hidden />
-                    </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className={CHIP_MENU}>
-                    <p className="px-2 pt-1.5 pb-2 text-xs text-muted-foreground">
-                        {t("code.skill.intro")}
-                    </p>
-                    {skills.length > 6 ? (
-                        <MenuSearch
-                            value={query}
-                            onChange={setQuery}
-                            placeholder={t("code.skill.search")}
-                        />
-                    ) : null}
-                    {shown.map((option) => (
-                        <DropdownMenuItem
-                            key={option.name}
-                            onSelect={() => onSkill(option.name)}
-                            className="items-start"
-                        >
-                            <span className="flex min-w-0 flex-col">
-                                <span className="min-w-0 truncate" title={option.name}>
-                                    {option.name}
-                                </span>
-                                {option.description ? (
-                                    <span
-                                        className="line-clamp-2 text-xs text-muted-foreground"
-                                        title={option.description}
-                                    >
-                                        {option.description}
-                                    </span>
-                                ) : null}
-                            </span>
-                            <Mark on={skill === option.name} />
-                        </DropdownMenuItem>
-                    ))}
-                    {skills.length === 0 ? (
-                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                            {t("code.skill.empty")}
-                        </p>
-                    ) : null}
-                    {skills.length > 0 && shown.length === 0 ? (
-                        <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                            {t("code.skill.noMatch")}
-                        </p>
-                    ) : null}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem asChild>
-                        <Link href="/polar/settings/skills">{t("code.skill.manage")}</Link>
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-            {skill ? (
-                <ChipClear label={t("code.skill.clear")} onClear={() => onSkill(null)} />
-            ) : null}
+            <span
+                title={`${t("code.skill.label")}: /${skill}`}
+                aria-label={`${t("code.skill.label")}: /${skill}`}
+                className={cn(CHIP, "hover:bg-transparent hover:text-muted-foreground")}
+            >
+                <Wand2 className="size-3.5 shrink-0" aria-hidden />
+                <span className="min-w-0 truncate">/{skill}</span>
+            </span>
+            {disabled ? null : <ChipClear label={t("code.skill.clear")} onClear={onClear} />}
         </span>
     );
 }

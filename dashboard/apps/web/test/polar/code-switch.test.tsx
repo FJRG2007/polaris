@@ -459,10 +459,10 @@ describe("how the agent asks before it acts", () => {
         fireEvent.click(codeOption);
         const box = await screen.findByRole("textbox", { name: "Task for the agent" });
         await screen.findByRole("button", { name: /^Where the agent works: acme\/web/ });
-        const mode = screen.getByRole("button", { name: "Permissions: Full access" });
+        const mode = screen.getByRole("button", { name: /^Session options: Permissions: Full access/ });
         fireEvent.pointerDown(mode, { button: 0, ctrlKey: false });
         fireEvent.click(await screen.findByRole("menuitem", { name: /Ask first/ }));
-        expect(screen.getByRole("button", { name: "Permissions: Ask first" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: /^Session options: Permissions: Ask first/ })).toBeTruthy();
         fireEvent.change(box, { target: { value: "Fix the login form" } });
         const send = screen.getByRole("button", { name: "Start session" }) as HTMLButtonElement;
         await waitFor(() => expect(send.disabled).toBe(false));
@@ -554,11 +554,13 @@ describe("starting from an issue or a skill", () => {
         fireEvent.click(await screen.findByRole("menuitem", { name: /Login fails on Safari/ }));
         expect(screen.getByRole("button", { name: "Issue: #42 Login fails on Safari" })).toBeTruthy();
 
-        fireEvent.pointerDown(screen.getByRole("button", { name: "Skill: none" }), {
-            button: 0,
-            ctrlKey: false
-        });
-        fireEvent.click(await screen.findByRole("menuitem", { name: /tdd/ }));
+        // A skill has no chip: it is picked with "/" in the box.
+        expect(screen.queryByRole("button", { name: /^Skill/ })).toBeNull();
+        const box = screen.getByRole("textbox", { name: "Task for the agent" });
+        fireEvent.change(box, { target: { value: "/tdd" } });
+        await screen.findByRole("listbox", { name: "Commands" });
+        fireEvent.keyDown(box, { key: "Enter" });
+        await waitFor(() => expect(screen.getByLabelText("Skill: /tdd")).toBeTruthy());
 
         const send = screen.getByRole("button", { name: "Start session" }) as HTMLButtonElement;
         await waitFor(() => expect(send.disabled).toBe(false));

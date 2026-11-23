@@ -183,13 +183,9 @@ describe("Code's composer is Chat's", () => {
             "Microphone and model",
             "Write something to improve it",
             PICKED,
-            // The engine for this task: the person's setting unless picked here.
-            "Engine: Your setting",
-            // A Claude source runs on Claude Code, whose questions are answered here.
-            "Permissions: Full access",
-            "Conversation: Terminal",
-            // Where the session runs: Polaris, or one of the person's paired computers.
-            "Runs on: Polaris",
+            // One menu holds the permission mode, the conversation, the engine
+            // and where the session runs; the chip names the mode.
+            "Session options: Permissions: Full access, Conversation: Terminal, Engine: Your setting, Runs on: Polaris",
             "Start the task first, then talk to it"
         ]);
         const form = box.closest("form") as HTMLFormElement;

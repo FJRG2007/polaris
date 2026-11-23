@@ -1602,6 +1602,10 @@
         "issueGone": "No se pudo leer esa issue en GitHub. Elígela de nuevo o empieza sin ella.",
         "skillGone": "Esa skill ya no es tuya. Elige otra o empieza sin ella.",
         "starterGone": "No se pudo usar la issue o skill elegida. Elígela de nuevo.",
+        "options": {
+            "label": "Opciones",
+            "title": "Opciones de sesión"
+        },
         "surface": {
             "label": "Conversación",
             "terminal": {
