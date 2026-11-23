@@ -108,6 +108,7 @@ export interface DeviceAccount {
     readonly userId: string;
     readonly name: string;
     readonly email: string;
+    readonly username: string | null;
     readonly image: string | null;
     /** Whether this is the account the browser is acting as right now. */
     readonly active: boolean;
@@ -115,7 +116,13 @@ export interface DeviceAccount {
 
 interface ListedSession {
     session: { id: string; token: string };
-    user: { id: string; name: string; email: string; image?: string | null };
+    user: {
+        id: string;
+        name: string;
+        email: string;
+        username?: string | null;
+        image?: string | null;
+    };
 }
 
 /** The plugin's server API, which this package cannot name through `Auth`'s
@@ -160,13 +167,17 @@ function toAccount(entry: ListedSession, active: boolean): DeviceAccount {
         userId: entry.user.id,
         name: entry.user.name,
         email: entry.user.email,
+        username: entry.user.username ?? null,
         image: entry.user.image ?? null,
         active
     };
 }
 
 /**
- * The accounts whose sessions this browser actually holds, the active one first.
+ * The accounts whose sessions this browser actually holds, the active one first,
+ * each account once. Signing in to an account the browser already holds replaces
+ * its older session (the plugin's after-hook) rather than adding a second, and
+ * the plugin's list keeps one session per account besides.
  *
  * Only a cookie better-auth signed can name a session here, so no account ever
  * appears because somebody typed its id. The active session is included even

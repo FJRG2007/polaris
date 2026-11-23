@@ -153,6 +153,51 @@ describe("adding an account", () => {
         expect(db.session.filter((row) => row.userId === ids.ana)).toHaveLength(2); // one from sign-up
     });
 
+    it("signing in again to the active account rotates its session, never adds a row", async () => {
+        const browser = new Browser();
+        await signIn(browser, "ana");
+        await signIn(browser, "ben");
+        const before = db.session.filter((row) => row.userId === ids.ben).length;
+        await signIn(browser, "ben");
+
+        const accounts = await listDeviceAccounts(auth, browser.headers());
+        expect(accounts.map((account) => [account.name, account.active])).toEqual([
+            ["ben", true],
+            ["ana", false]
+        ]);
+        expect(browser.multiCookies()).toHaveLength(2);
+        expect(db.session.filter((row) => row.userId === ids.ben)).toHaveLength(before);
+    });
+
+    it("lists an account once even when the browser holds two of its sessions", async () => {
+        const browser = new Browser();
+        await signIn(browser, "ana");
+        await signIn(browser, "ben");
+        // A second session of ana's in the same browser, as a flow that skipped
+        // the replacement on sign-in would leave it.
+        const elsewhere = new Browser();
+        await signIn(elsewhere, "ana");
+        for (const name of elsewhere.multiCookies()) browser.jar.set(name, elsewhere.jar.get(name)!);
+        expect(browser.multiCookies()).toHaveLength(3);
+
+        const accounts = await listDeviceAccounts(auth, browser.headers());
+        expect(accounts.map((account) => account.name)).toEqual(["ben", "ana"]);
+        // The one left over is cleared from the browser like any dead cookie.
+        expect(
+            staleDeviceCookies(
+                browser.headers().get("cookie"),
+                accounts.map((account) => account.token)
+            )
+        ).toHaveLength(1);
+    });
+
+    it("carries each account's username for the sign-in screen to match against", async () => {
+        const browser = new Browser();
+        await signIn(browser, "ana");
+        const [account] = await listDeviceAccounts(auth, browser.headers());
+        expect(account).toMatchObject({ email: "ana@fixture.test", username: null });
+    });
+
     it("enrols a session opened before accounts could be added, so the next sign-in cannot push it out", async () => {
         const browser = new Browser();
         await signIn(browser, "ana");
