@@ -14,6 +14,11 @@
  *   signed in by an older release beside the desktop app on the same machine.
  *   Two computers of one account that share a name and a system read as one; the
  *   device panel says so.
+ * - **The extension, paired with Polaris Desktop.** The extension hands the
+ *   desktop app on its computer a nonce through native messaging, and the
+ *   desktop presents it over its own session; the server then gives the
+ *   extension's connection that session's device key (`./device-pairing`), so it
+ *   joins by the first rule - and the browser that let it in joins by the next.
  * - **The extension and the browser that let it in.** The extension opens the
  *   approval page in a tab of its own browser, so the session that approved it
  *   is that browser - when it is still signed in and reads as the same browser
@@ -169,6 +174,8 @@ export interface DeviceRowLists {
         readonly browser: string;
         readonly lastSeenAt: string;
         readonly approvedBySessionId?: string | null;
+        /** Bound by a pairing Polaris Desktop presented (`./device-pairing`). */
+        readonly deviceKey?: string | null;
     }[];
 }
 
@@ -194,7 +201,7 @@ export function deviceMembers(lists: DeviceRowLists): DeviceMember[] {
         })),
         ...(lists.extensions ?? []).map((extension) => ({
             id: extension.id,
-            deviceKey: null,
+            deviceKey: extension.deviceKey ?? null,
             name: null,
             os: extension.os,
             browser: extension.browser,

@@ -165,17 +165,18 @@ const EXTENSION = {
 };
 
 describe("the machine a row runs on", () => {
-    it("names the extension after the computer its terminal reported, on both rows", () => {
+    function renderBeside(extensionKey: string | null) {
         render(
             <SessionsTable
                 sessions={[]}
-                extensions={[EXTENSION]}
+                extensions={[{ ...EXTENSION, deviceKey: extensionKey }]}
                 deviceSessions={[
                     {
                         ...SIGN_IN,
                         name: "DRAGON",
                         hostname: "DRAGON",
                         os: "Windows",
+                        deviceKey: "c".repeat(64),
                         lastUsedIp: EXTENSION.ip
                     }
                 ]}
@@ -185,8 +186,23 @@ describe("the machine a row runs on", () => {
             />,
             { wrapper: MessagesWrapper }
         );
-        // The CLI row's own name, and the extension's machine label.
-        expect(screen.getAllByText("DRAGON")).toHaveLength(2);
+    }
+
+    it("words the address's guess as a reading while nothing proves the extension is on it", () => {
+        renderBeside(null);
+        // The extension's badge says what it is - the same network - instead
+        // of naming a computer its group does not.
+        const unpaired = screen.getAllByText("DRAGON").length;
+        expect(screen.getByText("Same network as DRAGON")).toBeTruthy();
+        cleanup();
+        renderBeside("c".repeat(64));
+        expect(screen.getAllByText("DRAGON").length).toBe(unpaired + 1);
+    });
+
+    it("names the extension after the computer once Polaris Desktop paired it", () => {
+        renderBeside("c".repeat(64));
+        expect(screen.queryByText("Same network as DRAGON")).toBeNull();
+        expect(screen.getAllByText("DRAGON").length).toBeGreaterThanOrEqual(2);
     });
 });
 

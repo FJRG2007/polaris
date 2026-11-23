@@ -3869,12 +3869,42 @@ model ExtensionSession {
     // following the account's own rule for sessions (null) - the same three
     // answers a browser session has.
     pinToAddress Boolean?
+    // The computer it runs on, proven rather than guessed: Polaris Desktop on
+    // the same machine presented a pairing nonce this connection was issued,
+    // over its own session, and this is that session's device key. Null until
+    // then, and for every browser with no desktop app beside it.
+    deviceKey  String?
+    // The extension's own id in its browser (chrome.runtime.id), as it reported
+    // it when asking to be paired - what the desktop app lets talk to its native
+    // messaging host. A label, never a credential.
+    runtimeId  String?
 
-    user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user         User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
     vaultDevices VaultDevice[]
+    pairings     ExtensionDevicePairing[]
 
     @@unique([userId, deviceId])
     @@index([userId])
+}
+
+// One offer to pair an extension connection with the computer it runs on.
+//
+// Short-lived and single-use: the extension is handed the nonce, passes it to
+// Polaris Desktop through the browser's native messaging, and the desktop
+// presents it over its own session. Only the hash is kept, and claiming it
+// deletes the row, so a nonce presented twice finds nothing.
+model ExtensionDevicePairing {
+    id                 String   @id @default(uuid(7)) @db.Uuid
+    userId             String   @db.Uuid
+    extensionSessionId String   @db.Uuid
+    nonceHash          String   @unique
+    expiresAt          DateTime
+    createdAt          DateTime @default(now())
+
+    extensionSession ExtensionSession @relation(fields: [extensionSessionId], references: [id], onDelete: Cascade)
+
+    @@index([extensionSessionId])
+    @@index([expiresAt])
 }
 
 // One extension waiting to be let in, before there is a session.

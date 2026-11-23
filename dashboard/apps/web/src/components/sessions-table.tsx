@@ -277,6 +277,7 @@ export function SessionsTable({
     const now = useNow();
     const sessionRows = inUseFirst(sessions, now);
     const extensionRows = inUseFirst(extensions, now);
+    const groups = groupByDevice(deviceMembers({ sessions, deviceSessions, extensions }));
     const machines = machinesOf([
         ...sessions.map((session) => ({
             id: session.id,
@@ -295,8 +296,7 @@ export function SessionsTable({
             os: device.os,
             hostname: device.hostname
         }))
-    ]);
-    const groups = groupByDevice(deviceMembers({ sessions, deviceSessions, extensions }));
+    ], groups);
     const grouped = new Set(groups.flatMap((group) => group.memberIds));
     function toggle(key: string) {
         setCollapsed((was) => {
@@ -841,16 +841,21 @@ export function MachineBadge({
     const t = useTranslations("components");
     if (!machine || (current && !machine.name)) return null;
     if (!machine.here && machine.name === named) return null;
+    // A machine only the address points at - its group says otherwise - is
+    // worded as the reading it is, so the badge never contradicts the group.
+    const words = machine.reading
+        ? machine.name
+            ? t("sessionsTable.sameNetworkAs", { name: machine.name })
+            : t("sessionsTable.sameNetworkAsHere")
+        : (machine.name ?? t("sessionsTable.thisComputer"));
     return (
         <Badge
-            variant={machine.here ? "primary" : "neutral"}
-            title={t("sessionsTable.machineHint")}
-            className="min-w-0 max-w-[12rem]"
+            variant={machine.here && !machine.reading ? "primary" : "neutral"}
+            title={machine.reading ? t("sessionsTable.sameNetworkHint") : t("sessionsTable.machineHint")}
+            className="min-w-0 max-w-[14rem]"
         >
             <Monitor aria-hidden className="size-3 shrink-0" />
-            <span className="min-w-0 truncate">
-                {machine.name ?? t("sessionsTable.thisComputer")}
-            </span>
+            <span className="min-w-0 truncate">{words}</span>
         </Badge>
     );
 }

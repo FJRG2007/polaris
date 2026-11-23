@@ -192,3 +192,53 @@ describe("groupByDevice", () => {
         expect(groups.map((group) => group.key)).toEqual([KEY, OTHER_KEY]);
     });
 });
+describe("an extension paired with Polaris Desktop", () => {
+    const lists: DeviceRowLists = {
+        sessions: [
+            {
+                id: "desktop",
+                deviceKey: KEY,
+                deviceName: "DRAGON",
+                os: "Windows 11",
+                browser: "Polaris Desktop",
+                lastSeenAt: "2026-11-23T10:00:00Z",
+                current: false
+            },
+            {
+                id: "brave",
+                deviceKey: null,
+                deviceName: null,
+                os: "Windows 11",
+                browser: "Brave",
+                lastSeenAt: "2026-11-23T10:01:00Z",
+                current: true
+            }
+        ],
+        extensions: [
+            {
+                id: "ext",
+                os: "Windows",
+                browser: "Brave",
+                lastSeenAt: "2026-11-23T10:00:30Z",
+                approvedBySessionId: "brave",
+                deviceKey: KEY
+            }
+        ]
+    };
+
+    it("joins the desktop's device, and the browser that let it in comes along", () => {
+        const groups = groupByDevice(deviceMembers(lists));
+        expect(groups).toHaveLength(1);
+        expect(groups[0]!.key).toBe(KEY);
+        expect(groups[0]!.name).toBe("DRAGON");
+        expect(groups[0]!.here).toBe(true);
+        expect([...groups[0]!.memberIds].sort()).toEqual(["brave", "desktop", "ext"]);
+    });
+
+    it("stays apart from the desktop while it is not paired", () => {
+        const unpaired = { ...lists, extensions: lists.extensions!.map((row) => ({ ...row, deviceKey: null })) };
+        const desktop = groupByDevice(deviceMembers(unpaired)).find((group) => group.memberIds.includes("desktop"))!;
+        expect(desktop.memberIds).not.toContain("ext");
+        expect(desktop.memberIds).not.toContain("brave");
+    });
+});

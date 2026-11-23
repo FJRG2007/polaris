@@ -70,3 +70,37 @@ describe("the machine a session runs on", () => {
         expect(DEVICE_SESSION_KINDS.tv.namesMachine).toBe(false);
     });
 });
+describe("a machine the device groups do not confirm", () => {
+    const rows = [
+        { id: "brave", ip: HOME, os: "Windows 11", current: true },
+        { id: "ext", ip: HOME, os: "Windows" },
+        { id: "desktop", ip: HOME, os: "Windows", hostname: "DRAGON" }
+    ];
+
+    it("is a reading on a row whose group is another device", () => {
+        const machines = machinesOf(rows, [
+            { name: null, here: true, memberIds: ["brave", "ext"] },
+            { name: "DRAGON", here: false, memberIds: ["desktop"] }
+        ]);
+        expect(machines.get("brave")).toEqual({ name: "DRAGON", here: true, reading: true });
+        expect(machines.get("ext")).toEqual({ name: "DRAGON", here: true, reading: true });
+        expect(machines.get("desktop")).toEqual({ name: "DRAGON", here: true });
+    });
+
+    it("is the row's own computer once the group proves it", () => {
+        const machines = machinesOf(rows, [{ name: "DRAGON", here: true, memberIds: ["brave", "ext", "desktop"] }]);
+        for (const id of ["brave", "ext", "desktop"]) expect(machines.get(id)?.reading).toBeUndefined();
+    });
+
+    it("words an unnamed computer as a reading when the row is not proven to be on it", () => {
+        const machines = machinesOf(
+            [
+                { id: "brave", ip: HOME, os: "macOS", current: true },
+                { id: "ext", ip: HOME, os: "macOS" }
+            ],
+            []
+        );
+        expect(machines.get("brave")).toEqual({ name: null, here: true });
+        expect(machines.get("ext")).toEqual({ name: null, here: true, reading: true });
+    });
+});

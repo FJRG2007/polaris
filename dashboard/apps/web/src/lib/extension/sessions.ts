@@ -40,6 +40,7 @@ import { notifySessionsClosed } from "@/lib/notifications/session-events";
 import { addressPinned, describeClient, isHandheld, type AddressPinScope } from "@polaris/core";
 import { AUTHORIZATION_POLL_MS, AUTHORIZATION_TTL_MS, newUserCode } from "@/lib/device-code";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { isDeviceBlocked } from "@/lib/device-sessions/device-key";
 
 /** How long a connection of the same browser on the same system has to have
  *  gone unused before a new one retires it as a reinstall's leftover. */
@@ -101,6 +102,9 @@ export interface ExtensionSessionView {
      *  its own browser - so the sessions screen can place it beside that
      *  browser (`groupByDevice`). Null when nobody recorded one. */
     readonly approvedBySessionId: string | null;
+    /** The device key Polaris Desktop on the same computer proved it shares
+     *  (`lib/device-sessions/device-pairing`), or null when nothing did. */
+    readonly deviceKey: string | null;
 }
 
 /** The connection behind a token on a request. */
@@ -381,6 +385,7 @@ export async function readExtensionToken(
             ip: true,
             revokedAt: true,
             pinToAddress: true,
+            deviceKey: true,
             user: {
                 select: {
                     bannedAt: true,
@@ -391,6 +396,9 @@ export async function readExtensionToken(
         }
     });
     if (!row || row.revokedAt || row.user.bannedAt || row.user.disabledAt) return null;
+    // A connection proven to run on a computer the account blocked is refused
+    // with it - the block names the machine, and this is on that machine.
+    if (await isDeviceBlocked(row.userId, row.deviceKey)) return null;
 
     // The address lock, judged the way a session's is: against where it was last
     // seen, and only where both ends name an address. A request with nothing to
@@ -459,6 +467,7 @@ export async function listExtensionSessions(userId: string): Promise<ExtensionSe
             lastSeenAt: true,
             pinToAddress: true,
             approvedBySessionId: true,
+            deviceKey: true,
             _count: { select: { vaultDevices: true } }
         }
     });
@@ -483,6 +492,7 @@ export async function listExtensionSessions(userId: string): Promise<ExtensionSe
             vaultClients: row._count.vaultDevices,
             pinToAddress: row.pinToAddress ?? null,
             approvedBySessionId: row.approvedBySessionId,
+            deviceKey: row.deviceKey,
             pinnedByRule: isPinned(
                 { os: client.os, pinToAddress: null },
                 security?.pinSessionsToAddress
