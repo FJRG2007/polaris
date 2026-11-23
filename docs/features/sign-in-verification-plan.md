@@ -17,9 +17,10 @@ because a similar one worked.
   phone shows a number to match and asks for its own lock, and that counts as
   multi-factor on its own.
   <https://learn.microsoft.com/en-us/entra/identity/authentication/howto-authentication-passwordless-phone>
+  (link from memory, not re-fetched for this work)
 - Google sign-in prompts: offered for the typed account on a phone already
   signed in to it, with the password one press away.
-  <https://support.google.com/accounts/answer/7026266>
+  <https://support.google.com/accounts/answer/7026266> (link from memory, not re-fetched)
 - GitHub Mobile (pick the number among three choices) is the model for showing
   choices instead of a keypad; its documentation was not re-read for this work.
 
