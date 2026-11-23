@@ -479,7 +479,6 @@
         "unlinkBody": "{name} stops following a Polaris account and comes off the list.",
         "lastLevel": "Level {level} when last seen, {date}",
         "linkedHint": "Joins from wherever {name} is signed in to Polaris",
-        "linked": "linked",
         "lastLogin": "Last logged in {date}",
         "lifts": "Lifts {date}",
         "timedOut": "timed out, {left}",

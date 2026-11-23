@@ -110,7 +110,8 @@ import {
 } from "lucide-react";
 import { hostUi } from "@polaris/app-host/client";
 import * as view from "../../lib/minecraft/players-view";
-import { addressShown } from "../../lib/minecraft/address-label";
+import Link from "next/link";
+import { addressShown, type AddressWhere } from "../../lib/minecraft/address-label";
 
 const { relativeTime } = hostUi.relativeTime;
 const { useConfirm } = hostUi.confirmDialog;
@@ -118,6 +119,7 @@ const { ToolbarSwitch } = hostUi.toolbarSwitch;
 const { useDisplayFormat } = hostUi.displayFormat;
 const { writeSnapshot } = hostUi.snapshotCache;
 const { useKeptSnapshot } = hostUi.liveRead;
+const { Avatar } = hostUi.avatar;
 
 /** Nobody known to be idle: the screen before the first answer about it. */
 const NOBODY_IDLE: Readonly<Record<string, number>> = {};
@@ -270,6 +272,11 @@ export function MinecraftPlayers({
     const target = acting?.player ?? null;
     const bedrock = status?.edition === "bedrock";
     const edition = access?.edition ?? status?.edition ?? "java";
+    const locale = hostUi.i18nProvider.useLocale();
+    const where = useMemo<AddressWhere>(
+        () => ({ countries: access?.countries, locale }),
+        [access?.countries, locale]
+    );
     const known = useMemo(
         () => foldPlayers(status, roster, access, sessions, now, seen, passwords ?? []),
         [status, roster, access, sessions, now, seen, passwords]
@@ -729,7 +736,7 @@ export function MinecraftPlayers({
                                     <span className="font-medium">{refusal.player}</span>
                                     <span className="text-muted-foreground">
                                         {from
-                                            ? t("playersTab.arrivedFrom", { address: addressShown(from, (ref) => t("playersTab.addressRef", { ref })) })
+                                            ? t("playersTab.arrivedFrom", { address: addressShown(from, (ref) => t("playersTab.addressRef", { ref }), where) })
                                             : t("playersTab.arrivedFromAnAddressThe")}
                                         {" - "}
                                         {format.dateTime(refusal.at)}
@@ -1012,6 +1019,7 @@ export function MinecraftPlayers({
                     <PlayerRow
                         key={player.name.toLowerCase()}
                         player={player}
+                        where={where}
                         mode={modes[player.name] ?? null}
                         chosen={selection.isChosen(player.name)}
                         // Right-clicking a row that is one of several chosen
@@ -1091,6 +1099,7 @@ export function MinecraftPlayers({
                               }
                             : null
                     }
+                    where={where}
                     onLink={linkPlayer}
                     onInvite={async (input) => {
                         const result = await actions.invitePlayerAccountAction({
@@ -1257,6 +1266,7 @@ export function MinecraftPlayers({
 
 function PlayerRow({
     player,
+    where,
     mode,
     chosen,
     bulk,
@@ -1282,6 +1292,8 @@ function PlayerRow({
     onRevoke
 }: {
     player: PlayerEntry;
+    /** What a reference to one of their addresses reads as. */
+    where: AddressWhere;
     /** The game mode they were last read in, while they are on. */
     mode: string | null;
     /** Whether the row is one of those chosen. */
@@ -1457,13 +1469,37 @@ function PlayerRow({
                 </td>
                 <td className="px-3 py-2">
                     <TagList>
+                        {/* The account they are, by face and name; the name opens its
+                        profile, where that account's own privacy decides the rest. */}
                         {player.linkedTo && (
                             <Badge
                                 title={t("playersTab.linkedHint", {
                                     name: schemaText(player.linkedTo.name) ?? ""
                                 })}
                             >
-                                {t("playersTab.linked")}
+                                <span className="flex max-w-40 min-w-0 items-center gap-1">
+                                    <Avatar
+                                        person={{
+                                            id: player.linkedTo.userId,
+                                            name: player.linkedTo.name
+                                        }}
+                                        size={16}
+                                        status={false}
+                                    />
+                                    {player.linkedTo.profile ? (
+                                        <Link
+                                            href={`/u/${encodeURIComponent(player.linkedTo.profile)}`}
+                                            onClick={(event) => event.stopPropagation()}
+                                            className="min-w-0 truncate underline-offset-2 hover:underline"
+                                        >
+                                            {player.linkedTo.name}
+                                        </Link>
+                                    ) : (
+                                        <span className="min-w-0 truncate">
+                                            {player.linkedTo.name}
+                                        </span>
+                                    )}
+                                </span>
                             </Badge>
                         )}
                         {player.addresses.length > 0 && (
@@ -1540,7 +1576,7 @@ function PlayerRow({
                     ) : (
                         <TagList>
                             {player.addresses.map((address) => (
-                                <Badge key={address}>{addressShown(address, (ref) => t("playersTab.addressRef", { ref }))}</Badge>
+                                <Badge key={address}>{addressShown(address, (ref) => t("playersTab.addressRef", { ref }), where)}</Badge>
                             ))}
                         </TagList>
                     )}

@@ -38,6 +38,8 @@ export interface PlayerEntry {
     readonly linkedTo: {
         readonly userId: string;
         readonly name: string;
+        /** The account's handle, which opens its profile. */
+        readonly profile: string | null;
         /** False when the account is only who they are and typed addresses hold. */
         readonly followSignIns: boolean;
     } | null;
@@ -123,7 +125,12 @@ export function foldPlayers(
     }
     for (const link of access?.links ?? []) {
         upsert(link.username, {
-            linkedTo: { userId: link.userId, name: link.name, followSignIns: link.followSignIns }
+            linkedTo: {
+                userId: link.userId,
+                name: link.name,
+                profile: link.profile ?? null,
+                followSignIns: link.followSignIns
+            }
         });
     }
     for (const player of roster?.ops ?? []) upsert(player, { operator: true });

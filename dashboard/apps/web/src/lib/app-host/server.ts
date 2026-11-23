@@ -170,6 +170,7 @@ const load = {
     requestContext: once(() => import("@/lib/request-context")),
     safeFetch: once(() => import("@/lib/safe-fetch")),
     seasonalService: once(() => import("@/lib/seasonal-service")),
+    geoip: once(() => import("@/lib/analytics-geoip")),
     serverMetricsService: once(() => import("@/lib/server-metrics-service")),
     peopleSearch: once(() => import("@/lib/people-search")),
     session: once(() => import("@/lib/session")),
@@ -603,6 +604,11 @@ export const serverHost = {
     // people search - so no app's "add by email" is an account-existence oracle.
     peopleSearch: {
         resolveNamedAccount: later(load.peopleSearch, "resolveNamedAccount")
+    },
+    // The country an address is in, for a screen that shows a reference to an
+    // address instead of the address.
+    geoip: {
+        countryForAddress: later(load.geoip, "countryForAddress")
     },
     settingStore: {
         getSetting: later(load.settingStore, "getSetting"),

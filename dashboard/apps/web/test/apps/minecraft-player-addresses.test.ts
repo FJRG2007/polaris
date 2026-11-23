@@ -29,6 +29,11 @@ vi.mock("@/lib/session", () => ({
     }
 }));
 
+vi.mock("@/lib/analytics-geoip", () => ({
+    countryForAddress: async (ip: string) =>
+        ({ "203.0.113.7": "US", "198.51.100.4": "ES", "192.0.2.9": "FR" })[ip] ?? null
+}));
+
 const { forViewer } = await import("@polaris-app/game-servers/src/lib/minecraft/player-access");
 const refs = await import("@polaris-app/game-servers/src/lib/minecraft/address-refs");
 const { addressShown } = await import("@polaris-app/game-servers/src/lib/minecraft/address-label");
@@ -88,6 +93,27 @@ describe("player addresses on the players screen", () => {
         expect(refs.isAddressRef(shown.refusals[0]!.address!)).toBe(true);
         // The stored view is untouched: enforcement reads the rows themselves.
         expect(view.rules[0]!.address).toBe("203.0.113.7");
+    });
+
+    it("keeps the country of a typed or refused address, never of a sign-in", async () => {
+        const shown = await forViewer(view, undefined, SERVER);
+        const [ada, bob, cy] = addressesOf(shown);
+        expect(shown.countries?.[bob!]).toBe("ES");
+        expect(shown.countries?.[cy!]).toBe("US");
+        expect(shown.countries?.[shown.refusals[0]!.address!]).toBe("FR");
+        // A linked account's sign-in, and a refused join from that same line.
+        expect(shown.countries?.[ada!]).toBeUndefined();
+        const linked = { ...view, links: [{ username: "BOB" }] } as unknown as View;
+        expect((await forViewer(linked, undefined, SERVER)).countries?.[bob!]).toBeUndefined();
+        const where = { countries: shown.countries, locale: "en-US" };
+        expect(addressShown(bob!, (ref) => `Address ${ref}`, where)).toMatch(
+            /^Address [0-9A-F]{4}-[0-9A-F]{4} \(Spain\)$/
+        );
+    });
+
+    it("carries no countries when the addresses themselves are shown", async () => {
+        state.isAdmin = true;
+        expect((await forViewer(view, undefined, SERVER)).countries).toBeUndefined();
     });
 
     it("gives another server different references for the same address", async () => {

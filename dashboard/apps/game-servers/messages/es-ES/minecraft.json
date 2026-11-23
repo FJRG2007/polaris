@@ -479,7 +479,6 @@
         "unlinkBody": "{name} deja de seguir a una cuenta de Polaris y sale de la lista.",
         "lastLevel": "Nivel {level} la última vez que se le vio, {date}",
         "linkedHint": "Entra desde donde {name} tenga sesión en Polaris",
-        "linked": "vinculado",
         "lastLogin": "Última entrada el {date}",
         "lifts": "Termina el {date}",
         "timedOut": "aislado, {left}",

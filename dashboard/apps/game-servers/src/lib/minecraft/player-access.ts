@@ -77,6 +77,7 @@ import { addressRef, addressRefKey, isAddressRef, resolveAddressRef } from "./ad
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 const { getSetting } = host.settingStore;
 const { requireUser } = host.session;
+const { countryForAddress } = host.geoip;
 
 /**
  * The instance setting an administrator sets under Management > Security. The
@@ -118,6 +119,11 @@ export async function viewerSeesSignInAddresses(viewer?: {
  *   address. Otherwise typing a guess and comparing it with what is listed
  *   would tell a manager where a player connects from.
  *
+ * The country of a reference stays on (`countries`) for an address a person
+ * typed or one a refused player arrived from, as an anonymous visitor's does in
+ * a link's access log. Never for a player linked to an account: that account
+ * is named, and where it is from is its own.
+ *
  * Enforcement never goes through here - it reads the rows themselves.
  */
 export async function forViewer(
@@ -127,18 +133,48 @@ export async function forViewer(
 ): Promise<PlayerAccessView> {
     if (await viewerSeesSignInAddresses(viewer)) return view;
     const key = await addressRefKey();
-    return {
-        ...view,
-        rules: view.rules.map((rule) => ({
-            ...rule,
-            address: ruleReference(key, installedAppId, rule)
-        })),
-        refusals: view.refusals.map((refusal) =>
+    const countries: Record<string, string> = {};
+    // A refused join from a line a linked account signs in from shares that
+    // sign-in's reference, so it carries no country either; nor does an address
+    // typed for a linked player, which is that account's too.
+    const linked = new Set(view.links.map((link) => link.username.toLowerCase()));
+    const signIns = new Set(
+        view.rules
+            .filter((rule) => rule.source === "session")
+            .map((rule) => ruleReference(key, installedAppId, rule))
+    );
+    const located = async (ref: string, address: string): Promise<string> => {
+        if (signIns.has(ref)) return ref;
+        const country = await countryForAddress(address);
+        if (country) countries[ref] = country;
+        return ref;
+    };
+    const rules = await Promise.all(
+        view.rules.map(async (rule) => {
+            const ref = ruleReference(key, installedAppId, rule);
+            const address =
+                rule.source === "manual" &&
+                ref !== rule.address &&
+                !linked.has(rule.username.toLowerCase())
+                    ? await located(ref, rule.address)
+                    : ref;
+            return { ...rule, address };
+        })
+    );
+    const refusals = await Promise.all(
+        view.refusals.map(async (refusal) =>
             refusal.address
-                ? { ...refusal, address: addressRef(key, installedAppId, refusal.address) }
+                ? {
+                      ...refusal,
+                      address: await located(
+                          addressRef(key, installedAppId, refusal.address),
+                          refusal.address
+                      )
+                  }
                 : refusal
         )
-    };
+    );
+    return { ...view, rules, refusals, countries };
 }
 
 /** What a rule's address reads as to somebody not allowed to see it. */
@@ -192,6 +228,8 @@ export interface PlayerLinkView {
     readonly userId: string;
     /** What Polaris calls that account. */
     readonly name: string;
+    /** The account's handle, which opens its profile; null when it has none. */
+    readonly profile: string | null;
     /** Whether their addresses are the account's sign-ins, or the ones typed for
      *  them - see `linkPlayerAccount`. */
     readonly followSignIns: boolean;
@@ -366,6 +404,9 @@ export interface PlayerAccessView {
     /** False on Bedrock, whose log carries no address to check against. */
     readonly addressesAvailable: boolean;
     readonly edition: MinecraftEdition;
+    /** The country of each reference that may carry one, by reference - see
+     *  `forViewer`. Absent when the addresses themselves are shown. */
+    readonly countries?: Readonly<Record<string, string>>;
 }
 
 interface AccessInstall {
@@ -417,6 +458,11 @@ export async function listPlayerAccess(
     const names = new Map(
         people.map((person) => [person.id, person.name || person.username || ""])
     );
+    const handles = new Map(
+        people.flatMap((person) =>
+            person.username?.trim() ? [[person.id, person.username.trim()] as const] : []
+        )
+    );
     return {
         refusals: install.refusals,
         rules: rows.map((row) => ({
@@ -431,6 +477,7 @@ export async function listPlayerAccess(
             username: link.player,
             userId: link.userId,
             name: names.get(link.userId) || gameMessage("games", "lib.aPolarisAccount"),
+            profile: handles.get(link.userId) ?? null,
             followSignIns: follows(link)
         })),
         bindAddresses: install.bindAddresses,

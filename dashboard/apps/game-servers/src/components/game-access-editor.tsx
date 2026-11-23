@@ -18,7 +18,8 @@ import { useGameText, useSchemaText } from "../screens/game-text";
 import { useMemo, useState, useTransition } from "react";
 import { GameAccessForm } from "./game-access-form";
 import { ACCESS_REACH_NOTE } from "../lib/minecraft/access";
-import { addressShown } from "../lib/minecraft/address-label";
+import { addressShown, type AddressWhere } from "../lib/minecraft/address-label";
+import { hostUi } from "@polaris/app-host/client";
 import { Badge, Button, Card, CardBody, Switch, useOptimisticToggle } from "@polaris/ui";
 import type { PlayerAccessView } from "../lib/minecraft/player-access";
 import {
@@ -46,6 +47,8 @@ export function GameAccessEditor({
     const [failure, setFailure] = useState<string | null>(null);
 
     const edition = access?.edition ?? "java";
+    const locale = hostUi.i18nProvider.useLocale();
+    const where: AddressWhere = { countries: access?.countries, locale };
     const rules = access?.rules ?? [];
     const links = access?.links ?? [];
     // One row per address in the table, one line per person on the screen. A
@@ -208,7 +211,7 @@ export function GameAccessEditor({
                                             key={address}
                                             className="inline-flex items-center gap-0.5"
                                         >
-                                            <Badge>{addressShown(address, (ref) => t("accessEditor.addressRef", { ref }))}</Badge>
+                                            <Badge>{addressShown(address, (ref) => t("accessEditor.addressRef", { ref }), where)}</Badge>
                                             {/* Each address goes on its own. Taking the last
                                                 one takes the player, which the service decides
                                                 so both screens agree about it. A linked
@@ -220,13 +223,13 @@ export function GameAccessEditor({
                                                     disabled={pending}
                                                     aria-label={t("accessEditor.removeAddress", {
                                                         address: addressShown(address, (ref) =>
-                                                            t("accessEditor.addressRef", { ref })
+                                                            t("accessEditor.addressRef", { ref }), where
                                                         ),
                                                         name: person.username
                                                     })}
                                                     title={t("accessEditor.removeAddress", {
                                                         address: addressShown(address, (ref) =>
-                                                            t("accessEditor.addressRef", { ref })
+                                                            t("accessEditor.addressRef", { ref }), where
                                                         ),
                                                         name: person.username
                                                     })}

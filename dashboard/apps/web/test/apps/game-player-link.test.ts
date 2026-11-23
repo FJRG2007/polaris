@@ -371,7 +371,7 @@ describe("the list as the screen reads it", () => {
         await service.linkPlayerAccount(OWNER, SERVER, OWNER, { username: "AdaMC", userId: ADA });
         const view = await service.listPlayerAccess(OWNER, SERVER);
         expect(view.links).toEqual([
-            { username: "AdaMC", userId: ADA, name: "Ada", followSignIns: true }
+            { username: "AdaMC", userId: ADA, name: "Ada", profile: "ada", followSignIns: true }
         ]);
         expect(view.rules.map((rule) => rule.source)).toEqual(["session"]);
     });

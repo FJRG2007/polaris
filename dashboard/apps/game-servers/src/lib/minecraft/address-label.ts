@@ -15,12 +15,34 @@ export function isAddressRef(value: string): boolean {
 
 /**
  * The text to show for `address`: a reference through `label` (which words it,
- * "Address 3F9A-C21B"), anything else as is.
+ * "Address 3F9A-C21B") followed by its country when `where` names one, anything
+ * else as is.
  */
-export function addressShown(address: string, label: (ref: string) => string): string {
+export function addressShown(
+    address: string,
+    label: (ref: string) => string,
+    where?: AddressWhere
+): string {
     if (!isAddressRef(address)) return address;
     const code = address
         .slice(ADDRESS_REF_PREFIX.length, ADDRESS_REF_PREFIX.length + 8)
         .toUpperCase();
-    return label(`${code.slice(0, 4)}-${code.slice(4)}`);
+    const shown = label(`${code.slice(0, 4)}-${code.slice(4)}`);
+    const country = where?.countries?.[address];
+    return country ? `${shown} (${countryName(country, where.locale)})` : shown;
+}
+
+/** The countries a list carries for its references, and the reader's language. */
+export interface AddressWhere {
+    readonly countries: Readonly<Record<string, string>> | undefined;
+    readonly locale: string;
+}
+
+/** A country code in the reader's language, or the code where there is no name. */
+function countryName(code: string, locale: string): string {
+    try {
+        return new Intl.DisplayNames([locale], { type: "region" }).of(code) ?? code;
+    } catch {
+        return code;
+    }
 }

@@ -151,6 +151,12 @@ export function countryForIp(ip: string | null | undefined): string | null {
     }
 }
 
+/** `countryForIp` for an installable app, which reaches every host service
+ *  asynchronously. Never waits for the database to arrive. */
+export async function countryForAddress(ip: string | null | undefined): Promise<string | null> {
+    return countryForIp(ip);
+}
+
 /** Whether a copy is loaded - the backfill waits for it rather than guessing. */
 export function geoDatabaseReady(): boolean {
     return reader !== null;

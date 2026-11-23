@@ -15,7 +15,7 @@
  * is not something a one-shot read shared with the others could do.
  */
 
-import { addressShown } from "../../lib/minecraft/address-label";
+import { addressShown, type AddressWhere } from "../../lib/minecraft/address-label";
 import * as actions from "./minecraft-actions";
 import { useGameText, useSchemaText } from "../game-text";
 import type { GameKey } from "../../../messages";
@@ -699,9 +699,12 @@ export function PlayerAccessDialog({
     onLookUp,
     onLink,
     onUnlink,
-    onInvite
+    onInvite,
+    where
 }: {
     edition: MinecraftEdition;
+    /** What a reference to one of their addresses reads as. */
+    where?: AddressWhere;
     /** The player being edited, or null to register somebody new. */
     player: {
         username: string;
@@ -1152,16 +1155,16 @@ export function PlayerAccessDialog({
                                         key={held}
                                         className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs"
                                     >
-                                        {addressShown(held, (ref) => t("playersTab.addressRef", { ref }))}
+                                        {addressShown(held, (ref) => t("playersTab.addressRef", { ref }), where)}
                                         {onRemoveAddress && !following && (
                                             <button
                                                 type="button"
                                                 disabled={pending}
                                                 aria-label={t("players.removeAddressFrom", {
-                                                    address: addressShown(held, (ref) => t("playersTab.addressRef", { ref })),
+                                                    address: addressShown(held, (ref) => t("playersTab.addressRef", { ref }), where),
                                                     name: player.username
                                                 })}
-                                                title={t("players.removeNamed", { name: held })}
+                                                title={t("players.removeNamed", { name: addressShown(held, (ref) => t("playersTab.addressRef", { ref }), where) })}
                                                 className="text-muted-foreground hover:text-danger disabled:opacity-50"
                                                 onClick={() => onRemoveAddress(held)}
                                             >
