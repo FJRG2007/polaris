@@ -111,10 +111,6 @@
         "defaultIs": "The default here is {size}px. <back>Go back to it</back>",
         "saved": "Text size saved."
     },
-    "spoilers": {
-        "title": "Show spoilers without asking",
-        "body": "{surface, select, app {Pictures and messages somebody sent covered are drawn straight away instead of waiting for a press. This app only.} other {Pictures and messages somebody sent covered are drawn straight away instead of waiting for a press. This browser only.}}"
-    },
     "deviceCache": {
         "title": "This device",
         "body": "{surface, select, app {Polaris keeps a few things in this app so screens open faster - pictures, how loud each person is in a call, playback speed. Clear them if something looks out of date and a reload has not fixed it. Your other devices are not affected, and you stay signed in.} other {Polaris keeps a few things in this browser so screens open faster - pictures, how loud each person is in a call, playback speed. Clear them if something looks out of date and a reload has not fixed it. Your other devices are not affected, and you stay signed in.}}",
@@ -2343,18 +2339,5 @@
         "title": "Open links in the Polaris app",
         "body": "A Polaris link you open in a browser opens in the desktop or phone app instead, on devices where you've signed in to the app.",
         "failed": "Couldn't save that. Try again."
-    },
-    "mediaDownload": {
-        "title": "Media auto-download",
-        "body": "Recent photos, videos and documents are saved on this device so chats open without a connection.",
-        "photos": "Photos",
-        "videos": "Videos",
-        "files": "Documents",
-        "always": "Always",
-        "wifi": "Wi-Fi only",
-        "never": "Never",
-        "cap": "Storage limit",
-        "used": "{used} of {cap} used",
-        "clear": "Clear"
     }
 }

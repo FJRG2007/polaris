@@ -5,10 +5,9 @@
  * Anything left on "Platform default" follows what the operator set for the
  * deployment.
  *
- * A couple of the settings here are per browser rather than per account - what
- * is cached on this device, and whether covers are taken off before they are
- * seen. They say so on their own cards: they are statements about the screen
- * somebody is reading on, not about the person.
+ * Emptying what this browser holds is per browser rather than per account, and
+ * says so on its card. Chat's own choices - spoilers, media kept on this device -
+ * are on Chat's settings (/chat/settings), not here.
  *
  * The reference screen for translation (docs/i18n.md): the page's own words come
  * from `getTranslations`, the client cards' from `useTranslations` under the
@@ -18,8 +17,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/session";
 import { resolveDisplayPreferences } from "@polaris/core";
-import { SpoilersCard } from "@/app/(app)/chat/spoilers-card";
-import { MediaDownloadCard } from "@/app/(app)/chat/media-download-card";
 import { DeviceCacheCard } from "@/components/device-cache-card";
 import { SeasonalCard } from "@/components/seasonal/seasonal-card";
 import { getSeasonalChoice, seasonCalendar, seasonsAllowed } from "@/lib/seasonal-service";
@@ -93,8 +90,6 @@ export default async function PreferencesPage() {
                 <SidebarPresetCard />
                 <SeasonalCard allowed={seasonsOn} initial={seasonal} calendar={calendar} />
                 <OpenInAppCard initial={links?.openLinksInApp ?? true} save={setOpenLinksInAppAction} />
-                <SpoilersCard />
-                <MediaDownloadCard />
                 <DeviceCacheCard />
                 {/* The install offer used to be on this page, because this is where the
                     browser's own install prompt was already being held. It has moved to

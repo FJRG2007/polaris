@@ -10,7 +10,7 @@
 import { useState } from "react";
 import { Stamp } from "lucide-react";
 import { runAction } from "@/lib/run-action";
-import { saveViewOnceWatermarkAction } from "./actions";
+import { saveViewOnceWatermarkAction } from "@/app/(app)/account/privacy/actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     Button,

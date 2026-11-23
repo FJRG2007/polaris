@@ -1988,6 +1988,37 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
         }
     ],
     /**
+     * Chat draws its own conversation list, so nothing here is a rail entry:
+     * this is hidden and exists so the global search finds Chat's settings by
+     * what is on them. Somebody after "spoilers" or "auto-download" types that,
+     * and it has to land on Chat, not on Account.
+     */
+    chat: [
+        {
+            label: "Chat settings", // i18n-ignore
+            href: "/chat/settings",
+            icon: MessageCircle,
+            hidden: true,
+            keywords: [
+                "chat",
+                "spoilers",
+                "media",
+                "auto-download",
+                "photos",
+                "videos",
+                "documents",
+                "storage",
+                "offline",
+                "wi-fi",
+                "disappearing messages",
+                "view once",
+                "watermark",
+                "link previews",
+                "captions"
+            ]
+        }
+    ],
+    /**
      * Mail draws no rail from here.
      *
      * What belongs in it is one account's folders as that server names them,

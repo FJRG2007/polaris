@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { Link2Off } from "lucide-react";
 import { runAction } from "@/lib/run-action";
-import { saveLinkPreviewsAction } from "./actions";
+import { saveLinkPreviewsAction } from "@/app/(app)/account/privacy/actions";
 import { Card, CardBody, Switch } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 

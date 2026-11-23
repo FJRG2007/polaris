@@ -3053,6 +3053,32 @@
         "whoCanMessageHint": "Mensajes, llamadas, última conexión y bloqueos.",
         "notifications": "Notificaciones",
         "notificationsHint": "Avisos, notificaciones push y horas de silencio.",
-        "open": "Abrir"
+        "open": "Abrir",
+        "spoilers": {
+            "title": "Mostrar spoilers sin preguntar",
+            "body": "Las imágenes y los mensajes que alguien envió tapados se muestran directamente, sin esperar a que pulses. Solo en este navegador."
+        },
+        "media": {
+            "title": "Descarga automática",
+            "body": "Las fotos, vídeos y documentos de los mensajes recientes se guardan antes en este dispositivo para abrir los chats sin conexión. Lo demás carga al abrirlo. Solo en este navegador.",
+            "whenHint": "Siempre guarda con cualquier conexión, datos móviles incluidos. Solo wifi espera a wifi o cable. Nunca no guarda nada antes.",
+            "photos": "Fotos",
+            "photosHint": "Imágenes enviadas en tus chats.",
+            "videos": "Vídeos",
+            "videosHint": "Clips de vídeo. Son lo que más ocupa.",
+            "files": "Documentos",
+            "filesHint": "PDF, hojas de cálculo y otros archivos.",
+            "always": "Siempre",
+            "wifi": "Solo wifi",
+            "never": "Nunca",
+            "cap": "Espacio máximo",
+            "capHint": "Lo máximo que puede ocupar lo guardado. Al llenarse, se borra lo más antiguo.",
+            "usedTitle": "Espacio en uso",
+            "used": "{used} de {cap} en uso",
+            "measuring": "Midiendo...",
+            "clear": "Vaciar",
+            "clearTitle": "¿Vaciar lo guardado?",
+            "clearBody": "Se borran las fotos, vídeos y documentos guardados en este dispositivo. Los mensajes se quedan y cada uno vuelve a cargar al abrirlo."
+        }
     }
 }

@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { ImageDown } from "lucide-react";
 import { runAction } from "@/lib/run-action";
-import { saveAutoDownloadAction } from "./actions";
+import { saveAutoDownloadAction } from "@/app/(app)/account/privacy/actions";
 import { Card, CardBody, Select } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AUTO_DOWNLOAD_CHOICES, type AutoDownload } from "@/lib/chat/moderation-policy-rules";

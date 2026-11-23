@@ -8,7 +8,7 @@
 import { useState } from "react";
 import { Timer } from "lucide-react";
 import { runAction } from "@/lib/run-action";
-import { saveChatTimerAction } from "./actions";
+import { saveChatTimerAction } from "@/app/(app)/account/privacy/actions";
 import { Card, CardBody, Select } from "@polaris/ui";
 import { VANISH_DURATIONS } from "@/lib/chat/vanish-rules";
 import { useTranslations } from "@/components/i18n/i18n-provider";

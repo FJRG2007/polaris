@@ -3,9 +3,10 @@
  *
  * Every person's own, reached from the conversation list. What the operator
  * decides for everybody stays under Polaris apps (/admin/apps/chat/settings);
- * nothing here changes what anybody else sees. The chat cards from Privacy are
- * drawn here too, so a reader looking for Chat's options finds all of them in
- * Chat.
+ * nothing here changes what anybody else sees. Every option that only changes
+ * Chat lives here and nowhere else - the disappearing timer, link previews and
+ * picture loading that used to sit in Privacy, and the per-browser spoilers and
+ * media kept on this device that used to sit in Preferences.
  */
 
 import Link from "next/link";
@@ -20,10 +21,12 @@ import { loadChatPreferences } from "@/lib/chat/preferences";
 import { resolveAutoDownload } from "@/lib/chat/auto-download";
 import { moderationPolicy } from "@/lib/chat/moderation-policy";
 import { instancePreviewsAllowed } from "@/lib/chat/link-preview-policy";
-import { ChatTimerCard } from "@/app/(app)/account/privacy/chat-timer-card";
-import { LinkPreviewsCard } from "@/app/(app)/account/privacy/link-previews-card";
-import { AutoDownloadCard } from "@/app/(app)/account/privacy/auto-download-card";
-import { ViewOnceWatermarkCard } from "@/app/(app)/account/privacy/view-once-watermark-card";
+import { SpoilersCard } from "./spoilers-card";
+import { ChatTimerCard } from "./chat-timer-card";
+import { LinkPreviewsCard } from "./link-previews-card";
+import { AutoDownloadCard } from "./auto-download-card";
+import { MediaDownloadCard } from "./media-download-card";
+import { ViewOnceWatermarkCard } from "./view-once-watermark-card";
 
 export const dynamic = "force-dynamic";
 
@@ -77,6 +80,8 @@ export default async function ChatSettingsPage() {
                     }
                     instance={policy.autoDownload}
                 />
+                <MediaDownloadCard />
+                <SpoilersCard />
                 {elsewhere.map(({ href, icon: Icon, title, hint }) => (
                     <Card key={href}>
                         <CardBody className="flex flex-wrap items-center gap-x-3 gap-y-2 p-3">

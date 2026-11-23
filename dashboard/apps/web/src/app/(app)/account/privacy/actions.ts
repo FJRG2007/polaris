@@ -57,6 +57,9 @@ const PRIVACY_PATH = "/account/privacy";
  *  that says why - so they are told as well as this one. */
 const CHAT_PATH = "/chat";
 
+/** Where the Chat-only choices kept on the privacy row are drawn. */
+const CHAT_SETTINGS_PATH = "/chat/settings";
+
 async function guard(run: () => Promise<void>): Promise<{ error?: string }> {
     try {
         await run();
@@ -323,7 +326,7 @@ export async function saveChatTimerAction(seconds: unknown): Promise<{ error?: s
         update: { chatVanishAfter: parsed.data },
         select: { userId: true }
     });
-    revalidatePath(PRIVACY_PATH);
+    revalidatePath(CHAT_SETTINGS_PATH);
     return {};
 }
 
@@ -346,7 +349,7 @@ export async function saveLinkPreviewsAction(on: unknown): Promise<{ error?: str
         update: { linkPreviews: parsed.data },
         select: { userId: true }
     });
-    revalidatePath(PRIVACY_PATH);
+    revalidatePath(CHAT_SETTINGS_PATH);
     return {};
 }
 
@@ -364,7 +367,7 @@ export async function saveAutoDownloadAction(choice: unknown): Promise<{ error?:
         update: { chatAutoDownload: parsed.data },
         select: { userId: true }
     });
-    revalidatePath(PRIVACY_PATH);
+    revalidatePath(CHAT_SETTINGS_PATH);
     return {};
 }
 
@@ -380,6 +383,6 @@ export async function saveViewOnceWatermarkAction(on: unknown): Promise<{ error?
         update: { viewOnceWatermark: parsed.data },
         select: { userId: true }
     });
-    revalidatePath(PRIVACY_PATH);
+    revalidatePath(CHAT_SETTINGS_PATH);
     return {};
 }

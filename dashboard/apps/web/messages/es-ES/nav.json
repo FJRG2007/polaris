@@ -460,7 +460,8 @@
         "Calls": "Llamadas",
         "Updates": "Versiones",
         "General settings": "Ajustes generales",
-        "Seasonal themes": "Temas de temporada"
+        "Seasonal themes": "Temas de temporada",
+        "Chat settings": "Ajustes del chat"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

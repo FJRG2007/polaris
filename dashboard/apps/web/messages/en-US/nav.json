@@ -460,7 +460,8 @@
         "Calls": "Calls",
         "Updates": "Updates",
         "General settings": "General settings",
-        "Seasonal themes": "Seasonal themes"
+        "Seasonal themes": "Seasonal themes",
+        "Chat settings": "Chat settings"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

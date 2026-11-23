@@ -1,5 +1,9 @@
 /**
  * Privacy (/account/privacy): what this account shows, and to whom.
+ *
+ * The choices that only change Chat - the disappearing timer, the view-once
+ * watermark, link previews and which pictures load on their own - are on Chat's
+ * own settings (/chat/settings), where somebody looking for them looks.
  */
 
 import Link from "next/link";
@@ -10,14 +14,6 @@ import { Button, Card, CardBody } from "@polaris/ui";
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { PrivacyView } from "./privacy-view";
-import { prisma } from "@polaris/db";
-import { ChatTimerCard } from "./chat-timer-card";
-import { ViewOnceWatermarkCard } from "./view-once-watermark-card";
-import { LinkPreviewsCard } from "./link-previews-card";
-import { AutoDownloadCard } from "./auto-download-card";
-import { moderationPolicy } from "@/lib/chat/moderation-policy";
-import { resolveAutoDownload } from "@/lib/chat/auto-download";
-import { instancePreviewsAllowed } from "@/lib/chat/link-preview-policy";
 import { BlockedCard } from "./blocked-card";
 import { listsFor, namePeople, privacyFor, privacyLocks } from "@/lib/privacy-service";
 
@@ -26,17 +22,11 @@ export const dynamic = "force-dynamic";
 export default async function PrivacyPage() {
     const session = await requireUser();
     const t = await getTranslations("accountPrivacy");
-    const [settings, lists, blocked, chatPrivacy, locks, previewsAllowed, policy] = await Promise.all([
+    const [settings, lists, blocked, locks] = await Promise.all([
         privacyFor(session.id),
         listsFor(session.id),
         listBlocked(session.id),
-        prisma.userPrivacy.findUnique({
-            where: { userId: session.id },
-            select: { chatVanishAfter: true, viewOnceWatermark: true, linkPreviews: true, chatAutoDownload: true }
-        }),
-        privacyLocks(),
-        instancePreviewsAllowed(),
-        moderationPolicy()
+        privacyLocks()
     ]);
     // Every name any rule needs, in one read: a row draws the people it names,
     // and it holds their ids.
@@ -64,20 +54,6 @@ export default async function PrivacyPage() {
                 </CardBody>
             </Card>
             <PrivacyView settings={settings} lists={lists} people={people} locked={[...locks]} />
-            <ChatTimerCard seconds={chatPrivacy?.chatVanishAfter ?? 0} />
-            <ViewOnceWatermarkCard on={chatPrivacy?.viewOnceWatermark ?? true} />
-            <LinkPreviewsCard
-                on={chatPrivacy?.linkPreviews ?? true}
-                forbidden={!previewsAllowed}
-            />
-            <AutoDownloadCard
-                choice={
-                    chatPrivacy?.chatAutoDownload
-                        ? resolveAutoDownload(chatPrivacy.chatAutoDownload, policy.autoDownload)
-                        : null
-                }
-                instance={policy.autoDownload}
-            />
             {/* What is shared beside your name has its own page: sources,
                 detected games and your own, which outgrew a card here. */}
             <Card>

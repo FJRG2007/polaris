@@ -3053,6 +3053,32 @@
         "whoCanMessageHint": "Messages, calls, last seen and blocked people.",
         "notifications": "Notifications",
         "notificationsHint": "Alerts, push notifications and quiet hours.",
-        "open": "Open"
+        "open": "Open",
+        "spoilers": {
+            "title": "Show spoilers without asking",
+            "body": "Pictures and messages somebody sent covered are drawn straight away instead of waiting for a press. This browser only."
+        },
+        "media": {
+            "title": "Media auto-download",
+            "body": "Photos, videos and documents from recent messages are saved on this device ahead of time, so chats open without a connection. Anything not saved still loads when you open it. This browser only.",
+            "whenHint": "Always saves on any connection, mobile data included. Wi-Fi only waits for Wi-Fi or a cable. Never saves nothing ahead of time.",
+            "photos": "Photos",
+            "photosHint": "Pictures sent in your chats.",
+            "videos": "Videos",
+            "videosHint": "Video clips. They take the most space.",
+            "files": "Documents",
+            "filesHint": "PDFs, spreadsheets and other files.",
+            "always": "Always",
+            "wifi": "Wi-Fi only",
+            "never": "Never",
+            "cap": "Storage limit",
+            "capHint": "The most space saved media may take. The oldest goes first once it fills up.",
+            "usedTitle": "Space used",
+            "used": "{used} of {cap} used",
+            "measuring": "Measuring...",
+            "clear": "Clear",
+            "clearTitle": "Clear saved media?",
+            "clearBody": "Photos, videos and documents saved on this device are deleted. Messages stay, and each one loads again when you open it."
+        }
     }
 }

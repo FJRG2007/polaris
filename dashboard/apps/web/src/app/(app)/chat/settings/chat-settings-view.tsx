@@ -12,6 +12,7 @@ import Link from "next/link";
 import { ArrowLeft, Settings2 } from "lucide-react";
 import { Card, CardBody, Select } from "@polaris/ui";
 import { useEffect, useState, type ReactNode } from "react";
+import { SettingRow } from "./setting-row";
 import { setCaptionPositionAction } from "../preference-actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { rememberChatPreferences, useChatPreferences } from "../chat-preferences";
@@ -71,25 +72,18 @@ export function ChatSettingsView({
                     <p className="text-sm text-muted-foreground">{t("chatSettings.intro")}</p>
                     <Card>
                         <CardBody className="flex flex-col gap-2">
-                            <div className="flex flex-wrap items-start justify-between gap-4">
-                                <div className="flex min-w-0 flex-1 flex-col gap-1">
-                                    <span className="text-sm font-medium">
-                                        {t("chatSettings.captionPosition")}
-                                    </span>
-                                    <span
-                                        id="chat-caption-position-hint"
-                                        className="text-sm text-muted-foreground"
-                                    >
-                                        {t("chatSettings.captionPositionHint")}
-                                    </span>
-                                </div>
+                            <SettingRow
+                                id="chat-caption-position"
+                                label={t("chatSettings.captionPosition")}
+                                hint={t("chatSettings.captionPositionHint")}
+                            >
                                 <Select
                                     value={preferences.captionPosition}
                                     onValueChange={(value) => void changeCaption(value as CaptionPosition)}
                                     disabled={pending}
                                     aria-label={t("chatSettings.captionPosition")}
                                     aria-describedby="chat-caption-position-hint"
-                                    className="h-8 w-48 max-w-full shrink-0"
+                                    className="h-8 w-48 max-w-full"
                                     options={CAPTION_POSITIONS.map((position) => ({
                                         value: position,
                                         label:
@@ -98,7 +92,7 @@ export function ChatSettingsView({
                                                 : t("chatSettings.captionBelow")
                                     }))}
                                 />
-                            </div>
+                            </SettingRow>
                             {error ? (
                                 <p role="alert" className="text-sm text-danger">
                                     {error}

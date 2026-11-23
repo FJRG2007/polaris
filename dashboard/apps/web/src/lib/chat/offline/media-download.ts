@@ -1,7 +1,7 @@
 /**
  * Which of a conversation's media this device fetches ahead of time, WhatsApp
  * style: photos always, videos and documents only on Wi-Fi, under a storage
- * limit. Each person can change it on this device (Preferences).
+ * limit. Each person can change it on this device (Chat settings).
  *
  * The rules are pure so they are tested without a browser; the fetching and the
  * Cache Storage half live in `app/(app)/chat/media-download`.

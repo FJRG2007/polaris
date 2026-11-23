@@ -13,25 +13,29 @@
  * unasked, and ignoring that by default would make marking something pointless.
  */
 
+import { SettingRow } from "./setting-row";
 import { Card, CardBody, Switch } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { setSpoilersShown, useSpoilersShown } from "./spoilers-shown";
+import { setSpoilersShown, useSpoilersShown } from "../spoilers-shown";
 
 export function SpoilersCard() {
-    const t = useTranslations("account");
+    const t = useTranslations("chat");
     const shown = useSpoilersShown();
     return (
         <Card>
-            <CardBody className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                    <p className="text-sm font-medium">{t("spoilers.title")}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{t("spoilers.body")}</p>
-                </div>
-                <Switch
-                    checked={shown}
-                    aria-label={t("spoilers.title")}
-                    onChange={(next) => setSpoilersShown(next)}
-                />
+            <CardBody>
+                <SettingRow
+                    id="chat-spoilers"
+                    label={t("chatSettings.spoilers.title")}
+                    hint={t("chatSettings.spoilers.body")}
+                >
+                    <Switch
+                        checked={shown}
+                        aria-label={t("chatSettings.spoilers.title")}
+                        aria-describedby="chat-spoilers-hint"
+                        onChange={(next) => setSpoilersShown(next)}
+                    />
+                </SettingRow>
             </CardBody>
         </Card>
     );
