@@ -38,7 +38,7 @@ Reported before; still happening.
 
 ## Cause
 
-Not confirmed yet. Steps 1-4 were exercised in a real Electron run and work;
+Steps 1-4 were exercised in a real Electron run and work;
 the failing step has not been observed.
 
 What was run (headless Electron 44.3.0, hidden window, `--mute-audio`, clicks
@@ -78,24 +78,57 @@ So the remaining candidates, none of them proven:
 - **An older client.** The installed app on the reporting machine was 0.1.56
   at the time of this entry.
 
-## Fix
+## Narrowed down (2026-11-23)
 
-None yet. Next steps, in order:
+The owner tried right-click > "Open link in browser" on the same link: that
+does nothing either. That menu item calls the main process's `openExternal`
+directly, without the mail frame, the page or `window.open`, so the failure is
+in step 5: the hand-over from the main process to Windows. The machine's https
+default is Brave (`BraveHTML`, registered and installed), and the installed
+0.1.57 bundle's `openOutside` is the same code as the source.
 
-1. Get the failing message: the raw `href` of the button (Copy link from the
-   right-click menu), and whether "Open link in browser" from that same menu
-   works. The menu goes straight to step 5, so this splits "the click never
-   arrives" from "Windows refuses the address".
-2. Make step 5 visible: when `openOutside` returns false, tell the page so it
-   can show "Couldn't open the link" with Copy link, instead of nothing.
-3. In the frame script, cancel the click only once the address is known to be
-   openable, and read SVG `<a>` and `<area>` links too.
+Still not seen: whether `shell.openExternal` rejects there (then `rundll32`
+runs, and `rundll32` reports success whether or not a browser started) or
+resolves without a browser appearing. Neither was observable, because a failure
+was only written to the main process's console. The exact Windows-side cause is
+therefore still open.
+
+## Fix (desktop 0.1.58, dashboard image)
+
+- **Desktop, `open-external.ts`.** The address is trimmed and normalised
+  (`new URL().href`) before any route, and never shortened. When every route
+  fails, a dialog says "Couldn't open the link", shows the address and offers
+  Copy link, instead of nothing. Every failure is also written to
+  `links.log` in the app's logs folder (`%APPDATA%\Polaris\logs`), with one
+  previous file kept, so the next report carries the reason.
+- **Mail frame (`frameDocument`).** The script decides first what the link
+  points at and only cancels the click when it opens it, scrolls to it, or
+  refuses its scheme. SVG `<a>` (with `href` or `xlink:href`), image-map
+  `<area>` and relative addresses (resolved against the frame's base) are now
+  read and opened; before, an SVG link was cancelled and dropped. The link menu
+  reads links the same way.
+
+The status stays **open** until the owner confirms links open on 0.1.58. If
+they still do not and no dialog appears, `shell.openExternal` is resolving
+without a browser starting; `links.log` will then be empty, which is itself
+the answer, and the next step is a different route on Windows.
 
 ## Regression test
 
-The harness used above (desktop `openPolarisWindow` + preload + real mail frame,
-CDP clicks, recorded `shell.openExternal`) is to be added under
-`desktop/test/` as the regression test once the cause is confirmed.
+- `desktop/test/main/open-external.test.ts`: a several-thousand-character
+  tracking link reaches the system whole; an address with spaces is normalised
+  before both routes; `file:`, `javascript:`, custom schemes and UNC paths never
+  reach a route.
+- `dashboard/apps/web/test/mail/frame-links.test.ts`: SVG, `xlink:href`,
+  `<area>`, relative and long links open; an anchor with no address is left
+  alone; a custom scheme is refused; the link menu reads SVG links; the frame's
+  sandbox has popups and never `allow-same-origin`.
+- Real Electron run (headless, `--mute-audio`, CDP clicks, `shell.openExternal`
+  recorded instead of called): the desktop's own `openPolarisWindow`, built
+  preload and the dashboard's real mail frame and `openLink`. Mail button left
+  and middle click, a plain link and a `target=_blank` link all reach
+  `shell.openExternal`. This harness is not in the repo yet.
+- Not exercised: the real Windows hand-over to a browser, and the dialog.
 
 ## History of earlier attempts
 

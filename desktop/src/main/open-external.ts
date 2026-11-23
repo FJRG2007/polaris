@@ -11,8 +11,10 @@
  * own URL handler, which reads the same registration by a different route.
  */
 
-import { shell } from "electron";
+import { BrowserWindow, app, clipboard, dialog, shell } from "electron";
 import { execFile } from "node:child_process";
+import { appendFileSync, renameSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { isSafeExternalUrl } from "./navigation";
 
 export interface OpenExternalDeps {
@@ -23,11 +25,24 @@ export interface OpenExternalDeps {
 }
 
 /**
+ * The address as the system is handed it: parsed and written back out, so a
+ * link with stray spaces or unescaped characters reaches the browser in the
+ * one form every route accepts. Never shortened - a tracking link of several
+ * thousand characters goes out whole. Null for anything but http, https and
+ * mailto.
+ */
+export function outsideAddress(url: string): string | null {
+    if (!isSafeExternalUrl(url.trim())) return null;
+    return new URL(url.trim()).href;
+}
+
+/**
  * Open `url` outside the app. Resolves true when a route accepted it; false
  * for a URL that is not http, https or mailto, and when every route failed.
  */
-export async function openOutside(url: string, deps: OpenExternalDeps): Promise<boolean> {
-    if (!isSafeExternalUrl(url)) return false;
+export async function openOutside(raw: string, deps: OpenExternalDeps): Promise<boolean> {
+    const url = outsideAddress(raw);
+    if (!url) return false;
     try {
         await deps.open(url);
         return true;
@@ -57,13 +72,58 @@ function windowsFallback(url: string): Promise<void> {
     });
 }
 
+/** Where a failed hand-over is written, beside the app's other logs, so it
+ *  survives a restart; kept to one file and one previous one. */
+function writeLog(message: string, error: unknown): void {
+    console.error(`[polaris] ${message}:`, error);
+    try {
+        const file = join(app.getPath("logs"), "links.log");
+        try {
+            if (statSync(file).size > 256 * 1024) renameSync(file, `${file}.old`);
+        } catch {
+            // No file yet.
+        }
+        const detail = error instanceof Error ? error.message : String(error);
+        appendFileSync(file, `${new Date().toISOString()} ${message}: ${detail}
+`);
+    } catch {
+        // A log that cannot be written must never stop the link.
+    }
+}
+
+/**
+ * Said on screen when no route opened the link, so a click is never answered
+ * with nothing: the address, and a way to take it to the browser by hand.
+ */
+async function sayFailed(url: string): Promise<void> {
+    const options = {
+        type: "warning" as const,
+        title: "Couldn't open the link",
+        message: "Couldn't open the link",
+        detail: `Windows didn't open it in your browser. Copy it and paste it into your browser instead.
+
+${url}`,
+        buttons: ["Copy link", "Close"],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true
+    };
+    const parent = BrowserWindow.getFocusedWindow();
+    const { response } = parent ? await dialog.showMessageBox(parent, options) : await dialog.showMessageBox(options);
+    if (response === 0) clipboard.writeText(url);
+}
+
 const deps: OpenExternalDeps = {
     open: (url) => shell.openExternal(url),
     fallback: process.platform === "win32" ? windowsFallback : null,
-    log: (message, error) => console.error(`[polaris] ${message}:`, error)
+    log: writeLog
 };
 
-/** Open a link outside the app, for callers that do not wait on the outcome. */
+/** Open a link outside the app, for callers that do not wait on the outcome.
+ *  When every route fails, the person is told and offered the address. */
 export function openExternal(url: string): void {
-    void openOutside(url, deps);
+    void openOutside(url, deps).then((opened) => {
+        const address = outsideAddress(url);
+        if (!opened && address) void sayFailed(address).catch(() => undefined);
+    });
 }

@@ -362,8 +362,8 @@ export function frameDocument(
       if (!text.trim()) {
         // A link or a picture with nothing selected: Polaris's menu for it, as
         // on any page. Only the addresses travel, and the page checks them too.
-        var anchor = event.target && event.target.closest ? event.target.closest("a[href]") : null;
-        var href = anchor && /^(https?:|mailto:)/i.test(anchor.href) ? anchor.href : "";
+        var link = linkAt(event.target);
+        var href = link && link.href ? link.href : "";
         var picture = event.target && event.target.closest ? event.target.closest("img") : null;
         var image = picture ? (picture.currentSrc || picture.src || "") : "";
         if (!/^https?:/i.test(image)) image = "";
@@ -386,20 +386,37 @@ export function frameDocument(
     // other link in Polaris opens. Left to the frame, it is a popup out of a
     // sandbox, and the phone app's WebView has nowhere to put one: the click
     // did nothing. A link to a place in the message scrolls there instead.
+    //
+    // What the link points at is decided before the click is touched: a click
+    // is only ever cancelled when it is opened from here, scrolled, or refused
+    // for its scheme - never for a link this script could not read. SVG links
+    // (whose href is not a string), image-map areas and relative addresses are
+    // all read here, so none of them is swallowed silently.
+    function linkAt(node) {
+      var found = node && node.closest ? node.closest("a, area") : null;
+      if (!found) return null;
+      var raw = found.getAttribute("href");
+      if (raw === null) raw = found.getAttributeNS("http://www.w3.org/1999/xlink", "href");
+      if (raw === null) return null;
+      raw = String(raw).trim();
+      if (raw.charAt(0) === "#") return { fragment: raw.slice(1) };
+      var url;
+      try { url = new URL(raw, document.baseURI); } catch (error) { return { refused: true }; }
+      if (!/^(https?:|mailto:)$/i.test(url.protocol)) return { refused: true };
+      return { href: url.href };
+    }
     function follow(event) {
       if (event.button !== 0 && event.button !== 1) return;
-      var anchor = event.target && event.target.closest ? event.target.closest("a[href]") : null;
-      if (!anchor) return;
+      var link = linkAt(event.target);
+      if (!link) return;
       event.preventDefault();
-      var raw = anchor.getAttribute("href") || "";
-      if (raw.charAt(0) === "#") {
-        var name = raw.slice(1);
+      if (link.fragment !== undefined) {
+        var name = link.fragment;
         var spot = name && (document.getElementById(name) || document.getElementsByName(name)[0]);
         if (spot && spot.scrollIntoView) spot.scrollIntoView();
         return;
       }
-      if (!/^(https?:|mailto:)/i.test(anchor.href)) return;
-      parent.postMessage({ polarisMailOpen: anchor.href }, "*");
+      if (link.href) parent.postMessage({ polarisMailOpen: link.href }, "*");
     }
     document.addEventListener("click", follow, true);
     document.addEventListener("auxclick", follow, true);
