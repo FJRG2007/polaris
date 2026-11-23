@@ -42,7 +42,10 @@ fn bench(c: &mut Criterion) {
     c.bench_function("phone/formatPhoneAsTyped (all vectors)", |b| {
         b.iter(|| {
             for a in &cases {
-                let _ = black_box(phone::format_phone_as_typed(arg(a, 0).unwrap_or(""), arg(a, 1)));
+                let _ = black_box(phone::format_phone_as_typed(
+                    arg(a, 0).unwrap_or(""),
+                    arg(a, 1),
+                ));
             }
         })
     });

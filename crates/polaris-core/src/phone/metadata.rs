@@ -133,7 +133,9 @@ pub fn select(argument: &str) -> Result<Option<PlanId>, PhoneError> {
     }
     if is_calling_code(argument) {
         if !has_calling_code(argument) {
-            return Err(PhoneError::error(format!("Unknown calling code: {argument}")));
+            return Err(PhoneError::error(format!(
+                "Unknown calling code: {argument}"
+            )));
         }
         return Ok(plan_for_code(argument));
     }
@@ -214,7 +216,11 @@ impl FormatRef {
             .formats_list()
             .iter()
             .enumerate()
-            .map(|(index, format)| FormatRef { owner, format, index })
+            .map(|(index, format)| FormatRef {
+                owner,
+                format,
+                index,
+            })
             .collect()
     }
 
@@ -250,16 +256,24 @@ mod tests {
         assert_eq!(calling_code_entry("1").map(|l| l[0]), Some("US"));
         assert_eq!(countries_for_code("800"), None);
         assert!(has_calling_code("800"));
-        assert_eq!(plan_for_code("44").map(|p| p.plan().calling_code), Some("44"));
+        assert_eq!(
+            plan_for_code("44").map(|p| p.plan().calling_code),
+            Some("44")
+        );
         assert_eq!(country_keys().count(), COUNTRY_ORDER.len());
     }
 
     #[test]
     fn every_metadata_pattern_compiles() {
         for plan in PLANS {
-            for p in [plan.national_pattern, plan.leading_digits, plan.idd, plan.np_for_parsing]
-                .into_iter()
-                .flatten()
+            for p in [
+                plan.national_pattern,
+                plan.leading_digits,
+                plan.idd,
+                plan.np_for_parsing,
+            ]
+            .into_iter()
+            .flatten()
             {
                 js::matches_entirely("1", p);
                 js::test(&format!("^(?:{p})"), "1");

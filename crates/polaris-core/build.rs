@@ -132,7 +132,10 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     let text = std::fs::read_to_string(source).expect("read the phone metadata");
     let json: Value = serde_json::from_str(&text).expect("parse the phone metadata");
-    assert_eq!(json["version"], 4, "the phone tables expect metadata version 4");
+    assert_eq!(
+        json["version"], 4,
+        "the phone tables expect metadata version 4"
+    );
 
     let mut plans = Vec::new();
     let mut countries = Vec::new();
@@ -175,13 +178,18 @@ fn main() {
     pairs("COUNTRY_SORTED", &sorted, &mut out);
     non_geo.sort();
     pairs("NON_GEO_SORTED", &non_geo, &mut out);
-    writeln!(out, "pub(super) static CALLING_CODES_SORTED: &[(&str, &[&str])] = &[").unwrap();
+    writeln!(
+        out,
+        "pub(super) static CALLING_CODES_SORTED: &[(&str, &[&str])] = &["
+    )
+    .unwrap();
     for (k, list) in &codes {
         let items: Vec<String> = list.iter().map(|c| format!("{c:?}")).collect();
         writeln!(out, "    ({k:?}, &[{}]),", items.join(", ")).unwrap();
     }
     writeln!(out, "];").unwrap();
 
-    let dest = std::path::Path::new(&std::env::var("OUT_DIR").expect("OUT_DIR")).join("phone_metadata.rs");
+    let dest =
+        std::path::Path::new(&std::env::var("OUT_DIR").expect("OUT_DIR")).join("phone_metadata.rs");
     std::fs::write(dest, out).expect("write the phone tables");
 }

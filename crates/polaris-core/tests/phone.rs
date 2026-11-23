@@ -66,8 +66,13 @@ fn run(op: &str, args: &[Decoded]) -> Result<Decoded, PhoneError> {
             fields.push(("national".to_string(), national));
             Decoded::Object(fields)
         }
-        "formatPhoneAsTyped" => s(&phone::format_phone_as_typed(&a0(), text_arg(args, 1).as_deref())?),
-        "formatPhoneInternational" => text(phone::format_phone_international(&a0())?, &units(&args[0])),
+        "formatPhoneAsTyped" => s(&phone::format_phone_as_typed(
+            &a0(),
+            text_arg(args, 1).as_deref(),
+        )?),
+        "formatPhoneInternational" => {
+            text(phone::format_phone_international(&a0())?, &units(&args[0]))
+        }
         other => panic!("no Rust replay for phone/{other}"),
     })
 }
@@ -97,11 +102,16 @@ fn every_phone_vector_matches() {
             let got = run(op, &case.args);
             let same = match (&case.expect, &got) {
                 (Expect::Ok(want), Ok(have)) => want == have,
-                (Expect::Error { kind, message }, Err(e)) => kind == e.class && message == &e.message,
+                (Expect::Error { kind, message }, Err(e)) => {
+                    kind == e.class && message == &e.message
+                }
                 _ => false,
             };
             if !same {
-                failures.push(format!("{op} / {}: expected {:?}, got {:?}", case.name, case.expect, got));
+                failures.push(format!(
+                    "{op} / {}: expected {:?}, got {:?}",
+                    case.name, case.expect, got
+                ));
             }
         }
     }
@@ -110,6 +120,11 @@ fn every_phone_vector_matches() {
         failures.is_empty(),
         "{} of {total} cases differ:\n{}",
         failures.len(),
-        failures.iter().take(40).cloned().collect::<Vec<_>>().join("\n")
+        failures
+            .iter()
+            .take(40)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
     );
 }

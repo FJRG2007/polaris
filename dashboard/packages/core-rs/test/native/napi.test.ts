@@ -9,6 +9,9 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import * as core from "../../src/index";
 import * as probe from "../../src/probe";
+import * as phone from "../../src/phone";
+import * as phoneTwin from "../../src/domains/phone/ts";
+import { PHONE_RESET_INPUT } from "../support/phone-corpus";
 import { createRequire } from "node:module";
 import * as twin from "../../src/domains/probe/ts";
 import { canonical, outcome, replay } from "../../src/vectors";
@@ -39,10 +42,23 @@ const RAW_OPS: Record<string, (...args: unknown[]) => unknown> = {
         }
     }
 };
+/** A phone op as the vector files see it: `null` stands for `undefined`, in and out. */
+const asVector =
+    (fn: (...args: never[]) => unknown) =>
+    (...args: unknown[]) => {
+        const result = (fn as (...a: unknown[]) => unknown)(...args.map((a) => (a === null ? undefined : a)));
+        return result === undefined ? null : result;
+    };
 const FACADE_OPS: Record<string, (...args: unknown[]) => unknown> = {
     "probe/fnv1a32": (text) => probe.fnv1a32(text as string),
-    "probe/decodeHex": (hex) => probe.decodeHex(hex as string)
+    "probe/decodeHex": (hex) => probe.decodeHex(hex as string),
+    ...Object.fromEntries(
+        Object.entries(phone).map(([op, fn]) => [`phone/${op}`, asVector(fn as (...args: never[]) => unknown)])
+    )
 };
+// The raw phone exports need the facade's conversions (null/undefined, input
+// slices), so their raw replay is the facade forced onto the binding.
+for (const op of Object.keys(phone)) RAW_OPS[`phone/${op}`] = FACADE_OPS[`phone/${op}`]!;
 
 beforeEach(() => {
     core.setRecorder(null);
@@ -50,14 +66,20 @@ beforeEach(() => {
     core.setBindingSource(core.nativeSource());
 });
 
-afterEach(() => core.setMode("probe", null));
+afterEach(() => {
+    core.setMode("probe", null);
+    core.setMode("phone", null);
+});
 
 describe("Node binding: golden vectors", () => {
     for (const [domain, op] of allVectorFiles()) {
         it(`${domain}/${op}: the raw binding and the facade in rust mode match every vector`, () => {
             const file = loadVectors(domain, op);
+            core.setMode("phone", "rust");
+            if (domain === "phone") phone.toE164(PHONE_RESET_INPUT);
             expect(replay(file, RAW_OPS[`${domain}/${op}`]!)).toEqual([]);
             core.setMode("probe", "rust");
+            if (domain === "phone") phone.toE164(PHONE_RESET_INPUT);
             expect(replay(file, FACADE_OPS[`${domain}/${op}`]!)).toEqual([]);
             expect(core.status().source).toBe("napi");
             expect(core.records()).toEqual([]);
@@ -165,5 +187,34 @@ describe("Node binding: failure injection through the facade", () => {
         const [entry] = core.records();
         expect(entry).toMatchObject({ kind: "difference", op: "decodeHex" });
         expect(JSON.stringify(entry)).not.toContain("c0ffee");
+    });
+});
+
+describe("Node binding: phone property equivalence with the TypeScript twin", () => {
+    const text = fc.oneof(
+        fc.string({ unit: "binary" }),
+        fc.string({ unit: "grapheme" }),
+        fc.stringMatching(/^[+＋]?[0-9０-９٠-٩ ()-.x#;=a-z]{0,24}$/),
+        fc.tuple(fc.constantFrom("+", "", "00", "011", "0"), fc.integer({ min: 1, max: 999 }), fc.stringMatching(/^[0-9]{0,14}$/)).map(([p, c, n]) => `${p}${c}${n}`)
+    );
+    const country = fc.oneof(fc.constant(undefined), fc.constantFrom(...phoneTwin.phoneCountries()), fc.constantFrom("", "XX", "es", "001", "toString"));
+    // `undefined` and `null` are different answers here; the codec carries neither apart.
+    const seen = (fn: () => unknown) => canonical(outcome(() => fn() ?? `<${String(fn())}>`));
+    const same = (a: () => unknown, b: () => unknown) => expect(seen(a)).toBe(seen(b));
+
+    beforeEach(() => core.setMode("phone", "rust"));
+
+    it("toE164, formatPhoneAsTyped, splitPhone, formatPhoneInternational and phoneCountryOf agree (10,000 runs each)", () => {
+        fc.assert(
+            fc.property(text, country, (value, c) => {
+                same(() => phone.toE164(value, c as never), () => phoneTwin.toE164(value, c as never));
+                same(() => phone.formatPhoneAsTyped(value, c as never), () => phoneTwin.formatPhoneAsTyped(value, c as never));
+                same(() => phone.splitPhone(value), () => phoneTwin.splitPhone(value));
+                same(() => phone.formatPhoneInternational(value), () => phoneTwin.formatPhoneInternational(value));
+                same(() => phone.phoneCountryOf(value), () => phoneTwin.phoneCountryOf(value));
+            }),
+            { numRuns: RUNS }
+        );
+        expect(core.records()).toEqual([]);
     });
 });

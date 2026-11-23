@@ -17,21 +17,14 @@ pub fn utf16_len(text: &str) -> usize {
 pub fn is_js_space(c: char) -> bool {
     matches!(
         c,
-        '\u{9}'
-            | '\u{a}'
-            | '\u{b}'
-            | '\u{c}'
-            | '\u{d}'
-            | ' '
-            | '\u{a0}'
-            | '\u{1680}'
-            | '\u{2000}'..='\u{200a}'
-            | '\u{2028}'
-            | '\u{2029}'
-            | '\u{202f}'
-            | '\u{205f}'
-            | '\u{3000}'
-            | '\u{feff}'
+        '\u{9}' | '\u{a}' | '\u{b}' | '\u{c}' | '\u{d}' | ' ' | '\u{a0}' | '\u{1680}' | '\u{2000}'
+            ..='\u{200a}'
+                | '\u{2028}'
+                | '\u{2029}'
+                | '\u{202f}'
+                | '\u{205f}'
+                | '\u{3000}'
+                | '\u{feff}'
     )
 }
 
@@ -200,7 +193,10 @@ mod tests {
 
     #[test]
     fn replacement_templates() {
-        assert_eq!(replace_first("(\\d{3})(\\d{2})", "12345", "$1 $2"), "123 45");
+        assert_eq!(
+            replace_first("(\\d{3})(\\d{2})", "12345", "$1 $2"),
+            "123 45"
+        );
         assert_eq!(replace_first("(\\d)", "5", "$$1 $& $9 $01"), "$1 5 $9 5");
         assert_eq!(replace_first("x", "axb", "[$`|$']"), "a[a|b]b");
         assert_eq!(replace_first("(\\$\\d)", "$1 $2", "0$1"), "0$1 $2");

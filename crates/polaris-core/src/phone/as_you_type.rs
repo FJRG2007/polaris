@@ -50,7 +50,9 @@ fn populate(template: &str, position: isize, digits: &str) -> Option<(String, is
     let mut template = template.to_string();
     let mut position = position;
     for d in digits.chars() {
-        let from = usize::try_from(position + 1).unwrap_or(0).min(template.len());
+        let from = usize::try_from(position + 1)
+            .unwrap_or(0)
+            .min(template.len());
         if !template[from..].contains('x') {
             return None;
         }
@@ -123,7 +125,9 @@ mod pattern {
         for i in 0..p.len() {
             match p[i] {
                 '|' | ')' | '[' | ']' => return Some((i, 1)),
-                '(' if p.get(i + 1) == Some(&'?') && p.get(i + 2) == Some(&':') => return Some((i, 3)),
+                '(' if p.get(i + 1) == Some(&'?') && p.get(i + 2) == Some(&':') => {
+                    return Some((i, 3))
+                }
                 _ => {}
             }
         }
@@ -168,7 +172,8 @@ mod pattern {
                     return Err(());
                 }
                 let top = self.top()?;
-                top.instructions.extend(p.iter().map(|c| Node::Text(vec![*c])));
+                top.instructions
+                    .extend(p.iter().map(|c| Node::Text(vec![*c])));
                 return Ok(());
             };
             let before = &p[..at];
@@ -178,7 +183,12 @@ mod pattern {
                     if !before.is_empty() {
                         self.parse_pattern(before)?;
                     }
-                    self.context.push(Ctx { or: true, set: false, instructions: Vec::new(), branches: Some(Vec::new()) });
+                    self.context.push(Ctx {
+                        or: true,
+                        set: false,
+                        instructions: Vec::new(),
+                        branches: Some(Vec::new()),
+                    });
                 }
                 (')', _) => {
                     if !self.top()?.or {
@@ -220,7 +230,12 @@ mod pattern {
                     if !before.is_empty() {
                         self.parse_pattern(before)?;
                     }
-                    self.context.push(Ctx { or: false, set: true, instructions: Vec::new(), branches: None });
+                    self.context.push(Ctx {
+                        or: false,
+                        set: true,
+                        instructions: Vec::new(),
+                        branches: None,
+                    });
                 }
                 (']', _) => {
                     if !self.top()?.set {
@@ -243,7 +258,12 @@ mod pattern {
     pub fn parse(pattern: &str) -> Result<Node, ()> {
         let chars: Vec<char> = pattern.chars().collect();
         let mut parser = Parser {
-            context: vec![Ctx { or: true, set: false, instructions: Vec::new(), branches: None }],
+            context: vec![Ctx {
+                or: true,
+                set: false,
+                instructions: Vec::new(),
+                branches: None,
+            }],
         };
         parser.parse_pattern(&chars)?;
         if parser.context.len() != 1 {
@@ -319,7 +339,11 @@ mod pattern {
                         None => {}
                     }
                 }
-                Ok(if partial { Some(Outcome::Partial) } else { None })
+                Ok(if partial {
+                    Some(Outcome::Partial)
+                } else {
+                    None
+                })
             }
             Node::Set(set) => {
                 for c in set {
@@ -340,7 +364,9 @@ mod pattern {
 }
 
 fn type_error(property: &str) -> PhoneError {
-    PhoneError::type_error(format!("Cannot read properties of undefined (reading '{property}')"))
+    PhoneError::type_error(format!(
+        "Cannot read properties of undefined (reading '{property}')"
+    ))
 }
 
 #[derive(Default)]
@@ -364,7 +390,8 @@ fn truthy(value: &Option<String>) -> Option<&str> {
 impl State {
     fn national_digits(&self) -> String {
         if self.international {
-            let skip = self.idd.as_ref().map_or(0, String::len) + self.calling_code.as_ref().map_or(0, String::len);
+            let skip = self.idd.as_ref().map_or(0, String::len)
+                + self.calling_code.as_ref().map_or(0, String::len);
             return self.digits.get(skip..).unwrap_or("").to_string();
         }
         self.digits.clone()
@@ -435,7 +462,11 @@ impl AsYouType {
     /// `state.setCallingCode` and the `onCallingCodeChange` it fires.
     fn set_calling_code(&mut self, code: Option<String>) -> Result<(), PhoneError> {
         self.state.calling_code = code;
-        let key = self.state.country.map(str::to_string).or_else(|| self.state.calling_code.clone());
+        let key = self
+            .state
+            .country
+            .map(str::to_string)
+            .or_else(|| self.state.calling_code.clone());
         self.plan = match key {
             Some(k) => metadata::select(&k)?.map(PlanId::plan),
             None => None,
@@ -444,7 +475,10 @@ impl AsYouType {
         match self.plan {
             Some(plan) => {
                 self.parser_has_plan = true;
-                self.could_extract_another = plan.np_for_parsing.is_some_and(|p| p.chars().any(|c| !(c.is_ascii_digit() || c == '[' || c == ']')));
+                self.could_extract_another = plan.np_for_parsing.is_some_and(|p| {
+                    p.chars()
+                        .any(|c| !(c.is_ascii_digit() || c == '[' || c == ']'))
+                });
             }
             None => {
                 self.parser_has_plan = false;
@@ -472,7 +506,11 @@ impl AsYouType {
         Ok(())
     }
 
-    fn start_international(&mut self, country: Option<&'static str>, code: Option<String>) -> Result<(), PhoneError> {
+    fn start_international(
+        &mut self,
+        country: Option<&'static str>,
+        code: Option<String>,
+    ) -> Result<(), PhoneError> {
         self.state.international = true;
         self.state.country = country;
         self.set_calling_code(code)
@@ -500,7 +538,9 @@ impl AsYouType {
             if chars.is_empty() {
                 return true;
             }
-            return match pattern::parse(pattern).and_then(|tree| pattern::matches(&chars, &tree, true)) {
+            return match pattern::parse(pattern)
+                .and_then(|tree| pattern::matches(&chars, &tree, true))
+            {
                 Ok(found) => found.is_some(),
                 Err(()) => true,
             };
@@ -536,7 +576,9 @@ impl AsYouType {
         if self.is_nanp {
             return " ";
         }
-        if f.np_rule().is_some_and(|r| r.contains('-') || r.contains(' ')) {
+        if f.np_rule()
+            .is_some_and(|r| r.contains('-') || r.contains(' '))
+        {
             return " ";
         }
         ""
@@ -544,7 +586,11 @@ impl AsYouType {
 
     fn international_prefix(&self, spacing: bool) -> String {
         if let Some(idd) = truthy(&self.state.idd) {
-            return if spacing { format!("{idd} ") } else { idd.to_string() };
+            return if spacing {
+                format!("{idd} ")
+            } else {
+                idd.to_string()
+            };
         }
         if self.state.missing_plus {
             return String::new();
@@ -556,11 +602,21 @@ impl AsYouType {
         self.populated = Some(template.clone());
         self.populated_pos = -1;
         self.template = Some(if self.state.international {
-            let code = self.state.calling_code.as_ref().ok_or_else(|| type_error("length"))?;
+            let code = self
+                .state
+                .calling_code
+                .as_ref()
+                .ok_or_else(|| type_error("length"))?;
             let prefix: String = self
                 .international_prefix(true)
                 .chars()
-                .map(|c| if c.is_ascii_digit() || c == '+' { 'x' } else { c })
+                .map(|c| {
+                    if c.is_ascii_digit() || c == '+' {
+                        'x'
+                    } else {
+                        c
+                    }
+                })
                 .collect();
             format!("{prefix}{} {template}", x_times(code.len()))
         } else {
@@ -571,7 +627,8 @@ impl AsYouType {
 
     /// `formatNationalNumber` of `AsYouTypeFormatter.complete`.
     fn complete_national(&self, f: &FormatRef, use_np_rule: bool) -> Option<String> {
-        let mut formatted = parse::format_using(&self.state.nsn, f, self.state.international, use_np_rule);
+        let mut formatted =
+            parse::format_using(&self.state.nsn, f, self.state.international, use_np_rule);
         if !use_np_rule {
             if let Some(np) = truthy(&self.state.national_prefix) {
                 formatted = format!("{np}{}{formatted}", self.separator_after_np(f));
@@ -597,19 +654,29 @@ impl AsYouType {
     fn template_for(&self, f: &FormatRef) -> Result<Option<String>, PhoneError> {
         let pattern = legacy_pattern(f.format.pattern);
         let Some(found) = js::re(&pattern).find(DUMMY) else {
-            return Err(PhoneError::type_error("Cannot read properties of null (reading '0')".into()));
+            return Err(PhoneError::type_error(
+                "Cannot read properties of null (reading '0')".into(),
+            ));
         };
         let mut digits = found.as_str().to_string();
         let nsn = &self.state.nsn;
         if nsn.len() > digits.len() {
             return Ok(None);
         }
-        let dummy: String = nsn.chars().map(|c| if c.is_ascii_digit() { '9' } else { c }).collect();
+        let dummy: String = nsn
+            .chars()
+            .map(|c| if c.is_ascii_digit() { '9' } else { c })
+            .collect();
         if js::test(&format!("^{pattern}$"), &dummy) {
             digits = dummy;
         }
         let international = self.state.international;
-        let mut number_format = if international { f.international_format() } else { f.format.format }.to_string();
+        let mut number_format = if international {
+            f.international_format()
+        } else {
+            f.format.format
+        }
+        .to_string();
         let mut np_included = false;
         let np = truthy(&self.state.national_prefix);
         if self.should_try_np_rule(f) {
@@ -631,7 +698,11 @@ impl AsYouType {
             if let Some(prefix) = truthy(&self.state.prefix_not_np) {
                 template = format!("{} {template}", x_times(prefix.len()));
             } else if let Some(np) = np {
-                template = format!("{}{}{template}", x_times(np.len()), self.separator_after_np(f));
+                template = format!(
+                    "{}{}{template}",
+                    x_times(np.len()),
+                    self.separator_after_np(f)
+                );
             }
         }
         if international {
@@ -648,11 +719,19 @@ impl AsYouType {
             if self.chosen == Some(f) {
                 break;
             }
-            let text = if self.state.international { f.international_format() } else { f.format.format };
+            let text = if self.state.international {
+                f.international_format()
+            } else {
+                f.format.format
+            };
             if !js::test(&non_altering, text) {
                 continue;
             }
-            let template = if f.format.pattern.contains('|') { None } else { self.template_for(&f)? };
+            let template = if f.format.pattern.contains('|') {
+                None
+            } else {
+                self.template_for(&f)?
+            };
             match template.filter(|t| !t.is_empty()) {
                 Some(t) => {
                     self.set_template(t)?;
@@ -692,7 +771,10 @@ impl AsYouType {
                 if let Some(done) = self.format_complete(&f).filter(|s| !s.is_empty()) {
                     self.reset_format();
                     self.chosen = Some(f);
-                    let template: String = done.chars().map(|c| if c.is_ascii_digit() { 'x' } else { c }).collect();
+                    let template: String = done
+                        .chars()
+                        .map(|c| if c.is_ascii_digit() { 'x' } else { c })
+                        .collect();
                     self.set_template(template)?;
                     self.populated = Some(done.clone());
                     self.populated_pos = self
@@ -744,7 +826,11 @@ impl AsYouType {
         self.formatter_reset()
     }
 
-    fn on_extracted(&mut self, extracted: parse::Extracted, national_digits: &str) -> Result<(), PhoneError> {
+    fn on_extracted(
+        &mut self,
+        extracted: parse::Extracted,
+        national_digits: &str,
+    ) -> Result<(), PhoneError> {
         let nsn = extracted.national;
         let mut modified = false;
         let mut prefix_not_np = None;
@@ -798,7 +884,11 @@ impl AsYouType {
         Ok(true)
     }
 
-    fn parser_start_international(&mut self, country: Option<&'static str>, code: Option<String>) -> Result<(), PhoneError> {
+    fn parser_start_international(
+        &mut self,
+        country: Option<&'static str>,
+        code: Option<String>,
+    ) -> Result<(), PhoneError> {
         self.start_international(country, code)?;
         if !self.state.nsn.is_empty() {
             self.state.reset_nsn();
@@ -825,7 +915,8 @@ impl AsYouType {
 
     fn extract_calling_code(&mut self) -> Result<bool, PhoneError> {
         let number = format!("+{}", self.state.digits_without_idd());
-        let found = parse::extract_calling_code(&number, self.state.country.or(self.default_country))?;
+        let found =
+            parse::extract_calling_code(&number, self.state.country.or(self.default_country))?;
         match found.code {
             Some(code) => {
                 self.set_calling_code(Some(code))?;
@@ -841,7 +932,8 @@ impl AsYouType {
             return Ok(false);
         }
         let digits = self.state.digits.clone();
-        let found = parse::extract_code_without_plus(&digits, self.state.country.or(self.default_country))?;
+        let found =
+            parse::extract_code_without_plus(&digits, self.state.country.or(self.default_country))?;
         match found {
             Some((code, _)) => {
                 self.state.missing_plus = true;
@@ -900,7 +992,8 @@ impl AsYouType {
 
     fn full_number(&self, national: &str) -> String {
         if self.state.international {
-            let prefix = |text: String| format!("{}{text}", self.international_prefix(!text.is_empty()));
+            let prefix =
+                |text: String| format!("{}{text}", self.international_prefix(!text.is_empty()));
             return match self.state.calling_code.as_deref().filter(|c| !c.is_empty()) {
                 None => prefix(self.state.digits_without_idd()),
                 Some(code) if national.is_empty() => prefix(code.to_string()),
@@ -1008,7 +1101,10 @@ mod tests {
     #[test]
     fn legacy_rewrite() {
         assert_eq!(legacy_pattern("(\\d{3})(\\d{4})"), "(\\d{3})(\\d{4})");
-        assert_eq!(legacy_pattern("([2-9]\\d{2})(1)(\\d{3,4})"), "(\\d\\d{2})(\\d)(\\d{3,4})");
+        assert_eq!(
+            legacy_pattern("([2-9]\\d{2})(1)(\\d{3,4})"),
+            "(\\d\\d{2})(\\d)(\\d{3,4})"
+        );
     }
 
     #[test]
@@ -1020,8 +1116,14 @@ mod tests {
     #[test]
     fn leading_digit_matcher() {
         let tree = pattern::parse("1(?:[2-4]|5)").unwrap();
-        assert!(matches!(pattern::matches(&['1'], &tree, true), Ok(Some(pattern::Outcome::Partial))));
-        assert!(matches!(pattern::matches(&['1', '3'], &tree, true), Ok(Some(pattern::Outcome::Match(2)))));
+        assert!(matches!(
+            pattern::matches(&['1'], &tree, true),
+            Ok(Some(pattern::Outcome::Partial))
+        ));
+        assert!(matches!(
+            pattern::matches(&['1', '3'], &tree, true),
+            Ok(Some(pattern::Outcome::Match(2)))
+        ));
         assert!(matches!(pattern::matches(&['2'], &tree, true), Ok(None)));
         assert!(pattern::parse("1?").is_err());
     }

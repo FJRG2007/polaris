@@ -575,7 +575,10 @@ pub fn phone_main_country(calling_code: String) -> Option<&'static str> {
 }
 
 #[napi(js_name = "phoneToE164", catch_unwind)]
-pub fn phone_to_e164(value: String, country: Option<String>) -> napi::Result<Option<String>, ErrorClass> {
+pub fn phone_to_e164(
+    value: String,
+    country: Option<String>,
+) -> napi::Result<Option<String>, ErrorClass> {
     polaris_core::phone::to_e164(&value, country.as_deref()).map_err(coded)
 }
 
@@ -597,7 +600,10 @@ pub fn phone_split(value: String) -> napi::Result<PhoneSplit, ErrorClass> {
 }
 
 #[napi(catch_unwind)]
-pub fn phone_format_as_typed(value: String, country: Option<String>) -> napi::Result<String, ErrorClass> {
+pub fn phone_format_as_typed(
+    value: String,
+    country: Option<String>,
+) -> napi::Result<String, ErrorClass> {
     polaris_core::phone::format_phone_as_typed(&value, country.as_deref()).map_err(coded)
 }
 

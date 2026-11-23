@@ -27,11 +27,17 @@ pub struct PhoneError {
 
 impl PhoneError {
     fn error(message: String) -> Self {
-        PhoneError { class: "Error", message }
+        PhoneError {
+            class: "Error",
+            message,
+        }
     }
 
     fn type_error(message: String) -> Self {
-        PhoneError { class: "TypeError", message }
+        PhoneError {
+            class: "TypeError",
+            message,
+        }
     }
 }
 
@@ -106,11 +112,19 @@ pub fn to_e164(value: &str, country: Option<&str>) -> Result<Option<String>, Pho
     if typed.is_empty() {
         return Ok(None);
     }
-    let country = if typed.starts_with('+') { None } else { country };
+    let country = if typed.starts_with('+') {
+        None
+    } else {
+        country
+    };
     let Some(parsed) = parse::parse(typed, country)? else {
         return Ok(None);
     };
-    Ok(if parsed.is_valid()? { Some(parsed.e164()) } else { None })
+    Ok(if parsed.is_valid()? {
+        Some(parsed.e164())
+    } else {
+        None
+    })
 }
 
 /// `phoneCountryOf(value)`.
@@ -157,7 +171,10 @@ pub fn format_phone_international(value: &str) -> Result<Text, PhoneError> {
     let (typed, _, _) = js::js_trim(value);
     match parse::parse(typed, None)? {
         Some(parsed) => Ok(Text::Owned(parsed.format(true)?)),
-        None => Ok(Text::Slice { start: 0, end: js::utf16_len(value) }),
+        None => Ok(Text::Slice {
+            start: 0,
+            end: js::utf16_len(value),
+        }),
     }
 }
 
@@ -179,8 +196,14 @@ mod tests {
 
     #[test]
     fn spain() {
-        assert_eq!(to_e164(" 600 11 12 22 ", Some("ES")).unwrap().as_deref(), Some("+34600111222"));
-        assert_eq!(to_e164("+34600111222", None).unwrap().as_deref(), Some("+34600111222"));
+        assert_eq!(
+            to_e164(" 600 11 12 22 ", Some("ES")).unwrap().as_deref(),
+            Some("+34600111222")
+        );
+        assert_eq!(
+            to_e164("+34600111222", None).unwrap().as_deref(),
+            Some("+34600111222")
+        );
         assert_eq!(to_e164("600111222", None).unwrap(), None);
         assert_eq!(phone_country_of("+34600111222").unwrap(), Some("ES"));
         assert_eq!(
@@ -191,14 +214,20 @@ mod tests {
             split_phone("+34600111222").unwrap(),
             (Some("ES"), Text::Owned("600 11 12 22".into()))
         );
-        assert_eq!(format_phone_as_typed("600111222", Some("ES")).unwrap(), "600 11 12 22");
+        assert_eq!(
+            format_phone_as_typed("600111222", Some("ES")).unwrap(),
+            "600 11 12 22"
+        );
     }
 
     #[test]
     fn calling_codes() {
         assert_eq!(phone_calling_code("ES").unwrap(), Some("34"));
         assert_eq!(phone_calling_code("toString").unwrap(), None);
-        assert_eq!(phone_calling_code("XX").unwrap_err().message, "Unknown country: XX");
+        assert_eq!(
+            phone_calling_code("XX").unwrap_err().message,
+            "Unknown country: XX"
+        );
         assert_eq!(phone_main_country("1"), Some("US"));
         assert_eq!(phone_main_country("800"), None);
         assert!(phone_countries().len() > 200);

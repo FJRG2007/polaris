@@ -188,7 +188,11 @@ fn from_possible_uri(text: &str) -> Result<Option<String>, ()> {
             number.truncate(i);
         }
     }
-    Ok(if number.is_empty() { None } else { Some(number) })
+    Ok(if number.is_empty() {
+        None
+    } else {
+        Some(number)
+    })
 }
 
 /// What `parseInput` hands on: the number and its extension.
@@ -211,7 +215,7 @@ pub enum Length {
     IsPossible,
     TooShort,
     TooLong,
-    InvalidLength,
+    Invalid,
 }
 
 /// `checkNumberLength(nationalNumber, undefined, metadata)` for `plan`.
@@ -223,7 +227,7 @@ pub fn check_length(national: &str, plan: &'static Plan) -> Length {
     let Some(&min) = lengths.first() else {
         // `possible_lengths[0]` is undefined: every comparison is false, and
         // `indexOf(n, 1)` finds nothing.
-        return Length::InvalidLength;
+        return Length::Invalid;
     };
     let min = usize::from(min);
     if min == actual {
@@ -238,7 +242,7 @@ pub fn check_length(national: &str, plan: &'static Plan) -> Length {
     if lengths.iter().skip(1).any(|&l| usize::from(l) == actual) {
         Length::IsPossible
     } else {
-        Length::InvalidLength
+        Length::Invalid
     }
 }
 
@@ -271,7 +275,10 @@ pub fn has_number_type(national: &str, plan: &'static Plan) -> bool {
 }
 
 /// `getCountryByNationalNumber`.
-pub fn country_by_national_number(national: &str, countries: &[&'static str]) -> Option<&'static str> {
+pub fn country_by_national_number(
+    national: &str,
+    countries: &[&'static str],
+) -> Option<&'static str> {
     for &country in countries {
         let Some(plan) = metadata::country(country) else {
             continue;
@@ -307,7 +314,11 @@ pub struct Extracted {
 /// `extractNationalNumberFromPossiblyIncompleteNumber(number, metadata)` with
 /// `plan` selected.
 pub fn extract_national_incomplete(number: &str, plan: &'static Plan) -> Extracted {
-    let unchanged = || Extracted { national: number.to_string(), national_prefix: None, carrier: None };
+    let unchanged = || Extracted {
+        national: number.to_string(),
+        national_prefix: None,
+        carrier: None,
+    };
     let Some(prefix) = plan.np_for_parsing().filter(|_| !number.is_empty()) else {
         return unchanged();
     };
@@ -318,7 +329,13 @@ pub fn extract_national_incomplete(number: &str, plan: &'static Plan) -> Extract
     };
     let whole = caps.get(0).map_or("", |m| m.as_str());
     let count = caps.len() - 1;
-    let last_group = if count > 0 { caps.get(count).map(|m| m.as_str()).filter(|s| !s.is_empty()) } else { None };
+    let last_group = if count > 0 {
+        caps.get(count)
+            .map(|m| m.as_str())
+            .filter(|s| !s.is_empty())
+    } else {
+        None
+    };
     let has_groups = last_group.is_some();
     let first_group = caps.get(1).map(|m| m.as_str());
     let mut carrier = None;
@@ -352,7 +369,11 @@ pub fn extract_national_incomplete(number: &str, plan: &'static Plan) -> Extract
     } else {
         Some(whole.to_string())
     };
-    Extracted { national, national_prefix, carrier }
+    Extracted {
+        national,
+        national_prefix,
+        carrier,
+    }
 }
 
 /// `extractNationalNumber(number, undefined, metadata)` with `plan` selected.
@@ -370,7 +391,10 @@ pub fn extract_national(number: &str, plan: &'static Plan) -> (String, Option<St
                 Some(c) => metadata::country(c).map_or(plan, PlanId::plan),
                 None => plan,
             };
-            if matches!(check_length(&national, target), Length::TooShort | Length::InvalidLength) {
+            if matches!(
+                check_length(&national, target),
+                Length::TooShort | Length::Invalid
+            ) {
                 return (number.to_string(), None);
             }
         }
@@ -406,7 +430,8 @@ pub fn extract_code_without_plus(
     let (shorter_national, _) = extract_national(shorter, plan);
     let (national, _) = extract_national(number, plan);
     let pattern = plan.national_pattern.unwrap_or("undefined");
-    if (!js::matches_entirely(&national, pattern) && js::matches_entirely(&shorter_national, pattern))
+    if (!js::matches_entirely(&national, pattern)
+        && js::matches_entirely(&shorter_national, pattern))
         || check_length(&national, plan) == Length::TooLong
     {
         return Ok(Some((code, shorter.to_string())));
@@ -446,8 +471,14 @@ pub struct CodeExtraction {
 
 /// `extractCountryCallingCode(number, country, defaultCountry, undefined, metadata)`;
 /// `country` is `country || defaultCountry`.
-pub fn extract_calling_code(number: &str, country: Option<&str>) -> Result<CodeExtraction, PhoneError> {
-    let none = CodeExtraction { code: None, number: None };
+pub fn extract_calling_code(
+    number: &str,
+    country: Option<&str>,
+) -> Result<CodeExtraction, PhoneError> {
+    let none = CodeExtraction {
+        code: None,
+        number: None,
+    };
     if number.is_empty() {
         return Ok(none);
     }
@@ -459,10 +490,16 @@ pub fn extract_calling_code(number: &str, country: Option<&str>) -> Result<CodeE
             _ => {
                 if country.is_some() {
                     if let Some((code, shorter)) = extract_code_without_plus(&number, country)? {
-                        return Ok(CodeExtraction { code: Some(code.to_string()), number: Some(shorter) });
+                        return Ok(CodeExtraction {
+                            code: Some(code.to_string()),
+                            number: Some(shorter),
+                        });
                     }
                 }
-                return Ok(CodeExtraction { code: None, number: Some(number) });
+                return Ok(CodeExtraction {
+                    code: None,
+                    number: Some(number),
+                });
             }
         }
     }
@@ -475,7 +512,10 @@ pub fn extract_calling_code(number: &str, country: Option<&str>) -> Result<CodeE
     while i - 1 <= MAX_LENGTH_COUNTRY_CODE && i <= number.len() {
         let code = &number[1..i];
         if metadata::has_calling_code(code) {
-            return Ok(CodeExtraction { code: Some(code.to_string()), number: Some(number[i..].to_string()) });
+            return Ok(CodeExtraction {
+                code: Some(code.to_string()),
+                number: Some(number[i..].to_string()),
+            });
         }
         i += 1;
     }
@@ -509,7 +549,10 @@ impl PhoneNumber {
         if plan.types.is_some_and(|t| !t.is_empty()) {
             return Ok(has_number_type(&self.national, plan));
         }
-        Ok(js::matches_entirely(&self.national, plan.national_pattern.unwrap_or("undefined")))
+        Ok(js::matches_entirely(
+            &self.national,
+            plan.national_pattern.unwrap_or("undefined"),
+        ))
     }
 
     /// `format('NATIONAL')` and `format('INTERNATIONAL')`.
@@ -555,7 +598,12 @@ fn format_national(national: &str, plan: &'static Plan, international: bool) -> 
 }
 
 /// `formatNationalNumberUsingFormat`.
-pub fn format_using(national: &str, format: &FormatRef, international: bool, with_np: bool) -> String {
+pub fn format_using(
+    national: &str,
+    format: &FormatRef,
+    international: bool,
+    with_np: bool,
+) -> String {
     let template = if international {
         format.international_format().to_string()
     } else {
@@ -583,7 +631,8 @@ pub fn international_separators(text: &str) -> String {
 /// `undefined` (a parse error, caught).
 pub fn parse(text: &str, default_country: Option<&str>) -> Result<Option<PhoneNumber>, PhoneError> {
     // An unsupported default country (no own key) is dropped, as `isSupportedCountry` does.
-    let default_country = default_country.filter(|c| !c.is_empty() && metadata::country(c).is_some());
+    let default_country =
+        default_country.filter(|c| !c.is_empty() && metadata::country(c).is_some());
     let Ok(input) = parse_input(text) else {
         return Ok(None);
     };
@@ -601,7 +650,9 @@ pub fn parse(text: &str, default_country: Option<&str>) -> Result<Option<PhoneNu
             let dc = default_country.unwrap_or_default();
             let plan = metadata::select(dc)?;
             country = metadata::country_keys().find(|k| *k == dc);
-            let code = plan.map(|p| p.plan().calling_code.to_string()).unwrap_or_default();
+            let code = plan
+                .map(|p| p.plan().calling_code.to_string())
+                .unwrap_or_default();
             (code, plan)
         }
         _ => return Ok(None),
@@ -624,5 +675,10 @@ pub fn parse(text: &str, default_country: Option<&str>) -> Result<Option<PhoneNu
     if national.len() < MIN_LENGTH_FOR_NSN || national.len() > MAX_LENGTH_FOR_NSN {
         return Ok(None);
     }
-    Ok(Some(PhoneNumber { country, calling_code: code, national, ext }))
+    Ok(Some(PhoneNumber {
+        country,
+        calling_code: code,
+        national,
+        ext,
+    }))
 }

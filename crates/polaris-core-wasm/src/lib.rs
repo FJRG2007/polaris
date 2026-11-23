@@ -353,7 +353,10 @@ pub fn phone_split(value: &str) -> Result<JsValue, JsValue> {
                 let _ = js_sys::Reflect::set(&out, &JsValue::from_str(key), &v);
             };
             set("country", country.map_or(JsValue::NULL, JsValue::from_str));
-            set("national", text.owned().map_or(JsValue::NULL, JsValue::from_str));
+            set(
+                "national",
+                text.owned().map_or(JsValue::NULL, JsValue::from_str),
+            );
             set("start", JsValue::from(text.range().0 as u32));
             set("end", JsValue::from(text.range().1 as u32));
             out.into()
