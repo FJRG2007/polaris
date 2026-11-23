@@ -11,6 +11,7 @@ members = [
     "crates/polaris-core-node",
     "crates/polaris-core-wasm",
     "crates/polaris-core-opaque-wasm",
+    "crates/polaris-native-host",
 ]
 exclude = ["vendor/smoltcp", "crates/polaris-core/fuzz"]
 

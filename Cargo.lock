@@ -2443,6 +2443,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "polaris-native-host"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "serde_json",
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "polaris-tunnel"
 version = "0.1.2"
 dependencies = [

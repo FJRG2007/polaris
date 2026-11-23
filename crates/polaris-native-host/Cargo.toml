@@ -1,0 +1,29 @@
+[package]
+name = "polaris-native-host"
+version = "0.1.0"
+description = "Polaris Desktop's native messaging host: relays a browser extension's pairing message to the running desktop app over a per-user local socket."
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[[bin]]
+name = "polaris-native-host"
+path = "src/main.rs"
+
+[dependencies]
+serde_json = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.191"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+    "Win32_System_WindowsProgramming",
+] }
