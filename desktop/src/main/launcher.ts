@@ -39,6 +39,7 @@ import { holdGlobalKey } from "./call-hotkeys";
 import { runningPrograms } from "./game-detect";
 import { quickAnswer } from "@/shared/quick-answer";
 import type { LauncherStatus } from "@/shared/bridge";
+import { takeFocus } from "./window-front";
 import { installedApps, installedAppsRead, isListedApp } from "./launcher-apps";
 import { CLIPBOARD_LIMIT, isConcealed, withClip, type ClipEntry } from "@/shared/clipboard-history";
 import { DEFAULT_LAUNCHER_BINDING, displayAccelerator, launcherAccelerator } from "@/shared/launcher-hotkey";
@@ -368,6 +369,10 @@ function create(): BrowserWindow {
         if (isMainFrame && remote && code !== -3 && url.startsWith(remote) && !made.isDestroyed()) loadOwnPanel(made);
     });
     made.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+    // Windows hands every window the app menu: here it would only take the Alt key.
+    made.removeMenu();
+    // Activated later than it was shown (the foreground lock let go): the page takes the keys then too.
+    made.on("focus", () => made.webContents.focus());
     made.on("blur", hide);
     made.once("ready-to-show", () => {
         if (window === made) ready = true;
@@ -401,8 +406,7 @@ function create(): BrowserWindow {
 function place(target: BrowserWindow): void {
     const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     target.setBounds(workArea);
-    target.show();
-    target.focus();
+    takeFocus(target, process.platform, "pop-up-menu");
     target.webContents.send(LAUNCHER_CHANNELS.opened);
 }
 

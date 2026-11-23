@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import { closeOnceShown, createPresenter, launchedByInstaller } from "@/main/window-front";
+import { closeOnceShown, createPresenter, launchedByInstaller, takeFocus } from "@/main/window-front";
 
 function liftable() {
     const calls: string[] = [];
@@ -64,5 +64,50 @@ describe("windows in front", () => {
         closeOnceShown(showable(false, true), close);
         closeOnceShown(null, close);
         expect(close).toHaveBeenCalledTimes(3);
+    });
+});
+
+/** A window that takes focus at the `focusAt`th call to `focus()`, or never. */
+function focusable(focusAt: number | null) {
+    const calls: string[] = [];
+    let focuses = 0;
+    return {
+        calls,
+        show: () => calls.push("show"),
+        focus: () => {
+            focuses++;
+            calls.push("focus");
+        },
+        isFocused: () => focusAt !== null && focuses >= focusAt,
+        setAlwaysOnTop: (flag: boolean) => calls.push(`top:${flag}`),
+        minimize: () => calls.push("minimize"),
+        restore: () => calls.push("restore"),
+        webContents: { focus: () => calls.push("page") }
+    };
+}
+
+describe("the keyboard for a window raised from a global key", () => {
+    it("stops at show and focus when Windows lets the window take it", () => {
+        const window = focusable(1);
+        takeFocus(window, "win32");
+        expect(window.calls).toEqual(["show", "focus", "page"]);
+    });
+
+    it("flips topmost when the foreground lock refused the first focus", () => {
+        const window = focusable(2);
+        takeFocus(window, "win32");
+        expect(window.calls).toEqual(["show", "focus", "top:false", "top:true", "focus", "page"]);
+    });
+
+    it("minimizes and restores as the last resort", () => {
+        const window = focusable(null);
+        takeFocus(window, "win32");
+        expect(window.calls).toEqual(["show", "focus", "top:false", "top:true", "focus", "minimize", "restore", "focus", "page"]);
+    });
+
+    it("only shows and focuses elsewhere, where there is no foreground lock", () => {
+        const window = focusable(null);
+        takeFocus(window, "darwin");
+        expect(window.calls).toEqual(["show", "focus", "page"]);
     });
 });

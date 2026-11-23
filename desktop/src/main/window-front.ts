@@ -13,7 +13,7 @@
 export interface Liftable {
     show(): void;
     focus(): void;
-    setAlwaysOnTop(flag: boolean): void;
+    setAlwaysOnTop(flag: boolean, level?: "pop-up-menu"): void;
 }
 
 /** What waiting for a window to be on screen needs of it. */
@@ -49,4 +49,41 @@ export function createPresenter(lift: boolean): (window: Liftable) => void {
 export function closeOnceShown(next: Showable | null, close: () => void): void {
     if (next && !next.isDestroyed() && !next.isVisible()) next.once("show", close);
     else close();
+}
+
+/** What taking the keyboard needs of a window, so the tests can hand in a stand-in. */
+export interface Focusable extends Liftable {
+    isFocused(): boolean;
+    minimize(): void;
+    restore(): void;
+    readonly webContents: { focus(): void; };
+}
+
+/**
+ * Show a window and give it the keyboard, for a window brought up from a key
+ * held system-wide (the launcher). Windows' foreground lock lets a process
+ * that is not in front raise a window without activating it: it is drawn on
+ * top, but the keys still go to the app behind. Each step is tried only when
+ * the one before left the window without focus, in the order Electron's own
+ * reports settled on (electron/electron#2867): show and focus; then a topmost
+ * flip, which Windows treats as the window being brought forward; then a
+ * minimize and restore, which activates it. Last, the page itself is focused -
+ * a window kept hidden and shown again is active with its page still blurred
+ * unless that is asked for, the way Flow Launcher activates its window and
+ * then focuses its query box.
+ */
+export function takeFocus(window: Focusable, platform: NodeJS.Platform, level?: "pop-up-menu"): void {
+    window.show();
+    window.focus();
+    if (platform === "win32" && !window.isFocused()) {
+        window.setAlwaysOnTop(false);
+        window.setAlwaysOnTop(true, level);
+        window.focus();
+    }
+    if (platform === "win32" && !window.isFocused()) {
+        window.minimize();
+        window.restore();
+        window.focus();
+    }
+    window.webContents.focus();
 }
