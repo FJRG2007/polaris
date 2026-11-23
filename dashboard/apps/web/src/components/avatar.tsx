@@ -539,8 +539,10 @@ export function Avatar({
                 </span>
             ) : (
                 <span
-                    aria-label={autoWord ?? (seenWord || t(`presence.${where.status}`))}
-                    title={autoWord ?? (seenWord || t(`presence.${where.status}`))}
+                    aria-label={
+                        autoWord ?? (seenWord || t(`presence.${where?.status ?? "online"}`))
+                    }
+                    title={autoWord ?? (seenWord || t(`presence.${where?.status ?? "online"}`))}
                     className={cn(
                         "absolute -bottom-0.5 -end-0.5 rounded-full ring-2 ring-background",
                         PRESENCE_COLOURS[where?.status ?? "online"]
