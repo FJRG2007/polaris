@@ -46,6 +46,7 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "arcade.calls": "Play games in calls",
     "polar.use": "Talk to Polar",
     "polar.spend": "Spend this deployment's keys on Polar",
+    "terminal.control": "Control your terminals",
     "deploy.read": "Read deployments",
     "deploy.manage": "Manage deployments",
     "games.read": "Read game servers",
@@ -108,6 +109,7 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
     "arcade.calls": "Start a game inside a call, or join one somebody started.",
     "polar.use": "Open Polar and talk to it.",
     "polar.spend": "Run Polar on the deployment's own provider keys instead of your own.",
+    "terminal.control": "Reach your signed-in Polaris Terminals from elsewhere and run their actions.",
     "chat.meetings": "Create meetings anybody holding the link can join, and host them.",
     "deploy.read": "Inspect apps, deployments, and logs.",
     "deploy.manage": "Deploy, restart, and remove apps.",
@@ -212,6 +214,8 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
     { title: "Polar", scopes: ["polar.use", "polar.spend"], app: "polar" },
+    // i18n-ignore said in the reader's words by account/api-keys/scope-picker
+    { title: "Terminal", scopes: ["terminal.control"] },
     {
         // i18n-ignore said in the reader's words by account/api-keys/scope-picker
         title: "Home",

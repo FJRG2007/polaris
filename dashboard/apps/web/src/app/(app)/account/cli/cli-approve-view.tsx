@@ -46,7 +46,8 @@ const SCOPE_WORDS = {
     "agents.read": "cli.scope.agentsRead",
     "agents.manage": "cli.scope.agentsManage",
     "polar.use": "cli.scope.polarUse",
-    "polar.spend": "cli.scope.polarSpend"
+    "polar.spend": "cli.scope.polarSpend",
+    "terminal.control": "cli.scope.terminalControl"
 } as const satisfies Record<SignInScope, `cli.scope.${string}`>;
 
 /**

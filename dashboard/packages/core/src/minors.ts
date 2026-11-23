@@ -323,6 +323,8 @@ export const STAGE_PRESETS: Readonly<Record<PresetCapability, StageLevels>> = {
     "tasks.read": EVERYDAY,
     "tasks.manage": EVERYDAY,
     "polar.use": PUBLIC_ADDRESS,
+    // A shell on the child's own computer, reached from another device.
+    "terminal.control": BUILDER,
     "app:polar": PUBLIC_ADDRESS,
     "feature:polarMemories": [O, O, O, O, Y],
     "feature:publicLinks": PUBLIC_ADDRESS,

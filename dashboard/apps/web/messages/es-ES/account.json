@@ -437,7 +437,8 @@
                 "inbox": "Correo y SMS",
                 "family": "Familia",
                 "administration": "Administración",
-                "polar": "Polar"
+                "polar": "Polar",
+                "terminal": "Terminal"
             },
             "levelOf": "Acceso a {group}",
             "level": {
@@ -1918,7 +1919,8 @@
             "agentsRead": "Ver tus sesiones de agentes y lo que están haciendo",
             "agentsManage": "Iniciar, responder y detener tus sesiones de agentes",
             "polarUse": "Hablar con Polar",
-            "polarSpend": "Usar Polar con las claves de proveedor de este despliegue"
+            "polarSpend": "Usar Polar con las claves de proveedor de este despliegue",
+            "terminalControl": "Acceder a esta terminal desde tus otros dispositivos y controlarla"
         },
         "consent": "Si dices que sí, este equipo recibe una clave que actúa en nombre de tu cuenta durante un año, limitada a lo que aparece arriba. Aparece en Sesiones como este equipo, donde puedes cerrarla, y plr logout también.",
         "working": "Procesando",

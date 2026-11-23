@@ -3070,6 +3070,7 @@
             "games": "Juegos",
             "translate": "Traductor",
             "polar": "Polar",
+            "terminal": "Terminal",
             "alerts": "Alertas"
         },
         "permissions": {
@@ -3182,6 +3183,9 @@
             "polar": {
                 "use": "Hablar con Polar",
                 "spend": "Usar Polar con las claves del despliegue"
+            },
+            "terminal": {
+                "control": "Controlar tus terminales desde otro dispositivo"
             },
             "alerts": {
                 "topics": "Recibir alertas de otros sistemas"

@@ -30,6 +30,7 @@ export async function seedDefaultRoles(): Promise<void> {
     await carryGrants(CHAT_CARRY_MARK, CHAT_CAPABILITIES, holdsChat);
     await carryGrants(GAMES_CARRY_MARK, GAMES_CAPABILITIES, holdsChat);
     await carryGrants(FAMILY_CARRY_MARK, FAMILY_CAPABILITIES, isMemberRole);
+    await carryGrants(TERMINAL_CARRY_MARK, TERMINAL_CAPABILITIES, isMemberRole);
 }
 
 /** That the carry-forward below has already happened, so it happens once. */
@@ -40,6 +41,12 @@ const GAMES_CARRY_MARK = "roles.gamesCapabilitiesCarried";
 
 /** The same, for looking after a child's account. */
 const FAMILY_CARRY_MARK = "roles.familyCapabilitiesCarried";
+
+/** The same, for reaching one's own Polaris Terminal from elsewhere. */
+const TERMINAL_CARRY_MARK = "roles.terminalCapabilitiesCarried";
+
+/** What the built-in `member` role gained with the terminal relay. */
+const TERMINAL_CAPABILITIES: readonly Permission[] = ["terminal.control"];
 
 /** What the built-in `member` role gained with family accounts. */
 const FAMILY_CAPABILITIES: readonly Permission[] = ["family.manage"];

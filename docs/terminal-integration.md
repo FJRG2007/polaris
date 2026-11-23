@@ -198,24 +198,48 @@ vocabulary, `XWarpPointer`) carries over unchanged.
   closest pieces are the deploy console's WebSocket sidecar (`apps/web/ws-server.mjs`,
   ticket over `Sec-WebSocket-Protocol`, routed by Traefik at `/api/deploy/ws`)
   and the agent runner protocol (`docs/runner-protocol.md`).
-- **Gap:** a relay so one signed-in account sees and controls every terminal it
-  owns. Too large for this pass; the design:
+- **Built:** the relay, so one signed-in account reaches every terminal it
+  owns:
   - **Transport:** the terminal keeps one outbound WebSocket to
-    `wss://<instance>/api/terminal/ws` (a new route in `ws-server.mjs`, Traefik
-    priority 100 like `/api/deploy/ws`), authenticated by its `terminal` key.
-    Outbound only, so it works behind NAT with no port opened on the PC.
-  - **Protocol:** the local-control envelope unchanged, wrapped as
-    `{ "instance": <id>, "envelope": RequestEnvelope }`. The relay never
-    interprets actions; it routes by instance id and checks that the caller owns
-    the instance (or holds a grant, see sharing). The same 89 actions then work
-    locally and remotely, and `polaris terminal ...` targets either.
-  - **Scope:** a new `terminal.control` key scope, added to `TERMINAL_SCOPES`
-    and the approval screen in the same change; the web caller needs a session
-    of the owning account.
+    `wss://<instance>/api/deploy/ws/terminal?role=instance` with its `terminal`
+    key as a Bearer token. The path sits under `/api/deploy/ws`, which the edge
+    already routes to the sidecar (priority 100), so an existing install needs
+    no new router. Outbound only, so it works behind NAT with no port opened on
+    the PC. A controller (the CLI, a script, another terminal) dials the same
+    path with `?role=controller` and any key holding `terminal.control`.
+  - **Protocol:** JSON text frames. The terminal sends
+    `{ "type": "hello", "name", "os", "version" }` within 10 s and gets
+    `{ "type": "ready", "instance": <id> }`. A controller sends
+    `{ "type": "request", "instance": <id>, "envelope": RequestEnvelope }`; the
+    terminal receives `{ "type": "request", "id": <relay id>, "envelope" }` and
+    answers `{ "type": "response", "id", "envelope": ResponseEnvelope }`; the
+    controller receives `{ "type": "response", "instance", "request_id",
+    "envelope" }`, or `{ "type": "error", "instance", "request_id", "code" }`
+    with `code` one of `not_found` (unknown or not the caller's), `offline`,
+    `busy` (64 in flight), `timeout` (60 s). `ping` -> `pong` on both sides.
+    The relay never interprets the envelope, so the same 89 actions work
+    locally and remotely.
+  - **Checks:** the key is verified with the same network, client and device
+    rules as any API call; a controller's key and the instance's owner are
+    checked on every request; a held terminal whose key is revoked, switched
+    off or expired, or whose owner is banned, is closed within a minute.
+  - **Scope:** `terminal.control`, a new permission (area Terminal) seeded into
+    the built-in `member` role and carried once into existing installs'
+    `member` role; it is in `TERMINAL_SCOPES` and on the approval screen.
   - **Registry:** `TerminalInstance(id, userId, apiKeyId, name, os, version,
-    lastSeenAt)`; presence comes from the open socket, never polled.
-  - **Pane output** (watching a pane live) is a stream on the same socket,
-    capped per pane, and only while a viewer is attached.
+    relayNode, lastSeenAt)`, one row per terminal key; presence comes from the
+    open socket, never polled.
+  - **Several nodes:** a request for a terminal held on another node goes
+    through the web app and `pg_notify` (`polaris_terminal`, base64 pieces
+    under the NOTIFY limit, 256 KiB per frame) to that node's sidecar, and the
+    answer comes back the same way.
+  - **Not built yet:** watching a pane's output live (a capped stream on the
+    same socket, only while a viewer is attached) and a web screen listing the
+    account's terminals.
+- **Code:** `apps/web/terminal-relay.mjs` (sidecar), `apps/web/ws-server.mjs`
+  (wiring), `apps/web/src/lib/terminal/relay.ts` and
+  `apps/web/src/app/api/terminal/relay/route.ts` (loopback),
+  `test/terminal/relay.test.ts`.
 
 ### Session sharing (`drive`, shared sessions)
 
@@ -329,7 +353,8 @@ vocabulary, `XWarpPointer`) carries over unchanged.
 | `POST /api/terminal/authorize`, `POST /api/terminal/authorize/claim`, `DELETE /api/terminal/session` | `apps/web/src/app/api/terminal/` |
 | Approval page `/account/terminal` and Sessions label | `app/(app)/account/terminal/page.tsx`, `lib/device-sessions/kinds.ts` |
 | CI scaffold for `terminal/**` | `.github/workflows/terminal.yml` |
+| Remote-control relay at `/api/deploy/ws/terminal`, scope `terminal.control`, `TerminalInstance` | `apps/web/terminal-relay.mjs`, `apps/web/src/lib/terminal/relay.ts`, `app/api/terminal/relay/route.ts` |
 
-Not built, with the design above: the remote-control relay, terminal objects
-and shared sessions, the `polaris terminal` CLI subcommand, and the Desktop
+Not built, with the design above: live pane output over the relay, terminal
+objects and shared sessions, the `polaris terminal` CLI subcommand, and the Desktop
 shared sign-in.

@@ -7,14 +7,16 @@
  * its key reaches today. `polar.spend` is what lets those calls run on the
  * deployment's provider keys rather than the person's own; like every scope it
  * is narrowed again to what the approving account holds, so somebody without it
- * still connects and talks to Polar on their own keys. Growing what the terminal
- * does (remote control, shared sessions) means growing this list, which puts
- * the new reach on the approval screen.
+ * still connects and talks to Polar on their own keys. `terminal.control` lets
+ * the terminal hold its socket on the remote-control relay, so the account's
+ * other devices can reach it (`terminal-relay.mjs`). Growing what the terminal
+ * does means growing this list, which puts the new reach on the approval
+ * screen.
  *
  * Client-safe: the approval screen imports it.
  */
 
-export const TERMINAL_SCOPES = ["polar.use", "polar.spend"] as const;
+export const TERMINAL_SCOPES = ["polar.use", "polar.spend", "terminal.control"] as const;
 
 export type TerminalScope = (typeof TERMINAL_SCOPES)[number];
 

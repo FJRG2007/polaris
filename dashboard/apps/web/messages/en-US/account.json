@@ -437,7 +437,8 @@
                 "inbox": "Email & SMS",
                 "family": "Family",
                 "administration": "Administration",
-                "polar": "Polar"
+                "polar": "Polar",
+                "terminal": "Terminal"
             },
             "levelOf": "Access to {group}",
             "level": {
@@ -1918,7 +1919,8 @@
             "agentsRead": "See your agent sessions and what they are doing",
             "agentsManage": "Start, answer and stop your agent sessions",
             "polarUse": "Talk to Polar",
-            "polarSpend": "Run Polar on this deployment's provider keys"
+            "polarSpend": "Run Polar on this deployment's provider keys",
+            "terminalControl": "Reach this terminal from your other devices and control it"
         },
         "consent": "Saying yes gives this computer a key that acts for your account for a year, limited to what is listed above. It is listed under Sessions as this computer, where you can sign it out, and plr logout does too.",
         "working": "Working",

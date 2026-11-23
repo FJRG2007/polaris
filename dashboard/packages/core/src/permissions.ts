@@ -49,6 +49,7 @@ export const PERMISSIONS = [
     "agents.manage",
     "polar.use",
     "polar.spend",
+    "terminal.control",
     "home.read",
     "home.control",
     "home.manage",
@@ -165,6 +166,9 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         // Polar on the person's own keys. Spending the deployment's keys is
         // billed to its administrator, so no seeded role holds "polar.spend".
         "polar.use",
+        // Reaching one's own Polaris Terminal from another device. It controls
+        // nothing but the terminals the account itself signed in.
+        "terminal.control",
         // Creating and looking after a child's account. Every adult member by
         // default (D3); a minor never holds it, whatever their role says
         // (`MINOR_FLOOR` in minors.ts).
@@ -352,6 +356,9 @@ export const PERMISSION_META: Readonly<Record<Permission, PermissionMeta>> = {
     // Every turn on the deployment's keys is billed to its administrator, which
     // is why this is apart from using Polar at all.
     "polar.spend": { area: "Polar", label: "Run Polar on this deployment's keys" },
+    // Only the account's own terminals, or ones shared with it: a grant to
+    // control somebody else's is never implied by this.
+    "terminal.control": { area: "Terminal", label: "Control your terminals from another device" },
     "home.read": { area: "Home", app: "home", label: "Watch the cameras and read what they saw" },
     // Pointing a camera somewhere is not the same decision as being allowed to
     // look at where it already points, and neither is silencing an alert.

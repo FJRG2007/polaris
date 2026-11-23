@@ -46,6 +46,8 @@ import {
     sessionsRequest
 } from "./terminal-sessions.mjs";
 import { RUNNER_LIMITS, RUNNER_SOCKET_PATH, createRunnerSidecar } from "./runner-sidecar.mjs";
+import { TERMINAL_CLOSE, TERMINAL_LIMITS, TERMINAL_SOCKET_PATH, createTerminalRelay } from "./terminal-relay.mjs";
+import os from "node:os";
 
 const port = Number(process.env.POLARIS_WS_PORT || 3001);
 const appPort = Number(process.env.PORT || 3000);
@@ -72,6 +74,7 @@ setInterval(() => sessions.sweep(), 60_000).unref();
 for (const signal of ["SIGTERM", "SIGINT"]) {
     process.once(signal, () => {
         sessions.endAll(1001, "session ended");
+        terminals.endAll(1001, "going away");
         for (const ws of liveTerminals.keys()) ws.close(1001, "session ended");
         setTimeout(() => process.exit(0), 500).unref();
     });
@@ -137,12 +140,37 @@ const wss = new WebSocketServer({
 });
 const runnerWss = new WebSocketServer({ noServer: true, maxPayload: RUNNER_LIMITS.frameBytes + 1024 });
 
+/** Polaris Terminal's remote-control relay (terminal-relay.mjs). */
+const terminals = createTerminalRelay({
+    node: os.hostname(),
+    app: async (body) => {
+        const res = await fetch(`http://127.0.0.1:${appPort}/api/terminal/relay`, {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-internal-key": internalKey },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(10_000)
+        });
+        if (!res.ok) throw new Error(`terminal relay answered ${res.status}`);
+        return res.json();
+    }
+});
+setInterval(() => terminals.sweep(), 5_000).unref();
+setInterval(() => void terminals.checkStanding(), 60_000).unref();
+const terminalWss = new WebSocketServer({ noServer: true, maxPayload: TERMINAL_LIMITS.frameBytes + 1024 });
+
 // Two kinds of socket share the port, told apart by path: terminals, and the
 // runners on people's own computers (under the same edge prefix, so the
 // existing router reaches it).
 server.on("upgrade", (req, socket, head) => {
     const path = new URL(req.url ?? "/", "http://sidecar").pathname;
-    const target = path === RUNNER_SOCKET_PATH ? runnerWss : path === "/api/deploy/ws" ? wss : null;
+    const target =
+        path === RUNNER_SOCKET_PATH
+            ? runnerWss
+            : path === TERMINAL_SOCKET_PATH
+              ? terminalWss
+              : path === "/api/deploy/ws"
+                ? wss
+                : null;
     if (!target) {
         socket.destroy();
         return;
@@ -150,6 +178,24 @@ server.on("upgrade", (req, socket, head) => {
     target.handleUpgrade(req, socket, head, (ws) => target.emit("connection", ws, req));
 });
 runnerWss.on("connection", (ws, req) => runners.acceptRunner(ws, req));
+terminalWss.on("connection", (ws, req) => {
+    ws.on("error", (err) => console.error(`polaris ws: terminal relay socket error - ${err?.message ?? err}`));
+    const header = String(req.headers.authorization ?? "");
+    const role = new URL(req.url ?? "/", "http://sidecar").searchParams.get("role") ?? "";
+    const headers = {};
+    for (const name of ["x-forwarded-for", "x-real-ip", "user-agent"]) {
+        const value = req.headers[name];
+        if (typeof value === "string") headers[name] = value.slice(0, 1024);
+    }
+    const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+    const handlers = terminals.accept(ws, { role, token, headers });
+    // The protocol is JSON text frames only.
+    ws.on("message", (data, isBinary) => {
+        if (isBinary) ws.close(TERMINAL_CLOSE.protocol, "text frames only");
+        else handlers.message(data.toString("utf8"));
+    });
+    ws.on("close", () => handlers.close());
+});
 
 server.on("listening", () => console.error(`polaris deploy ws sidecar on :${port}`));
 
@@ -231,6 +277,22 @@ wss.on("connection", async (ws, req) => {
 /** The web app's loopback calls on a user's sessions (see `sessionsRequest`). */
 async function handleInternal(req, res) {
     const url = new URL(req.url ?? "/", "http://sidecar");
+    if (url.pathname.startsWith("/terminal/")) {
+        const key = String(req.headers["x-internal-key"] ?? "");
+        let answer = { status: 403, body: { error: "forbidden" } };
+        if (req.method === "POST" && internalKey && safeEqual(key, internalKey)) {
+            let body = null;
+            try {
+                body = JSON.parse(await readBody(req, TERMINAL_LIMITS.frameBytes + 4096));
+            } catch {
+                body = null;
+            }
+            answer = terminals.internal(url.pathname, body) ?? { status: 404, body: { error: "not found" } };
+        }
+        res.writeHead(answer.status, { "content-type": "application/json" });
+        res.end(JSON.stringify(answer.body));
+        return;
+    }
     if (url.pathname.startsWith("/runner/")) {
         const key = String(req.headers["x-internal-key"] ?? "");
         const answer =

@@ -47,6 +47,8 @@ export const AREA_APPS: Readonly<Record<string, string | null>> = {
     Chat: "chat",
     Games: "arcade",
     Polar: "polar",
+    // Polaris Terminal is a native app, not one in the switcher.
+    Terminal: null,
     Apps: "apps",
     "Game servers": "games",
     Home: "home",

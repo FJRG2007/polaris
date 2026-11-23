@@ -94,7 +94,7 @@ describe("POST /api/terminal/authorize", () => {
         expect(opened[0]).toMatchObject({
             kind: "terminal",
             deviceName: "ada-desktop",
-            scopes: ["polar.use", "polar.spend"],
+            scopes: ["polar.use", "polar.spend", "terminal.control"],
             requestUserAgent: "polaris-terminal/0.2026.11.23 (win32; x64)",
             requestIp: "203.0.113.4"
         });

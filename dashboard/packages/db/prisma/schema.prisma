@@ -334,6 +334,7 @@ model User {
     extensionSessions    ExtensionSession[]
     trustedDevices      TrustedDevice[]
     agentRunners        AgentRunner[]
+    terminalInstances   TerminalInstance[]
     agentNativeModels   AgentNativeModels[]
     accountDevices      AccountDevice[]
     deviceCodes         DeviceCode[]
@@ -1083,6 +1084,32 @@ model AgentRunner {
     @@index([userId])
 }
 
+// A signed-in Polaris Terminal, reachable through the remote-control relay
+// (docs/terminal-integration.md). One per terminal key: signing the terminal in
+// again mints a new key and so a new row, and signing it out deletes the key and
+// this with it.
+model TerminalInstance {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    apiKeyId  String   @unique @db.Uuid
+    // As the terminal last reported them in its hello. Shown, never an input to
+    // a decision.
+    name      String?
+    os        String?
+    version   String?
+    // Which dashboard node holds its relay socket. Null while it is not
+    // connected anywhere: presence comes from the open socket, never a poll.
+    relayNode String?
+    lastSeenAt DateTime?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+}
+
 // A command for a runner whose connection is on another dashboard node, too
 // large for a NOTIFY payload. Read and deleted by the node that holds it.
 model AgentRunnerCommand {
@@ -1753,6 +1780,7 @@ model ApiKey {
     groups  ApiKeyAccessGroup[]
     usage   ApiKeyUsage[]
     calls   ApiKeyCallHour[]
+    terminalInstance TerminalInstance?
     tvUpdate TvUpdateRequest?
     tvPreference TvPreference?
 

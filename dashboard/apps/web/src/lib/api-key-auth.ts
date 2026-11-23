@@ -54,11 +54,24 @@ export async function authenticateApiKey(
 ): Promise<ApiKeyPrincipal | null> {
     const token = bearerToken(request);
     if (!token) return null;
+    const [ip, userAgent] = await Promise.all([clientIp(), clientUserAgent()]);
+    return authenticateKeyToken(token, ip, userAgent, { tv });
+}
 
+/**
+ * The same checks as `authenticateApiKey`, for a key that did not arrive on this
+ * request - the WebSocket sidecar passing on what a socket presented, with the
+ * address and user-agent the socket came from.
+ */
+export async function authenticateKeyToken(
+    token: string,
+    ip: string | undefined,
+    userAgent: string | undefined,
+    { tv = false }: { tv?: boolean } = {}
+): Promise<ApiKeyPrincipal | null> {
     const verified = await verifyApiKey(token);
     if (!verified || (verified.kind === "tv" && !tv)) return null;
 
-    const [ip, userAgent] = await Promise.all([clientIp(), clientUserAgent()]);
     // The key's own allowlist, and whatever an administrator imposed on the
     // account behind it: a key must not be a way around a limit set on its owner.
     const decision = await evaluateAccountAccess(verified.userId, ip, verified.rules);

@@ -3070,6 +3070,7 @@
             "games": "Games",
             "translate": "Translate",
             "polar": "Polar",
+            "terminal": "Terminal",
             "alerts": "Alerts"
         },
         "permissions": {
@@ -3182,6 +3183,9 @@
             "polar": {
                 "use": "Talk to Polar",
                 "spend": "Run Polar on this deployment's keys"
+            },
+            "terminal": {
+                "control": "Control your terminals from another device"
             },
             "alerts": {
                 "topics": "Receive alerts from other systems"
