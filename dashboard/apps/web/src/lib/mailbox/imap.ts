@@ -20,7 +20,12 @@
 import { ImapFlow } from "imapflow";
 import { isCredentialRefusal } from "./refusals";
 import { hearRefusal } from "./action-refusal";
-import { mailCredential, MailAuthError, type MailCredentialSource } from "./credentials";
+import {
+    withMailCredential,
+    MailAuthError,
+    type MailCredential,
+    type MailCredentialSource
+} from "./credentials";
 
 /** Raised when the server could not be reached or would not finish a command.
  *  Distinct from `MailAuthError`, which is the person's to resolve. */
@@ -179,7 +184,16 @@ export async function openImap(
     account: MailConnectionSource,
     tuning: { readonly maxIdleTime?: number } = {}
 ): Promise<ImapFlow> {
-    const credential = await mailCredential(account);
+    // An authorized mailbox whose token is refused is logged in once more with
+    // a fresh one before that counts as a refusal - see `withMailCredential`.
+    return withMailCredential(account, (credential) => connectImap(account, credential, tuning));
+}
+
+async function connectImap(
+    account: MailConnectionSource,
+    credential: MailCredential,
+    tuning: { readonly maxIdleTime?: number }
+): Promise<ImapFlow> {
     // The logger is built before the client it logs for, so it reports to a
     // holder the client is put in once it exists - see `action-refusal`.
     const listener: { client: object | null } = { client: null };
@@ -236,7 +250,10 @@ export function isLoopback(host: string): boolean {
  * succeeds, so this costs one handshake and reads nobody's mail.
  */
 export async function checkImap(account: MailConnectionSource): Promise<void> {
-    const credential = await mailCredential(account);
+    await withMailCredential(account, (credential) => verifyImap(account, credential));
+}
+
+async function verifyImap(account: MailConnectionSource, credential: MailCredential): Promise<void> {
     const client = new ImapFlow({
         host: account.imapHost,
         port: account.imapPort,

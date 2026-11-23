@@ -192,7 +192,9 @@ async function listen(listener: Listener): Promise<void> {
             client = await openImap(account, { maxIdleTime: IDLE_RESTART_MS });
         } catch (caught) {
             if (caught instanceof MailAuthError) {
-                await refused.recordCredentialRefusal(account.id, caught.message);
+                await refused.recordCredentialRefusal(account.id, caught.message, {
+                    grantRefused: caught.grantRefused
+                });
                 return;
             }
             console.warn("mail inbox listener could not connect", account.id, describe(caught));

@@ -91,6 +91,7 @@ function account(overrides: Partial<MailAccountView> = {}): MailAccountView {
         lastOkAt: null,
         refusedSince: null,
         lastRefusedAt: null,
+        grantRefused: false,
         notify: true,
         unified: true,
         appendToSent: true,
@@ -121,12 +122,22 @@ describe("the notice", () => {
         );
     });
 
-    it("says reconnect for an authorized mailbox", () => {
+    it("says reconnect for an authorized mailbox whose grant was refused", () => {
+        render(
+            <RefusedMailboxes accounts={[account({ auth: "oauth", grantRefused: true })]} />,
+            { wrapper: MessagesWrapper }
+        );
+        expect(screen.getByText("Needs reconnecting")).toBeTruthy();
+        expect(screen.getByRole("link", { name: "Reconnect" })).toBeTruthy();
+    });
+
+    it("does not ask to reconnect an authorized mailbox whose grant still works", () => {
         render(<RefusedMailboxes accounts={[account({ auth: "oauth" })]} />, {
             wrapper: MessagesWrapper
         });
-        expect(screen.getByText("Needs reconnecting")).toBeTruthy();
-        expect(screen.getByRole("link", { name: "Reconnect" })).toBeTruthy();
+        expect(screen.queryByText("Needs reconnecting")).toBeNull();
+        expect(screen.queryByRole("link", { name: "Reconnect" })).toBeNull();
+        expect(screen.getByText("Sign-in refused")).toBeTruthy();
     });
 
     it("draws nothing while every mailbox works", () => {

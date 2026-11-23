@@ -145,13 +145,17 @@ export interface RefusalState {
     readonly refusedSince: Date | string | null;
     /** The server's latest refusal: a failed connection does not move it. */
     readonly lastRefusedAt: Date | string | null;
+    /** For an authorized mailbox: the provider itself refused the grant. Absent
+     *  reads as no, which is the quiet answer. */
+    readonly grantRefused?: boolean;
 }
 
 /** What a mailbox that works again stops carrying, so its next refusal is news. */
 export const REFUSAL_ENDED = {
     refusalAnnouncedAt: null,
     refusedSince: null,
-    lastRefusedAt: null
+    lastRefusedAt: null,
+    grantRefused: false
 } as const;
 
 /**
@@ -175,7 +179,10 @@ export function refusalCause(
     others: readonly RefusalState[],
     now = Date.now()
 ): RefusalCause {
-    if (account.auth === "oauth") return "authorization";
+    // An authorized mailbox needs its owner only when the provider refused the
+    // grant. A mail server turning away a token the provider had just minted
+    // (see `withMailCredential`) is the server's, and Polaris keeps trying.
+    if (account.auth === "oauth") return account.grantRefused ? "authorization" : "recent";
     const began = time(account.refusedSince) ?? time(account.lastOkAt);
     if (began === null || account.lastOkAt === null) return "password";
     const together = others.some((other) => {
@@ -211,6 +218,8 @@ export interface MailPassState {
     /** When this refusal began. */
     readonly refusedSince?: Date | null;
     readonly createdAt: Date;
+    /** "oauth" for an authorized mailbox. */
+    readonly auth?: string;
 }
 
 /**
@@ -226,6 +235,12 @@ export interface MailPassState {
  * that never noticed would be the same silence this exists to end.
  */
 export function refusedRetryDelayMs(account: MailPassState): number {
+    // An authorized mailbox is retried on the shortest wait, always. A try is a
+    // token request, answered without a login when the grant is gone, and one
+    // more login with a fresh token when it is not - nothing a provider locks
+    // an account over, and a refusal that ended by itself is noticed within the
+    // half hour rather than the next day.
+    if (account.auth === "oauth") return REFUSED_RETRY_MIN_MS;
     const since = (account.refusedSince ?? account.lastOkAt ?? account.createdAt).getTime();
     const tried = (account.lastSyncAt ?? account.createdAt).getTime();
     const refusedFor = Math.max(0, tried - since);

@@ -30,7 +30,15 @@ describe("the notice for a mailbox that stopped signing in", () => {
         return renderToStaticMarkup(
             withMessages(
                 <RefusedMailboxes
-                    accounts={[{ id: "m1", address: "ana@example.com", auth, state: "auth" }]}
+                    accounts={[
+                        {
+                            id: "m1",
+                            address: "ana@example.com",
+                            auth,
+                            state: "auth",
+                            grantRefused: auth === "oauth"
+                        }
+                    ]}
                 />,
                 "es-ES"
             )

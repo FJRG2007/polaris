@@ -582,6 +582,10 @@ function stateSentence(
         // Said as what happened and what Polaris did about it. The detail is
         // the refusal's own sentence, which is Polaris' words, never the
         // server's.
+        // An authorized mailbox whose grant still works was turned away by its
+        // server, and reconnecting would change nothing: said as the server's.
+        if (account.auth === "oauth" && refusalCause(account, accounts) !== "authorization")
+            return tm("rail.serverMayBeFailing");
         return account.auth === "oauth"
             ? t("accounts.state.oauthRefused", {
                   detail: account.stateDetail

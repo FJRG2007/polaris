@@ -72,6 +72,7 @@ export const ACCOUNT_COLUMNS = {
     lastOkAt: true,
     refusedSince: true,
     lastRefusedAt: true,
+    grantRefused: true,
     pollSeconds: true,
     notify: true,
     unified: true,

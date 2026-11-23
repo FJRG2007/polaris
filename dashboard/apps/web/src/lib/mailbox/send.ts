@@ -25,7 +25,7 @@ import type Mail from "nodemailer/lib/mailer";
 import { MailAuthError } from "./credentials";
 import { asMailFailure, isLoopback } from "./imap";
 import MailComposer from "nodemailer/lib/mail-composer";
-import { mailCredential, type MailCredentialSource } from "./credentials";
+import { withMailCredential, type MailCredential, type MailCredentialSource } from "./credentials";
 
 /** What an account has to carry to send. */
 export interface MailSendSource extends MailCredentialSource {
@@ -61,10 +61,7 @@ const IMPLICIT_TLS_PORT = 465;
 const CONNECT_TIMEOUT_MS = 20_000;
 const SOCKET_TIMEOUT_MS = 60_000;
 
-function transportFor(
-    account: MailSendSource,
-    credential: Awaited<ReturnType<typeof mailCredential>>
-) {
+function transportFor(account: MailSendSource, credential: MailCredential) {
     return createTransport({
         host: account.smtpHost,
         port: account.smtpPort,
@@ -93,15 +90,16 @@ function transportFor(
  *  message. Used by the account form so a mailbox that can read but not send is
  *  found out on the form rather than on somebody's first reply. */
 export async function checkSmtp(account: MailSendSource): Promise<void> {
-    const credential = await mailCredential(account);
-    const transport = transportFor(account, credential);
-    try {
-        await transport.verify();
-    } catch (caught) {
-        throw asMailFailure(caught);
-    } finally {
-        transport.close();
-    }
+    await withMailCredential(account, async (credential) => {
+        const transport = transportFor(account, credential);
+        try {
+            await transport.verify();
+        } catch (caught) {
+            throw asMailFailure(caught);
+        } finally {
+            transport.close();
+        }
+    });
 }
 
 /** One outgoing message, as this app holds it before it becomes MIME. */
@@ -254,7 +252,19 @@ export async function sendMime(
     message: OutgoingMessage,
     mime: Buffer
 ): Promise<MailSendOutcome> {
-    const credential = await mailCredential(account);
+    // A refused login happens before the envelope, so nothing has gone when an
+    // authorized mailbox is tried once more with a fresh token.
+    return withMailCredential(account, (credential) =>
+        sendWith(account, credential, message, mime)
+    );
+}
+
+async function sendWith(
+    account: MailSendSource,
+    credential: MailCredential,
+    message: OutgoingMessage,
+    mime: Buffer
+): Promise<MailSendOutcome> {
     const transport = transportFor(account, credential);
     const envelope = [...message.to, ...message.cc, ...message.bcc].map((entry) => entry.address);
     try {

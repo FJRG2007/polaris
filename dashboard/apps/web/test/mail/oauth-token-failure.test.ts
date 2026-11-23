@@ -105,6 +105,24 @@ describe("minting a mailbox's token", () => {
         );
     });
 
+    it("retries, rather than pausing the mailbox, when a refused refresh is not about the grant", async () => {
+        mint.microsoft = async () => {
+            throw new MicrosoftAuthExpiredError(
+                "Microsoft refused the token request (400): temporarily_unavailable"
+            );
+        };
+        await expect(mailCredential(authorized("outlook"))).rejects.not.toBeInstanceOf(MailAuthError);
+    });
+
+    it("marks a refused grant as the owner's to fix", async () => {
+        mint.google = async () => {
+            throw new GoogleAuthExpiredError(
+                "Google no longer accepts this authorization: invalid_grant - Token has been expired or revoked."
+            );
+        };
+        await expect(mailCredential(authorized("gmail"))).rejects.toMatchObject({ grantRefused: true });
+    });
+
     it("hands back the token when it is minted", async () => {
         await expect(mailCredential(authorized("gmail"))).resolves.toMatchObject({
             kind: "oauth",

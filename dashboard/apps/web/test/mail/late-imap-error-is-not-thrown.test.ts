@@ -31,7 +31,16 @@ vi.mock("@/lib/mailbox/credentials", () => ({
         kind: "password",
         user: "fixture@example.test",
         pass: "fixture"
-    })
+    }),
+    withMailCredential: async (
+        _account: unknown,
+        attempt: (credential: unknown) => Promise<unknown>
+    ) =>
+        attempt({
+            kind: "password",
+            user: "fixture@example.test",
+            pass: "fixture"
+        })
 }));
 
 const { checkImap, withImap } = await import("@/lib/mailbox/imap");

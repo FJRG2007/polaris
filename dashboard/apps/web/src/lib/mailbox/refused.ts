@@ -16,6 +16,11 @@
  * - **Pick up again.** A pass that works puts the row back to `ok`
  *   (`recordAccountState`), the notice is answered, and the next refusal after
  *   that is news again.
+ *
+ * An authorized mailbox is the owner's to fix only when the provider refused the
+ * grant (`grantRefused`). Its server refusing a token is put to the provider
+ * before it gets here (`withMailCredential`), and one the provider vouched for
+ * pauses the mailbox quietly and is retried on the shortest backoff.
  */
 
 import { prisma } from "@polaris/db";
@@ -31,9 +36,14 @@ const REFUSED_EVENT = "mail.account.refused";
  *
  * `lastSyncAt` moves on every refusal, which is what spaces the next try out.
  * The detail is the sentence the refusal already carried - Polaris' own words,
- * never the server's, which name hosts and paths.
+ * never the server's, which name hosts and paths. `grantRefused` is the
+ * refusal's own (`MailAuthError`), and only matters for an authorized mailbox.
  */
-export async function recordCredentialRefusal(accountId: string, detail: string): Promise<void> {
+export async function recordCredentialRefusal(
+    accountId: string,
+    detail: string,
+    options: { readonly grantRefused?: boolean } = {}
+): Promise<void> {
     const now = new Date();
     await prisma.mailAccount.updateMany({
         where: { id: accountId, refusedSince: null },
@@ -41,7 +51,13 @@ export async function recordCredentialRefusal(accountId: string, detail: string)
     });
     await prisma.mailAccount.updateMany({
         where: { id: accountId },
-        data: { state: "auth", stateDetail: detail, lastSyncAt: now, lastRefusedAt: now }
+        data: {
+            state: "auth",
+            stateDetail: detail,
+            lastSyncAt: now,
+            lastRefusedAt: now,
+            grantRefused: options.grantRefused === true
+        }
     });
     const account = await prisma.mailAccount.findUnique({
         where: { id: accountId },
@@ -56,6 +72,7 @@ export async function recordCredentialRefusal(accountId: string, detail: string)
             lastOkAt: true,
             refusedSince: true,
             lastRefusedAt: true,
+            grantRefused: true,
             refusalAnnouncedAt: true
         }
     });

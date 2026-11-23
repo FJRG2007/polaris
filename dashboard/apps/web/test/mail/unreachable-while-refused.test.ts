@@ -33,7 +33,12 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@/lib/mailbox/credentials", () => ({
     MailAuthError: class MailAuthError extends Error {},
-    mailCredential: async () => ({ kind: "password", username: "ana", password: "fixture" })
+    mailCredential: async () => ({ kind: "password", username: "ana", password: "fixture" }),
+    withMailCredential: async (
+        _account: unknown,
+        attempt: (credential: unknown) => Promise<unknown>
+    ) =>
+        attempt({ kind: "password", username: "ana", password: "fixture" })
 }));
 vi.mock("@/lib/mailbox/refused", () => ({
     recordCredentialRefusal: async (id: string) => void seen.refusals.push(id)

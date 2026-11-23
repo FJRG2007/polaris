@@ -22,7 +22,15 @@ import { refusalCause, refusedMailboxHref } from "@/lib/mailbox/refusals";
 
 type NoticeAccount = Pick<
     MailAccountView,
-    "id" | "address" | "auth" | "state" | "imapHost" | "lastOkAt" | "refusedSince" | "lastRefusedAt"
+    | "id"
+    | "address"
+    | "auth"
+    | "state"
+    | "imapHost"
+    | "lastOkAt"
+    | "refusedSince"
+    | "lastRefusedAt"
+    | "grantRefused"
 >;
 
 /** One thing to say about the refused mailboxes, in rail order. */

@@ -145,6 +145,14 @@ describe("leaving a refused mailbox alone", () => {
         expect(tries).toBeLessThan(15);
     });
 
+    it("tries an authorized mailbox again every half hour, however long it has been refused", () => {
+        const authorized = { ...refused(T0, T0 + 10 * 24 * HOUR), auth: "oauth" };
+        expect(refusedRetryDelayMs(authorized)).toBe(REFUSED_RETRY_MIN_MS);
+        expect(mayTryMailbox(authorized, { now: T0 + 10 * 24 * HOUR + 31 * 60 * 1000 })).toBe(
+            true
+        );
+    });
+
     it("lets its owner's own Check now through", () => {
         const account = refused(T0, T0 + 5 * 60 * 1000);
         expect(mayTryMailbox(account, { now: T0 + 6 * 60 * 1000, force: true })).toBe(true);

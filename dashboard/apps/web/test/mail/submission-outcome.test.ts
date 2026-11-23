@@ -42,7 +42,12 @@ class MailUnreachableError extends Error {}
 
 vi.mock("@/lib/mailbox/credentials", () => ({
     MailAuthError,
-    mailCredential: async () => ({ kind: "password", user: "me@example.com", pass: "x" })
+    mailCredential: async () => ({ kind: "password", user: "me@example.com", pass: "x" }),
+    withMailCredential: async (
+        _account: unknown,
+        attempt: (credential: unknown) => Promise<unknown>
+    ) =>
+        attempt({ kind: "password", user: "me@example.com", pass: "x" })
 }));
 vi.mock("@/lib/mailbox/imap", () => ({
     isLoopback: () => false,

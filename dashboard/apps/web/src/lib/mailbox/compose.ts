@@ -440,7 +440,9 @@ export async function deliverQueued(draftId: string): Promise<boolean> {
         // way: the mailbox pauses and its owner is told once. The queue then
         // leaves this message alone until the credential works again.
         if (auth) {
-            await recordCredentialRefusal(account.id, caught.message).catch(() => undefined);
+            await recordCredentialRefusal(account.id, caught.message, {
+                grantRefused: caught.grantRefused
+            }).catch(() => undefined);
         }
 
         /**

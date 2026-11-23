@@ -201,11 +201,16 @@ async function onePass(accountId: string, force: boolean): Promise<void> {
         // A refusal is said to the owner once and spaces the next try out; see
         // `refused.ts`. Anything else is a retry on the ordinary interval.
         if (auth || failureIsNews(account)) moved = true;
-        if (auth) await recordCredentialRefusal(accountId, caught.message);
-        // Unreachable while refused says nothing about the credential, so it
-        // stays refused: flipping to unreachable and back would announce the
-        // same refusal a second time.
-        else if (account.state === "auth") await recordAccountAttempt(accountId);
+        if (auth) {
+            await recordCredentialRefusal(accountId, caught.message, {
+                grantRefused: caught.grantRefused
+            });
+        } else if (account.state === "auth") {
+            // Unreachable while refused says nothing about the credential, so it
+            // stays refused: flipping to unreachable and back would announce the
+            // same refusal a second time.
+            await recordAccountAttempt(accountId);
+        }
         else if (failureIsNews(account)) await recordAccountState(accountId, "unreachable");
         else await recordAccountAttempt(accountId);
         if (!auth) {
@@ -330,7 +335,9 @@ async function oneFolderPass(accountId: string, folderId: string): Promise<void>
         // The same answer a pass gives a refusal, so the listener and the
         // passes stop offering the credential together.
         if (caught instanceof MailAuthError) {
-            await recordCredentialRefusal(accountId, caught.message).catch(() => undefined);
+            await recordCredentialRefusal(accountId, caught.message, {
+                grantRefused: caught.grantRefused
+            }).catch(() => undefined);
         } else {
             console.warn(
                 "mail folder catch-up failed",
@@ -1826,6 +1833,7 @@ export async function accountsToSync(): Promise<string[]> {
             userId: true,
             pollSeconds: true,
             state: true,
+            auth: true,
             lastSyncAt: true,
             lastOkAt: true,
             refusedSince: true,

@@ -14416,6 +14416,9 @@ model MailAccount {
     refusedSince DateTime?
     /// The server's latest refusal. A failed connection does not move it.
     lastRefusedAt DateTime?
+    /// An authorized mailbox whose provider refused the grant itself, which is
+    /// the one refusal reconnecting fixes; false again once it works.
+    grantRefused Boolean @default(false)
     // How often the server is asked when it will not push. Seconds.
     pollSeconds  Int       @default(300)
     notify       Boolean   @default(true)

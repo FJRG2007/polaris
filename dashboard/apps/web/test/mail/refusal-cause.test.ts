@@ -62,11 +62,23 @@ describe("why a mailbox is refused", () => {
         expect(refusalCause(all[0], all, NOW)).toBe("password");
     });
 
-    it("calls a mailbox that never worked a credential, and a token an authorization", () => {
+    it("calls a mailbox that never worked a credential, and a refused grant an authorization", () => {
         expect(refusalCause(mailbox("a", null, 1), [], NOW)).toBe("password");
-        expect(refusalCause(mailbox("a", ago(5), 1, 1, { auth: "oauth" }), [], NOW)).toBe(
-            "authorization"
-        );
+        expect(
+            refusalCause(mailbox("a", ago(5), 1, 1, { auth: "oauth", grantRefused: true }), [], NOW)
+        ).toBe("authorization");
+    });
+
+    it("never asks to reconnect an authorized mailbox whose grant still works", () => {
+        // BUG-0021: the server refused a token the provider had just minted.
+        expect(refusalCause(mailbox("a", ago(5), 1, 1, { auth: "oauth" }), [], NOW)).toBe("recent");
+        expect(
+            refusalCause(
+                mailbox("a", ago(48 * 60), 48 * 60, 1, { auth: "oauth", grantRefused: false }),
+                [],
+                NOW
+            )
+        ).toBe("recent");
     });
 });
 

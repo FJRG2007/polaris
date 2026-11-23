@@ -75,7 +75,16 @@ vi.mock("@/lib/mailbox/credentials", () => ({
         kind: "password",
         user: "fixture@example.test",
         pass: "fixture"
-    })
+    }),
+    withMailCredential: async (
+        _account: unknown,
+        attempt: (credential: unknown) => Promise<unknown>
+    ) =>
+        attempt({
+            kind: "password",
+            user: "fixture@example.test",
+            pass: "fixture"
+        })
 }));
 
 vi.mock("@/lib/mailbox/access", () => ({ ACCOUNT_COLUMNS: { id: true } }));
@@ -245,7 +254,9 @@ describe("what is never held open", () => {
         state.connectError = new FakeAuthError("refused");
         idle.holdInboxListeners("usr_1", ["acc_1"]);
         await settle(1_000);
-        expect(recordCredentialRefusal).toHaveBeenCalledWith("acc_1", "refused");
+        expect(recordCredentialRefusal).toHaveBeenCalledWith("acc_1", "refused", {
+            grantRefused: undefined
+        });
         const tried = clients.length;
         await settle(30 * 60_000);
         expect(clients.length).toBe(tried);

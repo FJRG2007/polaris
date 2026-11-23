@@ -57,6 +57,9 @@ export interface MailAccountView {
     readonly lastOkAt: string | null;
     readonly refusedSince: string | null;
     readonly lastRefusedAt: string | null;
+    /** An authorized mailbox whose provider refused the grant: the one refusal
+     *  reconnecting fixes. */
+    readonly grantRefused: boolean;
     readonly notify: boolean;
     readonly unified: boolean;
     readonly appendToSent: boolean;
@@ -109,6 +112,7 @@ export function accountView(row: AccountRow): MailAccountView {
         lastOkAt: row.lastOkAt?.toISOString() ?? null,
         refusedSince: row.refusedSince?.toISOString() ?? null,
         lastRefusedAt: row.lastRefusedAt?.toISOString() ?? null,
+        grantRefused: row.grantRefused,
         notify: row.notify,
         unified: row.unified,
         appendToSent: row.appendToSent,

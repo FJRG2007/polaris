@@ -30,6 +30,8 @@ interface Row {
     lastOkAt: Date | null;
     refusedSince: Date | null;
     lastRefusedAt: Date | null;
+    grantRefused: boolean;
+    refusalAnnouncedAt?: Date | null;
 }
 
 interface Notice {
@@ -164,6 +166,7 @@ function mailbox(overrides: Partial<Row> = {}): Row {
         lastOkAt: new Date("2026-09-10T08:00:00Z"),
         refusedSince: null,
         lastRefusedAt: null,
+        grantRefused: false,
         ...overrides
     };
     state.rows = [row];
@@ -221,10 +224,45 @@ describe("a mailbox the server stops accepting", () => {
         expect(row.lastSyncAt?.getTime()).toBeGreaterThan(before);
     });
 
-    it("says reconnect, not password, for an authorized mailbox", async () => {
+    it("says reconnect, not password, for an authorized mailbox whose grant was refused", async () => {
         const row = mailbox({ auth: "oauth", connectionId: "c1" });
-        await recordCredentialRefusal(row.id, "This mailbox needs authorizing again.");
+        await recordCredentialRefusal(row.id, "This mailbox needs authorizing again.", {
+            grantRefused: true
+        });
+        expect(row.grantRefused).toBe(true);
         expect(state.notified[0]?.title).toBe("ana@example.com needs connecting again");
+    });
+
+    it("pauses an authorized mailbox quietly when its grant still works", async () => {
+        // BUG-0021: the provider minted a fresh token and the server still said no.
+        const row = mailbox({ auth: "oauth", connectionId: "c1", refusedSince: hoursAgo(48) });
+        await recordCredentialRefusal(row.id, "The mail server refused this account's credentials.");
+        await recordCredentialRefusal(row.id, "The mail server refused this account's credentials.", {
+            grantRefused: false
+        });
+        expect(row.state).toBe("auth");
+        expect(row.grantRefused).toBe(false);
+        expect(state.notified).toHaveLength(0);
+        expect(row.refusalAnnouncedAt ?? null).toBeNull();
+    });
+
+    it("rings once the provider refuses the grant of a mailbox that was paused quietly", async () => {
+        const row = mailbox({ auth: "oauth", connectionId: "c1" });
+        await recordCredentialRefusal(row.id, "The mail server refused this account's credentials.");
+        expect(state.notified).toHaveLength(0);
+        await recordCredentialRefusal(row.id, "This mailbox needs authorizing again.", {
+            grantRefused: true
+        });
+        expect(state.notified).toHaveLength(1);
+    });
+
+    it("clears the grant refusal once it works again", async () => {
+        const row = mailbox({ auth: "oauth", connectionId: "c1" });
+        await recordCredentialRefusal(row.id, "This mailbox needs authorizing again.", {
+            grantRefused: true
+        });
+        await recordAccountState(row.id, "ok");
+        expect(row.grantRefused).toBe(false);
     });
 
     it("starts over once the credential works again", async () => {
