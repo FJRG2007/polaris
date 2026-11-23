@@ -299,3 +299,90 @@ impl MlsMember {
             .map_err(mls_error)
     }
 }
+
+
+fn phone_error(error: polaris_core::phone::PhoneError) -> JsValue {
+    coded_error(error.class, error.message)
+}
+
+#[wasm_bindgen(js_name = phoneCountries)]
+pub fn phone_countries() -> Vec<String> {
+    polaris_core::phone::phone_countries()
+        .into_iter()
+        .map(str::to_string)
+        .collect()
+}
+
+#[wasm_bindgen(js_name = phoneIsCountry)]
+pub fn phone_is_country(code: Option<String>) -> bool {
+    polaris_core::phone::is_phone_country(code.as_deref())
+}
+
+#[wasm_bindgen(js_name = phoneCallingCode)]
+pub fn phone_calling_code(country: &str) -> Result<Option<String>, JsValue> {
+    polaris_core::phone::phone_calling_code(country)
+        .map(|code| code.map(str::to_string))
+        .map_err(phone_error)
+}
+
+#[wasm_bindgen(js_name = phoneMainCountry)]
+pub fn phone_main_country(calling_code: &str) -> Option<String> {
+    polaris_core::phone::phone_main_country(calling_code).map(str::to_string)
+}
+
+#[wasm_bindgen(js_name = phoneToE164)]
+pub fn phone_to_e164(value: &str, country: Option<String>) -> Result<Option<String>, JsValue> {
+    polaris_core::phone::to_e164(value, country.as_deref()).map_err(phone_error)
+}
+
+#[wasm_bindgen(js_name = phoneCountryOf)]
+pub fn phone_country_of(value: &str) -> Result<Option<String>, JsValue> {
+    polaris_core::phone::phone_country_of(value)
+        .map(|country| country.map(str::to_string))
+        .map_err(phone_error)
+}
+
+/// `splitPhone` across the boundary, the same shape as the Node binding's.
+#[wasm_bindgen(js_name = phoneSplit)]
+pub fn phone_split(value: &str) -> Result<JsValue, JsValue> {
+    polaris_core::phone::split_phone(value)
+        .map(|(country, text)| {
+            let out = js_sys::Object::new();
+            let set = |key: &str, v: JsValue| {
+                // Plain data properties on a fresh object cannot fail.
+                let _ = js_sys::Reflect::set(&out, &JsValue::from_str(key), &v);
+            };
+            set("country", country.map_or(JsValue::NULL, JsValue::from_str));
+            set("national", text.owned().map_or(JsValue::NULL, JsValue::from_str));
+            set("start", JsValue::from(text.range().0 as u32));
+            set("end", JsValue::from(text.range().1 as u32));
+            out.into()
+        })
+        .map_err(phone_error)
+}
+
+#[wasm_bindgen(js_name = phoneFormatAsTyped)]
+pub fn phone_format_as_typed(value: &str, country: Option<String>) -> Result<String, JsValue> {
+    polaris_core::phone::format_phone_as_typed(value, country.as_deref()).map_err(phone_error)
+}
+
+/// `None` means the input comes back unchanged.
+#[wasm_bindgen(js_name = phoneFormatInternational)]
+pub fn phone_format_international(value: &str) -> Result<Option<String>, JsValue> {
+    polaris_core::phone::format_phone_international(value)
+        .map(|text| text.owned().map(str::to_string))
+        .map_err(phone_error)
+}
+
+#[wasm_bindgen(js_name = phoneCountryFromRegions)]
+pub fn phone_country_from_regions(regions: Vec<JsValue>) -> Option<String> {
+    polaris_core::phone::phone_country_from_regions(
+        regions
+            .iter()
+            .map(JsValue::as_string)
+            .collect::<Vec<_>>()
+            .iter()
+            .map(Option::as_deref),
+    )
+    .map(str::to_string)
+}

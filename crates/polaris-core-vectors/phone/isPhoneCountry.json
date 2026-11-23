@@ -1,0 +1,2482 @@
+{
+  "domain": "phone",
+  "op": "isPhoneCountry",
+  "source": "dashboard/packages/core-rs/src/domains/phone/ts.ts",
+  "cases": [
+    {
+      "name": "code 0 AC",
+      "args": [
+        "AC"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 1 AD",
+      "args": [
+        "AD"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 2 AE",
+      "args": [
+        "AE"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 3 AF",
+      "args": [
+        "AF"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 4 AG",
+      "args": [
+        "AG"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 5 AI",
+      "args": [
+        "AI"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 6 AL",
+      "args": [
+        "AL"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 7 AM",
+      "args": [
+        "AM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 8 AO",
+      "args": [
+        "AO"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 9 AR",
+      "args": [
+        "AR"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 10 AS",
+      "args": [
+        "AS"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 11 AT",
+      "args": [
+        "AT"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 12 AU",
+      "args": [
+        "AU"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 13 AW",
+      "args": [
+        "AW"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 14 AX",
+      "args": [
+        "AX"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 15 AZ",
+      "args": [
+        "AZ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 16 BA",
+      "args": [
+        "BA"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 17 BB",
+      "args": [
+        "BB"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 18 BD",
+      "args": [
+        "BD"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 19 BE",
+      "args": [
+        "BE"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 20 BF",
+      "args": [
+        "BF"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 21 BG",
+      "args": [
+        "BG"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 22 BH",
+      "args": [
+        "BH"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 23 BI",
+      "args": [
+        "BI"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 24 BJ",
+      "args": [
+        "BJ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 25 BL",
+      "args": [
+        "BL"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 26 BM",
+      "args": [
+        "BM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 27 BN",
+      "args": [
+        "BN"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 28 BO",
+      "args": [
+        "BO"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 29 BQ",
+      "args": [
+        "BQ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 30 BR",
+      "args": [
+        "BR"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 31 BS",
+      "args": [
+        "BS"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 32 BT",
+      "args": [
+        "BT"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 33 BW",
+      "args": [
+        "BW"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 34 BY",
+      "args": [
+        "BY"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 35 BZ",
+      "args": [
+        "BZ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 36 CA",
+      "args": [
+        "CA"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 37 CC",
+      "args": [
+        "CC"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 38 CD",
+      "args": [
+        "CD"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 39 CF",
+      "args": [
+        "CF"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 40 CG",
+      "args": [
+        "CG"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 41 CH",
+      "args": [
+        "CH"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 42 CI",
+      "args": [
+        "CI"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 43 CK",
+      "args": [
+        "CK"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 44 CL",
+      "args": [
+        "CL"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 45 CM",
+      "args": [
+        "CM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 46 CN",
+      "args": [
+        "CN"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 47 CO",
+      "args": [
+        "CO"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 48 CR",
+      "args": [
+        "CR"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 49 CU",
+      "args": [
+        "CU"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 50 CV",
+      "args": [
+        "CV"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 51 CW",
+      "args": [
+        "CW"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 52 CX",
+      "args": [
+        "CX"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 53 CY",
+      "args": [
+        "CY"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 54 CZ",
+      "args": [
+        "CZ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 55 DE",
+      "args": [
+        "DE"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 56 DJ",
+      "args": [
+        "DJ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 57 DK",
+      "args": [
+        "DK"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 58 DM",
+      "args": [
+        "DM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 59 DO",
+      "args": [
+        "DO"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 60 DZ",
+      "args": [
+        "DZ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 61 EC",
+      "args": [
+        "EC"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 62 EE",
+      "args": [
+        "EE"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 63 EG",
+      "args": [
+        "EG"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 64 EH",
+      "args": [
+        "EH"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 65 ER",
+      "args": [
+        "ER"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 66 ES",
+      "args": [
+        "ES"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 67 ET",
+      "args": [
+        "ET"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 68 FI",
+      "args": [
+        "FI"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 69 FJ",
+      "args": [
+        "FJ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 70 FK",
+      "args": [
+        "FK"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 71 FM",
+      "args": [
+        "FM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 72 FO",
+      "args": [
+        "FO"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 73 FR",
+      "args": [
+        "FR"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 74 GA",
+      "args": [
+        "GA"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 75 GB",
+      "args": [
+        "GB"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 76 GD",
+      "args": [
+        "GD"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 77 GE",
+      "args": [
+        "GE"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 78 GF",
+      "args": [
+        "GF"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 79 GG",
+      "args": [
+        "GG"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 80 GH",
+      "args": [
+        "GH"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 81 GI",
+      "args": [
+        "GI"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 82 GL",
+      "args": [
+        "GL"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 83 GM",
+      "args": [
+        "GM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 84 GN",
+      "args": [
+        "GN"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 85 GP",
+      "args": [
+        "GP"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 86 GQ",
+      "args": [
+        "GQ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 87 GR",
+      "args": [
+        "GR"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 88 GT",
+      "args": [
+        "GT"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 89 GU",
+      "args": [
+        "GU"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 90 GW",
+      "args": [
+        "GW"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 91 GY",
+      "args": [
+        "GY"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 92 HK",
+      "args": [
+        "HK"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 93 HN",
+      "args": [
+        "HN"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 94 HR",
+      "args": [
+        "HR"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 95 HT",
+      "args": [
+        "HT"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 96 HU",
+      "args": [
+        "HU"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 97 ID",
+      "args": [
+        "ID"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 98 IE",
+      "args": [
+        "IE"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 99 IL",
+      "args": [
+        "IL"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 100 IM",
+      "args": [
+        "IM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 101 IN",
+      "args": [
+        "IN"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 102 IO",
+      "args": [
+        "IO"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 103 IQ",
+      "args": [
+        "IQ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 104 IR",
+      "args": [
+        "IR"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 105 IS",
+      "args": [
+        "IS"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 106 IT",
+      "args": [
+        "IT"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 107 JE",
+      "args": [
+        "JE"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 108 JM",
+      "args": [
+        "JM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 109 JO",
+      "args": [
+        "JO"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 110 JP",
+      "args": [
+        "JP"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 111 KE",
+      "args": [
+        "KE"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 112 KG",
+      "args": [
+        "KG"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 113 KH",
+      "args": [
+        "KH"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 114 KI",
+      "args": [
+        "KI"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 115 KM",
+      "args": [
+        "KM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 116 KN",
+      "args": [
+        "KN"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 117 KP",
+      "args": [
+        "KP"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 118 KR",
+      "args": [
+        "KR"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 119 KW",
+      "args": [
+        "KW"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 120 KY",
+      "args": [
+        "KY"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 121 KZ",
+      "args": [
+        "KZ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 122 LA",
+      "args": [
+        "LA"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 123 LB",
+      "args": [
+        "LB"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 124 LC",
+      "args": [
+        "LC"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 125 LI",
+      "args": [
+        "LI"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 126 LK",
+      "args": [
+        "LK"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 127 LR",
+      "args": [
+        "LR"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 128 LS",
+      "args": [
+        "LS"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 129 LT",
+      "args": [
+        "LT"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 130 LU",
+      "args": [
+        "LU"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 131 LV",
+      "args": [
+        "LV"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 132 LY",
+      "args": [
+        "LY"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 133 MA",
+      "args": [
+        "MA"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 134 MC",
+      "args": [
+        "MC"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 135 MD",
+      "args": [
+        "MD"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 136 ME",
+      "args": [
+        "ME"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 137 MF",
+      "args": [
+        "MF"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 138 MG",
+      "args": [
+        "MG"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 139 MH",
+      "args": [
+        "MH"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 140 MK",
+      "args": [
+        "MK"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 141 ML",
+      "args": [
+        "ML"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 142 MM",
+      "args": [
+        "MM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 143 MN",
+      "args": [
+        "MN"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 144 MO",
+      "args": [
+        "MO"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 145 MP",
+      "args": [
+        "MP"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 146 MQ",
+      "args": [
+        "MQ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 147 MR",
+      "args": [
+        "MR"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 148 MS",
+      "args": [
+        "MS"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 149 MT",
+      "args": [
+        "MT"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 150 MU",
+      "args": [
+        "MU"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 151 MV",
+      "args": [
+        "MV"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 152 MW",
+      "args": [
+        "MW"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 153 MX",
+      "args": [
+        "MX"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 154 MY",
+      "args": [
+        "MY"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 155 MZ",
+      "args": [
+        "MZ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 156 NA",
+      "args": [
+        "NA"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 157 NC",
+      "args": [
+        "NC"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 158 NE",
+      "args": [
+        "NE"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 159 NF",
+      "args": [
+        "NF"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 160 NG",
+      "args": [
+        "NG"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 161 NI",
+      "args": [
+        "NI"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 162 NL",
+      "args": [
+        "NL"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 163 NO",
+      "args": [
+        "NO"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 164 NP",
+      "args": [
+        "NP"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 165 NR",
+      "args": [
+        "NR"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 166 NU",
+      "args": [
+        "NU"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 167 NZ",
+      "args": [
+        "NZ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 168 OM",
+      "args": [
+        "OM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 169 PA",
+      "args": [
+        "PA"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 170 PE",
+      "args": [
+        "PE"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 171 PF",
+      "args": [
+        "PF"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 172 PG",
+      "args": [
+        "PG"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 173 PH",
+      "args": [
+        "PH"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 174 PK",
+      "args": [
+        "PK"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 175 PL",
+      "args": [
+        "PL"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 176 PM",
+      "args": [
+        "PM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 177 PR",
+      "args": [
+        "PR"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 178 PS",
+      "args": [
+        "PS"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 179 PT",
+      "args": [
+        "PT"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 180 PW",
+      "args": [
+        "PW"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 181 PY",
+      "args": [
+        "PY"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 182 QA",
+      "args": [
+        "QA"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 183 RE",
+      "args": [
+        "RE"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 184 RO",
+      "args": [
+        "RO"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 185 RS",
+      "args": [
+        "RS"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 186 RU",
+      "args": [
+        "RU"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 187 RW",
+      "args": [
+        "RW"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 188 SA",
+      "args": [
+        "SA"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 189 SB",
+      "args": [
+        "SB"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 190 SC",
+      "args": [
+        "SC"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 191 SD",
+      "args": [
+        "SD"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 192 SE",
+      "args": [
+        "SE"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 193 SG",
+      "args": [
+        "SG"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 194 SH",
+      "args": [
+        "SH"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 195 SI",
+      "args": [
+        "SI"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 196 SJ",
+      "args": [
+        "SJ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 197 SK",
+      "args": [
+        "SK"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 198 SL",
+      "args": [
+        "SL"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 199 SM",
+      "args": [
+        "SM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 200 SN",
+      "args": [
+        "SN"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 201 SO",
+      "args": [
+        "SO"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 202 SR",
+      "args": [
+        "SR"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 203 SS",
+      "args": [
+        "SS"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 204 ST",
+      "args": [
+        "ST"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 205 SV",
+      "args": [
+        "SV"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 206 SX",
+      "args": [
+        "SX"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 207 SY",
+      "args": [
+        "SY"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 208 SZ",
+      "args": [
+        "SZ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 209 TA",
+      "args": [
+        "TA"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 210 TC",
+      "args": [
+        "TC"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 211 TD",
+      "args": [
+        "TD"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 212 TG",
+      "args": [
+        "TG"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 213 TH",
+      "args": [
+        "TH"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 214 TJ",
+      "args": [
+        "TJ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 215 TK",
+      "args": [
+        "TK"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 216 TL",
+      "args": [
+        "TL"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 217 TM",
+      "args": [
+        "TM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 218 TN",
+      "args": [
+        "TN"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 219 TO",
+      "args": [
+        "TO"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 220 TR",
+      "args": [
+        "TR"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 221 TT",
+      "args": [
+        "TT"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 222 TV",
+      "args": [
+        "TV"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 223 TW",
+      "args": [
+        "TW"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 224 TZ",
+      "args": [
+        "TZ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 225 UA",
+      "args": [
+        "UA"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 226 UG",
+      "args": [
+        "UG"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 227 US",
+      "args": [
+        "US"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 228 UY",
+      "args": [
+        "UY"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 229 UZ",
+      "args": [
+        "UZ"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 230 VA",
+      "args": [
+        "VA"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 231 VC",
+      "args": [
+        "VC"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 232 VE",
+      "args": [
+        "VE"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 233 VG",
+      "args": [
+        "VG"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 234 VI",
+      "args": [
+        "VI"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 235 VN",
+      "args": [
+        "VN"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 236 VU",
+      "args": [
+        "VU"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 237 WF",
+      "args": [
+        "WF"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 238 WS",
+      "args": [
+        "WS"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 239 XK",
+      "args": [
+        "XK"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 240 YE",
+      "args": [
+        "YE"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 241 YT",
+      "args": [
+        "YT"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 242 ZA",
+      "args": [
+        "ZA"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 243 ZM",
+      "args": [
+        "ZM"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 244 ZW",
+      "args": [
+        "ZW"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 245 null",
+      "args": [
+        null
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 246 ",
+      "args": [
+        ""
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 247 es",
+      "args": [
+        "es"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 248 Es",
+      "args": [
+        "Es"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 249 XX",
+      "args": [
+        "XX"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 250 ZZ",
+      "args": [
+        "ZZ"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 251 001",
+      "args": [
+        "001"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 252 US ",
+      "args": [
+        "US "
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 253 UK",
+      "args": [
+        "UK"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 254 EU",
+      "args": [
+        "EU"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 255 constructor",
+      "args": [
+        "constructor"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 256 __defineGetter__",
+      "args": [
+        "__defineGetter__"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 257 __defineSetter__",
+      "args": [
+        "__defineSetter__"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 258 hasOwnProperty",
+      "args": [
+        "hasOwnProperty"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 259 __lookupGetter__",
+      "args": [
+        "__lookupGetter__"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 260 __lookupSetter__",
+      "args": [
+        "__lookupSetter__"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 261 isPrototypeOf",
+      "args": [
+        "isPrototypeOf"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 262 propertyIsEnumerable",
+      "args": [
+        "propertyIsEnumerable"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 263 toString",
+      "args": [
+        "toString"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 264 valueOf",
+      "args": [
+        "valueOf"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 265 __proto__",
+      "args": [
+        "__proto__"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 266 toLocaleString",
+      "args": [
+        "toLocaleString"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 267 AC",
+      "args": [
+        "AC"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 268 TA",
+      "args": [
+        "TA"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 269 XK",
+      "args": [
+        "XK"
+      ],
+      "expect": {
+        "ok": true
+      }
+    },
+    {
+      "name": "code 270 AQ",
+      "args": [
+        "AQ"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 271 BV",
+      "args": [
+        "BV"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 272 eS",
+      "args": [
+        "eS"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 273 ES\u0000",
+      "args": [
+        "ES\u0000"
+      ],
+      "expect": {
+        "ok": false
+      }
+    },
+    {
+      "name": "code 274 ＥＳ",
+      "args": [
+        "ＥＳ"
+      ],
+      "expect": {
+        "ok": false
+      }
+    }
+  ]
+}

@@ -1,3 +1,4 @@
 {
-    "probe": { "mode": "ts", "ledger": "F4", "timeoutMs": 50 }
+    "probe": { "mode": "ts", "ledger": "F4", "timeoutMs": 50 },
+    "phone": { "mode": "ts", "ledger": "P2", "timeoutMs": 50 }
 }

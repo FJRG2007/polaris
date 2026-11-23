@@ -57,12 +57,20 @@ sha2 = { version = "0.10", default-features = false, optional = true }
 base64 = { version = "0.22", default-features = false, features = ["alloc"], optional = true }
 generic-array = { version = "=0.14.7", optional = true }
 
+# Leftmost-first matching, like JavaScript's backtracking engine on the
+# metadata patterns (none use backreferences or lookaround). No Unicode tables:
+# `\d` is rewritten to ASCII before compiling, which is how JavaScript reads it.
+regex = { version = "1.11.1", default-features = false, features = ["std", "perf"] }
+
 # Browsers: OpenMLS's crypto provider draws its HPKE and nonce entropy from the
 # platform (crypto.getRandomValues through getrandom), and its clock from
 # web-time; both need their wasm32 backends switched on.
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 openmls = { version = "=0.9.2", optional = true, default-features = false, features = ["js"] }
 getrandom_02 = { package = "getrandom", version = "=0.2.17", features = ["js"] }
+
+[build-dependencies]
+serde_json = { workspace = true }
 
 [dev-dependencies]
 polaris-core-vectors = { path = "../polaris-core-vectors" }
@@ -94,6 +102,10 @@ harness = false
 name = "mls"
 harness = false
 required-features = ["mls"]
+
+[[bench]]
+name = "phone"
+harness = false
 
 [[test]]
 name = "opaque"

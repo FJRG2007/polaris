@@ -539,3 +539,77 @@ impl MlsMember {
             .map_err(mls_error)
     }
 }
+
+fn coded(error: polaris_core::phone::PhoneError) -> napi::Error<ErrorClass> {
+    napi::Error::new(ErrorClass(error.class), error.message)
+}
+
+/// `splitPhone` across the boundary: `national` is new text, or else the
+/// input's UTF-16 range `start..end` is.
+#[napi(object)]
+pub struct PhoneSplit {
+    pub country: Option<String>,
+    pub national: Option<String>,
+    pub start: u32,
+    pub end: u32,
+}
+
+#[napi(catch_unwind)]
+pub fn phone_countries() -> Vec<&'static str> {
+    polaris_core::phone::phone_countries()
+}
+
+#[napi(catch_unwind)]
+pub fn phone_is_country(code: Option<String>) -> bool {
+    polaris_core::phone::is_phone_country(code.as_deref())
+}
+
+#[napi(catch_unwind)]
+pub fn phone_calling_code(country: String) -> napi::Result<Option<&'static str>, ErrorClass> {
+    polaris_core::phone::phone_calling_code(&country).map_err(coded)
+}
+
+#[napi(catch_unwind)]
+pub fn phone_main_country(calling_code: String) -> Option<&'static str> {
+    polaris_core::phone::phone_main_country(&calling_code)
+}
+
+#[napi(js_name = "phoneToE164", catch_unwind)]
+pub fn phone_to_e164(value: String, country: Option<String>) -> napi::Result<Option<String>, ErrorClass> {
+    polaris_core::phone::to_e164(&value, country.as_deref()).map_err(coded)
+}
+
+#[napi(catch_unwind)]
+pub fn phone_country_of(value: String) -> napi::Result<Option<&'static str>, ErrorClass> {
+    polaris_core::phone::phone_country_of(&value).map_err(coded)
+}
+
+#[napi(catch_unwind)]
+pub fn phone_split(value: String) -> napi::Result<PhoneSplit, ErrorClass> {
+    polaris_core::phone::split_phone(&value)
+        .map(|(country, text)| PhoneSplit {
+            country: country.map(str::to_string),
+            national: text.owned().map(str::to_string),
+            start: text.range().0 as u32,
+            end: text.range().1 as u32,
+        })
+        .map_err(coded)
+}
+
+#[napi(catch_unwind)]
+pub fn phone_format_as_typed(value: String, country: Option<String>) -> napi::Result<String, ErrorClass> {
+    polaris_core::phone::format_phone_as_typed(&value, country.as_deref()).map_err(coded)
+}
+
+/// `None` means the input comes back unchanged.
+#[napi(catch_unwind)]
+pub fn phone_format_international(value: String) -> napi::Result<Option<String>, ErrorClass> {
+    polaris_core::phone::format_phone_international(&value)
+        .map(|text| text.owned().map(str::to_string))
+        .map_err(coded)
+}
+
+#[napi(catch_unwind)]
+pub fn phone_country_from_regions(regions: Vec<Option<String>>) -> Option<&'static str> {
+    polaris_core::phone::phone_country_from_regions(regions.iter().map(Option::as_deref))
+}

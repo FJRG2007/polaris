@@ -5,6 +5,7 @@
 //! Node through `polaris-core-node` and from browsers through
 //! `polaris-core-wasm`; both bindings only convert types and map errors.
 
+pub mod phone;
 pub mod probe;
 
 #[cfg(feature = "mls")]

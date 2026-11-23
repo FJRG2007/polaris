@@ -2,16 +2,22 @@ import { dirname } from "node:path";
 import { CORPUS } from "../support/corpus";
 import { describe, expect, it } from "vitest";
 import * as probe from "../../src/domains/probe/ts";
+import { PHONE_RESET_INPUT, PHONE_TWINS } from "../support/phone-corpus";
+
+const resetPhone = (domain: string) => domain === "phone" && probePhoneReset();
+const probePhoneReset = () => PHONE_TWINS.toE164!(PHONE_RESET_INPUT as never, null as never);
 import { allVectorFiles, loadVectors, vectorPath } from "../support/files";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { canonical, decodeValue, encodeValue, outcome, replay, type VectorFile } from "../../src/vectors";
 
 const TWINS: Record<string, (...args: never[]) => unknown> = {
     "probe/fnv1a32": probe.fnv1a32 as (...args: never[]) => unknown,
-    "probe/decodeHex": probe.decodeHex as (...args: never[]) => unknown
+    "probe/decodeHex": probe.decodeHex as (...args: never[]) => unknown,
+    ...Object.fromEntries(Object.entries(PHONE_TWINS).map(([op, fn]) => [`phone/${op}`, fn]))
 };
 
 function generate(entry: (typeof CORPUS)[number]): VectorFile {
+    resetPhone(entry.domain);
     return {
         domain: entry.domain,
         op: entry.op,
@@ -47,6 +53,7 @@ describe("golden vectors", () => {
     it("the TypeScript twin replays every committed vector", () => {
         for (const [domain, op] of allVectorFiles()) {
             const fn = TWINS[`${domain}/${op}`] as (...a: unknown[]) => unknown;
+            resetPhone(domain);
             expect(replay(loadVectors(domain, op), fn), `${domain}/${op}`).toEqual([]);
         }
     });

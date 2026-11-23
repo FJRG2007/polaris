@@ -9,9 +9,33 @@ export interface CoreBinding {
     probeFnv1a32(text: string): number;
     probeDecodeHex(hex: string): Uint8Array;
     probePanic(): void;
+    phoneCountries(): string[];
+    phoneIsCountry(code: string | null | undefined): boolean;
+    phoneCallingCode(country: string): string | null | undefined;
+    phoneMainCountry(callingCode: string): string | null | undefined;
+    phoneToE164(value: string, country: string | null | undefined): string | null | undefined;
+    phoneCountryOf(value: string): string | null | undefined;
+    phoneSplit(value: string): { country?: string | null; national?: string | null; start: number; end: number };
+    phoneFormatAsTyped(value: string, country: string | null | undefined): string;
+    phoneFormatInternational(value: string): string | null | undefined;
+    phoneCountryFromRegions(regions: (string | null)[]): string | null | undefined;
 }
 
-export const BINDING_EXPORTS: readonly (keyof CoreBinding)[] = ["probeFnv1a32", "probeDecodeHex", "probePanic"];
+export const BINDING_EXPORTS: readonly (keyof CoreBinding)[] = [
+    "probeFnv1a32",
+    "probeDecodeHex",
+    "probePanic",
+    "phoneCountries",
+    "phoneIsCountry",
+    "phoneCallingCode",
+    "phoneMainCountry",
+    "phoneToE164",
+    "phoneCountryOf",
+    "phoneSplit",
+    "phoneFormatAsTyped",
+    "phoneFormatInternational",
+    "phoneCountryFromRegions"
+];
 
 /** Copy the expected exports off a loaded module, refusing one that lacks any. */
 export function pickBinding(loaded: unknown): CoreBinding {

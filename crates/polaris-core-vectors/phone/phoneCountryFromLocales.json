@@ -1,0 +1,319 @@
+{
+  "domain": "phone",
+  "op": "phoneCountryFromLocales",
+  "source": "dashboard/packages/core-rs/src/domains/phone/ts.ts",
+  "cases": [
+    {
+      "name": "locales 0 ",
+      "args": [
+        []
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "locales 1 es-ES",
+      "args": [
+        [
+          "es-ES"
+        ]
+      ],
+      "expect": {
+        "ok": "ES"
+      }
+    },
+    {
+      "name": "locales 2 es",
+      "args": [
+        [
+          "es"
+        ]
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "locales 3 en-US,es-ES",
+      "args": [
+        [
+          "en-US",
+          "es-ES"
+        ]
+      ],
+      "expect": {
+        "ok": "US"
+      }
+    },
+    {
+      "name": "locales 4 en,fr-CA",
+      "args": [
+        [
+          "en",
+          "fr-CA"
+        ]
+      ],
+      "expect": {
+        "ok": "CA"
+      }
+    },
+    {
+      "name": "locales 5 zh-Hant-TW",
+      "args": [
+        [
+          "zh-Hant-TW"
+        ]
+      ],
+      "expect": {
+        "ok": "TW"
+      }
+    },
+    {
+      "name": "locales 6 en-us",
+      "args": [
+        [
+          "en-us"
+        ]
+      ],
+      "expect": {
+        "ok": "US"
+      }
+    },
+    {
+      "name": "locales 7 EN-gb",
+      "args": [
+        [
+          "EN-gb"
+        ]
+      ],
+      "expect": {
+        "ok": "GB"
+      }
+    },
+    {
+      "name": "locales 8 en-419",
+      "args": [
+        [
+          "en-419"
+        ]
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "locales 9 es-419,pt-BR",
+      "args": [
+        [
+          "es-419",
+          "pt-BR"
+        ]
+      ],
+      "expect": {
+        "ok": "BR"
+      }
+    },
+    {
+      "name": "locales 10 de-DD",
+      "args": [
+        [
+          "de-DD"
+        ]
+      ],
+      "expect": {
+        "ok": "DE"
+      }
+    },
+    {
+      "name": "locales 11 en-UK",
+      "args": [
+        [
+          "en-UK"
+        ]
+      ],
+      "expect": {
+        "ok": "GB"
+      }
+    },
+    {
+      "name": "locales 12 sr-Latn-RS",
+      "args": [
+        [
+          "sr-Latn-RS"
+        ]
+      ],
+      "expect": {
+        "ok": "RS"
+      }
+    },
+    {
+      "name": "locales 13 x-private",
+      "args": [
+        [
+          "x-private"
+        ]
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "locales 14 i-klingon",
+      "args": [
+        [
+          "i-klingon"
+        ]
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "locales 15 en-GB-oed",
+      "args": [
+        [
+          "en-GB-oed"
+        ]
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "locales 16 ,es-ES",
+      "args": [
+        [
+          "",
+          "es-ES"
+        ]
+      ],
+      "expect": {
+        "ok": "ES"
+      }
+    },
+    {
+      "name": "locales 17 not a tag,fr-FR",
+      "args": [
+        [
+          "not a tag",
+          "fr-FR"
+        ]
+      ],
+      "expect": {
+        "ok": "FR"
+      }
+    },
+    {
+      "name": "locales 18 und-AQ",
+      "args": [
+        [
+          "und-AQ"
+        ]
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "locales 19 und-001",
+      "args": [
+        [
+          "und-001"
+        ]
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "locales 20 en-001",
+      "args": [
+        [
+          "en-001"
+        ]
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "locales 21 en-XK",
+      "args": [
+        [
+          "en-XK"
+        ]
+      ],
+      "expect": {
+        "ok": "XK"
+      }
+    },
+    {
+      "name": "locales 22 ar-EG-u-nu-arab",
+      "args": [
+        [
+          "ar-EG-u-nu-arab"
+        ]
+      ],
+      "expect": {
+        "ok": "EG"
+      }
+    },
+    {
+      "name": "locales 23 ja-JP-u-ca-japanese",
+      "args": [
+        [
+          "ja-JP-u-ca-japanese"
+        ]
+      ],
+      "expect": {
+        "ok": "JP"
+      }
+    },
+    {
+      "name": "locales 24 en-US-POSIX",
+      "args": [
+        [
+          "en-US-POSIX"
+        ]
+      ],
+      "expect": {
+        "ok": "US"
+      }
+    },
+    {
+      "name": "locales 25 root",
+      "args": [
+        [
+          "root"
+        ]
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "locales 26 en_US",
+      "args": [
+        [
+          "en_US"
+        ]
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "locales 27 es-ES,es-ES",
+      "args": [
+        [
+          "es-ES",
+          "es-ES"
+        ]
+      ],
+      "expect": {
+        "ok": "ES"
+      }
+    }
+  ]
+}

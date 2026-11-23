@@ -1,0 +1,2452 @@
+{
+  "domain": "phone",
+  "op": "phoneCallingCode",
+  "source": "dashboard/packages/core-rs/src/domains/phone/ts.ts",
+  "cases": [
+    {
+      "name": "country 0 AC",
+      "args": [
+        "AC"
+      ],
+      "expect": {
+        "ok": "247"
+      }
+    },
+    {
+      "name": "country 1 AD",
+      "args": [
+        "AD"
+      ],
+      "expect": {
+        "ok": "376"
+      }
+    },
+    {
+      "name": "country 2 AE",
+      "args": [
+        "AE"
+      ],
+      "expect": {
+        "ok": "971"
+      }
+    },
+    {
+      "name": "country 3 AF",
+      "args": [
+        "AF"
+      ],
+      "expect": {
+        "ok": "93"
+      }
+    },
+    {
+      "name": "country 4 AG",
+      "args": [
+        "AG"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 5 AI",
+      "args": [
+        "AI"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 6 AL",
+      "args": [
+        "AL"
+      ],
+      "expect": {
+        "ok": "355"
+      }
+    },
+    {
+      "name": "country 7 AM",
+      "args": [
+        "AM"
+      ],
+      "expect": {
+        "ok": "374"
+      }
+    },
+    {
+      "name": "country 8 AO",
+      "args": [
+        "AO"
+      ],
+      "expect": {
+        "ok": "244"
+      }
+    },
+    {
+      "name": "country 9 AR",
+      "args": [
+        "AR"
+      ],
+      "expect": {
+        "ok": "54"
+      }
+    },
+    {
+      "name": "country 10 AS",
+      "args": [
+        "AS"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 11 AT",
+      "args": [
+        "AT"
+      ],
+      "expect": {
+        "ok": "43"
+      }
+    },
+    {
+      "name": "country 12 AU",
+      "args": [
+        "AU"
+      ],
+      "expect": {
+        "ok": "61"
+      }
+    },
+    {
+      "name": "country 13 AW",
+      "args": [
+        "AW"
+      ],
+      "expect": {
+        "ok": "297"
+      }
+    },
+    {
+      "name": "country 14 AX",
+      "args": [
+        "AX"
+      ],
+      "expect": {
+        "ok": "358"
+      }
+    },
+    {
+      "name": "country 15 AZ",
+      "args": [
+        "AZ"
+      ],
+      "expect": {
+        "ok": "994"
+      }
+    },
+    {
+      "name": "country 16 BA",
+      "args": [
+        "BA"
+      ],
+      "expect": {
+        "ok": "387"
+      }
+    },
+    {
+      "name": "country 17 BB",
+      "args": [
+        "BB"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 18 BD",
+      "args": [
+        "BD"
+      ],
+      "expect": {
+        "ok": "880"
+      }
+    },
+    {
+      "name": "country 19 BE",
+      "args": [
+        "BE"
+      ],
+      "expect": {
+        "ok": "32"
+      }
+    },
+    {
+      "name": "country 20 BF",
+      "args": [
+        "BF"
+      ],
+      "expect": {
+        "ok": "226"
+      }
+    },
+    {
+      "name": "country 21 BG",
+      "args": [
+        "BG"
+      ],
+      "expect": {
+        "ok": "359"
+      }
+    },
+    {
+      "name": "country 22 BH",
+      "args": [
+        "BH"
+      ],
+      "expect": {
+        "ok": "973"
+      }
+    },
+    {
+      "name": "country 23 BI",
+      "args": [
+        "BI"
+      ],
+      "expect": {
+        "ok": "257"
+      }
+    },
+    {
+      "name": "country 24 BJ",
+      "args": [
+        "BJ"
+      ],
+      "expect": {
+        "ok": "229"
+      }
+    },
+    {
+      "name": "country 25 BL",
+      "args": [
+        "BL"
+      ],
+      "expect": {
+        "ok": "590"
+      }
+    },
+    {
+      "name": "country 26 BM",
+      "args": [
+        "BM"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 27 BN",
+      "args": [
+        "BN"
+      ],
+      "expect": {
+        "ok": "673"
+      }
+    },
+    {
+      "name": "country 28 BO",
+      "args": [
+        "BO"
+      ],
+      "expect": {
+        "ok": "591"
+      }
+    },
+    {
+      "name": "country 29 BQ",
+      "args": [
+        "BQ"
+      ],
+      "expect": {
+        "ok": "599"
+      }
+    },
+    {
+      "name": "country 30 BR",
+      "args": [
+        "BR"
+      ],
+      "expect": {
+        "ok": "55"
+      }
+    },
+    {
+      "name": "country 31 BS",
+      "args": [
+        "BS"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 32 BT",
+      "args": [
+        "BT"
+      ],
+      "expect": {
+        "ok": "975"
+      }
+    },
+    {
+      "name": "country 33 BW",
+      "args": [
+        "BW"
+      ],
+      "expect": {
+        "ok": "267"
+      }
+    },
+    {
+      "name": "country 34 BY",
+      "args": [
+        "BY"
+      ],
+      "expect": {
+        "ok": "375"
+      }
+    },
+    {
+      "name": "country 35 BZ",
+      "args": [
+        "BZ"
+      ],
+      "expect": {
+        "ok": "501"
+      }
+    },
+    {
+      "name": "country 36 CA",
+      "args": [
+        "CA"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 37 CC",
+      "args": [
+        "CC"
+      ],
+      "expect": {
+        "ok": "61"
+      }
+    },
+    {
+      "name": "country 38 CD",
+      "args": [
+        "CD"
+      ],
+      "expect": {
+        "ok": "243"
+      }
+    },
+    {
+      "name": "country 39 CF",
+      "args": [
+        "CF"
+      ],
+      "expect": {
+        "ok": "236"
+      }
+    },
+    {
+      "name": "country 40 CG",
+      "args": [
+        "CG"
+      ],
+      "expect": {
+        "ok": "242"
+      }
+    },
+    {
+      "name": "country 41 CH",
+      "args": [
+        "CH"
+      ],
+      "expect": {
+        "ok": "41"
+      }
+    },
+    {
+      "name": "country 42 CI",
+      "args": [
+        "CI"
+      ],
+      "expect": {
+        "ok": "225"
+      }
+    },
+    {
+      "name": "country 43 CK",
+      "args": [
+        "CK"
+      ],
+      "expect": {
+        "ok": "682"
+      }
+    },
+    {
+      "name": "country 44 CL",
+      "args": [
+        "CL"
+      ],
+      "expect": {
+        "ok": "56"
+      }
+    },
+    {
+      "name": "country 45 CM",
+      "args": [
+        "CM"
+      ],
+      "expect": {
+        "ok": "237"
+      }
+    },
+    {
+      "name": "country 46 CN",
+      "args": [
+        "CN"
+      ],
+      "expect": {
+        "ok": "86"
+      }
+    },
+    {
+      "name": "country 47 CO",
+      "args": [
+        "CO"
+      ],
+      "expect": {
+        "ok": "57"
+      }
+    },
+    {
+      "name": "country 48 CR",
+      "args": [
+        "CR"
+      ],
+      "expect": {
+        "ok": "506"
+      }
+    },
+    {
+      "name": "country 49 CU",
+      "args": [
+        "CU"
+      ],
+      "expect": {
+        "ok": "53"
+      }
+    },
+    {
+      "name": "country 50 CV",
+      "args": [
+        "CV"
+      ],
+      "expect": {
+        "ok": "238"
+      }
+    },
+    {
+      "name": "country 51 CW",
+      "args": [
+        "CW"
+      ],
+      "expect": {
+        "ok": "599"
+      }
+    },
+    {
+      "name": "country 52 CX",
+      "args": [
+        "CX"
+      ],
+      "expect": {
+        "ok": "61"
+      }
+    },
+    {
+      "name": "country 53 CY",
+      "args": [
+        "CY"
+      ],
+      "expect": {
+        "ok": "357"
+      }
+    },
+    {
+      "name": "country 54 CZ",
+      "args": [
+        "CZ"
+      ],
+      "expect": {
+        "ok": "420"
+      }
+    },
+    {
+      "name": "country 55 DE",
+      "args": [
+        "DE"
+      ],
+      "expect": {
+        "ok": "49"
+      }
+    },
+    {
+      "name": "country 56 DJ",
+      "args": [
+        "DJ"
+      ],
+      "expect": {
+        "ok": "253"
+      }
+    },
+    {
+      "name": "country 57 DK",
+      "args": [
+        "DK"
+      ],
+      "expect": {
+        "ok": "45"
+      }
+    },
+    {
+      "name": "country 58 DM",
+      "args": [
+        "DM"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 59 DO",
+      "args": [
+        "DO"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 60 DZ",
+      "args": [
+        "DZ"
+      ],
+      "expect": {
+        "ok": "213"
+      }
+    },
+    {
+      "name": "country 61 EC",
+      "args": [
+        "EC"
+      ],
+      "expect": {
+        "ok": "593"
+      }
+    },
+    {
+      "name": "country 62 EE",
+      "args": [
+        "EE"
+      ],
+      "expect": {
+        "ok": "372"
+      }
+    },
+    {
+      "name": "country 63 EG",
+      "args": [
+        "EG"
+      ],
+      "expect": {
+        "ok": "20"
+      }
+    },
+    {
+      "name": "country 64 EH",
+      "args": [
+        "EH"
+      ],
+      "expect": {
+        "ok": "212"
+      }
+    },
+    {
+      "name": "country 65 ER",
+      "args": [
+        "ER"
+      ],
+      "expect": {
+        "ok": "291"
+      }
+    },
+    {
+      "name": "country 66 ES",
+      "args": [
+        "ES"
+      ],
+      "expect": {
+        "ok": "34"
+      }
+    },
+    {
+      "name": "country 67 ET",
+      "args": [
+        "ET"
+      ],
+      "expect": {
+        "ok": "251"
+      }
+    },
+    {
+      "name": "country 68 FI",
+      "args": [
+        "FI"
+      ],
+      "expect": {
+        "ok": "358"
+      }
+    },
+    {
+      "name": "country 69 FJ",
+      "args": [
+        "FJ"
+      ],
+      "expect": {
+        "ok": "679"
+      }
+    },
+    {
+      "name": "country 70 FK",
+      "args": [
+        "FK"
+      ],
+      "expect": {
+        "ok": "500"
+      }
+    },
+    {
+      "name": "country 71 FM",
+      "args": [
+        "FM"
+      ],
+      "expect": {
+        "ok": "691"
+      }
+    },
+    {
+      "name": "country 72 FO",
+      "args": [
+        "FO"
+      ],
+      "expect": {
+        "ok": "298"
+      }
+    },
+    {
+      "name": "country 73 FR",
+      "args": [
+        "FR"
+      ],
+      "expect": {
+        "ok": "33"
+      }
+    },
+    {
+      "name": "country 74 GA",
+      "args": [
+        "GA"
+      ],
+      "expect": {
+        "ok": "241"
+      }
+    },
+    {
+      "name": "country 75 GB",
+      "args": [
+        "GB"
+      ],
+      "expect": {
+        "ok": "44"
+      }
+    },
+    {
+      "name": "country 76 GD",
+      "args": [
+        "GD"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 77 GE",
+      "args": [
+        "GE"
+      ],
+      "expect": {
+        "ok": "995"
+      }
+    },
+    {
+      "name": "country 78 GF",
+      "args": [
+        "GF"
+      ],
+      "expect": {
+        "ok": "594"
+      }
+    },
+    {
+      "name": "country 79 GG",
+      "args": [
+        "GG"
+      ],
+      "expect": {
+        "ok": "44"
+      }
+    },
+    {
+      "name": "country 80 GH",
+      "args": [
+        "GH"
+      ],
+      "expect": {
+        "ok": "233"
+      }
+    },
+    {
+      "name": "country 81 GI",
+      "args": [
+        "GI"
+      ],
+      "expect": {
+        "ok": "350"
+      }
+    },
+    {
+      "name": "country 82 GL",
+      "args": [
+        "GL"
+      ],
+      "expect": {
+        "ok": "299"
+      }
+    },
+    {
+      "name": "country 83 GM",
+      "args": [
+        "GM"
+      ],
+      "expect": {
+        "ok": "220"
+      }
+    },
+    {
+      "name": "country 84 GN",
+      "args": [
+        "GN"
+      ],
+      "expect": {
+        "ok": "224"
+      }
+    },
+    {
+      "name": "country 85 GP",
+      "args": [
+        "GP"
+      ],
+      "expect": {
+        "ok": "590"
+      }
+    },
+    {
+      "name": "country 86 GQ",
+      "args": [
+        "GQ"
+      ],
+      "expect": {
+        "ok": "240"
+      }
+    },
+    {
+      "name": "country 87 GR",
+      "args": [
+        "GR"
+      ],
+      "expect": {
+        "ok": "30"
+      }
+    },
+    {
+      "name": "country 88 GT",
+      "args": [
+        "GT"
+      ],
+      "expect": {
+        "ok": "502"
+      }
+    },
+    {
+      "name": "country 89 GU",
+      "args": [
+        "GU"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 90 GW",
+      "args": [
+        "GW"
+      ],
+      "expect": {
+        "ok": "245"
+      }
+    },
+    {
+      "name": "country 91 GY",
+      "args": [
+        "GY"
+      ],
+      "expect": {
+        "ok": "592"
+      }
+    },
+    {
+      "name": "country 92 HK",
+      "args": [
+        "HK"
+      ],
+      "expect": {
+        "ok": "852"
+      }
+    },
+    {
+      "name": "country 93 HN",
+      "args": [
+        "HN"
+      ],
+      "expect": {
+        "ok": "504"
+      }
+    },
+    {
+      "name": "country 94 HR",
+      "args": [
+        "HR"
+      ],
+      "expect": {
+        "ok": "385"
+      }
+    },
+    {
+      "name": "country 95 HT",
+      "args": [
+        "HT"
+      ],
+      "expect": {
+        "ok": "509"
+      }
+    },
+    {
+      "name": "country 96 HU",
+      "args": [
+        "HU"
+      ],
+      "expect": {
+        "ok": "36"
+      }
+    },
+    {
+      "name": "country 97 ID",
+      "args": [
+        "ID"
+      ],
+      "expect": {
+        "ok": "62"
+      }
+    },
+    {
+      "name": "country 98 IE",
+      "args": [
+        "IE"
+      ],
+      "expect": {
+        "ok": "353"
+      }
+    },
+    {
+      "name": "country 99 IL",
+      "args": [
+        "IL"
+      ],
+      "expect": {
+        "ok": "972"
+      }
+    },
+    {
+      "name": "country 100 IM",
+      "args": [
+        "IM"
+      ],
+      "expect": {
+        "ok": "44"
+      }
+    },
+    {
+      "name": "country 101 IN",
+      "args": [
+        "IN"
+      ],
+      "expect": {
+        "ok": "91"
+      }
+    },
+    {
+      "name": "country 102 IO",
+      "args": [
+        "IO"
+      ],
+      "expect": {
+        "ok": "246"
+      }
+    },
+    {
+      "name": "country 103 IQ",
+      "args": [
+        "IQ"
+      ],
+      "expect": {
+        "ok": "964"
+      }
+    },
+    {
+      "name": "country 104 IR",
+      "args": [
+        "IR"
+      ],
+      "expect": {
+        "ok": "98"
+      }
+    },
+    {
+      "name": "country 105 IS",
+      "args": [
+        "IS"
+      ],
+      "expect": {
+        "ok": "354"
+      }
+    },
+    {
+      "name": "country 106 IT",
+      "args": [
+        "IT"
+      ],
+      "expect": {
+        "ok": "39"
+      }
+    },
+    {
+      "name": "country 107 JE",
+      "args": [
+        "JE"
+      ],
+      "expect": {
+        "ok": "44"
+      }
+    },
+    {
+      "name": "country 108 JM",
+      "args": [
+        "JM"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 109 JO",
+      "args": [
+        "JO"
+      ],
+      "expect": {
+        "ok": "962"
+      }
+    },
+    {
+      "name": "country 110 JP",
+      "args": [
+        "JP"
+      ],
+      "expect": {
+        "ok": "81"
+      }
+    },
+    {
+      "name": "country 111 KE",
+      "args": [
+        "KE"
+      ],
+      "expect": {
+        "ok": "254"
+      }
+    },
+    {
+      "name": "country 112 KG",
+      "args": [
+        "KG"
+      ],
+      "expect": {
+        "ok": "996"
+      }
+    },
+    {
+      "name": "country 113 KH",
+      "args": [
+        "KH"
+      ],
+      "expect": {
+        "ok": "855"
+      }
+    },
+    {
+      "name": "country 114 KI",
+      "args": [
+        "KI"
+      ],
+      "expect": {
+        "ok": "686"
+      }
+    },
+    {
+      "name": "country 115 KM",
+      "args": [
+        "KM"
+      ],
+      "expect": {
+        "ok": "269"
+      }
+    },
+    {
+      "name": "country 116 KN",
+      "args": [
+        "KN"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 117 KP",
+      "args": [
+        "KP"
+      ],
+      "expect": {
+        "ok": "850"
+      }
+    },
+    {
+      "name": "country 118 KR",
+      "args": [
+        "KR"
+      ],
+      "expect": {
+        "ok": "82"
+      }
+    },
+    {
+      "name": "country 119 KW",
+      "args": [
+        "KW"
+      ],
+      "expect": {
+        "ok": "965"
+      }
+    },
+    {
+      "name": "country 120 KY",
+      "args": [
+        "KY"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 121 KZ",
+      "args": [
+        "KZ"
+      ],
+      "expect": {
+        "ok": "7"
+      }
+    },
+    {
+      "name": "country 122 LA",
+      "args": [
+        "LA"
+      ],
+      "expect": {
+        "ok": "856"
+      }
+    },
+    {
+      "name": "country 123 LB",
+      "args": [
+        "LB"
+      ],
+      "expect": {
+        "ok": "961"
+      }
+    },
+    {
+      "name": "country 124 LC",
+      "args": [
+        "LC"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 125 LI",
+      "args": [
+        "LI"
+      ],
+      "expect": {
+        "ok": "423"
+      }
+    },
+    {
+      "name": "country 126 LK",
+      "args": [
+        "LK"
+      ],
+      "expect": {
+        "ok": "94"
+      }
+    },
+    {
+      "name": "country 127 LR",
+      "args": [
+        "LR"
+      ],
+      "expect": {
+        "ok": "231"
+      }
+    },
+    {
+      "name": "country 128 LS",
+      "args": [
+        "LS"
+      ],
+      "expect": {
+        "ok": "266"
+      }
+    },
+    {
+      "name": "country 129 LT",
+      "args": [
+        "LT"
+      ],
+      "expect": {
+        "ok": "370"
+      }
+    },
+    {
+      "name": "country 130 LU",
+      "args": [
+        "LU"
+      ],
+      "expect": {
+        "ok": "352"
+      }
+    },
+    {
+      "name": "country 131 LV",
+      "args": [
+        "LV"
+      ],
+      "expect": {
+        "ok": "371"
+      }
+    },
+    {
+      "name": "country 132 LY",
+      "args": [
+        "LY"
+      ],
+      "expect": {
+        "ok": "218"
+      }
+    },
+    {
+      "name": "country 133 MA",
+      "args": [
+        "MA"
+      ],
+      "expect": {
+        "ok": "212"
+      }
+    },
+    {
+      "name": "country 134 MC",
+      "args": [
+        "MC"
+      ],
+      "expect": {
+        "ok": "377"
+      }
+    },
+    {
+      "name": "country 135 MD",
+      "args": [
+        "MD"
+      ],
+      "expect": {
+        "ok": "373"
+      }
+    },
+    {
+      "name": "country 136 ME",
+      "args": [
+        "ME"
+      ],
+      "expect": {
+        "ok": "382"
+      }
+    },
+    {
+      "name": "country 137 MF",
+      "args": [
+        "MF"
+      ],
+      "expect": {
+        "ok": "590"
+      }
+    },
+    {
+      "name": "country 138 MG",
+      "args": [
+        "MG"
+      ],
+      "expect": {
+        "ok": "261"
+      }
+    },
+    {
+      "name": "country 139 MH",
+      "args": [
+        "MH"
+      ],
+      "expect": {
+        "ok": "692"
+      }
+    },
+    {
+      "name": "country 140 MK",
+      "args": [
+        "MK"
+      ],
+      "expect": {
+        "ok": "389"
+      }
+    },
+    {
+      "name": "country 141 ML",
+      "args": [
+        "ML"
+      ],
+      "expect": {
+        "ok": "223"
+      }
+    },
+    {
+      "name": "country 142 MM",
+      "args": [
+        "MM"
+      ],
+      "expect": {
+        "ok": "95"
+      }
+    },
+    {
+      "name": "country 143 MN",
+      "args": [
+        "MN"
+      ],
+      "expect": {
+        "ok": "976"
+      }
+    },
+    {
+      "name": "country 144 MO",
+      "args": [
+        "MO"
+      ],
+      "expect": {
+        "ok": "853"
+      }
+    },
+    {
+      "name": "country 145 MP",
+      "args": [
+        "MP"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 146 MQ",
+      "args": [
+        "MQ"
+      ],
+      "expect": {
+        "ok": "596"
+      }
+    },
+    {
+      "name": "country 147 MR",
+      "args": [
+        "MR"
+      ],
+      "expect": {
+        "ok": "222"
+      }
+    },
+    {
+      "name": "country 148 MS",
+      "args": [
+        "MS"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 149 MT",
+      "args": [
+        "MT"
+      ],
+      "expect": {
+        "ok": "356"
+      }
+    },
+    {
+      "name": "country 150 MU",
+      "args": [
+        "MU"
+      ],
+      "expect": {
+        "ok": "230"
+      }
+    },
+    {
+      "name": "country 151 MV",
+      "args": [
+        "MV"
+      ],
+      "expect": {
+        "ok": "960"
+      }
+    },
+    {
+      "name": "country 152 MW",
+      "args": [
+        "MW"
+      ],
+      "expect": {
+        "ok": "265"
+      }
+    },
+    {
+      "name": "country 153 MX",
+      "args": [
+        "MX"
+      ],
+      "expect": {
+        "ok": "52"
+      }
+    },
+    {
+      "name": "country 154 MY",
+      "args": [
+        "MY"
+      ],
+      "expect": {
+        "ok": "60"
+      }
+    },
+    {
+      "name": "country 155 MZ",
+      "args": [
+        "MZ"
+      ],
+      "expect": {
+        "ok": "258"
+      }
+    },
+    {
+      "name": "country 156 NA",
+      "args": [
+        "NA"
+      ],
+      "expect": {
+        "ok": "264"
+      }
+    },
+    {
+      "name": "country 157 NC",
+      "args": [
+        "NC"
+      ],
+      "expect": {
+        "ok": "687"
+      }
+    },
+    {
+      "name": "country 158 NE",
+      "args": [
+        "NE"
+      ],
+      "expect": {
+        "ok": "227"
+      }
+    },
+    {
+      "name": "country 159 NF",
+      "args": [
+        "NF"
+      ],
+      "expect": {
+        "ok": "672"
+      }
+    },
+    {
+      "name": "country 160 NG",
+      "args": [
+        "NG"
+      ],
+      "expect": {
+        "ok": "234"
+      }
+    },
+    {
+      "name": "country 161 NI",
+      "args": [
+        "NI"
+      ],
+      "expect": {
+        "ok": "505"
+      }
+    },
+    {
+      "name": "country 162 NL",
+      "args": [
+        "NL"
+      ],
+      "expect": {
+        "ok": "31"
+      }
+    },
+    {
+      "name": "country 163 NO",
+      "args": [
+        "NO"
+      ],
+      "expect": {
+        "ok": "47"
+      }
+    },
+    {
+      "name": "country 164 NP",
+      "args": [
+        "NP"
+      ],
+      "expect": {
+        "ok": "977"
+      }
+    },
+    {
+      "name": "country 165 NR",
+      "args": [
+        "NR"
+      ],
+      "expect": {
+        "ok": "674"
+      }
+    },
+    {
+      "name": "country 166 NU",
+      "args": [
+        "NU"
+      ],
+      "expect": {
+        "ok": "683"
+      }
+    },
+    {
+      "name": "country 167 NZ",
+      "args": [
+        "NZ"
+      ],
+      "expect": {
+        "ok": "64"
+      }
+    },
+    {
+      "name": "country 168 OM",
+      "args": [
+        "OM"
+      ],
+      "expect": {
+        "ok": "968"
+      }
+    },
+    {
+      "name": "country 169 PA",
+      "args": [
+        "PA"
+      ],
+      "expect": {
+        "ok": "507"
+      }
+    },
+    {
+      "name": "country 170 PE",
+      "args": [
+        "PE"
+      ],
+      "expect": {
+        "ok": "51"
+      }
+    },
+    {
+      "name": "country 171 PF",
+      "args": [
+        "PF"
+      ],
+      "expect": {
+        "ok": "689"
+      }
+    },
+    {
+      "name": "country 172 PG",
+      "args": [
+        "PG"
+      ],
+      "expect": {
+        "ok": "675"
+      }
+    },
+    {
+      "name": "country 173 PH",
+      "args": [
+        "PH"
+      ],
+      "expect": {
+        "ok": "63"
+      }
+    },
+    {
+      "name": "country 174 PK",
+      "args": [
+        "PK"
+      ],
+      "expect": {
+        "ok": "92"
+      }
+    },
+    {
+      "name": "country 175 PL",
+      "args": [
+        "PL"
+      ],
+      "expect": {
+        "ok": "48"
+      }
+    },
+    {
+      "name": "country 176 PM",
+      "args": [
+        "PM"
+      ],
+      "expect": {
+        "ok": "508"
+      }
+    },
+    {
+      "name": "country 177 PR",
+      "args": [
+        "PR"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 178 PS",
+      "args": [
+        "PS"
+      ],
+      "expect": {
+        "ok": "970"
+      }
+    },
+    {
+      "name": "country 179 PT",
+      "args": [
+        "PT"
+      ],
+      "expect": {
+        "ok": "351"
+      }
+    },
+    {
+      "name": "country 180 PW",
+      "args": [
+        "PW"
+      ],
+      "expect": {
+        "ok": "680"
+      }
+    },
+    {
+      "name": "country 181 PY",
+      "args": [
+        "PY"
+      ],
+      "expect": {
+        "ok": "595"
+      }
+    },
+    {
+      "name": "country 182 QA",
+      "args": [
+        "QA"
+      ],
+      "expect": {
+        "ok": "974"
+      }
+    },
+    {
+      "name": "country 183 RE",
+      "args": [
+        "RE"
+      ],
+      "expect": {
+        "ok": "262"
+      }
+    },
+    {
+      "name": "country 184 RO",
+      "args": [
+        "RO"
+      ],
+      "expect": {
+        "ok": "40"
+      }
+    },
+    {
+      "name": "country 185 RS",
+      "args": [
+        "RS"
+      ],
+      "expect": {
+        "ok": "381"
+      }
+    },
+    {
+      "name": "country 186 RU",
+      "args": [
+        "RU"
+      ],
+      "expect": {
+        "ok": "7"
+      }
+    },
+    {
+      "name": "country 187 RW",
+      "args": [
+        "RW"
+      ],
+      "expect": {
+        "ok": "250"
+      }
+    },
+    {
+      "name": "country 188 SA",
+      "args": [
+        "SA"
+      ],
+      "expect": {
+        "ok": "966"
+      }
+    },
+    {
+      "name": "country 189 SB",
+      "args": [
+        "SB"
+      ],
+      "expect": {
+        "ok": "677"
+      }
+    },
+    {
+      "name": "country 190 SC",
+      "args": [
+        "SC"
+      ],
+      "expect": {
+        "ok": "248"
+      }
+    },
+    {
+      "name": "country 191 SD",
+      "args": [
+        "SD"
+      ],
+      "expect": {
+        "ok": "249"
+      }
+    },
+    {
+      "name": "country 192 SE",
+      "args": [
+        "SE"
+      ],
+      "expect": {
+        "ok": "46"
+      }
+    },
+    {
+      "name": "country 193 SG",
+      "args": [
+        "SG"
+      ],
+      "expect": {
+        "ok": "65"
+      }
+    },
+    {
+      "name": "country 194 SH",
+      "args": [
+        "SH"
+      ],
+      "expect": {
+        "ok": "290"
+      }
+    },
+    {
+      "name": "country 195 SI",
+      "args": [
+        "SI"
+      ],
+      "expect": {
+        "ok": "386"
+      }
+    },
+    {
+      "name": "country 196 SJ",
+      "args": [
+        "SJ"
+      ],
+      "expect": {
+        "ok": "47"
+      }
+    },
+    {
+      "name": "country 197 SK",
+      "args": [
+        "SK"
+      ],
+      "expect": {
+        "ok": "421"
+      }
+    },
+    {
+      "name": "country 198 SL",
+      "args": [
+        "SL"
+      ],
+      "expect": {
+        "ok": "232"
+      }
+    },
+    {
+      "name": "country 199 SM",
+      "args": [
+        "SM"
+      ],
+      "expect": {
+        "ok": "378"
+      }
+    },
+    {
+      "name": "country 200 SN",
+      "args": [
+        "SN"
+      ],
+      "expect": {
+        "ok": "221"
+      }
+    },
+    {
+      "name": "country 201 SO",
+      "args": [
+        "SO"
+      ],
+      "expect": {
+        "ok": "252"
+      }
+    },
+    {
+      "name": "country 202 SR",
+      "args": [
+        "SR"
+      ],
+      "expect": {
+        "ok": "597"
+      }
+    },
+    {
+      "name": "country 203 SS",
+      "args": [
+        "SS"
+      ],
+      "expect": {
+        "ok": "211"
+      }
+    },
+    {
+      "name": "country 204 ST",
+      "args": [
+        "ST"
+      ],
+      "expect": {
+        "ok": "239"
+      }
+    },
+    {
+      "name": "country 205 SV",
+      "args": [
+        "SV"
+      ],
+      "expect": {
+        "ok": "503"
+      }
+    },
+    {
+      "name": "country 206 SX",
+      "args": [
+        "SX"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 207 SY",
+      "args": [
+        "SY"
+      ],
+      "expect": {
+        "ok": "963"
+      }
+    },
+    {
+      "name": "country 208 SZ",
+      "args": [
+        "SZ"
+      ],
+      "expect": {
+        "ok": "268"
+      }
+    },
+    {
+      "name": "country 209 TA",
+      "args": [
+        "TA"
+      ],
+      "expect": {
+        "ok": "290"
+      }
+    },
+    {
+      "name": "country 210 TC",
+      "args": [
+        "TC"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 211 TD",
+      "args": [
+        "TD"
+      ],
+      "expect": {
+        "ok": "235"
+      }
+    },
+    {
+      "name": "country 212 TG",
+      "args": [
+        "TG"
+      ],
+      "expect": {
+        "ok": "228"
+      }
+    },
+    {
+      "name": "country 213 TH",
+      "args": [
+        "TH"
+      ],
+      "expect": {
+        "ok": "66"
+      }
+    },
+    {
+      "name": "country 214 TJ",
+      "args": [
+        "TJ"
+      ],
+      "expect": {
+        "ok": "992"
+      }
+    },
+    {
+      "name": "country 215 TK",
+      "args": [
+        "TK"
+      ],
+      "expect": {
+        "ok": "690"
+      }
+    },
+    {
+      "name": "country 216 TL",
+      "args": [
+        "TL"
+      ],
+      "expect": {
+        "ok": "670"
+      }
+    },
+    {
+      "name": "country 217 TM",
+      "args": [
+        "TM"
+      ],
+      "expect": {
+        "ok": "993"
+      }
+    },
+    {
+      "name": "country 218 TN",
+      "args": [
+        "TN"
+      ],
+      "expect": {
+        "ok": "216"
+      }
+    },
+    {
+      "name": "country 219 TO",
+      "args": [
+        "TO"
+      ],
+      "expect": {
+        "ok": "676"
+      }
+    },
+    {
+      "name": "country 220 TR",
+      "args": [
+        "TR"
+      ],
+      "expect": {
+        "ok": "90"
+      }
+    },
+    {
+      "name": "country 221 TT",
+      "args": [
+        "TT"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 222 TV",
+      "args": [
+        "TV"
+      ],
+      "expect": {
+        "ok": "688"
+      }
+    },
+    {
+      "name": "country 223 TW",
+      "args": [
+        "TW"
+      ],
+      "expect": {
+        "ok": "886"
+      }
+    },
+    {
+      "name": "country 224 TZ",
+      "args": [
+        "TZ"
+      ],
+      "expect": {
+        "ok": "255"
+      }
+    },
+    {
+      "name": "country 225 UA",
+      "args": [
+        "UA"
+      ],
+      "expect": {
+        "ok": "380"
+      }
+    },
+    {
+      "name": "country 226 UG",
+      "args": [
+        "UG"
+      ],
+      "expect": {
+        "ok": "256"
+      }
+    },
+    {
+      "name": "country 227 US",
+      "args": [
+        "US"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 228 UY",
+      "args": [
+        "UY"
+      ],
+      "expect": {
+        "ok": "598"
+      }
+    },
+    {
+      "name": "country 229 UZ",
+      "args": [
+        "UZ"
+      ],
+      "expect": {
+        "ok": "998"
+      }
+    },
+    {
+      "name": "country 230 VA",
+      "args": [
+        "VA"
+      ],
+      "expect": {
+        "ok": "39"
+      }
+    },
+    {
+      "name": "country 231 VC",
+      "args": [
+        "VC"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 232 VE",
+      "args": [
+        "VE"
+      ],
+      "expect": {
+        "ok": "58"
+      }
+    },
+    {
+      "name": "country 233 VG",
+      "args": [
+        "VG"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 234 VI",
+      "args": [
+        "VI"
+      ],
+      "expect": {
+        "ok": "1"
+      }
+    },
+    {
+      "name": "country 235 VN",
+      "args": [
+        "VN"
+      ],
+      "expect": {
+        "ok": "84"
+      }
+    },
+    {
+      "name": "country 236 VU",
+      "args": [
+        "VU"
+      ],
+      "expect": {
+        "ok": "678"
+      }
+    },
+    {
+      "name": "country 237 WF",
+      "args": [
+        "WF"
+      ],
+      "expect": {
+        "ok": "681"
+      }
+    },
+    {
+      "name": "country 238 WS",
+      "args": [
+        "WS"
+      ],
+      "expect": {
+        "ok": "685"
+      }
+    },
+    {
+      "name": "country 239 XK",
+      "args": [
+        "XK"
+      ],
+      "expect": {
+        "ok": "383"
+      }
+    },
+    {
+      "name": "country 240 YE",
+      "args": [
+        "YE"
+      ],
+      "expect": {
+        "ok": "967"
+      }
+    },
+    {
+      "name": "country 241 YT",
+      "args": [
+        "YT"
+      ],
+      "expect": {
+        "ok": "262"
+      }
+    },
+    {
+      "name": "country 242 ZA",
+      "args": [
+        "ZA"
+      ],
+      "expect": {
+        "ok": "27"
+      }
+    },
+    {
+      "name": "country 243 ZM",
+      "args": [
+        "ZM"
+      ],
+      "expect": {
+        "ok": "260"
+      }
+    },
+    {
+      "name": "country 244 ZW",
+      "args": [
+        "ZW"
+      ],
+      "expect": {
+        "ok": "263"
+      }
+    },
+    {
+      "name": "country 245 ",
+      "args": [
+        ""
+      ],
+      "expect": {
+        "error": {
+          "kind": "Error",
+          "message": "Unknown country: "
+        }
+      }
+    },
+    {
+      "name": "country 246 es",
+      "args": [
+        "es"
+      ],
+      "expect": {
+        "error": {
+          "kind": "Error",
+          "message": "Unknown country: es"
+        }
+      }
+    },
+    {
+      "name": "country 247 Es",
+      "args": [
+        "Es"
+      ],
+      "expect": {
+        "error": {
+          "kind": "Error",
+          "message": "Unknown country: Es"
+        }
+      }
+    },
+    {
+      "name": "country 248 XX",
+      "args": [
+        "XX"
+      ],
+      "expect": {
+        "error": {
+          "kind": "Error",
+          "message": "Unknown country: XX"
+        }
+      }
+    },
+    {
+      "name": "country 249 ZZ",
+      "args": [
+        "ZZ"
+      ],
+      "expect": {
+        "error": {
+          "kind": "Error",
+          "message": "Unknown country: ZZ"
+        }
+      }
+    },
+    {
+      "name": "country 250 001",
+      "args": [
+        "001"
+      ],
+      "expect": {
+        "error": {
+          "kind": "Error",
+          "message": "Unknown country: 001"
+        }
+      }
+    },
+    {
+      "name": "country 251 US ",
+      "args": [
+        "US "
+      ],
+      "expect": {
+        "error": {
+          "kind": "Error",
+          "message": "Unknown country: US "
+        }
+      }
+    },
+    {
+      "name": "country 252 UK",
+      "args": [
+        "UK"
+      ],
+      "expect": {
+        "error": {
+          "kind": "Error",
+          "message": "Unknown country: UK"
+        }
+      }
+    },
+    {
+      "name": "country 253 EU",
+      "args": [
+        "EU"
+      ],
+      "expect": {
+        "error": {
+          "kind": "Error",
+          "message": "Unknown country: EU"
+        }
+      }
+    },
+    {
+      "name": "country 254 constructor",
+      "args": [
+        "constructor"
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "country 255 __defineGetter__",
+      "args": [
+        "__defineGetter__"
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "country 256 __defineSetter__",
+      "args": [
+        "__defineSetter__"
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "country 257 hasOwnProperty",
+      "args": [
+        "hasOwnProperty"
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "country 258 __lookupGetter__",
+      "args": [
+        "__lookupGetter__"
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "country 259 __lookupSetter__",
+      "args": [
+        "__lookupSetter__"
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "country 260 isPrototypeOf",
+      "args": [
+        "isPrototypeOf"
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "country 261 propertyIsEnumerable",
+      "args": [
+        "propertyIsEnumerable"
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "country 262 toString",
+      "args": [
+        "toString"
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "country 263 valueOf",
+      "args": [
+        "valueOf"
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "country 264 __proto__",
+      "args": [
+        "__proto__"
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "country 265 toLocaleString",
+      "args": [
+        "toLocaleString"
+      ],
+      "expect": {
+        "ok": null
+      }
+    },
+    {
+      "name": "country 266 AQ",
+      "args": [
+        "AQ"
+      ],
+      "expect": {
+        "error": {
+          "kind": "Error",
+          "message": "Unknown country: AQ"
+        }
+      }
+    },
+    {
+      "name": "country 267 ＥＳ",
+      "args": [
+        "ＥＳ"
+      ],
+      "expect": {
+        "error": {
+          "kind": "Error",
+          "message": "Unknown country: ＥＳ"
+        }
+      }
+    }
+  ]
+}

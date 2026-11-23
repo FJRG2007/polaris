@@ -5,6 +5,7 @@
  */
 
 import * as probe from "../../src/domains/probe/ts";
+import { PHONE_CORPUS } from "./phone-corpus";
 
 export interface CorpusEntry {
     domain: string;
@@ -84,5 +85,6 @@ export const CORPUS: CorpusEntry[] = [
             { name: "huge valid (64 KiB)", args: [repeat("0f", 32768)] },
             { name: "huge mixed case", args: [repeat("aB", 4096)] }
         ]
-    }
+    },
+    ...PHONE_CORPUS
 ];
