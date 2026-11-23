@@ -93,7 +93,24 @@ export const instanceSecuritySchema = z.object({
      * for this address. Defaulted to nobody, so a policy stored before this
      * existed parses exactly as it did.
      */
-    requirePhishingResistant: z.enum(PHISHING_RESISTANT_SCOPES).default("off")
+    requirePhishingResistant: z.enum(PHISHING_RESISTANT_SCOPES).default("off"),
+    /**
+     * Every account confirms a phone number before it can use Polaris. Off unless
+     * an administrator turns it on, and defaulted so a policy stored before this
+     * existed parses exactly as it did. Only binds an account a confirmation code
+     * can actually reach, and never an administrator: a requirement nobody can
+     * meet would be a locked instance.
+     */
+    requirePhone: z.boolean().default(false),
+    /**
+     * Who turned the second-step requirement off, and when. Written by the server
+     * from the session that saved it, never taken from the request; null while
+     * the requirement is on, or when it was off before this was recorded.
+     */
+    secondFactorRiskAccepted: z
+        .object({ by: z.string().min(1).max(200), at: z.string().datetime() })
+        .nullable()
+        .default(null)
 });
 
 /** Whether `scope` asks an account with this admin flag for a passkey sign-in. */
@@ -122,5 +139,7 @@ export const INSTANCE_SECURITY_DEFAULTS: InstanceSecurityPolicy = {
     acceptedFactors: ["totp", "email"],
     challengeConnectionSignIn: false,
     requireLoginApproval: false,
-    requirePhishingResistant: "off"
+    requirePhishingResistant: "off",
+    requirePhone: false,
+    secondFactorRiskAccepted: null
 };

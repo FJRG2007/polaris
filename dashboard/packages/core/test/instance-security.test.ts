@@ -75,4 +75,14 @@ describe("the instance security policy", () => {
             instanceSecuritySchema.parse({ requireSecondFactor: true, acceptedFactors: [] }).acceptedFactors
         ).toEqual(["totp"]);
     });
+
+    it("asks nobody for a phone unless an administrator says so, and keeps a stored policy that predates it", () => {
+        expect(INSTANCE_SECURITY_DEFAULTS.requirePhone).toBe(false);
+        const stored = instanceSecuritySchema.parse({ requireSecondFactor: false, acceptedFactors: ["totp"] });
+        expect(stored.requirePhone).toBe(false);
+        expect(stored.secondFactorRiskAccepted).toBeNull();
+        expect(
+            instanceSecuritySchema.parse({ requireSecondFactor: true, acceptedFactors: [], requirePhone: true }).requirePhone
+        ).toBe(true);
+    });
 });
