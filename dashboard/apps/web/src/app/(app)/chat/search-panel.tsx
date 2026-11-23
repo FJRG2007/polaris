@@ -20,6 +20,7 @@ import * as core from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "./chat-context";
 import { PersonName } from "@/components/person-name";
+import { PersonPressable } from "@/components/person-press";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { searchMessagesAction, searchPeopleAction } from "./actions";
 import { unlockProofFor } from "./lock-session";
@@ -252,11 +253,24 @@ export function SearchPanel({
                 ) : (
                     <ol className="flex flex-col">
                         {shownHits.map((hit) => (
-                            <li key={hit.message.id}>
+                            // The whole row opens the hit, and the author's name
+                            // in it opens their card: a button cannot hold a
+                            // button, so the row's is laid over it and the name
+                            // is lifted above that.
+                            <li
+                                key={hit.message.id}
+                                onClick={() => onOpen(hit)}
+                                className="relative cursor-pointer border-b border-border transition-colors hover:bg-card-hover"
+                            >
                                 <button
                                     type="button"
-                                    onClick={() => onOpen(hit)}
-                                    className="flex w-full flex-col gap-0.5 border-b border-border px-3 py-2 text-start transition-colors hover:bg-card-hover"
+                                    aria-label={t("messageList.goToTheOriginalMessage")}
+                                    aria-describedby={`search-hit-${hit.message.id}`}
+                                    className="absolute inset-0 rounded-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+                                />
+                                <div
+                                    id={`search-hit-${hit.message.id}`}
+                                    className="relative flex w-full flex-col gap-0.5 px-3 py-2 text-start"
                                 >
                                     <span className="flex items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
                                         {hit.inSpace ? (
@@ -272,17 +286,29 @@ export function SearchPanel({
                                             className="shrink-0 whitespace-nowrap"
                                         />
                                     </span>
-                                    <span
-                                        className={cn(
-                                            "text-xs font-medium",
-                                            hit.message.authorId === viewerId && "text-primary"
-                                        )}
+                                    <PersonPressable
+                                        person={{
+                                            id: hit.message.authorId,
+                                            name: hit.message.authorName ?? t("messageList.somebodyWhoHasLeft2")
+                                        }}
+                                        channelId={hit.channelId}
+                                        className="self-start"
                                     >
-                                        <PersonName
-                                            id={hit.message.authorId}
-                                            name={hit.message.authorName ?? "Somebody who has left"}
-                                        />
-                                    </span>
+                                        <span
+                                            className={cn(
+                                                "text-xs font-medium",
+                                                hit.message.authorId === viewerId && "text-primary"
+                                            )}
+                                        >
+                                            <PersonName
+                                                id={hit.message.authorId}
+                                                name={
+                                                    hit.message.authorName ??
+                                                    t("messageList.somebodyWhoHasLeft2")
+                                                }
+                                            />
+                                        </span>
+                                    </PersonPressable>
                                     {/* Clamped rather than truncated: a hit is
                                         usually a paragraph, and one line of it
                                         is rarely the line that matched. */}
@@ -293,7 +319,7 @@ export function SearchPanel({
                                             flaggedLinks={hit.message.flaggedLinks}
                                         />
                                     </span>
-                                </button>
+                                </div>
                             </li>
                         ))}
                     </ol>

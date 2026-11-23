@@ -24,6 +24,8 @@ import Link from "next/link";
 import * as core from "@polaris/core";
 import * as actions from "./actions";
 import { Avatar } from "@/components/avatar";
+import { PersonCardProvider } from "./person-card";
+import { PersonPressable } from "@/components/person-press";
 import { useChat } from "./chat-context";
 import { ChatAvatar } from "@/components/chat-avatar";
 import { conversationFace } from "./conversation-face";
@@ -133,6 +135,7 @@ export function ConversationInfo({
     privacy?: ReactNode;
     layout?: InfoLayout;
 }) {
+    const { viewerId } = useChat();
     if (layout === "panel") {
         if (!open) return null;
         return (
@@ -152,13 +155,17 @@ export function ConversationInfo({
                 className="flex flex-col gap-0 overflow-hidden p-0 max-sm:p-0 max-sm:pt-[var(--safe-top)]"
             >
                 <DialogTitle className="sr-only">{channel.name}</DialogTitle>
-                <InfoBody
-                    channel={channel}
-                    layout="page"
-                    onClose={() => onOpenChange(false)}
-                    entries={entries}
-                    privacy={privacy}
-                />
+                {/* Inside the dialog, so a press on a member's card is not a
+                    press outside it. */}
+                <PersonCardProvider channelId={channel.id} viewerId={viewerId}>
+                    <InfoBody
+                        channel={channel}
+                        layout="page"
+                        onClose={() => onOpenChange(false)}
+                        entries={entries}
+                        privacy={privacy}
+                    />
+                </PersonCardProvider>
             </DialogContent>
         </Dialog>
     );
@@ -460,14 +467,19 @@ function InfoBody({
                 <PolarMemberRow channelId={channel.id} rowClass={ROW} />
                 {members.slice(0, MEMBERS_SHOWN).map((member) => (
                     <div key={member.id} className={cn(ROW, "hover:bg-transparent")}>
-                        <Avatar
+                        <PersonPressable
                             person={member}
-                            size={24}
-                            typing={typists.some((typist) => typist.userId === member.id)}
-                        />
-                        <span className="min-w-0 flex-1 truncate" title={member.name}>
-                            <PersonName id={member.id} name={member.name} />
-                        </span>
+                            className="flex min-w-0 flex-1 items-center gap-2"
+                        >
+                            <Avatar
+                                person={member}
+                                size={24}
+                                typing={typists.some((typist) => typist.userId === member.id)}
+                            />
+                            <span className="min-w-0 flex-1 truncate" title={member.name}>
+                                <PersonName id={member.id} name={member.name} />
+                            </span>
+                        </PersonPressable>
                     </div>
                 ))}
                 {entries.onMembers && (

@@ -3552,6 +3552,8 @@ export function ChannelView({
             <PinsDialog
                 open={pinsOpen}
                 onOpenChange={setPinsOpen}
+                channelId={channelId}
+                viewerId={viewerId}
                 pins={pins.pins}
                 mayPin={channel.mayPin}
                 onJump={jumpHere}

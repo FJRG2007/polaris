@@ -135,17 +135,21 @@ const NOTHING_SHARED: ChatProfile["mutual"] = {
  */
 export async function chatProfile(
     actor: ChatActor,
-    channelId: string,
+    /** The conversation it is asked through, or a meeting with no conversation
+     *  of its own - where the two of them being in that call is the permission. */
+    place: string | ProfileMeeting,
     userId: string,
     options: { recent?: boolean } = {}
 ): Promise<ChatProfile | null> {
     const self = userId === actor.id;
+    const channelId = typeof place === "string" ? place : null;
 
     // The reader's own reach first: everything below describes somebody in a
     // conversation, and whether this is a conversation of theirs is the question
     // that has to be settled before any of it is read.
-    const access = await channelAccess(actor, channelId);
-    if (!access) return null;
+    if (channelId === null) {
+        if (!(await meetingReach(actor.id, (place as ProfileMeeting).meetingId))) return null;
+    } else if (!(await channelAccess(actor, channelId))) return null;
 
     const reader = { id: actor.id, isAdmin: false };
     const [person, together, blocked, mayReadName, mayReadProfile] = await Promise.all([
@@ -168,7 +172,9 @@ export async function chatProfile(
         // row: a public channel in an "everybody here" space is reached without
         // one, and a rule that only counted rows would refuse the profile of
         // somebody who is plainly in the room.
-        channelAccess({ id: userId }, channelId),
+        channelId === null
+            ? metInMeeting(userId, (place as ProfileMeeting).meetingId)
+            : channelAccess({ id: userId }, channelId),
         blockedBetween(actor.id, [userId]),
         // Never as an administrator, like everything else in chat: whoever runs
         // the instance can read the database, and that is a different and
@@ -184,7 +190,8 @@ export async function chatProfile(
     // one may be shown the other at all.
     const [mutual, role, between, badges, recent] = await Promise.all([
         self || !mayReadProfile ? NOTHING_SHARED : mutualsBetween(actor.id, person.id),
-        roleIn(together, person.id),
+        // A meeting with no conversation belongs to no space: nobody is anything there.
+        together === true ? null : roleIn(together, person.id),
         self ? { standing: "self" as const, since: null } : standing(actor.id, person.id),
         // Loaded on use: the badge service records audits, which reads the
         // server's auth setup - nothing a profile read needs on import.
@@ -241,6 +248,27 @@ export async function chatProfile(
         friendship,
         friendsSince: between.since?.toISOString() ?? ""
     };
+}
+
+/** A meeting with no conversation of its own, as the place a profile is read. */
+export interface ProfileMeeting {
+    readonly meetingId: string;
+}
+
+/** Whether the reader is in this call right now - the only way they see its
+ *  chat, and so the only way they see the names in it. */
+function meetingReach(userId: string, meetingId: string): Promise<boolean> {
+    return prisma.meetingParticipant
+        .count({ where: { meetingId, userId, admission: "admitted", leftAt: null } })
+        .then((seated) => seated > 0);
+}
+
+/** Whether somebody was let into this call at any point. Not only now: what they
+ *  said in its chat stays on screen after they leave, and so does their name. */
+function metInMeeting(userId: string, meetingId: string): Promise<boolean> {
+    return prisma.meetingParticipant
+        .count({ where: { meetingId, userId, admission: "admitted" } })
+        .then((seated) => seated > 0);
 }
 
 /**

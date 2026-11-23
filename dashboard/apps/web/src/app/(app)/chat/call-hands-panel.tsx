@@ -25,6 +25,7 @@
 
 import type { CallState } from "./call-state";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { PersonPressable } from "@/components/person-press";
 import { Hand } from "lucide-react";
 import { Button, ScrollRow } from "@polaris/ui";
 import { handsSummary, type HandInQueue } from "./call-signals";
@@ -36,10 +37,11 @@ export function HandStrip({ call }: { call: CallState }) {
     const seat = call.participantId;
     /** The queue, named. Built once for the strip rather than looked up per
      *  chip, and in the order the call agreed on rather than in roster order. */
-    const hands = useMemo<HandInQueue[]>(
+    const hands = useMemo<(HandInQueue & { userId: string | null })[]>(
         () =>
             call.hands.map((id) => ({
                 id,
+                userId: participants?.find((person) => person.id === id)?.userId ?? null,
                 // A seat with nobody behind it is somebody who has just left,
                 // which reads better than an identifier nobody chose.
                 name:
@@ -100,9 +102,11 @@ export function HandStrip({ call }: { call: CallState }) {
                                 <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-warning text-[0.625rem] font-semibold text-warning-foreground">
                                     {index + 1}
                                 </span>
-                                <span className={person.own ? "font-medium" : undefined}>
-                                    {person.own ? t("hands.you") : person.name}
-                                </span>
+                                <PersonPressable person={{ id: person.userId, name: person.name }}>
+                                    <span className={person.own ? "font-medium" : undefined}>
+                                        {person.own ? t("hands.you") : person.name}
+                                    </span>
+                                </PersonPressable>
                                 {call.hosting && !person.own && (
                                     <button
                                         type="button"

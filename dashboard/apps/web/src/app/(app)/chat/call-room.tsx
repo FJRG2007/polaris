@@ -40,6 +40,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./meeting-actions";
 import { useHeldCall } from "./call-session";
 import { Avatar } from "@/components/avatar";
+import { PersonPressable } from "@/components/person-press";
 import { runAction } from "@/lib/run-action";
 import { NOISE_LEVELS } from "./mic-cleanup";
 import {
@@ -2539,7 +2540,10 @@ function Face({
                 )}
             </span>
             <span className="flex max-w-full items-center gap-1 text-xs">
-                <span className="truncate">{label ?? name}</span>
+                {/* Their name opens their card, as it does in the conversation. */}
+                <PersonPressable person={{ id: personId, name }} className="flex">
+                    <span className="truncate">{label ?? name}</span>
+                </PersonPressable>
                 {sharing && <LiveBadge />}
                 {/* Muted and deafened are on the face itself, the way a voice
                     channel shows them - see `callBadge`. */}
@@ -3061,9 +3065,11 @@ function Tile({
                 rather than wrapping into a plate that covers the picture. */}
             <span className="absolute bottom-1 left-1 flex min-w-0 max-w-[calc(100%-0.5rem)] items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[0.6875rem]">
                 {screen && <Monitor className="size-3 shrink-0" aria-hidden />}
-                <span className="min-w-0 truncate" title={label ?? name}>
-                    {label ?? name}
-                </span>
+                <PersonPressable person={{ id: personId, name }} className="flex">
+                    <span className="min-w-0 truncate" title={label ?? name}>
+                        {label ?? name}
+                    </span>
+                </PersonPressable>
                 {/* Drawn because this person cannot be heard, yours included,
                     camera on or off. After the name rather than ahead of it:
                     ahead, muting pushed the name sideways every time, the jump

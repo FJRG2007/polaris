@@ -26,12 +26,14 @@ import { runAction } from "@/lib/run-action";
 import type { ChatFrame } from "./use-chat-stream";
 import { Loader2, Pin, PinOff } from "lucide-react";
 import { PersonName } from "@/components/person-name";
+import { PersonPressable } from "@/components/person-press";
 import { MessageTime } from "@/components/message-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { PersonCardProvider } from "./person-card";
 import { useOpenedWithin } from "./opened-sealed";
 import type { ChatPinView } from "@/lib/chat/pins";
 import { PIN_DURATIONS, type PinDuration } from "@/lib/chat/pin-rules";
@@ -288,12 +290,18 @@ export function PinsDialog({
     pins,
     mayPin,
     onJump,
-    onUnpinned
+    onUnpinned,
+    channelId,
+    viewerId
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     pins: readonly ChatPinView[] | null;
     mayPin: boolean;
+    /** The conversation and the reader, for the card a pinned author's name
+     *  opens. Without them the name is the label it always was. */
+    channelId?: string;
+    viewerId?: string;
     onJump: (messageId: string) => void;
     onUnpinned: (messageId: string) => void;
 }) {
@@ -322,103 +330,132 @@ export function PinsDialog({
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="flex max-h-[80dvh] max-w-lg flex-col">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Pin className="size-4 text-primary" />
-                        {t("pins.title")}
-                    </DialogTitle>
-                </DialogHeader>
-                {error && (
-                    <p role="alert" className="text-sm text-danger">
-                        {error}
-                    </p>
-                )}
-                <div className="-mx-1 min-h-0 flex-1 overflow-y-auto overscroll-contain px-1">
-                    {pins === null ? (
-                        <div className="flex flex-col gap-2" aria-hidden="true">
-                            {[0, 1].map((row) => (
-                                <Skeleton key={row} className="h-16 w-full" />
-                            ))}
-                        </div>
-                    ) : pins.length === 0 ? (
-                        <EmptyState
-                            icon={<Pin />}
-                            title={t("pins.none")}
-                            description={t("pins.noneBody")}
-                        />
-                    ) : (
-                        <ul className="flex flex-col gap-2">
-                            {pins.map((entry) => (
-                                <li
-                                    key={entry.message.id}
-                                    className="rounded-lg border border-border bg-card p-3"
-                                >
-                                    <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                                        <span className="min-w-0 truncate font-medium text-foreground">
-                                            <PersonName
-                                                id={entry.message.authorId}
-                                                name={
-                                                    entry.message.authorName ??
-                                                    "Somebody who has left"
-                                                }
-                                            />
-                                        </span>
-                                        <MessageTime
-                                            iso={entry.message.createdAt}
-                                            className="shrink-0 whitespace-nowrap"
-                                        />
-                                        <span className="ms-auto flex shrink-0 items-center gap-1">
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                onClick={() => {
-                                                    onOpenChange(false);
-                                                    onJump(entry.message.id);
-                                                }}
-                                            >
-                                                {t("pins.jump")}
-                                            </Button>
-                                            {mayPin && (
-                                                <button
-                                                    type="button"
-                                                    aria-label={t("pins.unpin")}
-                                                    title={t("pins.unpin")}
-                                                    disabled={working === entry.message.id}
-                                                    onClick={() => void unpin(entry.message.id)}
-                                                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                                                >
-                                                    <PinOff className="size-3.5" />
-                                                </button>
-                                            )}
-                                        </span>
-                                    </div>
-                                    <p className="mt-1 line-clamp-3 break-words text-sm">
-                                        {excerptOf(
-                                            entry.message,
-                                            t("pins.attachment"),
-                                            t("pins.deleted")
-                                        )}
-                                    </p>
-                                    <p className="mt-1 truncate text-[0.6875rem] text-foreground-subtle">
-                                        {[
-                                            entry.pinnedBy
-                                                ? t("pins.byOn", { name: entry.pinnedBy })
-                                                : null,
-                                            entry.expiresAt
-                                                ? t("pins.until", {
-                                                      date: format.dateTime(entry.expiresAt)
-                                                  })
-                                                : t("pins.forever")
-                                        ]
-                                            .filter(Boolean)
-                                            .join(" - ")}
-                                    </p>
-                                </li>
-                            ))}
-                        </ul>
+                {/* Inside the dialog, so a press on the card is not a press outside it. */}
+                <PinsPeople channelId={channelId} viewerId={viewerId}>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Pin className="size-4 text-primary" />
+                            {t("pins.title")}
+                        </DialogTitle>
+                    </DialogHeader>
+                    {error && (
+                        <p role="alert" className="text-sm text-danger">
+                            {error}
+                        </p>
                     )}
-                </div>
+                    <div className="-mx-1 min-h-0 flex-1 overflow-y-auto overscroll-contain px-1">
+                        {pins === null ? (
+                            <div className="flex flex-col gap-2" aria-hidden="true">
+                                {[0, 1].map((row) => (
+                                    <Skeleton key={row} className="h-16 w-full" />
+                                ))}
+                            </div>
+                        ) : pins.length === 0 ? (
+                            <EmptyState
+                                icon={<Pin />}
+                                title={t("pins.none")}
+                                description={t("pins.noneBody")}
+                            />
+                        ) : (
+                            <ul className="flex flex-col gap-2">
+                                {pins.map((entry) => (
+                                    <li
+                                        key={entry.message.id}
+                                        className="rounded-lg border border-border bg-card p-3"
+                                    >
+                                        <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+                                            <PersonPressable
+                                                person={{
+                                                    id: entry.message.authorId,
+                                                    name: entry.message.authorName ?? t("messageList.somebodyWhoHasLeft2")
+                                                }}
+                                                className="flex"
+                                            >
+                                                <span className="min-w-0 truncate font-medium text-foreground">
+                                                    <PersonName
+                                                        id={entry.message.authorId}
+                                                        name={
+                                                            entry.message.authorName ??
+                                                            t("messageList.somebodyWhoHasLeft2")
+                                                        }
+                                                    />
+                                                </span>
+                                            </PersonPressable>
+                                            <MessageTime
+                                                iso={entry.message.createdAt}
+                                                className="shrink-0 whitespace-nowrap"
+                                            />
+                                            <span className="ms-auto flex shrink-0 items-center gap-1">
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={() => {
+                                                        onOpenChange(false);
+                                                        onJump(entry.message.id);
+                                                    }}
+                                                >
+                                                    {t("pins.jump")}
+                                                </Button>
+                                                {mayPin && (
+                                                    <button
+                                                        type="button"
+                                                        aria-label={t("pins.unpin")}
+                                                        title={t("pins.unpin")}
+                                                        disabled={working === entry.message.id}
+                                                        onClick={() => void unpin(entry.message.id)}
+                                                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+                                                    >
+                                                        <PinOff className="size-3.5" />
+                                                    </button>
+                                                )}
+                                            </span>
+                                        </div>
+                                        <p className="mt-1 line-clamp-3 break-words text-sm">
+                                            {excerptOf(
+                                                entry.message,
+                                                t("pins.attachment"),
+                                                t("pins.deleted")
+                                            )}
+                                        </p>
+                                        <p className="mt-1 truncate text-[0.6875rem] text-foreground-subtle">
+                                            {[
+                                                entry.pinnedBy
+                                                    ? t("pins.byOn", { name: entry.pinnedBy })
+                                                    : null,
+                                                entry.expiresAt
+                                                    ? t("pins.until", {
+                                                          date: format.dateTime(entry.expiresAt)
+                                                      })
+                                                    : t("pins.forever")
+                                            ]
+                                                .filter(Boolean)
+                                                .join(" - ")}
+                                        </p>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                </PinsPeople>
             </DialogContent>
         </Dialog>
+    );
+}
+
+/** The card a pinned author's name opens, where the conversation is known. */
+function PinsPeople({
+    channelId,
+    viewerId,
+    children
+}: {
+    channelId?: string;
+    viewerId?: string;
+    children: ReactNode;
+}) {
+    if (!channelId || !viewerId) return <>{children}</>;
+    return (
+        <PersonCardProvider channelId={channelId} viewerId={viewerId}>
+            {children}
+        </PersonCardProvider>
     );
 }

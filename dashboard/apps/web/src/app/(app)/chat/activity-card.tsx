@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { Joystick } from "lucide-react";
 import { Button, pollWhileVisible } from "@polaris/ui";
 import { Avatar } from "@/components/avatar";
+import { PersonPressable } from "@/components/person-press";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import type { ActivityCardView, JoinRefusal } from "@/lib/chat/activity-card";
@@ -116,11 +117,16 @@ export function ActivityCard({
                                     title={player.name}
                                     className="rounded-full ring-2 ring-card"
                                 >
-                                    <Avatar
+                                    <PersonPressable
                                         person={{ id: player.id, name: player.name }}
-                                        size={20}
-                                        status={false}
-                                    />
+                                        className="flex rounded-full"
+                                    >
+                                        <Avatar
+                                            person={{ id: player.id, name: player.name }}
+                                            size={20}
+                                            status={false}
+                                        />
+                                    </PersonPressable>
                                 </li>
                             ))}
                         </ul>

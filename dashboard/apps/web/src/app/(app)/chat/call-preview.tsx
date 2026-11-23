@@ -24,6 +24,7 @@ import { Button } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { LiveBadge, callBadgeOf } from "./call-roster";
 import { Avatar } from "@/components/avatar";
+import { PersonPressable } from "@/components/person-press";
 import { Mic, Video, X } from "lucide-react";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { PersonName, PersonRow } from "@/components/person-name";
@@ -100,17 +101,22 @@ export function CallPreview({
                             className="flex w-20 shrink-0 flex-col items-center gap-1"
                             title={person.name}
                         >
-                            <Avatar
-                                size={AVATAR_SIZE}
+                            <PersonPressable
                                 person={{ id: person.userId, name: person.name }}
-                                callBadge={callBadgeOf(person)}
-                            />
-                            <span className="flex w-full items-center justify-center gap-1 text-xs">
-                                <span className="min-w-0 truncate">
-                                    <PersonName id={person.userId} name={person.name} />
+                                className="flex w-full flex-col items-center gap-1"
+                            >
+                                <Avatar
+                                    size={AVATAR_SIZE}
+                                    person={{ id: person.userId, name: person.name }}
+                                    callBadge={callBadgeOf(person)}
+                                />
+                                <span className="flex w-full items-center justify-center gap-1 text-xs">
+                                    <span className="min-w-0 truncate">
+                                        <PersonName id={person.userId} name={person.name} />
+                                    </span>
+                                    {person.streaming && <LiveBadge />}
                                 </span>
-                                {person.streaming && <LiveBadge />}
-                            </span>
+                            </PersonPressable>
                         </PersonRow>
                     </SeatMenu>
                 ))}

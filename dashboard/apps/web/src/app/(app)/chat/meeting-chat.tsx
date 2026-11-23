@@ -30,6 +30,7 @@ import { Composer } from "./composer";
 import { knownPeopleOf } from "./known-people";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Avatar } from "@/components/avatar";
+import { PersonPressable } from "@/components/person-press";
 import type { CallState } from "./call-state";
 import { useAppUrl } from "@/components/app-url";
 import { MessageSquare, Download } from "lucide-react";
@@ -240,6 +241,10 @@ export function MeetingChat({
                     <ol className="flex flex-col gap-2">
                         {lines.map((line) => (
                             <li key={line.id} className="flex gap-2">
+                                <PersonPressable
+                                    person={{ id: line.userId, name: line.name }}
+                                    className="flex shrink-0 self-start rounded-full"
+                                >
                                 <Avatar
                                     decorated
                                     size={22}
@@ -259,6 +264,7 @@ export function MeetingChat({
                                         name: line.name
                                     }}
                                 />
+                                </PersonPressable>
                                 <span className="min-w-0 flex-1">
                                     <span className="flex items-baseline gap-1.5">
                                         <span
@@ -268,7 +274,11 @@ export function MeetingChat({
                                                     "text-primary"
                                             )}
                                         >
-                                            <PersonName id={line.userId} name={line.name} />
+                                            <PersonPressable
+                                                person={{ id: line.userId, name: line.name }}
+                                            >
+                                                <PersonName id={line.userId} name={line.name} />
+                                            </PersonPressable>
                                         </span>
                                         {/* Said beside the name, because who is
                                             from outside decides how somebody

@@ -8,10 +8,14 @@ export const dynamic = "force-dynamic";
 
 export const GET = pollRoute(
     z.object({
-        channelId: z.string().trim().min(1).max(200),
+        // The conversation it is asked through, or - for a meeting with no
+        // conversation of its own - the meeting in its place.
+        channelId: z.string().trim().max(200).default(""),
+        meetingId: z.string().trim().min(1).max(200).optional(),
         userId: z.string().trim().min(1).max(200),
         // The larger view also asks what they did lately.
         recent: z.enum(["1"]).optional()
     }),
-    ({ channelId, userId, recent }) => profileAction(channelId, userId, recent === "1")
+    ({ channelId, meetingId, userId, recent }) =>
+        profileAction(channelId, userId, recent === "1", meetingId)
 );

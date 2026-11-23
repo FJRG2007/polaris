@@ -39,6 +39,7 @@ import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { PersonPressable } from "@/components/person-press";
 import { asFiles } from "@/components/file-picker/as-files";
 import type { PickedFile } from "@/components/file-picker/picked-file";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
@@ -533,11 +534,26 @@ function PostRow({
         const name = tagsById.get(id);
         return name ? [{ id, name }] : [];
     });
+    // The whole row opens the post and the author's name opens their card: a
+    // button cannot hold a button, so the row's is laid over it and the name is
+    // lifted above that.
+    const described = `forum-post-${post.root.id}`;
     return (
-        <button
-            type="button"
+        // The row's own press is here, so a press anywhere on it - the cover
+        // button's included, which is the keyboard's way in - opens the post.
+        <div
             onClick={onOpen}
-            className="flex w-full min-w-0 flex-col gap-1 border-b border-border px-4 py-3 text-start transition-colors hover:bg-card-hover focus-visible:bg-card-hover focus-visible:outline-none"
+            className="relative cursor-pointer border-b border-border transition-colors hover:bg-card-hover focus-within:bg-card-hover"
+        >
+            <button
+                type="button"
+                aria-label={post.title}
+                aria-describedby={described}
+                className="absolute inset-0 focus-visible:outline-none"
+            />
+        <div
+            id={described}
+            className="relative flex w-full min-w-0 flex-col gap-1 px-4 py-3 text-start"
         >
             <span className="min-w-0 truncate text-sm font-semibold" title={post.title}>
                 {post.title}
@@ -553,7 +569,12 @@ function PostRow({
             )}
             {excerpt && <span className="line-clamp-2 min-w-0 text-sm text-muted-foreground">{excerpt}</span>}
             <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                <span className="min-w-0 truncate">{post.root.authorName ?? t("forum.someone")}</span>
+                <PersonPressable
+                    person={{ id: post.root.authorId, name: post.root.authorName ?? t("forum.someone") }}
+                    className="flex"
+                >
+                    <span className="min-w-0 truncate">{post.root.authorName ?? t("forum.someone")}</span>
+                </PersonPressable>
                 <span className="inline-flex items-center gap-1">
                     <MessageSquare aria-hidden className="size-3.5 shrink-0" />
                     {t("forum.replies", { count: post.root.replyCount })}
@@ -562,7 +583,8 @@ function PostRow({
                     {t("forum.lastActivity")} <RelativeTime iso={post.lastActivityAt} />
                 </span>
             </span>
-        </button>
+        </div>
+        </div>
     );
 }
 

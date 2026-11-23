@@ -111,11 +111,16 @@ export const chatProfile = (
     channelId: string,
     userId: string,
     signal?: AbortSignal,
-    options: { recent?: boolean } = {}
+    options: { recent?: boolean; meetingId?: string } = {}
 ) =>
     readPoll<Answer<typeof actionsModule.profileAction>>(
         "/api/chat/profile",
-        options.recent ? { channelId, userId, recent: "1" } : { channelId, userId },
+        {
+            channelId,
+            userId,
+            ...(options.recent ? { recent: "1" } : {}),
+            ...(options.meetingId ? { meetingId: options.meetingId } : {})
+        },
         signal
     );
 

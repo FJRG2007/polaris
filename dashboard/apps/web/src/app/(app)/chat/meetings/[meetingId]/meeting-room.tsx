@@ -30,6 +30,7 @@ import { useCallHold } from "@/app/(app)/chat/call-hold";
 import type { MeetingSummary } from "@/lib/chat/meetings";
 import { CallRoster } from "@/app/(app)/chat/call-roster";
 import { MeetingChat } from "@/app/(app)/chat/meeting-chat";
+import { PersonCardProvider } from "@/app/(app)/chat/person-card";
 import { SidePane } from "@/app/(app)/chat/side-pane";
 import { CALL_CHAT_PANE } from "@/app/(app)/chat/use-chat-pane";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -249,267 +250,271 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
     }
 
     return (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                <header className="flex h-header shrink-0 flex-wrap items-center gap-2 border-b border-border px-4">
-                    {/* On a phone this page has the whole screen, so it carries the
-                        way back to the list, as a conversation's header does. */}
-                    <Link data-swipe-back
-                        href="/chat"
-                        aria-label={t("channelHeader.backToConversations")}
-                        className="-ms-1.5 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
-                    >
-                        <ArrowLeft className="size-4" />
-                    </Link>
-                    <Video className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="min-w-0 flex-1 truncate text-sm">
-                        {/* The room's own copy first: it is re-read whenever the
-                            roster moves, so a host renaming the meeting mid-call
-                            reaches everybody in it rather than only themselves. */}
-                        <span className="font-medium">
-                            {call.meeting?.title || about?.title || t("meetingRoom.meeting")}
-                        </span>
-                        {about && (
-                            <span className="text-muted-foreground">
-                                {" - "}
-                                {about.mine
-                                    ? t("meetingRoom.youAreHosting")
-                                    : t("meetingRoom.hostedBy", { name: about.hostName })}
-                                {about.scheduledAt ? `, ${format.dateTime(about.scheduledAt)}` : ""}
+        // A name in the call or its chat opens that person's card, asked through
+        // this meeting: it has no conversation of its own - see `chatProfile`.
+        <PersonCardProvider channelId="" meetingId={meetingId} viewerId={viewerId}>
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                    <header className="flex h-header shrink-0 flex-wrap items-center gap-2 border-b border-border px-4">
+                        {/* On a phone this page has the whole screen, so it carries the
+                            way back to the list, as a conversation's header does. */}
+                        <Link data-swipe-back
+                            href="/chat"
+                            aria-label={t("channelHeader.backToConversations")}
+                            className="-ms-1.5 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+                        >
+                            <ArrowLeft className="size-4" />
+                        </Link>
+                        <Video className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 flex-1 truncate text-sm">
+                            {/* The room's own copy first: it is re-read whenever the
+                                roster moves, so a host renaming the meeting mid-call
+                                reaches everybody in it rather than only themselves. */}
+                            <span className="font-medium">
+                                {call.meeting?.title || about?.title || t("meetingRoom.meeting")}
                             </span>
-                        )}
-                    </span>
+                            {about && (
+                                <span className="text-muted-foreground">
+                                    {" - "}
+                                    {about.mine
+                                        ? t("meetingRoom.youAreHosting")
+                                        : t("meetingRoom.hostedBy", { name: about.hostName })}
+                                    {about.scheduledAt ? `, ${format.dateTime(about.scheduledAt)}` : ""}
+                                </span>
+                            )}
+                        </span>
 
-                    {about?.guestToken && (
-                        <Button
-                            size="xs"
-                            variant="secondary"
-                            title={t("meetingRoom.copyTheLinkToSend")}
-                            onClick={async () => {
-                                await copyText(`${baseUrl}/m/${about.guestToken}`);
-                                setCopied(true);
-                                window.setTimeout(() => setCopied(false), 2000);
-                            }}
-                        >
-                            <Link2 className="size-3.5" />
-                            {copied ? t("meetingRoom.copied") : t("meetingRoom.copyLink")}
-                        </Button>
-                    )}
-                    {host && about?.joinCode && <JoinCodeBadge code={about.joinCode} />}
-                    {host && about && <CopyInvitationButton meeting={about} />}
-                    {host && about?.guestToken && (
-                        <Button
-                            size="icon-xs"
-                            variant="secondary"
-                            title={t("meetingLink.limits")}
-                            aria-label={t("meetingLink.limitsFor")}
-                            onClick={() => setLimiting(true)}
-                        >
-                            <Shield className="size-3.5" />
-                        </Button>
-                    )}
-                    {host && (
-                        <>
-                            <Button size="xs" variant="secondary" onClick={() => setInviting(true)}>
-                                <UserPlus className="size-3.5" />
-                                {t("meetingRoom.invite")}
+                        {about?.guestToken && (
+                            <Button
+                                size="xs"
+                                variant="secondary"
+                                title={t("meetingRoom.copyTheLinkToSend")}
+                                onClick={async () => {
+                                    await copyText(`${baseUrl}/m/${about.guestToken}`);
+                                    setCopied(true);
+                                    window.setTimeout(() => setCopied(false), 2000);
+                                }}
+                            >
+                                <Link2 className="size-3.5" />
+                                {copied ? t("meetingRoom.copied") : t("meetingRoom.copyLink")}
                             </Button>
-                            {/* The name and the hour, which used to be settable
-                                once and never again: a meeting that moved could
-                                only be ended and made afresh, taking its link
-                                with it. */}
+                        )}
+                        {host && about?.joinCode && <JoinCodeBadge code={about.joinCode} />}
+                        {host && about && <CopyInvitationButton meeting={about} />}
+                        {host && about?.guestToken && (
                             <Button
                                 size="icon-xs"
                                 variant="secondary"
-                                title={t("meetingRoom.renameOrReschedule")}
-                                aria-label={t("meetingRoom.renameOrRescheduleThisMeeting")}
-                                onClick={() => setEditing(true)}
+                                title={t("meetingLink.limits")}
+                                aria-label={t("meetingLink.limitsFor")}
+                                onClick={() => setLimiting(true)}
                             >
-                                <Pencil className="size-3.5" />
+                                <Shield className="size-3.5" />
                             </Button>
-                            {/* In the call the doors are in its own "more" menu,
-                                beside recording; before anybody has joined,
-                                here. */}
-                            {!inCall && (
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button
-                                            size="icon-xs"
-                                            variant="secondary"
-                                            title={t("meetingRoom.hosting")}
-                                            aria-label={t("meetingRoom.hosting")}
-                                        >
-                                            <MoreHorizontal className="size-3.5" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="w-72">
-                                        {doors}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            )}
-                            <Button size="xs" variant="danger" onClick={() => setEnding(true)}>
-                                <LogOut className="size-3.5" />
-                                {closing.action}
-                            </Button>
-                        </>
-                    )}
-                </header>
+                        )}
+                        {host && (
+                            <>
+                                <Button size="xs" variant="secondary" onClick={() => setInviting(true)}>
+                                    <UserPlus className="size-3.5" />
+                                    {t("meetingRoom.invite")}
+                                </Button>
+                                {/* The name and the hour, which used to be settable
+                                    once and never again: a meeting that moved could
+                                    only be ended and made afresh, taking its link
+                                    with it. */}
+                                <Button
+                                    size="icon-xs"
+                                    variant="secondary"
+                                    title={t("meetingRoom.renameOrReschedule")}
+                                    aria-label={t("meetingRoom.renameOrRescheduleThisMeeting")}
+                                    onClick={() => setEditing(true)}
+                                >
+                                    <Pencil className="size-3.5" />
+                                </Button>
+                                {/* In the call the doors are in its own "more" menu,
+                                    beside recording; before anybody has joined,
+                                    here. */}
+                                {!inCall && (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                size="icon-xs"
+                                                variant="secondary"
+                                                title={t("meetingRoom.hosting")}
+                                                aria-label={t("meetingRoom.hosting")}
+                                            >
+                                                <MoreHorizontal className="size-3.5" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-72">
+                                            {doors}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                )}
+                                <Button size="xs" variant="danger" onClick={() => setEnding(true)}>
+                                    <LogOut className="size-3.5" />
+                                    {closing.action}
+                                </Button>
+                            </>
+                        )}
+                    </header>
 
-                {error && (
-                    <p
-                        role="alert"
-                        className="border-b border-border px-4 py-2 text-sm text-danger"
-                    >
-                        {error}
-                    </p>
-                )}
-
-                {inCall ? (
-                    <div className="flex min-h-0 flex-1 flex-col">
-                        <CallRoom
-                            // A room: the call has the width and the meeting's
-                            // chat is down the side, not underneath it.
-                            place="room"
-                            call={call}
-                            meetingId={meetingId}
-                            viewerId={viewerId}
-                            hostSeat={hostSeat}
-                            moreItems={doors}
-                            onLeave={() => {
-                                leaveCall();
-                                void load();
-                            }}
-                        />
-                    </div>
-                ) : (
-                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-                        <p className="text-sm text-muted-foreground">
-                            {waiting
-                                ? t("meetingRoom.waitingForTheHostTo")
-                                : about?.present
-                                  ? t("meetingRoom.present", { count: about.present })
-                                  : t("meetingRoom.nobodyIsInHereYet")}
+                    {error && (
+                        <p
+                            role="alert"
+                            className="border-b border-border px-4 py-2 text-sm text-danger"
+                        >
+                            {error}
                         </p>
-                        {!waiting && about && about.people.length > 0 && (
-                            <CallRoster people={about.people} />
-                        )}
-                        {host && about && (
-                            <InvitedPeople
-                                meeting={about}
-                                onRemovePerson={(person) => void invitations.removePerson(person)}
-                                onRemoveEmail={(email) => void invitations.removeEmail(email)}
+                    )}
+
+                    {inCall ? (
+                        <div className="flex min-h-0 flex-1 flex-col">
+                            <CallRoom
+                                // A room: the call has the width and the meeting's
+                                // chat is down the side, not underneath it.
+                                place="room"
+                                call={call}
+                                meetingId={meetingId}
+                                viewerId={viewerId}
+                                hostSeat={hostSeat}
+                                moreItems={doors}
+                                onLeave={() => {
+                                    leaveCall();
+                                    void load();
+                                }}
                             />
-                        )}
-                        <Button disabled={joining || waiting} onClick={() => void join()}>
-                            {(joining || waiting) && <Loader2 className="size-4 animate-spin" />}
-                            {waiting ? t("meetingRoom.waitingToBeLetIn") : t("meetingRoom.join")}
-                        </Button>
-                    </div>
+                        </div>
+                    ) : (
+                        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+                            <p className="text-sm text-muted-foreground">
+                                {waiting
+                                    ? t("meetingRoom.waitingForTheHostTo")
+                                    : about?.present
+                                      ? t("meetingRoom.present", { count: about.present })
+                                      : t("meetingRoom.nobodyIsInHereYet")}
+                            </p>
+                            {!waiting && about && about.people.length > 0 && (
+                                <CallRoster people={about.people} />
+                            )}
+                            {host && about && (
+                                <InvitedPeople
+                                    meeting={about}
+                                    onRemovePerson={(person) => void invitations.removePerson(person)}
+                                    onRemoveEmail={(email) => void invitations.removeEmail(email)}
+                                />
+                            )}
+                            <Button disabled={joining || waiting} onClick={() => void join()}>
+                                {(joining || waiting) && <Loader2 className="size-4 animate-spin" />}
+                                {waiting ? t("meetingRoom.waitingToBeLetIn") : t("meetingRoom.join")}
+                            </Button>
+                        </div>
+                    )}
+                </div>
+
+                {/* The column beside the room, and only once there is a room: the
+                    chat belongs to the meeting, and somebody who has not joined is
+                    not in it to read or to be read by. */}
+                {inCall && (
+                    <SidePane
+                        pane="call-chat"
+                        bounds={CALL_CHAT_PANE}
+                        beside="lg"
+                        label={t("meetingRoom.meetingChatWidth")}
+                        // Under the room on a phone, held to a third of the screen
+                        // so the call keeps the rest; it scrolls inside that.
+                        className="max-h-[33dvh] border-t border-border lg:max-h-none lg:border-s lg:border-t-0"
+                    >
+                        <MeetingChat meetingId={meetingId} call={call} className="flex-1" />
+                    </SidePane>
                 )}
-            </div>
 
-            {/* The column beside the room, and only once there is a room: the
-                chat belongs to the meeting, and somebody who has not joined is
-                not in it to read or to be read by. */}
-            {inCall && (
-                <SidePane
-                    pane="call-chat"
-                    bounds={CALL_CHAT_PANE}
-                    beside="lg"
-                    label={t("meetingRoom.meetingChatWidth")}
-                    // Under the room on a phone, held to a third of the screen
-                    // so the call keeps the rest; it scrolls inside that.
-                    className="max-h-[33dvh] border-t border-border lg:max-h-none lg:border-s lg:border-t-0"
-                >
-                    <MeetingChat meetingId={meetingId} call={call} className="flex-1" />
-                </SidePane>
-            )}
+                {host && (
+                    <Dialog open={limiting} onOpenChange={setLimiting}>
+                        <DialogContent className="max-w-lg">
+                            <DialogHeader>
+                                <DialogTitle>{t("meetingLink.limitsFor")}</DialogTitle>
+                                <DialogDescription>{t("meetingLink.hint")}</DialogDescription>
+                            </DialogHeader>
+                            {limiting && <MeetingLinkLimits meetingId={meetingId} />}
+                        </DialogContent>
+                    </Dialog>
+                )}
 
-            {host && (
-                <Dialog open={limiting} onOpenChange={setLimiting}>
-                    <DialogContent className="max-w-lg">
-                        <DialogHeader>
-                            <DialogTitle>{t("meetingLink.limitsFor")}</DialogTitle>
-                            <DialogDescription>{t("meetingLink.hint")}</DialogDescription>
-                        </DialogHeader>
-                        {limiting && <MeetingLinkLimits meetingId={meetingId} />}
-                    </DialogContent>
-                </Dialog>
-            )}
-
-            <MeetingDetailsDialog
-                open={editing}
-                meetingId={meetingId}
-                title={about?.title ?? ""}
-                scheduledAt={about?.scheduledAt ?? null}
-                onClose={() => setEditing(false)}
-                onSaved={load}
-                onError={setError}
-            />
-
-            {host && about && (
-                <InvitationsDialog
-                    open={inviting}
-                    meeting={about}
-                    viewerId={viewerId}
-                    edits={invitations}
-                    onClose={() => setInviting(false)}
+                <MeetingDetailsDialog
+                    open={editing}
+                    meetingId={meetingId}
+                    title={about?.title ?? ""}
+                    scheduledAt={about?.scheduledAt ?? null}
+                    onClose={() => setEditing(false)}
+                    onSaved={load}
+                    onError={setError}
                 />
-            )}
 
-            <ConfirmDeleteDialog
-                open={removing !== null}
-                onOpenChange={(next) => !next && setRemoving(null)}
-                name={removing?.name ?? ""}
-                kind="person"
-                requireTyping={false}
-                title={
-                    removing
-                        ? t("meetingRoom.removeQuestion", { name: removing.name })
-                        : t("meetingRoom.removeThem")
-                }
-                question={t.rich("meetingRoom.removeConfirm", {
-                    name: removing?.name ?? "",
-                    strong: (chunks) => (
-                        <span key="name" className="font-medium text-foreground">
-                            {chunks}
-                        </span>
-                    )
-                })}
-                description={t("meetingRoom.theyAreDroppedFromThe")}
-                confirmLabel={t("meetingRoom.remove")}
-                onConfirm={async () => {
-                    const person = removing;
-                    setRemoving(null);
-                    if (!person) return;
-                    const result = await runAction(
-                        () => removeFromMeetingAction(meetingId, person.id),
-                        setError
-                    );
-                    if (result?.warning) toast.show({ title: result.warning });
-                    if (!result?.error) await load();
-                }}
-            />
+                {host && about && (
+                    <InvitationsDialog
+                        open={inviting}
+                        meeting={about}
+                        viewerId={viewerId}
+                        edits={invitations}
+                        onClose={() => setInviting(false)}
+                    />
+                )}
 
-            <ConfirmDeleteDialog
-                open={ending}
-                onOpenChange={(next) => !next && setEnding(false)}
-                name={about?.title ?? t("meetingRoom.thisMeeting")}
-                kind="meeting"
-                requireTyping={false}
-                title={closing.title}
-                question={closing.body}
-                confirmLabel={closing.action}
-                onConfirm={async () => {
-                    setEnding(false);
-                    const result = await runAction(() => endMeetingAction(meetingId), setError);
-                    if (!result?.error) {
-                        leaveCall();
-                        router.push("/chat/meetings");
+                <ConfirmDeleteDialog
+                    open={removing !== null}
+                    onOpenChange={(next) => !next && setRemoving(null)}
+                    name={removing?.name ?? ""}
+                    kind="person"
+                    requireTyping={false}
+                    title={
+                        removing
+                            ? t("meetingRoom.removeQuestion", { name: removing.name })
+                            : t("meetingRoom.removeThem")
                     }
-                }}
-            />
-        </div>
+                    question={t.rich("meetingRoom.removeConfirm", {
+                        name: removing?.name ?? "",
+                        strong: (chunks) => (
+                            <span key="name" className="font-medium text-foreground">
+                                {chunks}
+                            </span>
+                        )
+                    })}
+                    description={t("meetingRoom.theyAreDroppedFromThe")}
+                    confirmLabel={t("meetingRoom.remove")}
+                    onConfirm={async () => {
+                        const person = removing;
+                        setRemoving(null);
+                        if (!person) return;
+                        const result = await runAction(
+                            () => removeFromMeetingAction(meetingId, person.id),
+                            setError
+                        );
+                        if (result?.warning) toast.show({ title: result.warning });
+                        if (!result?.error) await load();
+                    }}
+                />
+
+                <ConfirmDeleteDialog
+                    open={ending}
+                    onOpenChange={(next) => !next && setEnding(false)}
+                    name={about?.title ?? t("meetingRoom.thisMeeting")}
+                    kind="meeting"
+                    requireTyping={false}
+                    title={closing.title}
+                    question={closing.body}
+                    confirmLabel={closing.action}
+                    onConfirm={async () => {
+                        setEnding(false);
+                        const result = await runAction(() => endMeetingAction(meetingId), setError);
+                        if (!result?.error) {
+                            leaveCall();
+                            router.push("/chat/meetings");
+                        }
+                    }}
+                />
+            </div>
+        </PersonCardProvider>
     );
 }
 

@@ -1672,7 +1672,7 @@ const CASES: Case[] = [
                 )
             ).chatProfile("channelId-1", "userId-1"),
         action: "profileAction",
-        args: ["channelId-1", "userId-1", false]
+        args: ["channelId-1", "userId-1", false, undefined]
     },
     {
         name: "a person's larger profile asks what they did lately",
@@ -1684,7 +1684,7 @@ const CASES: Case[] = [
                 )
             ).chatProfile("channelId-1", "userId-1", undefined, { recent: true }),
         action: "profileAction",
-        args: ["channelId-1", "userId-1", true]
+        args: ["channelId-1", "userId-1", true, undefined]
     },
     {
         name: "the meetings the account can see, asked again on a timer",

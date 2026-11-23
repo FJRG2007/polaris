@@ -55,23 +55,39 @@ export function useChatProfile(
     channelId: string,
     userId: string | null,
     /** Also what they did lately - only the larger view has a place for it. */
-    recent = false
+    recent = false,
+    /** A meeting with no conversation, asked through in place of one. */
+    meetingId?: string
 ): { profile: ChatProfile | null; loading: boolean } {
-    const [profile, setProfile] = useState<ChatProfile | null>(null);
+    const base = userId ? `${meetingId ? `m:${meetingId}` : channelId}|${userId}` : null;
+    const key = base ? `${base}|${recent ? 1 : 0}` : null;
+    /** The larger view opened from the card starts from the card's answer: the
+     *  same person, minus what they did lately, which the read then adds. */
+    const known = (): ChatProfile | null =>
+        key && base ? (seen.get(key) ?? (recent ? (seen.get(`${base}|0`) ?? null) : null)) : null;
+    // The last answer for this person in this place, drawn at once: the card
+    // opens already holding what the page knew (their name and face, from what
+    // was pressed) and what it was told last time, and the read below only
+    // fills in or corrects the rest.
+    const [profile, setProfile] = useState<ChatProfile | null>(known);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (!userId) {
+        if (!userId || !key) {
             setProfile(null);
             return;
         }
         let live = true;
-        setLoading(true);
-        setProfile(null);
+        const cached = known();
+        setProfile(cached);
+        // Still loading while what they did lately is missing from it.
+        setLoading(cached === null || (recent && cached.recent === null));
         void polls
-            .chatProfile(channelId, userId, undefined, { recent })
+            .chatProfile(channelId, userId, undefined, { recent, meetingId })
             .then((result) => {
-                if (live) setProfile(result.profile ?? null);
+                const fresh = result.profile ?? null;
+                remember(key, fresh);
+                if (live) setProfile(fresh);
             })
             .catch(() => undefined)
             .finally(() => {
@@ -80,9 +96,23 @@ export function useChatProfile(
         return () => {
             live = false;
         };
-    }, [channelId, userId, recent]);
+    }, [channelId, userId, recent, meetingId, key]);
 
     return { profile, loading };
+}
+
+/** Profiles read this session, newest last, so a card opened twice opens full.
+ *  Bounded: a long session presses a lot of names. */
+const seen = new Map<string, ChatProfile | null>();
+const SEEN_MAX = 200;
+
+function remember(key: string, profile: ChatProfile | null): void {
+    seen.delete(key);
+    // A refusal is not kept: it would be drawn as "nothing to show" the next
+    // time, before the read that might now say otherwise.
+    if (!profile) return;
+    seen.set(key, profile);
+    if (seen.size > SEEN_MAX) seen.delete(seen.keys().next().value as string);
 }
 
 /** How big it is drawn. The column and the card are the same size; the expanded

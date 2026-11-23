@@ -48,6 +48,8 @@ import { ArrowUpRight, MessageSquare, MoreHorizontal, Pencil } from "lucide-reac
 interface Opened {
     readonly person: ProfilePerson;
     readonly anchor: HTMLElement;
+    /** The conversation it is asked through, when not the provider's own. */
+    readonly channelId?: string;
 }
 
 /**
@@ -62,11 +64,15 @@ interface Opened {
  */
 export function PersonCardProvider({
     channelId,
+    meetingId,
     viewerId,
     onMention,
     children
 }: {
     channelId: string;
+    /** A meeting with no conversation of its own: the card is asked through it,
+     *  and `channelId` is empty. */
+    meetingId?: string;
     viewerId: string;
     /** Put them into what is being written, from the card's menu. Absent where
      *  there is no box, and then the menu does not offer it. */
@@ -74,20 +80,26 @@ export function PersonCardProvider({
     children: ReactNode;
 }) {
     const [opened, setOpened] = useState<Opened | null>(null);
-    const [expanded, setExpanded] = useState<ProfilePerson | null>(null);
+    const [expanded, setExpanded] = useState<Opened | null>(null);
     /** Held here rather than in the card's menu: the menu is unmounted the moment
      *  an item is chosen, and a dialog opened by something about to disappear
      *  never appears. */
     const [naming, setNaming] = useState<MenuPerson | null>(null);
 
     // Pressing the same name again closes its card, the way a toggle does.
-    const press = useCallback<PersonPress>((person, anchor) => {
+    const press = useCallback<PersonPress>((person, anchor, found) => {
         setOpened((current) =>
             current && current.person.id === person.id && current.anchor === anchor
                 ? null
-                : { person, anchor }
+                : { person, anchor, channelId: found }
         );
     }, []);
+    // A conversation they were found in asks through that one; otherwise the
+    // place this provider is about - a conversation, or a meeting without one.
+    const placeOf = (shown: Opened) =>
+        shown.channelId
+            ? { channelId: shown.channelId, meetingId: undefined }
+            : { channelId, meetingId };
 
     return (
         <PersonPressContext.Provider value={press}>
@@ -99,21 +111,21 @@ export function PersonCardProvider({
                     key={opened.person.id}
                     person={opened.person}
                     anchor={opened.anchor}
-                    channelId={channelId}
+                    {...placeOf(opened)}
                     viewerId={viewerId}
                     onMention={onMention}
                     onNickname={setNaming}
                     onClose={() => setOpened(null)}
                     onExpand={() => {
-                        setExpanded(opened.person);
+                        setExpanded(opened);
                         setOpened(null);
                     }}
                 />
             )}
             {expanded && (
                 <PersonProfileDialog
-                    person={expanded}
-                    channelId={channelId}
+                    person={expanded.person}
+                    {...placeOf(expanded)}
                     viewerId={viewerId}
                     onMention={onMention}
                     onNickname={setNaming}
@@ -237,6 +249,7 @@ function PersonCard({
     person,
     anchor,
     channelId,
+    meetingId,
     viewerId,
     onMention,
     onNickname,
@@ -246,6 +259,7 @@ function PersonCard({
     person: ProfilePerson;
     anchor: HTMLElement;
     channelId: string;
+    meetingId?: string;
     viewerId: string;
     onMention?: (text: string) => void;
     onNickname: (person: MenuPerson) => void;
@@ -254,7 +268,7 @@ function PersonCard({
 }) {
     const { channels } = useChat();
     const channel = channels.find((entry) => entry.id === channelId);
-    const { profile, loading } = useChatProfile(channelId, person.id);
+    const { profile, loading } = useChatProfile(channelId, person.id, false, meetingId);
     /** The card's element, as state: it is drawn into a portal a render after
      *  this one, and placing it has to wait until it is there. */
     const [surface, setSurface] = useState<HTMLDivElement | null>(null);
@@ -359,6 +373,7 @@ function PersonCard({
 export function PersonProfileDialog({
     person,
     channelId,
+    meetingId,
     viewerId,
     onMention,
     onNickname,
@@ -367,6 +382,8 @@ export function PersonProfileDialog({
 }: {
     person: ProfilePerson;
     channelId: string;
+    /** A meeting with no conversation, asked through in place of one. */
+    meetingId?: string;
     viewerId: string;
     onMention?: (text: string) => void;
     onNickname: (person: MenuPerson) => void;
@@ -377,7 +394,7 @@ export function PersonProfileDialog({
     const t = useTranslations("chat");
     const { channels } = useChat();
     const channel = channels.find((entry) => entry.id === channelId);
-    const { profile, loading } = useChatProfile(channelId, person.id, true);
+    const { profile, loading } = useChatProfile(channelId, person.id, true, meetingId);
     const router = useRouter();
     const [messageError, setMessageError] = useState("");
     const direct = useOpenDirect(setMessageError);

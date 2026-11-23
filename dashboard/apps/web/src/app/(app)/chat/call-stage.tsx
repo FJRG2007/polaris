@@ -17,6 +17,7 @@ import { Avatar } from "@/components/avatar";
 import { showStage } from "@/lib/chat/call-stage";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { BellOff, ChevronUp, PhoneCall, Video, X } from "lucide-react";
+import { PersonPressable } from "@/components/person-press";
 import { PersonName, PersonRow } from "@/components/person-name";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { SeatMenu, type RosterModeration } from "./call-moderation-menu";
@@ -160,6 +161,17 @@ export function CallStage({
                             {face.person?.streaming && <LiveBadge />}
                         </span>
                     );
+                    // Their face and name open their card, as they do in the
+                    // conversation underneath.
+                    const pressable = (
+                        <PersonPressable
+                            person={{ id: face.id, name: face.name }}
+                            className="flex w-full flex-col items-center gap-2"
+                        >
+                            {avatar}
+                            {label}
+                        </PersonPressable>
+                    );
                     return face.person ? (
                         <SeatMenu key={face.key} person={face.person} moderation={moderation}>
                             <PersonRow
@@ -169,8 +181,7 @@ export function CallStage({
                                 className="flex w-24 shrink-0 flex-col items-center gap-2"
                                 title={face.name}
                             >
-                                {avatar}
-                                {label}
+                                {pressable}
                             </PersonRow>
                         </SeatMenu>
                     ) : (
@@ -179,8 +190,7 @@ export function CallStage({
                             title={face.name}
                             className="flex w-24 shrink-0 flex-col items-center gap-2"
                         >
-                            {avatar}
-                            {label}
+                            {pressable}
                         </li>
                     );
                 })}

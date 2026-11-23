@@ -1118,15 +1118,28 @@ export async function setNicknameAction(
 export async function profileAction(
     channelId: string,
     userId: string,
-    recent = false
+    recent = false,
+    /** A meeting with no conversation of its own, asked through in place of
+     *  one: `channelId` is then empty. */
+    meetingId?: string
 ): Promise<{ profile?: ChatProfile }> {
     const me = await actor();
     const parsed = z
-        .object({ channelId: z.string().uuid(), userId: z.string().uuid(), recent: z.boolean() })
-        .safeParse({ channelId, userId, recent });
+        .object({
+            channelId: z.string().uuid().or(z.literal("")),
+            meetingId: z.string().uuid().optional(),
+            userId: z.string().uuid(),
+            recent: z.boolean()
+        })
+        // Exactly one place: a conversation, or a meeting without one.
+        .refine((input) => (input.channelId === "") === (input.meetingId !== undefined))
+        .safeParse({ channelId, meetingId, userId, recent });
     if (!parsed.success) return {};
 
-    const profile = await chatProfile(me, parsed.data.channelId, parsed.data.userId, {
+    const place = parsed.data.meetingId
+        ? { meetingId: parsed.data.meetingId }
+        : parsed.data.channelId;
+    const profile = await chatProfile(me, place, parsed.data.userId, {
         recent: parsed.data.recent
     });
     return profile ? { profile } : {};

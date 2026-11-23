@@ -9,12 +9,19 @@
  * provides nothing leaves a mention as the label it has always been.
  */
 
-import { createContext, useContext } from "react";
+import { cn } from "@polaris/ui";
 import { PersonNameTag } from "@/components/name-tags/person-name-tag";
+import { useTranslations } from "@/components/i18n/i18n-provider";
+import { createContext, useContext, type ReactNode } from "react";
 
 /** Somebody pressed, and the thing they were pressed on - which is where a card
- *  about them opens beside. */
-export type PersonPress = (person: { id: string; name: string }, anchor: HTMLElement) => void;
+ *  about them opens beside. `channelId` is the conversation they were found in,
+ *  where that is not the one the screen is about (a search across all of them). */
+export type PersonPress = (
+    person: { id: string; name: string },
+    anchor: HTMLElement,
+    channelId?: string
+) => void;
 
 export const PersonPressContext = createContext<PersonPress | null>(null);
 
@@ -65,5 +72,48 @@ export function PersonMention({
             </button>
             <PersonNameTag id={id} />
         </>
+    );
+}
+
+/**
+ * Somebody drawn - their face, their name, or both - that opens their card when
+ * pressed.
+ *
+ * A button only where pressing does something: where no screen decides, or there
+ * is nobody to ask about (a guest, somebody who has left), it is what it always
+ * was. The press stops here, so a tile that grows when pressed or a row that
+ * jumps to a message still does that everywhere but on the name.
+ */
+export function PersonPressable({
+    person,
+    channelId,
+    className,
+    children
+}: {
+    person: { id: string | null | undefined; name: string };
+    /** The conversation they were found in, when it is not this screen's. */
+    channelId?: string;
+    className?: string;
+    children: ReactNode;
+}) {
+    const press = usePersonPress();
+    const t = useTranslations("chat");
+    const id = person.id;
+    if (!press || !id) return <>{children}</>;
+    return (
+        <button
+            type="button"
+            title={t("messageList.viewProfile", { name: person.name })}
+            onClick={(event) => {
+                event.stopPropagation();
+                press({ id, name: person.name }, event.currentTarget, channelId);
+            }}
+            className={cn(
+                "min-w-0 cursor-pointer rounded text-start hover:underline focus-visible:underline",
+                className
+            )}
+        >
+            {children}
+        </button>
     );
 }
