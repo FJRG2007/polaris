@@ -165,6 +165,25 @@ vi.mock("@/lib/rate-limit-service", () => ({
     }
 }));
 
+// The password worker runs the same four OPAQUE steps; vitest has no Worker, so
+// they run here - or fail, as a worker that never started does.
+const worker = vi.hoisted(() => ({ down: false }));
+vi.mock("@/lib/chat/e2ee/password-worker-client", async () => {
+    const real = await import("@polaris/chat-crypto/password-lock");
+    const guarded =
+        <A extends unknown[], R>(step: (...args: A) => Promise<R>) =>
+        async (...args: A): Promise<R> => {
+            if (worker.down) throw new Error("The password worker stopped");
+            return step(...args);
+        };
+    return {
+        startPasswordRegistration: guarded(real.startPasswordRegistration),
+        finishPasswordRegistration: guarded(real.finishPasswordRegistration),
+        startPasswordLogin: guarded(real.startPasswordLogin),
+        finishPasswordLogin: guarded(real.finishPasswordLogin)
+    };
+});
+
 const handlers = await import("@/lib/chat/e2ee/handlers");
 const service = await import("@/lib/chat/e2ee/opaque-service");
 const client = await import("@/lib/chat/e2ee/sign-in-client");
@@ -187,6 +206,8 @@ function post(path: string, body: unknown, type = "application/json"): Promise<R
 
 beforeEach(() => {
     process.env.POLARIS_INTERNAL_CHAT_E2EE = "1";
+    delete process.env.POLARIS_INTERNAL_PASSWORD_LOCK;
+    worker.down = false;
     for (const table of Object.values(state.tables)) table.clear();
     state.users.length = 0;
     state.credentials.clear();
@@ -203,16 +224,114 @@ beforeEach(() => {
 
 afterEach(() => {
     delete process.env.POLARIS_INTERNAL_CHAT_E2EE;
+    delete process.env.POLARIS_INTERNAL_PASSWORD_LOCK;
     vi.unstubAllGlobals();
 });
 
-describe("with the internal flag off", () => {
-    it("is off unless switched on, and both routes do not exist", async () => {
+describe("the switches", () => {
+    it("has the password lock on with nothing set, and passkey locks still behind the chat flag", async () => {
         delete process.env.POLARIS_INTERNAL_CHAT_E2EE;
-        const { chatE2eeEnabled } = await import("@/lib/chat/e2ee/flag");
+        const { chatE2eeEnabled, passwordLockEnabled } = await import("@/lib/chat/e2ee/flag");
         expect(chatE2eeEnabled()).toBe(false);
+        expect(passwordLockEnabled()).toBe(true);
+        // The sign-in route exists: a malformed body is a 400, not a 404.
+        expect((await post("/api/e2ee/sign-in", { op: "sign-in-start" })).status).toBe(400);
+        const alice = account("alice@example.com", "correct horse battery");
+        state.sessionUser = { id: alice.id };
+        expect((await post("/api/e2ee/keys", { op: "state" })).status).toBe(200);
+        // Passkey locks are not part of the password lock.
+        const passkey = await post("/api/e2ee/keys", { op: "delete-passkey-lock", lockId: "x".repeat(22) });
+        expect([400, 404]).toContain(passkey.status);
+        expect(passkey.status).not.toBe(200);
+    });
+
+    it("the kill switch takes both routes away and the form signs in the old way", async () => {
+        delete process.env.POLARIS_INTERNAL_CHAT_E2EE;
+        const alice = account("alice@example.com", "correct horse battery");
+        expect(await client.adoptOpaque(alice.email, "correct horse battery")).toBe(true);
+        process.env.POLARIS_INTERNAL_PASSWORD_LOCK = "0";
+        const { passwordLockEnabled } = await import("@/lib/chat/e2ee/flag");
+        expect(passwordLockEnabled()).toBe(false);
         expect((await post("/api/e2ee/sign-in", { op: "sign-in-start" })).status).toBe(404);
+        state.sessionUser = { id: alice.id };
         expect((await post("/api/e2ee/keys", { op: "state" })).status).toBe(404);
+        // An account already moved: OPAQUE answers nothing, the old route still has its hash.
+        expect(await client.signInWithOpaque(alice.email, "correct horse battery")).toBeNull();
+        expect(state.issued).toEqual([]);
+        expect(state.credentials.get(alice.id)).toBe("scrypt:correct horse battery");
+        expect(await client.adoptOpaque(alice.email, "correct horse battery")).toBe(false);
+    });
+
+    it("a worker that does not start leaves the old way running and the account unmoved", async () => {
+        const alice = account("alice@example.com", "correct horse battery");
+        worker.down = true;
+        expect(await client.signInWithOpaque(alice.email, "correct horse battery")).toBeNull();
+        expect(await client.adoptOpaque(alice.email, "correct horse battery")).toBe(false);
+        expect(state.tables.records.get(alice.id)).toBeUndefined();
+        expect(state.credentials.get(alice.id)).toBe("scrypt:correct horse battery");
+        // Next sign-in, with a working worker, moves it.
+        worker.down = false;
+        expect(await client.adoptOpaque(alice.email, "correct horse battery")).toBe(true);
+        expect(await client.signInWithOpaque(alice.email, "correct horse battery")).toEqual({ challenged: false });
+    });
+});
+
+describe("in the background", { timeout: 300_000 }, () => {
+    it("adopts without holding the sign-in, and the next sign-in is over OPAQUE", async () => {
+        const alice = account("alice@example.com", "correct horse battery");
+        let settled = false;
+        const queued = client.adoptInBackground(alice.email, "correct horse battery", true).then(() => {
+            settled = true;
+        });
+        // The call hands back at once; the work finishes behind it.
+        expect(settled).toBe(false);
+        await queued;
+        await client.backgroundIdle();
+        expect(state.tables.records.get(alice.id)?.verifiedAt).toBeInstanceOf(Date);
+        expect(state.tables.records.get(alice.id)?.ksfVersion).toBe(2);
+        expect(await client.signInWithOpaque(alice.email, "correct horse battery")).toEqual({ challenged: false });
+    });
+
+    it("a background adoption that fails never throws, and is retried next time", async () => {
+        const bob = account("bob@example.com", "a long passphrase");
+        worker.down = true;
+        await expect(client.adoptInBackground(bob.email, "a long passphrase", true)).resolves.toBeUndefined();
+        worker.down = false;
+        expect(await client.signInWithOpaque(bob.email, "a long passphrase")).toBeNull();
+        await client.adoptInBackground(bob.email, "a long passphrase", true);
+        expect(await client.signInWithOpaque(bob.email, "a long passphrase")).toEqual({ challenged: false });
+    });
+
+    it("a record made with profile v1 keeps signing in", async () => {
+        const carol = account("carol@example.com", "an older record");
+        const opaque = await import("@serenity-kit/opaque");
+        const { PASSWORD_KSF_V1 } = await import("@polaris/chat-crypto/password-lock");
+        await opaque.ready;
+        const started = opaque.client.startRegistration({ password: "an older record" });
+        const answered = (await (await post("/api/e2ee/sign-in", {
+            op: "adopt-start",
+            email: carol.email,
+            registrationRequest: started.registrationRequest
+        })).json()) as { userId: string; registrationResponse: string };
+        const made = opaque.client.finishRegistration({
+            clientRegistrationState: started.clientRegistrationState,
+            registrationResponse: answered.registrationResponse,
+            password: "an older record",
+            identifiers: { client: answered.userId },
+            keyStretching: PASSWORD_KSF_V1
+        });
+        // A client from before v2 names no profile.
+        const stored = await post("/api/e2ee/sign-in", {
+            op: "adopt-finish",
+            email: carol.email,
+            password: "an older record",
+            registrationRecord: made.registrationRecord
+        });
+        expect(stored.status).toBe(200);
+        expect(state.tables.records.get(carol.id)?.ksfVersion).toBe(1);
+        const row = state.tables.records.get(carol.id);
+        if (row) row.verifiedAt = new Date();
+        expect(await client.signInWithOpaque(carol.email, "an older record")).toEqual({ challenged: false });
     });
 });
 
@@ -262,7 +381,8 @@ describe("the move to OPAQUE", { timeout: 300_000 }, () => {
             op: "adopt-finish",
             email: carol.email,
             password: "interrupted pass",
-            registrationRecord: made.registrationRecord
+            registrationRecord: made.registrationRecord,
+            ksfVersion: made.ksfVersion
         });
         expect(stored.status).toBe(200);
         expect(state.tables.records.get(carol.id)?.verifiedAt).toBeNull();
@@ -349,12 +469,13 @@ describe("the routes, as a hostile caller sees them", { timeout: 300_000 }, () =
             op: "sign-in-start",
             email: hal.email,
             startLoginRequest: started.startLoginRequest
-        })).json()) as { loginId: string; loginResponse: string; userId: string };
+        })).json()) as { loginId: string; loginResponse: string; userId: string; ksfVersion: 1 | 2 };
         const finished = await opaqueClient.finishPasswordLogin({
             state: started.state,
             loginResponse: step.loginResponse,
             password: "single use pass",
-            userId: step.userId
+            userId: step.userId,
+            ksfVersion: step.ksfVersion
         });
         const finish = { op: "sign-in-finish", loginId: step.loginId, finishLoginRequest: finished.finishLoginRequest };
         expect((await post("/api/e2ee/sign-in", finish)).status).toBe(200);
@@ -389,15 +510,15 @@ describe("the routes, as a hostile caller sees them", { timeout: 300_000 }, () =
         const opaqueClient = await import("@polaris/chat-crypto/password-lock");
         state.sessionUser = { id: kim.id };
         const started = await opaqueClient.startPasswordLogin("someone else");
-        const step = (await (await post("/api/e2ee/keys", { op: "unlock-start", startLoginRequest: started.startLoginRequest })).json()) as { loginId: string; loginResponse: string; userId: string };
-        const finished = await opaqueClient.finishPasswordLogin({ state: started.state, loginResponse: step.loginResponse, password: "someone else", userId: step.userId });
+        const step = (await (await post("/api/e2ee/keys", { op: "unlock-start", startLoginRequest: started.startLoginRequest })).json()) as { loginId: string; loginResponse: string; userId: string; ksfVersion: 1 | 2 };
+        const finished = await opaqueClient.finishPasswordLogin({ state: started.state, loginResponse: step.loginResponse, password: "someone else", userId: step.userId, ksfVersion: step.ksfVersion });
         state.sessionUser = { id: jo.id };
         const stolen = await post("/api/e2ee/keys", { op: "unlock-finish", loginId: step.loginId, finishLoginRequest: finished.finishLoginRequest });
         expect(stolen.status).toBe(401);
         // Jo's own proof on Jo's session is what releases it.
         const own = await opaqueClient.startPasswordLogin("envelope owner");
-        const ownStep = (await (await post("/api/e2ee/keys", { op: "unlock-start", startLoginRequest: own.startLoginRequest })).json()) as { loginId: string; loginResponse: string; userId: string };
-        const ownFinished = await opaqueClient.finishPasswordLogin({ state: own.state, loginResponse: ownStep.loginResponse, password: "envelope owner", userId: ownStep.userId });
+        const ownStep = (await (await post("/api/e2ee/keys", { op: "unlock-start", startLoginRequest: own.startLoginRequest })).json()) as { loginId: string; loginResponse: string; userId: string; ksfVersion: 1 | 2 };
+        const ownFinished = await opaqueClient.finishPasswordLogin({ state: own.state, loginResponse: ownStep.loginResponse, password: "envelope owner", userId: ownStep.userId, ksfVersion: ownStep.ksfVersion });
         const released = (await (await post("/api/e2ee/keys", { op: "unlock-finish", loginId: ownStep.loginId, finishLoginRequest: ownFinished.finishLoginRequest })).json()) as { passwordLock: { akVersion: number } | null };
         expect(released.passwordLock?.akVersion).toBe(1);
     });
@@ -424,8 +545,8 @@ describe("the routes, as a hostile caller sees them", { timeout: 300_000 }, () =
         expect(await client.adoptOpaque(max.email, "changing midway")).toBe(true);
         const opaqueClient = await import("@polaris/chat-crypto/password-lock");
         const started = await opaqueClient.startPasswordLogin("changing midway");
-        const step = (await (await post("/api/e2ee/sign-in", { op: "sign-in-start", email: max.email, startLoginRequest: started.startLoginRequest })).json()) as { loginId: string; loginResponse: string; userId: string };
-        const finished = await opaqueClient.finishPasswordLogin({ state: started.state, loginResponse: step.loginResponse, password: "changing midway", userId: step.userId });
+        const step = (await (await post("/api/e2ee/sign-in", { op: "sign-in-start", email: max.email, startLoginRequest: started.startLoginRequest })).json()) as { loginId: string; loginResponse: string; userId: string; ksfVersion: 1 | 2 };
+        const finished = await opaqueClient.finishPasswordLogin({ state: started.state, loginResponse: step.loginResponse, password: "changing midway", userId: step.userId, ksfVersion: step.ksfVersion });
         state.credentials.set(max.id, "scrypt:reset by an administrator");
         const response = await post("/api/e2ee/sign-in", { op: "sign-in-finish", loginId: step.loginId, finishLoginRequest: finished.finishLoginRequest });
         expect(response.status).toBe(401);

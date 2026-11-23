@@ -323,5 +323,9 @@
         "loadFailed": "No se ha podido cargar.",
         "retry": "Reintentar",
         "notFound": "Ya no está aquí."
+    },
+    "slowSubmit": {
+        "protecting": "Protegiendo tu cuenta con cifrado robusto",
+        "working": "Ya casi está..."
     }
 }

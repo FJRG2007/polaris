@@ -25,6 +25,7 @@ import * as deviceLock from "@polaris/chat-crypto/device-lock";
 import * as passkeyLock from "@polaris/chat-crypto/passkey-lock";
 import { LOCK_ENVELOPE_BYTES } from "@polaris/chat-crypto/locks";
 import * as passwordLock from "@polaris/chat-crypto/password-lock";
+import * as passwordWorker from "@/lib/chat/e2ee/password-worker-client";
 import { platformSealedStore } from "@polaris/chat-crypto/platform-store";
 import { platformKeyWrap } from "@/lib/chat/e2ee/platform-key-wrap";
 
@@ -265,17 +266,23 @@ export async function settleAfterPassword(
 
 /** The password envelope through an OPAQUE unlock that writes nothing. */
 async function openWithUnlock(password: string, state: KeyState): Promise<HeldKey | null> {
-    const login = await passwordLock.startPasswordLogin(password);
-    const step = await post<{ loginId: string; loginResponse: string; userId: string }>({
+    const login = await passwordWorker.startPasswordLogin(password);
+    const step = await post<{
+        loginId: string;
+        loginResponse: string;
+        userId: string;
+        ksfVersion?: passwordLock.PasswordKsfVersion;
+    }>({
         op: "unlock-start",
         startLoginRequest: login.startLoginRequest
     });
     if (!step.data || step.data.userId !== state.userId) return null;
-    const finished = await passwordLock.finishPasswordLogin({
+    const finished = await passwordWorker.finishPasswordLogin({
         state: login.state,
         loginResponse: step.data.loginResponse,
         password,
-        userId: step.data.userId
+        userId: step.data.userId,
+        ksfVersion: step.data.ksfVersion
     });
     const done = await post<{ passwordLock: ReleasedLock | null }>({
         op: "unlock-finish",
@@ -301,17 +308,23 @@ async function openReleased(state: KeyState, lockKey: CryptoKey, lock: ReleasedL
 }
 
 async function sealPasswordLock(password: string, held: HeldKey): Promise<boolean> {
-    const login = await passwordLock.startPasswordLogin(password);
-    const step = await post<{ loginId: string; loginResponse: string; userId: string }>({
+    const login = await passwordWorker.startPasswordLogin(password);
+    const step = await post<{
+        loginId: string;
+        loginResponse: string;
+        userId: string;
+        ksfVersion?: passwordLock.PasswordKsfVersion;
+    }>({
         op: "unlock-start",
         startLoginRequest: login.startLoginRequest
     });
     if (!step.data) return false;
-    const finished = await passwordLock.finishPasswordLogin({
+    const finished = await passwordWorker.finishPasswordLogin({
         state: login.state,
         loginResponse: step.data.loginResponse,
         password,
-        userId: step.data.userId
+        userId: step.data.userId,
+        ksfVersion: step.data.ksfVersion
     });
     const envelope = await passwordLock.sealWithPassword(
         held.accountKey,

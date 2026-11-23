@@ -1355,3 +1355,63 @@ dialog.pdfSlick-dialog .dialogButton {
         font-size: max(1rem, 16px);
     }
 }
+
+/*
+ * A submit still busy after 300 ms (components/slow-submit-label.tsx): the busy
+ * label gives way to a longer line with a shield, in the same grid cell, so the
+ * button never changes size. Both fills run once and hold their end frame.
+ */
+@keyframes polaris-slow-submit-out {
+    to {
+        opacity: 0;
+        visibility: hidden;
+    }
+}
+
+@keyframes polaris-slow-submit-in {
+    from {
+        opacity: 0;
+        visibility: visible;
+    }
+    to {
+        opacity: 1;
+        visibility: visible;
+    }
+}
+
+@keyframes polaris-slow-submit-shield {
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(0.86);
+        opacity: 0.7;
+    }
+}
+
+.slow-submit-first {
+    animation: polaris-slow-submit-out 160ms ease-out 300ms forwards;
+}
+
+.slow-submit-later {
+    opacity: 0;
+    visibility: hidden;
+    animation: polaris-slow-submit-in 160ms ease-out 300ms forwards;
+}
+
+.slow-submit-shield {
+    animation: polaris-slow-submit-shield 1.4s ease-in-out 300ms infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .slow-submit-first,
+    .slow-submit-later {
+        animation-duration: 1ms;
+    }
+
+    .slow-submit-shield {
+        animation: none;
+    }
+}

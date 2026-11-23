@@ -7,20 +7,22 @@
  * succeeded. `/api/e2ee/keys` needs a session and only ever touches the
  * signed-in account's own rows.
  *
- * Both answer 404 while the internal flag is off - nothing about them exists
- * until the stack is switched on. Refusals are one fixed body whatever the
+ * Both answer 404 while their switch is off (`passwordLockEnabled()` for the
+ * password lock, `chatE2eeEnabled()` for the passkey locks) - nothing about
+ * them exists then. Refusals are one fixed body whatever the
  * cause; internals are logged, never returned.
  */
 
 import { auth } from "@/lib/auth";
 import * as keys from "./account-keys";
-import { chatE2eeEnabled } from "./flag";
+import { chatE2eeEnabled, passwordLockEnabled } from "./flag";
 import { NextResponse } from "next/server";
 import * as opaque from "./opaque-service";
 import { backgroundUser } from "@/lib/session";
 import { clientIp } from "@/lib/request-context";
 import { signInWithOpaque } from "@polaris/auth";
 import { keysBody, signInBody } from "./schemas";
+import type { KeysBody } from "./schemas";
 import { rateLimit } from "@/lib/rate-limit-service";
 
 const WINDOW_MS = 15 * 60 * 1000;
@@ -91,7 +93,7 @@ async function releasedEnvelope(userId: string): Promise<{ akVersion: number; en
 }
 
 export async function handleSignIn(request: Request): Promise<Response> {
-    if (!chatE2eeEnabled()) return json(NOT_FOUND, 404);
+    if (!passwordLockEnabled()) return json(NOT_FOUND, 404);
     const parsed = signInBody.safeParse(await readBody(request));
     if (!parsed.success) return json({ error: "invalid" }, 400);
     const body = parsed.data;
@@ -160,7 +162,7 @@ export async function handleSignIn(request: Request): Promise<Response> {
                     password: body.password
                 });
                 if (!hash || !matches) return json(REFUSED, 401);
-                await opaque.storePendingRecord(identity.userId, hash, body.registrationRecord);
+                await opaque.storePendingRecord(identity.userId, hash, body.registrationRecord, body.ksfVersion);
                 return json({ stored: true });
             }
             case "verify-finish": {
@@ -178,14 +180,26 @@ export async function handleSignIn(request: Request): Promise<Response> {
     }
 }
 
+/**
+ * Which switch an account-key operation sits behind: the passkey PRF locks stay
+ * with chat encryption's internal flag, everything the password lock needs
+ * (reading the state, creating the key, the OPAQUE unlock) with the password
+ * lock's own.
+ */
+function opEnabled(op: KeysBody["op"]): boolean {
+    if (op === "put-passkey-lock" || op === "delete-passkey-lock") return chatE2eeEnabled();
+    return passwordLockEnabled() || chatE2eeEnabled();
+}
+
 export async function handleKeys(request: Request): Promise<Response> {
-    if (!chatE2eeEnabled()) return json(NOT_FOUND, 404);
+    if (!passwordLockEnabled() && !chatE2eeEnabled()) return json(NOT_FOUND, 404);
     const user = await backgroundUser();
     // i18n-ignore: a status body no screen shows
     if (!user) return json({ error: "Unauthorized" }, 401);
     const parsed = keysBody.safeParse(await readBody(request));
     if (!parsed.success) return json({ error: "invalid" }, 400);
     const body = parsed.data;
+    if (!opEnabled(body.op)) return json(NOT_FOUND, 404);
     try {
         switch (body.op) {
             case "state": {

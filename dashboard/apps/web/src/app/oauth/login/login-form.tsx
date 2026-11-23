@@ -1,6 +1,7 @@
 "use client";
 
 import { holdForSecondFactor } from "@/lib/chat/e2ee/held-password";
+import { SlowSubmitLabel } from "@/components/slow-submit-label";
 import Link from "next/link";
 import { Building2, KeyRound } from "lucide-react";
 import { QrSignInPanel } from "./qr-panel";
@@ -106,14 +107,18 @@ export function LoginForm({
     providers,
     add = null,
     chooser = [],
-    opaqueSignIn = false
+    opaqueSignIn = false,
+    chatKeys = false
 }: {
     awaitingSetup: boolean;
-    /** Chat end-to-end encryption's internal flag: prove the password over
-     *  OPAQUE, and move an account onto it after a password sign-in. False
-     *  everywhere until the whole stack is switched on, and then the sign-in
-     *  below runs exactly as it always has. */
+    /** The password lock (`passwordLockEnabled()`): prove the password over
+     *  OPAQUE, and move an account onto it after a password sign-in. With it
+     *  false - the kill switch - the sign-in below runs exactly as it always
+     *  has and never loads the OPAQUE code. */
     opaqueSignIn?: boolean;
+    /** Chat end-to-end encryption's internal flag: passkey PRF locks and the
+     *  account key carried over a QR approval. */
+    chatKeys?: boolean;
     /** The services offered as a way in. Empty on a deployment whose operator
      *  has connected none or allows none. */
     providers: SignInProvider[];
@@ -129,6 +134,9 @@ export function LoginForm({
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<NamespaceKey<"auth"> | null>(null);
     const [pending, setPending] = useState(false);
+    // Whether this submit is running the password key stretching right now:
+    // it picks the line a slow submit shows (components/slow-submit-label.tsx).
+    const [protecting, setProtecting] = useState(false);
     const [canEmailLink, setCanEmailLink] = useState(false);
     const [linkSent, setLinkSent] = useState(false);
     const [hasPasskey, setHasPasskey] = useState(false);
@@ -237,7 +245,7 @@ export function LoginForm({
      * ceremony and never loads the chat key code.
      */
     async function passkeySignIn(allow: readonly PasskeyDescriptor[]): Promise<PasskeySignInResult> {
-        if (!opaqueSignIn) return signInWithPasskeys(allow);
+        if (!chatKeys) return signInWithPasskeys(allow);
         const prf = await import("@polaris/chat-crypto/passkey-lock");
         const result = await signInWithPasskeys(allow, await prf.prfExtension());
         if (result.error || !result.credentialId) return result;
@@ -344,6 +352,7 @@ export function LoginForm({
         const parsed = form.submit(values);
         if (!parsed) return;
         setPending(true);
+        setProtecting(false);
         setError(null);
         // An identifier may be an email or a username; resolve it to the email.
         const email = await resolveIdentifier(parsed.identifier);
@@ -352,10 +361,13 @@ export function LoginForm({
             setError(t("login.invalid"));
             return;
         }
-        // Behind the internal flag only: the OPAQUE sign-in first, and the
-        // password sign-in below whenever it does not end in a session.
+        // With the password lock on: the OPAQUE sign-in first (one Argon2id, in a
+        // worker), and the password sign-in below whenever it does not end in a
+        // session.
         const e2ee = opaqueSignIn ? await import("@/lib/chat/e2ee/sign-in-client") : null;
-        const viaOpaque = e2ee ? await e2ee.signInWithOpaque(email, parsed.password) : null;
+        const viaOpaque = e2ee
+            ? await e2ee.signInWithOpaque(email, parsed.password, () => setProtecting(true))
+            : null;
         const { data, error: signInError } = viaOpaque
             ? { data: { twoFactorRedirect: viaOpaque.challenged } as unknown, error: null }
             : await signIn.email({
@@ -375,11 +387,12 @@ export function LoginForm({
             return;
         }
         // The password was just accepted the old way: move the account onto
-        // OPAQUE while this page still holds it. Never fails the sign-in.
+        // OPAQUE while this tab still holds it. Queued in the background and
+        // never awaited, so the page moves on at once; it never fails the
+        // sign-in, and an adoption cut short is retried at the next one.
         if (e2ee && !viaOpaque) {
-            setPending(true);
             const challenged = (data as { twoFactorRedirect?: boolean } | null)?.twoFactorRedirect === true;
-            await e2ee.adoptOpaque(email, parsed.password, !challenged);
+            void e2ee.adoptInBackground(email, parsed.password, !challenged);
         }
         window.localStorage.setItem(LAST_IDENTIFIER_KEY, parsed.identifier);
         // With a second factor armed, the password alone issues no session: the
@@ -490,8 +503,17 @@ export function LoginForm({
                                 ) : null}
                             </div>
                             {error ? <p className="text-sm text-danger">{error}</p> : null}
-                            <Button type="submit" disabled={pending}>
-                                {pending ? t("login.submitting") : t("login.submit")}
+                            <Button
+                                type="submit"
+                                disabled={pending}
+                                aria-busy={pending}
+                                className={pending ? "disabled:opacity-100" : undefined}
+                            >
+                                {pending ? (
+                                    <SlowSubmitLabel busyLabel={t("login.submitting")} protecting={protecting} />
+                                ) : (
+                                    t("login.submit")
+                                )}
                             </Button>
                             {canSso ? (
                                 <Button
@@ -586,7 +608,7 @@ export function LoginForm({
                             </p>
                         ) : null}
                     </div>
-                    {add?.full ? null : <QrSignInPanel carryKeys={opaqueSignIn} />}
+                    {add?.full ? null : <QrSignInPanel carryKeys={chatKeys} />}
                 </CardBody>
             </Card>
         </main>

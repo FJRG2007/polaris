@@ -40,15 +40,19 @@ export function dropHeldPassword(): void {
 
 /**
  * After the challenge was answered and the session is whole: open the account
- * key with the held password, or create it and seal its password lock. Never
- * throws and never fails the sign-in; with nothing held it loads nothing.
+ * key with the held password, or create it and seal its password lock - queued
+ * in the background behind any adoption the sign-in started, and never awaited,
+ * so the page moves on at once. Never throws and never fails the sign-in; with
+ * nothing held it loads nothing. The value leaves this module here, and the
+ * queue drops it when the job ends.
  */
 export async function settleAfterSecondFactor(): Promise<void> {
     const password = takeHeldPassword();
     if (!password) return;
     try {
-        const keys = await import("@/lib/chat/e2ee/account-key-client");
-        await keys.settleAfterPassword(password, null);
+        // Already loaded by the sign-in form that held the password.
+        const client = await import("@/lib/chat/e2ee/sign-in-client");
+        void client.settleInBackground(password);
     } catch {
         // The account settles at its next sign-in.
     }

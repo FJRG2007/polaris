@@ -32,6 +32,9 @@ vi.mock("@polaris/chat-crypto/password-lock", async (original) => {
     };
 });
 
+// The worker runs the same four steps; vitest has no Worker, so they run here.
+vi.mock("@/lib/chat/e2ee/password-worker-client", () => import("@polaris/chat-crypto/password-lock"));
+
 const client = await import("../../../src/lib/chat/e2ee/account-key-client");
 
 interface Server {
@@ -379,12 +382,16 @@ describe("a sign-in that owed a second factor (no envelope came with it)", () =>
 
     it("settles from the challenge page with the held password, once", async () => {
         const held = await import("../../../src/lib/chat/e2ee/held-password");
+        const signIn = await import("../../../src/lib/chat/e2ee/sign-in-client");
         held.holdForSecondFactor("pw");
         await held.settleAfterSecondFactor();
+        // Queued, not awaited: the challenge page moves on before it ends.
+        await signIn.backgroundIdle();
         expect(server.key).not.toBeNull();
         expect(server.passwordLock).not.toBeNull();
         const ops = server.ops.length;
         await held.settleAfterSecondFactor();
+        await signIn.backgroundIdle();
         expect(server.ops.length).toBe(ops);
     });
 

@@ -12,3 +12,19 @@
 export function chatE2eeEnabled(): boolean {
     return process.env.POLARIS_INTERNAL_CHAT_E2EE === "1";
 }
+
+/**
+ * The password lock: OPAQUE password sign-in, moving an account onto it at its
+ * next password sign-in, and the account key it seals (docs/chat-e2ee-phase1.md,
+ * "Switched on"). On by default, with nothing to configure: an install that never
+ * received a new `.env` key has it on too. `POLARIS_INTERNAL_PASSWORD_LOCK=0` is a
+ * kill switch for an incident, not a setting - with it the sign-in form runs the
+ * old password route only and every OPAQUE route answers 404. Accounts already
+ * moved keep signing in, because their password hash is never removed.
+ *
+ * Passkey PRF locks and the QR key hand-over stay behind `chatE2eeEnabled()`.
+ * Read on every call rather than once, so a test can switch it per case.
+ */
+export function passwordLockEnabled(): boolean {
+    return process.env.POLARIS_INTERNAL_PASSWORD_LOCK !== "0";
+}

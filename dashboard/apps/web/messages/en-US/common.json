@@ -323,5 +323,9 @@
         "loadFailed": "This could not be loaded.",
         "retry": "Try again",
         "notFound": "This is no longer here."
+    },
+    "slowSubmit": {
+        "protecting": "Protecting your account with strong encryption",
+        "working": "Almost there..."
     }
 }
