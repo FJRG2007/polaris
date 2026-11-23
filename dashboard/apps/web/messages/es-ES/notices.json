@@ -117,7 +117,7 @@
         "backTitle": "Tu cuenta ha vuelto",
         "backBody": "Al iniciar sesión se ha recuperado. No se ha perdido nada.",
         "recoveryTitle": "Alguien no puede entrar en su cuenta",
-        "recoveryVerified": "Respondió a sus preguntas de recuperación. Apruébalo en Personas para que pueda poner una contraseña nueva.",
+        "recoveryVerified": "Respondió a sus preguntas de recuperación: es un indicio, no una prueba, porque alguien cercano puede saberlas. Comprueba quién es antes de aprobarlo en Personas.",
         "recoveryUnverified": "No pudo responder a ninguna pregunta de recuperación. Comprueba quién es antes de aprobarlo en Personas.",
         "signInRefusedTitle": "Se rechazó un acceso desde tu móvil",
         "signInRefusedBody": "Dijiste que no eras tú. Si alguien sabe tu contraseña, cámbiala o bloquea la cuenta desde Seguridad.",

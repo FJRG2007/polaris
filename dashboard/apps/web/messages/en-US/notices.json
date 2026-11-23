@@ -117,7 +117,7 @@
         "backTitle": "Your account is back",
         "backBody": "Signing in brought it back. Nothing was lost.",
         "recoveryTitle": "Someone is locked out of their account",
-        "recoveryVerified": "They answered their recovery questions. Approve it in People to let them set a new password.",
+        "recoveryVerified": "They answered their recovery questions - a hint, not proof, as people close to them may know the answers. Check who they are before approving it in People.",
         "recoveryUnverified": "They could not answer any recovery questions. Check who they are before approving it in People.",
         "signInRefusedTitle": "A sign-in was refused from your phone",
         "signInRefusedBody": "You said it was not you. If somebody knows your password, change it, or lock your account down from Security.",

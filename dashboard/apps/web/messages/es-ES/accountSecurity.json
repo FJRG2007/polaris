@@ -64,7 +64,7 @@
         },
         "questions": {
             "title": "Preguntas de seguridad",
-            "description": "Sirven para poner una contraseña nueva cuando has olvidado la actual.",
+            "description": "Una comprobación extra cuando Polaris duda de que seas tú. Nunca basta sola: un familiar o una filtración podría saberlas.",
             "remove": "Quitar preguntas de seguridad"
         },
         "grace": {

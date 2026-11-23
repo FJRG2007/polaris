@@ -64,7 +64,7 @@
         },
         "questions": {
             "title": "Security questions",
-            "description": "Used to set a new password when you have forgotten the current one.",
+            "description": "An extra check when Polaris is unsure it is you. Never enough on its own: a relative or a leak could know the answers.",
             "remove": "Remove security questions"
         },
         "grace": {
