@@ -61,6 +61,7 @@ import { AUTHORITY_INVALID, USE_CHROMIUM, pinScope, verifyDecision } from "./loc
 import { activeOrigin, backStep, failedLoadStep, samePlaceOn, titleWith } from "./window-failover";
 import { openExternal } from "./open-external";
 import { installDeviceHeaders } from "./device-headers";
+import { startNativeHost } from "./native-host/service";
 import { DEFAULT_HOLD_MS, UNTRUSTED_WORDS } from "../../../dashboard/packages/core/src/instance-fallback";
 import { createServerCheck, describeVerdict, probeServer, type ServerVerdict } from "@/shared/server-identity";
 
@@ -816,6 +817,9 @@ function start(): void {
         // Which computer this is, to the active server only, so its sessions
         // list can group this app with the other Polaris apps on the machine.
         installDeviceHeaders(session.defaultSession, server);
+        // Lets the browser extension on this computer prove it runs here, so the
+        // sessions list groups it with this app (native-host/service.ts).
+        startNativeHost({ primary: () => current, server });
 
         launcher.startLauncher({ server, showPolaris });
         registerIpc({

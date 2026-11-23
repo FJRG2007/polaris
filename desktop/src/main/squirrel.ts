@@ -10,6 +10,7 @@
 
 import { setOpenAtLogin } from "./login-item";
 import { removeStoreEntries } from "./install-tool";
+import { removeNativeHost } from "./native-host/service";
 import { DEEP_LINK_SCHEME } from "@/shared/deep-link";
 import { registerMailHandler, unregisterMailHandler } from "./mail-handler";
 import { app } from "electron";
@@ -42,7 +43,8 @@ export function handledSquirrelEvent(): boolean {
         app.removeAsDefaultProtocolClient(DEEP_LINK_SCHEME);
         // The browser's store entry goes with the app; the extension stays
         // installed in the browser, where it is the user's to remove.
-        void Promise.allSettled([removeStoreEntries(), unregisterMailHandler()]).finally(() =>
+        // So do the browser manifests that let the extension start its native host.
+        void Promise.allSettled([removeStoreEntries(), unregisterMailHandler(), removeNativeHost()]).finally(() =>
             updateThenQuit([`--removeShortcut=${exe}`])
         );
         return true;
