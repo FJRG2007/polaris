@@ -24,10 +24,13 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), push: 
 vi.mock("@/lib/auth-client", () => ({ authClient: { twoFactor: {} } }));
 vi.mock("@/app/(app)/account/step-up-actions", () => ({ sendStepUpCodeAction, proveStepUpAction }));
 vi.mock("@/components/shared-polls", () => ({ stepUpOptions }));
+// An account not on OPAQUE: the password goes as typed (the proof path has its own tests).
+vi.mock("@/lib/password-proof-client", () => ({ gatePasswordToSend: async (password: string) => password }));
 vi.mock("@/app/oauth/enroll/actions", () => ({
     sendEnrollmentCodeAction,
     armByEmailAction,
-    noteAuthenticatorArmedAction: vi.fn()
+    noteAuthenticatorArmedAction: vi.fn(),
+    startAuthenticatorAction: vi.fn()
 }));
 vi.mock("@/components/i18n/i18n-provider", () => ({
     useTranslations: () => (key: string, values?: Record<string, unknown>) =>
