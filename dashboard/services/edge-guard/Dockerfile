@@ -17,6 +17,7 @@ COPY packages/agent-runtime/package.json ./packages/agent-runtime/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/config/package.json ./packages/config/
 COPY packages/core/package.json ./packages/core/
+COPY packages/core-rs/package.json ./packages/core-rs/
 COPY packages/db/package.json ./packages/db/
 COPY packages/deploy/package.json ./packages/deploy/
 COPY packages/docker/package.json ./packages/docker/
@@ -34,8 +35,9 @@ COPY services/edge-guard/package.json ./services/edge-guard/
 RUN npm ci --ignore-scripts
 
 COPY . .
-# @polaris/core must be built first (the guard bundles from its dist), then bundle.
-RUN npm run build -w @polaris/core && npm run build -w @polaris/edge-guard
+# @polaris/core must be built first (the guard bundles from its dist), after the
+# @polaris/core-rs facades it imports, then bundle.
+RUN npm run build -w @polaris/core-rs && npm run build -w @polaris/core && npm run build -w @polaris/edge-guard
 
 # Alpine, patched at build, and without npm, yarn or corepack: the guard runs
 # one bundled file with no native addon, so it needs nothing Debian carries -

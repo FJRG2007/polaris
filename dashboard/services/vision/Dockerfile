@@ -17,6 +17,7 @@ COPY packages/agent-runtime/package.json ./packages/agent-runtime/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/config/package.json ./packages/config/
 COPY packages/core/package.json ./packages/core/
+COPY packages/core-rs/package.json ./packages/core-rs/
 COPY packages/db/package.json ./packages/db/
 COPY packages/deploy/package.json ./packages/deploy/
 COPY packages/docker/package.json ./packages/docker/
@@ -33,7 +34,7 @@ RUN npm ci --ignore-scripts
 COPY . .
 # @polaris/core first: the worker bundles the zone geometry, the detector's
 # decoder and the tracker out of its dist.
-RUN npm run build -w @polaris/core && npm run build -w @polaris/vision
+RUN npm run build -w @polaris/core-rs && npm run build -w @polaris/core && npm run build -w @polaris/vision
 
 # The model, fetched once at build time and checked.
 #
@@ -65,6 +66,7 @@ COPY packages/agent-runtime/package.json ./packages/agent-runtime/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/config/package.json ./packages/config/
 COPY packages/core/package.json ./packages/core/
+COPY packages/core-rs/package.json ./packages/core-rs/
 COPY packages/db/package.json ./packages/db/
 COPY packages/deploy/package.json ./packages/deploy/
 COPY packages/docker/package.json ./packages/docker/
