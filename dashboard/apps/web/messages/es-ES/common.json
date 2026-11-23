@@ -325,7 +325,7 @@
         "notFound": "Ya no está aquí."
     },
     "slowSubmit": {
-        "protecting": "Protegiendo tu cuenta con cifrado robusto",
+        "protecting": "Protegiendo tu cuenta con cifrado",
         "working": "Ya casi está..."
     }
 }

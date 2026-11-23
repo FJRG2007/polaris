@@ -325,7 +325,7 @@
         "notFound": "This is no longer here."
     },
     "slowSubmit": {
-        "protecting": "Protecting your account with strong encryption",
+        "protecting": "Securing your account with encryption",
         "working": "Almost there..."
     }
 }
