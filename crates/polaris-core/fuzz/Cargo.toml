@@ -1,4 +1,4 @@
-# The probe domain's fuzz targets (docs/rust-core-plan.md 4.3), run by
+# The Rust core's fuzz targets (docs/rust-core-plan.md 4.3), run by
 # `cargo +nightly fuzz run <target>` from this directory. Its own workspace and
 # lockfile: libFuzzer needs nightly and a sanitizer build, which the root
 # workspace never sees (it lists this directory under `exclude`).
@@ -14,7 +14,8 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "=0.4.13"
-polaris-core = { path = ".." }
+polaris-core = { path = "..", features = ["opaque"] }
+base64 = "0.22"
 # Untrusted MLS input from the delivery service (plan 4.3).
 
 [workspace]
@@ -58,6 +59,20 @@ bench = false
 [[bin]]
 name = "mls_key_package"
 path = "fuzz_targets/mls_key_package.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "opaque_server"
+path = "fuzz_targets/opaque_server.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "opaque_client"
+path = "fuzz_targets/opaque_client.rs"
 test = false
 doc = false
 bench = false

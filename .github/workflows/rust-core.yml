@@ -102,10 +102,10 @@ jobs:
         run: node dashboard/packages/core-rs/scripts/binding-check.mjs
       - name: Ledger matches the domains (F7)
         run: node dashboard/packages/core-rs/scripts/ledger-check.mjs
-      - run: cargo fmt --check -p polaris-core -p polaris-core-vectors -p polaris-core-node -p polaris-core-wasm
-      - run: cargo clippy --locked --all-targets -p polaris-core -p polaris-core-vectors -p polaris-core-node -p polaris-core-wasm -- -D warnings
-      - run: cargo clippy --locked --target wasm32-unknown-unknown -p polaris-core -p polaris-core-wasm -- -D warnings
-      - run: cargo test --locked -p polaris-core -p polaris-core-vectors
+      - run: cargo fmt --check -p polaris-core -p polaris-core-vectors -p polaris-core-node -p polaris-core-wasm -p polaris-core-opaque-wasm
+      - run: cargo clippy --locked --all-targets -p polaris-core -p polaris-core-vectors -p polaris-core-node -p polaris-core-wasm -p polaris-core-opaque-wasm --features polaris-core/opaque -- -D warnings
+      - run: cargo clippy --locked --target wasm32-unknown-unknown -p polaris-core -p polaris-core-wasm -p polaris-core-opaque-wasm -- -D warnings
+      - run: cargo test --locked -p polaris-core -p polaris-core-vectors --features polaris-core/opaque
       # The fuzz crate is its own workspace (it needs nightly to run, not to
       # compile), so the checks above do not reach it.
       - run: cargo fmt --check --manifest-path crates/polaris-core/fuzz/Cargo.toml
@@ -164,7 +164,7 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
         run: |
-          cargo test --locked -p polaris-core -p polaris-core-vectors
+          cargo test --locked -p polaris-core -p polaris-core-vectors --features polaris-core/opaque
           cd dashboard
           $CORE_RS_INSTALL
           npm run build:rust -w @polaris/core-rs -- --only node --node-target "$TARGET"
@@ -201,7 +201,7 @@ jobs:
               rustup-init -y --profile minimal --default-toolchain none
               export PATH="/root/.cargo/bin:$PATH"
               cargo --version
-              cargo test --locked -p polaris-core -p polaris-core-vectors
+              cargo test --locked -p polaris-core -p polaris-core-vectors --features polaris-core/opaque
               cd dashboard
               $CORE_RS_INSTALL
               npm run build:rust -w @polaris/core-rs -- --only node --node-target "$TARGET"
