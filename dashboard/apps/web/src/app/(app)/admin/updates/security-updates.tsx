@@ -7,26 +7,15 @@
  *
  * Critical and high install at once by default. Leaving either to wait is
  * allowed, but it is accepting a known hole, so the change is not saved until
- * the administrator ticks that they accept it - in a dialog, not a native
- * confirm - and the server refuses it without that, too.
+ * the administrator ticks that they accept it - in RiskAcceptanceDialog, not a
+ * native confirm - and the server refuses it without that, too.
  */
 
 import { ShieldAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import {
-    Button,
-    Checkbox,
-    DateInput,
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    Select,
-    Skeleton
-} from "@polaris/ui";
+import { DateInput, Select, Skeleton } from "@polaris/ui";
+import { RiskAcceptanceDialog } from "@/components/risk-acceptance-dialog";
 import {
     DEFAULT_SECURITY_DAILY_AT,
     SECURITY_SEVERITIES,
@@ -49,7 +38,6 @@ export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
     const [hour, setHour] = useState(4);
     const [error, setError] = useState<string | null>(null);
     const [pendingRisk, setPendingRisk] = useState<Timings | null>(null);
-    const [accepted, setAccepted] = useState(false);
     const [saving, setSaving] = useState(false);
     // What is typed in each time field, which is half a time while it is typed.
     const [drafts, setDrafts] = useState<Partial<Record<SecuritySeverity, string>>>({});
@@ -112,7 +100,6 @@ export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
             next.times = { ...policy.times, [severity]: at };
         }
         if (securityPolicyLowers(policy, next)) {
-            setAccepted(false);
             setPendingRisk(next);
             return;
         }
@@ -181,39 +168,22 @@ export function SecurityUpdates({ disabled }: { disabled?: boolean }) {
             ) : null}
             {error ? <p className="text-xs text-danger">{error}</p> : null}
 
-            <Dialog open={pendingRisk !== null} onOpenChange={(open) => !open && setPendingRisk(null)}>
-                <DialogContent>
-                    <div className="flex flex-col gap-4">
-                        <DialogHeader>
-                            <DialogTitle>{t("settings.security.risk.title")}</DialogTitle>
-                            <DialogDescription>{t("settings.security.risk.description")}</DialogDescription>
-                        </DialogHeader>
-                        <label className="flex items-start gap-2 text-sm">
-                            <Checkbox
-                                checked={accepted}
-                                onChange={(event) => setAccepted(event.target.checked)}
-                            />
-                            <span>{t("settings.security.risk.accept")}</span>
-                        </label>
-                        <DialogFooter>
-                            <Button variant="secondary" onClick={() => setPendingRisk(null)}>
-                                {t("settings.security.risk.keep")}
-                            </Button>
-                            <Button
-                                variant="danger"
-                                disabled={!accepted}
-                                onClick={() => {
-                                    const next = pendingRisk;
-                                    setPendingRisk(null);
-                                    if (next) void save(next, true);
-                                }}
-                            >
-                                {t("settings.security.risk.confirm")}
-                            </Button>
-                        </DialogFooter>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            <RiskAcceptanceDialog
+                open={pendingRisk !== null}
+                copy={{
+                    title: t("settings.security.risk.title"),
+                    description: t("settings.security.risk.description"),
+                    accept: t("settings.security.risk.accept"),
+                    keep: t("settings.security.risk.keep"),
+                    confirm: t("settings.security.risk.confirm")
+                }}
+                onKeep={() => setPendingRisk(null)}
+                onAccept={() => {
+                    const next = pendingRisk;
+                    setPendingRisk(null);
+                    if (next) void save(next, true);
+                }}
+            />
         </div>
     );
 }
