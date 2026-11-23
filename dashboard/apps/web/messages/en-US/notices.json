@@ -121,7 +121,9 @@
         "recoveryUnverified": "They could not answer any recovery questions. Check who they are before approving it in People.",
         "signInRefusedTitle": "A sign-in was refused from your phone",
         "signInRefusedBody": "You said it was not you. If somebody knows your password, change it, or lock your account down from Security.",
-        "signInMismatchBody": "The wrong number was picked, so it was denied. If this was not you, somebody may know your password: change it, or lock your account down from Security."
+        "signInMismatchBody": "The wrong number was picked, so it was denied. If this was not you, somebody may know your password: change it, or lock your account down from Security.",
+        "phoneSignInRefusedBody": "You said it was not you. Somebody typed your email to sign in with your phone; nothing was let in. If it keeps happening, lock your account down from Security.",
+        "phoneSignInMismatchBody": "The wrong number was picked, so it was denied and nothing was let in. If this was not you, lock your account down from Security."
     },
     "safety": {
         "lockedDownTitle": "An account has been locked down",

@@ -264,6 +264,33 @@ export async function emailForUsername(username: string): Promise<string | null>
 }
 
 /**
+ * The address behind a phone number, for signing in with the number and the
+ * password (or the phone approval) instead of the address.
+ *
+ * Only a number its owner has verified counts, and only when exactly one
+ * account holds it verified: a number two accounts share names neither, so it
+ * never picks one of them at random. Null for a number nobody has, for one that
+ * is not verified, for one shared, and for a banned account - all the same
+ * answer, so the sign-in screen cannot be used to find out which is which.
+ *
+ * `phone` is already in international form (`phoneShapeField`); both the form
+ * it was typed in and its E.164 spelling are looked for, since numbers stored
+ * before that check existed are kept as they were typed.
+ */
+export async function emailForPhone(phone: string, e164: string | null): Promise<string | null> {
+    const spellings = [...new Set([phone, e164].filter((value): value is string => Boolean(value)))];
+    if (spellings.length === 0) return null;
+    const rows = await prisma.userPhone.findMany({
+        where: { phone: { in: spellings }, verifiedAt: { not: null } },
+        select: { user: { select: { email: true, bannedAt: true } } },
+        take: 2
+    });
+    if (rows.length !== 1) return null;
+    const user = rows[0]!.user;
+    return user.bannedAt ? null : user.email;
+}
+
+/**
  * Whether an emailed link may sign this address in.
  *
  * Answered from the address rather than from a user id because that is all the

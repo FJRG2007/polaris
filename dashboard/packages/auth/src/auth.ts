@@ -30,6 +30,7 @@ import { emailLinkPlugin, MAGIC_LINK_VERIFY_PATH } from "./email-link.js";
 import { noteSecondFactor, noteSentCodeAnswered, noteSignIn } from "./sign-in-record.js";
 import { connectionSignInPlugin, CONNECTION_SIGN_IN_PATH } from "./connection-sign-in.js";
 import { opaqueSignInPlugin, OPAQUE_SIGN_IN_PATH } from "./opaque-sign-in.js";
+import { phoneSignInPlugin, PHONE_SIGN_IN_PATH } from "./phone-sign-in.js";
 import {
     ASSERTION_PATHS,
     refuseSessionForEnforcedDomain,
@@ -563,6 +564,7 @@ const SIGN_IN_METHOD_BY_PATH: ReadonlyMap<string, SignInMethod> = new Map([
     [MAGIC_LINK_VERIFY_PATH, "email-link"],
     ["/passkey/verify-authentication", "passkey"],
     [DEVICE_TOKEN_PATH, "qr-code"],
+    [PHONE_SIGN_IN_PATH, "phone"],
     ...[...ASSERTION_PATHS].map((path) => [path, "sso"] as const)
 ] as const);
 
@@ -619,7 +621,7 @@ const recordSignInMethod = createAuthMiddleware(async (ctx) => {
         SIGN_IN_METHOD_BY_PATH.get(ctx.path) ?? connectionSignInMethod(ctx.path, ctx.body);
     if (method) {
         const armed = (user as { twoFactorEnabled?: unknown }).twoFactorEnabled === true;
-        // A passkey, a scanned code and a connected account this deployment does
+        // A passkey, a scanned code, a phone approval and a connected account this deployment does
         // not challenge are never asked for a second step, so an armed factor
         // says nothing about how they got in. The sign-ins that are challenged
         // are exactly the ones that spend a remembered browser's pass, which is
@@ -659,6 +661,7 @@ function buildPlugins(options: AuthOptions, address: string): BetterAuthPlugin[]
         deviceAuthorizationPlugin(),
         connectionSignInPlugin(),
         opaqueSignInPlugin(),
+        phoneSignInPlugin(),
         samlSsoPlugin()
     ];
     const webauthn = passkeyPlugin(address, options.appOrigins?.() ?? []);

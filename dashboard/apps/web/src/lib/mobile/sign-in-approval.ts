@@ -20,6 +20,13 @@
  * pressing the button over and over - cannot be approved by a reflexive tap.
  * A wrong pick denies the request, and three in an hour switch phone approval
  * off for the account until the hour has passed.
+ *
+ * The same request also signs in with no password at all (`purpose: "sign-in"`,
+ * see `app/oauth/login/phone-sign-in-actions.ts`). There the identifier is a
+ * random secret held in an http-only cookie of the browser that asked, so only
+ * that browser can collect the approval, and what it collects is the account to
+ * issue a session for rather than a code. Each kind is collected only by its
+ * own collector, so an approval for one can never be spent as the other.
  */
 
 import { prisma } from "@polaris/db";
@@ -35,6 +42,9 @@ export const MISMATCH_LIMIT = 3;
 const MISMATCH_WINDOW_MS = 60 * 60_000;
 
 export type ApprovalDecision = "approve" | "deny";
+
+/** What a request finishes: a second-factor challenge, or a whole sign-in. */
+export type ApprovalPurpose = "second-factor" | "sign-in";
 
 /** How a phone's answer landed. */
 export type DecisionOutcome = "approved" | "denied" | "mismatch" | "outdated" | "gone";
@@ -132,6 +142,7 @@ export async function requestApproval(input: {
     device: string | null;
     ip: string | null;
     place: string | null;
+    purpose?: ApprovalPurpose;
 }): Promise<{ id: string; matchNumber: number }> {
     const challengeHash = hashChallenge(input.identifier);
     const now = new Date();
@@ -157,6 +168,7 @@ export async function requestApproval(input: {
             ip: input.ip?.slice(0, 64) ?? null,
             place,
             matchNumber,
+            purpose: input.purpose ?? "second-factor",
             expiresAt
         },
         select: { id: true }
@@ -228,19 +240,10 @@ export async function decideApproval(
 export async function collectApproval(identifier: string, id: string): Promise<ApprovalState> {
     const row = await prisma.signInApproval.findUnique({
         where: { id },
-        select: { userId: true, challengeHash: true, status: true, reason: true, expiresAt: true }
+        select: { userId: true, challengeHash: true, status: true, reason: true, expiresAt: true, purpose: true }
     });
-    if (!row || !sameHash(row.challengeHash, hashChallenge(identifier))) return { state: "expired" };
-    if (row.status === "denied") return { state: "denied", reason: row.reason === "mismatch" ? "mismatch" : "not-me" };
-    if (row.status === "pending") return row.expiresAt > new Date() ? { state: "pending" } : { state: "expired" };
-    if (row.status !== "approved") return { state: "expired" };
-
-    // Spent here, once: a second collector finds it already used.
-    const { count } = await prisma.signInApproval.updateMany({
-        where: { id, status: "approved" },
-        data: { status: "used" }
-    });
-    if (count !== 1) return { state: "expired" };
+    const settled = await settle(row, identifier, "second-factor", id);
+    if (settled.state !== "approved" || !row) return settled;
 
     // The same row better-auth's send-otp writes for this challenge (`2fa-otp-`
     // plus the identifier, a SHA-256 base64url hash and the attempt count), so
@@ -260,4 +263,59 @@ export async function collectApproval(identifier: string, id: string): Promise<A
     ]);
     await noteSecondFactor(row.userId, "phone-approval");
     return { state: "approved", code };
+}
+
+type Settled = Exclude<ApprovalState, { state: "approved" }> | { state: "approved" };
+
+/**
+ * Where a request stands for the browser asking, spending an approval on the
+ * way: a request of another purpose, or for another browser's identifier,
+ * answers "expired" like one that does not exist.
+ */
+async function settle(
+    row: {
+        challengeHash: string;
+        status: string;
+        reason: string | null;
+        expiresAt: Date;
+        purpose: string;
+    } | null,
+    identifier: string,
+    purpose: ApprovalPurpose,
+    id: string
+): Promise<Settled> {
+    if (!row || row.purpose !== purpose || !sameHash(row.challengeHash, hashChallenge(identifier)))
+        return { state: "expired" };
+    if (row.status === "denied") return { state: "denied", reason: row.reason === "mismatch" ? "mismatch" : "not-me" };
+    if (row.status === "pending") return row.expiresAt > new Date() ? { state: "pending" } : { state: "expired" };
+    if (row.status !== "approved") return { state: "expired" };
+    // Spent here, once: a second collector finds it already used.
+    const { count } = await prisma.signInApproval.updateMany({
+        where: { id, status: "approved" },
+        data: { status: "used" }
+    });
+    return count === 1 ? { state: "approved" } : { state: "expired" };
+}
+
+/** How a passwordless request stands; an approved one names the account to sign in. */
+export type SignInApprovalState = Exclude<ApprovalState, { state: "approved" }> | { state: "approved"; userId: string };
+
+/**
+ * The browser that asked to sign in with its phone, collecting the answer.
+ * `secret` is the value of its own http-only cookie; an approval is handed over
+ * once, and only to the browser holding it.
+ */
+export async function collectSignIn(secret: string, id: string): Promise<SignInApprovalState> {
+    const row = await prisma.signInApproval.findUnique({
+        where: { id },
+        select: { userId: true, challengeHash: true, status: true, reason: true, expiresAt: true, purpose: true }
+    });
+    const settled = await settle(row, secret, "sign-in", id);
+    return settled.state === "approved" && row ? { state: "approved", userId: row.userId } : (settled as SignInApprovalState);
+}
+
+/** What a request was for, so a refusal can be described in the right words. */
+export async function approvalPurpose(id: string): Promise<ApprovalPurpose> {
+    const row = await prisma.signInApproval.findUnique({ where: { id }, select: { purpose: true } }).catch(() => null);
+    return row?.purpose === "sign-in" ? "sign-in" : "second-factor";
 }

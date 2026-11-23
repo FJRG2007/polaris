@@ -21,66 +21,18 @@
  * while the flag is off, so the password sign-in is unchanged byte for byte.
  */
 
-import { z } from "zod";
 import type { Auth } from "./auth.js";
 import type { BetterAuthPlugin } from "better-auth";
-import type { IssuedCookie } from "./device-login.js";
-import { readIssuedCookies } from "./device-login.js";
-import { setSessionCookie } from "better-auth/cookies";
-import { APIError, createAuthEndpoint, createAuthMiddleware } from "better-auth/api";
+import { issueSealedSignIn, sealedSignInPlugin, type SealedSignInResult } from "./sealed-sign-in.js";
 
 export const OPAQUE_SIGN_IN_PATH = "/polaris/opaque-sign-in";
+const ENDPOINT = "polarisOpaqueSignIn";
 
 export function opaqueSignInPlugin(): BetterAuthPlugin {
-    return {
-        id: "polaris-opaque-sign-in",
-        hooks: {
-            before: [
-                {
-                    matcher: (context) => context.path === OPAQUE_SIGN_IN_PATH,
-                    handler: createAuthMiddleware(async (ctx) => {
-                        if (!ctx.request) return;
-                        throw new APIError("NOT_FOUND", { message: "Not found" });
-                    })
-                }
-            ]
-        },
-        endpoints: {
-            polarisOpaqueSignIn: createAuthEndpoint(
-                OPAQUE_SIGN_IN_PATH,
-                { method: "POST", body: z.object({ userId: z.string() }) },
-                async (ctx) => {
-                    if (ctx.request) throw new APIError("NOT_FOUND", { message: "Not found" });
-                    const user = await ctx.context.internalAdapter.findUserById(ctx.body.userId);
-                    if (!user) throw new APIError("UNAUTHORIZED", { message: "That account is no longer here." });
-                    const session = await ctx.context.internalAdapter.createSession(user.id);
-                    if (!session) throw new APIError("INTERNAL_SERVER_ERROR", { message: "Session not created" });
-                    ctx.context.setNewSession({ session, user });
-                    // Same order as a password sign-in: the cookie exists, and the
-                    // two-factor hook takes it back when a challenge is due.
-                    await setSessionCookie(ctx, { session, user });
-                    return ctx.json({ signedIn: true });
-                }
-            )
-        }
-    } satisfies BetterAuthPlugin;
+    return sealedSignInPlugin("polaris-opaque-sign-in", OPAQUE_SIGN_IN_PATH, ENDPOINT);
 }
 
-interface OpaqueSignInApi {
-    polarisOpaqueSignIn(input: {
-        body: { userId: string };
-        headers: Headers;
-        returnHeaders: true;
-    }): Promise<{ headers: Headers }>;
-}
-
-export interface OpaqueSignInResult {
-    readonly cookies: readonly IssuedCookie[];
-    /** No session was issued: the cookies carry the second-factor challenge. */
-    readonly challenged: boolean;
-}
-
-const TWO_FACTOR_COOKIE_SUFFIX = "two_factor";
+export type OpaqueSignInResult = SealedSignInResult;
 
 /** Issue the session for an account whose OPAQUE finish the app just accepted. */
 export async function signInWithOpaque(
@@ -88,14 +40,5 @@ export async function signInWithOpaque(
     userId: string,
     headers: Headers
 ): Promise<OpaqueSignInResult> {
-    const { headers: issued } = await (auth.api as unknown as OpaqueSignInApi).polarisOpaqueSignIn({
-        body: { userId },
-        headers,
-        returnHeaders: true
-    });
-    const cookies = readIssuedCookies(issued);
-    return {
-        cookies,
-        challenged: cookies.some((cookie) => cookie.name.endsWith(TWO_FACTOR_COOKIE_SUFFIX) && cookie.value !== "")
-    };
+    return issueSealedSignIn(auth, ENDPOINT, userId, headers);
 }

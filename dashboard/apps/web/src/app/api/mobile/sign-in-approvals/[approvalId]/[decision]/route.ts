@@ -20,7 +20,7 @@ import { wordsFor } from "@/lib/notifications/notice-words";
 import { notify } from "@/lib/notifications/dispatch";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { readerWords } from "@/lib/i18n/reader-words";
-import { decideApproval } from "@/lib/mobile/sign-in-approval";
+import { approvalPurpose, decideApproval } from "@/lib/mobile/sign-in-approval";
 import {
     deviceChallenge,
     deviceProofSchema,
@@ -55,13 +55,24 @@ function signedTarget(approvalId: string, decision: string, picked: number | nul
 }
 
 /** Tells the account a sign-in was refused from its phone, and where to lock it down. */
-async function tellAccount(userId: string, mismatch: boolean): Promise<void> {
+async function tellAccount(userId: string, mismatch: boolean, approvalId: string): Promise<void> {
     const t = await wordsFor(userId, "notices");
+    // A passwordless request needs no password, so "somebody may know your
+    // password" would send the reader to change the wrong thing.
+    const passwordless = (await approvalPurpose(approvalId)) === "sign-in";
     await notify({
         userId,
         event: "account.security",
         title: t("account.signInRefusedTitle"),
-        body: t(mismatch ? "account.signInMismatchBody" : "account.signInRefusedBody"),
+        body: t(
+            passwordless
+                ? mismatch
+                    ? "account.phoneSignInMismatchBody"
+                    : "account.phoneSignInRefusedBody"
+                : mismatch
+                  ? "account.signInMismatchBody"
+                  : "account.signInRefusedBody"
+        ),
         href: "/account/security",
         actionRequired: true
     }).catch(() => undefined);
@@ -118,7 +129,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
         targetType: "sign-in-approval",
         targetId: approvalId
     });
-    if (outcome !== "approved") await tellAccount(user.id, outcome === "mismatch");
+    if (outcome !== "approved") await tellAccount(user.id, outcome === "mismatch", approvalId);
     if (outcome === "mismatch") {
         return Response.json({ error: words("mobile.signIn.mismatch") }, { status: 409, headers: NO_STORE });
     }

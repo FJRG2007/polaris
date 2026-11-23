@@ -1002,6 +1002,7 @@
             "passkey": "Passkey",
             "emailLink": "Email link",
             "qrCode": "QR code",
+            "phone": "Phone approval",
             "sso": "Single sign-on"
         },
         "secondFactors": {
